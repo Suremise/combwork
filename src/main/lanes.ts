@@ -1259,6 +1259,11 @@ async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<
   return ws.path ? await projectTargets(ws, join(ws.path, project)).catch(() => null) : null
 }
 
+/** A project's own Merges into (HI-2556: its Work merges into), for a lane's target check (HI-2898's window edits); null: none. */
+export async function laneDefaultTarget(ws: WorkspaceService, project: string): Promise<string | null> {
+  return ws.path ? ((await projectTargetsOf(ws, project))?.default ?? null) : null
+}
+
 /** A lane's Merges into as a start names it (HI-2556): null for the project's own, else a branch it lists; refused otherwise. */
 async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Promise<string | null> {
   const t = await projectTargetsOf(ws, project)
@@ -1276,7 +1281,7 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
  * HI-2556: a lane is one target: refused when a card of `cards` has its own Merges into (the board's `target`) and it isn't
  * the lane's (`target`, null: the project's). Read under the lanes' lock, as the list is.
  */
-function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readonly number[], target: string | null, def: string | null, scope: string | null): void {
+export function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readonly number[], target: string | null, def: string | null, scope: string | null): void {
   const store = FactStore.forBoard(ws, { project, key: '' })
   for (const n of cards) {
     let own: string | null = null
@@ -1739,6 +1744,13 @@ export async function listLanes(ws: WorkspaceService, o: { project?: string | nu
   if (!ws.path) return []
   const lanes = (await read(ws)).filter((l) => !o.project || same(l.project, o.project))
   return views(ws, o.all ? [...lanes].sort((a, b) => a.startedAt.localeCompare(b.startedAt)) : listedLanes(lanes, Date.now()))
+}
+
+/** The lanes that ended (or were abandoned) at or after `since` (ms), newest first (HI-2898: Progress → Lanes' Ended today). */
+export async function lanesEndedSince(ws: WorkspaceService, since: number): Promise<LaneInfo[]> {
+  if (!ws.path) return []
+  const ended = (await read(ws)).filter((l) => !running(l) && !!l.endedAt && Date.parse(l.endedAt) >= since)
+  return views(ws, ended.sort((a, b) => b.endedAt!.localeCompare(a.endedAt!)))
 }
 
 /** One lane by id (`project`: only one of that project's). */

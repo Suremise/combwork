@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- **Edit a lane's cards yourself** (HI-2898). In Progress → Lanes, open a running lane and drag its waiting cards into another order (or Alt+Up and Alt+Down), take one off with × or Delete (it stays on the board), or add one with **Add Card…** or by dragging it from the board onto the lane.
+  - **As the Assistant's changes are:** a change made while a card is being worked waits until that card is Done, shown under the lane with **Cancel Change**; between cards it applies at once. The card being worked and the cards before it keep their places.
+  - **Refused in place, with why**, nothing changed: a card that's Done, not in Todo, of another project, keeping earlier work or placed before a card it depends on, or a lane that changed meanwhile. A card on another lane offers **Move Here**, which moves it in one step.
+  - **Undo** in the notification, or **Ctrl+Z** in the tab, puts the last change back exactly, or not at all once something changed since.
+- **Today's ended lanes** (HI-2898). **Ended today**, at the top of Progress → Lanes, lists the lanes that ended or were abandoned since midnight, with their builder and reviewer, cards, merge commit and how long they ran, each opening to its cards.
+
 ### Fixed
 
 - **A lane's next card starts when its builder watches its own lane** (HI-2889). A builder that watched its lane after a card went Done ended its turn waiting on that watch, and Combwork never gives a card to an agent waiting on a watch, so the lane's next card sat in Todo until the lane-next stall raised it 15 minutes later. Now Combwork ends a watch on the builder's own lane alone (nothing else in it) and starts the card, which wakes the builder. A watch on anything else is still the builder's own wait, left as it is.

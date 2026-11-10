@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Réordonner un couloir en cours, tout de suite",
   "tips.laneBranchSquash.text": "Après la fusion en squash de la carte d’un agent, Combwork met sa branche à jour avant sa carte suivante, pour que chaque relecture ne montre que le travail de cette carte. Ce qu’il ne peut pas faire sans risque, il le demande dans Pour toi ; Paramètres → Avancé le fait demander à chaque fois.",
   "tips.laneBranchSquash.title": "La branche d’un agent à jour entre les cartes",
+  "tips.laneEdit.text": "Dans l’onglet Couloirs du panneau Progression, ouvre un couloir en cours pour faire glisser ses cartes en attente dans un nouvel ordre, en retirer une, ou en ajouter une avec Ajouter une carte… ou en la faisant glisser depuis le tableau. Ctrl+Z annule.",
+  "tips.laneEdit.title": "Modifier toi-même les cartes d’un couloir",
   "tips.laneGates.text": "Dans le panneau Progression, un couloir dit dans son en-tête ce qu’il attend, et une encoche rouge sur le segment d’une carte signifie que sa dernière demande a été refusée : survole-la pour voir pourquoi et quoi faire ensuite.",
   "tips.laneGates.title": "Vois pourquoi un couloir n’avance pas",
   "tips.laneNext.text": "Quand les règles du flux de travail sont appliquées, dès qu’une carte d’un couloir est terminée, Combwork donne la suivante à son auteur dès la fin de son tour : le couloir continue sans que toi ni l’Assistant ayez à le relancer.",

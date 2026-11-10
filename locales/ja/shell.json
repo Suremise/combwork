@@ -68,6 +68,7 @@
   "shell.command.help.shortcuts": "キーボードショートカット",
   "shell.command.help.tips": "ヒント…",
   "shell.command.hooks.adminSnippet": "Claude Code 管理者用スニペット…",
+  "shell.command.lanes.undoEdit": "レーンの変更を元に戻す",
   "shell.command.layout": "レイアウト：{layout}",
   "shell.command.mcp.import": "プロジェクトのMCPサーバーをワークスペースにコピー",
   "shell.command.notes.open": "共有ノートを開く",

@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Reorder a running lane now",
   "tips.laneBranchSquash.text": "After an agent's card is squash-merged, Combwork brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
   "tips.laneBranchSquash.title": "An agent's branch kept up to date between cards",
+  "tips.laneEdit.text": "In Progress → Lanes, open a running lane to drag its waiting cards into a new order, take one off, or add one with Add Card… or by dragging it from the board. Ctrl+Z undoes it.",
+  "tips.laneEdit.title": "Change a lane's cards yourself",
   "tips.laneGates.text": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
   "tips.laneGates.title": "See why a lane isn’t moving",
   "tips.laneNext.text": "With workflow rules on, once a lane's card is Done Combwork gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",

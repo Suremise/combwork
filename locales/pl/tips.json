@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Przestaw działający tor od razu",
   "tips.laneBranchSquash.text": "Po scaleniu karty agenta jako squash Combwork aktualizuje jego gałąź przed następną kartą, więc każda recenzja pokazuje tylko pracę tej karty. O to, czego nie może zrobić bezpiecznie, pyta w sekcji Dla Ciebie; Ustawienia → Zaawansowane sprawiają, że pyta za każdym razem.",
   "tips.laneBranchSquash.title": "Gałąź agenta aktualna między kartami",
+  "tips.laneEdit.text": "W zakładce Tory panelu Postęp otwórz działający tor, aby przeciągnąć jego czekające karty w nowej kolejności, usunąć jedną albo dodać kartę przyciskiem Dodaj kartę… lub przeciągając ją z tablicy. Ctrl+Z to cofa.",
+  "tips.laneEdit.title": "Samodzielnie zmień karty toru",
   "tips.laneGates.text": "W panelu Postęp tor mówi w nagłówku, na co czeka, a czerwone wcięcie na segmencie karty oznacza, że jej ostatnie żądanie zostało odrzucone: najedź na nie, aby zobaczyć dlaczego i co dalej.",
   "tips.laneGates.title": "Zobacz, dlaczego tor stoi",
   "tips.laneNext.text": "Gdy reguły przepływu pracy są egzekwowane, a karta toru jest gotowa, Combwork daje następną jego wykonawcy, gdy tylko skończy on swoją turę, więc tor idzie dalej bez ponaglania przez Ciebie ani Asystenta.",

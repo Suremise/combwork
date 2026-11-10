@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { RUNS_KEEP_PX, laneCardTime, laneWaitTime, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, queuedChange, queuedChangeText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
-import type { LaneCard, LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
+import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
+import { droppedPlace, nudgedPlace, queueRows, type QueueRow } from '@shared/laneQueueEdit'
+import { dayBounds, dayKey } from '@shared/laneDay'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
 import { useWorkBadges } from '../cardWork'
@@ -15,7 +17,8 @@ import { call, errorMessage } from '../api'
 import { NO_PROJECTS, activityAgentKey, cardLabelOf, confirm, get, notify, openVersionControl, openWorkspaceActivity, set, useLanguage, useStore } from '../store'
 import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
 import { openLaneStart } from './LaneStartDialog'
-import { saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
+import { lanesOf, saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
+import { CARD_DRAG, editLane, undoLaneEdit } from '../laneEdits'
 import { useNow } from '../usage'
 import { cx } from '../util'
 import { useAdvancedValue } from '../advanced'
@@ -76,8 +79,11 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   const badges = useWorkBadges()
   // Each project's stages and names (#1421): a segment says its card's stage, and the legend the stages of the lanes' projects.
   const stages = useProjectStages()
-  // Pulse leaves out a Solo project's lanes unless one runs (#1421); the Lanes tab shows every lane.
-  const lanes = full ? given : pulseLanes(given, (p) => stages.get(p.toLowerCase())?.preset)
+  // Today's ended lanes (HI-2898), at the top of the Lanes tab, and there only.
+  const endedToday = useEndedToday(full)
+  // Pulse leaves out a Solo project's lanes unless one runs (#1421); the Lanes tab shows every lane, today's ended ones
+  // under Ended today.
+  const lanes = full ? (endedToday.length ? given.filter((l) => !endedToday.some((e) => e.id === l.id)) : given) : pulseLanes(given, (p) => stages.get(p.toLowerCase())?.preset)
   // Off, an old rules mark still shows (it is a fact) and says the rules aren't enforced (#1421).
   const enforced = useAdvancedValue<boolean>('cw.workflow.enforce')
   const [foldedKept, toggle] = usePanelFold(ws ? foldKey(ws) : null)
@@ -282,7 +288,7 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
     return () => watch.disconnect()
   }, [open, lanes, width, full])
   // No lanes: the paused team's band still shows (HI-2095: Show Its Window brings forward a workspace with none, to End It there).
-  if (!lanes.length)
+  if (!lanes.length && !endedToday.length)
     return full ? (
       <div className="pane-empty progress-empty">
         <TeamPauseBand />
@@ -300,7 +306,21 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   const foldTip = folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))
   const legendId = `lanes-legend-${full ? 'tab' : 'pulse'}`
   return (
-    <div className={cx('progress-lanes', folded && 'folded', full && 'full')} role="region" aria-label={tr(LANES)}>
+    <div
+      className={cx('progress-lanes', folded && 'folded', full && 'full')}
+      role="region"
+      aria-label={tr(LANES)}
+      // Ctrl+Z in the Lanes tab (HI-2898): undoes the last change of a lane's cards made in this window.
+      onKeyDown={
+        full
+          ? (e) => {
+              if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'z' || typing(e.target)) return
+              e.preventDefault()
+              void undoLaneEdit()
+            }
+          : undefined
+      }
+    >
       {!folded && !full && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} min={min} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
       {!full && (
         <Tooltip block focus className="lanes-legend-tip" content={<LaneLegend groups={legend} more={foldTip} />}>
@@ -331,6 +351,7 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
       <span id={legendId} className="visually-hidden">
         {legendText(legend)}
       </span>
+      {full && <EndedToday lanes={endedToday} badges={badges} />}
       {!folded && (
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
         <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
@@ -643,9 +664,32 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
     const platform = projects.find((p) => p.name === owner)?.platform?.id
     return (id: string): string => (platform ? revisionShort(platform, id) : id.slice(0, 7))
   }
+  // Its queue edited in the Lanes tab (HI-2898): a running lane's, with a refusal shown under it.
+  const { editing, refusal, dismiss } = useQueueEditing(l, all)
+  // A card dragged from the board onto its row: added last (into its open queue, where it's dropped).
+  const [cardOver, setCardOver] = useState(false)
+  const cardDrop = editing
+    ? {
+        onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
+          if (!e.dataTransfer.types.includes(CARD_DRAG)) return r?.onDragOver(e)
+          if (e.isDefaultPrevented()) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setCardOver(true)
+        },
+        onDragLeave: (e: React.DragEvent<HTMLDivElement>) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setCardOver(false),
+        onDrop: (e: React.DragEvent<HTMLDivElement>) => {
+          if (!e.dataTransfer.types.includes(CARD_DRAG)) return r?.onDrop(e)
+          e.preventDefault()
+          setCardOver(false)
+          const n = Number(e.dataTransfer.getData(CARD_DRAG))
+          if (Number.isInteger(n) && n > 0) editing.add(n)
+        }
+      }
+    : {}
   return (
     <div
-      className={cx('progress-lane', l.state, r?.movable && 'movable', r?.dragging && 'dragging', r?.dropBefore && 'drop-before', r?.dropAfter && 'drop-after')}
+      className={cx('progress-lane', l.state, r?.movable && 'movable', r?.dragging && 'dragging', r?.dropBefore && 'drop-before', r?.dropAfter && 'drop-after', cardOver && 'card-over')}
       data-lane={l.id}
       // A running lane is focusable, to move it with Alt+Up and Alt+Down (#568).
       {...(r
@@ -660,7 +704,8 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
             onDragOver: r.onDragOver,
             onDrop: r.onDrop,
             onKeyDown: r.onKeyDown,
-            onContextMenu: r.onContextMenu
+            onContextMenu: r.onContextMenu,
+            ...cardDrop
           }
         : {})}
     >
@@ -801,9 +846,16 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
       {queued && (
         <div className="progress-lane-queued faint" data-queued="" title={queued}>
           <Icon name="history" /> <span className="progress-lane-queued-text">{queued}</span>
+          {/* Cancel Change (HI-2898): drops the queued change, bound to the list shown. */}
+          {editing && (
+            <button type="button" className="link progress-lane-cancel-change" data-action="lane-cancel-change" onClick={() => editing.run({ op: 'cancel', lane: l.id, rev: l.listRev })}>
+              {tr(EDIT.cancel)}
+            </button>
+          )}
         </div>
       )}
-      {expanded && <LaneQueue lane={l} badges={badges} />}
+      {refusal && editing && <RefusalLine lane={l} refusal={refusal} onMoveHere={editing.run} onDismiss={dismiss} />}
+      {expanded && <LaneQueue lane={l} badges={badges} {...(editing ? { edit: editing } : {})} />}
     </div>
   )
 }
@@ -818,48 +870,430 @@ const queueState = (c: LaneCard, forYou = 0): QueueState =>
   c.column === 'gone' || c.column === 'unrecorded' ? c.column : c.column !== 'done' && (c.blocked || c.roundLimit || c.column === 'hold' || forYou > 0) ? 'waiting' : c.column === 'done' ? 'done' : c.column === 'review' || c.column === 'passed' ? 'review' : c.column === 'doing' ? 'doing' : 'todo'
 const QUEUE_ICON: Record<QueueState, string> = { done: 'pass', doing: 'circle-filled', review: 'eye', todo: 'circle-large-outline', waiting: 'debug-pause', gone: 'circle-slash', unrecorded: 'question' }
 
+/** A lane's card dragged within its queue (HI-2898): its number. */
+const QUEUE_DRAG = 'application/x-combwork-lane-card'
+
+/** Editing a running lane's queue in the Lanes tab (HI-2898): asks main for an edit, and adds a card where it goes. */
+interface QueueEditing {
+  run: (e: LaneEdit) => void
+  add: (card: number, at?: number) => void
+  all: Lane[]
+}
+
+const EDIT = {
+  handle: msg({ id: 'board.laneEdit.handle', defaultMessage: 'Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off', description: "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key." }),
+  remove: msg({ id: 'board.laneEdit.remove', defaultMessage: 'Take {card} off the lane (it goes back to the board)', description: "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key." }),
+  locked: msg({ id: 'board.laneEdit.locked', defaultMessage: '{card} is under way: it keeps its place', description: "HI-2898: tooltip of the lock on a lane's card in progress (Progress → Lanes): it can't be moved. {card} is its key." }),
+  add: msg({ id: 'board.laneEdit.add', defaultMessage: 'Add Card…', description: "HI-2898: a button at the end of a lane's cards (Progress → Lanes): opens a search to add a card of the project to the lane. The … says more follows: keep it." }),
+  search: msg({ id: 'board.laneEdit.search', defaultMessage: 'Find a card by key or title', description: "HI-2898: placeholder and accessible name of the search box that adds a card to a lane (Progress → Lanes, Add Card…)." }),
+  none: msg({ id: 'board.laneEdit.noMatch', defaultMessage: 'No card in To do matches.', description: "HI-2898: under the search box that adds a card to a lane (Progress → Lanes), when no card of the project in To do (not started) matches what was typed. To do is the board's column, as the board names it." }),
+  onOther: msg({ id: 'board.laneEdit.onOther', defaultMessage: 'on the lane of {builder}', description: "HI-2898: after a card in the search that adds a card to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it." }),
+  moveHere: msg({ id: 'board.laneEdit.moveHere', defaultMessage: 'Move Here', description: "HI-2898: a button beside the refusal to add a card that another lane has (Progress → Lanes): takes it off that lane and adds it to this one, in one change." }),
+  dismiss: msg({ id: 'board.laneEdit.dismiss', defaultMessage: 'Dismiss', description: "HI-2898: tooltip of the × that closes a refused change's message under a lane (Progress → Lanes)." }),
+  cancel: msg({ id: 'board.laneEdit.cancelChange', defaultMessage: 'Cancel Change', description: "HI-2898: a button after a lane's queued change (Progress → Lanes: a change of its cards that waits for its card in progress to be Done): drops that change, keeping the cards as they are." }),
+  moved: msg({ id: 'board.laneEdit.said', defaultMessage: '{card}: {at} of {n, plural, one {# card} other {# cards}}', description: "HI-2898: said to screen readers after a card is moved in a lane's cards with Alt+Up or Alt+Down (Progress → Lanes): the card ({card}, its key) and its place now ({at}) among the lane's cards ({n})." }),
+  stuck: msg({ id: 'board.laneEdit.stuck', defaultMessage: '{card} can’t move further that way', description: "HI-2898: said to screen readers when a card in a lane's cards (Progress → Lanes) is moved with Alt+Up or Alt+Down but is already first among the cards that can move, or last." }),
+  cards: msg({ id: 'board.laneEdit.cards', defaultMessage: 'Cards to add', description: "HI-2898: accessible name of the list of matching cards under the search box that adds a card to a lane (Progress → Lanes)." })
+}
+
+/** Copies a merge commit, saying so. */
+const copyCommit = (commit: string): void =>
+  void navigator.clipboard.writeText(commit).then(() => notify('success', tr(msg({ id: 'board.lanes.mergeCopied', defaultMessage: 'Merge commit copied', description: "A notification after copying a Done card's merge commit from a lane's cards (Progress panel → Lanes)." }))))
+
+const COPY_MERGE = msg({ id: 'board.lanes.copyMerge', defaultMessage: 'Copy the merge commit {commit}', description: "Tooltip of a Done card's merge commit in a lane's cards (Progress panel → Lanes): copies its whole id ({commit})." })
+
+/** Whether a key press is typing in a field (Delete and Ctrl+Z belong to it there). */
+const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')
+
 /**
  * A lane opened to its cards (HI-1926, the Lanes tab): in its order, each with its state (as the lane left it, for an
  * ended one), its key (it opens the card) and title, its round, how long it took or has taken so far, and a Done card's
  * merge commit, copied with a click. Only what its cycle's facts say: nothing for a card gone, not recorded or unknown.
+ * A running lane's (`edit`, HI-2898) can be changed: its working list (its queued one when it has one) shows, its cards
+ * waiting their turn dragged to another place (or Alt+Up and Alt+Down), taken off (× or Delete), a card added at its end
+ * (Add Card…) or dropped from the board where it goes; the card in progress shows a lock, and the cards before it and
+ * it keep their places.
  */
-function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBadge> }) {
+function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, WorkBadge>; edit?: QueueEditing }) {
   const tasks = useStore((s) => s.tasks)
   const now = Date.now()
+  const board = useMemo(() => new Map(tasks.map((t) => [t.number, { number: t.number, title: t.title, column: t.column, agent: t.agent }])), [tasks])
+  const rows: QueueRow[] = edit ? queueRows(l, board, l.builder.agentId) : l.info.map((card) => ({ card, queued: false }))
+  const list = rows.map((r) => r.card.number)
+  const [dragCard, setDragCard] = useState<number | null>(null)
+  const [dropBefore, setDropBefore] = useState<number | null | undefined>(undefined)
+  const [picking, setPicking] = useState(false)
+  const [said, setSaid] = useState('')
+  const ref = useRef<HTMLOListElement>(null)
+  const refocus = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const n = refocus.current
+    if (n === null) return
+    refocus.current = null
+    ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)?.focus({ preventScroll: true })
+  }, [l])
+  const reset = (): void => {
+    setDragCard(null)
+    setDropBefore(undefined)
+  }
+  /** Where a drop with the pointer at `y` over row `n` (none: under the rows) would go, shown by a line; undefined: nowhere. */
+  const over = (e: React.DragEvent<HTMLElement>, n: number | null): void => {
+    if (!edit || e.isDefaultPrevented()) return
+    const own = e.dataTransfer.types.includes(QUEUE_DRAG)
+    if (!own && !e.dataTransfer.types.includes(CARD_DRAG)) return
+    let before: number | null = null
+    if (n !== null) {
+      const box = e.currentTarget.getBoundingClientRect()
+      before = e.clientY < box.top + box.height / 2 ? n : (list[list.indexOf(n) + 1] ?? null)
+    }
+    // A card dragged from the board isn't known until the drop: placed as a new one.
+    if (droppedPlace(rows, own ? dragCard : null, before) === null) return setDropBefore(undefined)
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    setDropBefore(before)
+  }
+  const drop = (e: React.DragEvent<HTMLElement>): void => {
+    if (!edit || dropBefore === undefined) return
+    e.preventDefault()
+    e.stopPropagation()
+    const own = e.dataTransfer.types.includes(QUEUE_DRAG)
+    const n = own ? dragCard : Number(e.dataTransfer.getData(CARD_DRAG))
+    const before = dropBefore
+    reset()
+    if (!n || !Number.isInteger(n) || n <= 0) return
+    // A card of this lane dragged from the board is a move too.
+    if (list.includes(n)) {
+      const to = droppedPlace(rows, n, before)
+      if (to !== null) edit.run({ op: 'move', lane: l.id, rev: l.listRev, card: n, to })
+      return
+    }
+    edit.add(n, droppedPlace(rows, null, before) ?? undefined)
+  }
+  const nudge = (n: number, by: -1 | 1): void => {
+    const to = nudgedPlace(rows, n, by)
+    const label = cardLabelOf({ tasks }, n)
+    if (to === null) return setSaid(tr(EDIT.stuck, { card: label }))
+    refocus.current = n
+    setSaid(tr(EDIT.moved, { card: label, at: to + 1, n: rows.length }))
+    edit?.run({ op: 'move', lane: l.id, rev: l.listRev, card: n, to })
+  }
   return (
-    <ol className="progress-lane-queue" aria-label={tr(msg({ id: 'board.lanes.queue', defaultMessage: 'Cards of {lane}', description: "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)." }), { lane: lanePair(l) })}>
-      {l.info.map((c) => {
-        const state = queueState(c, l.frozen ? 0 : (badges.get(c.number)?.forYou ?? 0))
-        const known = state !== 'gone' && state !== 'unrecorded'
-        const time = known ? laneCardTime(c.column, badges.get(c.number), l.frozen ? l.endedAt : null, now) : null
-        const label = cardLabelOf({ tasks }, c.number)
-        const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Active} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
-        return (
-          <li key={c.number} className={cx('progress-lane-queue-row', state)} data-card={c.number} data-state={state}>
-            <Icon name={QUEUE_ICON[state]} className="progress-lane-queue-icon" aria-label={stateText} title={stateText} />
-            <button type="button" className="link progress-lane-queue-key" onClick={() => set({ taskOpen: c.number })}>
-              {label}
-            </button>
-            <span className="progress-lane-queue-title" title={c.title}>
-              {c.title}
-            </span>
-            {known && <span className="faint progress-lane-queue-round">{tr(msg({ id: 'board.lanes.round', defaultMessage: 'r{round}', description: "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews." }), { round: c.round })}</span>}
-            {time?.soFar !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.soFar', defaultMessage: '{time} so far', description: "How long a lane's card has been worked on so far, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.soFar, tr) })}</span>}
-            {time?.took !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.took', defaultMessage: 'took {time}', description: "How long a lane's Done card took, from its start to its merge, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.took, tr) })}</span>}
-            {time?.merged && (
-              <button
-                type="button"
-                className="link progress-lane-queue-commit"
-                title={tr(msg({ id: 'board.lanes.copyMerge', defaultMessage: 'Copy the merge commit {commit}', description: "Tooltip of a Done card's merge commit in a lane's cards (Progress panel → Lanes): copies its whole id ({commit})." }), { commit: time.merged })}
-                onClick={() => void navigator.clipboard.writeText(time.merged!).then(() => notify('success', tr(msg({ id: 'board.lanes.mergeCopied', defaultMessage: 'Merge commit copied', description: "A notification after copying a Done card's merge commit from a lane's cards (Progress panel → Lanes)." }))))}
-              >
-                {time.merged.slice(0, 7)}
+    <>
+      <ol
+        ref={ref}
+        className={cx('progress-lane-queue', !!edit && 'editable')}
+        aria-label={tr(msg({ id: 'board.lanes.queue', defaultMessage: 'Cards of {lane}', description: "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)." }), { lane: lanePair(l) })}
+        onDragOver={(e) => over(e, null)}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropBefore(undefined)}
+        onDrop={drop}
+      >
+        {rows.map(({ card: c, queued }, i) => {
+          const state = queueState(c, l.frozen ? 0 : (badges.get(c.number)?.forYou ?? 0))
+          const known = state !== 'gone' && state !== 'unrecorded'
+          const time = known ? laneCardTime(c.column, badges.get(c.number), l.frozen ? l.endedAt : null, now) : null
+          const label = cardLabelOf({ tasks }, c.number)
+          const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Active} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
+          const movable = !!edit && queued
+          const underWay = !!edit && !queued && (c.column === 'doing' || c.column === 'review' || c.column === 'passed')
+          return (
+            <li
+              key={c.number}
+              className={cx('progress-lane-queue-row', state, movable && 'movable', dragCard === c.number && 'dragging', dropBefore === c.number && 'drop-before', dropBefore === null && i === rows.length - 1 && 'drop-after')}
+              data-card={c.number}
+              data-state={state}
+              {...(movable
+                ? {
+                    tabIndex: 0,
+                    draggable: true,
+                    'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown Delete',
+                    'aria-description': tr(EDIT.handle, { card: label }),
+                    onDragStart: (e: React.DragEvent<HTMLLIElement>) => {
+                      e.stopPropagation()
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData(QUEUE_DRAG, String(c.number))
+                      e.dataTransfer.setData('text/plain', label)
+                      setTimeout(() => setDragCard(c.number), 0)
+                    },
+                    onDragEnd: reset,
+                    onKeyDown: (e: React.KeyboardEvent<HTMLLIElement>) => {
+                      if (typing(e.target) || e.target !== e.currentTarget) return
+                      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        nudge(c.number, e.key === 'ArrowUp' ? -1 : 1)
+                      } else if (e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        edit.run({ op: 'remove', lane: l.id, rev: l.listRev, card: c.number })
+                      }
+                    }
+                  }
+                : {})}
+              onDragOver={(e) => over(e, c.number)}
+              onDrop={drop}
+            >
+              {movable && <Icon name="gripper" className="progress-lane-queue-grip" title={tr(EDIT.handle, { card: label })} aria-hidden="true" />}
+              {underWay && <Icon name="lock" className="progress-lane-queue-lock" title={tr(EDIT.locked, { card: label })} aria-label={tr(EDIT.locked, { card: label })} />}
+              <Icon name={QUEUE_ICON[state]} className="progress-lane-queue-icon" aria-label={stateText} title={stateText} />
+              <button type="button" className="link progress-lane-queue-key" onClick={() => set({ taskOpen: c.number })}>
+                {label}
               </button>
-            )}
-          </li>
-        )
-      })}
-    </ol>
+              <span className="progress-lane-queue-title" title={c.title}>
+                {c.title}
+              </span>
+              {known && <span className="faint progress-lane-queue-round">{tr(msg({ id: 'board.lanes.round', defaultMessage: 'r{round}', description: "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews." }), { round: c.round })}</span>}
+              {time?.soFar !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.soFar', defaultMessage: '{time} so far', description: "How long a lane's card has been worked on so far, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.soFar, tr) })}</span>}
+              {time?.took !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.took', defaultMessage: 'took {time}', description: "How long a lane's Done card took, from its start to its merge, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.took, tr) })}</span>}
+              {time?.merged && (
+                <button type="button" className="link progress-lane-queue-commit" title={tr(COPY_MERGE, { commit: time.merged })} onClick={() => copyCommit(time.merged!)}>
+                  {time.merged.slice(0, 7)}
+                </button>
+              )}
+              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={() => edit.run({ op: 'remove', lane: l.id, rev: l.listRev, card: c.number })} />}
+            </li>
+          )
+        })}
+      </ol>
+      {edit && (
+        <div className="progress-lane-queue-add">
+          {picking ? (
+            <CardPicker lane={l} all={edit.all} taken={list} onPick={(n) => edit.add(n)} onClose={() => setPicking(false)} />
+          ) : (
+            <button type="button" className="btn small subtle" data-action="lane-add-card" onClick={() => setPicking(true)}>
+              <Icon name="add" /> {tr(EDIT.add)}
+            </button>
+          )}
+        </div>
+      )}
+      {edit && (
+        <div className="visually-hidden" role="status">
+          {said}
+        </div>
+      )}
+    </>
+  )
+}
+
+/** A project's folder name, as cards name their project. */
+const folderOf = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ''
+
+/**
+ * Add Card… (HI-2898): a search of the lane's project's cards in To do that it hasn't, by key or title; one on another
+ * lane says whose (adding it is refused there, with Move here). Enter adds the first, Escape closes.
+ */
+function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all: Lane[]; taken: number[]; onPick: (n: number) => void; onClose: () => void }) {
+  const tasks = useStore((s) => s.tasks)
+  const [q, setQ] = useState('')
+  const project = folderOf(l.project)
+  const query = q.trim().toLowerCase()
+  const found = tasks
+    .filter((t) => !t.archived && t.column === 'todo' && t.project.toLowerCase() === project && !taken.includes(t.number))
+    .filter((t) => !query || cardLabelOf({ tasks }, t.number).toLowerCase().includes(query) || t.title.toLowerCase().includes(query))
+    .slice(0, 20)
+  const laneOf = (n: number): Lane | undefined => all.find((x) => x.id !== l.id && laneRunning(x.state) && (x.cards.includes(n) || !!x.queued?.includes(n)))
+  const pick = (n: number): void => {
+    onPick(n)
+    onClose()
+  }
+  return (
+    <div className="progress-lane-picker" data-picker="">
+      <input
+        className="input small"
+        autoFocus
+        value={q}
+        placeholder={tr(EDIT.search)}
+        aria-label={tr(EDIT.search)}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            e.stopPropagation()
+            onClose()
+          } else if (e.key === 'Enter' && found[0]) {
+            e.preventDefault()
+            pick(found[0].number)
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            e.currentTarget.parentElement?.querySelector<HTMLElement>('.progress-lane-picker-card')?.focus()
+          }
+        }}
+      />
+      <IconButton icon="close" title={tr(EDIT.dismiss)} onClick={onClose} />
+      {found.length ? (
+        <ul className="progress-lane-picker-list" aria-label={tr(EDIT.cards)}>
+          {found.map((t) => {
+            const other = laneOf(t.number)
+            return (
+              <li key={t.number}>
+                <button
+                  type="button"
+                  className="progress-lane-picker-card"
+                  data-card={t.number}
+                  onClick={() => pick(t.number)}
+                  onKeyDown={(e) => {
+                    const step = e.key === 'ArrowDown' ? 'nextElementSibling' : e.key === 'ArrowUp' ? 'previousElementSibling' : null
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      onClose()
+                    }
+                    if (!step) return
+                    e.preventDefault()
+                    const li = e.currentTarget.parentElement?.[step] as HTMLElement | null | undefined
+                    li?.querySelector<HTMLElement>('button')?.focus()
+                  }}
+                >
+                  <span className="progress-lane-queue-key">{cardLabelOf({ tasks }, t.number)}</span>
+                  <span className="progress-lane-queue-title">{t.title}</span>
+                  {other && <span className="faint">{tr(EDIT.onOther, { builder: other.builder.name })}</span>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="faint progress-lane-picker-none">{tr(EDIT.none)}</p>
+      )}
+    </div>
+  )
+}
+
+/** A refused edit, shown under its lane (HI-2898): main's reason, and Move here for a card another lane has. */
+interface Refusal {
+  text: string
+  moveHere: { card: number; from: Lane; at?: number } | null
+}
+
+/**
+ * How a running lane's row edits its queue (HI-2898): each edit asked of main, a refusal kept to show under the lane
+ * (cleared by the next edit or dismissed); a card another lane has is offered Move here.
+ */
+function useQueueEditing(l: Lane, all: Lane[] | undefined): { editing: QueueEditing | null; refusal: Refusal | null; dismiss: () => void } {
+  const [refusal, setRefusal] = useState<Refusal | null>(null)
+  if (!all || !laneRunning(l.state) || l.frozen) return { editing: null, refusal: null, dismiss: () => undefined }
+  const names = { lane: lanePair(l) }
+  const run = (e: LaneEdit, card?: number, at?: number): void => {
+    setRefusal(null)
+    void editLane(e, names).then((why) => {
+      if (why === null) return
+      const from = card !== undefined && e.op === 'add' ? all.find((x) => x.id !== l.id && laneRunning(x.state) && (x.cards.includes(card) || !!x.queued?.includes(card))) : undefined
+      setRefusal({ text: why, moveHere: from && card !== undefined ? { card, from, ...(at !== undefined ? { at } : {}) } : null })
+    })
+  }
+  return {
+    editing: { run: (e) => run(e), add: (card, at) => run({ op: 'add', lane: l.id, rev: l.listRev, card, ...(at !== undefined ? { at } : {}) }, card, at), all },
+    refusal,
+    dismiss: () => setRefusal(null)
+  }
+}
+
+/** The refusal of an edit, in place under its lane (HI-2898), with Move here when another lane has the card. */
+function RefusalLine({ lane: l, refusal: r, onMoveHere, onDismiss }: { lane: Lane; refusal: Refusal; onMoveHere: (e: LaneEdit) => void; onDismiss: () => void }) {
+  return (
+    <div className="progress-lane-refusal" role="alert" data-refusal="">
+      <Icon name="warning" />
+      <span className="progress-lane-refusal-text">{r.text}</span>
+      {r.moveHere && (
+        <button type="button" className="btn small" data-action="lane-move-here" onClick={() => onMoveHere({ op: 'transfer', card: r.moveHere!.card, from: { lane: r.moveHere!.from.id, rev: r.moveHere!.from.listRev }, to: { lane: l.id, rev: l.listRev }, ...(r.moveHere!.at !== undefined ? { at: r.moveHere!.at } : {}) })}>
+          {tr(EDIT.moveHere)}
+        </button>
+      )}
+      <IconButton icon="close" title={tr(EDIT.dismiss)} onClick={onDismiss} />
+    </div>
+  )
+}
+
+const ENDED = {
+  title: msg({ id: 'board.lanes.endedToday', defaultMessage: 'Ended today ({n, number})', description: "HI-2898: a collapsed row at the top of Progress → Lanes: the lanes (a builder and a reviewer working through cards in turn) that ended today, local time ({n}: how many); it opens to them." }),
+  took: msg({ id: 'board.lanes.endedTook', defaultMessage: '{time} in all', description: "HI-2898: how long a lane that ended today ran, from its start to its end, in Ended today (Progress → Lanes). {time}: 4 min, 1 h 5 min." }),
+  cards: msg({ id: 'board.lanes.endedCards', defaultMessage: '{n, plural, one {# card} other {# cards}}', description: "HI-2898: how many cards a lane that ended today had, in Ended today (Progress → Lanes)." })
+}
+
+/**
+ * Today's ended lanes (HI-2898, Darren's decision: the local calendar day): the lanes that ended since local midnight,
+ * read again as the lanes change, at midnight (and on a change of the date, clock or time zone, seen on focus and each
+ * minute). Only while the Lanes tab shows (`on`).
+ */
+function useEndedToday(on: boolean): Lane[] {
+  const ws = useStore((s) => s.workspace?.path ?? null)
+  const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  const raw = useStore((s) => s.lanes)
+  const [day, setDay] = useState(() => dayKey(new Date()))
+  const [ended, setEnded] = useState<LaneInfo[]>(NO_ENDED)
+  useEffect(() => {
+    if (!on) return
+    const check = (): void => setDay(dayKey(new Date()))
+    const atMidnight = setTimeout(check, Math.max(1000, dayBounds(new Date()).end.getTime() - Date.now() + 1000))
+    const each = setInterval(check, 60_000)
+    window.addEventListener('focus', check)
+    return () => {
+      clearTimeout(atMidnight)
+      clearInterval(each)
+      window.removeEventListener('focus', check)
+    }
+  }, [on, day])
+  useEffect(() => {
+    if (!on || !ws) return setEnded(NO_ENDED)
+    let current = true
+    void call('lanes:endedSince', dayBounds(new Date()).start.toISOString()).then(
+      (r) => current && setEnded(r.length ? r : NO_ENDED),
+      () => undefined
+    )
+    return () => {
+      current = false
+    }
+  }, [on, ws, day, raw])
+  return useMemo(() => lanesOf(ended, projects), [ended, projects])
+}
+const NO_ENDED: LaneInfo[] = []
+
+/**
+ * Ended today (HI-2898), collapsed at the top of the Lanes tab, hidden with none: each lane's builder and reviewer, its
+ * name, merged or abandoned, its cards and how long it ran, with its merge commit (copied with a click); each opens to
+ * its cards as it left them, read only.
+ */
+function EndedToday({ lanes, badges }: { lanes: Lane[]; badges: Map<number, WorkBadge> }) {
+  const [open, setOpen] = useState(false)
+  const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set())
+  if (!lanes.length) return null
+  const toggle = (id: string): void => setShown((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])))
+  return (
+    <div className="progress-lanes-ended" data-ended-today="">
+      <button type="button" className="progress-lanes-ended-bar" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} /> {tr(ENDED.title, { n: lanes.length })}
+      </button>
+      {open &&
+        lanes.map((l) => {
+          const pair = lanePair(l)
+          const took = l.endedAt ? Date.parse(l.endedAt) - Date.parse(l.startedAt) : null
+          const word = stateWord(l.state)
+          return (
+            <div key={l.id} className={cx('progress-lane', 'progress-lane-ended', l.state)} data-lane={l.id}>
+              <div className="progress-lane-top">
+                <IconButton
+                  icon={shown.has(l.id) ? 'chevron-down' : 'chevron-right'}
+                  className="progress-lane-expand"
+                  title={tr(msg({ id: 'board.lanes.expand', defaultMessage: '{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}', description: "Tooltip of the chevron before a lane's name in the Progress panel's Lanes tab: shows or hides its cards in order ({lane}: its builder / reviewer). Keep the select keys." }), { open: shown.has(l.id) ? 'yes' : 'no', lane: pair })} // i18n-ignore: a select's key, never shown
+                  expanded={shown.has(l.id)}
+                  onClick={() => toggle(l.id)}
+                />
+                <span className="progress-lane-pair">{pair}</span>
+                {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
+                <div className="grow" />
+                {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+                <span className="faint">{tr(ENDED.cards, { n: l.cards.length })}</span>
+                {took !== null && took >= 0 && <span className="faint progress-lane-ended-took">{tr(ENDED.took, { time: durationText(took, tr) })}</span>}
+                {l.mergeCommit && (
+                  <button type="button" className="link progress-lane-queue-commit" title={tr(COPY_MERGE, { commit: l.mergeCommit })} onClick={() => copyCommit(l.mergeCommit!)}>
+                    {l.mergeCommit.slice(0, 7)}
+                  </button>
+                )}
+              </div>
+              {shown.has(l.id) && <LaneQueue lane={l} badges={badges} />}
+            </div>
+          )
+        })}
+    </div>
   )
 }
 

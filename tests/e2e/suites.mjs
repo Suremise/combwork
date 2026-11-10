@@ -198,6 +198,7 @@ export const SUITES = [
   { name: 'lanebrief' },
   { name: 'laneend' },
   { name: 'lanenotices' },
+  { name: 'lanequeue' },
   { name: 'laneslotretry' },
   { name: 'lanesslots' },
   { name: 'lanestages' },

@@ -1819,6 +1819,86 @@
     "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
     "description": "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are."
   },
+  "board.laneEdit.add": {
+    "defaultMessage": "Add Card…",
+    "description": "HI-2898: a button at the end of a lane's cards (Progress → Lanes): opens a search to add a card of the project to the lane. The … says more follows: keep it."
+  },
+  "board.laneEdit.cancelChange": {
+    "defaultMessage": "Cancel Change",
+    "description": "HI-2898: a button after a lane's queued change (Progress → Lanes: a change of its cards that waits for its card in progress to be Done): drops that change, keeping the cards as they are."
+  },
+  "board.laneEdit.cards": {
+    "defaultMessage": "Cards to add",
+    "description": "HI-2898: accessible name of the list of matching cards under the search box that adds a card to a lane (Progress → Lanes)."
+  },
+  "board.laneEdit.dismiss": {
+    "defaultMessage": "Dismiss",
+    "description": "HI-2898: tooltip of the × that closes a refused change's message under a lane (Progress → Lanes)."
+  },
+  "board.laneEdit.done": {
+    "defaultMessage": "{op, select, move {Moved {card} in {lane}} add {Added {card} to {lane}} remove {Took {card} off {lane}} transfer {Moved {card} to {lane}} cancel {Cancelled the queued change of {lane}} other {Undone}}",
+    "description": "HI-2898: a notification's title after the user changed a lane's cards in Progress → Lanes (a lane: a builder and a reviewer agent working through cards in turn): moved a card ({card}, its key) within it, added one, took one off (it goes back to the board), moved one here from another lane (transfer), cancelled its queued change, or undid the last change (other). {lane} is the lane's builder / reviewer (B1 / R1). Keep the select keys. It has an Undo button."
+  },
+  "board.laneEdit.handle": {
+    "defaultMessage": "Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off",
+    "description": "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key."
+  },
+  "board.laneEdit.locked": {
+    "defaultMessage": "{card} is under way: it keeps its place",
+    "description": "HI-2898: tooltip of the lock on a lane's card in progress (Progress → Lanes): it can't be moved. {card} is its key."
+  },
+  "board.laneEdit.moveHere": {
+    "defaultMessage": "Move Here",
+    "description": "HI-2898: a button beside the refusal to add a card that another lane has (Progress → Lanes): takes it off that lane and adds it to this one, in one change."
+  },
+  "board.laneEdit.noMatch": {
+    "defaultMessage": "No card in To do matches.",
+    "description": "HI-2898: under the search box that adds a card to a lane (Progress → Lanes), when no card of the project in To do (not started) matches what was typed. To do is the board's column, as the board names it."
+  },
+  "board.laneEdit.notLast": {
+    "defaultMessage": "Only the last change of the lanes made here can be undone.",
+    "description": "HI-2898: why an Undo on an older notification of a change of a lane's cards (Progress → Lanes) does nothing: only the latest change can be undone."
+  },
+  "board.laneEdit.nothingToUndo": {
+    "defaultMessage": "Nothing to undo in the lanes",
+    "description": "HI-2898: said (a notification) when the user presses Ctrl+Z in Progress → Lanes with no change of a lane's cards made in this window to undo."
+  },
+  "board.laneEdit.onOther": {
+    "defaultMessage": "on the lane of {builder}",
+    "description": "HI-2898: after a card in the search that adds a card to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it."
+  },
+  "board.laneEdit.otherWorkspace": {
+    "defaultMessage": "That change was made in another workspace: open it there to undo it.",
+    "description": "HI-2898: an error, the Undo of a change of a lane's cards was pressed after this window switched to another workspace."
+  },
+  "board.laneEdit.queued": {
+    "defaultMessage": "It applies once {card} is Done.",
+    "description": "HI-2898: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change waits for the lane's card in progress ({card}, its key) to be Done first."
+  },
+  "board.laneEdit.remove": {
+    "defaultMessage": "Take {card} off the lane (it goes back to the board)",
+    "description": "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key."
+  },
+  "board.laneEdit.said": {
+    "defaultMessage": "{card}: {at} of {n, plural, one {# card} other {# cards}}",
+    "description": "HI-2898: said to screen readers after a card is moved in a lane's cards with Alt+Up or Alt+Down (Progress → Lanes): the card ({card}, its key) and its place now ({at}) among the lane's cards ({n})."
+  },
+  "board.laneEdit.search": {
+    "defaultMessage": "Find a card by key or title",
+    "description": "HI-2898: placeholder and accessible name of the search box that adds a card to a lane (Progress → Lanes, Add Card…)."
+  },
+  "board.laneEdit.stuck": {
+    "defaultMessage": "{card} can’t move further that way",
+    "description": "HI-2898: said to screen readers when a card in a lane's cards (Progress → Lanes) is moved with Alt+Up or Alt+Down but is already first among the cards that can move, or last."
+  },
+  "board.laneEdit.undo": {
+    "defaultMessage": "Undo",
+    "description": "HI-2898: the button on the notification after changing a lane's cards (Progress → Lanes): undoes that change."
+  },
+  "board.laneEdit.undoFailed": {
+    "defaultMessage": "Couldn’t undo the change of the lane",
+    "description": "HI-2898: a notification's title: undoing a change of a lane's cards (Progress → Lanes) was refused; the reason follows (the lane changed since, say)."
+  },
   "board.laneStart.addCard": {
     "defaultMessage": "Add a card from Todo…",
     "description": "The first entry of the Start Lane dialog's card picker: choosing a card adds it at the end of the lane's list. Todo is a board column."
@@ -2022,6 +2102,18 @@
   "board.lanes.endFailed": {
     "defaultMessage": "Couldn't end {lane}",
     "description": "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows."
+  },
+  "board.lanes.endedCards": {
+    "defaultMessage": "{n, plural, one {# card} other {# cards}}",
+    "description": "HI-2898: how many cards a lane that ended today had, in Ended today (Progress → Lanes)."
+  },
+  "board.lanes.endedToday": {
+    "defaultMessage": "Ended today ({n, number})",
+    "description": "HI-2898: a collapsed row at the top of Progress → Lanes: the lanes (a builder and a reviewer working through cards in turn) that ended today, local time ({n}: how many); it opens to them."
+  },
+  "board.lanes.endedTook": {
+    "defaultMessage": "{time} in all",
+    "description": "HI-2898: how long a lane that ended today ran, from its start to its end, in Ended today (Progress → Lanes). {time}: 4 min, 1 h 5 min."
   },
   "board.lanes.expand": {
     "defaultMessage": "{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}",

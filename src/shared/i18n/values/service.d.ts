@@ -197,6 +197,23 @@ interface CombworkMessageValues {
   'service.keys.prefix': { key: string | number; other: string | number }
   'service.keys.taken': { key: string | number }
   'service.keys.unknownProject': undefined
+  'service.laneEdit.already': { card: string | number }
+  'service.laneEdit.cardChanged': { card: string | number }
+  'service.laneEdit.changed': { lane: string | number }
+  'service.laneEdit.dependency': { card: string | number; dep: string | number }
+  'service.laneEdit.done': { card: string | number }
+  'service.laneEdit.ended': { lane: string | number }
+  'service.laneEdit.fixedPlace': { card: string | number }
+  'service.laneEdit.invalid': undefined
+  'service.laneEdit.keptWork': { card: string | number }
+  'service.laneEdit.noQueued': { lane: string | number }
+  'service.laneEdit.notExact': { lane: string | number }
+  'service.laneEdit.notOnLane': { card: string | number }
+  'service.laneEdit.notQueued': { card: string | number }
+  'service.laneEdit.notTodo': { card: string | number }
+  'service.laneEdit.onLane': { card: string | number; builder: string | number }
+  'service.laneEdit.otherProject': { card: string | number; project: string | number }
+  'service.laneEdit.since': undefined
   'service.laneStart.busy': { status: string; agent: string | number }
   'service.laneStart.done': { card: string | number }
   'service.laneStart.needsReviewer': { project: string | number }

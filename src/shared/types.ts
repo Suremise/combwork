@@ -4422,6 +4422,52 @@ export interface LaneSlotInfo {
   since: string
 }
 
+/** A running lane as a window edit of its list saw it (HI-2898): its id and its list's revision (LaneInfo.listRev). */
+export interface LaneSeen {
+  lane: string
+  rev: number
+}
+
+/**
+ * A window edit of a running lane's list (HI-2898, Progress → Lanes): each names the revision it was made on, and is
+ * refused once that moved. `to` and `at` are places in the lane's working list (its queued list when it has one): `to`
+ * where the card ends up, `at` before which card it goes (none: last).
+ */
+export type LaneEdit =
+  | ({ op: 'move'; card: number; to: number } & LaneSeen)
+  | ({ op: 'add'; card: number; at?: number } & LaneSeen)
+  | ({ op: 'remove'; card: number } & LaneSeen)
+  | ({ op: 'cancel' } & LaneSeen)
+  | { op: 'transfer'; card: number; from: LaneSeen; to: LaneSeen; at?: number }
+  | { op: 'undo'; undo: LaneEditUndo }
+
+/** A lane's list as an edit left it or found it: its cards, its queued list (null: none) and their revision. */
+export interface LaneListState {
+  lane: string
+  cards: number[]
+  pending: number[] | null
+  rev: number
+}
+
+/**
+ * What undoing a window edit of lanes needs (HI-2898): each lane's list before it and the revision the edit left it at,
+ * and the card's agent before and after when the edit changed it, with the card's history entry the edit left (its
+ * token: any change of the card since moves it on). Undone whole or not at all.
+ */
+export interface LaneEditUndo {
+  lanes: { before: Omit<LaneListState, 'rev'>; rev: number }[]
+  card: { number: number; before: string | null; after: string | null; head: string | null } | null
+}
+
+/** What a window edit of lanes did (HI-2898): for its notification, and its Undo (null: nothing to undo). */
+export interface LaneEditResult {
+  op: LaneEdit['op']
+  card: number | null
+  /** Each lane it changed, with the card in flight its change was queued after (null: applied now). */
+  lanes: { lane: string; queuedAfter: number | null }[]
+  undo: LaneEditUndo | null
+}
+
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
   builder: string
