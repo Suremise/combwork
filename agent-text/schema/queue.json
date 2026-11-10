@@ -265,6 +265,22 @@
   "queue.returned.subjectIt": {
     "placeholders": {}
   },
+  "queue.signing.exited": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "queue.signing.noSshKey": {
+    "placeholders": {}
+  },
+  "queue.signing.notFound": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "queue.signing.unfinished": {
+    "placeholders": {}
+  },
   "queue.wake.left.decision": {
     "placeholders": {
       "card": "plain",

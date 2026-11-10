@@ -16,6 +16,7 @@ import { gitExe } from '../gitTool'
 import { withLauncherEnv } from '../gitWorker'
 import { boundedSpawn } from './boundedSpawn'
 import type { QueueGitResult } from './integration'
+import { agentMsg, say } from '../../shared/agentText'
 import type { GitScope, ScopedValue, SigningInfo, SigningStatus } from '../../shared/gitSigning'
 
 /** How long a check waits on its signer before ending it (a few seconds: a signer that asks takes longer). */
@@ -40,7 +41,12 @@ export const signingTestHooks: { eligible?: (path: string) => boolean } = {}
 
 const SCOPES: readonly GitScope[] = ['system', 'global', 'local', 'worktree', 'command']
 const scopeOf = (s: string): GitScope => (SCOPES as readonly string[]).includes(s) ? (s as GitScope) : 'unknown'
-const said = (r: QueueGitResult): string => `${r.err}\n${r.out}`.trim() || `exited with code ${r.code}` // i18n-ignore: a tool's side of a message, in English as git's are
+const T = {
+  exited: agentMsg({ id: 'queue.signing.exited', text: 'exited with code {code}', note: "A signing check's detail (HI-1185) when the tool said nothing: its exit code." }),
+  notFound: agentMsg({ id: 'queue.signing.notFound', text: "{name} wasn't found", note: "A signing check's detail (HI-1185): the signing program (name: as configured, or git's default) isn't on the commit's PATH." }),
+  noSshKey: agentMsg({ id: 'queue.signing.noSshKey', text: 'user.signingkey is not set, and git needs it to sign with ssh', note: "A signing check's detail (HI-1185): ssh signing with no key set and no key command. Keep user.signingkey." })
+}
+const said = (r: QueueGitResult): string => `${r.err}\n${r.out}`.trim() || say(T.exited, { code: r.code })
 
 /** One setting's effective value and scope (the last git reads wins), null when unset; `failed` when git couldn't say. */
 async function scoped(d: SignDeps, args: string[], regexp = false): Promise<ScopedValue | null | { failed: string }> {
@@ -157,7 +163,7 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS): Prom
   if (failed(prog)) return { ...info, status: { kind: 'unreadable', message: prog.failed } }
   const name = prog?.value || (format === 'ssh' ? 'ssh-keygen' : 'gpg')
   const program = resolveProgram(name, d.cwd, d.env)
-  if (!program) return { ...info, status: { kind: 'cantSign', message: `${name} wasn't found` } } // i18n-ignore: a tool's side of a message, in English as git's are
+  if (!program) return { ...info, status: { kind: 'cantSign', message: say(T.notFound, { name }) } }
   const withProgram = { ...info, program }
   // Where this git is installed, as it says itself (its own ssh-keygen and gpg are beside it).
   const exec = await d.git(d.cwd, ['--exec-path'])
@@ -180,7 +186,7 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS): Prom
       const cmd = await scoped(d, ['--get', 'gpg.ssh.defaultKeyCommand'])
       if (failed(cmd)) return { ...withProgram, status: { kind: 'unreadable', message: cmd.failed } }
       if (cmd) return { ...withProgram, status: { kind: 'notChecked', why: 'keyCommand' } } // i18n-ignore: a status code, never shown as text
-      return { ...withProgram, status: { kind: 'cantSign', message: 'user.signingkey is not set, and git needs it to sign with ssh' } } // i18n-ignore: a tool's side of a message, in English as git's are
+      return { ...withProgram, status: { kind: 'cantSign', message: say(T.noSshKey) } }
     }
     if (key.value.startsWith('key::')) {
       file = join(dir, 'key.pub')

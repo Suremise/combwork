@@ -84,6 +84,9 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   return add.ok ? null : again(add.err)
 }
 
+/** A signing check that didn't finish within its bound (HI-1185): the pause's detail, never proof it asked. */
+const SIGN_UNFINISHED = agentMsg({ id: 'queue.signing.unfinished', text: "The signer didn't finish within a few seconds with nobody there.", note: "A merge queue pause's detail (HI-1185, signingWaits): the signing check's signer was still running at its bound." })
+
 /**
  * HI-1185 (SPEC §16.9.5): just before a step that signs, whether its signer could sign with nobody there, checked as
  * that commit would sign (its folder, identity overrides and environment), once a round. One that needs someone, or
@@ -95,7 +98,7 @@ async function preSign(h: CandidateHost, f: string, who: string[]): Promise<Cand
   const env = use.launcherEnv ? withLauncherEnv(commitEnv(), use.launcherEnv) : commitEnv()
   const status = await (h.reads.signCheck ??= checkSigning({ git: (cwd, args) => h.run(cwd, args), spawn: h.spawn ?? ((file, args, o) => boundedSpawn(file, args, o)), cwd: f, who, env }).then((i) => i.status))
   if (status.kind === 'needsSomeone') return { pause: 'signingWaits', message: status.detail }
-  if (status.kind === 'couldNotComplete') return { pause: 'signingWaits', message: `The signer didn't finish within a few seconds with nobody there.` } // i18n-ignore: the pause's detail, in English as git's are
+  if (status.kind === 'couldNotComplete') return { pause: 'signingWaits', message: say(SIGN_UNFINISHED) }
   if (status.kind === 'cantSign') return { pause: 'signing', message: status.message }
   if (status.kind === 'unreadable') return again(status.message)
   return null
