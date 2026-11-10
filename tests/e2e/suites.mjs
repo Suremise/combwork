@@ -370,6 +370,7 @@ export const SUITES = [
   { name: 'stopswitch' },
   { name: 'storage' },
   { name: 'storageclose' },
+  { name: 'submodulediff' },
   { name: 'swap' },
   { name: 'tabstrip' },
   { name: 'taskbar', serial: 'window focus' },

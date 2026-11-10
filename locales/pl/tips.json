@@ -500,6 +500,8 @@
   "tips.storageCleanup.title": "Zobacz, co przechowuje Combwork, i posprzątaj",
   "tips.storagePurge.text": "Wyczyść całkowicie… w Ustawieniach projektu → Miejsce na dysku albo Wyczyść całkowicie pliki Combwork… na sesji usuwa to, co Combwork przechowuje dla sesji: kopie, załączniki, pozostałości. Najpierw wymienia pliki; pliki agentów i sumy użycia zostają.",
   "tips.storagePurge.title": "Wyczyść całkowicie to, co przechowuje Combwork",
+  "tips.submodulesInDiffs.text": "Gdy karta przesuwa podmoduł na inny commit, Zmiany i sekcja Praca karty pokazują to jako „Podmoduł lib/sub: 0bbdde2 → 0fc182f”. Pokaż diff gita pokazuje wiersze samego gita.",
+  "tips.submodulesInDiffs.title": "Przesunięty podmoduł w jednym wierszu",
   "tips.submodulesLfs.text": "Przy submodułach lub Git LFS Combwork pobiera submoduły i pliki LFS do każdego slotu i kopii do recenzji przed skryptem przygotowania, nie zmieniając ustawień repozytorium. Sloty i kopie → Przygotuj submoduły i LFS to wyłącza.",
   "tips.submodulesLfs.title": "Submoduły i Git LFS w slotach",
   "tips.taskbarBadge.text": "Przycisk Combwork na pasku zadań pokazuje, ilu agentów Cię potrzebuje, i miga, gdy któryś o coś pyta, a Combwork jest w tle.",

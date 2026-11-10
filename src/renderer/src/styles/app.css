@@ -3165,6 +3165,33 @@ p.hint {
   position: absolute;
   inset: 0;
 }
+/* A moved submodule's diff (HI-2864): its row on top, git's own lines below it when asked for. */
+.editor-host > .gitlink-diff {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gitlink-diff-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.gitlink-row,
+.gitlink-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.gitlink-row {
+  font-weight: 600;
+}
 /* The code editor's right-click menu (#1102). Monaco draws it in a shadow root hosted beside .monaco-editor, where
    its theme's colour variables don't reach (it showed black text on no surface), and standalone Monaco defines no
    border width or radius at all. Custom properties do cross into a shadow root, so its host gets Combwork's menu look

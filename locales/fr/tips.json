@@ -500,6 +500,8 @@
   "tips.storageCleanup.title": "Voir ce que Combwork conserve, et faire le ménage",
   "tips.storagePurge.text": "Purger… dans Paramètres du projet → Stockage, ou Purger les fichiers de Combwork… sur une session, retire ce que Combwork conserve pour les sessions : sauvegardes, pièces jointes, restes. Il liste d’abord chaque fichier ; ceux des agents et tes totaux restent.",
   "tips.storagePurge.title": "Purger ce que Combwork conserve",
+  "tips.submodulesInDiffs.text": "Quand une carte déplace un sous-module vers un autre commit, Modifications et la section Travail de la carte l’affichent comme « Sous-module lib/sub : 0bbdde2 → 0fc182f ». Afficher le diff de git montre les lignes de git lui-même.",
+  "tips.submodulesInDiffs.title": "Un sous-module déplacé, en une ligne",
   "tips.submodulesLfs.text": "Avec des sous-modules ou Git LFS, Combwork extrait les sous-modules et récupère les fichiers LFS dans chaque emplacement et copie de relecture avant son script de préparation, sans changer les réglages de ton dépôt. Emplacements et copies → Préparer les sous-modules et LFS le désactive.",
   "tips.submodulesLfs.title": "Sous-modules et Git LFS dans les emplacements",
   "tips.taskbarBadge.text": "Le bouton de Combwork dans la barre des tâches montre combien d’agents ont besoin de toi, et clignote quand l’un d’eux te pose une question pendant que Combwork est en arrière-plan.",

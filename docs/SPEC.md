@@ -6784,7 +6784,24 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   submodule's LFS files are smudged as the user's own git-lfs filter config says. git-lfs missing, or no LFS filter set
   up (`git lfs install`, without which `git lfs pull` leaves pointers), fails the preparation, saying so; where the
   user's config requires the filter, git's own checkout fails first, setting or not.
-- **Not here:** showing a moved gitlink as "submodule X: abc → def" in diffs (HI-2864).
+- **A moved gitlink in diffs** (HI-2864, design HI-2864/s10; `src/shared/gitlink.ts`, `components/GitlinkDiff.tsx`):
+  the Changes tab's diff, its comparison of two branches and a card's Work section show a submodule's change as one row,
+  "Submodule lib/sub: 0bbdde2 → 0fc182f" (added, removed, and replaced by or replacing a file or symbolic link worded
+  as such; the full ids in its tooltip), in place of the empty diff git's commit couldn't be read into. **Show git's
+  diff** shows git's own `Subproject commit` lines; a side that is a file or link keeps its real content there.
+  - **Told by its mode, never by a failed read**: one `git --literal-pathspecs diff --raw -z --no-abbrev --no-renames`
+    of that path per diff opened (the comparison's two commits, or the ref against the working tree). Only a side of
+    mode 160000 is a gitlink, so one whose commit is in the parent's store is still one. A blob's id is never shown.
+  - **The working tree's commit** is git's own patch line for that path (`--submodule=short`, its gitlink section
+    only), read for every working gitlink side: raw gives zeros once the checkout moved, and a checkout dirty at the
+    index's commit has raw's id but only the patch says `-dirty` ("uncommitted changes inside"; that section has no
+    `index` line, so it is taken as the gitlink's only where raw says both sides are gitlinks, and only as the one
+    section). A line that can't be read is an error with Retry, never an empty side or a guessed id. An unpopulated folder shows the
+    index's commit; a deleted one, the submodule removed. A ref that isn't a commit yet (no commit in the repository)
+    has no committed side to be a gitlink.
+  - **The Work section** reads a submission's files as raw rows (`filesChanged`: the same paths and letters as
+    `--name-status`), and a row with a gitlink side keeps each side (`FileChange.gitlink`), stored with the submission:
+    earlier submissions show their paths as before. Output that isn't raw rows is unknown, never a partial list.
 
 ### 16.11 Lanes, with or without the Assistant
 

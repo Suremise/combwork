@@ -389,6 +389,11 @@
     "note": "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run.",
     "audience": "both"
   },
+  "service.git.gitlinkUnread": {
+    "text": "Couldn't read which commit submodule {path} is at.",
+    "note": "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule.",
+    "audience": "both"
+  },
   "service.git.outside": {
     "text": "Path is outside the project",
     "note": "An error showing a file's changes: its path leads out of the project.",
