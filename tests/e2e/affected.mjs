@@ -36,6 +36,8 @@ export const EVERYTHING = [
   'src/main/windows.ts',
   'src/main/workspace.ts',
   'src/main/sessions.ts',
+  // Every session's start is admitted through it (HI-2887's launch holds).
+  'src/main/launchHolds.ts',
   // The Agent API (HI-2690 measured why it isn't split by route): 109 files hold a request, most through a helper whose
   // path is `BASE + path` (lib.cjs's, every suite's own), which no selection can follow to the routes it reaches.
   'src/main/servers.ts',

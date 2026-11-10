@@ -259,8 +259,8 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
     expect(h.journals.of('lr').read()).toBeNull()
   })
 
-  it('the control workspace is made only when the project folder is quiet, and is never a slot', async () => {
-    const h = harness({ quiet: async () => false })
+  it('the control workspace is made only when no agent works in the project folder (its hold), and is never a slot', async () => {
+    const h = harness({ busy: 'p|a1' })
     const { repo, root, base } = h.repo('control', false)
     expect((await h.port.create(repo, join(root, 'slot-a'), base)).err).toBe(JJ_REFUSED.control)
     expect(readdirSync(root)).toEqual([])

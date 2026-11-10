@@ -90,6 +90,7 @@ import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
+import { admitLaunch, endAdmission, setLiveFolders } from './launchHolds'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
@@ -2035,6 +2036,7 @@ class SessionManager {
       throw e
     } finally {
       this.starting.delete(id)
+      endAdmission(id)
       const slow = times.slowLine()
       if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
@@ -2354,6 +2356,10 @@ class SessionManager {
     times.mark('folder')
     this.assertStarting(id)
     const cwd = place.cwd
+    // HI-2887: admitted in its folder now its folder is known, before anything is launched or prepared there: a folder
+    // held against launches (jj's control's making) makes it wait; its admission lasts until the start ends.
+    await admitLaunch(id, cwd, () => !!this.starting.get(id)?.cancelled)
+    this.assertStarting(id)
     if (!existsSync(cwd)) throw combworkError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
 
     if (existing?.archived) throw combworkError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
@@ -9221,6 +9227,8 @@ class SessionManager {
 }
 
 export const sessions = new SessionManager()
+// HI-2887: a hold against launches reads the live sessions' folders.
+setLiveFolders(() => sessions.liveStates().flatMap((s) => (s.cwd ? [s.cwd] : [])))
 // A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
 WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())

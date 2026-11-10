@@ -323,7 +323,13 @@ export class JjPlatform implements PlatformAdapter {
    */
   async content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null> {
     const e = this.evidence(card, s, o, primed)
-    return e === null ? null : e.replace(/^epoch:\d+\|/, '')
+    if (e === null) return null
+    const parts = e.split('|').filter((x) => !x.startsWith('epoch:'))
+    // A card not started yet (HI-2887, HB6's proof): its start itself makes jj workspaces (the control's, its slot's),
+    // each a jj operation, so the single head moves under it. Leaving the head out here, only that start's own move
+    // gathers it once more (its slot now there, nothing made again); a target that moved is read afresh by that pass.
+    const todo = (primed as Primed | null)?.view === null
+    return (todo ? parts.filter((x) => !x.startsWith('head:')) : parts).join('|')
   }
 
   /** The slot's head as J2 reads it, pinned: `@-` when `@` is empty with one parent, else `@`. */
