@@ -13,6 +13,7 @@ import { bundledScriptExists, workerHere, workerStarted } from '../workerThreads
 import { runJj, type JjOutcome, type JjRequest } from './jjProcess'
 import type { RunOptions, RunResult } from './repoContext'
 import type { JjWorkerMessage, JjWorkerReply } from './jjWorker'
+import { previewOf, type OpPreviewCore, type OpPreviewInput } from './jjOpView'
 
 const log = createLogger('jj')
 
@@ -73,6 +74,8 @@ export interface JjRunner {
   problem(): string | null
   /** Ends every command under way (each one's process tree) and jj's worker, within `ms`: Combwork quitting. */
   shutdown(ms?: number): Promise<void>
+  /** An operation's preview worked out off main's thread, on jj's worker (HI-2800); absent: the caller works it out. */
+  preview?(input: OpPreviewInput): Promise<OpPreviewCore>
 }
 
 /** The jj Windows starts for `jj` on this PATH (jj.exe in each folder, in order), or null. */
@@ -138,6 +141,7 @@ export function problemOf(t: JjTool): string | null {
 class JjThread {
   private worker: Worker | null = null
   private calls = new Map<number, (r: JjOutcome | null) => void>()
+  private previews = new Map<number, (r: OpPreviewCore | null) => void>()
   private next = 0
   private lost = ''
 
@@ -159,6 +163,17 @@ class JjThread {
     })
   }
 
+  /** An operation's preview worked out on the worker (HI-2800); here where there is no built script (unit tests). */
+  preview(input: OpPreviewInput): Promise<OpPreviewCore> {
+    const w = this.ensure()
+    if (!w) return Promise.resolve(previewOf(input))
+    const id = ++this.next
+    return new Promise((done, fail) => {
+      this.previews.set(id, (r) => (r ? done(r) : fail(new Error(`Combwork's jj worker ended (${this.lost})`)))) // i18n-ignore: for the log
+      w.postMessage({ id, preview: input } satisfies JjWorkerMessage, [])
+    })
+  }
+
   private ensure(): Worker | null {
     if (this.worker) return this.worker
     const script = this.script()
@@ -170,6 +185,12 @@ class JjThread {
     this.worker = w
     workerStarted('jj', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (r: JjWorkerReply) => {
+      if ('preview' in r) {
+        const p = this.previews.get(r.id)
+        this.previews.delete(r.id)
+        p?.(r.preview)
+        return
+      }
       const c = this.calls.get(r.id)
       this.calls.delete(r.id)
       c?.(r.outcome)
@@ -181,6 +202,8 @@ class JjThread {
       this.lost = why
       for (const c of this.calls.values()) c(null)
       this.calls.clear()
+      for (const p of this.previews.values()) p(null)
+      this.previews.clear()
     }
     w.on('error', (e: Error) => gone(e.message))
     w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
@@ -197,6 +220,8 @@ class JjThread {
     await w.terminate()
     for (const c of this.calls.values()) c(null)
     this.calls.clear()
+    for (const p of this.previews.values()) p(null)
+    this.previews.clear()
   }
 }
 
@@ -263,6 +288,7 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
     readiness,
     readinessNow: () => current,
     problem: () => problemOf(current),
+    preview: (input) => (o.here ? Promise.resolve(previewOf(input)) : ownThread.preview(input)),
     async shutdown(ms = 5000) {
       closed = true
       for (const r of running) r.ac.abort()

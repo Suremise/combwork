@@ -29,6 +29,10 @@ export interface JjWorkspaceRow {
   name: string
   commit: string
   change: string
+  /** The project folder's own workspace (HI-2800). */
+  here?: boolean
+  /** Its files are behind its working-copy commit (another workspace rewrote it); null when that couldn't be read. Only on `here`. */
+  stale?: boolean | null
 }
 
 /** The Repository section: where the repository is, what jj is, its operation head and workspaces, what isn't supported. */
@@ -119,6 +123,65 @@ export interface JjConflictsView {
   rows: JjConflictRow[]
   capped: boolean
 }
+
+/** A jj operation as the Operations section lists it (HI-2800): its full id, what jj named it, when, by whom and where. */
+export interface JjOperationRow {
+  id: string
+  parents: string[]
+  /** When it started, ISO (UTC). */
+  time: string
+  user: string
+  workspace: string
+  /** Its description's first line, as jj wrote it (never translated). */
+  description: string
+  snapshot: boolean
+}
+
+export interface JjOperationsView {
+  op: string
+  rows: JjOperationRow[]
+  /** The next page's first operation, or null at the end. */
+  next: string | null
+}
+
+/**
+ * Why a preview gives no command (HI-2800/s19's E1–E7): `tool`, `heads` and `moved` are E1's (the tested jj, one head,
+ * the head shown); `parents` E2; `shape` and `bounds` E3; `workingCopy` E4; `gitOwn` E5; `overlap` E6; `stale` E7;
+ * `nothing`: the operation changed nothing a revert could undo.
+ */
+export type JjOpRefusal = 'tool' | 'heads' | 'moved' | 'parents' | 'shape' | 'bounds' | 'workingCopy' | 'gitOwn' | 'overlap' | 'stale' | 'nothing'
+
+/** One thing an operation changed: an entry's key (`bookmark:main`, `wc:default`…) and its value before and after (null: absent). */
+export interface JjOpChange {
+  key: string
+  before: string | null
+  after: string | null
+}
+
+/** A later change a revert would also touch: an entry changed since, or a commit made on, rewritten or restored since. */
+export interface JjOpOverlap {
+  key: string
+  now: string | null
+  why: 'changedSince' | 'descendant' | 'rewrittenSince' | 'restoredSince'
+}
+
+/** What reverting one operation would change, read at the single head `at` (never run: Combwork runs no jj write). */
+export interface JjOperationPreview {
+  /** The operation head H the preview was read at: the command is offered for this moment only. */
+  at: string
+  op: string
+  description: string
+  did: JjOpChange[]
+  commits: { added: string[]; hidden: string[] }
+  later: JjOpOverlap[]
+  /** `jj op revert <full id>`, or null with `refused` saying why. */
+  command: string | null
+  refused: JjOpRefusal | null
+  detail?: string
+}
+
+/** At most this many operations a page lists. */
+export const JJ_OPERATIONS_MAX = 50
 
 /** At most this many commits a history page shows (one more read says it was capped). */
 export const JJ_HISTORY_MAX = 200

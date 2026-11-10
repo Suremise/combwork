@@ -1,5 +1,8 @@
 // jj (Jujutsu) in the Version Control tab (HI-2799, J6; SPEC §16.3.5, §16.3.6 "jj in the window and the switch",
 // §16.6.5): the real app, the pinned jj (npm run jj:fetch) on its PATH, a throwaway profile and workspace, no CLI agent.
+// - Operations (HI-2800, J7): shop's operations by name; a clean one's preview gives its `jj op revert` command, Copy
+//   copies it, and a head moved since the preview copies nothing and shows it again; an operation whose bookmark moved
+//   again since gives no command, with the later work listed; no preview writes anything.
 // - shop: a Git project in a jj repository colocated with Git (made by jj): the fact and the jjFound offer; Git's own
 //   sections first (Git's UI kept). The switch to jj refused while a card is in flight (the drain, listed, Check Again),
 //   then made: the group named, every gate clear, jj's limits listed. jj's sections: Repository (the unsupported list,
@@ -150,7 +153,7 @@ function jjRepo(dir, o = {}) {
     await shoot(warn, 'switch-to-jj')
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
     check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
-    check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']), HUNG_MS)), JSON.stringify(await sections()))
+    check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts', 'jjOperations']), HUNG_MS)), JSON.stringify(await sections()))
 
     // --- Repository.
     const repo = await section('jjRepo')
@@ -184,6 +187,36 @@ function jjRepo(dir, o = {}) {
     const cf = await section('jjConflicts')
     check('Conflicts: the merge, with a.txt', !!(await until(async () => (await cf.locator('[data-jj-conflicts] > li').count()) >= 1 && /a\.txt/.test(await text(cf)), HUNG_MS)), await text(cf))
     await shoot(page.locator('.vc-view'), 'conflicts')
+
+    // --- Operations (HI-2800): by name, a preview of undoing one, the command only when nothing else would change.
+    jj(shop, 'bookmark', 'create', 'opdemo', '-r', base)
+    const clean = heads(shop)[0]
+    jj(shop, 'bookmark', 'create', 'moved', '-r', base)
+    const overlapped = heads(shop)[0]
+    jj(shop, 'bookmark', 'set', 'moved', '-r', feature, '--allow-backwards')
+    const ops = await section('jjOperations')
+    await ops.locator('[data-action="jj-refresh"]').click()
+    check('Operations: each by the name jj gave it', !!(await until(async () => (await ops.locator(`[data-jj-op="${clean}"]`).count()) === 1 && /create bookmark opdemo/.test(await text(ops.locator(`[data-jj-op="${clean}"]`))), HUNG_MS)), await text(ops))
+    const before = JSON.stringify(heads(shop))
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    const cleanPreview = ops.locator(`[data-jj-op-preview="${clean}"][data-jj-refused=""]`)
+    check('…a clean one: what it changed, and its jj op revert command', !!(await until(async () => (await cleanPreview.count()) === 1 && (await text(cleanPreview.locator('[data-jj-op-command] code'))) === `jj op revert ${clean}` && /opdemo/.test(await text(cleanPreview.locator('[data-jj-op-did]'))), HUNG_MS)), await text(ops))
+    await shoot(page.locator('.vc-view'), 'operations-command')
+    await cleanPreview.locator('[data-action="jj-op-copy"]').click()
+    check('…Copy copies it', !!(await until(async () => /Command copied/.test(await text(page.locator('body'))), HUNG_MS)))
+    // The head moves after the preview: Copy copies nothing and shows it again.
+    jj(shop, 'bookmark', 'create', 'meanwhile', '-r', base)
+    await cleanPreview.locator('[data-action="jj-op-copy"]').click()
+    check('…a head moved since: nothing copied, the preview shown again', !!(await until(async () => (await ops.locator('[data-jj-moved-at-copy]').count()) === 1, HUNG_MS)), await text(ops))
+    await shoot(page.locator('.vc-view'), 'operations-moved')
+    const afterMoved = JSON.stringify(heads(shop))
+    await ops.locator('[data-action="jj-refresh"]').click()
+    await until(async () => (await ops.locator(`[data-jj-op="${overlapped}"]`).count()) === 1, HUNG_MS)
+    await ops.locator(`[data-jj-op="${overlapped}"] [data-action="jj-op-preview"]`).click()
+    const overlapPreview = ops.locator(`[data-jj-op-preview="${overlapped}"][data-jj-refused="overlap"]`)
+    check('…one whose bookmark moved again since: no command, the later work listed', !!(await until(async () => (await overlapPreview.count()) === 1 && (await overlapPreview.locator('[data-jj-op-command]').count()) === 0 && /moved/.test(await text(overlapPreview.locator('[data-jj-op-later]'))), HUNG_MS)), await text(ops))
+    await shoot(page.locator('.vc-view'), 'operations-overlap')
+    check('…and no preview wrote anything (the operation heads only the commands’ own)', JSON.stringify(heads(shop)) === afterMoved && before !== afterMoved && heads(shop).length === 1)
 
     // --- A card can't start in a jj project.
     const next = await inv('tasks:create', { title: 'Under jj', project: 'shop' })
@@ -242,6 +275,10 @@ function jjRepo(dir, o = {}) {
       const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
       check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]), HUNG_MS)), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
+      const opsHere = await section('jjOperations')
+      check(`${language}: Operations in the language`, !!cat['jj.ops.intro'] && !!(await until(async () => (await text(opsHere)).includes(cat['jj.ops.intro'].slice(0, 20)), HUNG_MS)), await text(opsHere))
+      await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-operations-${language}.png`) })
+      await section('jjRepo')
     }
     await speak(english)
   } finally {

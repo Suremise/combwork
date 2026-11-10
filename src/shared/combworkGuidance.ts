@@ -72,6 +72,11 @@ const A = {
     text: "Combwork sets your folder (the project's, a card's or lane's slot, or the review copy a review names): make no git worktree to work in unless the user asks. Merge or remove a subagent's worktree before you finish.",
     note: "#476: Combwork tracks the folder it gave the session (locks, Changes, merging, card tools); a worktree made here isn't. One the user asks for is theirs (#482). #1444: a card's or lane's slot, or a review's copy; #1529: or the project folder, shared."
   }),
+  jj: agentMsg({
+    id: 'contract.agent.jj',
+    text: "This project uses jj (Jujutsu) with Git beside it. Record your work with jj (`jj describe`, `jj commit`, `jj new`). Don't run git commands that change HEAD, the index, branches or refs (commit, add, reset, restore --staged, rebase, merge, cherry-pick, checkout, switch, stash, branch, tag, update-ref, worktree, pull), nor `jj git init`: `git status` and `git log` may show changes jj has already recorded. Combwork starts no card in a jj project, and the user integrates finished work.",
+    note: "HI-2800 (J7): only in a jj project's sessions (platformRule). HI-2781 probed plain git in a jj workspace: jj imports a git commit on detached HEAD, but reset, rebase, merge and the index aren't validated, and git status can look dirty after jj snapshotted. Decision A (HI-2794): no jj card starts, the user integrates."
+  }),
   scratch: agentMsg({
     id: 'contract.agent.scratch',
     text: "Put scratch, probes and logs in a temp folder (as the project's notes say, or your scratchpad), never in or beside a project or worktree, nor in its .codex, .claude or .agents (a stray .codex stops Codex's commands).",
@@ -289,6 +294,21 @@ export function controlRules(control: AssistantControlLevel, changeSettings = fa
  */
 export function journalRule(scope: readonly string[]): string {
   return [say(A.journalRule), say(A.journalScope, { hasScope: scope.length ? 'yes' : 'no', scope: scope.join(', ') })].join('\n')
+}
+
+/**
+ * The project's version control rule (HI-2800, J7): given only to sessions whose project uses jj, after the contract
+ * (like the latest handover's pointer, it is the project's part of what a launch tells a session). Under decision A
+ * (HI-2794) no card starts in a jj project, so its agents are sessions the user opens in the project folder, the user's
+ * own jj workspace, where a plain git command that moves HEAD, the index or a branch confuses jj (HI-2781's probes).
+ * Empty for every other platform.
+ */
+export const platformRule = (platform: string | null | undefined): string => (platform === 'jj' ? say(A.jj) : '')
+
+/** The instructions with the project's version control rule after them, when it has one (platformRule). */
+export function withPlatformRule(instructions: string, platform: string | null | undefined): string {
+  const rule = platformRule(platform)
+  return rule ? `${instructions}\n${rule}` : instructions
 }
 
 export function withLatestHandover(instructions: string, relPath: string | null | undefined): string {

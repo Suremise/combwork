@@ -4,9 +4,11 @@
 
 import { parentPort } from 'worker_threads'
 import { runJj, type JjOutcome, type JjRequest } from './jjProcess'
+import { previewOf, type OpPreviewCore, type OpPreviewInput } from './jjOpView'
 
-export type JjWorkerMessage = { id: number; run: JjRequest } | { id: number; cancel: true }
-export type JjWorkerReply = { id: number; outcome: JjOutcome }
+// An operation's preview too (HI-2800): parsing and comparing three whole views is CPU work kept off main's thread.
+export type JjWorkerMessage = { id: number; run: JjRequest } | { id: number; cancel: true } | { id: number; preview: OpPreviewInput }
+export type JjWorkerReply = { id: number; outcome: JjOutcome } | { id: number; preview: OpPreviewCore }
 
 const port = parentPort
 if (port) {
@@ -14,6 +16,10 @@ if (port) {
   port.on('message', (m: JjWorkerMessage) => {
     if ('cancel' in m) {
       running.get(m.id)?.abort()
+      return
+    }
+    if ('preview' in m) {
+      port.postMessage({ id: m.id, preview: previewOf(m.preview) } satisfies JjWorkerReply)
       return
     }
     const ac = new AbortController()

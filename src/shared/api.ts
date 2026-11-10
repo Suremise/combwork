@@ -172,7 +172,7 @@ import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
-import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjRepoView, JjResolved, JjView } from './jjViews'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjView } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1088,6 +1088,10 @@ export interface CombworkRequests {
   'jj:bookmarks': (projectPath: string) => JjView<JjBookmarksView>
   'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
   'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
+  /** jj's operations, newest first, a page from the head or from `from` (HI-2800). */
+  'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
+  /** What reverting one operation would change, read only; `at`: the head the window showed it at (Copy's revalidation). */
+  'jj:operationPreview': (projectPath: string, op: string, at?: string | null) => JjView<JjOperationPreview>
   'git:info': (projectPath: string) => GitRepoInfo
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string

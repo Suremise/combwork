@@ -276,6 +276,8 @@
   "tips.inboxNotices.title": "Nachrichten erreichen beschäftigte Agenten zwischen zwei Schritten",
   "tips.isolatedChecks.text": "In einem geteilten Ordner zählt ein Check nicht, wenn ein anderer Agent währenddessen etwas ändert. cw-progress --check typecheck --isolated führt ihn in einer eigenen Kopie auf der Revision der Karte aus, in die nichts anderes schreibt. „Stoppen“ im Fortschrittspanel beendet ihn samt allem, was er gestartet hat.",
   "tips.isolatedChecks.title": "Ein Check, den niemand verderben kann",
+  "tips.jjOperations.text": "In einem jj-Projekt listet Versionsverwaltung → Operationen die Operationen von jj nach Namen auf. „Rückgängig-Vorschau“ zeigt, was das Rückgängigmachen einer davon ändern würde, und gibt dir den auszuführenden Befehl, wenn sich sonst nichts ändern würde. Combwork führt ihn nie aus.",
+  "tips.jjOperations.title": "Das Rückgängigmachen einer jj-Operation vorab ansehen",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Combwork den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
   "tips.laneApplyNow.text": "In „Lane starten“ für den Bearbeiter einer Lane ändert „Jetzt anwenden“ die Reihenfolge sofort: Die Karte in Arbeit geht zurück nach „Offen“, ihre Arbeit bleibt auf ihrem Branch, und der Bearbeiter wird informiert.",

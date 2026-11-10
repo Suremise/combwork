@@ -276,6 +276,8 @@
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
   "tips.isolatedChecks.text": "En una carpeta compartida, una comprobación no cuenta si otro agente edita algo mientras se ejecuta. cw-progress --check typecheck --isolated la ejecuta en una copia propia en la versión de la tarjeta, donde nada más escribe. Detener, en el panel Progreso, la termina con todo lo que inició.",
   "tips.isolatedChecks.title": "Una comprobación que nadie puede estropear",
+  "tips.jjOperations.text": "En un proyecto jj, Control de versiones → Operaciones lista las operaciones de jj por nombre. Previsualizar deshacer muestra qué cambiaría al deshacer una, y te da el comando para ejecutarlo cuando nada más cambiaría. Combwork nunca lo ejecuta.",
+  "tips.jjOperations.title": "Previsualiza cómo deshacer una operación de jj",
   "tips.keepAwake.text": "Mientras un agente trabaja, Combwork impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el PC sigue despierto",
   "tips.laneApplyNow.text": "En Iniciar carril para el autor de un carril, Aplicar ahora cambia el orden al momento: la tarjeta en la que se trabaja vuelve a Pendiente con su trabajo en su rama, y se avisa al autor.",

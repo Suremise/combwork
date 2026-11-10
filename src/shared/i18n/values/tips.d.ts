@@ -278,6 +278,8 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
+  'tips.jjOperations.text': undefined
+  'tips.jjOperations.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneApplyNow.text': undefined

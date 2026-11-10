@@ -2536,7 +2536,7 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   records the copy, checks the same invariant against its files, and stores `intact` (1 or 0) on the lease in the write
   that frees the copy, so nothing reuses it or reads a result before. jj's check and review credit (J3's) requires
   `intact = 1`; Git leases keep null.
-- **Stale recovery** (`recoverStale`): explicit only, J7's operation, never the pool's clean-up; its journal resumes it
+- **Stale recovery** (`recoverStale`): explicit only, never the pool's clean-up (under decision A, J7 wires no UI for it: it recovers Combwork-owned slots, none of which exist until jj cards start; HI-2840); its journal resumes it
   after any stop. Phases: planned (the stale operation S and the workspace's commit then, WS, read pinned), preserved
   (the files that differ from WS: WS's tracked files plus what git lists as not ignored by jj's rules, with no
   repository of the workspace's own; their bytes copied outside every workspace, each fsynced, a manifest fsynced last,
@@ -2805,6 +2805,88 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   pushed, the exact pushed id, the remote advancing, `notHeld` after a reset, `notFetched`, two tracked remotes and
   several untracked without origin, the remote URL and the target moving during `ls-remote`, two cards settled by one
   push without coming back, and a reintegration's own obligation with a late answer for the earlier one.
+
+##### jj's recovery, agents and compatibility (1.5.0's J7, HI-2800)
+
+J7 finishes jj's user and agent flows under decision A (HI-2794). Its design is HI-2800/s12, s16 and s19 (HR2's).
+**Reconciled with A** (the Assistant's OK on HI-2800; the items dropped are recorded on HI-2840, option B): Combwork runs
+no jj write, so "a previewed undo" is a read-only preview of the user's own `jj op revert`; no jj card starts, so agents
+get no jj slot, and their guidance is for the sessions the user opens in the project folder. **Not built here**: a
+Combwork-run undo, a UI for J2's `recoverStale` (it recovers Combwork-owned slots, and none exist until jj cards
+start), and the skills' jj-slot workflow.
+- **Operations** (`platform/jjOperations.ts`, `platform/jjOpView.ts`; IPC `jj:operations`, `jj:operationPreview`; the
+  window's Operations section): jj's operation log, 50 a page (an older page read `--at-op` its first operation), each
+  operation by jj's own description, its user, workspace, time and snapshot flag. Every read is pinned at the single
+  head H (J3's `JjReads.pinned`: `op log`, `debug object operation` and `debug object view` pinned write nothing, probed
+  on 0.47.1), and the answer stands only while H is still the head.
+- **The preview reads the whole view.** For an operation O with parent P, jj 0.47.1's `debug object view` of P, O and H
+  (the Rust Debug form of its `View`) is read by a strict parser (`viewEntries`): exactly the fields `head_ids`,
+  `local_bookmarks`, `local_tags`, `remote_views` (each remote's bookmarks and tags, every ref's target **and** tracking
+  state), `git_refs`, `git_heads` and `wc_commit_ids`, each nested shape checked (a target `Resolved(Some|None)` or
+  `Conflicted([…])`), flattened to keyed entries (`bookmark:main`, `remote:origin:bookmark:main`, `gitref:…`,
+  `githead:<ws>`, `wc:<ws>`, `head:<commit>`). An unknown, missing or reordered field, text that doesn't parse, a
+  duplicate key, over 4 MB of text, over 5,000 entries in a dimension or over 200 commits in a list is no preview at
+  all, never a partial one. jj is pinned (J0), so this shape is the contract; another version's is never read. The parse
+  and comparison run on jj's worker (`runner.preview`).
+- **What O did**: every entry whose value differs between P and O, and the commits it made visible or hid
+  (`at_operation(O, ::visible_heads()) ~ at_operation(P, ::visible_heads())` and the reverse, read at H; never `all()`,
+  which on 0.47.1 also takes in commits a revset names, so a hidden one would count as visible). **Later overlap**: an
+  entry O changed whose value at H isn't O's; descendants at H of what O made visible; what O made that is gone at H;
+  what O hid that is back.
+- **The command** (`jj op revert <full id>`, never with `--at-op`, which could make divergent operations) is offered
+  only when E1–E7 all hold, else the preview says which failed: **E1** the tested jj, one operation head, the H shown;
+  **E2** O has one parent (not the root, not a merge of operations); **E3** the three views whole within the bounds;
+  **E4** O changed no `wc:` entry (the user's command would update files there, which a pinned read can't see: commit,
+  describe or edit of `@`, a snapshot, a workspace added or forgotten); **E5** each `gitref:` O changed is jj's export
+  of the jj ref it changed to the same value (`refs/heads/<b>` with `bookmark:<b>`, `refs/tags/<t>` with `tag:<t>`),
+  O changed no `githead:`, and O isn't jj's import or fetch (its description `import git refs`, `import git head` or
+  `fetch from git remote…`, 0.47.1's words: an import changes both sides alike); **E6** no later overlap; **E7** the
+  project folder's workspace not stale at H (J2's read; unknown counts as stale). A clean metadata-only operation (a
+  bookmark created or deleted, a remote bookmark tracked or untracked) is eligible.
+- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command; **Copy**
+  asks main again with that H (`jj:operationPreview`'s `at`), and a head that isn't H gives no command (`moved`): the
+  window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
+  first records any unrecorded edits, as its own snapshot operation S, before reverting.
+- **The proof** (`tests/jjOperationsReal.test.ts`, the pinned jj): each preview writes nothing (the operation heads, the
+  project's checkout record and its files the same before and after). Where a command is offered the test runs exactly
+  it from the project folder and checks the revert R against the operation it applied to, B: every entry outside "what O
+  did" equal at R and B, and O's own back to P's. B is H, or S when jj recorded edits first, found by its provenance
+  (its parent H, a snapshot in the project's workspace) and its exact delta (only that workspace's `wc:`, its Git HEAD
+  and `head:` entries); the edit's bytes are in S's working-copy commit and still on disk. Cases: a bookmark created
+  with an unrelated one after (with and without an unrecorded edit), a bookmark deleted, tracking only (eligible, then
+  overlap once tracked again), the same bookmark moved since, a commit made on what O rewrote, a merge of operations, a
+  racing set, a commit and a workspace added, an import of a plain Git branch move, a stale project workspace, two heads
+  (nothing read), and the head moving between the preview and Copy. The parser and the rules on recorded and built
+  views: `tests/jjOpView.test.ts`.
+- **Stale workspaces** are explained, never recovered: the preview's refusal and the guide say what `jj workspace
+  update-stale` can do to unrecorded edits (HI-2781: they can end up in a separate divergent revision).
+- **Agents** (agent text, `contract.agent.jj`): a session whose project's platform is jj gets one more line after the
+  contract (`platformRule`, like the latest handover's pointer: the project's part of a launch): record work with jj,
+  run no git command that changes HEAD, the index, branches or refs, nor `jj git init`; `git status` may show what jj
+  already recorded; no card starts, and the user integrates. Claude Code gets it in the combwork server's instructions
+  (`CW_PLATFORM`, set at launch from the project's config, part of the tools' signature), the others in the launch's
+  guidance (`sessions.combworkGuidance`). The gate plainGit stays closed; its reason now says agents are told. The
+  scenario `jj-plain-git` (a colocated project switched to jj through Combwork, asked to commit a fix) checks the line
+  was given, the fix recorded in a described jj commit, no git command that moves HEAD, the index, a branch or a ref
+  (`tests/scenarios/gitMutations.cjs`, unit-tested), no `jj git init`, and jj left consistent.
+- **Compatibility**:
+  - **Files**: `.jj` is a platform's own folder whatever the project's platform (`shared/platform/metadataDirs.ts`):
+    hidden in the Files tab (`repoMetadataDirs`), skipped by search's walk and the files watcher, refused by the
+    document tools, never a None project's deliverable (a non-colocated jj repository is None), and never a project
+    write in the workflow's write log.
+  - **Moves** (gate relocation): Repair of a moved `.combwork` folder's projects (`combworkMove.repairWorktrees`)
+    leaves a worktree that is a jj workspace (a `.jj` in it) as it is: git's repair would make only git's half right.
+    Combwork's own slots and agents' worktrees (`workspaceMove`) are Git's, and no jj slot exists.
+  - **Non-colocated**: `.combwork` is kept out in the `info/exclude` of jj's own Git store (`platform/jjKeepOut.ts`,
+    `.jj/repo/store/git_target`; probed: jj 0.47.1 honours it), at each refresh and before each launch; what jj recorded
+    before stays tracked. Trust: its root is the folder itself (`git: false`); a colocated project's is Git's main
+    working tree, the jj root. A git-based build finds no repository there: a documented limit, no promise.
+  - **The Changes tab's status** already runs with `--no-optional-locks` (`GIT_PREFIX`), so it takes no index lock while
+    jj writes: no change (the audit's result, HR2's correction).
+  - **Tools**: jj's readiness stays lazy (no startup check) and shows in Copy Diagnostics and the Version Control tab.
+- **Documented limits match the gates**: the user guide's *What jj doesn't support in Combwork* has exactly one item per
+  closed gate, each tagged with its gate (`tests/jjLimits.test.ts` holds it to `PLATFORMS.jj.gates` and to each gate's
+  name in `GATE_TEXT`).
 
 ##### Open: jj's target advance (J1's gate)
 

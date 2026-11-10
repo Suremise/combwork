@@ -358,6 +358,12 @@ workspace's resumable recovery (`recoverStale`), and `schema/workspaceIdentitySt
 and identity columns. `slots.ts` and `copies.ts` take a port per row (`portOf`) and call `record` where they hold the
 folder; jj's port reaches them only by injection (not in `workspacePorts.ts`), from the tests (`tests/jjWorkspaces`,
 `jjSlotPool`, `jjRecovery`, over `tests/jjWorkspaceHarness.ts`).
+jj's operations (1.5.0's J7, HI-2800; SPEC §16.3.6, jj's recovery, agents and compatibility): `platform/jjOperations.ts`
+reads the operation log and an operation's views pinned at the single head, and `platform/jjOpView.ts` (pure, run on jj's
+worker through `runner.preview`) parses jj 0.47.1's `debug object view` whole and decides a revert's preview and whether
+its command is offered (E1–E7); the window's Operations section is `views/JjSections.tsx`. `platform/jjKeepOut.ts` keeps
+`.combwork` out of a non-colocated jj repository, and `shared/platform/metadataDirs.ts` names every platform's own folder
+(`.git`, `.jj`) for the Files tab, search, the watchers, the document tools and None's deliverables.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

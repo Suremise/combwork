@@ -1790,6 +1790,9 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
+    // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
+    // switch to jj or back is told to a running agent at its next start.
+    if (mcpServers[TOOLS_SERVER] && !assistant && pc.platform === 'jj') mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: 'jj' } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an

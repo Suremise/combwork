@@ -337,6 +337,7 @@ const M = {
   jjCompare: msg({ id: 'git.section.jjCompare', defaultMessage: 'Compare', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): what changed between two revisions." }),
   jjBookmarks: msg({ id: 'git.section.jjBookmarks', defaultMessage: 'Bookmarks', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its bookmarks (jj's named lines, like Git's branches). Use jj's own word for bookmark in your language's jj documentation, else translate it." }),
   jjConflicts: msg({ id: 'git.section.jjConflicts', defaultMessage: 'Conflicts', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): the commits jj stores with unresolved conflicts." }),
+  jjOperations: msg({ id: 'git.section.jjOperations', defaultMessage: 'Operations', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2800): jj's operation log, each operation by its name, and a preview of undoing one. Use jj's own word for operation in your language's jj documentation, else translate it." }),
   queue: msg({ id: 'git.section.queue', defaultMessage: 'Merge queue', description: "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue." }),
   agentBusy: msg({
     id: 'git.busy.agent',
@@ -377,7 +378,7 @@ const M = {
 }
 
 /** The Version Control tab's sections (#1416, SPEC §16.6): Workflow, then the platform's own. */
-export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'jjRepo' | 'jjHistory' | 'jjCompare' | 'jjBookmarks' | 'jjConflicts' | 'queue'; label: Msg; icon: string }[] = [
+export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'jjRepo' | 'jjHistory' | 'jjCompare' | 'jjBookmarks' | 'jjConflicts' | 'jjOperations' | 'queue'; label: Msg; icon: string }[] = [
   { id: 'workflow', label: M.workflow, icon: 'git-pull-request' },
   { id: 'changes', label: M.changes, icon: 'git-compare' },
   { id: 'history', label: M.history, icon: 'history' },
@@ -388,6 +389,8 @@ export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'b
   { id: 'jjCompare', label: M.jjCompare, icon: 'git-compare' },
   { id: 'jjBookmarks', label: M.jjBookmarks, icon: 'bookmark' },
   { id: 'jjConflicts', label: M.jjConflicts, icon: 'warning' },
+  // HI-2800: jj's operations and a preview of reverting one, the command the user's to run.
+  { id: 'jjOperations', label: M.jjOperations, icon: 'discard' },
   { id: 'queue', label: M.queue, icon: 'git-merge' }
 ]
 export type VcSection = (typeof VC_SECTIONS)[number]['id']
@@ -396,7 +399,7 @@ export type VcSection = (typeof VC_SECTIONS)[number]['id']
 const PLATFORM_SECTIONS: Record<PlatformId, readonly VcSection[]> = {
   git: ['changes', 'history', 'branches', 'queue'],
   none: [],
-  jj: ['jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']
+  jj: ['jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts', 'jjOperations']
 }
 
 /**

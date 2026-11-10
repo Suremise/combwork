@@ -276,6 +276,8 @@
   "tips.inboxNotices.title": "Les messages joignent un agent occupé entre deux étapes",
   "tips.isolatedChecks.text": "Dans un dossier partagé, une vérification ne compte pas si un autre agent modifie quelque chose pendant qu’elle tourne. cw-progress --check typecheck --isolated la lance dans une copie à elle, à la révision de la carte, où rien d’autre n’écrit. Arrêter, dans le panneau Progression, l’arrête avec tout ce qu’elle a lancé.",
   "tips.isolatedChecks.title": "Une vérification que personne ne peut gâcher",
+  "tips.jjOperations.text": "Dans un projet jj, Gestion de versions → Opérations liste les opérations de jj par leur nom. Aperçu de l’annulation montre ce que l’annulation de l’une d’elles changerait, et te donne la commande à exécuter quand rien d’autre ne changerait. Combwork ne l’exécute jamais.",
+  "tips.jjOperations.title": "Prévisualiser l’annulation d’une opération jj",
   "tips.keepAwake.text": "Pendant qu’un agent travaille, Combwork empêche Windows de se mettre en veille (l’écran peut toujours se verrouiller), et le laisse se mettre en veille une fois les agents terminés. Choisis quand dans Paramètres → Général.",
   "tips.keepAwake.title": "Laisse les agents travailler, le PC reste éveillé",
   "tips.laneApplyNow.text": "Dans Démarrer un couloir pour l’auteur d’un couloir, Appliquer maintenant change l’ordre tout de suite : la carte en cours revient dans À faire, son travail gardé sur sa branche, et l’auteur est prévenu.",

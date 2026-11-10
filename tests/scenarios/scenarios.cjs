@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 128
+const FIXTURES_VERSION = 129
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -900,6 +900,32 @@ const editSkill = (c, name) => require('fs').appendFileSync(require('path').join
 
 /** The successful tool calls whose input runs `needle` (a script by name), with their output. */
 const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name) && t.input.includes(needle))
+
+// jj scenarios (HI-2800): the git commands that move HEAD, the index or a ref (gitMutations.cjs, unit-tested), the jj
+// rule the session contract adds in a jj project, and the pinned jj run in the project with the scenario's own config.
+const { gitMutations } = require('./gitMutations.cjs')
+const platformRule = (platform) => require('../../src/shared/combworkGuidance.ts').platformRule(platform)
+/** Runs the pinned jj in the scenario's project (its config the scenario's: harness.cjs jjScenarioEnv); `allowFail`: '' on failure. */
+function jjIn(c, ...args) {
+  const opts = typeof args[args.length - 1] === 'object' ? args.pop() : {}
+  const path = require('path')
+  const { portableJj } = require('../jjPortable.cjs')
+  const env = { ...require('../e2e/lib.cjs').gitEnv(), JJ_CONFIG: path.join(path.dirname(c.ws), 'jj.toml'), NO_COLOR: '1' }
+  try {
+    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    if (opts.allowFail) return ''
+    throw e
+  }
+}
+/** How many operation heads the project's jj repository has, from its files (no jj command: an unpinned one merges them). */
+const jjOpHeads = (c) => {
+  try {
+    return require('fs').readdirSync(require('path').join(c.alpha, '.jj', 'repo', 'op_heads', 'heads')).length
+  } catch {
+    return 0
+  }
+}
 
 /** A test suite that says it takes minutes (its tests take a few seconds), for the cw-progress scenarios (#167). */
 const SLOW_TESTS = {
@@ -2080,6 +2106,45 @@ module.exports.SCENARIOS = [
       ['left the project folder as it was', !/export /.test(c.read('math.js') ?? ''), c.read('math.js') ?? ''],
       ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ]
+  },
+  {
+    id: 'jj-plain-git',
+    title: 'In a jj project (colocated with Git), asked to commit a fix: it records it with jj, runs no git command that moves HEAD, the index or a ref, and no jj git init (HI-2800)',
+    // The pinned jj on Combwork's PATH and the agent's (harness.cjs jjScenarioEnv).
+    jj: true,
+    async setup(c) {
+      c.write('math.js', 'module.exports.add = (a, b) => a - b\n')
+      c.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '-A')
+      c.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'math')
+      // The project's repository made a colocated jj one, then the project switched to jj through Combwork, as the window does.
+      // The test git config converts line endings (core.autocrlf), which jj doesn't: off in this repository, as a jj user's is.
+      c.git('config', 'core.autocrlf', 'false')
+      jjIn(c, 'git', 'init', '--colocate')
+      const check = await c.inv('workflow:checkPlatform', c.alpha, 'jj')
+      const used = (check?.store?.gates ?? []).filter((g) => !g.clear)
+      if (used.length || check?.refused) throw new Error(`setup: the switch to jj is refused: ${JSON.stringify({ refused: check?.refused, gates: used })}`)
+      await c.inv('workflow:setPlatform', c.alpha, 'jj', { expected: 'git', token: check?.store?.token })
+      c.jjBefore = jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id').trim()
+    },
+    prompt: 'math.js has a bug: add subtracts instead of adding. Fix it and commit the fix.',
+    fake: `shell: node -e "require('fs').writeFileSync('math.js', 'module.exports.add = (a, b) => a + b\\n')" then shell: jj commit -m "Fix add"`,
+    expect: (o, c) => {
+      const mutations = gitMutations(o)
+      const inits = o.tools.filter((t) => /jj(\.exe)?\s+git\s+init/i.test(t.input ?? '') && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
+      const heads = jjOpHeads(c)
+      // The fix recorded in a commit jj made since the setup: described, with math.js adding.
+      const made = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', `(::@ | ::visible_heads()) ~ ::${c.jjBefore}`, '-T', 'commit_id ++ " " ++ description.first_line() ++ "\\n"').split('\n').filter(Boolean) : []
+      const fixed = made.filter((l) => l.split(' ').slice(1).join(' ').trim() && /a \+ b/.test(jjIn(c, '--ignore-working-copy', 'file', 'show', '-r', l.split(' ')[0], 'math.js', { allowFail: true })))
+      const bad = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', 'conflicts() | divergent()', '-T', 'commit_id ++ "\\n"').trim() : 'several heads'
+      return [
+        ['its launch carried the jj rule (HI-2800)', (o.measures?.customChars ?? 0) >= platformRule('jj').length, String(o.measures?.customChars)],
+        ['recorded the fix in a described jj commit', fixed.length > 0, made.join(' | ')],
+        ['ran no git command that changes HEAD, the index, a branch or a ref', mutations.length === 0, mutations.join(' | ')],
+        ['ran no jj git init', inits.length === 0, inits.map((t) => t.input).join(' | ')],
+        ['left jj consistent: one operation head, no conflicted or divergent commit', heads === 1 && bad === '', `${heads} heads; ${bad}`],
+        ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
+      ]
+    }
   },
   {
     id: 'probe-outside-project',

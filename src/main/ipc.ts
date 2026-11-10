@@ -146,6 +146,7 @@ import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
+import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
@@ -1796,6 +1797,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
     'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
     'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    // The Operations section (HI-2800): read only; the preview's command is the user's to run.
+    'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
+    'jj:operationPreview': (p, op, at) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof at === 'string' ? at : null),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

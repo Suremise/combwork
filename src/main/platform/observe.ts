@@ -23,6 +23,7 @@ import { createLogger, userText } from '../logger'
 import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
+import { inMetadataDir } from '../../shared/platform/metadataDirs'
 import { unknown, type Maybe } from './types'
 import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
@@ -189,6 +190,8 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
+    // jj's store (HI-2800): every jj command writes there, and none of it is the project's work.
+    if (inMetadataDir(rel)) return
     // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
     // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a
     // question about their time is unknown.
