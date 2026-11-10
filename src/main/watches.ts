@@ -1135,6 +1135,45 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
 }
 
 /**
+ * HI-2889: a lane's builder whose watch follows nothing but that lane (its id alone, maybe cards of the lane beside it; no
+ * agents, no usage) and hasn't fired: ended, so Combwork can start the lane's next card on it. Such a watch waits for the
+ * lane to go on, which the card's start is (its prompt wakes the builder), and nothing fires it when its card goes Done
+ * (`moved` isn't a default lane event). HB2 watched its own lane after each Done and sat `watching`, which a start never
+ * types into, until the lane-next stall fired 15 min later. Checked and ended under the store's lock; the label of the
+ * watch ended, or null (no watch, or one that waits on more, or one firing now: its wake goes first).
+ */
+export async function endOwnLaneWatch(projectPath: string, agentId: string, lane: { id: string; cards: readonly number[] }): Promise<string | null> {
+  const ws = workspaceFor(projectPath)
+  if (!ws?.path) return null
+  const store = await load(ws)
+  const rec = await locked(store, async () => {
+    const r = recordOf(store, projectPath, agentId)
+    if (!r || !ownLaneOnly(r, lane) || r.fired || store.delivering.has(r.id)) return null
+    const before = store.list
+    store.list = store.list.filter((x) => x !== r)
+    try {
+      await save(store)
+    } catch (e) {
+      store.list = before
+      log.warn(`ending ${userText(agentId)}'s watch on its lane ${lane.id}`, e)
+      return null
+    }
+    return r
+  })
+  if (!rec) return null
+  log.info(`${userText(agentId)}'s watch ended: its lane ${lane.id}'s next card starts`)
+  sessions.watchChanged(projectPath, agentId)
+  return infoOf(rec).label
+}
+
+/** HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that lane. */
+function ownLaneOnly(r: WatchRecord, lane: { id: string; cards: readonly number[] }): boolean {
+  if (!r.lanes || r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
+  if (r.agents || r.usage) return false
+  return r.cond.cards.every((n) => lane.cards.includes(n))
+}
+
+/**
  * What agents did lately (#416), by agentKey: each change to a status that isn't working (its turn ended, it waits for
  * the user, it stopped), with the agent as it was then, numbered in order (`seq`: from the clock, so a number saved in a
  * watch still compares after a restart). The last few for each agent, whether or not anyone watches it yet: a wake's

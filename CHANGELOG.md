@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A lane's next card starts when its builder watches its own lane** (HI-2889). A builder that watched its lane after a card went Done ended its turn waiting on that watch, and Combwork never gives a card to an agent waiting on a watch, so the lane's next card sat in Todo until the lane-next stall raised it 15 minutes later. Now Combwork ends a watch on the builder's own lane alone (nothing else in it) and starts the card, which wakes the builder. A watch on anything else is still the builder's own wait, left as it is.
 - **`main` into the next version after a release** (HI-2885). **Bring Up to Date…** on a merge queue's card now offers the repository's default branch (`main`) too, even when it isn't one of the branches the project merges work into, and even when the project merges into only one. It lands as a merge commit through the merge checks even when the next version already has every file of `main`'s, where before it was taken as merged already and nothing was merged.
 
 ## 1.3.0 — 2026-11-10
