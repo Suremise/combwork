@@ -64,12 +64,40 @@ describe.skipIf(!exe)('jj compatibility on the real jj (HI-2800)', () => {
     expect(jj(root, 'status')).toMatch(/\.combwork/)
   })
 
-  it('colocated: Git’s keep-out holds it (not jj’s), and another workspace’s pointer is no store of its own', async () => {
+  it('colocated: Git’s keep-out holds it, not jj’s', async () => {
     const root = repo('colo', true)
     expect(await ensureJjExcluded(root)).toBeNull()
-    const ws2 = join(resolve(root, '..'), 'ws2')
-    jj(root, 'workspace', 'add', '--no-colocate', ws2)
-    expect(await jjGitStoreOf(ws2)).toBeNull()
+  })
+
+  it("non-colocated, a linked workspace (HR2's round 1): its pointer followed to the shared store; the workspace itself and a project subfolder of it kept out, the primary's rules kept", async () => {
+    const root = repo('linked', false)
+    mkdirSync(join(root, '.combwork'))
+    writeFileSync(join(root, '.combwork', 'p.md'), 'primary')
+    expect((await ensureJjExcluded(root))?.added).toBe(true)
+    const other = join(resolve(root, '..'), 'other')
+    jj(root, 'workspace', 'add', '--no-colocate', other)
+    const store = await jjGitStoreOf(other)
+    expect(store).toBe(await jjGitStoreOf(root))
+    // The workspace as a project.
+    mkdirSync(join(other, '.combwork'))
+    writeFileSync(join(other, '.combwork', 'private.md'), 'secret')
+    writeFileSync(join(other, 'b.txt'), 'b\n')
+    expect(await ensureJjExcluded(other)).toEqual({ excluded: true, root: other, added: false })
+    // A project in a subfolder of it: its own anchored line.
+    const sub = join(other, 'sub')
+    mkdirSync(join(sub, '.combwork'), { recursive: true })
+    writeFileSync(join(sub, '.combwork', 'private.md'), 'secret')
+    writeFileSync(join(sub, 'c.txt'), 'c\n')
+    expect(await ensureJjExcluded(sub)).toEqual({ excluded: true, root: other, added: true })
+    const exclude = readFileSync(join(store!, 'info', 'exclude'), 'utf8')
+    expect(exclude).toMatch(/^\/\.combwork\/$/m)
+    expect(exclude).toMatch(/^\/sub\/\.combwork\/$/m)
+    // jj's own snapshot of each workspace: the files, never .combwork.
+    const files = jj(other, 'file', 'list')
+    expect(files).toMatch(/b\.txt/)
+    expect(files).toMatch(/sub[\\/]c\.txt/)
+    expect(files).not.toMatch(/\.combwork/)
+    expect(jj(root, 'file', 'list')).not.toMatch(/\.combwork/)
   })
 
   it("trust's root: the folder itself when not colocated, Git's main working tree (the jj root) when colocated", async () => {

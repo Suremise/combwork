@@ -71,6 +71,7 @@
   "jj.ops.refused.shape": "jj hat sie in einer Form aufgezeichnet, die Combwork nicht vollständig lesen kann.",
   "jj.ops.refused.stale": "Der Workspace des Projektordners ist veraltet. jj workspace update-stale aktualisiert ihn, aber Bearbeitungen, die jj nicht aufgezeichnet hat, können in einem separaten Commit landen.",
   "jj.ops.refused.tool": "jj ist nicht die Version, mit der Combwork getestet ist.",
+  "jj.ops.refused.unimported": "Git hat Änderungen, die jj noch nicht erfasst hat (ein Branch, ein Tag oder HEAD wurde mit git verschoben): Dein jj-Befehl würde sie zuerst übernehmen. Führe einen beliebigen jj-Befehl aus und zeige die Vorschau dann erneut an.",
   "jj.ops.refused.workingCopy": "Sie hat die Arbeitskopie eines Workspace geändert: Das Rückgängigmachen würde dort Dateien aktualisieren, was eine Vorschau nicht prüfen kann.",
   "jj.ops.snapshot": "Snapshot",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {verfolgt} other {nicht verfolgt}}",

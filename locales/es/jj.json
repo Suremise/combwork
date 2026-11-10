@@ -71,6 +71,7 @@
   "jj.ops.refused.shape": "jj la registró en una forma que Combwork no puede leer entera.",
   "jj.ops.refused.stale": "el workspace de la carpeta del proyecto está desactualizado. jj workspace update-stale lo actualiza, pero las ediciones que jj no ha registrado pueden acabar en un commit aparte.",
   "jj.ops.refused.tool": "jj no es la versión con la que Combwork está probado.",
+  "jj.ops.refused.unimported": "Git tiene cambios que jj aún no ha registrado (una rama, una etiqueta o HEAD movidos con git): tu comando de jj los incorporaría primero. Ejecuta cualquier comando de jj y vuelve a previsualizar.",
   "jj.ops.refused.workingCopy": "cambió la copia de trabajo de un workspace: deshacerla actualizaría archivos allí, algo que una vista previa no puede comprobar.",
   "jj.ops.snapshot": "instantánea",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {con seguimiento} other {sin seguimiento}}",

@@ -1090,8 +1090,8 @@ export interface CombworkRequests {
   'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
   /** jj's operations, newest first, a page from the head or from `from` (HI-2800). */
   'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
-  /** What reverting one operation would change, read only; `at`: the head the window showed it at (Copy's revalidation). */
-  'jj:operationPreview': (projectPath: string, op: string, at?: string | null) => JjView<JjOperationPreview>
+  /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
+  'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
   'git:info': (projectPath: string) => GitRepoInfo
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string

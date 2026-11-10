@@ -5,7 +5,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { canon, operationFacts, parseDebug, previewOf, revertCommand, viewEntries, VIEW_ENTRIES_MAX, VIEW_TEXT_MAX, OP_COMMITS_MAX, type OpPreviewInput } from '../src/main/platform/jjOpView'
+import { canon, gitAgrees, operationFacts, parseDebug, previewOf, revertCommand, viewEntries, VIEW_ENTRIES_MAX, VIEW_TEXT_MAX, OP_COMMITS_MAX, type OpGitState, type OpPreviewInput } from '../src/main/platform/jjOpView'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'jj', name), 'utf8')
 
@@ -35,7 +35,15 @@ function view(o: { heads?: string[]; bookmarks?: Record<string, string | null>; 
 }
 
 const NO_COMMITS = { added: [], hidden: [], descendants: [], gone: [], back: [] }
-const input = (p: string, o: string, h: string, extra: Partial<OpPreviewInput> = {}): OpPreviewInput => ({ op: OP('b'), facts: { view: OP('e'), parents: [OP('a')], snapshot: false, workspace: 'default', description: 'create bookmark feature' }, parent: OP('a'), views: { parent: p, op: o, head: h }, commits: NO_COMMITS, stale: false, ...extra })
+/** Git's state as jj recorded it in a view (E8 agrees): each `gitref:` at its commit, HEAD at `githead:default`. */
+function agreeing(h: string): OpGitState {
+  const v = viewEntries(h)
+  if (!(v instanceof Map)) return { refs: [], colocated: true, workspace: 'default', head: null }
+  const commit = (s: string | undefined): string | null => (s ? (/"([0-9a-f]{40})"/.exec(s)?.[1] ?? null) : null)
+  const refs = [...v].filter(([k, val]) => k.startsWith('gitref:') && commit(val)).map(([k, val]) => ({ name: k.slice(7), oid: commit(val)!, peeled: null }))
+  return { refs, colocated: true, workspace: 'default', head: commit(v.get('githead:default')) }
+}
+const input = (p: string, o: string, h: string, extra: Partial<OpPreviewInput> = {}): OpPreviewInput => ({ op: OP('b'), facts: { view: OP('e'), parents: [OP('a')], snapshot: false, workspace: 'default', description: 'create bookmark feature' }, parent: OP('a'), views: { parent: p, op: o, head: h }, commits: NO_COMMITS, stale: false, git: agreeing(h), ...extra })
 
 describe('the Debug reader', () => {
   it('reads the recorded view whole: a conflicted bookmark, the git and origin remotes with their tracking, Git refs and HEAD', () => {
@@ -168,5 +176,33 @@ describe('the preview: E2 to E7', () => {
     expect(previewOf(input(P, O, O, { stale: null })).refused).toBe('stale')
     expect(previewOf(input(P, P, P)).refused).toBe('nothing')
     expect(previewOf(input(P, 'View {', O)).refused).toBe('shape')
+  })
+})
+
+describe("E8: Git's actual refs and HEAD what jj recorded (HR2's HI-2800 round 1)", () => {
+  const P = view({ bookmarks: {}, gitRefs: {}, gitHeads: { default: C3 } })
+  const O = view({ bookmarks: { feature: C1 }, remotes: { git: { bookmarks: { feature: [C1, 'Tracked'] } } }, gitRefs: { 'refs/heads/feature': C1 }, gitHeads: { default: C3 } })
+  const H = viewEntries(O) as Map<string, string>
+  const git = (o: Partial<OpGitState> = {}): OpGitState => ({ refs: [{ name: 'refs/heads/feature', oid: C1, peeled: null }], colocated: true, workspace: 'default', head: C3, ...o })
+
+  it('agrees when Git is what jj recorded', () => {
+    expect(gitAgrees(H, git())).toBe(true)
+    expect(previewOf(input(P, O, O, { git: git() })).refused).toBeNull()
+  })
+
+  it('a plain Git move of the very ref, a ref jj never imported, one deleted in Git, or HEAD moved: no command', () => {
+    expect(previewOf(input(P, O, O, { git: git({ refs: [{ name: 'refs/heads/feature', oid: C2, peeled: null }] }) })).refused).toBe('unimported')
+    expect(gitAgrees(H, git({ refs: [{ name: 'refs/heads/feature', oid: C1, peeled: null }, { name: 'refs/heads/new', oid: C2, peeled: null }] }))).toBe(false)
+    expect(gitAgrees(H, git({ refs: [] }))).toBe(false)
+    expect(gitAgrees(H, git({ head: C2 }))).toBe(false)
+    expect(gitAgrees(H, git({ head: null }))).toBe(false)
+    expect(previewOf(input(P, O, O, { git: null })).refused).toBe('unimported')
+  })
+
+  it("leaves what jj doesn't import alone; an annotated tag counts by its peeled commit; non-colocated has no HEAD to compare", () => {
+    expect(gitAgrees(H, git({ refs: [{ name: 'refs/heads/feature', oid: C1, peeled: null }, { name: 'refs/remotes/origin/HEAD', oid: C2, peeled: null }, { name: 'refs/notes/x', oid: C2, peeled: null }] }))).toBe(true)
+    const tagged = viewEntries(view({ tags: { v1: C1 }, gitRefs: { 'refs/tags/v1': C1 } })) as Map<string, string>
+    expect(gitAgrees(tagged, { refs: [{ name: 'refs/tags/v1', oid: C2, peeled: C1 }], colocated: false, workspace: null, head: null })).toBe(true)
+    expect(gitAgrees(tagged, { refs: [{ name: 'refs/tags/v1', oid: C2, peeled: C3 }], colocated: false, workspace: null, head: null })).toBe(false)
   })
 })

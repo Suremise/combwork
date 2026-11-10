@@ -71,6 +71,7 @@
   "jj.ops.refused.shape": "jj zapisał ją w formie, której Combwork nie potrafi odczytać w całości.",
   "jj.ops.refused.stale": "obszar roboczy folderu projektu jest nieaktualny. jj workspace update-stale go aktualizuje, ale edycje, których jj nie zapisał, mogą trafić do osobnego commita.",
   "jj.ops.refused.tool": "jj nie jest wersją, z którą przetestowano Combwork.",
+  "jj.ops.refused.unimported": "Git ma zmiany, których jj jeszcze nie zapisał (gałąź, tag lub HEAD przesunięte poleceniem git): Twoje polecenie jj najpierw by je przejęło. Uruchom dowolne polecenie jj, a potem ponownie wyświetl podgląd.",
   "jj.ops.refused.workingCopy": "zmieniła kopię roboczą obszaru roboczego: cofnięcie zaktualizowałoby tam pliki, czego podgląd nie może sprawdzić.",
   "jj.ops.snapshot": "migawka",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {śledzona} other {nieśledzona}}",

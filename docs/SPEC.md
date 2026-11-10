@@ -2834,17 +2834,25 @@ start), and the skills' jj-slot workflow.
   entry O changed whose value at H isn't O's; descendants at H of what O made visible; what O made that is gone at H;
   what O hid that is back.
 - **The command** (`jj op revert <full id>`, never with `--at-op`, which could make divergent operations) is offered
-  only when E1–E7 all hold, else the preview says which failed: **E1** the tested jj, one operation head, the H shown;
+  only when E1–E8 all hold, else the preview says which failed: **E1** the tested jj, one operation head, the H shown;
   **E2** O has one parent (not the root, not a merge of operations); **E3** the three views whole within the bounds;
   **E4** O changed no `wc:` entry (the user's command would update files there, which a pinned read can't see: commit,
   describe or edit of `@`, a snapshot, a workspace added or forgotten); **E5** each `gitref:` O changed is jj's export
   of the jj ref it changed to the same value (`refs/heads/<b>` with `bookmark:<b>`, `refs/tags/<t>` with `tag:<t>`),
   O changed no `githead:`, and O isn't jj's import or fetch (its description `import git refs`, `import git head` or
   `fetch from git remote…`, 0.47.1's words: an import changes both sides alike); **E6** no later overlap; **E7** the
-  project folder's workspace not stale at H (J2's read; unknown counts as stale). A clean metadata-only operation (a
-  bookmark created or deleted, a remote bookmark tracked or untracked) is eligible.
-- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command; **Copy**
-  asks main again with that H (`jj:operationPreview`'s `at`), and a head that isn't H gives no command (`moved`): the
+  project folder's workspace not stale at H (J2's read; unknown counts as stale); **E8** (HR2's round 1) Git's actual
+  state is what jj recorded at H: every ref jj imports (`refs/heads`, `refs/tags`, `refs/remotes` but a remote's
+  `HEAD`), read with read-only git (`for-each-ref` on the store, never an import), at the commit its `gitref:` names (an
+  annotated tag's peeled commit counts), none recorded that Git lacks, nothing conflicted, and, colocated, the project
+  workspace's HEAD at its `githead:` (`unimported` otherwise: a plain Git move leaves jj's operation heads as they were,
+  and the user's command would import it first). A clean metadata-only operation (a bookmark created or deleted, a
+  remote bookmark tracked or untracked) is eligible.
+- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command. Its
+  `moment` hashes H, J3's fingerprint of the workspace (`jjFingerprint`: colocated, Git's HEAD, index, reflogs, packed
+  refs and branch files) and Git's refs and HEAD as E8 read them; they are read first and again after every other read
+  (the fence's end), and any change between is no answer (`moved`). **Copy** asks main again with that moment
+  (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the
   window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
   first records any unrecorded edits, as its own snapshot operation S, before reverting.
 - **The proof** (`tests/jjOperationsReal.test.ts`, the pinned jj): each preview writes nothing (the operation heads, the
@@ -2856,7 +2864,9 @@ start), and the skills' jj-slot workflow.
   with an unrelated one after (with and without an unrecorded edit), a bookmark deleted, tracking only (eligible, then
   overlap once tracked again), the same bookmark moved since, a commit made on what O rewrote, a merge of operations, a
   racing set, a commit and a workspace added, an import of a plain Git branch move, a stale project workspace, two heads
-  (nothing read), and the head moving between the preview and Copy. The parser and the rules on recorded and built
+  (nothing read), the head moving between the preview and Copy, and a plain Git move jj hasn't imported (of the very
+  branch, between the preview and Copy and before a preview; a Git-only branch; HEAD), each with the operation heads
+  unchanged. The parser and the rules on recorded and built
   views: `tests/jjOpView.test.ts`.
 - **Stale workspaces** are explained, never recovered: the preview's refusal and the guide say what `jj workspace
   update-stale` can do to unrecorded edits (HI-2781: they can end up in a separate divergent revision).
@@ -2878,8 +2888,9 @@ start), and the skills' jj-slot workflow.
     leaves a worktree that is a jj workspace (a `.jj` in it) as it is: git's repair would make only git's half right.
     Combwork's own slots and agents' worktrees (`workspaceMove`) are Git's, and no jj slot exists.
   - **Non-colocated**: `.combwork` is kept out in the `info/exclude` of jj's own Git store (`platform/jjKeepOut.ts`,
-    `.jj/repo/store/git_target`; probed: jj 0.47.1 honours it), at each refresh and before each launch; what jj recorded
-    before stays tracked. Trust: its root is the folder itself (`git: false`); a colocated project's is Git's main
+    `.jj/repo/store/git_target`; probed: jj 0.47.1 honours it in every workspace), at each refresh and before each
+    launch, from the repository's own workspace or a linked one (its `.jj/repo` pointer followed as J0's detection does,
+    HR2's round 1), each project's line anchored at its workspace root; what jj recorded before stays tracked. Trust: its root is the folder itself (`git: false`); a colocated project's is Git's main
     working tree, the jj root. A git-based build finds no repository there: a documented limit, no promise.
   - **The Changes tab's status** already runs with `--no-optional-locks` (`GIT_PREFIX`), so it takes no index lock while
     jj writes: no change (the audit's result, HR2's correction).

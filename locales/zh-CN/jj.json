@@ -71,6 +71,7 @@
   "jj.ops.refused.shape": "jj 记录它的形式是 Combwork 无法完整读取的。",
   "jj.ops.refused.stale": "项目文件夹的工作区已过时。jj workspace update-stale 可以更新它，但 jj 尚未记录的编辑可能会进入一个单独的提交。",
   "jj.ops.refused.tool": "jj 不是 Combwork 测试过的版本。",
+  "jj.ops.refused.unimported": "Git 中有 jj 尚未记录的更改（分支、标签或 HEAD 被 git 移动过）：你的 jj 命令会先将其导入。请先运行任意 jj 命令，然后再次预览。",
   "jj.ops.refused.workingCopy": "它改变了某个工作区的工作副本：撤销它会更新那里的文件，而预览无法检查这一点。",
   "jj.ops.snapshot": "快照",
   "jj.ops.tracked": "{commit}，{state, select, Tracked {已跟踪} other {未跟踪}}",

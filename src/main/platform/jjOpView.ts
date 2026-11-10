@@ -7,8 +7,9 @@
 // field of a View is known, each one's nested shape is checked, and anything else (a field added or missing, text that
 // doesn't parse, a size past the bounds) is no preview at all, never a partial one.
 //
-// A command (`jj op revert <id>`, for the user to run: Combwork runs nothing) is offered only when E1 to E7 all hold:
-// E1 the tested jj, one operation head, the H shown; E2 one parent; E3 the whole view parsed within its bounds; E4 no
+// A command (`jj op revert <id>`, for the user to run: Combwork runs nothing) is offered only when E1 to E8 all hold:
+// E1 the tested jj, one operation head, the H shown; E2 one parent; E3 the whole view parsed within its bounds; E8 Git's
+// actual refs and HEAD what jj recorded at H (no plain Git change jj hasn't imported: HR2's HI-2800 round 1); E4 no
 // working-copy change; E5 each Git ref or Git HEAD the operation changed is jj's own export of the jj ref it changed;
 // E6 nothing it changed was changed again since (later overlap); E7 the project's workspace not stale.
 
@@ -321,6 +322,56 @@ export interface OpCommits {
   back: string[]
 }
 
+/**
+ * Git's actual state beside jj's record (E8): the refs jj imports (`refs/heads`, `refs/tags`, `refs/remotes`), each with its
+ * object and, for an annotated tag, the commit it peels to; and, colocated, the project workspace's HEAD (null: unborn).
+ */
+export interface OpGitState {
+  refs: { name: string; oid: string; peeled: string | null }[]
+  colocated: boolean
+  /** The project folder's workspace, whose Git HEAD jj records as `githead:<it>`. */
+  workspace: string | null
+  head: string | null
+}
+
+/** The refs jj imports from Git and records in its view (a remote's symbolic HEAD it doesn't). */
+const IMPORTED = (name: string): boolean => /^refs\/(heads|tags|remotes)\//.test(name) && !/^refs\/remotes\/[^/]+\/HEAD$/.test(name)
+
+/** A recorded target's commits, or null for a conflicted one; none for an absent one (`Resolved(None)`). */
+function targetCommits(v: string | undefined): string[] | null {
+  if (v === undefined) return []
+  if (v.startsWith('Conflicted')) return null
+  return [...v.matchAll(/"([0-9a-f]{40})"/g)].map((m) => m[1])
+}
+
+/**
+ * Whether Git's actual refs and HEAD are what jj recorded at the head (E8): every imported ref Git has, at the commit
+ * jj's `gitref:` names (an annotated tag's peeled commit counts), none jj records that Git lacks, nothing conflicted,
+ * and, colocated, the workspace's HEAD at its `githead:`. A plain Git change jj hasn't imported disagrees.
+ */
+export function gitAgrees(H: ViewEntries, git: OpGitState): boolean {
+  const seen = new Set<string>()
+  for (const r of git.refs) {
+    if (!IMPORTED(r.name)) continue
+    seen.add(r.name)
+    const ids = targetCommits(H.get(`gitref:${r.name}`))
+    if (!ids || ids.length !== 1 || (ids[0] !== r.oid && ids[0] !== r.peeled)) return false
+  }
+  for (const [key, value] of H) {
+    if (!key.startsWith('gitref:')) continue
+    const name = key.slice('gitref:'.length)
+    if (!IMPORTED(name) || seen.has(name)) continue
+    const ids = targetCommits(value)
+    if (!ids || ids.length) return false
+  }
+  if (git.colocated && git.workspace !== null) {
+    const ids = targetCommits(H.get(`githead:${git.workspace}`))
+    if (!ids) return false
+    if (git.head === null ? ids.length !== 0 : ids.length !== 1 || ids[0] !== git.head) return false
+  }
+  return true
+}
+
 export interface OpPreviewInput {
   op: string
   facts: OperationFacts
@@ -329,6 +380,8 @@ export interface OpPreviewInput {
   commits: OpCommits
   /** Whether the project folder's workspace is stale at H; null when that couldn't be read. */
   stale: boolean | null
+  /** Git's actual refs and HEAD (E8); null when they couldn't be read (no command). */
+  git: OpGitState | null
 }
 
 export interface OpPreviewCore {
@@ -374,6 +427,9 @@ export function previewOf(input: OpPreviewInput): OpPreviewCore {
   for (const id of c.back) later.push({ key: `commit:${id}`, now: id, why: 'restoredSince' }) // i18n-ignore: a protocol code (JjOpOverlap.why), shown through the window's messages
   const core = { did, commits: { added: c.added, hidden: c.hidden }, later }
   if (!did.length && !c.added.length && !c.hidden.length) return { ...core, refused: 'nothing' }
+  // E8: Git's actual refs and HEAD what jj recorded at H (a plain Git move jj hasn't imported leaves the operation heads
+  // as they were, and the user's command would import it first: outside the preview's moment).
+  if (!input.git || !gitAgrees(H, input.git)) return { ...core, refused: 'unimported' }
   // E4: no working-copy change (the user's command would update files there, which the preview can't see).
   if (did.some((d) => d.key.startsWith('wc:'))) return { ...core, refused: 'workingCopy' }
   // E5: a Git ref changed only as jj's export of the jj ref it changed to the same value; Git's HEAD never. jj's import

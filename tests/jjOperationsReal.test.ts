@@ -73,9 +73,9 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
   /** Everything a preview must leave alone: the operation heads' bytes, the project's checkout record, its files. */
   const state = (r: Repo): string => JSON.stringify({ heads: readOpHeads(r.ctx.jjRepo), checkout: readFileSync(join(r.root, '.jj', 'working_copy', 'checkout')).toString('hex'), files: ['base.txt', 'a.txt', 'local.txt'].map((f) => { try { return readFileSync(join(r.root, f), 'utf8') } catch { return null } }) })
 
-  async function preview(r: Repo, op: string, at?: string): Promise<JjOperationPreview> {
+  async function preview(r: Repo, op: string, moment?: string): Promise<JjOperationPreview> {
     const before = state(r)
-    const p = await jjOperationPreview(r.root, op, at, runner)
+    const p = await jjOperationPreview(r.root, op, moment, runner)
     expect(state(r)).toBe(before)
     if (isJjViewUnknown(p)) throw new Error(`unknown: ${JSON.stringify(p)}`)
     return p
@@ -266,12 +266,40 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     const shown = await preview(r, O)
     expect(shown.command).not.toBeNull()
     jj(r.root, 'bookmark', 'create', 'unrelated', '-r', 'main-')
-    const atCopy = await preview(r, O, shown.at)
+    const atCopy = await preview(r, O, shown.moment)
     expect(atCopy.refused).toBe('moved')
     expect(atCopy.command).toBeNull()
     expect(atCopy.at).not.toBe(shown.at)
     const fresh = await preview(r, O)
     expect(fresh.command).toBe(shown.command)
-    expect((await preview(r, O, fresh.at)).command).toBe(shown.command)
+    expect((await preview(r, O, fresh.moment)).command).toBe(shown.command)
+  })
+  it("a plain Git move jj hasn't imported (HR2's round 1): before the preview, no command (E8); between the preview and Copy, nothing copied; nothing imported or written", async () => {
+    const r = await repo('plaingit')
+    jj(r.root, 'bookmark', 'create', 'feature', '-r', 'main')
+    const O = r.head()
+    const shown = await preview(r, O)
+    expect(shown.command).not.toBeNull()
+    // Between the preview and Copy: Git moves the very branch, jj's operation heads untouched.
+    const heads = readOpHeads(r.ctx.jjRepo)
+    git(r.root, 'update-ref', 'refs/heads/feature', r.id('main-'))
+    expect(readOpHeads(r.ctx.jjRepo)).toEqual(heads)
+    const atCopy = await preview(r, O, shown.moment)
+    expect(atCopy.command).toBeNull()
+    expect(atCopy.at).toBe(shown.at)
+    // A fresh preview now: Git disagrees with jj's record at the same head, so no command at all.
+    const fresh = await preview(r, O)
+    expect(fresh.refused).toBe('unimported')
+    expect(fresh.command).toBeNull()
+    expect(readOpHeads(r.ctx.jjRepo)).toEqual(heads)
+    // A new Git branch jj never imported, and HEAD moved by plain Git, disagree the same way.
+    git(r.root, 'update-ref', 'refs/heads/feature', r.id('main'))
+    expect((await preview(r, O)).refused).toBeNull()
+    git(r.root, 'branch', 'gitonly', r.id('main-'))
+    expect((await preview(r, O)).refused).toBe('unimported')
+    git(r.root, 'branch', '-D', 'gitonly')
+    git(r.root, 'update-ref', '--no-deref', 'HEAD', r.id('main-'))
+    expect((await preview(r, O)).refused).toBe('unimported')
+    expect(readOpHeads(r.ctx.jjRepo)).toEqual(heads)
   })
 })

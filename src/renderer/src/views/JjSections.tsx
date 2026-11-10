@@ -113,6 +113,7 @@ const M = {
   'refused.parents': msg({ id: 'jj.ops.refused.parents', defaultMessage: 'it joins operations that ran at the same time (or is the first one), so undoing it can’t be previewed.', description: 'Why a jj undo preview gives no command (HI-2800): a merge of concurrent operations, or the root operation.' }),
   'refused.shape': msg({ id: 'jj.ops.refused.shape', defaultMessage: 'jj recorded it in a form Combwork can’t read whole.', description: 'Why a jj undo preview gives no command (HI-2800): the operation’s view isn’t exactly what the tested jj writes. Keep jj.' }),
   'refused.bounds': msg({ id: 'jj.ops.refused.bounds', defaultMessage: 'it changed more than a preview shows.', description: 'Why a jj undo preview gives no command (HI-2800): too many bookmarks, refs or commits to account for.' }),
+  'refused.unimported': msg({ id: 'jj.ops.refused.unimported', defaultMessage: 'Git has changes jj hasn’t recorded yet (a branch, a tag or HEAD moved with git): your jj command would take them in first. Run any jj command, then preview again.', description: 'Why a jj undo preview gives no command (HI-2800): the colocated Git repository’s refs or HEAD differ from what jj last recorded. Keep jj and Git, git and HEAD.' }),
   'refused.workingCopy': msg({ id: 'jj.ops.refused.workingCopy', defaultMessage: 'it changed a workspace’s working copy: undoing it would update files there, which a preview can’t check.', description: 'Why a jj undo preview gives no command (HI-2800): a commit, describe, new, snapshot, workspace added or forgotten.' }),
   'refused.gitOwn': msg({ id: 'jj.ops.refused.gitOwn', defaultMessage: 'it recorded a change made in Git: undoing it changes nothing in Git, and jj would import it again.', description: 'Why a jj undo preview gives no command (HI-2800): an import of Git’s refs or a fetch. Keep jj and Git.' }),
   'refused.overlap': msg({ id: 'jj.ops.refused.overlap', defaultMessage: 'undoing it would also change later work, listed above.', description: 'Why a jj undo preview gives no command (HI-2800).' }),
@@ -555,6 +556,7 @@ const REFUSED: Record<JjOpRefusal, Msg> = {
   parents: M['refused.parents'],
   shape: M['refused.shape'],
   bounds: M['refused.bounds'],
+  unimported: M['refused.unimported'],
   workingCopy: M['refused.workingCopy'],
   gitOwn: M['refused.gitOwn'],
   overlap: M['refused.overlap'],
@@ -567,10 +569,11 @@ function OperationPreview({ project, p, note, onReplace }: { project: ProjectInf
   const [busy, setBusy] = useState(false)
   const copy = (): void => {
     setBusy(true)
-    // Copy asks main again at the head the preview was read at: a changed head copies nothing and shows the new preview.
-    call('jj:operationPreview', project.path, p.op, p.at)
+    // Copy asks main again at the moment the preview was read at (the head and Git's state): any change since copies
+    // nothing and shows the new preview.
+    call('jj:operationPreview', project.path, p.op, p.moment)
       .then(async (again) => {
-        if (!isJjViewUnknown(again) && again.command && again.at === p.at) {
+        if (!isJjViewUnknown(again) && again.command && again.moment === p.moment) {
           await navigator.clipboard.writeText(again.command)
           notify('success', tr(M.copied))
           return
