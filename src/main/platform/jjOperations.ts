@@ -11,9 +11,10 @@
 // operation heads as they were. Git's refs and HEAD are read (read-only git, `--no-optional-locks`, never an import) and
 // compared with jj's record at H (E8), inside J5's verified capture (jjSourcesPrint.ts, HI-2798): a print of every
 // source those reads rest on (the operation heads, HEAD, packed refs, every loose ref under refs/heads, refs/tags and
-// refs/remotes, a reftable, the store's config) before and after them, equal, and the same print checked once more
-// synchronously in the continuation that answers. The preview's `moment` hashes H, the print and Git's answers, and Copy
-// sends it back.
+// refs/remotes, a reftable, the store's config) before and after them, equal, and the same print checked once more at
+// the answer. The prints and the answer run on jj's worker (HR2's round 3: a print walks and hashes every loose ref, too
+// much for main's thread): the final check and the answer are one synchronous task there (jjPreviewTask.ts), and main
+// only relays it, nothing read after. The preview's `moment` hashes H, the print and Git's answers; Copy sends it back.
 
 import { createHash } from 'crypto'
 import { join } from 'path'
@@ -23,9 +24,10 @@ import { jjRunner, type JjRunner } from './jjRunner'
 import { isJjUnknown, jjUnknown, type JjMaybe, type JjReads } from './jjReads'
 import { contextOf, readsOf, staleAt, unknownOf } from './jjViews'
 import { readCheckout, workspaceGitDir } from './jjView'
-import { rawSourcesPrint } from './jjSourcesPrint'
+import type { PrintSources } from './jjSourcesPrint'
+import { previewTask, printTask } from './jjPreviewTask'
 import type { JjContext } from './jjDetect'
-import { commitList, isOpId, OP_COMMITS_MAX, operationFacts, previewOf, revertCommand, soleParent, VIEW_TEXT_MAX, type OpCommits, type OperationFacts, type OpGitState } from './jjOpView'
+import { commitList, isOpId, OP_COMMITS_MAX, operationFacts, revertCommand, soleParent, VIEW_TEXT_MAX, type OpCommits, type OperationFacts, type OpGitState } from './jjOpView'
 
 const SEP = '\x1f'
 
@@ -116,19 +118,22 @@ async function gitStateOf(c: JjContext, git: GitRead): Promise<{ state: OpGitSta
 }
 
 /**
- * The print of every Git source E8's reads rest on (the Operations view's list, the Assistant's on HI-2800): jj's
+ * Every Git source E8's reads rest on, for the print (the Operations view's list, the Assistant's on HI-2800): jj's
  * operation heads, the store's HEAD and, for a workspace with its own Git folder, that HEAD, the packed refs, every loose
  * ref under refs/heads, refs/tags and refs/remotes, a reftable if the store has one, and the store's config. The same in
- * both Git-backed modes (a non-colocated store's included). Undefined when any can't be read.
+ * both Git-backed modes (a non-colocated store's included).
  */
-function gitPrint(c: JjContext): string | undefined {
+function printSources(c: JjContext): PrintSources {
   const own = c.colocated ? workspaceGitDir(c.root) : null
-  return rawSourcesPrint({
+  return {
     jjRepo: c.jjRepo,
     files: [{ label: 'HEAD', path: join(c.store, 'HEAD') }, ...(own && own !== c.store ? [{ label: 'workspace HEAD', path: join(own, 'HEAD') }] : []), { label: 'packed', path: join(c.store, 'packed-refs') }, { label: 'config', path: join(c.store, 'config') }], // i18n-ignore: a print's labels, hashed, never shown
     trees: ['heads', 'tags', 'remotes'].map((t) => ({ label: `refs/${t}`, path: join(c.store, 'refs', t) })).concat([{ label: 'reftable', path: join(c.store, 'reftable') }]) // i18n-ignore: a print's labels, hashed, never shown
-  })
+  }
 }
+
+/** One print of the sources, on jj's worker (here only for a runner without one: tests' own). */
+const printOf = (runner: JjRunner, sources: PrintSources): Promise<string | 'over' | null> => (runner.print ? runner.print(sources) : Promise.resolve(printTask(sources) ?? null))
 
 /** The moment: the head, the print and Git's answers, hashed. */
 const momentOf = (H: string, print: string, gitText: string): string => `${H}:${createHash('sha256').update(`${print}
@@ -156,10 +161,12 @@ export async function jjOperationPreview(folder: string, op: string, moment?: st
   const reads = readsOf(c, runner)
   const r = await reads.pinned(async (H): Promise<JjMaybe<JjOperationPreview>> => {
     // Git's state first, as a verified capture: the print, the reads, the print again (equal: the answers belong to
-    // those bytes). What E8 compares, and the moment the answer stands for.
-    const print = gitPrint(c)
+    // those bytes). What E8 compares, and the moment the answer stands for. Past the print's bounds: no command.
+    const sources = printSources(c)
+    const print = await printOf(runner, sources)
+    if (print === 'over') return refusedEarly(H, '', op, null, 'bounds')
     const before = print ? await gitStateOf(c, git) : null
-    if (!print || !before || gitPrint(c) !== print) return jjUnknown('moved', 'git')
+    if (!print || !before || (await printOf(runner, sources)) !== print) return jjUnknown('moved', 'git')
     const at = momentOf(H, print, before.text)
     const opText = await reads.run(H, ['debug', 'object', 'operation', op])
     if (isJjUnknown(opText)) return opText
@@ -197,10 +204,12 @@ export async function jjOperationPreview(folder: string, op: string, moment?: st
     }
     const stale = await staleAt(reads, c.root, H)
     const input = { op, facts, parent, views: { parent: views[0], op: views[1], head: views[2] }, commits, stale, git: before.state }
-    const core = await (runner.preview ? runner.preview(input) : Promise.resolve(previewOf(input)))
-    // The fence's end, in this continuation after the last awaited read, nothing awaited before the answer: the same print,
-    // else a Git change meanwhile (a tag, a remote ref, HEAD) is no answer.
-    if (gitPrint(c) !== print) return jjUnknown('moved', 'git')
+    // The final answer and the fence's end, one task on jj's worker after the last awaited read: the preview, then the same
+    // print, else a Git change meanwhile (a tag, a remote ref, HEAD) is no answer. Nothing is read after it here.
+    const answer = await (runner.preview ? runner.preview(input, { sources, print }) : Promise.resolve(previewTask(input, { sources, print })))
+    if (answer.fence === 'over') return refusedEarly(H, '', op, facts, 'bounds')
+    if (answer.fence !== 'held') return jjUnknown('moved', 'git')
+    const core = answer.core
     return { at: H, moment: at, op, description: facts.description, did: core.did, commits: core.commits, later: core.later, command: core.refused === null ? revertCommand(op) : null, refused: core.refused }
   })
   if (isJjUnknown(r)) return unknownOf(r)

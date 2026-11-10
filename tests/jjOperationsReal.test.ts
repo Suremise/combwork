@@ -7,6 +7,8 @@
 //
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
+import { monitorEventLoopDelay } from 'perf_hooks'
+import { build } from 'esbuild'
 import { createRequire } from 'module'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
@@ -16,7 +18,8 @@ import { createJjRunner } from '../src/main/platform/jjRunner'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { readOpHeads } from '../src/main/platform/jjView'
 import { jjOperationPreview, jjOperations, type GitRead } from '../src/main/platform/jjOperations'
-import { operationFacts, previewOf, viewEntries, type OpPreviewInput, type ViewEntries } from '../src/main/platform/jjOpView'
+import { operationFacts, viewEntries, type OpPreviewInput, type ViewEntries } from '../src/main/platform/jjOpView'
+import { previewTask, type OpFence } from '../src/main/platform/jjPreviewTask'
 import { isJjViewUnknown, type JjOperationPreview } from '../src/shared/jjViews'
 import { tempDir } from './tempDir'
 
@@ -350,10 +353,10 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     git(r.root, 'update-ref', '-d', 'refs/remotes/origin/late')
     // During the last awaited read of all (the worker's preview): the synchronous check at the answer catches it.
     made = false
-    const lastRead = await jjOperationPreview(r.root, O, null, { ...runner, preview: async (input: OpPreviewInput) => {
+    const lastRead = await jjOperationPreview(r.root, O, null, { ...runner, preview: async (input: OpPreviewInput, fence: OpFence) => {
       git(r.root, 'tag', 'latest', r.id('main'))
       made = true
-      return previewOf(input)
+      return previewTask(input, fence)
     } })
     expect(made).toBe(true)
     expect(isJjViewUnknown(lastRead) && lastRead.jjUnknown).toBe('moved')
@@ -395,4 +398,46 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     const after = await jjOperationPreview(real, O, null, runner)
     expect(!isJjViewUnknown(after) && after.refused).toBe('unimported')
   })
+  it("off main's thread (HR2's round 3): with 4,000 loose tags, the worker's preview keeps the event loop free where the same work on this thread blocks it; past the print's bounds, no command", async () => {
+    const r = await repo('manytags')
+    jj(r.root, 'bookmark', 'create', 'feature', '-r', 'main')
+    const O = r.head()
+    // 4,000 loose tags, as HR2's fixture: written as Git writes loose refs (no pack), then imported by jj so E8 agrees.
+    const commit = r.id('main')
+    const tags = join(r.root, '.git', 'refs', 'tags')
+    mkdirSync(tags, { recursive: true })
+    for (let i = 0; i < 4000; i++) writeFileSync(join(tags, `t${i}`), `${commit}\n`)
+    jj(r.root, 'git', 'import')
+    jj(r.root, 'bookmark', 'create', 'other', '-r', 'main')
+    const O2 = r.head()
+    // jj's worker, built as the app builds it (tests/jjRunner.test.ts' way).
+    const bundle = join(tempDir('jjo-worker-'), 'jj-worker.cjs')
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'platform', 'jjWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+    const inWorker = createJjRunner({ exe: exe!, env, worker: bundle })
+    const here = createJjRunner({ exe: exe!, env, here: true })
+    /** The longest stall of this thread's event loop while a preview runs (ms), and the preview. */
+    const longestStall = async (rn: typeof runner) => {
+      const h = monitorEventLoopDelay({ resolution: 5 })
+      h.enable()
+      const p = await jjOperationPreview(r.root, O2, null, rn)
+      h.disable()
+      return { ms: h.max / 1e6, p }
+    }
+    await longestStall(inWorker)
+    const before = await longestStall(here)
+    const after = await longestStall(inWorker)
+    console.log(`jjOperationsReal timing, 4,000 loose tags: the longest event-loop stall ${before.ms.toFixed(1)} ms with the prints and answer on this thread, ${after.ms.toFixed(1)} ms with them on jj's worker`)
+    for (const x of [before.p, after.p]) {
+      if (isJjViewUnknown(x)) throw new Error(JSON.stringify(x))
+      expect(x.refused).toBeNull()
+    }
+    expect(after.ms).toBeLessThan(before.ms)
+    await inWorker.shutdown()
+    // Past the bound (20,000 files in the print's trees): no command, nothing read past it.
+    for (let i = 4000; i < 20_001; i++) writeFileSync(join(tags, `t${i}`), `${commit}\n`)
+    const over = await jjOperationPreview(r.root, O, null, here)
+    if (isJjViewUnknown(over)) throw new Error(JSON.stringify(over))
+    expect(over.refused).toBe('bounds')
+    expect(over.command).toBeNull()
+  }, 300_000)
 })

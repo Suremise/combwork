@@ -9,8 +9,20 @@ import { createHash } from 'crypto'
 import { join } from 'path'
 import { readOpHeads } from './jjView'
 
-/** At most this many files a print's trees hold (more is no print: unknown). */
+/** At most this many files a print's trees hold by default (more is no print: unknown). */
 export const PRINT_TREE_MAX = 20_000
+
+/**
+ * A print's bounds (HR2's HI-2800 round 3): the files its trees hold, the folders it walks and the bytes it reads in all.
+ * Past any, the print is `over`: its caller refuses rather than read on.
+ */
+export interface PrintBounds {
+  files: number
+  dirs: number
+  bytes: number
+}
+
+const UNBOUNDED_BYTES: PrintBounds = { files: PRINT_TREE_MAX, dirs: Number.POSITIVE_INFINITY, bytes: Number.POSITIVE_INFINITY }
 
 export interface PrintSources {
   /** The shared jj repository, whose operation heads are printed. */
@@ -33,29 +45,54 @@ function bytesOf(f: string): Buffer | null | undefined {
   }
 }
 
-/** Every file under a folder, sorted, with its bytes' hash; null when absent, undefined when unreadable or past the bound. */
-function treeOf(dir: string): string[] | null | undefined {
+/** What a print has spent of its bounds so far. */
+interface Spent {
+  files: number
+  dirs: number
+  bytes: number
+  over: boolean
+}
+
+/** A file's bytes within the budget: null when absent, undefined when unreadable, 'over' past the bytes. */
+function bytesWithin(f: string, spent: Spent, b: PrintBounds): Buffer | null | undefined | 'over' {
+  const got = bytesOf(f)
+  if (got === null || got === undefined) return got
+  spent.bytes += got.length
+  if (spent.bytes > b.bytes) {
+    spent.over = true
+    return 'over'
+  }
+  return got
+}
+
+/** Every file under a folder, sorted, with its bytes' hash; null when absent, undefined when unreadable or past a bound. */
+function treeOf(dir: string, spent: Spent, b: PrintBounds): string[] | null | undefined {
   const out: string[] = []
   const walk = (d: string, rel: string): boolean => {
+    if (++spent.dirs > b.dirs) {
+      spent.over = true
+      return false
+    }
     let h
     try {
       h = opendirSync(d)
-    } catch (e) {
-      const code = (e as { code?: string }).code
-      if (rel === '' && (code === 'ENOENT' || code === 'ENOTDIR')) return true
+    } catch {
       return false
     }
     try {
       for (let e = h.readSync(); e; e = h.readSync()) {
-        if (out.length >= PRINT_TREE_MAX) return false
         const p = join(d, e.name)
         const r = rel ? `${rel}/${e.name}` : e.name
         if (e.isDirectory()) {
           if (!walk(p, r)) return false
         } else if (e.isFile()) {
-          const b = bytesOf(p)
-          if (b === undefined) return false
-          out.push(`${r}=${b === null ? '-' : createHash('sha256').update(b).digest('hex')}`)
+          if (++spent.files > b.files) {
+            spent.over = true
+            return false
+          }
+          const got = bytesWithin(p, spent, b)
+          if (got === undefined || got === 'over') return false
+          out.push(`${r}=${got === null ? '-' : createHash('sha256').update(got).digest('hex')}`)
         } else return false
       }
     } finally {
@@ -63,34 +100,43 @@ function treeOf(dir: string): string[] | null | undefined {
     }
     return true
   }
-  let there = true
   try {
     opendirSync(dir).closeSync()
   } catch (e) {
     const code = (e as { code?: string }).code
-    if (code === 'ENOENT' || code === 'ENOTDIR') there = false
-    else return undefined
+    return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
   }
-  if (!there) return null
   return walk(dir, '') ? out.sort() : undefined
 }
 
-/** The print of every source, or undefined when any can't be read (a read error, not "not there"). */
-export function rawSourcesPrint(s: PrintSources): string | undefined {
+/**
+ * The print of every source within `bounds`: its hash, `over` past a bound, or undefined when any source can't be read
+ * (a read error, not "not there").
+ */
+export function sourcesPrintWithin(s: PrintSources, bounds: PrintBounds): string | 'over' | undefined {
   const h = createHash('sha256')
   const heads = readOpHeads(s.jjRepo)
   if (!heads) return undefined
   h.update(`heads:${[...heads].sort().join(',')}\n`)
   if (s.env !== undefined) h.update(`env:${s.env}\n`)
+  const spent: Spent = { files: 0, dirs: 0, bytes: 0, over: false }
   for (const f of s.files) {
-    const b = bytesOf(f.path)
+    const b = bytesWithin(f.path, spent, bounds)
+    if (b === 'over') return 'over'
     if (b === undefined) return undefined
     h.update(`${f.label}:${b === null ? '-' : createHash('sha256').update(b).digest('hex')}\n`)
   }
   for (const t of s.trees ?? []) {
-    const files = treeOf(t.path)
+    const files = treeOf(t.path, spent, bounds)
+    if (spent.over) return 'over'
     if (files === undefined) return undefined
     h.update(`${t.label}:${files === null ? '-' : files.join(',')}\n`)
   }
   return h.digest('hex')
+}
+
+/** The print of every source (J5's: a few small files, no byte bound), or undefined when any can't be read or a tree is past its bound. */
+export function rawSourcesPrint(s: PrintSources): string | undefined {
+  const p = sourcesPrintWithin(s, UNBOUNDED_BYTES)
+  return p === 'over' ? undefined : p
 }

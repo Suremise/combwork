@@ -13,7 +13,9 @@ import { bundledScriptExists, workerHere, workerStarted } from '../workerThreads
 import { runJj, type JjOutcome, type JjRequest } from './jjProcess'
 import type { RunOptions, RunResult } from './repoContext'
 import type { JjWorkerMessage, JjWorkerReply } from './jjWorker'
-import { previewOf, type OpPreviewCore, type OpPreviewInput } from './jjOpView'
+import type { OpPreviewInput } from './jjOpView'
+import type { PrintSources } from './jjSourcesPrint'
+import { previewTask, printTask, type OpFence, type OpPreviewAnswer } from './jjPreviewTask'
 
 const log = createLogger('jj')
 
@@ -74,8 +76,10 @@ export interface JjRunner {
   problem(): string | null
   /** Ends every command under way (each one's process tree) and jj's worker, within `ms`: Combwork quitting. */
   shutdown(ms?: number): Promise<void>
-  /** An operation's preview worked out off main's thread, on jj's worker (HI-2800); absent: the caller works it out. */
-  preview?(input: OpPreviewInput): Promise<OpPreviewCore>
+  /** An operation's final answer off main's thread, on jj's worker (HI-2800): the preview, then the print against `fence`. */
+  preview?(input: OpPreviewInput, fence: OpFence): Promise<OpPreviewAnswer>
+  /** One print of an operation preview's sources off main's thread, on jj's worker (HI-2800): its hash, `over` a bound, null unreadable. */
+  print?(sources: PrintSources): Promise<string | 'over' | null>
 }
 
 /** The jj Windows starts for `jj` on this PATH (jj.exe in each folder, in order), or null. */
@@ -141,7 +145,8 @@ export function problemOf(t: JjTool): string | null {
 class JjThread {
   private worker: Worker | null = null
   private calls = new Map<number, (r: JjOutcome | null) => void>()
-  private previews = new Map<number, (r: OpPreviewCore | null) => void>()
+  private previews = new Map<number, (r: OpPreviewAnswer | null) => void>()
+  private prints = new Map<number, (r: string | 'over' | null | undefined) => void>()
   private next = 0
   private lost = ''
 
@@ -163,14 +168,25 @@ class JjThread {
     })
   }
 
-  /** An operation's preview worked out on the worker (HI-2800); here where there is no built script (unit tests). */
-  preview(input: OpPreviewInput): Promise<OpPreviewCore> {
+  /** An operation's final answer worked out on the worker (HI-2800): the preview, then its fence; here where there is no built script (unit tests). */
+  preview(input: OpPreviewInput, fence: OpFence): Promise<OpPreviewAnswer> {
     const w = this.ensure()
-    if (!w) return Promise.resolve(previewOf(input))
+    if (!w) return Promise.resolve(previewTask(input, fence))
     const id = ++this.next
     return new Promise((done, fail) => {
       this.previews.set(id, (r) => (r ? done(r) : fail(new Error(`Combwork's jj worker ended (${this.lost})`)))) // i18n-ignore: for the log
-      w.postMessage({ id, preview: input } satisfies JjWorkerMessage, [])
+      w.postMessage({ id, preview: input, fence } satisfies JjWorkerMessage, [])
+    })
+  }
+
+  /** One print of an operation preview's sources on the worker (HI-2800): its hash, `over` a bound, null unreadable; here without a worker. */
+  print(sources: PrintSources): Promise<string | 'over' | null> {
+    const w = this.ensure()
+    if (!w) return Promise.resolve(printTask(sources) ?? null)
+    const id = ++this.next
+    return new Promise((done, fail) => {
+      this.prints.set(id, (r) => (r === undefined ? fail(new Error(`Combwork's jj worker ended (${this.lost})`)) : done(r))) // i18n-ignore: for the log
+      w.postMessage({ id, print: sources } satisfies JjWorkerMessage, [])
     })
   }
 
@@ -191,6 +207,12 @@ class JjThread {
         p?.(r.preview)
         return
       }
+      if ('print' in r) {
+        const p = this.prints.get(r.id)
+        this.prints.delete(r.id)
+        p?.(r.print)
+        return
+      }
       const c = this.calls.get(r.id)
       this.calls.delete(r.id)
       c?.(r.outcome)
@@ -204,6 +226,8 @@ class JjThread {
       this.calls.clear()
       for (const p of this.previews.values()) p(null)
       this.previews.clear()
+      for (const p of this.prints.values()) p(undefined)
+      this.prints.clear()
     }
     w.on('error', (e: Error) => gone(e.message))
     w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
@@ -222,6 +246,8 @@ class JjThread {
     this.calls.clear()
     for (const p of this.previews.values()) p(null)
     this.previews.clear()
+    for (const p of this.prints.values()) p(undefined)
+    this.prints.clear()
   }
 }
 
@@ -288,7 +314,8 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
     readiness,
     readinessNow: () => current,
     problem: () => problemOf(current),
-    preview: (input) => (o.here ? Promise.resolve(previewOf(input)) : ownThread.preview(input)),
+    preview: (input, fence) => (o.here ? Promise.resolve(previewTask(input, fence)) : ownThread.preview(input, fence)),
+    print: (sources) => (o.here ? Promise.resolve(printTask(sources) ?? null) : ownThread.print(sources)),
     async shutdown(ms = 5000) {
       closed = true
       for (const r of running) r.ac.abort()

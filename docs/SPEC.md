@@ -2854,8 +2854,17 @@ start), and the skills' jj-slot workflow.
   bytes of every source they rest on, in both Git-backed modes: jj's operation heads, the store's HEAD (and a colocated
   workspace's own HEAD), the packed refs, every loose ref under `refs/heads`, `refs/tags` and `refs/remotes`, a reftable,
   and the store's config. Print, read, print again (equal: the answers belong to those bytes), and the same print
-  checked once more synchronously in the continuation that answers, after the last awaited read: any change is no
-  answer (`moved`). The `moment` hashes H, the print and Git's answers. **Copy** asks main again with that moment
+  checked once more at the answer, after the last awaited read: any change is no answer (`moved`). The `moment` hashes
+  H, the print and Git's answers.
+- **Off main's thread** (HR2's round 3: a print walks and hashes every loose ref, 4,000 tags about 260 ms): the prints
+  run on jj's worker (`runner.print`), and the final answer is one synchronous task there (`platform/jjPreviewTask.ts`):
+  the preview worked out, then the print taken again and compared, nothing awaited between the check and the answer it
+  carries; main only relays it and reads nothing after. That is enough here because the preview writes nothing and the
+  user acts later, if at all: no write follows the check, as one did J5's compare-and-set (the Assistant's note). The
+  Operations print is bounded (`OPERATIONS_PRINT_BOUNDS`: 20,000 files and 2,000 folders in its trees, 16 MB read in
+  all): past any, no command (`bounds`). Measured on 4,000 loose tags (`tests/jjOperationsReal.test.ts`): the longest
+  stall of the event loop during a preview, 221.6 ms with the prints and answer on that thread, 20.2 ms with them on jj's
+  worker. **Copy** asks main again with that moment
   (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the
   window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
   first records any unrecorded edits, as its own snapshot operation S, before reverting.

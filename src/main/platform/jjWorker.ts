@@ -4,11 +4,14 @@
 
 import { parentPort } from 'worker_threads'
 import { runJj, type JjOutcome, type JjRequest } from './jjProcess'
-import { previewOf, type OpPreviewCore, type OpPreviewInput } from './jjOpView'
+import type { OpPreviewInput } from './jjOpView'
+import type { PrintSources } from './jjSourcesPrint'
+import { previewTask, printTask, type OpFence, type OpPreviewAnswer } from './jjPreviewTask'
 
-// An operation's preview too (HI-2800): parsing and comparing three whole views is CPU work kept off main's thread.
-export type JjWorkerMessage = { id: number; run: JjRequest } | { id: number; cancel: true } | { id: number; preview: OpPreviewInput }
-export type JjWorkerReply = { id: number; outcome: JjOutcome } | { id: number; preview: OpPreviewCore }
+// An operation's preview too (HI-2800): its verified capture's prints (file reads and hashes) and its final answer
+// (parsing and comparing three whole views, then the print again) are kept off main's thread.
+export type JjWorkerMessage = { id: number; run: JjRequest } | { id: number; cancel: true } | { id: number; preview: OpPreviewInput; fence: OpFence } | { id: number; print: PrintSources }
+export type JjWorkerReply = { id: number; outcome: JjOutcome } | { id: number; preview: OpPreviewAnswer } | { id: number; print: string | 'over' | null }
 
 const port = parentPort
 if (port) {
@@ -19,7 +22,11 @@ if (port) {
       return
     }
     if ('preview' in m) {
-      port.postMessage({ id: m.id, preview: previewOf(m.preview) } satisfies JjWorkerReply)
+      port.postMessage({ id: m.id, preview: previewTask(m.preview, m.fence) } satisfies JjWorkerReply)
+      return
+    }
+    if ('print' in m) {
+      port.postMessage({ id: m.id, print: printTask(m.print) ?? null } satisfies JjWorkerReply)
       return
     }
     const ac = new AbortController()
