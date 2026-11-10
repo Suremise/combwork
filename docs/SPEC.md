@@ -5012,7 +5012,8 @@ read as the options are when the queue runs.
 **The endpoint, captured once for an attempt.** The target must track a remote branch (`branch.<target>.remote`, not
 `.`, and `.merge`): G18's fallback to the only remote or `origin` doesn't apply; none pauses `noUpstream`. Its push URL
 is read as git resolves it then (`git remote get-url --push --all`, rewrites applied): exactly one, else
-`remoteAmbiguous` (the URLs, without credentials, named). A shallow repository pauses `remoteUnsupported`. The snapshot
+`remoteAmbiguous` (the URLs, without credentials, named); a relative filesystem path is made absolute against the
+project, so the sealed context and recovery reach the same repository. A shallow repository pauses `remoteUnsupported`. The snapshot
 holds that URL, the full ref, where the project's objects are, and an allowlist of transport and sign-in settings as
 resolved (`credential.*`, `http.*` per URL too, `core.sshCommand`, `ssh.variant`, `protocol.*`), never `url.*`,
 `remote.*`, `include*` or `core.hooksPath`.
@@ -5030,8 +5031,8 @@ fragment, the ref, the remote head tested on, and the snapshot's id and SHA-256 
 `queue-transport.json` in Combwork's profile, encrypted with safeStorage (DPAPI), keyStore.ts's pattern (one atomic
 write, no `.bak`), decrypted only to build a sealed context, never sent to a window, a reply, a log or diagnostics;
 removed once its entry has an outcome, and any no begun publication needs is dropped by the queue host. git's words kept
-for a pause or a log are redacted first (URL userinfo, authorization and bearer values, each secret value of the
-snapshot). Where it can't be kept safely, the queue pauses `remoteUnsupported`.
+for a pause or a log are redacted first (URL userinfo, any URL's query and fragment, authorization and bearer values,
+each secret value of the snapshot, its URL's query values included). Where it can't be kept safely, the queue pauses `remoteUnsupported`.
 
 **The queue's steps** (§16.9.1, changed only as follows):
 1. **Fetch first:** the snapshot's ref fetched into the sealed context and its head pinned in the project at
@@ -5040,7 +5041,9 @@ snapshot). Where it can't be kept safely, the queue pauses `remoteUnsupported`.
    remote lacks pauses `remoteDiverged` (never forced, never merged silently). An owed G18 push or catch-up is settled
    first, as today.
 2. **Test on the remote's head** (`onto`): strict's update, the test merge, the merge checks (`CW_CHECK_BASE`) and "already
-   in the target" use it; the local head stays the advance's `expected`.
+   in the target" use it; the local head stays the advance's `expected`. A card found in that head (published by someone
+   else) is recorded from it (`Integrated` by outside, the blocker rule applying), never from the local target, and the
+   local catch-up is owed.
 3. **Publish** (the advance): the result proved to contain `onto` (else nothing is published), the snapshot kept,
    `IntegrationStarted` with its record, then two journal phases:
    - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
