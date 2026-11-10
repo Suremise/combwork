@@ -198,6 +198,8 @@
   "git.queue.none": "没有合并队列。当项目的工作流程让 Combwork 合并其卡片时（“版本控制”→“工作流程”：“由谁合并”），每个目标分支的队列及其历史会显示在这里。",
   "git.queue.open": "打开 {card}",
   "git.queue.outcome": "结果",
+  "git.queue.past": "{n, plural, other {过去的分支（# 个）}}",
+  "git.queue.pastTip": "不再合并工作且队列为空的分支：其队列合并和退回的内容。",
   "git.queue.reading": "正在读取合并队列…",
   "git.queue.region": "合并队列",
   "git.queue.result": "合并提交",

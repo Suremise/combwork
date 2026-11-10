@@ -739,7 +739,7 @@
   "board.queue.removeTitle": "Retirer {card} de la file de fusion ?",
   "board.queue.resume": "Reprendre la file",
   "board.queue.resumeFailed": "Impossible de reprendre la file de fusion",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflit} other {conflit dans {files}}}} checks {{check, select, none {vérifications en échec} other {vérifications en échec : {check}}}} hook {un hook a échoué} folderBusy {le dossier où {target} est extraite était occupé} notUpToDate {pas à jour avec {target}} focused {ses tests ciblés n’ont pas pu être choisis ou prouvés} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflit} other {conflit dans {files}}}} checks {{check, select, none {vérifications en échec} other {vérifications en échec : {check}}}} hook {un hook a échoué} folderBusy {le dossier où {target} est extraite était occupé} notUpToDate {pas à jour avec {target}} focused {ses tests ciblés n’ont pas pu être choisis ou prouvés} direction {à contresens des versions, sans dérogation} other {{why}}}",
   "board.queue.returned": "{card} renvoyée : {why}",
   "board.queue.returnedTo": "{card} renvoyée à l’auteur {builder} : {why}",
   "board.queue.runBy": "Exécutée par le profil {profile}",

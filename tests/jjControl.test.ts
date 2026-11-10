@@ -229,7 +229,7 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
     })
 
     it("the window's leftovers (HI-2869): only proved absences pruned, in rotating batches; present, registered, unreadable or changed meanwhile, kept", async () => {
-      const w = setup('ctlp')
+      const w = setup('ctll')
       expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
       const rec = w.record()!
       const dir = join(resolve(w.repo, '..'), 'leftovers')
@@ -295,6 +295,47 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       })
       expect(await w.port.pruneResidues(w.repo)).toBe(0)
       expect(w.record()!.residues).toEqual([gone, late])
+    })
+
+    it("replaced or given a file while a slot's parent folder is made (HI-2870, HR2's round 1): proved after it, so no add; the replacement or file kept", async () => {
+      const h = harness()
+      const { repo, root, base } = h.repo(`ctlp${colocated ? 'c' : 'n'}`, colocated)
+      let onParent: (() => void) | null = null
+      const port = h.portWith({
+        remakeAllowed: () => true,
+        slotParentMade: () => {
+          const f = onParent
+          onParent = null
+          f?.()
+        }
+      })
+      expect((await port.create(repo, join(root, 'slot-a'), base)).ok).toBe(true)
+      const key = `jj_control:${repo.toLowerCase()}`
+      const rec = (): Rec => h.journals.rows.get(key) as Rec
+      const ops = (): string => h.jj(repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
+      // Each slot in a parent folder not made yet, so its making is a real await.
+      const slot = (n: string): string => join(root, `p-${n}`, 'slot')
+      // Byte for byte while the parent is made: refused, nothing run, the replacement kept.
+      const ws1 = rec().ws!
+      onParent = () => {
+        renameSync(ws1, `${ws1}-old`)
+        cpSync(`${ws1}-old`, ws1, { recursive: true })
+        rmSync(`${ws1}-old`, { recursive: true, force: true })
+      }
+      let before = ops()
+      expect((await port.create(repo, slot('b'), base)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(existsSync(slot('b'))).toBe(false)
+      expect(existsSync(join(ws1, '.jj'))).toBe(true)
+      // A foreign file in the (new) control instead: refused, nothing run, the file kept.
+      expect((await port.create(repo, slot('c'), base)).ok).toBe(true)
+      const ws2 = rec().ws!
+      onParent = () => writeFileSync(join(ws2, 'foreign.txt'), 'x\n')
+      before = ops()
+      expect((await port.create(repo, slot('d'), base)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(existsSync(slot('d'))).toBe(false)
+      expect(readFileSync(join(ws2, 'foreign.txt'), 'utf8')).toBe('x\n')
     })
 
     it('two simultaneous makings: one control; replaced while the recovery waits for the lock: kept, a fresh one made', async () => {

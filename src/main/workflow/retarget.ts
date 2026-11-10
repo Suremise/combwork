@@ -252,10 +252,11 @@ async function moveLaneAlone(ws: WorkspaceService, projectPath: string, l: NonNu
 
 /**
  * What still records `branch` (HI-2680: a finished target taken out of Other branches work can merge into): running
- * lanes on it, cards in flight started on it, cards whose own target it is, open queue entries for it, and slots
- * recording it. Read as the board is; the save's guard reads it inside its board write.
+ * lanes on it, cards in flight started on it, cards whose own target it is, open queue entries for it, and the slots
+ * `slots` gives (read when called: inside the caller's board write). Read as the board is; the save's guard reads it
+ * inside its board write.
  */
-export async function referencesTo(ws: WorkspaceService, projectPath: string, branch: string, slots?: readonly { name: string; target: string | null }[]): Promise<string[]> {
+export async function referencesTo(ws: WorkspaceService, projectPath: string, branch: string, slots: () => readonly { name: string; target: string | null }[]): Promise<string[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const out: string[] = []
@@ -275,18 +276,30 @@ export async function referencesTo(ws: WorkspaceService, projectPath: string, br
     const builder = wf.store.laneBuilder(id)
     out.push(builder ? (names.get(builder) ?? builder) : id)
   }
-  for (const s of slots ?? (await slotTargets(ws, projectPath))) if (s.target === branch) out.push(s.name)
+  for (const s of slots()) if (s.target === branch) out.push(s.name)
   return out
 }
 
+/** A project's slots as `referencesTo` counts them (HI-2886): read when called. */
+export interface SlotUses {
+  /** The slots that use the target they record (`SlotStore.targetsInUse`): a free slot's last target doesn't count. */
+  inUse(): { name: string; target: string }[]
+  /** Every slot recording a target, free or not (a branch's deletion: a free slot's clean-up still checks against it). */
+  all(): { name: string; target: string | null }[]
+}
+
 /**
- * The project's slots and the target each records (HI-2680), read from its pool: before a save takes its locks (the
- * pool keeps its own connection to the board's database, never opened inside the board's write).
+ * The project's slot pool, opened before a save takes its locks (opening it may write; HI-2680), and read when the
+ * caller asks, inside its board write (HI-2886): every slot write is a board write too, so what it reads there is what
+ * the save commits against. A pool that can't be opened throws: never an empty list that would let a branch go.
  */
-export async function slotTargets(ws: WorkspaceService, projectPath: string): Promise<{ name: string; target: string | null }[]> {
+export async function slotUses(ws: WorkspaceService, projectPath: string): Promise<SlotUses> {
   const { poolFor } = await import('../slotsApp')
-  const pool = await poolFor(ws, projectPath).catch(() => null)
-  return pool ? pool.deps.store.slots().map((s) => ({ name: s.name, target: s.target ?? null })) : []
+  const store = (await poolFor(ws, projectPath)).deps.store
+  return {
+    inUse: () => store.targetsInUse(),
+    all: () => store.slots().map((s) => ({ name: s.name, target: s.target ?? null }))
+  }
 }
 
 /** A preview as the window sends it back (HI-2680): its shape checked, item by item; anything else refused. */
@@ -310,12 +323,13 @@ const IN_USE = msg({ id: 'service.workflow.targetInUse', defaultMessage: '{branc
 
 /**
  * HI-2680: refused when a save takes a branch out of the project's Other branches work can merge into (`before` → `after`,
- * the new default not counted) while anything still records it (`referencesTo`). Called inside the save's board write,
- * which every writer of those references (card targets and starts, enqueues, lane lists) takes too: serial with them.
+ * the new default not counted) while anything still uses it (`referencesTo`, a slot only while it isn't free: HI-2886).
+ * Called inside the save's board write, which every writer of those references (card targets and starts, enqueues, lane
+ * lists, slot leases and operations) takes too: serial with them.
  */
-export async function refuseRemovedTargets(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], keep: string | null, slots: readonly { name: string; target: string | null }[]): Promise<void> {
+export async function refuseRemovedTargets(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], keep: string | null, slots: SlotUses): Promise<void> {
   for (const branch of before.filter((b) => !after.includes(b) && b !== keep)) {
-    const uses = await referencesTo(ws, projectPath, branch, slots)
+    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse())
     if (uses.length) throw combworkError(IN_USE, { branch, uses: fmt.list(uses) }, { kind: 'conflict' })
   }
 }

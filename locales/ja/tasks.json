@@ -116,7 +116,7 @@
   "tasks.history.context": "最初に読む：{refs}",
   "tasks.history.contextRemoved": "最初に読むドキュメントのセクションを削除しました",
   "tasks.history.created": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」に作成",
-  "tasks.history.queueReturned": "マージキューから差し戻されました：{reason, select, conflict {{target}との競合} checks {マージ前のチェック{check}がマージ結果で失敗しました} checksSome {マージ前のチェックがマージ結果で失敗しました} checksEnv {マージ前のチェック{check}が作業ではなく環境のために失敗しました} install {マージ前のチェックの前のインストールが失敗しました} hook {gitフックがマージコミットを拒否しました} targetMoved {マージ中に{target}が動きました} folderBusy {{target}がチェックアウトされているフォルダーが使用中でした} notUpToDate {{target}に対して最新ではありません} focused {対象テストをマージ結果で実行できませんでした} other {{reason}}}{files, select, none {} other {（{files}）}}。カードの「作業」セクションに実行が表示されます。",
+  "tasks.history.queueReturned": "マージキューから差し戻されました：{reason, select, conflict {{target}との競合} checks {マージ前のチェック{check}がマージ結果で失敗しました} checksSome {マージ前のチェックがマージ結果で失敗しました} checksEnv {マージ前のチェック{check}が作業ではなく環境のために失敗しました} install {マージ前のチェックの前のインストールが失敗しました} hook {gitフックがマージコミットを拒否しました} targetMoved {マージ中に{target}が動きました} folderBusy {{target}がチェックアウトされているフォルダーが使用中でした} notUpToDate {{target}に対して最新ではありません} focused {対象テストをマージ結果で実行できませんでした} direction {リリースの流れと逆向きに{target}を最新にするもので、例外が記録されていません} other {{reason}}}{files, select, none {} other {（{files}）}}。カードの「作業」セクションに実行が表示されます。",
   "tasks.history.startsWithout": "{card}は作業がマージ先にないまま完了に移動されました（{reason}）。このカードはその作業なしで開始できます。",
   "tasks.history.decision": "決定事項を記録：「{decision}」",
   "tasks.history.decisionChanged": "決定事項を「{decision}」に変更（変更前：「{was}」）",

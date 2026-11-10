@@ -116,7 +116,7 @@
   "tasks.history.context": "先读：{refs}",
   "tasks.history.contextRemoved": "已移除先读的文档章节",
   "tasks.history.created": "创建于“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已批准} done {已完成} other {{column}}}”",
-  "tasks.history.queueReturned": "已被合并队列退回：{reason, select, conflict {与 {target} 冲突} checks {合并前检查 {check} 在合并结果上失败} checksSome {合并前检查在合并结果上失败} checksEnv {合并前检查 {check} 因环境而失败，而非工作本身} install {合并前检查之前的安装失败} hook {git 钩子拒绝了合并提交} targetMoved {合并期间 {target} 发生了变化} folderBusy {检出 {target} 的文件夹正被占用} notUpToDate {它与 {target} 不同步} focused {其针对性测试无法在合并结果上运行} other {{reason}}}{files, select, none {} other {（{files}）}}。卡片的工作记录部分显示了这次运行。",
+  "tasks.history.queueReturned": "已被合并队列退回：{reason, select, conflict {与 {target} 冲突} checks {合并前检查 {check} 在合并结果上失败} checksSome {合并前检查在合并结果上失败} checksEnv {合并前检查 {check} 因环境而失败，而非工作本身} install {合并前检查之前的安装失败} hook {git 钩子拒绝了合并提交} targetMoved {合并期间 {target} 发生了变化} folderBusy {检出 {target} 的文件夹正被占用} notUpToDate {它与 {target} 不同步} focused {其针对性测试无法在合并结果上运行} direction {它会逆着版本发布路径的方向更新 {target}，且未记录例外放行} other {{reason}}}{files, select, none {} other {（{files}）}}。卡片的工作记录部分显示了这次运行。",
   "tasks.history.startsWithout": "{card} 已在其工作未进入目标的情况下被移到“已完成”（{reason}）：此卡片可以在没有该工作的情况下开始。",
   "tasks.history.decision": "记录了决定：“{decision}”",
   "tasks.history.decisionChanged": "将一项决定改为“{decision}”（原为“{was}”）",

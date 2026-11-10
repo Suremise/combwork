@@ -2947,7 +2947,8 @@ start), and the skills' jj-slot workflow.
 - **Agents** (agent text, `contract.agent.jj`): a session whose project's platform is jj gets one more line after the
   contract (`platformRule`, like the latest handover's pointer: the project's part of a launch): record work with jj,
   run no git command that changes HEAD, the index, branches or refs, nor `jj git init`; `git status` may show what jj
-  already recorded; no card starts, and the user integrates. Claude Code gets it in the combwork server's instructions
+  already recorded; the user integrates finished work, and nothing an agent does moves a bookmark or pushes (J9d's
+  wording; it said no card starts before). Claude Code gets it in the combwork server's instructions
   (`CW_PLATFORM`, set at launch from the project's config, part of the tools' signature), the others in the launch's
   guidance (`sessions.combworkGuidance`). The gate plainGit stays closed; its reason now says agents are told. The
   scenario `jj-plain-git` (a colocated project switched to jj through Combwork, asked to commit a fix) checks the line
@@ -3133,6 +3134,40 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   rewrite; a claim committed between the plan and the write; restart carry and the changed target; pin ownership and
   seq order; check credit, a transient edit, a throw, `--isolated`; the guard without the seam; the epoch).
 
+##### Agents in jj slots (1.5.0's J9d, HI-2870)
+
+Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-2870/s7 (HR2's OK). One owner per rule:
+- **The rule** stays J7's `contract.agent.jj` line (above): record work with jj, no git command that moves HEAD, the
+  index, branches or refs. Its last sentence, which said no card starts in a jj project, is now "The user integrates
+  finished work: nothing you do moves a bookmark or pushes", so J9e changes no agent text. It's addressed to agents:
+  Combwork's owned slot writes and the user's integration aren't theirs.
+- **The gates** say their own next step (`submit.empty`, `platform.jjRefused`, `api.check.noCopies`); no skill repeats
+  them.
+- **The workflow** is the bundled skills':
+  - work-on-card: a jj card's work is a commit, as a Git card's ("for a code card in Git or jj": the run record names
+    it, and the submission is the card's own revision, so commit first; a change id named is refused by
+    `check.revisionMismatch`, so the skill doesn't say it). After a pass, where the user integrates, there is nothing for
+    the agent to merge: the card waits for the user.
+  - card-loop and review-agent-work: their "for a code card in Git" clauses (commit each round, name the commit, ask for
+    a missing one) are "in Git or jj".
+  - review-agent-work: a jj review copy's working copy is an empty commit on the revision, so the reviewer diffs the
+    base to the revision, not `@`.
+  - The skills' size budgets (`tests/guidance.test.ts`) grow by those words only.
+- **Scenarios:** `jj-plain-git` (J7's), and `jj-card-submit`, `jj-card-review` and `jj-card-passed` (a jj project with
+  slots: a card built and submitted, reviewed in its copy, and told it passed). They check `tests/scenarios/gitMutations.cjs`
+  and `tests/scenarios/jjPublishes.cjs` (a bookmark or tag moved, a push, a repository set up or a remote changed:
+  every attempt, a failed one too; unit-tested), the bookmarks unchanged and jj consistent. Before J9e they start jj
+  cards through `CW_TEST_JJ_CARDS=1` (`jjCardsTestSwitch`, compile.ts), honoured only by an unpackaged build;
+  J9e removes it with the seam.
+  - `jj-card-review` also checks the review copy is left as it was (HR2's round 1; `tests/scenarios/jjReviewCopy.cjs`,
+    unit-tested): the reviewer's tool calls (a file tool's edit there; a jj command that records, or a command that
+    writes files, run there), and the copy's files and jj's `@` and its parent looked at again while it is still the
+    reviewer's. Its review starts at the submitted revision.
+  - The fixture is a colocated repository only: a separate (non-colocated) one can't be switched to jj in 1.5.0
+    (`switchRefused`'s `jjSeparate`), so it has no cards to review.
+- **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
+  project's worktrees folder is absent before its first slot), inside the store's lock and before the control's proof:
+  nothing is awaited between that proof's final check and the add (HI-2887).
 ##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
 
 Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
@@ -3225,7 +3260,7 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   residue added, while the write waits for its lock), and the e2e suites `jjview` (the publish records and leftovers,
   seeded, Mark as checked, Refresh) and `jjwindow`: a real jj card in the app, colocated (a non-colocated project can't
   be switched to before J9f, HI-2896, which checks these views there). An unpackaged build starts jj cards before J9e
-  for it alone (`CW_TEST_JJ_CARDS=1`, `slotCards.ts`; never a packaged one, J9e removes it with the guard): a fake
+  through HI-2870's switch (`CW_TEST_JJ_CARDS=1`, `jjCardsTestSwitch`; never a packaged one, J9e removes it): a fake
   builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
   written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
   through its confirmation once nothing works in it, its unrecorded edit kept (its return to the pool after Done is HI-2906's:
@@ -3934,7 +3969,11 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   none); gone → `gone`; anything else → `dirty`, set aside (`board_meta` `slot_aside:`, with what it was moving to and
   what was found): no later look makes it ready, and it is never lent, carried or renamed (a rename that met one carries it to the new name), until it is removed. A store failure
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
-  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, slots),
+  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
+  slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
+  any kind, not set aside), whose recorded target is only the last its lease served; the slots read inside the save's board write, the
+  pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
+  every slot recording it, its clean-up checking against it),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
   lock) and the removal are serial; it is never taken out by itself. The window: Save…'s preview with **Also retarget
   what can move**, applied after the save; the Assistant: the setting's reply lists what can move with a preview id
@@ -5252,6 +5291,32 @@ brought up to date with the release branch, and only the pull request's merge co
 merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
 refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
 
+**Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
+next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the
+default branch as the project's own platform port names it and only while it exists (none named or readable: nothing
+counts as `main`): two versions (`X.Y.Z[-pre]` or `X.Y`, an optional `v`, read on the whole name or its last `/`
+segment, compared by semver) give `forward` older into newer and `backward` (`older`) newer into older, and `unknown`
+(`sameVersion`) for one version under two names, decided first, whichever is the default (HR1's round 1: with no
+`main` or `master`, git's default is the checked-out branch, which may be a version); then the default branch, unless
+its name is a version, into any other is `forward`, any other into it `backward` (`default`: a release reaches it
+through its pull request); any other pair is `unknown` (`unordered`).
+Ancestry decides nothing: no graph test tells which branch was made from which (one containing the other is equally a
+release behind its next version and a next version built on it), so a pair the names don't order is unknown, never
+permitted. Only `forward` is permitted by default:
+- **The window** offers Bring Up to Date… and counts *behind* only for sources `forward` into the target; a target with
+  none has no `forward` in its view. It has no override.
+- **A request** (`forwardMerge`: the window's IPC, `POST /v1/queue/forward`, `cw_queue forward`) for a `backward` or
+  `unknown` pair is refused, saying which and why (`invalid`, 400), after the membership, actor and Control checks, which
+  an override never bypasses. `override: true` (the Agent API alone, only the JSON boolean: anything else is 400) is the
+  user's explicit choice: the card's `ForwardRequested` records it (`override: { by, dir, why }`), bound to that card and
+  so to its pair, and the Assistant's `queue-forward` action says so. An open card for the pair made without one is
+  never given it: the request is refused (`conflict`), naming the card to remove first.
+- **Retry merge** on a forward card and **the queue, before each forward entry's test merge**, read the direction again:
+  one not `forward` whose request recorded no override is refused (Retry, the card staying Active), or returned
+  (`IntegrationFailed` `direction`, never merged, both branches as they were): a card from before, or one whose default
+  branch changed since, inherits nothing from having been queued. Remove from queue ends it. A recorded override holds
+  through Retry, the source frozen again.
+
 #### 16.9.2 Advancing the target
 
 [P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected
@@ -5603,7 +5668,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
   ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
   (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
-  *Queue in Version Control* opens it.
+  *Queue in Version Control* opens it; the card here has no such link (HI-2893). A past branch's queue (HI-2893:
+  `past`, §16.9.3's Merges tab) shows no card (no Pause queue): only its history, under a folded **Past branches (n)**
+  after the live ones.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Combwork merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
@@ -7255,7 +7322,7 @@ picked up in a clean slot, by the builder that knows it, and the next card alway
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
 a returned card gets its own slot and a fresh conversation) is put to Darren as OP-36.
 
-**Combwork starts the next card** [HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance]. On 29 Oct LE-250's builder read its Done, said it had only been asked to do LE-250, and went idle: the lane sat until the Assistant started LE-246 by hand (the card's own prompt, naming one card, won over the lane's brief). With the rules on, Combwork starts the lane's next card itself (`main/laneStarts.ts`): the first of the lane's own open cards (not Done, gone or held elsewhere), in Todo and not blocked, every card before it Done or another lane's (`laneStartDue` in `shared/lanes.ts`; its first card too since HI-2029, below), in an active lane (never a paused one). It is started on the lane's builder as the Assistant's Start gives one (`startTask` with Combwork as the actor, through the start's rules, so one card at a time, a line behind and a slot to wait for still refuse it): its slot's placement gives the builder the card, or the card is typed into the idle builder, or the builder is started with it when it isn't running. Each start is decided again just before it is made and checked once more where it is written, in the start's own transaction (`StartGuard`, from `laneNow` in `lanes.ts`: `laneView` itself, read synchronously from the same inputs as the lane view, so its effective pause for the user, a block, a merge, a slot or its hooks counts; the lane still running in that workspace, still the builder's, the card still its next due): a lane abandoned, changed or newly paused, or its card given to another agent, while an earlier start was on its way gets nothing assigned, written or delivered, and goes on once that clears [HR1's rounds 1 and 2]. **When:** only while the builder is free: idle (its turn over, nobody typing in its terminal), or not running and not starting or queued to resume. A builder in a turn (reading the Done wake, finishing a follow-up of the card) is waited for until its turn ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741). Looked at on the board's and lanes' changes, on the builder's status changes while its lane's next card waits, and every 30 s while one waits (a refused start is tried again at most that often). Its first card too [HI-2029: Legible's lane over a running LB1 sat "active" for 2 h 26 min with LE-259 in Todo, as nothing but its builder started a first card]: the builder starting it itself, in the turn it registers its lane (card-loop), is never free in between, and its own start of one Combwork started is that start. Nor while the lane's own start launches its agents (Start Lane…, or a lane the Assistant or a script records or updates: `holdLaneStart`, from before its record until its slot is lent and its agents started), as Combwork's start then took the slot the lane was being lent, or gave the builder a second conversation; nor while the lane waits for a slot (`slotWait`, `stoppedOnly` or not: the slot pass keeps it until it has lent the slot and launched the lane's agents, `laneWaitsForSlot`, read again just before the start) [HR1's round 1]. While a due card waits (its builder in a turn, on a watch of other work, a line of Combwork's queued for it, a failed start, or Combwork's start refused for now), the lane's status says why at once (`startWait`, *LE-259 waits to start: LB1 is in a turn*), never "active" with nothing said; after 15 minutes the lane-next stall (now its first card too, since the lane started) escalates it. **A card it depends on not Done** [HI-2129: HB5's lane sat on HI-2118, which depends on HI-2108, then in Review after a merge-queue conflict; HB5 watched HI-2108 for Done, and after 30 minutes the lane watch called HI-2118 stalled]: where the card's rules have `start.dependenciesIntegrated` (Dependencies must be Done), a card one of whose `blockedBy` cards isn't Done waits for it, whatever its builder does (`startWait` `why: "dependencies"`, `waitsFor` that card's key: *HI-2118 waits to start: it waits for HI-2108 to merge*). Combwork doesn't try the start meanwhile, and the lane-next stall says nothing of it (`laneOrderView`'s `waitsForDependency`), as nothing waits on its builder: once the card is Done the usual rules apply, Combwork starting it when its builder is free. One Done but not yet in the card's target is left to the start's own refusal (`refused`), as before. A line of Combwork's queued for the builder is offered first, by the delivery service under its own rules, and holds the start until it is given or cancelled: time alone never lets the card's start overlap it (the lane says *a line of Combwork's is on its way*). With the rules off the lane is bookkeeping, as before: the builder starts the next card. **The Done wake** to a lane's builder (`loopWakes.ts`, the lane holding the card) names what comes next in place of "carry on": *Your lane's next card is HI-12 ("…"): Combwork starts it for you once your turn ends, so end your turn now*; with the rules off *…: start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane*; one already under way, one that can't start yet (*cw_lane next says when it can start*), the lane paused, or *That was your lane's last card*. The card-loop skill says the same for a builder, as a backup and for the rules off.
+**Combwork starts the next card** [HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance]. On 29 Oct LE-250's builder read its Done, said it had only been asked to do LE-250, and went idle: the lane sat until the Assistant started LE-246 by hand (the card's own prompt, naming one card, won over the lane's brief). With the rules on, Combwork starts the lane's next card itself (`main/laneStarts.ts`): the first of the lane's own open cards (not Done, gone or held elsewhere), in Todo and not blocked, every card before it Done or another lane's (`laneStartDue` in `shared/lanes.ts`; its first card too since HI-2029, below), in an active lane (never a paused one). It is started on the lane's builder as the Assistant's Start gives one (`startTask` with Combwork as the actor, through the start's rules, so one card at a time, a line behind and a slot to wait for still refuse it): its slot's placement gives the builder the card, or the card is typed into the idle builder, or the builder is started with it when it isn't running. Each start is decided again just before it is made and checked once more where it is written, in the start's own transaction (`StartGuard`, from `laneNow` in `lanes.ts`: `laneView` itself, read synchronously from the same inputs as the lane view, so its effective pause for the user, a block, a merge, a slot or its hooks counts; the lane still running in that workspace, still the builder's, the card still its next due): a lane abandoned, changed or newly paused, or its card given to another agent, while an earlier start was on its way gets nothing assigned, written or delivered, and goes on once that clears [HR1's rounds 1 and 2]. **When:** only while the builder is free: idle (its turn over, nobody typing in its terminal), or not running and not starting or queued to resume. A builder in a turn (reading the Done wake, finishing a follow-up of the card) is waited for until its turn ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741), except one watching its own lane alone [HI-2889: on 10 Nov HB2 watched its lane after each Done, so its turn ended `watching` and its next card sat until the stall, four times; a lane watch's default events don't count a Done or a start]: that watch (its lane's id alone, maybe cards of that lane, no agents or usage, not firing) waits for what the start is, so Combwork ends it and starts the card, whose prompt wakes the builder (`endOwnLaneWatch`). Whether it may is decided again under the watch store's lock, just before the record is removed, from the lane as it is then (`laneNow`: still due on the same builder, still watching, the watch's cards still the lane's): a lane paused, ended or changed meanwhile keeps the watch. Looked at on the board's and lanes' changes, on the builder's status changes while its lane's next card waits, and every 30 s while one waits (a refused start is tried again at most that often). Its first card too [HI-2029: Legible's lane over a running LB1 sat "active" for 2 h 26 min with LE-259 in Todo, as nothing but its builder started a first card]: the builder starting it itself, in the turn it registers its lane (card-loop), is never free in between, and its own start of one Combwork started is that start. Nor while the lane's own start launches its agents (Start Lane…, or a lane the Assistant or a script records or updates: `holdLaneStart`, from before its record until its slot is lent and its agents started), as Combwork's start then took the slot the lane was being lent, or gave the builder a second conversation; nor while the lane waits for a slot (`slotWait`, `stoppedOnly` or not: the slot pass keeps it until it has lent the slot and launched the lane's agents, `laneWaitsForSlot`, read again just before the start) [HR1's round 1]. While a due card waits (its builder in a turn, on a watch of other work, a line of Combwork's queued for it, a failed start, or Combwork's start refused for now), the lane's status says why at once (`startWait`, *LE-259 waits to start: LB1 is in a turn*), never "active" with nothing said; after 15 minutes the lane-next stall (now its first card too, since the lane started) escalates it. **A card it depends on not Done** [HI-2129: HB5's lane sat on HI-2118, which depends on HI-2108, then in Review after a merge-queue conflict; HB5 watched HI-2108 for Done, and after 30 minutes the lane watch called HI-2118 stalled]: where the card's rules have `start.dependenciesIntegrated` (Dependencies must be Done), a card one of whose `blockedBy` cards isn't Done waits for it, whatever its builder does (`startWait` `why: "dependencies"`, `waitsFor` that card's key: *HI-2118 waits to start: it waits for HI-2108 to merge*). Combwork doesn't try the start meanwhile, and the lane-next stall says nothing of it (`laneOrderView`'s `waitsForDependency`), as nothing waits on its builder: once the card is Done the usual rules apply, Combwork starting it when its builder is free. One Done but not yet in the card's target is left to the start's own refusal (`refused`), as before. A line of Combwork's queued for the builder is offered first, by the delivery service under its own rules, and holds the start until it is given or cancelled: time alone never lets the card's start overlap it (the lane says *a line of Combwork's is on its way*). With the rules off the lane is bookkeeping, as before: the builder starts the next card. **The Done wake** to a lane's builder (`loopWakes.ts`, the lane holding the card) names what comes next in place of "carry on": *Your lane's next card is HI-12 ("…"): Combwork starts it for you once your turn ends, so end your turn now*; with the rules off *…: start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane*; one already under way, one that can't start yet (*cw_lane next says when it can start*), the lane paused, or *That was your lane's last card*. The card-loop skill says the same for a builder, as a backup and for the rules off.
 
 #### 16.11.2a Built [#1270]: Combwork owns the lane
 
@@ -7717,7 +7784,12 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   queued.*), while the project's current options have Combwork merge into it (`queue:list` gives the window those targets
   too, with `combworkMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
-  out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
+  out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
+  the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
+  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
+  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
+  only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
   busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
   inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. While a

@@ -17,7 +17,7 @@ import { resolveGithubHosts } from '../shared/githubHost'
 import { workflowWrite } from './workflow/writes'
 import { withFolderRepoLocks } from './platform/repoPorts'
 import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
-import { offerRetarget, refuseRemovedTargets, retargetPreview, slotTargets } from './workflow/retarget'
+import { offerRetarget, refuseRemovedTargets, retargetPreview, slotUses } from './workflow/retarget'
 import { boardWrite } from './boardStore'
 import { withLanesLock } from './lanes'
 import { newlyMissing, projectTargets } from './workflow/targets'
@@ -300,9 +300,10 @@ export async function applySetting(
     // Its repository's lock first, as Project Settings' save takes it (#1642 round 5).
     // HI-2680: the target in force before a change of it, for what can follow the new one (Retarget).
     const before = e.workflow === 'target' ? ((await projectTargets(workspace, projectPath).catch(() => null))?.default ?? null) : null
-    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, in the board's
-    // write (serial with every writer of those), the file written in it.
-    const slots = e.workflow === 'otherTargets' ? await slotTargets(workspace, projectPath) : []
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything uses it, in the board's
+    // write (serial with every writer of those), the file written in it. The pool opened here, its slots read in the write
+    // (HI-2886).
+    const slots = e.workflow === 'otherTargets' ? await slotUses(workspace, projectPath) : null
     // HI-2807: a branch newly named as a target must exist, checked in the write (one deleted since is caught too).
     const missingFirst = async (): Promise<void> => {
       const cfg = await workspace.projectConfig(projectPath)
@@ -321,7 +322,7 @@ export async function applySetting(
         const was = resolvedOf(workspace, projectPath, platform, cfg).options
         const will = resolvedOf(workspace, projectPath, platform, { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
         try {
-          await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots)
+          await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots!)
         } catch (err) {
           throw new SettingRefused(409, agentError(err as CombworkError))
         }

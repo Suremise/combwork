@@ -74,8 +74,8 @@ const A = {
   }),
   jj: agentMsg({
     id: 'contract.agent.jj',
-    text: "This project uses jj (Jujutsu) with Git beside it. Record your work with jj (`jj describe`, `jj commit`, `jj new`). Don't run git commands that change HEAD, the index, branches or refs (commit, add, reset, restore --staged, rebase, merge, cherry-pick, checkout, switch, stash, branch, tag, update-ref, worktree, pull), nor `jj git init`: `git status` and `git log` may show changes jj has already recorded. Combwork starts no card in a jj project, and the user integrates finished work.",
-    note: "HI-2800 (J7): only in a jj project's sessions (platformRule). HI-2781 probed plain git in a jj workspace: jj imports a git commit on detached HEAD, but reset, rebase, merge and the index aren't validated, and git status can look dirty after jj snapshotted. Decision A (HI-2794): no jj card starts, the user integrates."
+    text: "This project uses jj (Jujutsu) with Git beside it. Record your work with jj (`jj describe`, `jj commit`, `jj new`). Don't run git commands that change HEAD, the index, branches or refs (commit, add, reset, restore --staged, rebase, merge, cherry-pick, checkout, switch, stash, branch, tag, update-ref, worktree, pull), nor `jj git init`: `git status` and `git log` may show changes jj has already recorded. The user integrates finished work: nothing you do moves a bookmark or pushes.",
+    note: "HI-2800 (J7): only in a jj project's sessions (platformRule). HI-2781 probed plain git in a jj workspace: jj imports a git commit on detached HEAD, but reset, rebase, merge and the index aren't validated, and git status can look dirty after jj snapshotted. Decision A (HI-2794): the user integrates, and Combwork moves no bookmark. HI-2870 (J9d): its last sentence says that rather than 'no card starts', which J9e makes untrue; agents never move a bookmark or push (Combwork's own slot operations aren't theirs)."
   }),
   scratch: agentMsg({
     id: 'contract.agent.scratch',
@@ -298,9 +298,10 @@ export function journalRule(scope: readonly string[]): string {
 
 /**
  * The project's version control rule (HI-2800, J7): given only to sessions whose project uses jj, after the contract
- * (like the latest handover's pointer, it is the project's part of what a launch tells a session). Under decision A
- * (HI-2794) no card starts in a jj project, so its agents are sessions the user opens in the project folder, the user's
- * own jj workspace, where a plain git command that moves HEAD, the index or a branch confuses jj (HI-2781's probes).
+ * (like the latest handover's pointer, it is the project's part of what a launch tells a session): in the project
+ * folder (the user's own jj workspace) and in a card's slot (HI-2870, J9d), a plain git command that moves HEAD, the
+ * index or a branch confuses jj (HI-2781's probes). Under decision A (HI-2794) the user integrates. How a jj card's work
+ * is committed, submitted and reviewed is the bundled skills' (work-on-card, card-loop, review-agent-work).
  * Empty for every other platform.
  */
 export const platformRule = (platform: string | null | undefined): string => (platform === 'jj' ? say(A.jj) : '')

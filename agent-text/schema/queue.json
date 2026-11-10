@@ -56,6 +56,11 @@
       "target": "plain"
     }
   },
+  "queue.failure.direction": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "queue.failure.focused.newProof": {
     "placeholders": {
       "tests": "plain"
@@ -198,6 +203,9 @@
     "placeholders": {
       "target": "plain"
     }
+  },
+  "queue.next.direction": {
+    "placeholders": {}
   },
   "queue.next.fix": {
     "placeholders": {}

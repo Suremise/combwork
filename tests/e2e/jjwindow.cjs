@@ -1,6 +1,6 @@
 // The window for jj cards (HI-2869, J9c; SPEC "The window for jj cards"): the real app, the pinned jj (npm run jj:fetch)
 // on its PATH, a fake Claude Code builder (B1), a throwaway profile and workspace. jj cards start here before J9e through
-// the unpackaged seam alone (CW_TEST_JJ_CARDS=1, slotCards.ts); a packaged build never takes it. Colocated only: a
+// the unpackaged seam alone (CW_TEST_JJ_CARDS=1, HI-2870's jjCardsTestSwitch); a packaged build never takes it. Colocated only: a
 // non-colocated jj project can't be switched to before J9f (HI-2896, which checks these views in that mode).
 // - shop (jj, you review, target main): the user starts a card for B1, in a slot (a jj workspace); B1 commits there with
 //   jj and submits through the Agent API; the user passes it. Repository's Waiting for you to integrate shows it with its change id and

@@ -198,6 +198,8 @@
   "git.queue.none": "Nenhuma fila de merge. Quando o fluxo de trabalho do projeto faz o Combwork fazer o merge dos cartões (Controle de versão → Fluxo de trabalho: Quem faz o merge), a fila de cada branch de destino aparece aqui, com o histórico.",
   "git.queue.open": "Abrir {card}",
   "git.queue.outcome": "Resultado",
+  "git.queue.past": "{n, plural, one {Branches anteriores (# branch)} other {Branches anteriores (# branches)}}",
+  "git.queue.pastTip": "Branches em que o trabalho não é mais mesclado e cuja fila está vazia: o que as filas deles mesclaram e devolveram.",
   "git.queue.reading": "Lendo as filas de merge…",
   "git.queue.region": "Filas de merge",
   "git.queue.result": "Commit de merge",

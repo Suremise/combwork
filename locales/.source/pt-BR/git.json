@@ -218,6 +218,8 @@
   "git.queue.none": "No merge queue. When the project's workflow has Combwork merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.",
   "git.queue.open": "Open {card}",
   "git.queue.outcome": "Outcome",
+  "git.queue.past": "{n, plural, one {Past branches (# branch)} other {Past branches (# branches)}}",
+  "git.queue.pastTip": "Branches that work no longer merges into, with nothing in their queue: what their queues merged and returned.",
   "git.queue.reading": "Reading the merge queues…",
   "git.queue.region": "Merge queues",
   "git.queue.result": "Merge commit",

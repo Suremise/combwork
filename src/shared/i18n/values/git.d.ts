@@ -220,6 +220,8 @@ interface CombworkMessageValues {
   'git.queue.none': undefined
   'git.queue.open': { card: string | number }
   'git.queue.outcome': undefined
+  'git.queue.past': { n: number }
+  'git.queue.pastTip': undefined
   'git.queue.reading': undefined
   'git.queue.region': undefined
   'git.queue.result': undefined

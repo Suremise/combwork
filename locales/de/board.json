@@ -739,7 +739,7 @@
   "board.queue.removeTitle": "{card} aus der Merge-Warteschlange entfernen?",
   "board.queue.resume": "Warteschlange fortsetzen",
   "board.queue.resumeFailed": "Die Merge-Warteschlange konnte nicht fortgesetzt werden",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {Konflikt} other {Konflikt in {files}}}} checks {{check, select, none {Checks fehlgeschlagen} other {Checks fehlgeschlagen: {check}}}} hook {ein Hook ist fehlgeschlagen} folderBusy {der Ordner, in dem {target} ausgecheckt ist, war beschäftigt} notUpToDate {nicht auf dem Stand von {target}} focused {ihre gezielten Tests konnten nicht ausgewählt oder nachgewiesen werden} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {Konflikt} other {Konflikt in {files}}}} checks {{check, select, none {Checks fehlgeschlagen} other {Checks fehlgeschlagen: {check}}}} hook {ein Hook ist fehlgeschlagen} folderBusy {der Ordner, in dem {target} ausgecheckt ist, war beschäftigt} notUpToDate {nicht auf dem Stand von {target}} focused {ihre gezielten Tests konnten nicht ausgewählt oder nachgewiesen werden} direction {entgegen der Richtung des Release-Wegs, ohne Ausnahme} other {{why}}}",
   "board.queue.returned": "{card} zurückgegeben: {why}",
   "board.queue.returnedTo": "{card} an Bearbeiter {builder} zurückgegeben: {why}",
   "board.queue.runBy": "Ausgeführt von Profil {profile}",
