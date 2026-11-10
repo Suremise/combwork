@@ -1099,6 +1099,94 @@
     "defaultMessage": "Without a repository, agents work in the project folder, and Combwork has no worktrees or merging for it.",
     "description": "The Version Control tab of a Git project whose folder isn't a git repository."
   },
+  "git.signing.cantSign": {
+    "defaultMessage": "Can’t sign: {message}",
+    "description": "The Signing check’s result: signing failed, with the signer’s own words ({message}, in English)."
+  },
+  "git.signing.checkAgain": {
+    "defaultMessage": "Check again",
+    "description": "Button in the Signing section: checks once more whether commits can be signed with nobody there."
+  },
+  "git.signing.checking": {
+    "defaultMessage": "Checking…",
+    "description": "The Signing section while its check runs (a few seconds at most)."
+  },
+  "git.signing.couldNotComplete": {
+    "defaultMessage": "Couldn’t sign unattended: the signer didn’t finish within a few seconds with nobody there (it may be waiting for someone).",
+    "description": "The Signing check’s result: the signer was still running at the check’s time limit; never proof that it asked."
+  },
+  "git.signing.defaultKey": {
+    "defaultMessage": "Not set (git’s default)",
+    "description": "In the Signing table: no signing key is set, so git uses its own default (the committer’s identity for OpenPGP)."
+  },
+  "git.signing.format": {
+    "defaultMessage": "Format",
+    "description": "Row of the Signing table: how commits are signed (gpg.format: OpenPGP, SSH or X.509)."
+  },
+  "git.signing.formatName": {
+    "defaultMessage": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
+    "description": "A signing format’s name in the Signing table. Keep the select keys."
+  },
+  "git.signing.heading": {
+    "defaultMessage": "Signing",
+    "description": "Heading in Version Control → Branches & remotes (HI-1185), under Commit identity: how commits are signed."
+  },
+  "git.signing.howGpg": {
+    "defaultMessage": "To sign unattended with gpg, let gpg-agent keep the passphrase: set default-cache-ttl and max-cache-ttl in gpg-agent.conf, then sign once by hand (a commit of your own) to unlock it for that long.",
+    "description": "How-to under a Signing check that needs someone, for OpenPGP signing. Keep gpg-agent, default-cache-ttl, max-cache-ttl and gpg-agent.conf as they are."
+  },
+  "git.signing.howSsh": {
+    "defaultMessage": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, and point user.signingkey at its .pub file.",
+    "description": "How-to under a Signing check that needs someone, for SSH signing. Keep ssh-add, user.signingkey and .pub as they are; OpenSSH Authentication Agent is the Windows service’s name."
+  },
+  "git.signing.key": {
+    "defaultMessage": "Key",
+    "description": "Row of the Signing table: the signing key (user.signingkey), shortened."
+  },
+  "git.signing.limits": {
+    "defaultMessage": "A check that succeeds says only that this signer signed just now. An agent already running, a smartcard or a hardware key may still ask in its own way.",
+    "description": "A note under the Signing check: what a successful check means, and what Combwork can’t control."
+  },
+  "git.signing.needsSomeone": {
+    "defaultMessage": "Would ask for a passphrase: signing needs someone there now, so the merge queue pauses before each signed merge until you unlock the key.",
+    "description": "The Signing check’s result: the signer needs a passphrase, a PIN or an unlocked agent."
+  },
+  "git.signing.no": {
+    "defaultMessage": "No",
+    "description": "In the Signing table: commits are not signed."
+  },
+  "git.signing.notChecked": {
+    "defaultMessage": "{why, select, program {Not checked: Combwork runs only the signing programs of Git for Windows, GnuPG and Windows’ OpenSSH by itself, not {path}.} keyCommand {Not checked: the key comes from a command (gpg.ssh.defaultKeyCommand), which Combwork doesn’t run by itself.} x509 {Not checked: Combwork can’t check X.509 signing.} other {Not checked: a hardware key asks for a touch, which Combwork can’t check.}} The merge queue’s commits still sign as usual, and pause if signing waits.",
+    "description": "The Signing section when Combwork didn’t run the check: a program it doesn’t run by itself ({path}: its path), a key command, X.509, or a hardware key. Keep the select keys."
+  },
+  "git.signing.off": {
+    "defaultMessage": "Commits aren’t signed.",
+    "description": "The Signing section when git doesn’t sign commits."
+  },
+  "git.signing.program": {
+    "defaultMessage": "Program",
+    "description": "Row of the Signing table: the signing program git runs, as a path."
+  },
+  "git.signing.scope": {
+    "defaultMessage": "{scope, select, system {set for the computer} global {set for you} local {set in this repository} worktree {set in this folder} command {set for this command} other {}}",
+    "description": "After a setting in the Signing table, where git found it (git config scopes). Keep the select keys."
+  },
+  "git.signing.signs": {
+    "defaultMessage": "Signs commits",
+    "description": "Row of the Signing table: whether git signs commits (commit.gpgsign)."
+  },
+  "git.signing.unattended": {
+    "defaultMessage": "Signs without asking: this signer and key signed a test just now with nobody there. The merge queue’s commits sign unattended while that holds.",
+    "description": "The Signing check’s result: signing worked with no prompt (at the moment of the check; a cache can expire)."
+  },
+  "git.signing.unreadable": {
+    "defaultMessage": "Combwork couldn’t read how this repository signs: {message}",
+    "description": "The Signing section when git couldn’t read its settings; {message} is git’s own words."
+  },
+  "git.signing.yes": {
+    "defaultMessage": "Yes",
+    "description": "In the Signing table: commits are signed."
+  },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
     "description": "What git has in progress in the project folder, in the status bar and the Git tab (badge), lower case: \"main · merging\"."

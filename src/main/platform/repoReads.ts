@@ -12,6 +12,7 @@
 // between pages. The view types keep their Git names in 1.4.0 (the window's Git text); the members use platform words.
 
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
+import type { SigningInfo } from '../../shared/gitSigning'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
 import type { AgentBranchStatus, GitDiff, GitStatus, MergeBranchList, ProjectInfo } from '../../shared/types'
 
@@ -50,6 +51,11 @@ export interface RepoReads {
   info(root: string, workTarget: string | null): Promise<GitRepoInfo>
   /** What clean-up offers: merged lines and their remote ones. */
   leftovers(root: string, workTarget: string | null): Promise<LeftoverInfo>
+  /**
+   * HI-1185: how the folder's commits are signed, and whether its signer could sign just now with nobody there (bounded;
+   * at most once a minute unless `force`). Optional: a platform without signing has none, and nothing is shown.
+   */
+  signing?(root: string, force?: boolean): Promise<SigningInfo>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

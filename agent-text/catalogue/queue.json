@@ -223,6 +223,22 @@
     "text": "It",
     "note": "The subject of a returned card's sentence in its own card read (a wake names it by its key)."
   },
+  "queue.signing.exited": {
+    "text": "exited with code {code}",
+    "note": "A signing check's detail (HI-1185) when the tool said nothing: its exit code."
+  },
+  "queue.signing.noSshKey": {
+    "text": "user.signingkey is not set, and git needs it to sign with ssh",
+    "note": "A signing check's detail (HI-1185): ssh signing with no key set and no key command. Keep user.signingkey."
+  },
+  "queue.signing.notFound": {
+    "text": "{name} wasn't found",
+    "note": "A signing check's detail (HI-1185): the signing program (name: as configured, or git's default) isn't on the commit's PATH."
+  },
+  "queue.signing.unfinished": {
+    "text": "The signer didn't finish within a few seconds with nobody there.",
+    "note": "A merge queue pause's detail (HI-1185, signingWaits): the signing check's signer was still running at its bound."
+  },
   "queue.wake.left.decision": {
     "text": "{card} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (cw_read_task){to, select, review {; it is back in Review, and queued again once approved.} other {, then submit again (cw_submit).}}",
     "note": "#1354: its builder's wake for a card that left the queue for a decision since its approval. {to}: review (it went back to Review) or active."

@@ -995,6 +995,14 @@
     "defaultMessage": "Push to a backup remote",
     "description": "A tip's title."
   },
+  "tips.gitSigning.text": {
+    "defaultMessage": "Version Control → Branches & remotes → Signing shows how your repository signs commits and whether it can sign with nobody there. If it would ask for a passphrase, it says how to set it up so the merge queue’s signed merges go ahead unattended.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: merge queue."
+  },
+  "tips.gitSigning.title": {
+    "defaultMessage": "Signed merges without waiting",
+    "description": "A tip's title (HI-1185): the Signing section shows whether commits can be signed with nobody there, so the merge queue's signed merges don't wait."
+  },
   "tips.gitView.text": {
     "defaultMessage": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {example} is the status bar's git item as Combwork shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."

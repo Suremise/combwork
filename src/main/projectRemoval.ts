@@ -23,6 +23,7 @@ import { forgetProjectQueues } from './workflow/queueRunner'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { deleteBlocks, projectFolders, releaseDelete, removeFolders, reserveDelete, reserveRefusal, trashFolders } from './projectFolders'
 import { folderWhat } from '../shared/projectFolders'
+import { endOwnedWork } from './platform/ownedWork'
 
 const log = createLogger('projects')
 
@@ -169,6 +170,8 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
   const unfence = sessions.fenceStarts(p)
   try {
     await stopAgents(p)
+    // HI-1185: a signing check of its Version Control view given up (its signer and temp folder gone first).
+    await endOwnedWork((owner) => owner.toLowerCase() === key)
     // Looked at again now nothing runs there: a stopping agent may have written to its worktree at the last moment.
     const info = await removalInfo(p)
     const agents = projectAgents(await ws.projectConfig(p))

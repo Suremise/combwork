@@ -242,6 +242,8 @@
   "tips.gitInit.title": "Convierte un proyecto en repositorio git con un clic",
   "tips.gitRemotes.text": "Control de versiones → Ramas y remotos: Push a… envía esta rama, o todas las ramas y etiquetas, a cualquier remoto sin cambiar lo que sigue la rama. Ahí también puedes renombrar o eliminar un remoto, y Seguir de una rama elige qué usan Pull y Push.",
   "tips.gitRemotes.title": "Haz push a un remoto de copia de seguridad",
+  "tips.gitSigning.text": "Control de versiones → Ramas y remotos → Firma muestra cómo firma los commits tu repositorio y si puede firmar sin nadie presente. Si pediría una frase de contraseña, explica cómo configurarlo para que las fusiones firmadas de la cola de fusión sigan adelante sin supervisión.",
+  "tips.gitSigning.title": "Fusiones firmadas sin esperas",
   "tips.gitView.text": "En un proyecto Git, la pestaña Control de versiones muestra su rama, sus remotos, su historial y sus etiquetas, y te permite cambiar de rama o crear una, hacer fetch, pull y push, crear etiquetas y configurar su identidad de commit. La barra de estado muestra “{example}”: haz clic para ir allí.",
   "tips.gitView.title": "Ve y cambia el git de un proyecto",
   "tips.gotoProject.text": "Presiona {key} y escribe unas letras de su nombre.",

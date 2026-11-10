@@ -1799,6 +1799,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
     'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
     'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
+    'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
     // The Operations section (HI-2800): read only; the preview's command is the user's to run.
     'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
     'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),

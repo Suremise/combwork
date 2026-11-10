@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Signed merges without waiting** (HI-1185). When your repository signs its commits, Version Control → Branches & remotes has a **Signing** section: how it signs, and whether it can sign with nobody there (a quick check that signs a throwaway text, with no prompt). When it would ask for a passphrase, it says how to set up signing that doesn't (an SSH key in the Windows agent, or gpg-agent's cache).
+  - **The merge queue checks first**: a key that needs you now pauses the queue before anything is merged, rather than after its time limit.
+  - Combwork never changes your git, ssh or gpg settings, and runs only the signing programs of Git for Windows, GnuPG and Windows' OpenSSH by itself.
 - **Submodules and Git LFS in slots and copies** (HI-1182). Slots, review and check copies and the merge queue's folder are worktrees, which git makes with empty submodule folders, and Combwork's had LFS files only where the project's setup did it. Now, in a repository that uses either, Combwork sets them up itself, before the setup script and before every card, review or merge check, as a run of its own in the Progress panel.
   - **Submodules** are checked out at the folder's revision, nested ones too, each folder cloning its own. Your repository's config is never written (no `git submodule sync` or `init` there), so the project folder and your URL overrides stay as they are; a submodule you turned off (`active = false`, `update = none`) is left alone.
   - **Git LFS files** are fetched with `git lfs pull`, downloaded once for every worktree of the repository. A submodule's own LFS files follow your git-lfs setup.

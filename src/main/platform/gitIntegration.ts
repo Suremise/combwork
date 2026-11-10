@@ -17,7 +17,11 @@ import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } fro
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
 import { destinationOf, fetchHeadOf, prePushOf, publishOf, redactTransport } from './gitTransport'
-import { say } from '../../shared/agentText'
+import { checkSigning } from './gitSigning'
+import { boundedSpawn } from './boundedSpawn'
+import { gitExe } from '../gitTool'
+import { withLauncherEnv } from '../gitWorker'
+import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
 const NOT_SAME = UPDATE_NOT_SAME
@@ -86,6 +90,26 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
   const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at])
   return add.ok ? null : again(add.err)
+}
+
+/** A signing check that didn't finish within its bound (HI-1185): the pause's detail, never proof it asked. */
+const SIGN_UNFINISHED = agentMsg({ id: 'queue.signing.unfinished', text: "The signer didn't finish within a few seconds with nobody there.", note: "A merge queue pause's detail (HI-1185, signingWaits): the signing check's signer was still running at its bound." })
+
+/**
+ * HI-1185 (SPEC §16.9.5): just before a step that signs, whether its signer could sign with nobody there, checked as
+ * that commit would sign (its folder, identity overrides and environment), once a round. One that needs someone, or
+ * didn't finish within the check's bound, pauses `signingWaits` before anything is committed or rewritten; one that
+ * can't sign pauses `signing`; a signer Combwork doesn't run by itself (`notChecked`) goes on to the bounded commit as before.
+ */
+async function preSign(h: CandidateHost, f: string, who: string[]): Promise<CandidatePause | Again | null> {
+  const use = gitExe()
+  const env = use.launcherEnv ? withLauncherEnv(commitEnv(), use.launcherEnv) : commitEnv()
+  const status = await (h.reads.signCheck ??= checkSigning({ git: (cwd, args) => h.run(cwd, args), spawn: h.spawn ?? ((file, args, o) => boundedSpawn(file, args, o)), cwd: f, who, env }).then((i) => i.status))
+  if (status.kind === 'needsSomeone') return { pause: 'signingWaits', message: status.detail }
+  if (status.kind === 'couldNotComplete') return { pause: 'signingWaits', message: say(SIGN_UNFINISHED) }
+  if (status.kind === 'cantSign') return { pause: 'signing', message: status.message }
+  if (status.kind === 'unreadable') return again(status.message)
+  return null
 }
 
 /**
@@ -397,6 +421,8 @@ export const gitIntegration: IntegrationPort = {
     const signed = await signs(h, f)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     // Read now, as the options are just before the update (G19: the project's current Commit message, HR1's R7 round 1).
     const message = c.message()
@@ -457,6 +483,8 @@ export const gitIntegration: IntegrationPort = {
     const signed = await signs(h, f)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     const clean = async (): Promise<void> => {
       await h.run(f, ['merge', '--abort'])
@@ -522,6 +550,9 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
     const signed = await signs(h, f)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    // The rewritten commits are signed: checked first (an on-top linear suffix lands unchanged, signing nothing).
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     const u = await h.run(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
     // HI-2020: git never started, or HI-2042 a signal ended it: put back, and again.

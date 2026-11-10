@@ -248,6 +248,8 @@
   "tips.gitInit.title": "Make a project a git repository in one click",
   "tips.gitRemotes.text": "Version Control → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
   "tips.gitRemotes.title": "Push to a backup remote",
+  "tips.gitSigning.text": "Version Control → Branches & remotes → Signing shows how your repository signs commits and whether it can sign with nobody there. If it would ask for a passphrase, it says how to set it up so the merge queue’s signed merges go ahead unattended.",
+  "tips.gitSigning.title": "Signed merges without waiting",
   "tips.gitView.text": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
   "tips.gitView.title": "See and change a project's git",
   "tips.gotoProject.text": "Press {key} and type a few letters of its name.",

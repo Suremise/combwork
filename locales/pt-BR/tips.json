@@ -242,6 +242,8 @@
   "tips.gitInit.title": "Transforme um projeto em repositório git com um clique",
   "tips.gitRemotes.text": "Controle de versão → Branches e remotes: Fazer push para… envia este branch, ou todos os branches e tags, para qualquer remote sem mudar o que o branch rastreia. Ali também dá para renomear ou remover um remote, e Rastrear… de um branch escolhe o que Fazer pull e Fazer push usam.",
   "tips.gitRemotes.title": "Faça push para um remote de backup",
+  "tips.gitSigning.text": "Controle de versão → Branches e remotes → Assinatura mostra como o seu repositório assina commits e se ele consegue assinar sem ninguém presente. Se ele pediria uma frase secreta, explica como configurar para que os merges assinados da fila de merge sigam sem supervisão.",
+  "tips.gitSigning.title": "Merges assinados sem espera",
   "tips.gitView.text": "Em um projeto Git, a aba Controle de versão mostra o branch, os remotes, o histórico e as tags, e permite trocar ou criar um branch, fazer fetch, pull e push, criar tags e definir a identidade de commit. A barra de status mostra “{example}”: clique nela para ir até lá.",
   "tips.gitView.title": "Veja e altere o git de um projeto",
   "tips.gotoProject.text": "Pressione {key} e digite algumas letras do nome do projeto.",
