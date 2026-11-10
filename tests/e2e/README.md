@@ -882,7 +882,12 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   (430 MB) and the sandbox's (320 MB). The Claude Code test home is small (about 80 MB) and isn't opened.
 - **Stays:** the CLI test homes' sign-ins, config and sandbox setup (`codex`, but for the above; `claude`, never opened), scenario results and baselines (a scenario run's own start keeps the newest 30 fake runs' results and the newest 30 model trials', those cited and those a run still writes into: tests/scenarios/README.md), the
   claims and locks, the concurrency checker's folders (it removes its own), the Progress panel's timings, the machine's test settings (`config.json`: `heavySlots`, #589); logs (the
-  runner keeps the newest ten runs); a lane a runner holds.
+  runner keeps the newest ten runs); a lane a runner holds; and what is set up once, by hand or pinned, that a suite or
+  release check runs (HI-2902): `agy-probe` (the agy profile onboarded by hand: The real Antigravity CLI, above),
+  `tools` (portable tools, checked as fetched: `npm run jj:fetch`) and the pinned CLI copies `copilot-<version>`
+  (a release's two-version Copilot run, HI-2780) and `opencode-<version>` (The real OpenCode, above). `--dry-run` lists
+  each kept folder with its reason; a new such folder goes in `KEPT` or `KEPT_PATTERNS` in `clean.mjs`, or the age rule
+  takes it.
 - **Evidence stays, whoever deletes** (`evidence.cjs`): anything a card that isn't Done cites is kept by the clean-up,
   by the runners' own deletions (a suite's or scenario's earlier folder, a passed suite's folders, log pruning,
   scenario results and older baselines) and listed as `kept: … (cited by #n)`. A card cites a path by writing it: the
