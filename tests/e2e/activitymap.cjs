@@ -3,7 +3,9 @@
 // Tools, You), a failed call turns Shell red, a fetched URL shows only its host, and the context ring turns amber at 70 %
 // and red at 90 % (69 % stays as it is). Live, a new call sends a pulse; frozen, Map off or hidden, nothing is drawn,
 // pulsed or read by the map (its counters). All agents: one shared map with an agent ring each, and a click on a ring
-// shows that agent alone. The Show toggles are kept. Both themes, wide and narrow. Fake Claude Code only (no sign-in, no
+// shows that agent alone. A prompt counts at You, by the word only. The map follows Hide finished, in the project's tab
+// and the workspace's view; a turns read only the map wanted, held in main while the map is turned off, applies nothing
+// once released. The Show toggles are kept. Both themes, wide and narrow. Fake Claude Code only (no sign-in, no
 // tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -65,6 +67,8 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     // --- The tab, filtered to HB1, live: its own map.
     await page.locator('.tab', { hasText: 'Activity' }).click()
     const head = page.locator('.activity-head')
+    // Hide finished off: the map, as the list, shows the agents between their turns (it follows that filter: below).
+    await head.locator('.activity-hide input').uncheck()
     await head.locator('.activity-pick').first().click()
     await lib.menuEntry(page, 'HB1').click()
     await page.keyboard.press('Escape')
@@ -79,8 +83,9 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await turn('hb1', 'window 100000 then context 69000 then tool Read src/alpha/a.ts then tool Write src/alpha/b.ts then tool Bash npm-run-lint fail then tool WebFetch https://docs.example.com:8443/private/page?q=hush then tool WebFetch https://u:pw@login.example.com/ then tool Skill then tool mcp__github__get_issue then tool Agent')
     const station = (s) => page.locator(`.activity-map-station[data-station="${s}"]`)
     const countAt = async (s) => Number(await station(s).getAttribute('data-count').catch(() => '-1'))
-    const all = ['read', 'edit', 'shell', 'agents', 'tools']
-    check('each station counts its calls this turn: Read, Edit, Shell, Agents, Tools', !!(await lib.until(async () => (await countAt('read')) >= 1 && (await countAt('edit')) >= 1 && (await countAt('shell')) >= 1 && (await countAt('agents')) >= 1 && (await countAt('tools')) >= 3, HUNG_MS, 250)), JSON.stringify(await Promise.all(all.map(countAt))))
+    const all = ['you', 'read', 'edit', 'shell', 'agents', 'tools']
+    check('each station counts this turn: You (its prompt), Read, Edit, Shell, Agents, Tools', !!(await lib.until(async () => (await countAt('you')) === 1 && (await countAt('read')) >= 1 && (await countAt('edit')) >= 1 && (await countAt('shell')) >= 1 && (await countAt('agents')) >= 1 && (await countAt('tools')) >= 3, HUNG_MS, 250)), JSON.stringify(await Promise.all(all.map(countAt))))
+    check("…the prompt named by a word, never its text", /Prompt/.test(await station('you').evaluate((e) => e.textContent)) && !/window 100000|context 69000/.test(await map.evaluate((e) => e.textContent)))
     check('a failed call turns its station red', (await station('shell').getAttribute('data-failed')) === 'yes' && (await station('read').getAttribute('data-failed')) === 'no')
     const feed = page.locator('.activity-map-feed')
     const feedText = await feed.innerText()
@@ -124,7 +129,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     const hidden0 = await counts()
     await turn('hb1', 'window 100000 then context 20000 then tool Read src/alpha/f.ts then tool Write src/alpha/g.ts')
     const hidden1 = await counts()
-    check('hidden: the map reads, draws and pulses nothing', hidden1.reads === hidden0.reads && hidden1.renders === hidden0.renders && hidden1.pulses === hidden0.pulses, JSON.stringify([hidden0, hidden1]))
+    check('hidden: the map reads, draws and pulses nothing', hidden1.reads === hidden0.reads && hidden1.turnReads === hidden0.turnReads && hidden1.renders === hidden0.renders && hidden1.pulses === hidden0.pulses, JSON.stringify([hidden0, hidden1]))
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
       document.dispatchEvent(new Event('visibilitychange'))
@@ -142,7 +147,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     const off0 = await counts()
     await turn('hb1', 'window 100000 then context 30000 then tool Read src/alpha/h.ts')
     const off1 = await counts()
-    check('Map off: no map reads, drawing or pulses', off1.reads === off0.reads && off1.renders === off0.renders && off1.pulses === off0.pulses, JSON.stringify([off0, off1]))
+    check('Map off: no map reads, drawing or pulses', off1.reads === off0.reads && off1.turnReads === off0.turnReads && off1.renders === off0.renders && off1.pulses === off0.pulses, JSON.stringify([off0, off1]))
     await toggles.locator('[data-toggle="map"]').click()
     await lib.until(async () => (await map.count()) === 1, HUNG_MS, 250)
     // Feed off: kept for the next time.
@@ -151,10 +156,42 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('…and kept', (await page.evaluate(() => localStorage.getItem('combwork.activity.map'))) === JSON.stringify({ map: true, feed: false, context: true }))
     await toggles.locator('[data-toggle="feed"]').click()
 
-    // --- All agents: one shared map, a ring each; HB2's call among HB1's.
+    // --- A read only the map wants (HB2's session: the list shows HB1's tab), held in main (CW_TEST_HOLD_IPC) while the map
+    // is turned off: released, it applies nothing, and no map read starts with the map off (HR2's round 1).
+    const heldTurns = () => app.evaluate(() => globalThis.__cwHeldIpc?.['activity:turns'] ?? 0)
+    const gated = async (where, scope) => {
+      const mapIn = page.locator(`${scope} .activity-map`)
+      const mapToggle = page.locator(`${scope} .activity-map-toggles [data-toggle="map"]`)
+      await mapToggle.click()
+      await lib.until(async () => (await mapIn.count()) === 0, HUNG_MS, 250)
+      await app.evaluate(() => {
+        process.env.CW_TEST_HOLD_IPC = 'activity:turns'
+      })
+      const c0 = await counts()
+      await mapToggle.click()
+      const started = await lib.until(async () => (await counts()).turnReads > c0.turnReads && (await heldTurns()) >= 1, HUNG_MS, 100)
+      await mapToggle.click()
+      await lib.until(async () => (await mapIn.count()) === 0, HUNG_MS, 250)
+      const c1 = await counts()
+      await app.evaluate(() => {
+        delete process.env.CW_TEST_HOLD_IPC
+      })
+      await lib.until(async () => (await heldTurns()) === 0, HUNG_MS, 100)
+      // Calls made after the release answer after the held ones: the window has had their answers by then.
+      for (let i = 0; i < 3; i++) await inv('session:live')
+      const c2 = await counts()
+      check(`${where}: a map read held while the map was turned off applies nothing once released`, !!started && c2.turnsApplied === c0.turnsApplied, JSON.stringify([c0, c1, c2]))
+      check(`${where}: …and no map read starts while the map is off`, c2.turnReads === c1.turnReads, JSON.stringify([c1, c2]))
+      await mapToggle.click()
+      await lib.until(async () => (await mapIn.count()) === 1, HUNG_MS, 250)
+    }
     await head.locator('.activity-pick').first().click()
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
+    await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+    await gated('the project tab', '.activity-tab')
+
+    // --- All agents: one shared map, a ring each; HB2's call among HB1's.
     check('all agents: one shared map', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
     const rings = page.locator('.activity-map-ring')
     check('…with a context ring per agent', !!(await lib.until(async () => (await rings.count()) === 2, HUNG_MS, 250)), String(await rings.count()))
@@ -165,6 +202,28 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await shoot('3-shared-dark')
     await rings.filter({ hasText: 'HB2' }).click()
     check("a click on HB2's ring shows its map alone", !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'single' && /HB2/.test(await page.locator('.activity-map-centre').evaluate((e) => e.textContent).catch(() => '')), HUNG_MS, 250)))
+
+    // --- Hide finished, as the list has it: both agents idle, no map; off again, the map is back.
+    await head.locator('.activity-pick').first().click()
+    await lib.menuEntry(page, 'All').click()
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+    await head.locator('.activity-hide input').check()
+    check('the project tab, Hide finished on and both agents idle: no map, as the list shows nothing', !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250)))
+    await head.locator('.activity-hide input').uncheck()
+    check('…Hide finished off: the shared map again', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
+
+    // --- The workspace's Activity (the activity bar): its own Hide finished (on), then its shared map, and its held read.
+    await page.locator('.activity-btn[aria-label="Activity"]').click()
+    const wsMap = page.locator('.activity-workspace .activity-map')
+    const wsHead = page.locator('.activity-workspace .activity-head')
+    await lib.until(async () => (await wsHead.count()) === 1, HUNG_MS, 250)
+    check('the workspace view, Hide finished on and both agents idle: no map', !!(await lib.until(async () => (await wsMap.count()) === 0 && (await page.locator('.activity-workspace .pane-empty').count()) === 1, HUNG_MS, 250)))
+    await wsHead.locator('.activity-hide input').uncheck()
+    check('…Hide finished off: one shared map of the workspace, a ring per agent', !!(await lib.until(async () => (await wsMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await page.locator('.activity-workspace .activity-map-ring').count()) === 2, HUNG_MS, 250)))
+    await gated('the workspace view', '.activity-workspace')
+    await page.locator('.activity-btn[aria-label="Projects"]').click()
+    await lib.until(async () => (await head.count()) === 1, HUNG_MS, 250)
 
     // --- Light theme, and a narrow window: the map above the list.
     await head.locator('.activity-pick').first().click()

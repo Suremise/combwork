@@ -46,6 +46,7 @@
   "activity.map.notReported": "no informado",
   "activity.map.partial": "Según las últimas llamadas leídas: no todo el historial.",
   "activity.map.pct": "{pct, number} %",
+  "activity.map.prompt": "Prompt",
   "activity.map.ringTip": "{name}: {load, select, notLoaded {más allá de los ocho agentes que lee el mapa, así que sus llamadas no se muestran} loading {se están leyendo sus llamadas} other {{known, select, no {contexto desconocido} other {contexto {pct, number} %}}}}. Haz clic para mostrar solo este agente.",
   "activity.map.show": "Mostrar",
   "activity.map.state": "{state, select, working {Trabajando} waiting {Esperándote} failed {Con error o estancado} done {Terminado} other {Inactivo}}",

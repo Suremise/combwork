@@ -10,7 +10,7 @@ import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, u
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapTabs, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
@@ -137,13 +137,26 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const nowReads = useRef(boundedQueue(1))
   const listReads = useRef(boundedQueue(LISTS_AT_ONCE))
   const turnReads = useRef(boundedQueue(TURNS_AT_ONCE))
+  // A session's turns are read and taken in only while the list or the map shows it (HR2's HI-2903 round 1): checked when
+  // its read starts and when it answers.
+  const mapOnlyRef = useRef(new Set<string>())
   const readTurns = useCallback((wanted: { path: string; id: string }[]): void => {
+    const isShown = (key: string): boolean => shownSessionsRef.current.some((x) => sk(x.path, x.id) === key)
     for (const { path, id } of wanted) {
       const key = sk(path, id)
       turnReads.current.add(
         key,
-        () => (counts.turns++, call('activity:turns', path, id, turnsRef.current.get(key)?.version).catch(() => null)),
-        (t) => t && setTurns((m) => new Map(m).set(key, t))
+        () => {
+          if (!isShown(key)) return Promise.resolve(null)
+          if (mapOnlyRef.current.has(key)) noteMapTurns('read')
+          counts.turns++
+          return call('activity:turns', path, id, turnsRef.current.get(key)?.version).catch(() => null)
+        },
+        (t) => {
+          if (!t || !isShown(key)) return
+          if (mapOnlyRef.current.has(key)) noteMapTurns('applied')
+          setTurns((m) => new Map(m).set(key, t))
+        }
       )
     }
   }, [])
@@ -394,10 +407,11 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const entries = useMemo<MapEntry[]>(() => {
     const out = shownHosts.flatMap((h) => {
       const input = inputs.get(hk(h.path))!
-      return mapTabs(input, { agents: inFilter(h), cards: view.cards }, 'shared').map((t): MapEntry => ({ key: activityAgentKey(h.path, t.agentId), path: h.path, agentId: t.agentId, name: t.name, tab: t, input, live: h.agents.find((a) => a.id === t.agentId)?.live ?? null }))
+      const keep = h.agents.find((a) => activityAgentKey(h.path, a.id) === view.tab)?.id
+      return mapTabs(input, { agents: inFilter(h), cards: view.cards, hideFinished: view.hideFinished }, 'shared', keep).map((t): MapEntry => ({ key: activityAgentKey(h.path, t.agentId), path: h.path, agentId: t.agentId, name: t.name, tab: t, input, live: h.agents.find((a) => a.id === t.agentId)?.live ?? null }))
     })
     return mode === 'single' ? out.slice(0, 1) : out
-  }, [mode, shownHosts, inputs, inFilter, view.cards])
+  }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
   const entriesKey = entries.map((e) => `${e.key}:${e.live?.sessionId ?? ''}`).join('|')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(entries), [entriesKey])
@@ -415,15 +429,18 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   }, [parts, current?.host.path, mapRead])
   shownSessionsRef.current = shownSessions
   // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
-  const mapOnly = useRef(new Set<string>())
+  // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
+  const listPath = current?.host.path
+  const listedKeys = new Set(listPath ? parts.flatMap((p) => [...(p.session ? [sk(listPath, p.session.session.id)] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [sk(listPath, n.session.id)] : []))]) : [])
+  const mapOnlyNow = new Set(mapRead.map((x) => sk(x.path, x.id)).filter((k) => !listedKeys.has(k)))
+  mapOnlyRef.current = mapOnlyNow
+  const mapOnlyKey = [...mapOnlyNow].join(',')
+  const droppable = useRef(new Set<string>())
   useEffect(() => {
-    const path = current?.host.path
-    const listed = new Set(path ? parts.flatMap((p) => [...(p.session ? [sk(path, p.session.session.id)] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [sk(path, n.session.id)] : []))]) : [])
-    const wanted = new Set(mapRead.map((x) => sk(x.path, x.id)))
-    const drop = [...mapOnly.current].filter((k) => !wanted.has(k) && !listed.has(k))
-    mapOnly.current = new Set([...wanted].filter((k) => !listed.has(k)))
+    const drop = [...droppable.current].filter((k) => !mapOnlyRef.current.has(k) && !shownSessionsRef.current.some((x) => sk(x.path, x.id) === k))
+    droppable.current = new Set(mapOnlyRef.current)
     if (drop.length) setTurns((m) => new Map([...m].filter(([k]) => !drop.includes(k))))
-  }, [mapRead, parts, current?.host.path])
+  }, [mapOnlyKey])
   const unread = shownSessions.filter((x) => !turns.has(sk(x.path, x.id)))
   const unreadKey = unread.map((x) => sk(x.path, x.id)).join(',')
   useEffect(() => {

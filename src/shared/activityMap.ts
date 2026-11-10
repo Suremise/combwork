@@ -160,6 +160,8 @@ export interface MapAgentInput {
 /** A call on the map: its identity across reads (host, session, item), its agent and station, and its safe label. */
 export interface MapCall {
   key: string
+  /** A turn's prompt (the You station), named on the map by a word of its own: never its text. */
+  kind?: 'prompt'
   /** Its session's key (host-qualified): a session first seen is a baseline, never a burst of pulses. */
   sessionKey: string
   agentKey: string
@@ -180,6 +182,8 @@ export interface MapStationView {
   heat: number
   /** Its newest call's label, or a running process's name for Shell; empty: none. */
   last: string
+  /** Its newest is a prompt (You): shown as the word for one, never its text. */
+  lastKind?: 'prompt'
   failed: boolean
   /** Agents with a call here open now (their keys), or waiting (You). */
   here: string[]
@@ -213,24 +217,56 @@ export interface MapModel {
   sessions: string[]
 }
 
-/** An agent's calls in the turns read, its latest MAP_CALLS (each a tool call, or each call a script made). */
-export function agentCalls(a: MapAgentInput): { calls: MapCall[]; capped: boolean; lastTurn: Set<string> } {
+/**
+ * An agent's calls in the turns read, its latest MAP_CALLS (each turn's prompt, each tool call, or each call a script
+ * made), oldest first. Read from the newest back and stopped at the budget (HR2's round 1): no more is visited, labelled
+ * or kept, however many a turn or a script holds; `capped` says some were left.
+ */
+export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCall[]; capped: boolean; lastTurn: Set<string> } {
   const out: MapCall[] = []
   const lastTurn = new Set<string>()
   const turns = a.turns?.turns ?? []
-  const lastIdx = turns.length - 1
-  turns.forEach((turn, ti) => {
-    for (const tool of turn.tools) {
-      const made = tool.calls?.length ? tool.calls.map((name, i) => ({ name, summary: '', key: `${a.sessionKey}\n${tool.itemId}.${i}` })) : [{ name: tool.name, summary: tool.summary, key: `${a.sessionKey}\n${tool.itemId}` }]
-      for (const m of made) {
-        const st = stationOf(m.name)
-        out.push({ key: m.key, sessionKey: a.sessionKey ?? '', agentKey: a.key, station: st.station, ...(st.group ? { group: st.group } : {}), label: mapLabel(m), at: tool.at, failed: tool.failed, done: tool.done })
-        if (ti === lastIdx) lastTurn.add(m.key)
+  const sk = a.sessionKey ?? ''
+  let capped = false
+  const take = (c: Omit<MapCall, 'sessionKey' | 'agentKey'>, last: boolean): boolean => {
+    if (out.length >= budget) {
+      capped = true
+      return false
+    }
+    out.push({ ...c, sessionKey: sk, agentKey: a.key })
+    if (last) lastTurn.add(c.key)
+    return true
+  }
+  const full = (): boolean => {
+    if (out.length < budget) return false
+    capped = true
+    return true
+  }
+  const one = (name: string, summary: () => string, key: string, tool: { at: string | null; failed: boolean; done: boolean }, last: boolean): boolean => {
+    const st = stationOf(name)
+    return take({ key, station: st.station, ...(st.group ? { group: st.group } : {}), label: mapLabel({ name, summary: summary() }), at: tool.at, failed: tool.failed, done: tool.done }, last)
+  }
+  walk: for (let ti = turns.length - 1; ti >= 0; ti--) {
+    const turn = turns[ti]
+    const last = ti === turns.length - 1
+    for (let i = turn.tools.length - 1; i >= 0; i--) {
+      const tool = turn.tools[i]
+      if (tool.calls?.length) {
+        for (let j = tool.calls.length - 1; j >= 0; j--) {
+          // Over budget: the next is never read.
+          if (full()) break walk
+          one(tool.calls[j], () => '', `${sk}\n${tool.itemId}.${j}`, tool, last)
+        }
+        if (tool.callsMore) capped = true
+      } else {
+        if (full()) break walk
+        one(tool.name, () => tool.summary, `${sk}\n${tool.itemId}`, tool, last)
       }
     }
-  })
-  const capped = out.length > MAP_CALLS
-  return { calls: capped ? out.slice(-MAP_CALLS) : out, capped, lastTurn }
+    // The turn's prompt: You, by a word of its own (its text is content).
+    if (!take({ key: `${sk}\nprompt:${turn.itemId}`, kind: 'prompt', station: 'you', label: '', at: turn.at, failed: false, done: true }, last)) break
+  }
+  return { calls: out.reverse(), capped, lastTurn }
 }
 
 /** The map's model: each station's counts, heat, last label and failure, the feed, and the agents' rings. Pure. */
@@ -268,7 +304,12 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
   }
   // Each station's last label: its newest call's (Shell keeps a running process's name).
   const sorted = all.slice().sort((x, y) => (Date.parse(y.at ?? '') || 0) - (Date.parse(x.at ?? '') || 0))
-  for (const c of sorted) if (!stations[c.station].last) stations[c.station].last = c.label
+  for (const c of sorted) {
+    const s = stations[c.station]
+    if (s.last || s.lastKind) continue
+    if (c.kind === 'prompt') s.lastKind = 'prompt'
+    else s.last = c.label
+  }
   for (const s of MAP_STATIONS) {
     const st = stations[s]
     // Unsupported only when no shown agent's provider reports it; loading while no shown agent's turns are in.

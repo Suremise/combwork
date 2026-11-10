@@ -46,6 +46,7 @@
   "activity.map.notReported": "non signalé",
   "activity.map.partial": "D’après les derniers appels lus : pas tout l’historique.",
   "activity.map.pct": "{pct, number} %",
+  "activity.map.prompt": "Prompt",
   "activity.map.ringTip": "{name} : {load, select, notLoaded {au-delà des huit agents que lit la carte, ses appels ne sont donc pas affichés} loading {ses appels sont en cours de lecture} other {{known, select, no {contexte inconnu} other {contexte {pct, number} %}}}}. Clique pour n’afficher que cet agent.",
   "activity.map.show": "Afficher",
   "activity.map.state": "{state, select, working {Au travail} waiting {T’attend} failed {En échec ou à l’arrêt} done {Fini} other {Inactif}}",

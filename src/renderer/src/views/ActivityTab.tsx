@@ -11,7 +11,7 @@ import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, 
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapTabs, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
@@ -103,13 +103,26 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // round 3): hidden or gone, what waits is dropped and what still runs applies nothing.
   const turnReads = useRef(boundedQueue(TURNS_AT_ONCE))
   const listReads = useRef(latestOnly())
+  // A session's turns are read and taken in only while the list or the map shows it (HR2's HI-2903 round 1): checked when
+  // its read starts and when it answers, so a read the map no longer wants (a filter changed, the map off) neither runs
+  // nor fills the cache again after its session was dropped.
+  const wantedTurns = (id: string): boolean => shownSessionsRef.current.some((x) => x.id === id)
+  const mapOnlyRef = useRef(new Set<string>())
   const readTurns = useCallback(
     (ids: string[]): void => {
       for (const id of ids)
         turnReads.current.add(
           id,
-          () => call('activity:turns', project.path, id, turnsRef.current.get(id)?.version).catch(() => null),
-          (t) => t && setTurns((m) => new Map(m).set(id, t))
+          () => {
+            if (!wantedTurns(id)) return Promise.resolve(null)
+            if (mapOnlyRef.current.has(id)) noteMapTurns('read')
+            return call('activity:turns', project.path, id, turnsRef.current.get(id)?.version).catch(() => null)
+          },
+          (t) => {
+            if (!t || !wantedTurns(id)) return
+            if (mapOnlyRef.current.has(id)) noteMapTurns('applied')
+            setTurns((m) => new Map(m).set(id, t))
+          }
         )
     },
     [project.path]
@@ -305,7 +318,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // Its agents whatever Hide finished says (an idle agent is drawn idle): the shared map's those running, one agent's
   // map its agent even when it isn't.
   const entries = useMemo<MapEntry[]>(
-    () => mapTabs(input, view, mode).map((t) => ({ key: t.agentId, path: project.path, agentId: t.agentId, name: t.name, tab: t, input, live: project.agents.find((a) => a.id === t.agentId)?.live ?? null })),
+    () => mapTabs(input, view, mode, view.tab).map((t) => ({ key: t.agentId, path: project.path, agentId: t.agentId, name: t.name, tab: t, input, live: project.agents.find((a) => a.id === t.agentId)?.live ?? null })),
     // The live state is the project's now (its provider and session): taken in with the drawn reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, view.agents, view.cards, input]
@@ -328,14 +341,17 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   }, [parts, mapRead])
   shownSessionsRef.current = shownSessions
   // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
-  const mapOnly = useRef(new Set<string>())
+  // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
+  const listedIds = new Set(parts.flatMap((p) => [...(p.session ? [p.session.session.id] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [n.session.id] : []))]))
+  const mapOnlyNow = new Set(mapRead.map((x) => x.id).filter((id) => !listedIds.has(id)))
+  const droppable = useRef(new Set<string>())
+  mapOnlyRef.current = mapOnlyNow
+  const mapOnlyKey = [...mapOnlyNow].join(',')
   useEffect(() => {
-    const listed = new Set(parts.flatMap((p) => [...(p.session ? [p.session.session.id] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [n.session.id] : []))]))
-    const wanted = new Set(mapRead.map((x) => x.id))
-    const drop = [...mapOnly.current].filter((id) => !wanted.has(id) && !listed.has(id))
-    mapOnly.current = new Set([...wanted].filter((id) => !listed.has(id)))
+    const drop = [...droppable.current].filter((id) => !mapOnlyRef.current.has(id) && !shownSessionsRef.current.some((x) => x.id === id))
+    droppable.current = new Set(mapOnlyRef.current)
     if (drop.length) setTurns((m) => new Map([...m].filter(([id]) => !drop.includes(id))))
-  }, [mapRead, parts])
+  }, [mapOnlyKey])
   const unread = shownSessions.filter((x) => !turns.has(x.id)).map((x) => x.id).join(',')
   useEffect(() => {
     if (active && unread) readTurns(unread.split(','))

@@ -48,6 +48,7 @@ interface CombworkMessageValues {
   'activity.map.notReported': undefined
   'activity.map.partial': undefined
   'activity.map.pct': { pct: number }
+  'activity.map.prompt': undefined
   'activity.map.ringTip': { name: string | number; load: string; known: string; pct: number }
   'activity.map.show': undefined
   'activity.map.state': { state: string }

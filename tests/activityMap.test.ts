@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
-import { activityTurns, type ActivityTurns } from '../src/shared/activity'
+import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
 import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import type { TranscriptItem } from '../src/shared/types'
@@ -157,7 +157,7 @@ describe("the map's model", () => {
     expect(m.stations.shell).toMatchObject({ count: 1, failed: true, last: 'Bash' })
     expect(m.stations.edit).toMatchObject({ count: 1, here: ['A'], last: 'src/b.ts' })
     expect(m.stations.agents).toMatchObject({ status: 'ok', count: 0 })
-    expect(m.feed.map((c) => c.label)).toEqual(['src/b.ts', 'Bash', 'src/a.ts', 'a/old.ts'])
+    expect(m.feed.filter((c) => c.kind !== 'prompt').map((c) => c.label)).toEqual(['src/b.ts', 'Bash', 'src/a.ts', 'a/old.ts'])
     expect(m.agents[0].load).toBe('loaded')
   })
 
@@ -192,6 +192,66 @@ describe("the map's model", () => {
     expect(m.stations.tools.count).toBe(0)
   })
 
+  it("counts a turn's prompt at You, by the word for one (never its text), and sends it as a pulse once new", () => {
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[]]) })], 0)
+    expect(m.stations.you).toMatchObject({ count: 1, lastKind: 'prompt', last: '' })
+    expect(m.feed.map((c) => [c.station, c.kind, c.label])).toEqual([['you', 'prompt', '']])
+    const next = (() => {
+      let n = 0
+      return () => `p${++n}`
+    })()
+    const before = diffPulses(null, [], next, undefined, ['A-s'])
+    const r = diffPulses(before.seen, m.calls, next, before.sessions, m.sessions)
+    expect(r.pulses.map((p) => [p.station, p.back])).toEqual([['you', false], ['you', true]])
+  })
+
+  it('reads no more of a huge turn or a huge script than its budget: the latest calls, nothing earlier visited (HR2, round 1)', () => {
+    // Each summary and each script call counted as it is read: the walk stops at the budget.
+    let visited = 0
+    const tools = Array.from({ length: 10_000 }, (_, i) => ({
+      itemId: i + 2,
+      name: 'Read',
+      get summary(): string {
+        visited++
+        return `src/f${i}.ts`
+      },
+      at: null,
+      until: null,
+      failed: false,
+      done: true
+    }))
+    const huge: ActivityTurns = { sessionId: 's', version: 'v', total: 1, turns: [{ itemId: 1, at: null, prompt: '', reply: '', lastKind: 'tool', tools }] }
+    const m = buildMapModel([agent('A', { turns: huge })], 0)
+    expect(m.calls).toHaveLength(MAP_CALLS)
+    expect(visited).toBeLessThanOrEqual(MAP_CALLS)
+    expect(m.calls.at(-1)?.label).toBe('src/f9999.ts')
+    expect(m.agents[0].capped).toBe(true)
+    let indexed = 0
+    const calls = new Proxy(Array.from({ length: 10_000 }, () => 'Bash'), {
+      get(t, k, r) {
+        if (typeof k === 'string' && /^\d+$/.test(k)) indexed++
+        return Reflect.get(t, k, r)
+      }
+    })
+    const script: ActivityTurns = { sessionId: 's', version: 'v', total: 1, turns: [{ itemId: 1, at: null, prompt: '', reply: '', lastKind: 'tool', tools: [{ itemId: 2, name: 'Script', summary: '', at: null, until: null, failed: false, done: true, calls }] }] }
+    const ms = buildMapModel([agent('A', { turns: script })], 0)
+    expect(ms.stations.shell.count).toBe(MAP_CALLS)
+    expect(indexed).toBeLessThanOrEqual(MAP_CALLS)
+    expect(ms.stations.shell.partial).toBe(true)
+  })
+
+  it("keeps a script's latest SCRIPT_CALLS call names on main, and how many earlier ones there were", () => {
+    const tool = (n: number) => ({ id: 2, kind: 'tool', timestamp: null, tool: { toolUseId: 't', name: 'Script', summary: '', input: '', result: 'ok', isError: false, images: [], calls: Array.from({ length: n }, (_, i) => ({ toolUseId: `c${i}`, name: i % 2 ? 'Shell' : 'Edit', summary: 'secret', input: '', result: '', isError: false, images: [] })) } })
+    const prompt = { id: 1, kind: 'user', text: 'go', timestamp: null }
+    const big = activityTurns([prompt, tool(SCRIPT_CALLS + 600)] as unknown as TranscriptItem[]).turns[0].tools[0]
+    expect(big.calls).toHaveLength(SCRIPT_CALLS)
+    expect(big.callsMore).toBe(600)
+    const small = activityTurns([prompt, tool(3)] as unknown as TranscriptItem[]).turns[0].tools[0]
+    expect(small).toMatchObject({ calls: ['Edit', 'Shell', 'Edit'] })
+    expect(small.callsMore).toBeUndefined()
+    expect(buildMapModel([agent('A', { turns: { sessionId: 's', version: 'v', total: 1, turns: [{ itemId: 1, at: null, prompt: '', reply: '', lastKind: 'tool', tools: [big] }] } })], 0).agents[0].capped).toBe(true)
+  })
+
   it('caps one huge turn at MAP_CALLS calls, the latest, and says the counts are partial', () => {
     const huge = Array.from({ length: MAP_CALLS + 250 }, (_, i) => ({ name: i % 2 ? 'Read' : 'Bash' }))
     const m = buildMapModel([agent('A', { turns: turnsOf('s', [huge]) })], 0)
@@ -205,8 +265,9 @@ describe("the map's model", () => {
     const a = agent('C:/one\na-1', { sessionKey: 'c:/one\ns-1', turns: turnsOf('s-1', [[{ name: 'Read' }]]) })
     const b = agent('C:/two\na-1', { sessionKey: 'c:/two\ns-1', turns: turnsOf('s-1', [[{ name: 'Read' }]]) })
     const m = buildMapModel([a, b], 0)
-    expect(new Set(m.calls.map((c) => c.key)).size).toBe(2)
+    expect(new Set(m.calls.filter((c) => c.kind !== 'prompt').map((c) => c.key)).size).toBe(2)
     expect(m.stations.read.count).toBe(2)
+    expect(m.stations.you.count).toBe(2)
     expect(new Set(m.calls.map((c) => c.agentKey))).toEqual(new Set([a.key, b.key]))
   })
 

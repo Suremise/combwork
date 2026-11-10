@@ -21,7 +21,7 @@ import type { MapShow } from '../activityView'
  * What the map read, drew and animated, counted (HI-2903): its e2e suite reads them from a test copy's window to prove
  * it costs nothing while hidden (no reads, renders or pulses), and that Map off and frozen stop its own work.
  */
-const mapCounts = { renders: 0, pulses: 0, reads: 0, active: false }
+const mapCounts = { renders: 0, pulses: 0, reads: 0, turnReads: 0, turnsApplied: 0, active: false }
 ;(window as unknown as { __cwActivityMap?: typeof mapCounts }).__cwActivityMap = mapCounts
 
 /** An agent the map shows: its key (the filter's value: an agent id, or at the workspace level its host's and id), its host and its tab. */
@@ -41,12 +41,21 @@ const sessionKey = (path: string, id: string): string => `${path.toLowerCase()}\
 const NO_TURNS = { sessionId: '', version: '', total: 0, turns: [] }
 
 /**
- * The agents the map shows, in pane order, whatever Hide finished says (an idle agent is drawn idle): the shared map's
- * those running, narrowed by the agents and cards filters; one agent's map, its agent even when it isn't running.
+ * The agents the map shows: the list's own tabs, by the same filters (Agents, Cards, Hide finished; HR2's round 1), in pane
+ * order; one agent's map, the first. None: no map (the list says nothing runs).
  */
-export function mapTabs(input: ActivityInput, filter: ActivityFilter, mode: 'single' | 'shared'): ActivityTabInfo[] {
-  const tabs = activityTabs(input, { ...filter, hideFinished: false })
-  return mode === 'single' ? tabs.slice(0, 1) : tabs.filter((t) => !!input.agents.find((a) => a.id === t.agentId)?.live)
+export function mapTabs(input: ActivityInput, filter: ActivityFilter, mode: 'single' | 'shared', keep?: string | null): ActivityTabInfo[] {
+  const tabs = activityTabs(input, filter, keep)
+  return mode === 'single' ? tabs.slice(0, 1) : tabs
+}
+
+/**
+ * The map's own turn reads (HR2's round 1), counted for its cost measure: a read started for a session only the map
+ * shows, and an answer applied for one. The views check each such read when it starts and when it answers.
+ */
+export function noteMapTurns(what: 'read' | 'applied'): void {
+  if (what === 'read') mapCounts.turnReads++
+  else mapCounts.turnsApplied++
 }
 
 /** The sessions the shared map reads turns for (s16: each shown agent's running session, its first MAP_AGENTS only). */
@@ -291,8 +300,8 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
                 <span className="activity-map-feed-time">{c.at ? formatTime(c.at) : ''}</span>
                 {mode === 'shared' && <span className="activity-map-dot" style={{ background: colourOf(colours.get(c.agentKey)) }} />}
                 <span className="activity-map-feed-station">{stationName(c.station)}</span>
-                <span className="activity-map-feed-name" title={c.label}>
-                  {c.label}
+                <span className="activity-map-feed-name" title={c.kind === 'prompt' ? tr(M.prompt) : c.label}>
+                  {c.kind === 'prompt' ? tr(M.prompt) : c.label}
                 </span>
               </div>
             ))
@@ -309,7 +318,8 @@ function Station({ view: st, name, colours }: { view: MapStationView; name: stri
   const active = st.here.length > 0
   const waitingHere = st.station === 'you' && active
   const sub = st.status === 'notReported' ? tr(M.notReported) : st.status === 'loading' ? tr(M.loading) : tr(M.count, { n: st.count })
-  const title = st.status === 'ok' ? tr(M.stationTip, { station: name, n: st.count, heat: st.heat, last: st.last || 'none' }) : `${name}: ${sub}`
+  const last = st.lastKind === 'prompt' ? tr(M.prompt) : st.last
+  const title = st.status === 'ok' ? tr(M.stationTip, { station: name, n: st.count, heat: st.heat, last: last || 'none' }) : `${name}: ${sub}`
   return (
     <g className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status)} data-station={st.station} data-count={st.count} data-status={st.status} data-failed={st.failed ? 'yes' : 'no'}>
       <title>{title}</title>
@@ -320,9 +330,9 @@ function Station({ view: st, name, colours }: { view: MapStationView; name: stri
       <text x={p.x} y={p.y + 4} className="activity-map-station-sub">
         {waitingHere ? tr(M.needsYou) : sub}
       </text>
-      {st.last && st.status === 'ok' && (
+      {last && st.status === 'ok' && (
         <text x={p.x} y={p.y + 20} className="activity-map-station-last">
-          {short(st.last)}
+          {short(last)}
         </text>
       )}
       {colours.size > 1 &&
@@ -434,6 +444,7 @@ const M = {
   noCalls: msg({ id: 'activity.map.noCalls', defaultMessage: 'No tool calls yet.', description: "The Activity map's feed when the agents shown have made no tool call in the turns read." }),
   partial: msg({ id: 'activity.map.partial', defaultMessage: 'From the latest calls read: not the whole history.', description: "Under the Activity map's feed when its counts are a sample (an agent made more calls than the map counts, or more agents run than it reads)." }),
   stationTip: msg({ id: 'activity.map.stationTip', defaultMessage: '{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {last, select, none {none} other {{last}}}', description: "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool), none when there is none. Keep the select keys." }),
+  prompt: msg({ id: 'activity.map.prompt', defaultMessage: 'Prompt', description: "On the Activity map and its feed: a prompt the agent was given (at the You station), named by this word only, never its text." }),
   show: msg({ id: 'activity.map.show', defaultMessage: 'Show', description: "Before the Activity tab's toggles for its map: Map, Feed, Context." }),
   toggleMap: msg({ id: 'activity.map.toggleMap', defaultMessage: 'Map', description: "A toggle above the Activity tab: show its map (a honeycomb of what agents do)." }),
   toggleFeed: msg({ id: 'activity.map.toggleFeed', defaultMessage: 'Feed', description: "A toggle above the Activity tab: show the map's feed of the last actions." }),
