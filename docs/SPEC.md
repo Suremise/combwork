@@ -2652,8 +2652,10 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   revision and base equal to the change's, its owned `candidate` pin reading back its result now) that the head reaches
   by exact commit id; else §16.3.2's test unchanged on the backing store (Git's `contains` at that head: ancestry,
   a replaying commit, the whole target holding it). A divergent reviewed revision, or a divergent or conflicted proof
-  commit, is refused; change ids never count, not even as a hint. A refusal or unknown is never "not contained":
-  LeftTarget is written only on a proved null.
+  commit, is refused; change ids never count, not even as a hint. Every answer, a null included, is **fenced after its
+  last awaited read**: the target's head, the operation, Git's ref and the export matrix read again and compared (after
+  the proof, and again after retention's pin writes), so a plain Git move during the read is a refusal or unknown
+  (HR1's round 1). A refusal or unknown is never "not contained": LeftTarget is written only on a proved null.
 - **Retained bundles:** before it answers proved, every object the proof names (the reviewed revision, its base, the head,
   and a separate proof commit) is pinned in a bundle with an immutable identity, `refs/cw/jj-integrated/<card>/<cycle>/
   <bundle>/`, under J4's ownership rules (intent journalled, create-only, read back, owned only on its own create; a ref
@@ -2668,8 +2670,9 @@ pushes. The reconciler's existing "integrated outside" path records the result o
 - **Publish is observed, never done** (gate: publish stays closed for pushing). The remote: the bookmark's one tracked
   remote; several tracked, or none tracked with several configured and no `origin`, is `ambiguousRemote`; its URL from
   jj and from the store's config must agree. What the remote has is read from the remote (`ls-remote --refs`, no
-  prompt, exactly `refs/heads/T`), then the operation, the target's head, the remote and both URLs are read again: any
-  change writes nothing. A pushed commit the store lacks is `notFetched`.
+  prompt, exactly `refs/heads/T`), then the operation, the target's head and its export, the remote and both URLs are
+  read again, across the network read and **again after every awaited decision read, right before the settles** (which
+  are synchronous): any change writes nothing (HR1's round 1). A pushed commit the store lacks is `notFetched`.
 - **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
   exists in any state, so a settled one (`published`, with the pushed id, or `notHeld`) is a tombstone that never comes
   back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on

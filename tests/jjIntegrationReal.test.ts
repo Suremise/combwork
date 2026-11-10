@@ -306,6 +306,58 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
+  describe.each([true, false] as const)("round 1 (HR1): every answer fenced after its last awaited read, colocated: %s", (colocated) => {
+    const moveGitRef = async (w: World): Promise<void> => void (await w.git(['update-ref', 'refs/heads/main', w.fBase]))
+
+    it('a plain Git move of the target during a negative containment read: refused or unknown, never "not contained"', async () => {
+      const w = await world(colocated)
+      if (!colocated) w.jj('git', 'export')
+      const base = w.deps()
+      const gitContains: JjIntegrationDeps['gitContains'] = async (s, t, c, at) => {
+        const answer = await base.gitContains(s, t, c, at)
+        await moveGitRef(w)
+        return answer
+      }
+      const out = await jjContains(w.deps({ gitContains }), w.req())
+      expect(out, JSON.stringify(out)).not.toHaveProperty('containment')
+      expect(out).toMatchObject({ refused: 'partialExport' })
+    })
+
+    it('a plain Git move of the target after retention: refused, the proof never answered (the bundle kept for a retry)', async () => {
+      const w = await world(colocated)
+      if (!colocated) w.jj('git', 'export')
+      w.jj('new', w.T, w.R, '--no-edit', '-m', 'merge by hand')
+      w.setMain(w.log(`children(${w.T}) & children(${w.R})`)[0])
+      if (!colocated) w.jj('git', 'export')
+      const hook = async (p: JjIntegrationPoint): Promise<void> => {
+        if (p === 'afterRetain') await moveGitRef(w)
+      }
+      const out = await jjContains(w.deps({ hook }), w.req())
+      expect(out, JSON.stringify(out)).not.toHaveProperty('containment')
+      expect(out).toMatchObject({ refused: 'partialExport' })
+    })
+  })
+
+  describe('round 1 (HR1): publish revalidated after its decision reads, right before settling', () => {
+    it.each(['url', 'target'] as const)('the remote %s changed during the ancestry reads: moved, every row still owed', async (what) => {
+      const w = await world(true)
+      const store = memoryObligations()
+      w.setMain(w.T)
+      w.jj('git', 'push', '--bookmark', 'main')
+      reconstructObligations(store, [{ card: 'HI-1', cycle: 1, bundle: `b0-${token()}`, target: 'main', result: w.T, at: 1 }])
+      let done = false
+      const hook = (p: JjIntegrationPoint): void => {
+        if (p !== 'ancestry' || done) return
+        done = true
+        if (what === 'url') w.jj('git', 'remote', 'set-url', 'origin', join(resolve(w.repo, '..'), 'elsewhere.git'))
+        else w.setMain(w.fBase)
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      expect(out, JSON.stringify(out)).toMatchObject({ jjUnknown: 'moved' })
+      expect(store.rows.map((r) => r.state)).toEqual(['owed'])
+    })
+  })
+
   describe('publish: observed, per integration (a local bare remote)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)

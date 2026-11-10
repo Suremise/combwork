@@ -57,7 +57,7 @@ export interface JjIntegrationDeps {
 }
 
 /** Where a test pauses (a race placed exactly there). */
-export type JjIntegrationPoint = 'afterProof' | `beforePin:${string}` | 'afterRemote'
+export type JjIntegrationPoint = 'afterProof' | 'afterRetain' | `beforePin:${string}` | 'afterRemote' | 'ancestry'
 
 const BOOKMARK_T = `name ++ "${SEP}" ++ if(remote, remote, "") ++ "${SEP}" ++ conflict ++ "${SEP}" ++ if(normal_target, normal_target.commit_id(), "") ++ "${SEP}" ++ tracked ++ "\\n"`
 
@@ -140,6 +140,18 @@ export async function jjTargetHead(deps: JjIntegrationDeps, target: string): Pro
   return { head: local.target, op, gitRef, rows }
 }
 
+/**
+ * The target's evidence read again and compared with the moment an answer rests on (HR1's round 1): the same head, the
+ * same operation, the same Git ref, the export matrix still holding. Null when it is; else the refusal or unknown that
+ * the answer must become (never a proof, a null or a settle from the earlier moment).
+ */
+async function fence(deps: JjIntegrationDeps, target: string, th: JjTargetHead, where: string): Promise<JjRefused | JjReadUnknown | null> {
+  const again = await jjTargetHead(deps, target)
+  if (isJjUnknown(again) || isRefused(again)) return again
+  if (!again || again.head !== th.head || again.op !== th.op || again.gitRef !== th.gitRef) return jjUnknown('moved', where)
+  return null
+}
+
 /** One retained proof bundle (s17 §1): its immutable identity, the endpoints it keeps, and its pins (J4's ownership rules). */
 export interface JjBundle {
   bundle: string
@@ -217,7 +229,12 @@ export async function jjContains(deps: JjIntegrationDeps, req: JjProofRequest): 
   if (!containment) {
     const g = await deps.gitContains(deps.view.store, req.target, req.change, th.head)
     if (isUnknown(g)) return jjUnknown('failed', g.what)
-    if (!g) return reads.stillAt(th.op) ? { containment: null, bundles: [...req.bundles] } : jjUnknown('moved')
+    if (!g) {
+      // A negative answer is fenced like a positive one: a Git move (no jj operation) during the read is a refusal or
+      // unknown, never "not contained" (a null may become LeftTarget).
+      const moved = await fence(deps, req.target, th, 'notContained')
+      return moved ?? { containment: null, bundles: [...req.bundles] }
+    }
     containment = g
     via = g.method === 'squash' ? 'replay' : g.method === 'sameTree' ? 'sameTree' : 'ancestry'
   }
@@ -230,12 +247,16 @@ export async function jjContains(deps: JjIntegrationDeps, req: JjProofRequest): 
   }
   await deps.hook?.('afterProof')
   // The moment still the proof's: the same head, operation and Git ref.
-  const again = await jjTargetHead(deps, req.target)
-  if (isJjUnknown(again) || isRefused(again)) return again
-  if (!again || again.head !== th.head || again.op !== th.op || again.gitRef !== th.gitRef) return jjUnknown('moved', 'afterProof')
+  const afterProof = await fence(deps, req.target, th, 'afterProof')
+  if (afterProof) return afterProof
   const endpoints = { revision: req.change.revision, base: req.change.base, head: th.head, ...(proofCommit ? { proof: proofCommit } : {}) }
   const kept = await retain(deps, req, endpoints)
   if (isJjUnknown(kept) || isRefused(kept)) return kept
+  // Retention awaited pins and journal writes: the moment is fenced again before the proof is answered (the bundle stays,
+  // reusable for exactly these endpoints).
+  await deps.hook?.('afterRetain')
+  const afterRetain = await fence(deps, req.target, th, 'afterRetain')
+  if (afterRetain) return afterRetain
   return { containment, provenance: { op: th.op, head: th.head, gitRef: th.gitRef, via: via!, bundle: kept.bundle.bundle, ...(candidate ? { candidate } : {}), ...(proofCommit && via !== 'candidate' ? { commit: proofCommit } : {}) }, bundles: kept.bundles }
 }
 
@@ -486,16 +507,23 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   if (!ls.ok) return jjUnknown('failed', ls.err)
   const pushed = parseLsRemote(ls.out, ref)
   if (pushed === 'malformed') return jjUnknown('malformed', ls.out)
-  // Everything read again across the awaited read: any change, nothing settled.
-  const th2 = await jjTargetHead(deps, target)
-  if (isJjUnknown(th2) || isRefused(th2)) return th2
-  if (!th2 || th2.head !== th.head || th2.op !== th.op || th2.gitRef !== th.gitRef) return jjUnknown('moved', 'target')
-  const r2 = await remoteNow(th2.op)
-  if (isJjUnknown(r2) || isRefused(r2)) return r2
-  if (r2.remote !== r1.remote || r2.url !== r1.url) return jjUnknown('moved', 'remote')
-  if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', 'heads')
+  // The observation's whole context read again (the target, its export, the operation, the remote and both URLs): any
+  // change, nothing settled. Run across the network read and again after every awaited decision read (HR1's round 1),
+  // right before the settles, which are synchronous.
+  const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
+    const moved = await fence(deps, target, th, where)
+    if (moved) return moved
+    const r2 = await remoteNow(th.op)
+    if (isJjUnknown(r2) || isRefused(r2)) return r2
+    if (r2.remote !== r1.remote || r2.url !== r1.url) return jjUnknown('moved', `remote:${where}`)
+    if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
+    return null
+  }
+  const afterRemote = await still('afterRemote')
+  if (afterRemote) return afterRemote
   const ancestor = async (a: string, b: string): Promise<boolean | JjReadUnknown> => {
     const r = await deps.git(['merge-base', '--is-ancestor', a, b])
+    await deps.hook?.('ancestry')
     return r.code === 0 ? true : r.code === 1 ? false : jjUnknown('failed', r.err)
   }
   if (pushed) {
@@ -516,6 +544,8 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     if (isJjUnknown(held)) return held
     if (!held) decided.push({ o, to: 'notHeld' })
   }
+  const beforeSettle = await still('beforeSettle')
+  if (beforeSettle) return beforeSettle
   const settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] = []
   const at = now()
   for (const { o, to } of decided) {
