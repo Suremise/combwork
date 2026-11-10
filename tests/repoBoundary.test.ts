@@ -308,6 +308,96 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
     expect(order).toEqual(['B in', 'B out', 'child'])
   })
 
+  describe('a callback admitted on an inherited claim keeps its owner’s lock until it settles (s104, HR1’s round 2)', () => {
+    const lockFile = (dir: string): string => join(realpathSync(join(dir, '.git')), REPO_LOCK_FILE)
+    /** A holds X; inside it, a child takes `stores` (X among them), is admitted, and parks on a gate; A doesn't await it. */
+    async function parkedChild(x: string, stores: string[], o: { order: string[]; aFails?: boolean; childFails?: boolean }) {
+      const park = gate()
+      const admitted = gate()
+      let child: Promise<unknown> | null = null
+      const a = withRepoLock(x, async () => {
+        child = withFolderRepoLocks(stores, async () => {
+          admitted.open()
+          await park.wait
+          o.order.push('child resumed')
+          if (o.childFails) throw new Error('child failed')
+          o.order.push('child done')
+        }).catch((e: Error) => void o.order.push(`child: ${e.message}`))
+        await admitted.wait
+        if (o.aFails) throw new Error('A failed')
+        return 'A'
+      })
+      await admitted.wait
+      return { a, park, child: () => child! }
+    }
+
+    it('inherited only: A returns, B asks for X and waits; the child resumes and finishes first, then B runs', async () => {
+      const { lo: x } = twoStores()
+      const order: string[] = []
+      const { a, park, child } = await parkedChild(x, [x], { order })
+      let aDone = false
+      void a.then(() => (aDone = true))
+      const b = withRepoLock(x, async () => void order.push('B in'))
+      // B queued behind the held lock; A hasn't returned to its caller, its child still parked.
+      await vi.waitUntil(() => fileLockDepth(lockFile(x)) >= 2 || order.includes('B in'))
+      expect(order).toEqual([])
+      expect(aDone).toBe(false)
+      park.open()
+      expect(await a).toBe('A')
+      await child()
+      await b
+      expect(order).toEqual(['child resumed', 'child done', 'B in'])
+    })
+
+    it('mixed (an inherited store and its own): B waits for X until the child is done; its own Y is free again after', async () => {
+      const { lo: x, hi: y } = twoStores()
+      const order: string[] = []
+      const { a, park, child } = await parkedChild(x, [x, y], { order })
+      const b = withRepoLock(x, async () => void order.push('B in'))
+      await vi.waitUntil(() => fileLockDepth(lockFile(x)) >= 2 || order.includes('B in'))
+      expect(order).toEqual([])
+      expect(fileLockDepth(lockFile(y))).toBe(1)
+      park.open()
+      await a
+      await child()
+      await b
+      expect(order).toEqual(['child resumed', 'child done', 'B in'])
+      expect(await withRepoLock(y, async () => 'Y free')).toBe('Y free')
+    })
+
+    it("the owner failing: its error reaches its caller only once the child has settled, and B waits for X until then", async () => {
+      const { lo: x } = twoStores()
+      const order: string[] = []
+      const { a, park, child } = await parkedChild(x, [x], { order, aFails: true })
+      let aSettled = false
+      const aOut = a.then(
+        () => 'resolved',
+        (e: Error) => ((aSettled = true), e.message)
+      )
+      const b = withRepoLock(x, async () => void order.push('B in'))
+      await vi.waitUntil(() => fileLockDepth(lockFile(x)) >= 2 || order.includes('B in'))
+      expect(aSettled).toBe(false)
+      expect(order).toEqual([])
+      park.open()
+      expect(await aOut).toBe('A failed')
+      await child()
+      await b
+      expect(order).toEqual(['child resumed', 'child done', 'B in'])
+    })
+
+    it('the child failing: A still returns its own value, and X is released after the child', async () => {
+      const { lo: x } = twoStores()
+      const order: string[] = []
+      const { a, park, child } = await parkedChild(x, [x], { order, childFails: true })
+      const b = withRepoLock(x, async () => void order.push('B in'))
+      park.open()
+      expect(await a).toBe('A')
+      await child()
+      await b
+      expect(order).toEqual(['child resumed', 'child: child failed', 'B in'])
+    })
+  })
+
   it('a failed take ends only its own owner: an outer hold stays held', async () => {
     const { lo, hi } = twoStores()
     const g = gate()

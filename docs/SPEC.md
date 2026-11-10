@@ -3306,7 +3306,10 @@ s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports,
   take is an owner, live until just before its first release; a nested take runs through only for a store a live
   inherited owner holds (a continuation outliving its take takes the lock again), and that claim is checked again once
   the take's own locks are in: one that expired while it waited releases them, runs nothing, and the take is made again,
-  taking that store itself (HR1's round 1). A nested take of a store ordered
+  taking that store itself (HR1's round 1). A callback admitted on an inherited claim is pinned to that owner, which
+  keeps its locks (and stays live) until every such callback has settled, its own fn failing or not; a dependent's
+  failure is its own caller's, and one still running 30 s after its holder finished is logged, never released
+  (HI-2896/s104, HR1's round 2). A nested take of a store ordered
   before one already held never waits: taken if free at once, else refused (`git.repoLock.order`). Across processes both
   aliases of a store name one lock file, taken in the same order.
 - **A colocation change** (the user's `jj git colocation enable/disable` moves the store between `.jj/repo/store/git`

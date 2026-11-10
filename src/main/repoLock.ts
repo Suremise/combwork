@@ -170,6 +170,13 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
 interface StoreOwner {
   readonly keys: ReadonlySet<string>
   live: boolean
+  /**
+   * The callbacks admitted on this owner's claim (HI-2896/s104, HR1's round 2): the owner keeps its locks, and stays
+   * live, until each has settled, so none runs on a store another holder has taken.
+   */
+  readonly dependents: Set<Promise<unknown>>
+  /** A folder of its first store, for the log. */
+  readonly folder: string
 }
 const owners = new AsyncLocalStorage<readonly StoreOwner[]>()
 
@@ -209,24 +216,47 @@ async function takeOnce<T>(stores: readonly { store: string; folder: string }[],
     if (held.has(k)) relied.add(k)
     else if (!byKey.has(k)) byKey.set(k, s)
   }
-  const stillHeld = (): boolean => {
-    if (!relied.size) return true
-    const now = new Set(inherited.filter((o) => o.live).flatMap((o) => [...o.keys]))
-    return [...relied].every((k) => now.has(k))
+  /**
+   * fn admitted (s104): in one tick, the live inherited owner of each store this take relies on found (else RETAKE: one
+   * expired, maybe while this take waited for its own locks), fn started in `ctx`, and its promise pinned to each of those
+   * owners, which keep their locks until it settles. Nothing is awaited between the check and the pins.
+   */
+  const admit = (ctx: readonly StoreOwner[]): Promise<T> | typeof RETAKE => {
+    const pins = new Set<StoreOwner>()
+    for (const k of relied) {
+      const o = inherited.find((x) => x.live && x.keys.has(k))
+      if (!o) return RETAKE
+      pins.add(o)
+    }
+    const p = owners.run(ctx, fn)
+    for (const o of pins) {
+      o.dependents.add(p)
+      const done = (): void => void o.dependents.delete(p)
+      p.then(done, done)
+    }
+    return p
   }
-  if (!byKey.size) return stillHeld() ? fn() : RETAKE
+  if (!byKey.size) return admit(inherited)
   const keys = [...byKey.keys()].sort()
   const top = [...held].sort().pop()
-  const owner: StoreOwner = { keys: new Set(keys), live: true }
+  const owner: StoreOwner = { keys: new Set(keys), live: true, dependents: new Set(), folder: byKey.get(keys[0])!.folder }
   const inner = async (): Promise<T | typeof RETAKE> => {
     try {
-      // Every inherited claim still live once this take's own locks are in (it may have waited for them): else none of
-      // fn runs, its locks are released, and the take is made again, now taking those stores itself.
-      if (!stillHeld()) return RETAKE
-      return await owners.run([...inherited, owner], fn)
+      const run = admit([...inherited, owner])
+      return run === RETAKE ? RETAKE : await run
     } finally {
-      // Not live before the first lock is released: a continuation of fn that runs later takes the lock again.
-      owner.live = false
+      // Every callback admitted on this claim settled first (s104); then, in the tick that finds none left, no longer
+      // live, before the first lock is released: a continuation that runs later takes the lock again.
+      const slow = owner.dependents.size ? setTimeout(() => log.warn(`A callback started under the repository lock of ${userText(owner.folder)} still runs 30 s after its holder finished: the lock is kept until it ends`), 30_000) : null
+      slow?.unref?.()
+      for (;;) {
+        if (!owner.dependents.size) {
+          owner.live = false
+          break
+        }
+        await Promise.allSettled([...owner.dependents])
+      }
+      if (slow) clearTimeout(slow)
     }
   }
   const from = (i: number): Promise<T | typeof RETAKE> => {
