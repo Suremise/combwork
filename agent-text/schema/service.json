@@ -300,7 +300,8 @@
     "placeholders": {
       "from": "plain",
       "to": "plain",
-      "targets": "plain"
+      "targets": "plain",
+      "sources": "plain"
     }
   },
   "service.forward.raced": {

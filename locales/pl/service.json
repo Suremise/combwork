@@ -74,7 +74,7 @@
   "service.forward.missing": "{unknown, select, yes {Combwork nie może odczytać gałęzi {branch}, więc nic nie dodano do kolejki.} other {W tym repozytorium nie ma gałęzi {branch}, więc nic nie dodano do kolejki.}}",
   "service.forward.noGit": "Ten projekt nie scala pracy przez kolejkę scalania Combwork, więc nie ma czego aktualizować.",
   "service.forward.notAgents": "Tylko użytkownik lub Asystent aktualizuje jedną gałąź względem drugiej.",
-  "service.forward.notTargets": "{from} i {to} muszą być dwiema różnymi gałęziami, do których ten projekt scala pracę: {targets}.",
+  "service.forward.notTargets": "Nie można wprowadzić {from} do {to}: {to} musi być gałęzią, do której ten projekt scala pracę ({targets}), a {from} inną gałęzią spośród {sources}.",
   "service.forward.raced": "Karta scalenia aktualizującego zmieniła się podczas dodawania do kolejki, więc nic więcej nie zrobiono: zajrzyj do karty, a w razie potrzeby poproś ponownie.",
   "service.forward.title": "Zaktualizuj {to} względem {from}",
   "service.fsutil.keptBusy": "Inny program zapisuje teraz plik {file}: nic nie zostało zmienione. Spróbuj ponownie za chwilę.",

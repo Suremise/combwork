@@ -74,7 +74,7 @@
   "service.forward.missing": "{unknown, select, yes {Combwork no puede leer la rama {branch}, así que no se puso nada en cola.} other {No hay ninguna rama {branch} en este repositorio, así que no se puso nada en cola.}}",
   "service.forward.noGit": "Este proyecto no fusiona trabajo mediante la cola de fusión de Combwork, así que no tiene nada que poner al día.",
   "service.forward.notAgents": "Solo el usuario o el Asistente ponen una rama al día con otra.",
-  "service.forward.notTargets": "{from} y {to} deben ser dos ramas distintas en las que este proyecto fusiona trabajo: {targets}.",
+  "service.forward.notTargets": "{from} no se puede llevar a {to}: {to} debe ser una rama en la que este proyecto fusiona trabajo ({targets}), y {from} otra rama de {sources}.",
   "service.forward.raced": "La tarjeta de la fusión de actualización cambió mientras se ponía en cola, así que no se hizo nada más: mira la tarjeta y vuelve a pedirlo si hace falta.",
   "service.forward.title": "Poner {to} al día con {from}",
   "service.fsutil.keptBusy": "Otro programa está guardando {file}: no se ha cambiado nada. Vuelve a intentarlo en un momento.",

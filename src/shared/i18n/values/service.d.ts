@@ -87,7 +87,7 @@ interface CombworkMessageValues {
   'service.forward.missing': { unknown: string; branch: string | number }
   'service.forward.noGit': undefined
   'service.forward.notAgents': undefined
-  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number }
+  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number; sources: string | number }
   'service.forward.raced': undefined
   'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }

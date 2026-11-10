@@ -85,7 +85,7 @@
   "service.forward.missing": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
   "service.forward.noGit": "This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.",
   "service.forward.notAgents": "Only the user or the Assistant brings one branch up to date with another.",
-  "service.forward.notTargets": "{from} and {to} must be two different branches this project merges work into: {targets}.",
+  "service.forward.notTargets": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
   "service.forward.raced": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
   "service.forward.title": "Bring {to} up to date with {from}",
   "service.fsutil.keptBusy": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
