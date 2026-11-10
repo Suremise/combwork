@@ -3105,6 +3105,52 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   rewrite; a claim committed between the plan and the write; restart carry and the changed target; pin ownership and
   seq order; check credit, a transient edit, a throw, `--isolated`; the guard without the seam; the epoch).
 
+##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
+
+Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
+Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
+- **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
+  the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
+  journalled bundles, every bundle an Integrated fact already names as consumed, no J4 candidates: the user's own merge,
+  fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
+  result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
+  proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
+  depends on is undone, its obligation and retained-bundle rows in the same transaction, then Done. Not contained: Git's
+  stale and carry-over rules on the jj head (J3's sameness). Refused or unknown: nothing written, never "not
+  integrated". **Not offered for jj in 1.5.0:** InTarget (Review), MergedInPart (Active) and LeftTarget (Done): each
+  would need a containment decision outside J5's proof; `contains` stays a typed unknown.
+- **The records** (board migration 29, `schema/jjPublishStep.ts`), every key and query scoped by the project's canonical
+  id: `jj_obligations` (HI-2873's publish obligations, indexed by target and state and by target and seq),
+  `jj_oblig_targets` (each target's settle sequence and re-check sweep) and `jj_retained` (each Integrated card's retained
+  bundle, when it was last verified and how). `sqlObligations` (platform/jjObligations.ts) is HI-2873's store in SQL: each
+  change one compare-and-set statement, owed rows read whole (never truncated), settled history only through the indexed,
+  limited re-check page; nothing cached in memory.
+- **The publish observation** runs once per reconciliation run per target with owed or settled rows (the adapter's
+  `afterRun`, which the reconciler calls after each project run, unfinished cards or none). J5's `observePublish` decides
+  on main as before (its processes through jj's worker); its synchronous tail (the validator's file reads, then the
+  re-check and the settles: `jjPublishTail.ts`) runs in **jj's publish worker** (`jjPublishWorker.ts`) on a connection of
+  its own, in one `BEGIN IMMEDIATE` transaction: the request's cancel fence (a shared flag the follow sets synchronously
+  as it drops), the repository's and the store's identity (their folders' file ids and birth times), the database binding,
+  the tail, the fence again, the commit; anything failing rolls it back. Two Combworks are independent observers: SQLite
+  serializes their transactions and the compare-and-sets keep one winner; no owner. `checkThis` stays for the window
+  (J9c): nothing automatic moves it.
+- **Retention:** each run verifies a fair page of 8 due retained bundles (J5's `ensureRetained`), oldest first; a visit
+  completes its due whatever the outcome (kept for the window), so a broken bundle never starves the rest. Due: marked by
+  an invalidation, or verified longer than 6 hours ago. While more are due, a continuation run follows after 2 s (a timer,
+  while the follow lives).
+- **The watch** (`jjRepoWatch.ts`, the reconciler's beside the watcher's, by platform): one watch on the operation heads,
+  one recursive watch on the store's refs, one on the store's folder for `packed-refs`, one minute's timer that re-arms
+  what is missing and rescans; every jj operation (a slot's commit included) schedules a run; a branch ref's move is its
+  line (a non-colocated store has none until an export: its bookmark moves are operations); a change under a bundle's pins
+  marks that bundle due, `packed-refs` or a re-armed watch marks every bundle due; disposed with the project's follow
+  (which sets its requests' fences first).
+- **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
+  unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
+  published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,
+  project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
+  before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
+  pins, re-armed, disposed).
+
 ##### Open: jj's target advance (J1's gate)
 
 How jj advances a target with R4.1's guarantee is **not decided here**: J1 decides it, with evidence. What the

@@ -13,7 +13,6 @@
 // Unregistered, like J2–J4: jj has no `integration` capability; J6 composes jj's HistoryPort (`contains`, `lineHead`)
 // from these and the reconciler records `Integrated { by: 'outside' }` with this provenance (jjFacts.ts).
 
-import { readFileSync } from 'original-fs'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import type { JjAttemptRecord, JjPin } from './jjCandidates'
 import { parseRefs, validUpdate } from './jjCandidates'
@@ -22,10 +21,12 @@ import type { StoreLock } from './jjBoundary'
 import { isJjUnknown, JjReads, jjUnknown, type JjCommit, type JjReadUnknown } from './jjReads'
 import type { JjRunner } from './jjRunner'
 import { COMMIT_ID, readOpHeads, type ViewOf } from './jjView'
-import { rawSourcesPrint } from './jjSourcesPrint'
 import type { RunResult } from './repoContext'
 import type { Containment, Maybe } from './types'
 import { isUnknown } from './types'
+import { applyRecheck, publishTail, refFromFiles, sourcesPrint, type PublishTailInput } from './jjPublishTail'
+export { applyRecheck, refFromFiles, sourcesPrint }
+export type { PublishTailInput }
 
 const SEP = '\u001f'
 const ZERO = '0'.repeat(40)
@@ -63,6 +64,11 @@ export interface JjIntegrationDeps {
   signal?: AbortSignal
   timeout?: number
   hook?: (point: JjIntegrationPoint) => Promise<void> | void
+  /**
+   * Where a publish observation's synchronous tail runs (HI-2882/s22): the validator and every write together, in one
+   * database transaction of a worker's own (the app's). Absent: in `observePublish`'s own continuation, on its store.
+   */
+  commit?: (tail: PublishTailInput) => Promise<PublishObserved>
 }
 
 /** Where a test pauses (a race placed exactly there). */
@@ -703,22 +709,6 @@ export async function planRecheck(store: ObligationStore, target: string, now: P
 }
 
 /**
- * Applies a re-check plan (synchronous; the caller runs it in the same continuation as its final validator): the
- * schedule moved to its next generation by its compare-and-set first, and only if that held, each flag by its own
- * compare-and-set. Any pass applied since this one was planned advanced the generation, so this one then writes nothing
- * of the re-check (HR2's round 1: no ABA through a completed or unchanged schedule).
- */
-export function applyRecheck(store: ObligationStore, target: string, plan: RecheckPlan, at: number): { key: ObligationKey; differs: PublishDiffer[] }[] {
-  if (!store.setSweep(target, plan.expectedGen, plan.next)) return []
-  const flagged: { key: ObligationKey; differs: PublishDiffer[] }[] = []
-  for (const { o, check } of plan.flags) {
-    const key = { card: o.card, cycle: o.cycle, bundle: o.bundle }
-    if (store.flag(key, o.result, check.was, o.at!, { ...check, at })) flagged.push({ key, differs: check.differs })
-  }
-  return flagged
-}
-
-/**
  * Recovery's reconstruction (s20): an obligation for each recorded jj integration (its card, cycle, bundle, target and
  * result), created only when no row for that key exists in any state, so a settled one never reappears and a new
  * integration is never blocked by an old one's tombstone. Returns how many were created.
@@ -737,35 +727,6 @@ export function chooseRemote(target: string, rows: readonly BookmarkRow[], confi
   if (configured.length === 1) return configured[0]
   if (!configured.length) return null
   return configured.includes('origin') ? 'origin' : refused('ambiguousRemote', configured.join(','))
-}
-
-/**
- * A ref's commit read synchronously from the store's files (no process, so nothing can move between it and a synchronous
- * write after it): the loose ref, else its packed line; null when it is in neither; undefined when it can't be read.
- */
-export function refFromFiles(store: string, ref: string): string | null | undefined {
-  const read = (f: string): string | null | undefined => {
-    try {
-      return readFileSync(join(store, f), 'utf8')
-    } catch (e) {
-      const code = (e as { code?: string }).code
-      return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
-    }
-  }
-  const loose = read(ref)
-  if (loose === undefined) return undefined
-  if (loose !== null) {
-    const v = loose.trim()
-    return /^[0-9a-f]{40}$/.test(v) ? v : undefined
-  }
-  const packed = read('packed-refs')
-  if (packed === undefined) return undefined
-  if (packed === null) return null
-  for (const l of lines(packed)) {
-    const [oid, name] = l.split(' ')
-    if (name === ref) return /^[0-9a-f]{40}$/.test(oid) ? oid : undefined
-  }
-  return null
 }
 
 /** The config files Git reads for the store, found by Git (never parsed here), and the environment that steers Git's config. */
@@ -841,22 +802,6 @@ export async function configSources(deps: JjIntegrationDeps): Promise<ConfigSour
   if (files.size > SOURCES_MAX) return jjUnknown('malformed', 'too many config files') // i18n-ignore: a protocol detail for logs and tests, never shown
   const steering = Object.keys(env).filter((k) => /^GIT_CONFIG/i.test(k) || /^(HOME|USERPROFILE|XDG_CONFIG_HOME)$/i.test(k)).sort()
   return { files: [...files].sort(), env: steering.map((k) => `${k}=${env[k]}`).join('\n') }
-}
-
-/**
- * A fingerprint of every source the publish decision rests on, read synchronously (no process): jj's operation heads,
- * the store's HEAD (an `onbranch` condition), the target's loose ref and the packed refs, Git's config environment, and
- * the raw bytes of every config file `configSources` found (absent ones as absent). Raw bytes only, never interpreted:
- * any difference between two prints means something changed, whether or not it matters. Undefined when any source can't
- * be read (a read error but "not there").
- */
-export function sourcesPrint(store: string, jjRepo: string, target: string, sources: ConfigSources): string | undefined {
-  // The verified capture's print, shared with the Operations preview (jjSourcesPrint.ts, HI-2800): these sources, as before.
-  return rawSourcesPrint({
-    jjRepo,
-    env: sources.env,
-    files: [{ label: 'HEAD', path: join(store, 'HEAD') }, { label: 'ref', path: join(store, 'refs', 'heads', ...target.split('/')) }, { label: 'packed', path: join(store, 'packed-refs') }, ...sources.files.map((f) => ({ label: `config:${f.toLowerCase()}`, path: f }))] // i18n-ignore: a print's labels, hashed, never shown
-  })
 }
 
 /** Parses `jj git remote list` (`name url` a line). */
@@ -951,7 +896,7 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   // The check returns its synchronous tail as a validator (HR2's round 6): the caller runs it in its own continuation
   // straight before the synchronous writes, so no awaited return (a microtask) comes between the last read and the CAS.
   // It also hands back the print it validates against, kept as the settles' evidence (HI-2873).
-  type Validator = { check: () => JjReadUnknown | null; print: string }
+  type Validator = { check: () => JjReadUnknown | null; print: string; sources: ConfigSources }
   const isValidator = (v: JjRefused | JjReadUnknown | Validator): v is Validator => typeof (v as Validator).check === 'function'
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | Validator> => {
     // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
@@ -984,7 +929,7 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
       if (sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources) !== before) return jjUnknown('moved', `sources:${where}`)
       return null
     }
-    return { check, print: before }
+    return { check, print: before, sources }
   }
   const afterRemote = await still('afterRemote')
   if (!isValidator(afterRemote)) return afterRemote
@@ -1018,18 +963,9 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   if (isJjUnknown(plan)) return plan
   const beforeSettle = await still('beforeSettle')
   if (!isValidator(beforeSettle)) return beforeSettle
-  // From here to the last write: synchronous, one continuation. The validator's reads are the last before the writes
-  // (the settles, the sweep and the flags alike).
-  const finalNow = beforeSettle.check()
-  if (finalNow) return finalNow
-  const at = now()
-  const flagged = applyRecheck(store, target, plan, at)
-  if (absent) return { noRemote: true, flagged }
-  const settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] = []
-  const seen = { remote: r1.remote!, url: r1.url!, pushed, head: th.head, op: th.op, print: beforeSettle.print, at }
-  for (const { o, to } of decided) {
-    const key = { card: o.card, cycle: o.cycle, bundle: o.bundle }
-    if (store.settle(key, o.result, to, seen)) settled.push({ key, to })
-  }
-  return { remote: r1.remote!, url: r1.url!, pushed, settled, flagged }
+  // From here to the last write: synchronous, one continuation, or one database transaction of the caller's (`commit`,
+  // HI-2882/s22). The validator's reads are the last before the writes (the settles, the sweep and the flags alike).
+  const tail: PublishTailInput = { target, view: { jjRepo: deps.view.jjRepo, store: deps.view.store }, op: th.op, gitRef: th.gitRef, head: th.head, sources: beforeSettle.sources, print: beforeSettle.print, where: 'beforeSettle', plan, decided, remote: r1.remote, url: r1.url, pushed, absent, at: now() }
+  if (deps.commit) return deps.commit(tail)
+  return publishTail(store, tail)
 }

@@ -143,6 +143,11 @@ export interface Tx {
   putCard(card: CardRecord): void
   meta(key: string): string | null
   setMeta(key: string, value: string): void
+  /**
+   * Raw statements in this transaction (HI-2882: an Integrated jj card's obligation and retained-bundle rows, written with
+   * its fact, so the fact never exists without them).
+   */
+  sql(fn: (db: DatabaseSync) => void): void
   /** A commit seen on a shared folder's line, and whose it is: false when it was already recorded. */
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean
 }
@@ -880,6 +885,7 @@ export class FactStore {
         },
         meta: (k) => this.meta(k),
         setMeta: (k, v) => this.setMeta(k, v),
+        sql: (statements) => this.conn.write(() => statements(w as DatabaseSync)),
         recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
       }
       return fn(tx)

@@ -78,6 +78,7 @@ import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { stopPublishWorker } from './jjPublish'
 import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
@@ -1465,6 +1466,7 @@ app.on('will-quit', () => {
   unwatchAll()
   stopObserving()
   stopReconciling()
+  void stopPublishWorker()
   stopQueueHosts()
   stopSlotCards()
   stopLaneBriefs()

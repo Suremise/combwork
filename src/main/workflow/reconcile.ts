@@ -476,6 +476,132 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
   })
 }
 
+/**
+ * What jj's adapter answers for its reconciliation (HI-2882's J9b2): the card's head in its slot now (J2's head), whether
+ * a later head carries the approved pass (J3's `jjSameRevision`, with the merge base it found), and J5's proof for the
+ * approved submission (`jjContains`: its containment, its provenance and its retained bundle, or why not).
+ */
+export interface JjReconcilePorts {
+  headNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
+  same(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }, head: string): Promise<{ same: boolean; base: string | null }>
+  prove(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved>
+  /** The rows an Integrated fact's transaction writes beside it (its obligation and retained bundle). */
+  record(w: Write, row: { card: string; cycle: number; bundle: string; target: string; result: string; since: number }): void
+}
+
+/** J5's answer for an approved submission: contained (with what to record), not contained, or why it couldn't say. */
+export type JjProved =
+  | { contained: true; method: 'merge' | 'fastForward' | 'squash' | 'sameTree'; result: string; bundle: string; platform: Record<string, unknown> }
+  | { contained: false }
+  | { unknown: string }
+
+/** What a jj proof was made for: the card's exact approval, rechecked in the Integrated write (HI-2882/s10 §2). */
+interface ApprovalSnapshot {
+  cycle: number
+  stage: StageId
+  submission: number
+  revision: string
+  base: string
+  key: string | null
+  /** The approved submission's jj commit id as recorded (its `platform.jj`), or null. */
+  commit: string | null
+  target: string
+}
+
+const jjCommitOf = (platform: unknown): string | null => {
+  const j = platform && typeof platform === 'object' ? (platform as { jj?: { commitId?: unknown } }).jj : null
+  return j && typeof j.commitId === 'string' ? j.commitId : null
+}
+
+function approvalOf(card: CardRecord, s: CardState): ApprovalSnapshot | null {
+  if (!s.approved?.revision || !s.approved.base || !s.latest) return null
+  return { cycle: s.cycle, stage: card.stage, submission: s.latest.id, revision: s.approved.revision, base: s.approved.base, key: s.latest.key ?? null, commit: jjCommitOf(s.latest.platform), target: s.started?.target ?? '' }
+}
+
+const sameApproval = (a: ApprovalSnapshot, b: ApprovalSnapshot | null): boolean => !!b && a.cycle === b.cycle && a.stage === b.stage && a.submission === b.submission && a.revision === b.revision && a.base === b.base && a.key === b.key && a.commit === b.commit && a.target === b.target
+
+/**
+ * A jj card's reconciliation (HI-2882's J9b2, design HI-2882/s7–s22; SPEC §16.4.4's table for a platform whose user
+ * integrates, option A): Gone for the repository or the slot folder; its head observed (HeadMoved); in Approved, J5's
+ * proof first (contained: `Integrated` by outside, recorded only while the card is still exactly the approval proved, its
+ * obligation and retained bundle in the same write, then Done), else Git's stale and carry-over rules on the jj head. A
+ * proof refused or unknown is told to `hooks.unknown` and writes nothing: never "not integrated". Not offered for jj in
+ * 1.5.0: InTarget, MergedInPart and LeftTarget (each would need a containment decision outside J5's proof).
+ */
+export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: ReconcileHooks, ports: JjReconcilePorts): Promise<void> {
+  let card = wf.store.card(card0.id)
+  let s = wf.state(card)
+  if (!s.started) return
+  const r = wf.rulesetOf(card, s)
+  const o = r.options
+  const project = wf.cfg.project
+  const s0 = s
+  if (presence(project) === 'gone') {
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } })) // i18n-ignore: a fact's kind and codes, not text
+    return
+  }
+  if (card.stage !== 'done' && wf.ownLine(s) && presence(s.started.folder) === 'gone') {
+    const folder = s.started.folder
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.state().started?.folder === folder && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
+    return
+  }
+  // Its head, once its slot is prepared (#1551: until then there is nothing of its to observe).
+  if (card.stage !== 'done' && s.started.line && !slotPreparationOwed(wf, card, s)) await observeHead(wf, card, () => ports.headNow(card, s), s.started.line, hooks)
+  card = wf.store.card(card.id)
+  s = wf.state(card)
+  if (card.stage !== 'approved') return
+  const snap = approvalOf(card, s)
+  if (!snap) return
+  const approved = { base: snap.base, revision: snap.revision, key: snap.key }
+  if (approved.revision !== s.started!.base) {
+    const p = await ports.prove(card, s, approved)
+    if ('unknown' in p) return hooks.unknown?.(p.unknown)
+    if (p.contained) {
+      await hooks.afterRead?.()
+      await wf.write(card, r, 'outside', (w) => {
+        // Only while the card is still exactly the approval proved (its cycle, stage, approved submission and its
+        // endpoints, its recorded jj ids and its target), and nothing it depends on is undone.
+        const now = wf.store.card(card.id)
+        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || wf.closeWaitsFor(w).length) return
+        const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision: snap.revision, target: snap.target, result: p.result, method: p.method, by: 'outside', platform: p.platform } }) // i18n-ignore: a fact's kind and codes, not text
+        if (!f) return
+        w.written.push(f as Fact)
+        ports.record(w, { card: card.key, cycle: s.cycle, bundle: p.bundle, target: snap.target, result: p.result, since: Date.now() })
+        if (wf.cfg.reconcileActs && w.current !== 'done') w.move('done', 'derived')
+      })
+      return
+    }
+  }
+  // Not in its target: the pass follows the newest observed head, as under Git (#1623).
+  const back = 'approved'
+  const newest = (w: Write): boolean => sameCycle(w, s) && w.state().lastHeadFact === s.lastHeadFact && w.state().head === s.head
+  if (s.head === approved.revision && s.stale) {
+    const from = s.stale.current ?? approved.revision
+    await wf.write(card, r, 'combwork', (w) => {
+      if (!newest(w) || !w.state().stale) return
+      if (observed(w, 'CarriedOver', `back:${s.cycle}:${s.lastHeadFact}`, { from, to: approved.revision, toBase: approved.base, how: 'sameRevision' }) && wf.cfg.reconcileActs) holdsAgain(wf, w)
+    })
+    return
+  }
+  if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
+    await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, staleWake(card.key, approved.revision, s.stale?.current)))
+    return
+  }
+  if (s.head && s.head !== approved.revision && !s.stale) {
+    const head = s.head
+    const { same, base } = o.sameness === 'change' ? await ports.same(card, s, approved, head) : { same: false, base: null }
+    await wf.write(card, r, 'combwork', (w) => {
+      if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
+      if (same && base) {
+        observed(w, 'CarriedOver', `carried:${s.cycle}:${s.lastHeadFact}`, { from: approved.revision, to: head, toBase: base, how: 'replay' })
+        return
+      }
+      observed(w, 'Stale', `stale:${s.cycle}:${s.lastHeadFact}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
+      if (wf.cfg.reconcileActs) staleEffects(w, back, staleWake(card.key, approved.revision, head))
+    })
+  }
+}
+
 /** None: an edit to a card's paths after a pass makes the pass stale (§16.3.3); files outside its paths never do. */
 export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState): Promise<void> {
   // In Review, or in Approved waiting for your OK after the reviewer agent (N1, #1417).
