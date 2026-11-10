@@ -304,11 +304,34 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       return !!files && files.every((f) => f === '.jj' || f === '.git')
     }
     if (await ok()) return c.folder
-    // A record that isn't ready (an interrupted making) or doesn't match: refused, never taken for an ordinary slot.
-    if (rec && rec.phase !== 'ready') return null
-    if (rec) return null
-    if (existsSync(c.folder)) return null
+    // A record that doesn't match (another store, name or folder): refused, never taken for an ordinary slot.
+    const ours = !!rec && rec.workspace === name && !!rec.folder && samePath(rec.folder, c.folder) && !!rec.store && samePath(rec.store, ctx.store)
+    if (rec && !ours) return null
+    if (rec?.phase === 'ready') return null
     return deps.lock(ctx.store, async () => {
+      // An interrupted making (HI-2887): decided by jj's own list, under the lock. Added: ready. Not added: a half-made
+      // folder holding nothing but jj's own files is ours to trash, then made again; anything else in it is left alone.
+      if (rec?.phase === 'creating') {
+        const op = await pinned(repo)
+        if (isUnknown(op)) return null
+        const listed = await listAt(repo, op)
+        if (isUnknown(listed)) return null
+        const me = listed.find((w) => w.name === name)
+        if (me) {
+          if (!samePath(await realOr(me.root), await realOr(c.folder))) return null
+          const generation = await generationOf(c.folder)
+          if (!generation) return null
+          await c.journal.write({ phase: 'ready', store: ctx.store, workspace: name, folder: c.folder, generation })
+          return c.folder
+        }
+        if (existsSync(c.folder)) {
+          const files = await readdir(c.folder).catch(() => null)
+          if (!files || !files.every((f) => f === '.jj' || f === '.git')) return null
+          await deps.trash(c.folder)
+          if (existsSync(c.folder)) return null
+        }
+        await c.journal.clear()
+      } else if (existsSync(c.folder)) return null
       if (!(await deps.projectQuiet(repo))) return null
       await c.journal.write({ phase: 'creating', store: ctx.store, workspace: name, folder: c.folder })
       // The explicit owned record of the project folder: the one snapshot of it Combwork takes, under the lock, quiet.
