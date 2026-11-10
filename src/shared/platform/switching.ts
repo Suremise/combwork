@@ -100,7 +100,8 @@ export interface SwitchDrain {
 export const drainEmpty = (d: SwitchDrain): boolean => !d.lanes.length && !d.cards.length && !d.queue.length && !d.slots.length && !d.copies.length
 
 /** A gate the repository uses (from main's assessment): what uses it, or what couldn't be read (which counts as using it). */
-export type GateCheck = { gate: Gate; clear: true } | { gate: Gate; uses: string[] } | { gate: Gate; unknown: string }
+/** A repository gate's finding (`autocrlf`: Git's line-ending conversion is among its uses, HI-2872). */
+export type GateCheck = { gate: Gate; clear: true } | { gate: Gate; uses: string[]; autocrlf?: true } | { gate: Gate; unknown: string }
 
 /** What keeps a jj repository from going back to Git (HI-2799): each a code and what it is about. */
 export type FallbackProblem = { code: 'heads'; n: number } | { code: 'conflictedBookmark'; name: string } | { code: 'notExported'; name: string } | { code: 'conflictedCommit'; commit: string } | { code: 'unknown'; detail: string }

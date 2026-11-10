@@ -164,7 +164,7 @@ async function gatesOf(path: string, store: string): Promise<GateCheck[]> {
   const a = await assessJj(root, store)
   return REPO_GATES.map((g): GateCheck => {
     const f = a[g]
-    return 'clear' in f ? { gate: g, clear: true } : 'uses' in f ? { gate: g, uses: f.uses } : { gate: g, unknown: f.unknown }
+    return 'clear' in f ? { gate: g, clear: true } : 'uses' in f ? { gate: g, uses: f.uses, ...(f.autocrlf ? { autocrlf: true as const } : {}) } : { gate: g, unknown: f.unknown }
   })
 }
 

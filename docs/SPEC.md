@@ -2292,6 +2292,13 @@ a configured path outside what it can read, a tool that doesn't answer) is "uses
   `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
 - **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
   `.lfsconfig`.
+- **Git for Windows' stock settings** (HI-2872, Darren's (b) on HI-2799) aren't a use: the `filter.lfs.*` and
+  `diff.astextplain.textconv` values its installer writes, each at system scope from its own `<install>/etc/gitconfig`
+  (Git's `--show-origin`; the install from `git --exec-path`) with exactly the stock value, and the stock
+  `*.<ext> diff=astextplain` lines of its `<install>/etc/gitattributes` while no other level or value sets that driver.
+  The same keys at global or local scope, another value, another system file, any other line, and any use in the
+  repository still count. Its `core.autocrlf true` still counts (Git converts every text file's line endings, which
+  jj doesn't): the dialog says to turn it off for that repository alone (`git config core.autocrlf false` in it).
 - **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
 - **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
   the store's `hooks/` that isn't a `*.sample`.
@@ -2601,8 +2608,9 @@ merges under jj.
   `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
   without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
   hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
-  Windows' own system config and attributes (`core.autocrlf true`, `filter.lfs.*`, `diff=astextplain`) trip attributes
-  and lfs, so a default Windows install is refused until they're off. Back to Git (`fallback`): one head, no conflicted
+  Windows' stock system settings (`filter.lfs.*`, `diff=astextplain`) don't count (HI-2872: `GFW_STOCK_CONFIG`,
+  `gfwSystemFiles`); its `core.autocrlf true` does, and the finding carries `autocrlf` for the dialog's hint to turn it
+  off for the repository. Back to Git (`fallback`): one head, no conflicted
   local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
   `.jj` stays. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
 - **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's

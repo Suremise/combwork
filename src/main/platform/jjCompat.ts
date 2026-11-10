@@ -4,9 +4,11 @@
 // repository), every attribute source Git applies (the system's, the global one, every tracked `.gitattributes`, the
 // store's `info/attributes`), jj's effective config (`jj config list`), and the repository's files. Anything it can't
 // read, list or resolve is "uses it" (unknown): the gate stays closed. Read-only: never a write, a snapshot or an import.
-// J7 completes it (non-colocated paths, trust roots, file lists).
+// J7 completes it (non-colocated paths, trust roots, file lists). Git for Windows' stock system settings, as its installer
+// writes them, aren't a use (HI-2872): only those values, at system scope, from its own etc files.
 
 import { join, resolve, isAbsolute } from 'path'
+import { GIT_MINGW_DIRS } from '../../shared/gitLayout'
 import { readdir, readFile, stat } from 'original-fs/promises'
 import type { Gate } from '../../shared/platform/descriptors'
 import type { RunResult } from './repoContext'
@@ -17,8 +19,12 @@ import { jjRunner, type JjRunner } from './jjRunner'
 export type RepoGate = Extract<Gate, 'attributes' | 'lfs' | 'submodules' | 'hooks' | 'signing'>
 export const REPO_GATES: readonly RepoGate[] = ['attributes', 'lfs', 'submodules', 'hooks', 'signing']
 
-/** A gate's finding: clear, what uses it (a key, a file, an attribute line; at most a few), or what couldn't be read. */
-export type GateFinding = { clear: true } | { uses: string[] } | { unknown: string }
+/**
+ * A gate's finding: clear, what uses it (a key, a file, an attribute line; at most a few), or what couldn't be read.
+ * `autocrlf`: attributes' uses include Git's line-ending conversion (core.autocrlf on), which the dialog says how to turn
+ * off for the repository (HI-2872).
+ */
+export type GateFinding = { clear: true } | { uses: string[]; autocrlf?: true } | { unknown: string }
 export type Assessment = Record<RepoGate, GateFinding>
 
 /** What the assessment runs: git and jj in the repository (injected in tests). */
@@ -62,13 +68,53 @@ const gitTrue = (v: string | null): boolean => v === null || /^(true|yes|on|1)$/
 /** A Git boolean that is false (`false`, `no`, `off`, `0`, an empty value). */
 const gitFalse = (v: string | null): boolean => v !== null && /^(false|no|off|0|)$/i.test(v.trim())
 
-/** Each attribute line of a file naming an attribute jj doesn't apply, as `<file>: <line>` (at most 3), and lfs's. */
-export function attributeUses(text: string, file: string): { uses: string[]; lfs: string[] } {
+/**
+ * Git for Windows' stock system settings (HI-2872, Darren's (b) on HI-2799): the values its installer writes to its own
+ * `etc/gitconfig`, which a plain install always has and nothing applies unless the repository asks (an LFS filter no
+ * attribute names, a diff driver for Office files). An entry is stock only at system scope, from that file (Git's
+ * `--show-origin`), with exactly this value; the same key anywhere else, or another value, still counts.
+ */
+export const GFW_STOCK_CONFIG: Readonly<Record<string, string>> = {
+  'filter.lfs.clean': 'git-lfs clean -- %f',
+  'filter.lfs.smudge': 'git-lfs smudge -- %f',
+  'filter.lfs.process': 'git-lfs filter-process',
+  'filter.lfs.required': 'true',
+  'diff.astextplain.textconv': 'astextplain',
+}
+/** Git for Windows' stock `etc/gitattributes`: `*.<ext> diff=astextplain` for these, lower- and upper-case. */
+const GFW_STOCK_ATTR_EXTS = ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm', 'pdf', 'rtf', 'ods', 'odf', 'odt']
+const GFW_STOCK_ATTR_LINES = new Set(GFW_STOCK_ATTR_EXTS.flatMap((e) => [e, e.toUpperCase()]).map((e) => `*.${e} diff=astextplain`))
+/** Whether an attribute line (trimmed) is one of Git for Windows' stock `etc/gitattributes` lines. */
+export const gfwStockAttrLine = (line: string): boolean => GFW_STOCK_ATTR_LINES.has(line.split(/\s+/).join(' '))
+
+/** A path as Windows compares it. */
+const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
+
+/**
+ * Git for Windows' own system files, from where the git that runs here says it lives (`--exec-path`:
+ * `<install>/<mingw64|ucrt64|…>/libexec/git-core`): `<install>/etc/gitconfig` and `etc/gitattributes`. Null for another
+ * layout (not Git for Windows) or when git can't say: then nothing is stock.
+ */
+export async function gfwSystemFiles(root: string, deps: Pick<CompatDeps, 'git'>): Promise<{ config: string; attributes: string } | null> {
+  const r = await deps.git(root, ['--exec-path'])
+  if (!r.ok || !r.out.trim()) return null
+  const at = resolve(r.out.trim())
+  const [m, libexec, core] = at.split(/[\\/]/).slice(-3).map((p) => p.toLowerCase())
+  if (!(GIT_MINGW_DIRS as readonly string[]).includes(m) || libexec !== 'libexec' || core !== 'git-core') return null
+  const install = resolve(at, '..', '..', '..')
+  return { config: join(install, 'etc', 'gitconfig'), attributes: join(install, 'etc', 'gitattributes') }
+}
+
+/**
+ * Each attribute line of a file naming an attribute jj doesn't apply, as `<file>: <line>` (at most 3), and lfs's; a line
+ * `skip` takes (a stock one) is neither.
+ */
+export function attributeUses(text: string, file: string, skip?: (line: string) => boolean): { uses: string[]; lfs: string[] } {
   const uses: string[] = []
   const lfs: string[] = []
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
-    if (!line || line.startsWith('#')) continue
+    if (!line || line.startsWith('#') || skip?.(line)) continue
     const tokens = line.split(/\s+/).slice(1)
     const names = tokens.map((t) => t.replace(/^[-!]/, '').split('=')[0])
     if (tokens.some((t) => /^filter=lfs$/i.test(t))) lfs.push(`${file}: ${line}`.slice(0, 300))
@@ -122,7 +168,14 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   let hooksPath: string | null = null
   let autocrlf: { at: string; value: string | null } | null = null
   let attributesFile: string | null = null
+  // Git for Windows' stock system settings aren't a use (HI-2872): a key at system scope from its own etc/gitconfig with
+  // exactly the value it ships. Its stock attribute lines are ignored only while their diff driver is stock too.
+  const gfw = entries ? await gfwSystemFiles(root, deps) : null
+  const stock = (e: ConfigEntry): boolean => !!gfw && e.scope === 'system' && e.origin.startsWith('file:') && samePath(e.origin.slice(5), gfw.config) && e.value === GFW_STOCK_CONFIG[e.key]
+  let astextplainStock = true
   for (const e of entries ?? []) {
+    if (stock(e)) continue
+    if (e.key.startsWith('diff.astextplain.')) astextplainStock = false
     const at = `${e.key} (${e.scope})`
     // core.autocrlf as Git applies it: its last value, a later level's winning. False converts nothing, as jj does.
     if (e.key === 'core.autocrlf') autocrlf = { at, value: e.value }
@@ -136,12 +189,17 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
     if (e.key === 'core.hookspath') hooksPath = e.value
     if (e.key === 'core.attributesfile') attributesFile = e.value
   }
-  if (autocrlf && !gitFalse(autocrlf.value)) add(a, 'attributes', `${autocrlf.at} = ${autocrlf.value ?? 'true'}`) // i18n-ignore: what was found, shown as data beside its message
+  const autocrlfOn = !!autocrlf && !gitFalse(autocrlf.value)
+  if (autocrlf && autocrlfOn) add(a, 'attributes', `${autocrlf.at} = ${autocrlf.value ?? 'true'}`) // i18n-ignore: what was found, shown as data beside its message
   // Attribute sources: the system's and the global one as Git names them, every tracked .gitattributes, info/attributes.
   const sources: string[] = []
+  let systemAttributes: string | null = null
   for (const v of ['GIT_ATTR_SYSTEM', 'GIT_ATTR_GLOBAL']) {
     const r = await deps.git(root, ['var', v])
-    if (r.ok && r.out.trim()) sources.push(resolve(r.out.trim()))
+    if (r.ok && r.out.trim()) {
+      sources.push(resolve(r.out.trim()))
+      if (v === 'GIT_ATTR_SYSTEM') systemAttributes = resolve(r.out.trim())
+    }
     // No such source (GIT_ATTR_NOSYSTEM, no global file): git var exits 1 saying nothing. Anything it says is unknown.
     else if (!r.ok && r.err.trim() && !/not a valid|unknown variable/i.test(r.err)) unknownAt(a, 'attributes', `git var ${v}: ${r.err}`) // i18n-ignore: what was found, shown as data beside its message
   }
@@ -167,7 +225,8 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
       unknownAt(a, 'lfs', src)
       continue
     }
-    const u = attributeUses(text, src)
+    const stockLines = gfw && astextplainStock && src === systemAttributes && samePath(src, gfw.attributes)
+    const u = attributeUses(text, src, stockLines ? gfwStockAttrLine : undefined)
     for (const x of u.uses) add(a, 'attributes', x)
     for (const x of u.lfs) add(a, 'lfs', x)
   }
@@ -187,6 +246,7 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   const jc = await deps.jj.run(root, ['config', 'list', 'signing.behavior'])
   if (!jc.ok && jc.code === -1) unknownAt(a, 'signing', `jj config list: ${jc.err}`) // i18n-ignore: what was found, shown as data beside its message
   else if (jc.ok && /signing\.behavior\s*=\s*"(own|force)"/.test(jc.out)) add(a, 'signing', 'signing.behavior (jj)')
+  if (autocrlfOn && 'uses' in a.attributes) a.attributes = { ...a.attributes, autocrlf: true }
   return a
 }
 
