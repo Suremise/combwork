@@ -237,6 +237,26 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
     expect(await gone.h.port.stale(gone.slot)).toBe(true)
   })
 
+  it('a file that grows between its size read and its bytes read: refused as changing, the reader never past its cap', async () => {
+    const s = await stale(false)
+    let read = 0
+    const r = await run(s, s.deps({
+      bounds: { files: 100, bytes: 1024 },
+      hooks: {
+        afterStat: (path) => {
+          if (path === 'local.txt') writeFileSync(join(s.slot, 'local.txt'), Buffer.alloc(65536, 1))
+        },
+        read: (path, n) => {
+          if (path === 'local.txt') read += n
+        }
+      }
+    }))
+    expect(r).toEqual({ ok: false, why: 'changing', detail: 'local.txt' })
+    // 'mine\n' was 5 bytes at the stat: at most those and one byte to tell it is longer.
+    expect(read).toBeLessThanOrEqual(6)
+    expect(await s.h.port.stale(s.slot)).toBe(true)
+  })
+
   it('pinned reads: with diverged operation heads recovery refuses and writes nothing (no reconcile, no snapshot)', async () => {
     const s = await stale(false)
     const op = s.h.jj(s.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()

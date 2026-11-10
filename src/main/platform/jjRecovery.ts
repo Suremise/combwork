@@ -49,6 +49,10 @@ export interface RecoveryDeps {
     beforePlace?: (path: string) => void | Promise<void>
     afterPath?: (path: string) => void | Promise<void>
     afterRestore?: () => void | Promise<void>
+    /** Between a file's size read and its bytes read (tests: a writer growing it). */
+    afterStat?: (path: string) => void | Promise<void>
+    /** Each chunk a capped read takes from a file of the workspace (tests: the reader never passes its cap). */
+    read?: (path: string, bytes: number) => void
   }
 }
 
@@ -132,6 +136,36 @@ function freeName(file: string, suffix: string): string {
   for (let n = 1; ; n++) {
     const candidate = `${file}${suffix}${n === 1 ? '' : `-${n}`}`
     if (!existsSync(candidate)) return candidate
+  }
+}
+
+/**
+ * A file's bytes read from its opened handle, never more than `cap` bytes plus one byte to tell it is longer (HR1,
+ * HI-2795 round 2): a file that grows after its size was read can't make the reader allocate past its bound. `over`
+ * when it holds more than `cap`; null when it can't be opened or read. `seen`: told each chunk's size (tests).
+ */
+export async function readCapped(file: string, cap: number, seen?: (n: number) => void): Promise<Buffer | 'over' | null> {
+  const h = await open(file, 'r').catch(() => null)
+  if (!h) return null
+  try {
+    const chunks: Buffer[] = []
+    let total = 0
+    for (;;) {
+      const want = Math.min(64 * 1024, cap + 1 - total)
+      if (want <= 0) return 'over'
+      const buf = Buffer.alloc(want)
+      const { bytesRead } = await h.read(buf, 0, want, total)
+      if (bytesRead === 0) break
+      seen?.(bytesRead)
+      chunks.push(buf.subarray(0, bytesRead))
+      total += bytesRead
+      if (total > cap) return 'over'
+    }
+    return Buffer.concat(chunks, total)
+  } catch {
+    return null
+  } finally {
+    await h.close().catch(() => undefined)
   }
 }
 
@@ -231,9 +265,11 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         continue
       }
       if (bytes + st.size > bounds.bytes) return refuse('bounds')
-      const buf = await readFile(abs(folder, path)).catch(() => undefined)
-      if (buf === undefined) return refuse('unreadable', path)
-      if (buf.length !== st.size) return refuse('changing', path)
+      await deps.hooks?.afterStat?.(path)
+      // Read capped at its size as stat said it (HR1, round 2): one that grew since is refused without being read whole.
+      const buf = await readCapped(abs(folder, path), st.size, (n) => deps.hooks?.read?.(path, n))
+      if (buf === null) return refuse('unreadable', path)
+      if (buf === 'over' || buf.length !== st.size) return refuse('changing', path)
       const blob = blobOf(buf)
       if (w && w.blob === blob) continue
       bytes += buf.length
@@ -251,8 +287,9 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     try {
       for (const e of entries) {
         if (e.kind !== 'file') continue
-        const buf = await readFile(abs(folder, e.path))
-        if (sha256(buf) !== e.sha256) return refuse('changing', e.path)
+        // The live file read again, capped at the size the scan saw: one that changed since is refused, never read whole.
+        const buf = await readCapped(abs(folder, e.path), e.size, (n) => deps.hooks?.read?.(e.path, n))
+        if (buf === null || buf === 'over' || sha256(buf) !== e.sha256) return refuse('changing', e.path)
         await writeDurable(join(dir, 'files', ...e.path.split('/')), buf)
       }
       const manifest = JSON.stringify({ entries })
@@ -393,8 +430,10 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         await save({ ...cur, paths: { ...paths } })
       }
       // Already as preserved (a resume after the step, or nothing to do): done.
-      const nowBuf = await readFile(target).catch(() => null)
-      if (!st && ((e.kind === 'file' && nowBuf && sha256(nowBuf) === e.sha256) || (e.kind === 'deleted' && !nowBuf))) {
+      // Read capped at the preserved size (HR1, round 2): a live file never read past what it is compared with.
+      const nowThere = existsSync(target)
+      const nowBuf = nowThere && e.kind === 'file' ? await readCapped(target, e.size, (n) => deps.hooks?.read?.(e.path, n)) : null
+      if (!st && ((e.kind === 'file' && Buffer.isBuffer(nowBuf) && sha256(nowBuf) === e.sha256) || (e.kind === 'deleted' && !nowThere))) {
         await setPath({ sub: 'done', aside: '', recovered: '', outcome: 'already' }) // i18n-ignore: a protocol value (journal phase, hash header or refusal detail), never shown
         continue
       }
@@ -402,14 +441,16 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       if (!st) await setPath(s)
       if (s.sub === 'planned') {
         // The atomic move aside (or none: absent). A resume finds it done when the aside exists.
-        if (!existsSync(s.aside) && nowBuf) await rename(target, s.aside)
+        if (!existsSync(s.aside) && existsSync(target)) await rename(target, s.aside)
         s = { ...s, sub: 'aside' } // i18n-ignore: a protocol value (journal phase, hash header or refusal detail), never shown
         await setPath(s)
       }
       await deps.hooks?.beforePlace?.(e.path)
       if (!(await mine())) return refuse('fence')
-      const asideBuf = await readFile(s.aside).catch(() => null)
-      const C = asideBuf ? blobOf(asideBuf) : null
+      // The moved-aside file, read capped at the delta's byte bound: past it, it equals no version compared with.
+      const asideThere = existsSync(s.aside)
+      const asideRead = asideThere ? await readCapped(s.aside, bounds.bytes, (n) => deps.hooks?.read?.(e.path, n)) : null
+      const C = Buffer.isBuffer(asideRead) ? blobOf(asideRead) : asideThere ? 'unreadable or past the bound' : null // i18n-ignore: a value no blob equals, never shown
       const U = u.get(e.path)?.blob ?? null
       const WS = e.wsBlob
       let outcome: PathState['outcome']
@@ -425,11 +466,11 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
             outcome = 'beside'
           }
         } else outcome = existsSync(target) ? 'kept' : 'restored'
-        if (asideBuf) await unlink(s.aside)
+        if (asideThere) await unlink(s.aside)
       } else {
         // An overlap (an upstream change, a later write, a deletion against an edit): the current file back as it was,
         // the preserved version beside it, or the local deletion listed.
-        if (asideBuf) {
+        if (asideThere) {
           try {
             await copyFile(s.aside, target, constants.COPYFILE_EXCL)
             await unlink(s.aside)
@@ -448,7 +489,8 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const st = paths[e.path]
       const target = abs(folder, e.path)
       const at = st.outcome === 'beside' ? st.recovered : st.outcome === 'restored' || st.outcome === 'already' ? target : null
-      if (at && e.kind === 'file' && sha256(await readFile(at).catch(() => Buffer.alloc(0))) !== e.sha256) return refuse('restore', e.path)
+      const back = at && e.kind === 'file' ? await readCapped(at, e.size) : null
+      if (at && e.kind === 'file' && !(Buffer.isBuffer(back) && sha256(back) === e.sha256)) return refuse('restore', e.path)
     }
     await save({ ...(j as unknown as Journal), phase: 'restored', paths })
     cur = j as unknown as Journal

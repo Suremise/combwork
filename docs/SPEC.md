@@ -2403,7 +2403,8 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   checked again there. The pool records a jj slot only once no writer, job, session or process is in it (the rename
   probe), checked again right before the snapshot; a busy one is left as it is, not ready. Recovery checks the
   folder's generation at entry (fresh or resumed) and before every step, and its bounds apply to every entry and to a
-  file's size before it is read.
+  file's size before it is read; every live file is read from its opened handle in bounded chunks, never past the
+  size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
 - **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
   released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
   with no port there is kept (`cantCheck`).
