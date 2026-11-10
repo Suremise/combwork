@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "Combwork 因内存耗尽而关闭？",
   "tips.mergeBranch.text": "在“版本控制”→“分支与远程仓库”中，分支旁的 ⑂ 会将它合并到你选择的分支，每次一个合并。尚未进入“已完成”的卡片的分支会先询问，卡片会被标记为在规则之外合并。",
   "tips.mergeBranch.title": "手动合并分支",
+  "tips.mergeFollowRemote.text": "与他人共用 main？在“版本控制”→“工作流程”中开启“目标分支跟随其远程仓库”：合并队列会在每次试合并前获取，在远程仓库的最新提交上测试，并且仅在期间无人推送时才推送，如有人推送则重新测试。",
+  "tips.mergeFollowRemote.title": "对照团队的远程仓库合并",
   "tips.mergeMessage.text": "由 Combwork 合并时，“版本控制”→“工作流程”决定合并的提交信息：Combwork 的信息写明卡片，分支自己的信息让卡片键不进入你的历史。选择“压缩合并”时，每张卡片会以一个提交落地，带有其构建者的信息。",
   "tips.mergeMessage.title": "使用你自己的提交信息合并",
   "tips.mergePush.text": "由 Combwork 合并时，可在“版本控制”→“工作流程”中让合并队列在每次合并后推送目标分支，从不强制推送。如果远程仓库拒绝，队列会暂停并说明原因：拉取后恢复，或关闭该选项后恢复。",

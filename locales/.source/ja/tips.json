@@ -334,6 +334,8 @@
   "tips.memorySnapshot.title": "Combwork closed running out of memory?",
   "tips.mergeBranch.text": "⑂ beside a branch in Version Control → Branches & remotes merges it into the branch you pick, one merge at a time. A card's branch that isn't Done asks first, and the card is marked merged outside the rules.",
   "tips.mergeBranch.title": "Merge a branch by hand",
+  "tips.mergeFollowRemote.text": "Sharing main with others? Turn on The target branch follows its remote in Version Control → Workflow: the merge queue fetches before each test merge, tests on the remote’s latest commit, and pushes only if nobody pushed meanwhile, testing again if they did.",
+  "tips.mergeFollowRemote.title": "Merge against your team’s remote",
   "tips.mergeMessage.text": "With Combwork merging, Version Control → Workflow sets the merge’s commit message: Combwork’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
   "tips.mergeMessage.title": "Merges with your own commit messages",
   "tips.mergePush.text": "With Combwork merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",

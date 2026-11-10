@@ -119,6 +119,14 @@
       "folder": "plain"
     }
   },
+  "workflow.forYou.queuePublish": {
+    "placeholders": {
+      "card": "plain",
+      "result": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.forYou.queueStuck": {
     "placeholders": {
       "card": "plain",
@@ -243,6 +251,12 @@
     "placeholders": {}
   },
   "workflow.option.folder.title": {
+    "placeholders": {}
+  },
+  "workflow.option.followRemote.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.followRemote.title": {
     "placeholders": {}
   },
   "workflow.option.identity.desc": {
@@ -1287,6 +1301,24 @@
   "workflow.unreadable.pathOutside": {
     "placeholders": {
       "path": "plain"
+    }
+  },
+  "workflow.unreadable.remoteBehind": {
+    "placeholders": {
+      "target": "plain",
+      "endpoint": "plain"
+    }
+  },
+  "workflow.unreadable.remoteHead": {
+    "placeholders": {
+      "branch": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.remoteSetup": {
+    "placeholders": {
+      "target": "plain"
     }
   },
   "workflow.unreadable.replay": {

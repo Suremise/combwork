@@ -15,6 +15,7 @@ import type { Again, CandidateHost, CandidatePause, CandidateTestFail, Integrati
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
+import { destinationOf, fetchHeadOf, prePushOf, publishOf, redactTransport } from './gitTransport'
 import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
@@ -284,8 +285,17 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
     if (r.ok) return 'pushed'
     const said = `${r.err}\n${r.out}`.trim()
+    // HI-1183: the remote's own refusal (a hook, a protected branch), its words kept as they are.
+    if (!r.timedOut && /\[remote rejected\]/i.test(said)) return { refused: said }
     return !r.timedOut && PUSH_REJECTED.test(said) ? { rejected: said } : { failed: said }
   },
+
+  // Follow mode (HI-1183): gitTransport.ts's sealed context.
+  destination: destinationOf,
+  fetchHead: fetchHeadOf,
+  prePush: prePushOf,
+  publish: publishOf,
+  redact: redactTransport,
 
   // A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome (queueHost.ts's, moved).
   async dropQueuePins(project, card) {

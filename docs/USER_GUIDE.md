@@ -1491,6 +1491,7 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 | Work merges into | The branch the project is on | The repository's default branch | The repository's default branch | The repository's default branch | Finished work goes to the repository's default branch; working solo, to the branch the project is on. |
 | Work is up to date with its target branch before it merges | — | — | Off | Off | The merge queue tests the merged result anyway, so this mostly changes the history's shape. |
 | Push the target branch after merging | — | — | Off | Off | Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on. |
+| The target branch follows its remote | — | — | Off | Off | Following a remote reaches it and its sign-in before every merge, so it stays yours unless you turn it on. |
 | Commit message | — | — | The branch's own | The branch's own | Card titles can name people and details a public history shouldn't keep; choose Combwork's for the card's key, linking each merge to its card. |
 | Checks pass on the merged result | — | — | Quick checks | Quick checks and the tests | The checks run on the work as it will be once merged, not only as it was built. |
 | Install dependencies from scratch | — | — | When the lock file or manifests change | Before every merge | A clean install before every merge catches a dependency that only worked on the builder's machine. |
@@ -1548,6 +1549,19 @@ You stay in charge of each queue:
 
 The Assistant can do these for you within **Settings → Assistant → Control** (it gives your reason when it takes a card out or retries one), and lists them among its actions. Agents can see a queue but never change it. You see each queue in the Progress panel's **Merges** tab, in the project's Version Control tab (**Merge queue**, with its history), and on each card in its **Work** section.
 
+### The target follows its remote <a id="the-target-follows-its-remote"></a>
+
+When others push to the same branch (teammates on other computers, or a CI that pushes to `main`), a merge that passes on your computer can still meet a remote that has moved on. **The target branch follows its remote** (Version Control → Workflow, shown when Combwork merges; off in every preset) makes the remote branch the one the queue merges into:
+
+- **Before each test merge** the queue fetches the branch the target tracks, and tests the card's work merged with the remote's latest commit, not your local copy. If your local target is behind, that's fine: it catches up after the merge. If it has commits the remote doesn't, the queue pauses until you push or pull them; it never forces a push or merges them by itself.
+- **It pushes the merge only if nobody pushed meanwhile.** If someone did, the push is refused, nothing changes on the remote, and the card is tested again on the new commit (after three such tries in a row, the queue pauses until the branch settles). A card is Done once the remote has its merge.
+- **Then it brings your local target up to date**, in its folder too if it's checked out there, as a merge into a checked-out branch does. If a file there is in the way, the queue pauses and names it; the merged card stays Done.
+- New cards in slots start from the remote's latest commit. If Combwork can't fetch it, the card doesn't start, and says why.
+
+The target must track a remote branch (`git branch -u origin/main`), whose remote has a single push address. The option also turns on **Push the target branch after merging**. Your repository's pre-push hook runs once for each push, in the project folder. The queue pushes with no prompt, using your sign-in as the Version Control tab's Push does, and keeps the remote's sign-in settings encrypted on this computer only while a push is under way. Settings you change in your git configuration while a push is under way don't redirect it.
+
+If the remote refuses the push (a protected branch that takes changes through pull requests, or a hook), the queue pauses with the remote's message, and the card waits to be tested again. If Combwork pushes but never hears back (the network dropped, or Combwork stopped), it looks at the remote: if the merge is there, the card is Done. If it isn't, Combwork can't tell whether someone removed it since, so it asks you in **For you**: approve if it was published, decline and the queue tests the card again. Until you answer, the queue waits; **Resume** looks at the remote again.
+
 ### Each card's focused tests <a id="each-cards-focused-tests"></a>
 
 **Each card's focused tests pass on the merged result** (Version Control → Workflow, shown when Combwork merges; on in Team when the project has the command that runs them) runs the tests a card's change needs on the merged result too, not only the project's merge checks. The project gives two commands under the option:
@@ -1570,6 +1584,7 @@ Anything else that stops a merge is something to fix on this computer, not in th
 - **Signing waits for you**: the repository signs its commits (`commit.gpgsign`) and its signer wanted a passphrase or a PIN: it stopped saying so (it needed a passphrase, a PIN entry window or a terminal), or it was still waiting after **Settings → Advanced → Merge queue: longest a signed merge commit takes** (60 seconds, hooks included), and Combwork ended it. Combwork never waits on a prompt. Unlock your key so it signs without asking: start your GPG agent with the passphrase cached, or add your SSH key to `ssh-agent`. If signing or your hooks are only slow, raise that setting.
 - **A hook didn't finish**: the repository signs its commits, and one of its commit hooks was still running at that same limit. Combwork ended it. Make the hook quicker, or raise the setting.
 - **Signing failed**: the signer refused, with its message (no secret key, a key that can't be loaded). Fix the signing setup (`user.signingkey`, `gpg.program`, `gpg.format`), or turn signing off for the repository.
+- **Following the remote** (when the target follows its remote): the target tracks no remote branch, its remote has more than one push address, the repository is a shallow clone, fetching failed (with git's message: a sign-in, the network), or your local target has commits the remote doesn't. Put it right, then resume; or turn the option off.
 - **Needs you**: git couldn't merge for another reason, with git's message: another git command holding the repository's index (`index.lock`), a damaged repository, a folder it couldn't check out. Let the other command finish, or fix what git says.
 
 ### Merging into a branch checked out in a folder <a id="merging-into-a-branch-checked-out-in-a-folder"></a>

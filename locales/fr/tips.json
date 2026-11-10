@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "Combwork s’est fermé faute de mémoire ?",
   "tips.mergeBranch.text": "⑂ à côté d’une branche dans Gestion de versions → Branches et dépôts distants la fusionne dans la branche de ton choix, une fusion à la fois. La branche d’une carte qui n’est pas terminée demande d’abord, et la carte est marquée fusionnée hors des règles.",
   "tips.mergeBranch.title": "Fusionner une branche à la main",
+  "tips.mergeFollowRemote.text": "Tu partages main avec d’autres ? Active « La branche cible suit son dépôt distant » dans Gestion de versions → Flux de travail : la file de fusion fait un fetch avant chaque fusion d’essai, teste sur le dernier commit du dépôt distant et ne pousse que si personne n’a poussé entre-temps, sinon elle teste à nouveau.",
+  "tips.mergeFollowRemote.title": "Fusionner par rapport au dépôt distant de ton équipe",
   "tips.mergeMessage.text": "Quand Combwork fusionne, Gestion de versions → Flux de travail règle le message du commit de la fusion : celui de Combwork nomme la carte, celui de la branche garde les clés de carte hors de ton historique. Avec Squash, chaque carte arrive alors en un seul commit avec le message de son auteur.",
   "tips.mergeMessage.title": "Des fusions avec tes propres messages de commit",
   "tips.mergePush.text": "Quand Combwork fusionne, Gestion de versions → Flux de travail peut pousser la branche cible après chaque fusion, jamais en force. Si le dépôt distant refuse, la file se met en pause et dit pourquoi : fais un pull et reprends, ou désactive l’option et reprends.",
