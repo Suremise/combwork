@@ -984,9 +984,9 @@ const jjSafetyChecks = (o, c) => {
 /**
  * Card `key` of `who` submitted from its jj slot, as a builder does (HI-2870): moved into Doing as the user moves it, so
  * Combwork gives it to `who` in its slot; `who` stopped; `files` written in the slot and committed with jj commit; then
- * submitted through the Agent API with `who`'s token. Its number, slot folder, jj workspace and submitted revision.
+ * submitted as the user moves it into Review. Its number, slot folder, jj workspace and submitted revision.
  */
-async function jjSlotSubmission(c, key, who, card, files, summary) {
+async function jjSlotSubmission(c, key, who, card, files) {
   const n = await c.card(key, { ...card, agent: who })
   await userMove(c, n, 'doing')
   await builderStopped(c, key, who)
@@ -995,8 +995,8 @@ async function jjSlotSubmission(c, key, who, card, files, summary) {
   if (!folder) throw new Error(`setup: #${n}'s slot (${slot}) has no folder`)
   for (const [rel, text] of Object.entries(files)) require('fs').writeFileSync(require('path').join(folder, rel), text)
   jjIn(c, 'commit', '-m', card.title, { cwd: folder })
-  const r = await c.as(who, 'POST', `/v1/tasks/%23${n}/submit`, { summary })
-  if (r.status !== 200) throw new Error(`setup: #${n}'s submission: ${r.status} ${JSON.stringify(r.body)}`)
+  // Submitted as the user moves it (as inReview's): a stopped agent's token is no longer valid.
+  await userMove(c, n, 'review')
   const s = ((await c.inv('tasks:facts', n)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
   const workspace = s?.platform?.jjSlot?.workspace ?? s?.platform?.jj?.workspace
   if (!s?.revision || !workspace) throw new Error(`setup: #${n}'s submission has no jj record: ${JSON.stringify(s)}`)
@@ -2337,7 +2337,7 @@ module.exports.SCENARIOS = [
     startedByCombwork: true,
     async setup(c) {
       await jjCardProject(c, { builder: 'implementer', reviewer: 'coder' })
-      c.sub = await jjSlotSubmission(c, 'r', 'implementer', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with the name trimmed.' }, { 'greet.js': "module.exports = (name) => 'Helo, ' + name.trim()\n" }, 'Done: greet.js trims the name.')
+      c.sub = await jjSlotSubmission(c, 'r', 'implementer', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with the name trimmed.' }, { 'greet.js': "module.exports = (name) => 'Helo, ' + name.trim()\n" })
       c.bookmarks = jjBookmarks(c)
       c.copies = new Set()
     },
@@ -2378,9 +2378,11 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     jj: true,
     jjCards: true,
+    // Its setup leaves Coder's inbox with the card's start and its pass: the prompt comes first, not a wake for those.
+    promptAtLaunch: true,
     async setup(c) {
       await jjCardProject(c)
-      c.sub = await jjSlotSubmission(c, 'p', 'coder', { title: 'Greeting says Hi', description: 'greet.js says "Hi, <name>".' }, { 'greet.js': "module.exports = (name) => 'Hi, ' + name\n" }, 'Ready for review: greet.js says Hi.')
+      c.sub = await jjSlotSubmission(c, 'p', 'coder', { title: 'Greeting says Hi', description: 'greet.js says "Hi, <name>".' }, { 'greet.js': "module.exports = (name) => 'Hi, ' + name\n" })
       await c.startAgent('implementer')
       const started = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.p}/start-review`)
       if (started.status !== 200) throw new Error(`setup: start review: ${JSON.stringify(started.body)}`)
