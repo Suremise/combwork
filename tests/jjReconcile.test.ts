@@ -6,16 +6,19 @@
 // - the approval replaced while the proof was made: nothing recorded;
 // - a slot amend after approval: Stale (another change);
 // - the publish pass (afterRun): the user's push settles the obligation `published`; the remote rewound flags it
-//   `checkThis`; a retained pin deleted is recreated by the retention page.
+//   `checkThis`; a retained pin deleted is recreated by the retention page;
+// - the window's containment record (HI-2869): for exactly the approval, ordered by its generation, gone with Integrated.
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
 import { JjPlatform } from '../src/main/platform/jjPlatform'
 import { jjIntegratedOf } from '../src/main/platform/jjFacts'
+import { waitingOf } from '../src/main/jjWindow'
+import { containedKey } from '../src/main/workflow/reconcile'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
@@ -161,6 +164,74 @@ describe.skipIf(!jjExe)(`jj cards reconciled to Integrated (jj ${TESTED_JJ.versi
       expect(once).toBeNull()
       expect(integrated(w, card.id)).toEqual([])
       expect(rows(w, 'jj_obligations')).toEqual([])
+    })
+
+    it("the window's containment record (HI-2869): for exactly the approval, ordered by generation (never a clock), gone with Integrated", async () => {
+      const w = await world(colocated)
+      const { card, P } = await approved(w)
+      const waiting = () => waitingOf(w.wf, 'p-jj').find((c) => c.card === card.id)!
+      expect(waiting().contained).toBeNull()
+      await new JjPlatform(w.wf).reconcile(card, {})
+      expect(waiting()).toMatchObject({ revision: P, target: 'main', contained: { state: 'notYet' } })
+      expect(waiting().change).toMatch(/^[k-z]+$/)
+      // An older observation finishing after a newer one writes nothing: A reserves its generation and blocks in its proof,
+      // B (generation after A's) can't read the target (unknown) and records that; A's late "not yet" is dropped.
+      const integration = w.deps.integration
+      let release!: () => void
+      let entered!: () => void
+      const inA = new Promise<void>((r) => (entered = r))
+      let gate: Promise<void> | null = new Promise<void>((r) => (release = r))
+      w.deps.integration = async () => {
+        if (gate) {
+          const g = gate
+          gate = null
+          entered()
+          await g
+        }
+        return integration()
+      }
+      const a = new JjPlatform(w.wf).reconcile(card, {})
+      await inA
+      const wrapper = w.deps.integration
+      w.deps.integration = async () => null
+      const other = w.another()
+      await new JjPlatform(other).reconcile(other.store.card(card.id), {})
+      expect(waiting().contained).toMatchObject({ state: 'unknown' })
+      w.deps.integration = wrapper
+      release()
+      await a
+      expect(waiting().contained).toMatchObject({ state: 'unknown' })
+      // A newer observation replaces it whatever the clock says (equal, then earlier): the generation orders them.
+      const at = waiting().contained!.at
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(at)
+      try {
+        await new JjPlatform(w.wf).reconcile(w.wf.store.card(card.id), {})
+        expect(waiting().contained).toMatchObject({ state: 'notYet', at })
+        w.deps.integration = async () => null
+        clock.mockReturnValue(at - 60_000)
+        await new JjPlatform(w.wf).reconcile(w.wf.store.card(card.id), {})
+        expect(waiting().contained).toMatchObject({ state: 'unknown', at: at - 60_000 })
+      } finally {
+        clock.mockRestore()
+        w.deps.integration = integration
+      }
+      // Integrated: the record goes with the card.
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+      await new JjPlatform(w.wf).reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      expect(w.store.boardMeta(containedKey('p-jj', card.key, w.wf.state(card).cycle))).toBeNull()
+    })
+
+    it("the containment record isn't shown for another approval of the card (HI-2869: a full identity match)", async () => {
+      const w = await world(colocated)
+      const { card } = await approved(w)
+      await new JjPlatform(w.wf).reconcile(card, {})
+      expect(waitingOf(w.wf, 'p-jj')[0].contained).toMatchObject({ state: 'notYet' })
+      // The approval replaced by a later submission of the same revision (recorded only): the record names the old one.
+      const sub = w.store.facts(card.id).findLast((f) => f.kind === 'Submitted')!
+      w.store.tx((tx) => tx.append(card.id, { kind: 'Submitted', actor: 'combwork', source: 'recorded', data: { ...(sub.data as object), summary: 'again' } } as never))
+      const now = waitingOf(w.wf, 'p-jj').find((c) => c.card === card.id)
+      expect(now?.contained ?? null).toBeNull()
     })
 
     it('a slot amend after approval (another change): Stale', async () => {

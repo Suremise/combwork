@@ -7,6 +7,8 @@
 // - a user's file in an attempt's folder: kept; an empty attempt folder of its own: removed; a folder at the attempt's
 //   path made by someone else (no recorded generation): kept;
 // - two simultaneous makings: one control; a replacement while the recovery waits for the lock: kept, a fresh one made.
+// - the window's leftovers (HI-2869): a residue pruned only on a proved absence and no registration, in rotating batches;
+//   one changed meanwhile, present, registered or unreadable, kept.
 // Skipped without the fetched jj (npm run jj:fetch).
 import { closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { holdLaunches, setLiveFolders } from '../src/main/launchHolds'
@@ -224,6 +226,42 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(ops()).toBe(before)
       expect(h.jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).toContain(identity.workspace)
       expect(existsSync(join(ws2, '.jj'))).toBe(true)
+    })
+
+    it("the window's leftovers (HI-2869): only proved absences pruned, in rotating batches; present, registered, unreadable or changed meanwhile, kept", async () => {
+      const w = setup('ctlp')
+      expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
+      const rec = w.record()!
+      const dir = join(resolve(w.repo, '..'), 'leftovers')
+      mkdirSync(dir, { recursive: true })
+      // 20 residues (more than a batch): even ones still there, odd ones gone; one gone but still registered with jj
+      // (the control's own name); one under a file (ENOTDIR: gone); one whose lstat fails otherwise (kept).
+      const residues = Array.from({ length: 20 }, (_, i) => ({ path: join(dir, `r${i}`), why: 'unrecorded' }))
+      for (let i = 0; i < 20; i += 2) mkdirSync(residues[i].path)
+      writeFileSync(join(dir, 'afile'), 'x')
+      residues.push({ path: join(dir, 'gone-registered'), name: rec.name!, why: 'lost' } as never, { path: join(dir, 'afile', 'under'), why: 'unrecorded' }, { path: join(dir, 'bad\u0000name'), why: 'unrecorded' })
+      w.set({ ...rec, residues })
+      expect(w.port.residues(w.repo, 5)).toMatchObject({ total: 23, rows: residues.slice(0, 5) })
+      // Changed while the prune read (between its snapshot and its write): nothing pruned.
+      const rows = w.h.journals.rows as Map<string, unknown>
+      const key = `jj_control:${w.repo.toLowerCase()}`
+      const get = rows.get.bind(rows)
+      let reads = 0
+      rows.get = (k: string) => {
+        const v = get(k)
+        if (k === key && ++reads === 1) rows.set(k, { ...(v as object), touched: true })
+        return v
+      }
+      expect(await w.port.pruneResidues(w.repo)).toBe(0)
+      rows.get = get
+      expect(w.record()!.residues).toHaveLength(23)
+      // Batches of 16, the cursor rotating: two passes reach every residue.
+      const first = await w.port.pruneResidues(w.repo)
+      expect(first).toBeGreaterThan(0)
+      await w.port.pruneResidues(w.repo)
+      await w.port.pruneResidues(w.repo)
+      const left = w.record()!.residues!.map((r) => r.path)
+      expect(left.sort()).toEqual([...residues.filter((_, i) => i < 20 && i % 2 === 0).map((r) => r.path), join(dir, 'gone-registered'), join(dir, 'bad\u0000name')].sort())
     })
 
     it('two simultaneous makings: one control; replaced while the recovery waits for the lock: kept, a fresh one made', async () => {

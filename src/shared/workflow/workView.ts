@@ -141,6 +141,9 @@ export interface WorkRevision {
   unknown: Record<string, string>
   /** The same reasons as data where a platform's read gave one (its `platform.unknownText`, #1477): the window words them. */
   unknownText: Record<string, StoredText>
+  /** HI-2869: jj's change id of the revision, and how many commits its chain holds, where the submission recorded them. */
+  change?: string
+  chain?: number
 }
 
 export interface WorkVerdict {
@@ -213,6 +216,8 @@ export interface WorkIntegration {
   /** The merge's own revision when it was merged with one (`method` merge): the result. */
   mergeCommit: string | null
   at: string
+  /** HI-2869: how jj proved it (its fact's `platform.jj.via`: ancestry, replay, sameTree, candidate). */
+  via?: string
 }
 
 /**
@@ -268,8 +273,10 @@ export interface WorkView {
   reviewSkipProposed: string | null
   /** Where the card works: `project`, or the slot's folder. */
   folder: string | null
-  /** The line it works on (Git: its branch); null for None. */
+  /** The line it works on (Git: its branch); null for None. A jj card's is a key (`jj:…`), never shown: see `workspace`. */
   line: string | null
+  /** HI-2869: a jj card's slot workspace, which the window shows in its line's place. */
+  workspace?: string
   /** Every line it has started on, over its whole history (HI-1823: an open card's earlier work, never a leftover). */
   lines: string[]
   /** The revision its change starts from. */
@@ -422,7 +429,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const at = new Map(facts.map((f) => [f.seq, f.at]))
   const latest = s.latest?.id ?? null
   const revisions = s.submissions.map(
-    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform), unknownText: unknownTextOf(x.platform) })
+    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform), unknownText: unknownTextOf(x.platform), ...jjRevisionOf(x.platform) })
   )
   const verdicts = s.verdicts
     .filter((v) => v.seq >= s.cycle)
@@ -467,6 +474,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
+    ...(jjField(started?.platform, 'workspace') ? { workspace: jjField(started?.platform, 'workspace')! } : {}),
     lines: s.lines,
     base: started?.base ?? null,
     target: started?.target ?? null,
@@ -479,7 +487,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     verdicts,
     checks,
     marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, inTarget: inTargetNow(s), leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
-    integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
+    integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at, ...(jjField((integrated.data as { platform?: unknown }).platform, 'via') ? { via: jjField((integrated.data as { platform?: unknown }).platform, 'via')! } : {}) } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
     refused,
     queue: entry ? queueEntryOf(entry, facts) : null,
@@ -658,3 +666,16 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
   }
 }
 
+/** A string field of a fact's `platform.jj` (HI-2869: the window's jj ids), or null.  */
+function jjField(platform: unknown, field: string): string | null {
+  const j = platform && typeof platform === 'object' ? (platform as { jj?: Record<string, unknown> }).jj : null
+  return j && typeof j[field] === 'string' ? (j[field] as string) : null
+}
+
+/** A submission's jj ids for the window (HI-2869): its change id and its chain's length, where recorded. */
+function jjRevisionOf(platform: unknown): { change?: string; chain?: number } {
+  const change = jjField(platform, 'changeId')
+  const j = platform && typeof platform === 'object' ? (platform as { jj?: { chain?: unknown } }).jj : null
+  const chain = j && Array.isArray(j.chain) ? j.chain.length : 0
+  return { ...(change ? { change } : {}), ...(chain > 1 ? { chain } : {}) }
+}

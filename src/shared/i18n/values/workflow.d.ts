@@ -486,9 +486,14 @@ interface CombworkMessageValues {
   'workflow.slots.levelNone': undefined
   'workflow.slots.noSlots': undefined
   'workflow.slots.none': undefined
+  'workflow.slots.notRecovered': { slot: string | number; why: string }
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
+  'workflow.slots.recover': undefined
+  'workflow.slots.recoverMessage': undefined
+  'workflow.slots.recoverTitle': { slot: string | number }
+  'workflow.slots.recovered': { slot: string | number }
   'workflow.slots.release': undefined
   'workflow.slots.reviewCopies': undefined
   'workflow.slots.reviewCopiesDesc': undefined
@@ -497,6 +502,7 @@ interface CombworkMessageValues {
   'workflow.slots.setNone': undefined
   'workflow.slots.setup': undefined
   'workflow.slots.setupDesc': undefined
+  'workflow.slots.stale': undefined
   'workflow.slots.state.creating': undefined
   'workflow.slots.state.dirty': undefined
   'workflow.slots.state.gone': undefined

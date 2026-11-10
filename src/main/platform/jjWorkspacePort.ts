@@ -18,13 +18,14 @@
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'original-fs'
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'original-fs'
 import { lstat, mkdir, readdir, readFile, realpath, rmdir, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Maybe, type Unknown } from './types'
 import { jjContextOf, type JjContext } from './jjDetect'
+import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import type { OwnedWrite, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
@@ -114,6 +115,14 @@ export interface JjWorkspacePort extends WorkspacePort {
   binding(folder: string): Promise<Maybe<JjBinding | null>>
   /** A slot's pointer read synchronously from the bindings' store (an intent's evidence, HI-2868): null with none or no store. */
   pointerSync(store: string, workspace: string): JjBinding | null | 'unreadable'
+  /** What an interrupted or lost control making left (HI-2887's residues), at most `limit`, and how many there are (HI-2869). */
+  residues(repo: string, limit: number): { rows: { path: string; name?: string; why: string }[]; total: number }
+  /**
+   * Residues proved gone dropped from the record (HI-2869/s13, s16): under the store's lock, a fair batch of at most 16
+   * (rotating), each dropped only when its path is absent (ENOENT or ENOTDIR) and its registration isn't in jj's list at
+   * the single head; the head, the absences and the record checked again synchronously right before the write. How many.
+   */
+  pruneResidues(repo: string): Promise<number>
   /** Runs jj (the port's runner) in a folder, pinned at `op` (a read) or writing. For recovery and tests. */
   jj(folder: string, args: readonly string[], o?: { op?: string; write?: boolean }): Promise<JjRunResult>
 }
@@ -125,6 +134,8 @@ const OP_END = 'cw-op-end'
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)
 const step = (ok: boolean, err = ''): WorkspaceStep => ({ ok, err })
 const ownedPrefix = (repoHash: string): string => `cw-${repoHash}-`
+/** Residues a prune looks at in one pass (HI-2869/s16: bounded, rotating). */
+const PRUNE_BATCH = 16
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 const realOr = async (p: string): Promise<string> => resolve(await realpath(p).catch(() => p))
 
@@ -868,6 +879,47 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const k = o.settles ? parseJjLineKey(o.settles) : null
       if (!k || !o.target) return step(false, JJ_REFUSED.notBound)
       return ownedMove(folder, 'detach', { prep: `detach:${k.prep}`, key: null, card: null, cycle: null, lease: null, target: null, base: revision, submitted: [] }, o, o.target)
+    },
+    residues: (repo, limit) => {
+      const v = deps.control(repo).journal.read() as { residues?: { path: string; name?: string; why: string }[] } | null
+      const all = v && typeof v === 'object' && Array.isArray(v.residues) ? v.residues : []
+      return { rows: all.slice(0, Math.max(0, limit)), total: all.length }
+    },
+    pruneResidues: async (repo) => {
+      const ctx = await contextOf(repo)
+      if (!ctx) return 0
+      const c = deps.control(repo)
+      return deps.lock(ctx.store, async () => {
+        type Res = { path: string; name?: string; why: string }
+        const snap = c.journal.read() as ({ residues?: Res[]; pruneCursor?: number } & Record<string, unknown>) | null
+        const all = snap && Array.isArray(snap.residues) ? snap.residues : []
+        if (!snap || !all.length) return 0
+        const start = (snap.pruneCursor ?? 0) % all.length
+        const batch = [...all.slice(start), ...all.slice(0, start)].slice(0, PRUNE_BATCH)
+        const op = await pinned(repo)
+        if (isUnknown(op)) return 0
+        const listed = await listAt(repo, op)
+        if (isUnknown(listed)) return 0
+        const absent = async (p: string): Promise<boolean> => lstat(p).then(() => false, (e: { code?: string }) => e?.code === 'ENOENT' || e?.code === 'ENOTDIR')
+        const candidates: Res[] = []
+        for (const r of batch) if ((await absent(r.path)) && (!r.name || !listed.some((w) => w.name === r.name))) candidates.push(r)
+        // The final continuation, nothing awaited until the write: the head, the record and each absence again.
+        if (readOpHeads(ctx.jjRepo)?.join() !== op) return 0
+        if (JSON.stringify(c.journal.read()) !== JSON.stringify(snap)) return 0
+        const absentNow = (p: string): boolean => {
+          try {
+            lstatSync(p)
+            return false
+          } catch (e) {
+            const code = (e as { code?: string }).code
+            return code === 'ENOENT' || code === 'ENOTDIR'
+          }
+        }
+        const drop = new Set(candidates.filter((r) => absentNow(r.path)))
+        const rest = all.filter((r) => !drop.has(r))
+        await c.journal.write({ ...snap, residues: rest, pruneCursor: rest.length ? (start + PRUNE_BATCH - drop.size) % rest.length : 0 })
+        return drop.size
+      })
     },
     binding: (folder) => bindingNow(folder),
     pointerSync: (store, workspace) => deps.prep?.(store)?.pointer(store, workspace) ?? null,

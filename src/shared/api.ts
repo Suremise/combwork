@@ -174,7 +174,7 @@ import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
-import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjView } from './jjViews'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjLeftover, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjToCheckRow, JjView, JjWaitingCard } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1098,6 +1098,14 @@ export interface CombworkRequests {
   'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
   /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
   'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
+  /** HI-2869: the passed jj cards with their last containment observation for exactly their approval. */
+  'jj:waiting': (projectPath: string) => JjWaitingCard[]
+  /** HI-2869: a page of the publish records to check (J9b2's checkThis), after a cursor. */
+  'jj:toCheck': (projectPath: string, after?: { target: string; checkAt: number; card: string; cycle: number; bundle: string } | null) => { rows: JjToCheckRow[]; more: boolean }
+  /** HI-2869: Mark as checked, the user's acknowledgement (false: the record changed meanwhile). */
+  'jj:markChecked': (projectPath: string, row: { target: string; card: string; cycle: number; bundle: string; checkAt: number }) => boolean
+  /** HI-2869: what an interrupted or lost set-up left (after a prune of the ones proved gone). */
+  'jj:leftovers': (projectPath: string) => { rows: JjLeftover[]; total: number }
   'git:info': (projectPath: string) => GitRepoInfo
   /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
   'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
-import type { WorkView } from '@shared/workflow/workView'
-import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown } from '@shared/jjViews'
+import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
 import { msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { cardLabelOf, notify, useLanguage, useStore } from '../store'
+import { cardLabelOf, confirm, notify, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
 import { Icon, Tooltip } from '../components/ui'
 
@@ -43,7 +42,23 @@ const M = {
   integrateNone: msg({ id: 'jj.integrate.none', defaultMessage: 'No card is waiting.', description: 'Under “Waiting for you to integrate” (HI-2799) when no card has passed.' }),
   integrateCard: msg({ id: 'jj.integrate.card', defaultMessage: '{card} {title}: commit {commit} into {target}', description: 'A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into.' }),
   integrateHow: msg({ id: 'jj.integrate.how', defaultMessage: 'For example, then move {target} to the rebased commit with jj bookmark set:', description: 'Above a jj command suggested to integrate a passed card (HI-2799): rebase it onto its target, then move the target bookmark. Keep jj bookmark set (a command).' }),
-  contained: msg({ id: 'jj.integrate.contained', defaultMessage: 'In {target}: can’t check yet.', description: 'Under a passed jj card (HI-2799): whether its reviewed work is in its target. Combwork can’t check it yet (a later version records it); never read as not integrated.' }),
+  notYet: msg({ id: 'jj.integrate.notYet', defaultMessage: 'Not in {target} as of {when}.', description: 'Under a passed jj card (HI-2869): Combwork last looked and its reviewed work wasn’t in its target bookmark ({target}) yet. {when} is how long ago it looked (already translated, such as “5 minutes ago”).' }),
+  unknownContained: msg({ id: 'jj.integrate.unknown', defaultMessage: 'Couldn’t check whether it’s in {target} ({when}): {why, select, conflictedTarget {{target} is conflicted} divergentChange {its change is divergent} partialExport {{target} isn’t the same in Git} ambiguousRemote {it isn’t clear which remote {target} follows} notFetched {the remote has a commit Combwork hasn’t fetched} other {jj couldn’t read it}}.', description: 'Under a passed jj card (HI-2869): Combwork’s last look couldn’t say whether its reviewed work is in its target bookmark ({target}); never read as not integrated. {when}: how long ago (already translated). {why} picks the reason: keep the select keys.' }),
+  notChecked: msg({ id: 'jj.integrate.notChecked', defaultMessage: 'Not checked yet whether it’s in {target}.', description: 'Under a passed jj card (HI-2869): Combwork hasn’t looked yet, since its review passed, whether its reviewed work is in its target bookmark ({target}).' }),
+  changeId: msg({ id: 'jj.integrate.change', defaultMessage: 'change {change}', description: 'Beside a passed jj card’s reviewed commit (HI-2869): its jj change id (short). “change” is jj’s term.' }),
+  toCheck: msg({ id: 'jj.toCheck.head', defaultMessage: 'Publish records to check', description: 'A heading of the jj Repository section (HI-2869): integrations whose recorded publish state (pushed to the remote, or no longer held) no longer matches what Combwork sees; the user checks each.' }),
+  toCheckRow: msg({ id: 'jj.toCheck.row', defaultMessage: '{card}: {result} into {target} was recorded {was, select, published {as published to {remote}} other {as no longer in {target}}} ({when}).', description: 'A row under “Publish records to check” (HI-2869). {card} a card key; {result} a short commit id; {target} a bookmark; {remote} a remote’s name; {when} how long ago it was recorded (already translated). Keep the select keys.' }),
+  toCheckDiffers: msg({ id: 'jj.toCheck.differs', defaultMessage: '{what, select, remote {Its remote changed: {was} → {now}} url {Its remote’s address changed} pushed {The remote now has {now} (it had {was})} inRemote {The remote no longer has it} held {{now, select, yes {It’s back in its target} other {It’s no longer in its target}}} other {Something differs}}', description: 'What differs now for a publish record under “Publish records to check” (HI-2869). {was} and {now} are names or short commit ids (in held: yes or no). Keep the select keys.' }),
+  markChecked: msg({ id: 'jj.toCheck.mark', defaultMessage: 'Mark as checked', description: 'A button on a row under “Publish records to check” (HI-2869): the user has checked it; it leaves the list. Nothing in the repository changes.' }),
+  markTitle: msg({ id: 'jj.toCheck.markTitle', defaultMessage: 'Mark {card} as checked?', description: 'The title of the confirmation before Mark as checked (HI-2869). {card} is a card key.' }),
+  markMessage: msg({ id: 'jj.toCheck.markMessage', defaultMessage: 'It leaves this list. Combwork changes nothing in the repository or on the remote: this only records that you’ve looked.', description: 'The confirmation before Mark as checked (HI-2869).' }),
+  markChanged: msg({ id: 'jj.toCheck.changed', defaultMessage: 'That record changed since it was shown: look again.', description: 'A notice after Mark as checked was refused (HI-2869): the record changed meanwhile (checked elsewhere, or seen again).' }),
+  more: msg({ id: 'jj.toCheck.more', defaultMessage: 'Show more', description: 'A button under “Publish records to check” (HI-2869): the next page of records.' }),
+  leftovers: msg({ id: 'jj.leftovers.head', defaultMessage: 'Left over from setting up jj slots', description: 'A heading of the jj Repository section (HI-2869): folders an interrupted or lost set-up of jj slots kept because Combwork couldn’t prove they were its own; the user removes them.' }),
+  leftoversHint: msg({ id: 'jj.leftovers.hint', defaultMessage: 'Combwork never deletes these: remove each one yourself once you’ve looked at it.', description: 'Under “Left over from setting up jj slots” (HI-2869).' }),
+  leftoverWhy: msg({ id: 'jj.leftovers.why', defaultMessage: '{why, select, unrecorded {a set-up that didn’t finish} lost {a set-up that was lost} notEmpty {not empty} unproved {not provably Combwork’s} other {kept}}{name, select, none {} other {, registered as {name}}}', description: 'Why a folder under “Left over from setting up jj slots” was kept (HI-2869), and the jj workspace name it’s registered under (none: keep that branch empty). Keep the select keys.' }),
+  showFolder: msg({ id: 'jj.leftovers.show', defaultMessage: 'Show in folder', description: 'A button beside a leftover folder (HI-2869): opens it in the file manager.' }),
+  leftoversMore: msg({ id: 'jj.leftovers.more', defaultMessage: '{n, plural, one {# more not shown} other {# more not shown}}', description: 'Under “Left over from setting up jj slots” (HI-2869): how many more there are than the list shows.' }),
   noMerge: msg({ id: 'jj.integrate.noMerge', defaultMessage: 'Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.', description: 'A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj.' }),
   // History.
   change: msg({ id: 'jj.row.change', defaultMessage: 'Change', description: 'A column of jj’s History (HI-2799): the change id (stable across rewrites).' }),
@@ -243,49 +258,140 @@ function RowLine({ row }: { row: JjRow }) {
   )
 }
 
-/** Option A (HI-2794): the project's passed cards, each with its reviewed commit, its target and a command to integrate it. */
+/** Option A (HI-2794): the project's passed cards, each with its reviewed commit, its target, a command to integrate it, and
+ * its last containment observation for exactly that approval (HI-2869). */
 function IntegratePanel({ project }: { project: ProjectInfo }) {
   const tasks = useStore((s) => s.tasks)
   const passed = tasks.filter((t) => t.project === project.name && t.column === 'passed' && !t.archived)
-  const [views, setViews] = useState<Record<number, WorkView | null>>({})
+  const [rows, setRows] = useState<JjWaitingCard[]>([])
   const key = passed.map((t) => t.number).join(',')
   useEffect(() => {
     let live = true
-    void Promise.all(passed.map((t) => call('tasks:work', t.number).then((v) => [t.number, v] as const, () => [t.number, null] as const))).then((rows) => live && setViews(Object.fromEntries(rows)))
+    void call('jj:waiting', project.path).then((r) => live && setRows(r), () => live && setRows([]))
     return () => {
       live = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, project.path])
   return (
     <section className="jj-integrate" data-jj-integrate="">
       <h4>{tr(M.integrate)}</h4>
       <p className="hint">{tr(M.noMerge)}</p>
-      {passed.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="faint">{tr(M.integrateNone)}</p>
       ) : (
         <ul>
-          {passed.map((t) => {
-            const v = views[t.number]
-            const commit = v?.approved?.revision ?? null
-            const target = v?.target ?? ''
+          {rows.map((r) => {
+            const t = tasks.find((x) => x.number === r.card)
+            const target = r.target || '—'
+            const c = r.contained
             return (
-              <li key={t.number} data-jj-integrate-card={t.number}>
-                <div>{tr(M.integrateCard, { card: cardLabelOf({ tasks }, t.number), title: t.title, commit: commit ? commitShort(commit) : '—', target: target || '—' })}</div>
-                {commit && target && (
+              <li key={r.card} data-jj-integrate-card={r.card}>
+                <div>
+                  {tr(M.integrateCard, { card: cardLabelOf({ tasks }, r.card), title: t?.title ?? '', commit: commitShort(r.revision), target })}
+                  {r.change && <span className="faint mono"> · {tr(M.changeId, { change: r.change.slice(0, 12) })}</span>}
+                </div>
+                {r.target && (
                   <>
-                    <div className="hint">{tr(M.integrateHow, { target })}</div>
-                    <code className="mono jj-command" data-jj-command="">{`jj rebase -r ${commit} -d ${target}` /* i18n-ignore: a jj command, as typed */}</code>
+                    <div className="hint">{tr(M.integrateHow, { target: r.target })}</div>
+                    <code className="mono jj-command" data-jj-command="">{`jj rebase -r ${r.revision} -d ${r.target}` /* i18n-ignore: a jj command, as typed */}</code>
                   </>
                 )}
-                <div className="faint" data-jj-contained="unknown">
-                  {tr(M.contained, { target: target || '—' })}
+                <div className="faint" data-jj-contained={c ? c.state : 'none'}>
+                  {!c ? tr(M.notChecked, { target }) : c.state === 'notYet' ? tr(M.notYet, { target, when: timeAgo(new Date(c.at).toISOString()) }) : tr(M.unknownContained, { target, when: timeAgo(new Date(c.at).toISOString()), why: unknownWhy(c.why) })}
                 </div>
               </li>
             )
           })}
         </ul>
       )}
+    </section>
+  )
+}
+
+/** J5's refusal code at the start of an unknown's why, or other (the window words the known ones). */
+function unknownWhy(why: string | undefined): string {
+  const m = /^refused: (\w+)/.exec(why ?? '')
+  return m ? m[1] : 'other'
+}
+
+/** The publish records to check (J9b2's checkThis, HI-2869): a page at a time, each with what differs and Mark as checked. */
+function ToCheckPanel({ project }: { project: ProjectInfo }) {
+  const [rows, setRows] = useState<JjToCheckRow[]>([])
+  const [more, setMore] = useState(false)
+  const load = useCallback(
+    (after: JjToCheckRow | null) =>
+      call('jj:toCheck', project.path, after ? { target: after.target, checkAt: after.checkAt, card: after.card, cycle: after.cycle, bundle: after.bundle } : null).then(
+        (r) => {
+          setRows((prev) => (after ? [...prev, ...r.rows] : r.rows))
+          setMore(r.more)
+        },
+        () => undefined
+      ),
+    [project.path]
+  )
+  useEffect(() => {
+    void load(null)
+  }, [load])
+  if (!rows.length) return null
+  const mark = async (r: JjToCheckRow): Promise<void> => {
+    if (!(await confirm({ title: tr(M.markTitle, { card: r.card }), message: tr(M.markMessage), confirmLabel: tr(M.markChecked) }))) return
+    const ok = await call('jj:markChecked', project.path, { target: r.target, card: r.card, cycle: r.cycle, bundle: r.bundle, checkAt: r.checkAt }).catch(() => false)
+    if (!ok) notify('warning', tr(M.markChanged))
+    void load(null)
+  }
+  return (
+    <section className="jj-to-check" data-jj-to-check="">
+      <h4>{tr(M.toCheck)}</h4>
+      <ul>
+        {rows.map((r) => (
+          <li key={`${r.card}:${r.cycle}:${r.bundle}`} data-jj-to-check-row={r.card}>
+            <div>{tr(M.toCheckRow, { card: r.card, result: commitShort(r.result), target: r.target, was: r.was, remote: r.remote ?? '—', when: timeAgo(new Date(r.at).toISOString()) })}</div>
+            <ul className="faint">
+              {r.differs.map((d, i) => (
+                <li key={i}>{tr(M.toCheckDiffers, { what: d.what, was: d.was ? (d.what === 'pushed' ? commitShort(d.was) : d.was) : '—', now: d.now ? (d.what === 'pushed' ? commitShort(d.now) : d.now) : d.what === 'held' ? 'no' : '—' })}</li>
+              ))}
+            </ul>
+            <button className="btn small" data-jj-mark-checked="" onClick={() => void mark(r)}>
+              {tr(M.markChecked)}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {more && (
+        <button className="btn small" data-jj-to-check-more="" onClick={() => void load(rows[rows.length - 1])}>
+          {tr(M.more)}
+        </button>
+      )}
+    </section>
+  )
+}
+
+/** What an interrupted or lost set-up of jj slots left (HI-2887's residues, HI-2869): listed for the user to remove. */
+function LeftoversPanel({ project }: { project: ProjectInfo }) {
+  const [list, setList] = useState<{ rows: JjLeftover[]; total: number }>({ rows: [], total: 0 })
+  useEffect(() => {
+    let live = true
+    void call('jj:leftovers', project.path).then((r) => live && setList(r), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [project.path])
+  if (!list.rows.length) return null
+  return (
+    <section className="jj-leftovers" data-jj-leftovers="">
+      <h4>{tr(M.leftovers)}</h4>
+      <p className="hint">{tr(M.leftoversHint)}</p>
+      <ul>
+        {list.rows.map((r) => (
+          <li key={r.path} data-jj-leftover={r.path}>
+            <code className="mono">{r.path}</code> <span className="faint">{tr(M.leftoverWhy, { why: r.why, name: r.name ?? 'none' })}</span>{' '}
+            <button className="btn small" onClick={() => void call('app:showInFolder', r.path).catch(() => undefined)}>
+              {tr(M.showFolder)}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {list.total > list.rows.length && <p className="faint">{tr(M.leftoversMore, { n: list.total - list.rows.length })}</p>}
     </section>
   )
 }
@@ -320,6 +426,8 @@ export function JjRepoSection({ project }: { project: ProjectInfo }) {
             </ul>
           )}
           <IntegratePanel project={project} />
+          <ToCheckPanel project={project} />
+          <LeftoversPanel project={project} />
           <h4>{tr(M.unsupported)}</h4>
           <ul className="jj-unsupported" data-jj-unsupported="">
             {v.gates.map((g) => (
