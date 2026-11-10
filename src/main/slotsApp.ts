@@ -27,7 +27,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, quiet as quietFolder, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -43,6 +43,7 @@ import { boardPrepStore } from './platform/jjSlotPrep'
 import { historyFor } from './platform/historyPorts'
 import { withRepoLock } from './repoLock'
 import { trash } from './trash'
+import { holdLaunches } from './launchHolds'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { PlatformId } from '../shared/platform/descriptors'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
@@ -299,7 +300,9 @@ export function jjPort(): JjWorkspacePort {
       const journal = ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_control:${repo.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
       return { folder, journal }
     },
-    projectQuiet: async (repo) => !sessionIn(repo) && (await quietFolder(repo)),
+    // HI-2887 (Darren's r9: automatic): the project folder held against agent launches while its control is made.
+    projectHold: (repo) => holdLaunches(repo),
+    made: (repo, ws) => log.info(`Made jj's control workspace for ${userText(basename(repo))} at ${userText(ws)}: the project folder's working copy recorded once`),
     lock: storeLock,
     trash: async (p) => void (await trash(p)),
     prep: (store) => {

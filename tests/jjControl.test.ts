@@ -8,7 +8,8 @@
 //   path made by someone else (no recorded generation): kept;
 // - two simultaneous makings: one control; a replacement while the recovery waits for the lock: kept, a fresh one made.
 // Skipped without the fetched jj (npm run jj:fetch).
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { holdLaunches, setLiveFolders } from '../src/main/launchHolds'
 import { join, resolve } from 'path'
 import { statSync } from 'fs'
 import { describe, expect, it } from 'vitest'
@@ -19,13 +20,14 @@ type Rec = { phase?: string; token?: string; name?: string; store?: string; toke
 
 describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery (jj ${TESTED_JJ.version}), HI-2887`, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
-    const setup = (name: string, lockHook?: () => Promise<void> | void) => {
+    const setup = (name: string, lockHook?: () => Promise<void> | void, remake = true) => {
       const h = harness()
       const { repo, root, base } = h.repo(`${name}${colocated ? 'c' : 'n'}`, colocated)
       const key = `jj_control:${repo.toLowerCase()}`
       // The store's lock as the app's serializes (one holder at a time), with a test's hook on taking it.
       let chain: Promise<unknown> = Promise.resolve()
       const port = h.portWith({
+        remakeAllowed: () => remake,
         lock: (_s, fn) => {
           const run = chain.then(async () => {
             await lockHook?.()
@@ -53,12 +55,33 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       return `${s.ino}:${s.birthtimeNs}`
     }
 
+    it("made while the project folder is held open (an editor's handle), its uncommitted edit recorded into the user's @; refused with an agent there", async () => {
+      const h = harness()
+      const { repo, root, base } = h.repo(`ctlo${colocated ? 'c' : 'n'}`, colocated)
+      const port = h.portWith({ projectHold: (r) => holdLaunches(r) })
+      // An agent in the project folder: refused, nothing made.
+      setLiveFolders(() => [repo])
+      expect((await port.create(repo, join(root, 'slot-a'), base)).ok).toBe(false)
+      setLiveFolders(() => [])
+      // The folder held open (a file open in it, as an editor keeps one) and an uncommitted edit: made, the edit in @.
+      writeFileSync(join(repo, 'draft.txt'), 'work in progress\n')
+      const fd = openSync(join(repo, 'draft.txt'), 'r')
+      try {
+        expect((await port.create(repo, join(root, 'slot-a'), base)).ok).toBe(true)
+      } finally {
+        closeSync(fd)
+      }
+      expect(readFileSync(join(repo, 'draft.txt'), 'utf8')).toBe('work in progress\n')
+      expect(h.jj(repo, '--ignore-working-copy', 'diff', '--summary', '-r', '@')).toMatch(/draft\.txt/)
+    })
+
     it('interrupted after the add (no baseline for its ws): kept as a residue, a fresh attempt made, slots made', async () => {
       const w = setup('ctla')
       expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
       const first = w.record()!
       expect(first.phase).toBe('ready')
-      const { ws: _ws, wsGeneration: _g, ...partial } = first
+      // The first set-up, interrupted after jj's add (never ready): made again, automatically.
+      const { ws: _ws, wsGeneration: _g, everReady: _e, ...partial } = first as Rec & { everReady?: boolean }
       w.set({ ...partial, phase: 'folder' })
       expect((await w.port.create(w.repo, join(w.root, 'slot-b'), w.base)).ok).toBe(true)
       const now = w.record()!
@@ -68,7 +91,18 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(existsSync(first.ws!)).toBe(true)
     })
 
-    it("a ready control's ws replaced byte for byte, or its folder removed: not used, kept or reported; the next slot made", async () => {
+    it("a ready control lost: not made again until the user's decision covers it; refused, reported", async () => {
+      const w = setup('ctlh', undefined, false)
+      expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
+      const first = w.record()!
+      rmSync(first.tokenFolder!, { recursive: true, force: true })
+      expect((await w.port.create(w.repo, join(w.root, 'slot-b'), w.base)).ok).toBe(false)
+      expect(w.record()).toMatchObject({ phase: 'idle', everReady: true })
+      expect(w.record()!.residues).toEqual(expect.arrayContaining([expect.objectContaining({ name: first.name, why: 'lost' })]))
+      expect(w.tokens()).toEqual([])
+    })
+
+    it("a ready control's ws replaced byte for byte, or its folder removed (re-set-up allowed): not used, kept or reported; the next slot made", async () => {
       const w = setup('ctlb')
       expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
       const first = w.record()!

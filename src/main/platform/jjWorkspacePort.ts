@@ -59,10 +59,18 @@ export interface JjPortDeps {
   /** The project's control workspace: its folder (in the project's worktrees folder) and the record of it (board_meta). */
   control: (repo: string) => { folder: string; journal: WorkspaceJournal }
   /**
-   * Whether the project folder is quiet: no session, no process in it (the pool's proof). Only then is the control made,
-   * which snapshots the project folder's working copy once (an explicit owned record, HI-2795/s21 §4).
+   * The project folder held against agent launches while its control is made (HI-2887: the app's launch hold), which
+   * snapshots the project folder's working copy once (Darren's r9 on HI-2887: automatically, with no Combwork agent in
+   * the project folder). Refused (who is there) when an agent works in it or is starting there.
    */
-  projectQuiet: (repo: string) => Promise<boolean>
+  projectHold: (repo: string) => { release: () => void } | { busy: string }
+  /**
+   * Whether a control that was ready once and is lost may be made again automatically (another snapshot of the project
+   * folder): only on the user's decision covering it (HI-2887). Absent: never; the loss is reported and refused.
+   */
+  remakeAllowed?: () => boolean
+  /** Told when a control was made (the project folder's working copy recorded once), for the log. */
+  made?: (repo: string, ws: string) => void
   /** The store's repository lock (R1.1: one store, one lock), held around add, forget and the control's making. */
   lock: <T>(store: string, fn: () => Promise<T>) => Promise<T>
   /** The Recycle Bin (trash.ts), or a test's. */
@@ -305,7 +313,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     const c = deps.control(repo)
     const hash = await repoHash(repo)
     type Residue = { path: string; name?: string; why: string }
-    type Rec = { phase?: string; token?: string; name?: string; store?: string; tokenFolder?: string; tokenGeneration?: string; ws?: string; wsGeneration?: string; residues?: Residue[]; folder?: string; workspace?: string; generation?: string }
+    type Rec = { everReady?: boolean; phase?: string; token?: string; name?: string; store?: string; tokenFolder?: string; tokenGeneration?: string; ws?: string; wsGeneration?: string; residues?: Residue[]; folder?: string; workspace?: string; generation?: string }
     const recNow = (): Rec | null => {
       const v = c.journal.read()
       return v && typeof v === 'object' && !('unreadable' in v) ? (v as Rec) : null
@@ -362,29 +370,41 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
             await rmdir(tokenFolder).catch(() => keep({ path: tokenFolder, why: 'notEmpty' })) // i18n-ignore: a residue's protocol code, for the log and the window's own words
           } else keep({ path: tokenFolder, ...(name ? { name } : {}), why: ours ? 'notEmpty' : 'unproved' }) // i18n-ignore: a residue's protocol code, for the log and the window's own words
         }
-        await c.journal.write({ phase: 'idle', store: ctx.store, residues })
+        // Ready once (a working control lost): made again only on the user's decision covering another snapshot.
+        const lost = rec.phase === 'ready' || !!rec.everReady
+        await c.journal.write({ phase: 'idle', store: ctx.store, residues, ...(lost ? { everReady: true } : {}) })
+        if (lost && !deps.remakeAllowed?.()) return null
       }
-      if (!(await deps.projectQuiet(repo))) return null
       const token = randomUUID().replace(/-/g, '').slice(0, 12)
       const name = `${ownedPrefix(hash)}control-${token}` // i18n-ignore: a jj workspace name, not wording
       // Beside J9a's single control folder (a J9a control there stays as it was, a residue if it can't be used).
       const attempts = join(dirname(c.folder), '.cw-jj-controls')
       const tokenFolder = join(attempts, token)
       const ws = join(tokenFolder, 'ws')
-      const base = { store: ctx.store, token, name, tokenFolder, residues }
-      await c.journal.write({ phase: 'intent', ...base })
-      await mkdir(attempts, { recursive: true }).catch(() => undefined)
-      if (!(await mkdir(tokenFolder).then(() => true, () => false))) return null
-      const tokenGeneration = await folderGen(tokenFolder)
-      if (!tokenGeneration) return null
-      await c.journal.write({ phase: 'folder', ...base, tokenGeneration })
-      // The explicit owned record of the project folder: the one snapshot of it this attempt takes, under the lock, quiet.
-      const add = await jj(repo, ['workspace', 'add', ws, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
-      if (!add.ok) return null
-      const wsGeneration = await generationOf(ws)
-      if (!wsGeneration) return null
-      await c.journal.write({ phase: 'ready', ...base, tokenGeneration, ws, wsGeneration })
-      return ws
+      const base = { store: ctx.store, token, name, tokenFolder, residues, ...(rec?.everReady ? { everReady: true } : {}) }
+      // The project folder held against agent launches for the whole making (lock order: the store's lock, then the
+      // hold), released however it ends.
+      const hold = deps.projectHold(repo)
+      if ('busy' in hold) return null
+      try {
+        await c.journal.write({ phase: 'intent', ...base })
+        await mkdir(attempts, { recursive: true }).catch(() => undefined)
+        if (!(await mkdir(tokenFolder).then(() => true, () => false))) return null
+        const tokenGeneration = await folderGen(tokenFolder)
+        if (!tokenGeneration) return null
+        await c.journal.write({ phase: 'folder', ...base, tokenGeneration })
+        // The explicit owned record of the project folder: the one snapshot of it this attempt takes, under the lock and
+        // the hold (no Combwork agent in the project folder).
+        const add = await jj(repo, ['workspace', 'add', ws, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
+        if (!add.ok) return null
+        const wsGeneration = await generationOf(ws)
+        if (!wsGeneration) return null
+        await c.journal.write({ phase: 'ready', ...base, tokenGeneration, ws, wsGeneration, everReady: true })
+        deps.made?.(repo, ws)
+        return ws
+      } finally {
+        hold.release()
+      }
     })
   }
 

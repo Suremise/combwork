@@ -58,7 +58,7 @@ export interface Harness {
   portWith: (more?: Partial<JjPortDeps>) => JjWorkspacePort
 }
 
-export function harness(o: { quiet?: () => Promise<boolean> } = {}): Harness {
+export function harness(o: { busy?: string } = {}): Harness {
   const env = isolatedEnv()
   const runner = createJjRunner({ exe: jjExe!, env })
   const journals = new Journals()
@@ -68,7 +68,7 @@ export function harness(o: { quiet?: () => Promise<boolean> } = {}): Harness {
   const deps = (more: Partial<JjPortDeps> = {}): JjPortDeps => ({
     runner,
     control: (repo) => ({ folder: join(resolve(repo, '..'), 'slots', '.cw-jj-control'), journal: journals.of(`jj_control:${repo.toLowerCase()}`) }),
-    projectQuiet: o.quiet ?? (async () => true),
+    projectHold: () => (o.busy ? { busy: o.busy } : { release: () => undefined }),
     lock: (_store, fn) => fn(),
     trash: async (p) => {
       const to = join(trashDir, `${++n}-${basename(p)}`)

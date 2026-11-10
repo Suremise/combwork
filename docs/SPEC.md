@@ -3036,6 +3036,33 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   publication, resumed without a second write) and `tests/jjSlotPoolPrep.test.ts` (the pool's own prepare, settle after
   integration, kept when not integrated, and the recovery action).
 
+##### jj's control workspace (HI-2887)
+
+Every jj slot and copy is added and forgotten from a control workspace of Combwork's own (J2's, s21 §4: sparse and empty,
+so its own snapshot records nothing). jj can only add that first workspace from the project folder (`workspace add`
+refuses `--ignore-working-copy`, probed on 0.47.1), which snapshots the user's working copy. **Darren's decision (r9 on
+HI-2887, 10 Nov): it's made automatically**, the first time a jj slot is needed, provided no Combwork agent works in the
+project folder. J2's rename probe of the project folder (which an editor or terminal open in it always fails) is replaced
+by a **launch hold** (`launchHolds.ts`): under the store's lock the making holds the project folder, refused while any
+session is admitted or live in it; a session's start is admitted where its folder becomes known (sessions.ts' `start`,
+before anything is launched), waiting while a hold covers it; each side one synchronous step; released however the
+making ends. Logged, and the user guide's jj section says it.
+- **Each making is its own attempt**, its record journalled before each step and decided again inside the store's lock:
+  `intent` (a fresh token), `folder` (a token folder Combwork makes itself, empty, under `.cw-jj-controls`, its
+  generation recorded), `ready` (`jj workspace add <token>/ws` under the attempt's own name `cw-<hash>-control-<token>`,
+  `ws`'s generation recorded). A ready control is used only while both generations, its checkout's name, its store and
+  its empty sparse state hold.
+- **Recovery never deletes anything unproved:** an interrupted attempt is never adopted (a child with no recorded
+  baseline proves nothing); an empty token folder of its own is removed (`rmdir`, never recursive); anything else, and any
+  registration under its name, is kept as a residue the record lists, reported, for the user to remove (the pool's prune
+  forgets a residue registration whose folder is gone, from the next control: no snapshot). A first set-up interrupted
+  before it was ever ready is made again; **a control that was ready once and is lost isn't made again automatically**
+  (another snapshot of the project folder): refused, saying why, until the user's decision covers it (asked on HI-2887).
+- **Tests:** `tests/jjControl.test.ts` (the real jj, both modes: made with the project folder held open and an uncommitted
+  edit recorded into the user's `@`, refused with an agent there; each crash point; a replaced `ws`; a user's file kept;
+  an empty attempt folder removed; a lost control refused, then made again when allowed; two makings at once; a
+  replacement while the lock is awaited), `tests/launchHolds.test.ts`.
+
 ##### jj cards in the runtime, through Review (1.5.0's J9b1, HI-2868)
 
 J9b is split: J9b1 (this) a jj card's start, submission, checks and sameness, through Review to Approved; J9b2 (HI-2882)
