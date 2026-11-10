@@ -4358,6 +4358,8 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /** Its list's revision (HI-2898, LaneRecord.listRev): what a window edit of its list names, refused once it moved. */
+  listRev: number
   /**
    * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).

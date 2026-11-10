@@ -117,6 +117,13 @@ export interface LaneRecord {
    */
   pool?: true
   /**
+   * Its list's revision (HI-2898): goes up by one at each save that changes `cards` or `pending` (lanes.ts' write, and the
+   * runtime's writeLane), never reset or reused, so the same list coming back still has a new one. The window's lane
+   * edits name the revision they were made on, and are refused once it moved. Kept with the lane (its row's `extra`);
+   * missing: 0.
+   */
+  listRev?: number
+  /**
    * Its due card's wait for the cards it depends on (HI-2618): an episode begins once Combwork sees that card due with one
    * of them not Done (`waiting`, a new `id` each time), is claimed once none is open (`pending`: with the rules off, its
    * builder is owed one readiness wake, made with a receipt in the deliveries' own transaction), and is checkpointed
@@ -338,6 +345,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     mergeCommit: rec.mergeCommit,
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
+    listRev: rec.listRev ?? 0,
     oldRules: laneOldRules(rec, rulesetNow),
     // Its Merges into (HI-2556): the other target its recorded ruleset marks; absent for the project's own.
     ...(rec.ruleset && targetOfRulesetId(rec.ruleset) ? { target: targetOfRulesetId(rec.ruleset)! } : {}),
@@ -662,6 +670,7 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
+    ...(whole(v.listRev, Number.MAX_SAFE_INTEGER) ? { listRev: v.listRev as number } : {}),
     ...(fresh ? { freshStart: fresh } : {}),
     ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {})
   }

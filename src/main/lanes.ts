@@ -16,7 +16,7 @@ import { CombworkError, saidError } from './combworkError'
 import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
-import { openTable, readTable, saveTable } from './storeTables'
+import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
@@ -257,7 +257,8 @@ export function onLanesWritten(fn: () => void): () => void {
   return () => writtenListeners.delete(fn)
 }
 
-async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void, also?: (db: Writer) => void): Promise<void> {
+async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void, also?: (db: Writer) => void, inBoard = false): Promise<void> {
+  bumpListRevs(lanes)
   const ids = await ws.projectIds()
   const stamped = keptLanes(lanes, Date.now()).map((l) => {
     const saved = savedProjectName(l.project)
@@ -269,14 +270,37 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
   const gen = readGens.get(lanes)
   const seen = readAs.get(lanes)
   const path = ws.path!
-  await saveTable(path, 'lanes', stamped, {}, () => {
+  const guard = (): void => {
     if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
     // Another writer (the runtime, #1270) changed the lanes since they were read: nothing is saved over it.
     if (seen !== undefined && boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== seen) throw new StaleRead('the lanes changed since they were read') // i18n-ignore: internal, caught and retried (never shown)
     // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.
     check?.()
-  }, also)
+  }
+  // Inside a board change (HI-2898: a window's lane edit with the card it changes), in its transaction: the listeners
+  // are told once it commits (mutateInBoard).
+  if (inBoard) {
+    if (also) throw new Error('a lane save inside a board change takes no extra writes') // i18n-ignore: a mistake in Combwork's code, never shown
+    return saveTableInBoard(ws, 'lanes', stamped, guard)
+  }
+  await saveTable(path, 'lanes', stamped, {}, guard, also)
   for (const fn of writtenListeners) fn()
+}
+
+/**
+ * Each lane whose list (`cards` or `pending`) this save changes from what was read gets the next list revision
+ * (HI-2898, LaneRecord.listRev); a new lane keeps none (0). Before the save, so the revision is in its transaction.
+ */
+function bumpListRevs(lanes: LaneRecord[]): void {
+  const seen = readAs.get(lanes)
+  if (seen === undefined) return
+  const was = new Map<string, { cards?: unknown; pending?: unknown }>()
+  for (const v of JSON.parse(seen) as unknown[]) if (v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string') was.set((v as { id: string }).id, v as { cards?: unknown; pending?: unknown })
+  for (const l of lanes) {
+    const w = was.get(l.id)
+    if (!w) continue
+    if (JSON.stringify(w.cards ?? null) !== JSON.stringify(l.cards) || JSON.stringify(w.pending ?? null) !== JSON.stringify(l.pending ?? null)) l.listRev = (l.listRev ?? 0) + 1
+  }
 }
 
 /**
@@ -362,6 +386,31 @@ async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks:
     await write(ws, lanes, () => checks.forEach((c) => c()), (db) => also.forEach((w) => w(db)))
     return r
   }))
+  changed(ws)
+  return result
+}
+
+/**
+ * A change of the lanes saved with changes of the board, in one transaction (HI-2898: a window's lane edit and the card
+ * assignment it makes). Under the lanes' lock, as mutate: the lanes are read first (before the board's change, which
+ * holds every card change while it runs), then `decide` works out the change from them, with the awaited reads it needs;
+ * then, inside one board change, `commit` makes the card changes (through the card-change owner, re-entrant into this
+ * change) and the checks run with the lanes' save. A refusal, a check, or a stale read (the runtime changed the lanes
+ * meanwhile: decided again from a fresh read, as mutate) rolls all of it back. Listeners are told after it commits.
+ */
+export async function mutateInBoard<D, T>(ws: WorkspaceService, decide: (lanes: LaneRecord[]) => Promise<D>, commit: (lanes: LaneRecord[], d: D, checks: (() => void)[]) => Promise<T>): Promise<T> {
+  if (!ws.path) throw new LaneError(409, M.noWorkspace)
+  const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
+    const lanes = await read(ws)
+    const d = await decide(lanes)
+    return boardWrite(ws, async () => {
+      const checks: (() => void)[] = []
+      const r = await commit(lanes, d, checks)
+      await write(ws, lanes, () => checks.forEach((c) => c()), undefined, true)
+      return r
+    })
+  }))
+  for (const fn of writtenListeners) fn()
   changed(ws)
   return result
 }
@@ -838,6 +887,24 @@ function listChange(v: LaneInfo, was: readonly number[], cards: readonly number[
   const removal = sameList(was.filter((n) => cards.includes(n)), cards)
   if (removal && flying.every((n) => cards.includes(n))) return { behind: null, check: was.filter((n) => !cards.includes(n)) }
   return { behind: flying[0] ?? null, check: [...was] }
+}
+
+/**
+ * Gives a running lane a new list (`cards`), as Combwork owns it (#1270, §16.11.1): with the rules on, a change while a
+ * card of it is in flight is queued for the next card boundary (`pending`), never refused; between cards it applies now,
+ * checked as it saves (stillBetweenCards, pushed onto `checks`). With rules off, at once. Returns the card in flight it
+ * was queued after, or null. The one place a lane's list changes for cw_lane start and the window's edits (HI-2898).
+ */
+export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], on: boolean, checks: (() => void)[]): Promise<number | null> {
+  const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
+  if (change && change.behind !== null) {
+    was.pending = [...cards]
+    return change.behind
+  }
+  if (change) checks.push(stillBetweenCards(ws, was, change.check))
+  was.cards = [...cards]
+  delete was.pending
+  return null
 }
 
 const sameList = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((n, i) => n === b[i])
@@ -1325,15 +1392,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => cards.includes(n)) || on)) {
       // Combwork owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
-      if (change && change.behind !== null) {
-        queuedAfter = change.behind
-        was.pending = [...cards]
-      } else {
-        if (change) checks.push(stillBetweenCards(ws, was, change.check))
-        was.cards = cards
-        delete was.pending
-      }
+      queuedAfter = await applyLaneList(ws, was, cards, on, checks)
       Object.assign(was, {
         builder,
         ...(reviewer !== undefined ? { reviewer } : {}),
