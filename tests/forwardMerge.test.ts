@@ -289,11 +289,12 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     await expect(ask('1.5.0', '1.4.0', { override: 'yes' as unknown as boolean })).rejects.toThrow(/older version/)
     expect(wf.store.cards().length).toBe(before)
     const made = await ask('1.5.0', '1.4.0', { override: true }, assistant)
-    expect(made).toMatchObject({ queued: true, from: '1.5.0', to: '1.4.0' })
+    expect(made).toMatchObject({ queued: true, from: '1.5.0', to: '1.4.0', overridden: true })
     const card = 'card' in made ? made.card : null
     expect(wf.state(wf.store.card(card!.number)).forward).toMatchObject({ from: '1.5.0', to: '1.4.0', by: 'assistant', override: { by: 'assistant', dir: 'backward', why: 'older' } })
-    // In the direction, no override is recorded.
-    const fwd = await ask('1.4.0', '1.5.0')
+    // In the direction, no override is recorded, asked for or not.
+    const fwd = await ask('1.4.0', '1.5.0', { override: true })
+    expect('overridden' in fwd).toBe(false)
     expect(wf.state(wf.store.card(('card' in fwd ? fwd.card : null)!.number)).forward?.override).toBeUndefined()
   })
 

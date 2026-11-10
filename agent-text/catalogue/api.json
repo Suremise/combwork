@@ -701,7 +701,8 @@
     "text": "Created the project {name}"
   },
   "api.done.forwardQueued": {
-    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{card} is bringing {to} up to date with {from} already}}",
+    "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card."
   },
   "api.done.forwardUpToDate": {
     "text": "{to} has everything of {from} already: nothing queued"

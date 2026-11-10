@@ -455,7 +455,7 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
 }
 
 /** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
-export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string }
+export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string; overridden?: true }
 
 /** Thrown for a forward request that can't be made: why, as a message (the caller's window or tool says it). */
 export class ForwardRefused extends CombworkError {}
@@ -522,7 +522,8 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
     const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}) }, by, ruleset, guard), undefined, guard)
     // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
-    return { card: r.saved ?? made, queued: true, from, to }
+    // HI-2892: `overridden`, the user's override recorded on it (a pair against the release path's direction).
+    return { card: r.saved ?? made, queued: true, from, to, ...(override ? { overridden: true as const } : {}) }
   })
   if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
   return done

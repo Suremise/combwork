@@ -1003,7 +1003,8 @@
       "queued": "select",
       "card": "plain",
       "to": "plain",
-      "from": "plain"
+      "from": "plain",
+      "override": "select"
     }
   },
   "api.done.forwardUpToDate": {
