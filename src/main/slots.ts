@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
@@ -1419,6 +1419,33 @@ export class SlotPool {
     return port.record(s.folder, fence, s.identity ?? null)
   }
 
+  /**
+   * A jj write's fence for this operation (HI-2866): `still` is quietFor; `commit` runs a final record (the binding's
+   * publication) in the store's own transaction, only while the row there is still this operation's (the token), with
+   * no writer or job, and (for a lease's write) the lease still open: one commit with the record, so an owner cancelled
+   * or replaced while the write waited for the database publishes nothing (HR1's round 2).
+   */
+  private ownedFence(s: Slot, token: string, lease: string | null): WorkspaceFence {
+    return {
+      still: () => this.quietFor(s, token),
+      commit: async <T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }> => {
+        try {
+          return await this.store.fenced(s.name, token, (db, now) => {
+            if (now.writer || now.job) return { held: false as const }
+            if (lease !== null) {
+              const open = db.prepare('SELECT 1 AS one FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL').get(lease, this.store.project)
+              if (!open || now.op?.lease !== lease) return { held: false as const }
+            }
+            return { held: true as const, value: fn(db) }
+          })
+        } catch (e) {
+          if (e instanceof OpLost) return { held: false }
+          throw e
+        }
+      }
+    }
+  }
+
   /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
   private async quietFor(s: Slot, token: string): Promise<boolean> {
     const held = await this.store.fenced(s.name, token, (_db, now) => !now.writer && !now.job).catch(() => false)
@@ -1740,7 +1767,7 @@ export class SlotPool {
     if (isUnknown(h.target) || !h.target) return false
     // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
     // with the folder quiet, the target read again right before it. Git ignores the options.
-    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: { still: () => (token ? this.quietFor(s, token) : false) }, settles: h.line, target: s.target } : {}
+    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: token ? this.ownedFence(s, token, null) : { still: () => false }, settles: h.line, target: s.target } : {}
     const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
@@ -2265,7 +2292,7 @@ export class SlotPool {
             if (notYet) return { notYet }
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
-            const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: { still: () => this.quietFor(slot, token) }, lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
+            const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
             return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn, ...owned })
           }
           const r = await (p.around ? p.around(sw) : sw())

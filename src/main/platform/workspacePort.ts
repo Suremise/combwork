@@ -38,9 +38,20 @@ export interface WorkspaceIdentity {
   generation: string
 }
 
+/** A database a fence's transaction hands its callback (the pool's workspace database, as board_meta's store reads it). */
+export interface FenceDb {
+  prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown }
+}
+
 /** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
 export interface WorkspaceFence {
   still(): boolean | Promise<boolean>
+  /**
+   * The fence's own write transaction (HI-2866, HR1's round 2): `fn` runs inside it only while the holder's record there
+   * still holds (the operation's token, its lease open, no writer or job), checked in that same transaction, so a final
+   * record commits atomically with the fence; `held: false`, and `fn` never run, otherwise. The pool's fences have it.
+   */
+  commit?<T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }>
 }
 
 /**

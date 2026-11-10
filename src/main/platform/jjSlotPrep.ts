@@ -12,6 +12,8 @@
 // publishes its binding by compare and swap only once its write is done and read back. An unfinished preparation is
 // never shown as a binding, and a crash anywhere resumes from the journal's phase with `prev` still there.
 
+import type { FenceDb } from './workspacePort'
+
 /** A slot's completed binding: the card cycle it is prepared for (`key` null: detached at `base`, no card). */
 export interface JjBinding {
   /** The preparation's id: `<card>.<cycle>` for a card's, `detach:<card>.<cycle>` for a settle after Done. */
@@ -65,6 +67,11 @@ export interface JjPrepStore {
    * written, when the pointer moved or a later attempt took the preparation over meanwhile.
    */
   publish(store: string, workspace: string, expect: JjBinding | null, next: JjBinding, j: JjPrepJournal): Promise<boolean>
+  /**
+   * The same publication inside a caller's transaction on this store's database (a fence's `commit`, HR1's round 2), so
+   * the holder's check and the pointer's compare and swap commit as one.
+   */
+  publishIn?(db: BoardDb, store: string, workspace: string, expect: JjBinding | null, next: JjBinding, j: JjPrepJournal): boolean
 }
 
 /** A line key of a card cycle's preparation in a jj slot. */
@@ -127,15 +134,18 @@ export function chainIsBinding(chain: readonly string[], prev: JjBinding | null)
 export const pointerKey = (store: string, workspace: string): string => `slot_jjcur:${store.toLowerCase()}:${workspace}`
 export const journalKey = (store: string, workspace: string, prep: string): string => `slot_jjprep:${store.toLowerCase()}:${workspace}:${prep}`
 
+/** A database as board_meta's store uses it (a fence's transaction hands the same). */
+export type BoardDb = FenceDb
+
 /** A connection's read and transactional write, as boardConn's (SlotStore's `conn`). */
 export interface BoardRw {
-  read<T>(fn: (db: { prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown } }) => T): T
-  write<T>(fn: (db: { prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown } }) => T): Promise<T>
+  read<T>(fn: (db: BoardDb) => T): T
+  write<T>(fn: (db: BoardDb) => T): Promise<T>
 }
 
 /** The store over a workspace database's board_meta (the app's and the tests'). */
 export function boardPrepStore(conn: BoardRw): JjPrepStore {
-  const get = (db: Parameters<Parameters<BoardRw['read']>[0]>[0], key: string): { found: false } | { found: true; value: unknown } => {
+  const get = (db: BoardDb, key: string): { found: false } | { found: true; value: unknown } => {
     const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL, never shown
     if (!r) return { found: false }
     try {
@@ -144,11 +154,22 @@ export function boardPrepStore(conn: BoardRw): JjPrepStore {
       return { found: true, value: undefined }
     }
   }
-  const put = (db: Parameters<Parameters<BoardRw['read']>[0]>[0], key: string, v: unknown): void => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(v)) // i18n-ignore: SQL, never shown
-  const readPointer = (db: Parameters<Parameters<BoardRw['read']>[0]>[0], store: string, workspace: string): JjBinding | null | 'unreadable' => {
+  const put = (db: BoardDb, key: string, v: unknown): void => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(v)) // i18n-ignore: SQL, never shown
+  const readPointer = (db: BoardDb, store: string, workspace: string): JjBinding | null | 'unreadable' => {
     const r = get(db, pointerKey(store, workspace))
     if (!r.found) return null
     return bindingOf(r.value) ?? 'unreadable'
+  }
+  const publishIn = (db: BoardDb, store: string, workspace: string, expect: JjBinding | null, next: JjBinding, j: JjPrepJournal): boolean => {
+    const now = readPointer(db, store, workspace)
+    if (now === 'unreadable' || !sameBinding(now, expect)) return false
+    if (j.run !== undefined) {
+      const held = get(db, journalKey(store, workspace, j.prep))
+      if (!held.found || (journalOf(held.value)?.run ?? null) !== j.run) return false
+    }
+    put(db, pointerKey(store, workspace), next)
+    put(db, journalKey(store, workspace, j.prep), { ...j, phase: 'done' })
+    return true
   }
   return {
     pointer: (store, workspace) => conn.read((db) => readPointer(db, store, workspace)),
@@ -159,17 +180,7 @@ export function boardPrepStore(conn: BoardRw): JjPrepStore {
         return journalOf(r.value) ?? 'unreadable'
       }),
     writeJournal: (store, workspace, j) => conn.write((db) => put(db, journalKey(store, workspace, j.prep), j)),
-    publish: (store, workspace, expect, next, j) =>
-      conn.write((db) => {
-        const now = readPointer(db, store, workspace)
-        if (now === 'unreadable' || !sameBinding(now, expect)) return false
-        if (j.run !== undefined) {
-          const held = get(db, journalKey(store, workspace, j.prep))
-          if (!held.found || (journalOf(held.value)?.run ?? null) !== j.run) return false
-        }
-        put(db, pointerKey(store, workspace), next)
-        put(db, journalKey(store, workspace, j.prep), { ...j, phase: 'done' })
-        return true
-      })
+    publish: (store, workspace, expect, next, j) => conn.write((db) => publishIn(db, store, workspace, expect, next, j)),
+    publishIn
   }
 }

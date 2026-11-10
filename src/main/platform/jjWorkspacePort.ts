@@ -526,8 +526,14 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (files.length || s.stale || s.wc.divergent || s.wc.commit !== wrote.commit || !s.wc.empty || s.wc.parents.length !== 1 || s.wc.parents[0] !== bound.base) return step(false, JJ_REFUSED.uncertain)
       const g4 = await guard(s.op)
       if (g4) return stopAfterWrite(g4)
+      // Published in the fence's own transaction where it has one (the pool's: its operation's token, its lease open, no
+      // writer or job, checked in the same commit as the compare and swap; HR1's round 2), so an owner cancelled or
+      // replaced while the write waited publishes nothing and the journal stays `written`.
+      const fin = j
+      const pub = fence.commit && prep.publishIn ? await fence.commit((db) => prep.publishIn!(db, store, ws, fin.prev, bound, fin)) : { held: true as const, value: await prep.publish(store, ws, j.prev, bound, j) }
+      if (!pub.held) return step(false, JJ_REFUSED.fence)
       // Not published: the pointer moved, or a later attempt took the preparation over (its journal is its own now).
-      if (!(await prep.publish(store, ws, j.prev, bound, j))) return step(false, JJ_REFUSED.superseded)
+      if (!pub.value) return step(false, JJ_REFUSED.superseded)
       return step(true)
     })
   }

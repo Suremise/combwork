@@ -2963,7 +2963,9 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   still be the very commit the marked write made, empty on the base (an unrecorded edit or someone else's write since
   leaves it uncertain), then the guard once more; the binding is published by compare and swap against `prev` whole (its
   submitted endpoints included) and only while the journal is still this attempt's (each attempt takes the journal up
-  with a fresh `run`). Anything else refuses before the write and keeps the slot as it is: a read failure, extra or
+  with a fresh `run`), inside the pool's own fenced transaction (the fence's `commit`: the row still this operation's
+  token, its lease open, no writer or job, checked in the same commit; HR1's round 2), so an owner cancelled or replaced
+  while the publication waited for the database publishes nothing. Anything else refuses before the write and keeps the slot as it is: a read failure, extra or
   unintegrated work, a lost fence, a replaced folder, a binding changed meanwhile (`superseded`), the head or target
   moved. A fence lost after the write keeps the journal at `written`, for the holder's next attempt to confirm and
   publish. A crash resumes from the journal's phase by the same reading; a retry after publication recognises its own
