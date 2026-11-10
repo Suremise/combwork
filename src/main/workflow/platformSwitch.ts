@@ -66,7 +66,7 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
   const lanes = same ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
   const detected = same ? null : switchRefused(to, now.detected)
   // Git ↔ jj (HI-2799): the repository's projects switch together, after a drain and jj's checks.
-  const store = !same && !detected && storeWide(now.id, to) ? await checkStoreSwitch(ws, project.path, to) : null
+  const store = !same && !detected && storeWide(now.id, to, now.detected) ? await checkStoreSwitch(ws, project.path, to) : null
   return {
     from: now.id,
     to,
@@ -88,10 +88,11 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
 export async function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void; token?: unknown } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
   const to = platformArg(raw)
   const project = projectOf(ws, projectPath)
-  const current = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform).id
+  const now = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform)
+  const current = now.id
   // Git ↔ jj (HI-2799): the repository's switch, its own locks and fence (storeSwitch.ts); refused when what the window
   // showed isn't the platform in force, or the group it showed isn't the group now.
-  if (storeWide(current, to)) {
+  if (storeWide(current, to, now.detected)) {
     const expected = o.expected === undefined || o.expected === null ? current : platformArg(o.expected)
     return storeSwitch(ws, project.path, expected, to, { token: o.token, ...(o.guard ? { guard: o.guard } : {}) })
   }
@@ -112,7 +113,7 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     o.guard?.(from)
     if (from === to) return {}
     // A switch that became the repository's meanwhile (HI-2799) never takes this path: its drain and fence are storeSwitch's.
-    if (storeWide(from, to)) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
+    if (storeWide(from, to, now.detected)) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     const refused = switchRefused(to, now.detected)
     if (refused) {
       const t = switchRefusalText(refused)

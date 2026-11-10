@@ -52,8 +52,11 @@ export const SWITCH_REFUSED = {
   switching: msg({ id: 'git.vc.switch.switching', defaultMessage: 'This repository’s version control is being switched: try again in a moment.', description: 'Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way.' })
 } satisfies Record<string, Msg>
 
-/** Whether a switch from `from` to `to` is the repository's (HI-2799): Git ↔ jj, or None → jj (the group moves together). */
-export const storeWide = (from: PlatformId, to: PlatformId): boolean => from !== to && (to === 'jj' || (from === 'jj' && to === 'git'))
+/**
+ * Whether a switch from `from` to `to` is the repository's (HI-2799): to jj, back from jj to Git, or to Git where a jj
+ * repository is colocated (a None project there takes Git only as jj's fallback does: drained and checked ready).
+ */
+export const storeWide = (from: PlatformId, to: PlatformId, found?: Detection): boolean => from !== to && (to === 'jj' || (to === 'git' && (from === 'jj' || found?.platform === 'jj')))
 
 /** Whether a project can switch to `to` from what is detected now: null when it can (main checks the rest). */
 export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal | null {

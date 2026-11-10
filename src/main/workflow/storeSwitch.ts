@@ -214,12 +214,12 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
   if (to === 'jj') {
-    refused ??= await jjReady(path, g.store)
-    store.gates = await gatesOf(path, g.store)
+    refused ??= await (storeSwitchSeams.repo?.ready ?? jjReady)(path, g.store)
+    store.gates = await (storeSwitchSeams.repo?.gates ?? gatesOf)(path, g.store)
     store.unsupported = UNSUPPORTED
     if (!refused && store.gates.some((x) => !('clear' in x))) refused = { why: 'gates' } // i18n-ignore: a code or SQL, never shown as text
   } else {
-    store.fallback = await fallbackOf(path)
+    store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(path)
     if (!refused && store.fallback.length) refused = { why: 'fallback' } // i18n-ignore: a code or SQL, never shown as text
   }
   if (!refused && !drainEmpty(store.drain)) refused = { why: 'drain' } // i18n-ignore: a code or SQL, never shown as text
@@ -239,7 +239,12 @@ const refusalError = (r: SwitchRefusal): CombworkError => {
 const fenceWrite = <T>(ws: WorkspaceService, fn: (meta: Meta) => T): Promise<T> => boardWrite(ws, async () => boardWriteOp(ws, (db) => fn(metaOf(db))))
 
 /** Seams for the tests' pauses (s17's deterministic two-project tests): awaited at each named point when set. */
-export const storeSwitchSeams: { at?: (point: 'afterBegin' | 'afterDrain' | 'afterWrite' | 'beforeSettle', o: { members: readonly string[]; generation: number }) => Promise<void> | void; write?: (path: string, partial: Partial<ProjectConfig>) => Promise<void> } = {}
+export const storeSwitchSeams: {
+  at?: (point: 'afterBegin' | 'afterDrain' | 'afterWrite' | 'beforeSettle', o: { members: readonly string[]; generation: number }) => Promise<void> | void
+  write?: (path: string, partial: Partial<ProjectConfig>) => Promise<void>
+  /** The repository's own checks (jj's confirmation, the gates, the fallback), stood in for by the fence's tests; the real-jj tests run them. */
+  repo?: { ready?: (path: string, store: string) => Promise<SwitchRefusal | null>; gates?: (path: string, store: string) => Promise<GateCheck[]>; fallback?: (path: string) => Promise<FallbackProblem[]> }
+} = {}
 
 /**
  * Switches the repository of `path` between Git and jj (or a None project to jj, with its group), as the warning showed:
