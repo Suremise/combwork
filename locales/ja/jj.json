@@ -72,6 +72,7 @@
   "jj.ops.refused.stale": "プロジェクトフォルダーのワークスペースが古い状態です。jj workspace update-staleで更新できますが、jjが記録していない編集が別のコミットに入ることがあります。",
   "jj.ops.refused.tool": "jjがCombworkのテスト済みバージョンではありません。",
   "jj.ops.refused.unimported": "jj がまだ記録していない変更が Git にあります（git でブランチ、タグ、または HEAD が移動されました）。jj のコマンドを実行すると、先にそれが取り込まれます。任意の jj コマンドを実行してから、もう一度プレビューしてください。",
+  "jj.ops.refused.unimportedStore": ".jj の中にある Git のストアが git で変更されました（ref が移動されました）。jj はまだそれを記録していません。jj git import で取り込んでから、もう一度プレビューしてください。",
   "jj.ops.refused.workingCopy": "ワークスペースの作業コピーを変更しています。取り消すとそこのファイルが更新されますが、プレビューでは確認できません。",
   "jj.ops.snapshot": "スナップショット",
   "jj.ops.tracked": "{commit}、{state, select, Tracked {追跡中} other {未追跡}}",

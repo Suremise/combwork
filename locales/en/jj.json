@@ -291,6 +291,10 @@
     "defaultMessage": "Git has changes jj hasn’t recorded yet (a branch, a tag or HEAD moved with git): your jj command would take them in first. Run any jj command, then preview again.",
     "description": "Why a jj undo preview gives no command (HI-2800): the colocated Git repository’s refs or HEAD differ from what jj last recorded. Keep jj and Git, git and HEAD."
   },
+  "jj.ops.refused.unimportedStore": {
+    "defaultMessage": "Git’s store inside .jj was changed with git (a ref moved), which jj hasn’t recorded. jj git import takes it in; then preview again.",
+    "description": "Why a jj undo preview gives no command (HI-2896): in a jj repository not colocated with Git, the refs of the Git store jj keeps inside .jj differ from what jj last recorded, which only a git command run on that store does. Keep jj, Git, git, .jj and jj git import (a command)."
+  },
   "jj.ops.refused.workingCopy": {
     "defaultMessage": "it changed a workspace’s working copy: undoing it would update files there, which a preview can’t check.",
     "description": "Why a jj undo preview gives no command (HI-2800): a commit, describe, new, snapshot, workspace added or forgotten."

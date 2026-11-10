@@ -1208,8 +1208,8 @@
     "description": "A notice's title: the project {project}'s settings file names a version control Combwork doesn't have."
   },
   "service.workspace.platformJjFound": {
-    "defaultMessage": "{project} is a jj repository colocated with Git. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.",
-    "description": "A notice (HI-2799): a jj (Jujutsu) repository colocated with Git was found in a project. Combwork does not switch it by itself: the Version Control tab offers it. Keep jj and Git."
+    "defaultMessage": "{project} is a jj repository. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.",
+    "description": "A notice (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in a project. Combwork does not switch it by itself: the Version Control tab offers it. Keep jj."
   },
   "service.workspace.platformJjGone": {
     "defaultMessage": "{project}'s jj repository is gone. Switch it to Git or None in its Version Control tab.",

@@ -175,6 +175,11 @@
       "target": "plain"
     }
   },
+  "workflow.jj.start.inGit": {
+    "placeholders": {
+      "root": "plain"
+    }
+  },
   "workflow.jj.start.noSlot": {
     "placeholders": {}
   },

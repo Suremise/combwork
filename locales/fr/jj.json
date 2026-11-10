@@ -72,6 +72,7 @@
   "jj.ops.refused.stale": "le workspace du dossier du projet est périmé. jj workspace update-stale le met à jour, mais les modifications que jj n’a pas enregistrées peuvent se retrouver dans un commit séparé.",
   "jj.ops.refused.tool": "jj n’est pas la version avec laquelle Combwork est testé.",
   "jj.ops.refused.unimported": "Git a des modifications que jj n’a pas encore enregistrées (une branche, un tag ou HEAD déplacés avec git) : votre commande jj les intégrerait d’abord. Lancez une commande jj quelconque, puis prévisualisez à nouveau.",
+  "jj.ops.refused.unimportedStore": "Le stockage Git dans .jj a été modifié avec git (une ref a été déplacée), ce que jj n’a pas encore enregistré. jj git import l’intègre ; puis prévisualisez à nouveau.",
   "jj.ops.refused.workingCopy": "elle a changé la copie de travail d’un workspace : l’annuler mettrait à jour des fichiers là-bas, ce qu’un aperçu ne peut pas vérifier.",
   "jj.ops.snapshot": "instantané",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {suivi} other {non suivi}}",

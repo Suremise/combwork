@@ -37,9 +37,23 @@
       "profile": "plain"
     }
   },
+  "git.repoLock.jjFolder": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "git.repoLock.noGitDir": {
     "placeholders": {
       "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "git.repoLock.order": {
+    "placeholders": {}
+  },
+  "git.repoLock.unknownRepo": {
+    "placeholders": {
+      "root": "plain",
       "why": "plain"
     }
   },
@@ -99,7 +113,12 @@
   "git.vc.switch.groupChanged": {
     "placeholders": {}
   },
-  "git.vc.switch.jjSeparate": {
+  "git.vc.switch.jjInGit": {
+    "placeholders": {
+      "root": "plain"
+    }
+  },
+  "git.vc.switch.jjNoGitCopy": {
     "placeholders": {}
   },
   "git.vc.switch.jjTool": {

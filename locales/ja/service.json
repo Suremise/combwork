@@ -311,6 +311,6 @@
   "service.workspace.stillClosing": "{name}はまだ閉じている途中です。完了するまで待ってから、もう一度お試しください。",
   "service.workspace.stillOpening": "{name}はまだ開いている途中です。完了するまで待ってから、もう一度お試しください。",
   "service.workspace.twoCalled": "2個のエージェントが{name}という名前です",
-  "service.workspace.platformJjFound": "{project}はGitと共存するjjリポジトリです。「バージョン管理」タブでjjに切り替えるまで、Combworkは現在のバージョン管理のまま続行します。",
+  "service.workspace.platformJjFound": "{project}はjjリポジトリです。「バージョン管理」タブでjjに切り替えるまで、Combworkは現在のバージョン管理のまま続行します。",
   "service.workspace.platformJjGone": "{project}のjjリポジトリがなくなりました。「バージョン管理」タブでGitまたは「なし」に切り替えてください。"
 }

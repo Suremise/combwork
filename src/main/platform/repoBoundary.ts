@@ -150,7 +150,7 @@ export async function boundaryOf(folder: string): Promise<Boundary> {
 export async function gitVeto(folder: string): Promise<{ why: 'jj' | BoundaryUnknown; root: string } | null> {
   if (await isGitDir(folder)) return null
   const b = await boundaryOf(folder)
-  if ('jj' in b) return { why: 'jj', root: b.jj.root }
+  if ('jj' in b) return { why: 'jj', root: b.jj.root } // i18n-ignore: a code, never shown as text
   if ('unknown' in b) return { why: b.unknown, root: b.root }
   return null
 }

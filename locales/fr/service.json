@@ -311,6 +311,6 @@
   "service.workspace.stillClosing": "{name} est encore en cours de fermeture : attends la fin, puis réessaie.",
   "service.workspace.stillOpening": "{name} est encore en cours d’ouverture : attends la fin, puis réessaie.",
   "service.workspace.twoCalled": "Deux agents s’appellent {name}",
-  "service.workspace.platformJjFound": "{project} est un dépôt jj colocalisé avec Git. Combwork continue avec sa gestion de versions actuelle tant que tu ne l’as pas passée à jj dans son onglet Gestion de versions.",
+  "service.workspace.platformJjFound": "{project} est un dépôt jj. Combwork continue avec sa gestion de versions actuelle tant que tu ne l’as pas passée à jj dans son onglet Gestion de versions.",
   "service.workspace.platformJjGone": "Le dépôt jj de {project} a disparu. Passe-le à Git ou à Aucune dans son onglet Gestion de versions."
 }

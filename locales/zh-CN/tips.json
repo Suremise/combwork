@@ -593,6 +593,6 @@
   "tips.opencode.title": "使用 OpenCode 运行智能体",
   "tips.opencodeHistory.text": "OpenCode 代理的对话显示在“会话”标签页中，其令牌和费用按 OpenCode 的报告显示在概览和其窗格的页脚中。$0 的费用并不能衡量你的套餐额度；只有 OpenCode Go 或 Console 才显示限额。",
   "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用",
-  "tips.versionControlJj.text": "在与 Git 共存的 jj 仓库中，可在“版本控制”标签页顶部选择 jj：其历史会并排显示每个变更 ID 和提交 ID，比较、书签和冲突会读取仓库而不更改它。已评审的工作由你自己整合。",
+  "tips.versionControlJj.text": "在 jj 仓库中，可在“版本控制”标签页顶部选择 jj：其历史会并排显示每个变更 ID 和提交 ID，比较、书签和冲突会读取仓库而不更改它。已评审的工作由你自己整合。",
   "tips.versionControlJj.title": "查看 jj 仓库"
 }

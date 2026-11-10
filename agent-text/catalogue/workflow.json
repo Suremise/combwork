@@ -169,6 +169,10 @@
     "text": "its earlier work is in slot {slot} on {target}",
     "note": "HI-2868: why a restarted jj card could not start: its earlier work is still in its slot, on another target bookmark. {slot} is the slot name, {target} the bookmark."
   },
+  "workflow.jj.start.inGit": {
+    "text": "the slot is inside the Git repository at {root}, which git commands in it would reach",
+    "note": "HI-2896: why a jj card could not start: its slot of a jj repository not colocated with Git is inside a Git working tree ({root}, made or moved there after the switch)."
+  },
   "workflow.jj.start.noSlot": {
     "text": "no slot for its builder",
     "note": "HI-2868: why a jj card could not start: its builder was lent no slot."

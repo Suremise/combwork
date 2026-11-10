@@ -593,6 +593,6 @@
   "tips.opencode.title": "Ejecutar agentes con OpenCode",
   "tips.opencodeHistory.text": "La conversación de un agente de OpenCode aparece en la pestaña Sesiones, y sus tokens y su coste en el Resumen y en el pie de su panel, tal como los informa OpenCode. Un coste de $0 no mide la cuota de tu plan; solo hay límites para OpenCode Go o Console.",
   "tips.opencodeHistory.title": "El historial, los tokens y el coste de un agente de OpenCode",
-  "tips.versionControlJj.text": "En un repositorio jj colocalizado con Git, elige jj arriba en la pestaña Control de versiones: su Historial muestra cada id de cambio junto a su id de commit, y Comparar, Marcadores y Conflictos leen el repositorio sin modificarlo. Integras tú mismo el trabajo revisado.",
+  "tips.versionControlJj.text": "En un repositorio jj, elige jj arriba en la pestaña Control de versiones: su Historial muestra cada id de cambio junto a su id de commit, y Comparar, Marcadores y Conflictos leen el repositorio sin modificarlo. Integras tú mismo el trabajo revisado.",
   "tips.versionControlJj.title": "Ve un repositorio jj"
 }

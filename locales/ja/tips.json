@@ -593,6 +593,6 @@
   "tips.opencode.title": "OpenCodeでエージェントを実行する",
   "tips.opencodeHistory.text": "OpenCode エージェントの会話は [セッション] タブに、トークンとコストは概要とペインのフッターに、OpenCode が報告するとおりに表示されます。$0 のコストはプランの利用枠の目安ではありません。上限が表示されるのは OpenCode Go または Console だけです。",
   "tips.opencodeHistory.title": "OpenCode エージェントの履歴、トークン、コスト",
-  "tips.versionControlJj.text": "Gitと共存するjjリポジトリでは、「バージョン管理」タブの上部でjjを選べます。履歴には変更IDとコミットIDが並んで表示され、比較、ブックマーク、競合はリポジトリを変更せずに読み取ります。レビュー済みの作業はご自身で統合します。",
+  "tips.versionControlJj.text": "jjリポジトリでは、「バージョン管理」タブの上部でjjを選べます。履歴には変更IDとコミットIDが並んで表示され、比較、ブックマーク、競合はリポジトリを変更せずに読み取ります。レビュー済みの作業はご自身で統合します。",
   "tips.versionControlJj.title": "jjリポジトリを見る"
 }

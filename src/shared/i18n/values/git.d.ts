@@ -256,7 +256,10 @@ interface CombworkMessageValues {
   'git.remotes.pushesTo': { url: string | number }
   'git.remotes.url': undefined
   'git.repoLock.busy': { profile: string | number }
+  'git.repoLock.jjFolder': { folder: string | number }
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
+  'git.repoLock.order': undefined
+  'git.repoLock.unknownRepo': { root: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
   'git.repoOp.notOffered': undefined
@@ -383,7 +386,7 @@ interface CombworkMessageValues {
   'git.vc.fact.gone': undefined
   'git.vc.fact.jj': { root: string | number; colocated: string }
   'git.vc.fact.jjGone': undefined
-  'git.vc.fact.jjSeparate': { root: string | number }
+  'git.vc.fact.jjInGit': { root: string | number; git: string | number }
   'git.vc.fact.none': undefined
   'git.vc.fact.other': { vcs: string | number }
   'git.vc.fact.otherGit': { vcs: string | number }
@@ -465,7 +468,8 @@ interface CombworkMessageValues {
   'git.vc.switch.gitFolder': undefined
   'git.vc.switch.groupChanged': undefined
   'git.vc.switch.inFlight': { n: number; from: string | number }
-  'git.vc.switch.jjSeparate': undefined
+  'git.vc.switch.jjInGit': { root: string | number }
+  'git.vc.switch.jjNoGitCopy': undefined
   'git.vc.switch.jjTool': { state: string }
   'git.vc.switch.jjUnknown': { code: string | number }
   'git.vc.switch.lane': { name: string | number; builder: string | number }

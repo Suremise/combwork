@@ -573,7 +573,7 @@
   "tips.updateFromTarget.title": "Bring a branch up to date with its target",
   "tips.usageMoves.text": "In Settings → Accounts & Connections, open an account’s ⋯ → Account Settings… and tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
   "tips.usageMoves.title": "Move agents before a plan runs out",
-  "tips.versionControlJj.text": "In a jj repository colocated with Git, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
+  "tips.versionControlJj.text": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
   "tips.versionControlJj.title": "See a jj repository",
   "tips.versionControlSwitch.text": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Combwork offers the switch there.",
   "tips.versionControlSwitch.title": "Switch between None and Git",

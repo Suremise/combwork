@@ -72,6 +72,7 @@
   "jj.ops.refused.stale": "o workspace da pasta do projeto está desatualizado. jj workspace update-stale o atualiza, mas edições que o jj não registrou podem acabar em um commit separado.",
   "jj.ops.refused.tool": "o jj não é a versão testada com o Combwork.",
   "jj.ops.refused.unimported": "O Git tem mudanças que o jj ainda não registrou (um branch, uma tag ou o HEAD movidos com git): seu comando jj as incorporaria primeiro. Execute qualquer comando jj e depois veja a prévia de novo.",
+  "jj.ops.refused.unimportedStore": "O armazenamento do Git dentro de .jj foi alterado com git (uma ref foi movida), o que o jj ainda não registrou. jj git import o incorpora; depois veja a prévia de novo.",
   "jj.ops.refused.workingCopy": "ela mudou a cópia de trabalho de um workspace: desfazê-la atualizaria arquivos lá, o que uma prévia não consegue verificar.",
   "jj.ops.snapshot": "snapshot",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {rastreado} other {não rastreado}}",

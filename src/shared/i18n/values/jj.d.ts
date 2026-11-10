@@ -74,6 +74,7 @@ interface CombworkMessageValues {
   'jj.ops.refused.stale': undefined
   'jj.ops.refused.tool': undefined
   'jj.ops.refused.unimported': undefined
+  'jj.ops.refused.unimportedStore': undefined
   'jj.ops.refused.workingCopy': undefined
   'jj.ops.snapshot': undefined
   'jj.ops.tracked': { commit: string | number; state: string }

@@ -29,9 +29,24 @@
     "note": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it.",
     "audience": "both"
   },
+  "git.repoLock.jjFolder": {
+    "text": "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.",
+    "note": "An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git.",
+    "audience": "both"
+  },
   "git.repoLock.noGitDir": {
     "text": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message.",
+    "audience": "both"
+  },
+  "git.repoLock.order": {
+    "text": "This repository is busy with another change. Nothing was changed: try again in a moment.",
+    "note": "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other.",
+    "audience": "both"
+  },
+  "git.repoLock.unknownRepo": {
+    "text": "Combwork couldn't read the jj repository at {root} ({why}), so nothing was changed.",
+    "note": "An error (HI-2896): a change needed the lock of a project's repository, and the jj (Jujutsu) repository holding the folder couldn't be read ({why}: a short code, kept in English). Keep jj.",
     "audience": "both"
   },
   "git.tool.missing": {
@@ -119,9 +134,14 @@
     "note": "Why a switch between Git and jj is refused (HI-2799): a project joined the repository, or one of its projects’ choices or options changed, after the warning was shown.",
     "audience": "both"
   },
-  "git.vc.switch.jjSeparate": {
-    "text": "This jj repository has no colocated Git repository, which Combwork doesn’t support yet.",
-    "note": "Why a project can’t be switched to jj (HI-2799): its jj repository keeps Git’s data inside .jj rather than beside it (not colocated). Keep jj and Git.",
+  "git.vc.switch.jjInGit": {
+    "text": "This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.",
+    "note": "Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjNoGitCopy": {
+    "text": "No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.",
+    "note": "Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is.",
     "audience": "both"
   },
   "git.vc.switch.jjTool": {
@@ -140,8 +160,8 @@
     "audience": "both"
   },
   "git.vc.switch.noJj": {
-    "text": "No jj repository here. Combwork never makes one: create it with jj, colocated with Git.",
-    "note": "Why a project can’t be switched to jj (Jujutsu, HI-2799): its folder has no jj repository. Keep jj and Git.",
+    "text": "No jj repository here. Combwork never makes one: create it with jj.",
+    "note": "Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj.",
     "audience": "both"
   },
   "git.vc.switch.otherFound": {
