@@ -202,7 +202,8 @@ const onDb = (fn) => {
     check('…a changed observation shown with no Refresh (the board changed: couldn’t check, why)', !!(await until(async () => (await waiting.locator('[data-jj-contained="unknown"]').count()) === 1 && /hasn.t fetched/.test(await text(waiting)), HUNG_MS)), await text(waiting))
     await shoot(repo.locator('[data-jj-integrate]'), 'waiting-unknown')
 
-    // --- Publish records to check and Leftovers follow changes while mounted.
+    // --- Publish records to check and Leftovers follow changes while mounted: none yet, as read before anything changes.
+    check('nothing to check or left over yet', (await repo.locator('[data-jj-to-check]').count()) === 0 && (await repo.locator('[data-jj-leftovers]').count()) === 0)
     const kept = path.join(work, 'leftover-kept')
     fs.mkdirSync(path.join(kept, 'ws'), { recursive: true })
     fs.writeFileSync(path.join(kept, 'ws', 'notes.txt'), 'kept\n')
@@ -214,9 +215,11 @@ const onDb = (fn) => {
       const v = r ? JSON.parse(r.value) : { phase: 'idle' }
       db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(k, JSON.stringify({ ...v, residues: [...(v.residues ?? []), { path: kept, why: 'notEmpty' }] }))
     })
-    check('nothing to check or left over yet (as read before)', (await repo.locator('[data-jj-to-check]').count()) === 0 && (await repo.locator('[data-jj-leftovers]').count()) === 0)
+    // The flagged record, written from another connection (as the publish worker's): the board's poll tells the window,
+    // and the panel shows it with no Refresh. The leftover (a journal entry, no board change of the window's) on Refresh.
+    check('…the flagged record shown with no Refresh (the board changed)', !!(await until(async () => (await repo.locator('[data-jj-to-check-row="SH-90"]').count()) === 1, HUNG_MS)), await text(repo))
     await refresh()
-    check('…Refresh: the flagged record and the leftover shown', !!(await until(async () => (await repo.locator('[data-jj-to-check-row="SH-90"]').count()) === 1 && (await repo.locator('[data-jj-leftover]').count()) === 1, HUNG_MS)), await text(repo))
+    check('…Refresh: the leftover shown', !!(await until(async () => (await repo.locator('[data-jj-leftover]').count()) === 1, HUNG_MS)), await text(repo))
     fs.rmSync(kept, { recursive: true })
     await refresh()
     check('…the leftover removed by the user: gone from the list on Refresh', !!(await until(async () => (await repo.locator('[data-jj-leftovers]').count()) === 0, HUNG_MS)), await text(repo))
@@ -238,7 +241,13 @@ const onDb = (fn) => {
     void dialog
 
     // --- A stale slot: its working-copy commit rewritten from the project folder; Recover… keeps its unrecorded edit.
-    await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.state === 'free', HUNG_MS)
+    // The prerequisite: after Done, the slot back in the pool (a slot's state is `ready` when not lent), else no recovery.
+    const back = await until(async () => {
+      const s = (await inv('slots:list', shop)).find((x) => x.name === slot)
+      return s && s.state === 'ready' && !s.lease ? s : null
+    }, HUNG_MS)
+    check('after Done, the slot is back in the pool (ready, not lent)', !!back, JSON.stringify(await inv('slots:list', shop)))
+    if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')
     jj(shop, 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
