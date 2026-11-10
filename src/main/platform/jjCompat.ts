@@ -179,10 +179,9 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
     const at = `${e.key} (${e.scope})`
     // core.autocrlf as Git applies it: its last value, a later level's winning. False converts nothing, as jj does.
     if (e.key === 'core.autocrlf') autocrlf = { at, value: e.value }
-    else if (e.key === 'core.eol' || /^filter\.[^.]+\.(clean|smudge|process)$/.test(e.key)) {
-      if (e.key.startsWith('filter.lfs.')) add(a, 'lfs', at)
-      else add(a, 'attributes', at)
-    }
+    // Any filter.lfs.* key not stock is LFS's (HR3 on HI-2872: required too); another filter's driver keys are attributes'.
+    else if (e.key.startsWith('filter.lfs.')) add(a, 'lfs', at)
+    else if (e.key === 'core.eol' || /^filter\.[^.]+\.(clean|smudge|process|required)$/.test(e.key)) add(a, 'attributes', at)
     if (e.key.startsWith('lfs.')) add(a, 'lfs', at)
     if (e.key.startsWith('submodule.')) add(a, 'submodules', at)
     if ((e.key === 'commit.gpgsign' || e.key === 'tag.gpgsign') && gitTrue(e.value)) add(a, 'signing', at)

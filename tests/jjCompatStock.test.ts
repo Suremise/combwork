@@ -114,6 +114,35 @@ describe("jj's gates and Git for Windows' stock system settings (HI-2872)", () =
     expect((await assessJj(s.root, s.store, s.deps)).lfs).toEqual({ uses: ['filter.lfs.process (local)'] })
   })
 
+  // HR3's round 1: every exempt key, at global and local scope and with a changed system value (required among them).
+  const EXEMPT: [key: string, section: string, name: string, stockValue: string, changed: string][] = [
+    ['filter.lfs.clean', 'filter "lfs"', 'clean', 'git-lfs clean -- %f', 'other clean -- %f'],
+    ['filter.lfs.smudge', 'filter "lfs"', 'smudge', 'git-lfs smudge -- %f', 'other smudge -- %f'],
+    ['filter.lfs.process', 'filter "lfs"', 'process', 'git-lfs filter-process', 'other filter-process'],
+    ['filter.lfs.required', 'filter "lfs"', 'required', 'true', 'false'],
+    ['diff.astextplain.textconv', 'diff "astextplain"', 'textconv', 'astextplain', 'other-converter'],
+  ]
+  /** What refuses for a key: its LFS key itself, or for astextplain's driver the stock attribute lines it then uses. */
+  const refused = async (s: Setup, key: string, scope: string): Promise<boolean> => {
+    const a = await assessJj(s.root, s.store, s.deps)
+    if (key.startsWith('filter.lfs.')) return JSON.stringify(a.lfs) === JSON.stringify({ uses: [`${key} (${scope})`] })
+    return 'uses' in a.attributes && a.attributes.uses.some((u) => u.endsWith('*.doc\tdiff=astextplain')) && JSON.stringify(a.lfs) === '{"clear":true}'
+  }
+  it.each(EXEMPT)('%s set globally, set locally, or changed in the system file still refuses', async (key, section, name, stockValue, changed) => {
+    for (const scope of ['global', 'local'] as const) {
+      const s = setup()
+      s.git('config', 'core.autocrlf', 'false')
+      expect(allClear(await assessJj(s.root, s.store, s.deps))).toBe(true)
+      s.git('config', ...(scope === 'global' ? ['--global'] : []), key, stockValue)
+      expect(await refused(s, key, scope), `${key} (${scope})`).toBe(true)
+    }
+    const line = `\t${name} = ${stockValue}\n`
+    expect(STOCK_CONFIG.split(line).length, `${section}: one ${name} line`).toBe(2)
+    const m = setup({ config: STOCK_CONFIG.replace(line, `\t${name} = ${changed}\n`) })
+    m.git('config', 'core.autocrlf', 'false')
+    expect(await refused(m, key, 'system'), `${key} changed`).toBe(true)
+  })
+
   it('a changed or added system value still refuses', async () => {
     const changed = setup({ config: STOCK_CONFIG.replace('git-lfs smudge -- %f', 'my-lfs smudge -- %f') })
     expect((await assessJj(changed.root, changed.store, changed.deps)).lfs).toEqual({ uses: ['filter.lfs.smudge (system)'] })
