@@ -1102,18 +1102,39 @@ public static class CombworkJobs {
     lock (turn) Untold(id);
     int[] all = Members(id);
     int took; adopted.TryGetValue(id, out took);
-    var b = new StringBuilder("{\"total\":" + all.Length + ",\"adopted\":" + took + ",\"processes\":[");
+    var b = new StringBuilder();
+    var described = new HashSet<int>();
     if (all.Length > 0) {
       var where = new StringBuilder();
       for (int i = 0; i < all.Length && i < max; i++) where.Append(i > 0 ? " OR " : "").Append("ProcessId=").Append(all[i]);
       bool first = true;
       using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process WHERE " + where))
         foreach (ManagementObject p in q.Get()) {
-          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
+          int pid = Convert.ToInt32(p["ProcessId"]);
+          described.Add(pid);
+          b.Append(first ? "" : ",").Append("{\"pid\":").Append(pid).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(pid)).Append("\"}");
           first = false;
         }
     }
-    return b.Append("]}").ToString();
+    return "{\"total\":" + Counted(all, max, described, Gone) + ",\"adopted\":" + took + ",\"processes\":[" + b.Append("]}").ToString();
+  }
+  /**
+   * How many of a job's members (all, the first max of them asked to be described) Describe counts (HI-2858): each one
+   * described, and one not described unless it has gone by then. A member that exits between the job's list and its
+   * description (a console host, a CLI just ended) is no longer one: counted, it would hold its launch with nothing
+   * running in it. One not described that still runs, or can't be told, still counts; those past max aren't looked at.
+   */
+  public static int Counted(int[] all, int max, HashSet<int> described, Func<int, bool> gone) {
+    int n = 0;
+    for (int i = 0; i < all.Length; i++) if (i >= max || described.Contains(all[i]) || !gone(all[i])) n++;
+    return n;
+  }
+  /** Whether no process runs by this id now: none has it, or the one that has it has exited (its object still held). */
+  static bool Gone(int pid) {
+    // PROCESS_QUERY_LIMITED_INFORMATION; ERROR_INVALID_PARAMETER: no process has the id.
+    IntPtr p = OpenProcess(0x1000, false, pid);
+    if (p == IntPtr.Zero) return Marshal.GetLastWin32Error() == 87;
+    try { uint code; return GetExitCodeProcess(p, out code) && code != 259; } finally { CloseHandle(p); }
   }
   /** The memory each job's processes use now (working sets, as Task Manager counts them), for "job,job,…": a JSON array in the same order (#562). */
   public static string Memory(string ids) {
