@@ -219,13 +219,13 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.pool.owedWakePending()).toBe(true)
         // Still busy at the first pass: still owed, the next pass asked for (its pause grown).
         w.clock.fire()
-        expect(await until(() => w.pool.owedWakePending())).toBe(true)
+        expect(await until(() => w.pool.owedWakePending(), HUNG_MS)).toBe(true)
         expect(w.clock.pending().at(-1)?.ms).toBe(2000)
         expect(w.pool.owedOf(row.name)).not.toBeNull()
         // Quiet: the next pass settles it.
         w.sessions.delete(row.folder.toLowerCase())
         w.clock.fire()
-        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready', HUNG_MS)).toBe(true)
         await w.pool.owedPass()
         expect(await w.port.line(row.folder)).toBeNull()
         expect(w.pool.owedOf(row.name)).toBeNull()
@@ -243,7 +243,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(await w.port.line(row.folder)).toBe(key)
         expect(w.pool.owedOf(row.name)).not.toBeNull()
         w.clock.fire()
-        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready', HUNG_MS)).toBe(true)
         await w.pool.owedPass()
         expect(w.pool.owedOf(row.name)).toBeNull()
       })
@@ -272,7 +272,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.hooks.inRecord = () => void (entered = true)
         w.sessions.delete(row.folder.toLowerCase())
         const drain = w.pool.drained(row.name)
-        expect(await until(() => entered)).toBe(true)
+        expect(await until(() => entered, HUNG_MS)).toBe(true)
         w.hooks.recordGate = null
         w.sessions.add(row.folder.toLowerCase())
         await w.pool.owedPass()
@@ -288,12 +288,12 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.hooks.recordGate = new Promise<void>((r) => (release2 = r))
         entered = false
         w.clock.fire()
-        expect(await until(() => entered)).toBe(true)
+        expect(await until(() => entered, HUNG_MS)).toBe(true)
         w.hooks.recordGate = null
         await w.pool.drained(row.name)
         expect(w.pool.owedOf(row.name)).not.toBeNull()
         release2()
-        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready', HUNG_MS)).toBe(true)
         await w.pool.owedPass()
         expect(w.pool.owedOf(row.name)).toBeNull()
       })
@@ -309,19 +309,19 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.hooks.inRecord = () => void (entered = true)
         w.sessions.delete(row.folder.toLowerCase())
         const drain = w.pool.drained(row.name)
-        expect(await until(() => entered)).toBe(true)
+        expect(await until(() => entered, HUNG_MS)).toBe(true)
         w.hooks.recordGate = null
         w.sessions.add(row.folder.toLowerCase())
         // The pending wake fires now, during the drain's settle: its pass finds the slot taken, decides nothing.
         expect(w.clock.fire()).toBe(true)
-        expect(await until(() => w.pool.owedWakePending())).toBe(true)
+        expect(await until(() => w.pool.owedWakePending(), HUNG_MS)).toBe(true)
         release()
         await drain
         expect(w.pool.owedOf(row.name)).not.toBeNull()
         expect(w.pool.owedWakePending()).toBe(true)
         w.sessions.delete(row.folder.toLowerCase())
         w.clock.fire()
-        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready', HUNG_MS)).toBe(true)
         await w.pool.owedPass()
         expect(w.pool.owedOf(row.name)).toBeNull()
       })
@@ -385,7 +385,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.hooks.inRecord = () => void (entered = true)
         w.sessions.delete(row.folder.toLowerCase())
         expect(w.clock.fire()).toBe(true)
-        expect(await until(() => entered)).toBe(true)
+        expect(await until(() => entered, HUNG_MS)).toBe(true)
         w.hooks.recordGate = null
         let closed = false
         const closing = w.pool.close().then(() => void (closed = true))
