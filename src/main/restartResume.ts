@@ -7,7 +7,7 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { RESTART_READY_SECONDS, RESUME_AFTER_UPDATE } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
-import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, restartingLine, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
+import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, restartingLine, resumeNote, STALL_HOLD_MS, ackFile, takenFile, unreported, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
 import type { LaneInfo, LiveSessionState, TaskCard, ToastAction } from '../shared/types'
 import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
@@ -263,9 +263,10 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   let snapshot = base
   if (enriched) {
     const narrowed = new Set(base.map(agentKey))
-    record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched, reason)
-    // The idle ones are in the record only to be named as not resumed (HI-2909): not told they will be, nor counted.
+    // The idle ones are in the record only to be named as not resumed (HI-2909): not told they will be, nor counted. A
+    // quit's start offers what it resumes, and names no idle one: not kept.
     const idle = enriched.filter((e) => e.state === 'skipped')
+    record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, reason === 'quit' ? enriched.filter((e) => e.state !== 'skipped') : enriched, reason)
     snapshot = enriched.filter((e) => e.state !== 'skipped')
     await save()
     if (idle.length) log.info(`Not recording ${idle.length} idle agent(s) to resume as Combwork closes (${reason}): ${idle.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
@@ -320,7 +321,7 @@ export async function startRestartRecovery(): Promise<void> {
     if (e.state === 'offered') offer.push(e)
     // Skipped already, as Combwork closed (idle, HI-2909) or at this start (a day old): the report names them too, so
     // it accounts for every agent that was running.
-    if (e.state === 'skipped' && (e.why === 'idle' || e.why === 'expired')) skippedBefore.push(e)
+    if (unreported(e)) skippedBefore.push(e)
   }
   // Told before the write is awaited, as pump does (HI-2356): an offer the queue told already is replaced at once.
   if (offer.length) tellOffer()
@@ -702,9 +703,17 @@ function whyText(e: RestartEntry): string {
 /** The one notice of what this run's queue did, and each workspace's Assistant told; then the counts start again. */
 function report(): void {
   const { resumed, failed, held } = done
-  if (!resumed.length && !failed.length && !held.length && !done.skipped.length) return
-  // Those skipped before the queue (HI-2909) ride along with a report the queue makes; alone they make none.
-  const skipped = [...skippedBefore.splice(0), ...done.skipped]
+  // Those skipped before the queue (HI-2909: idle as Combwork closed, or expired), once their workspace is ready and has
+  // nothing left to decide or start: named once, alone too (an update whose agents were all idle), then kept no more.
+  const settled = (e: RestartEntry): boolean => !!readyWorkspaceOf(e) && !record?.entries.some((x) => samePlace(x.workspace, e.workspace) && (x.state === 'pending' || x.state === 'queued' || x.state === 'starting'))
+  const before = skippedBefore.filter(settled)
+  if (!resumed.length && !failed.length && !held.length && !done.skipped.length && !before.length) return
+  for (const e of before) {
+    skippedBefore.splice(skippedBefore.indexOf(e), 1)
+    e.reported = true
+  }
+  if (before.length) void save()
+  const skipped = [...before, ...done.skipped]
   const update = policy() !== 'quit'
   const lines: string[] = []
   if (resumed.length) lines.push(tr(msg({ id: 'main.restart.resumedLine', defaultMessage: 'Resumed: {names}.', description: 'A line of the notice after Combwork resumed agents when it started again. {names} lists them, each with its project.' }), { names: fmt.list(resumed.map((e) => `${e.agentName} (${e.project})`)) }))

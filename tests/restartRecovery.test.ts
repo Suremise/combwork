@@ -482,6 +482,56 @@ describe('the restart queue (HI-1707)', () => {
     expect(h.starts).toEqual(['b1', 'r1', 'r2'])
   })
 
+  // HR2's round 1: with every agent idle the record was removed at once and nothing told; skips from before the queue
+  // are kept until a start's notice names them, once, and then the record goes.
+  it('an update with every agent idle: the next start names them, once (a reload adds no second notice), and the record goes', async () => {
+    const ws = workspace(join(dir, 'ws'), ['i1', 'i2'])
+    h.workspaces = [ws]
+    await startWith([])
+    h.lives = ['i1', 'i2'].map((agentId, i) => ({ projectPath: join(ws.path, 'alpha'), agentId, runId: `r${i}`, status: 'finished', sessionId: `s-${agentId}`, provider: 'claude-code' }))
+    expect(await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })).toBe(0)
+    await m.restartRecordSaved()
+    expect(saved()?.entries.map((e) => [e.agentId, e.state, e.why])).toEqual([
+      ['i1', 'skipped', 'idle'],
+      ['i2', 'skipped', 'idle']
+    ])
+    await relaunch(ws)
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    for (const id of ['i1', 'i2']) expect(h.toasts[0].message).toContain(`Not resumed: ${id} (alpha): it was idle, with no card or lane waiting for it.`)
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+    // The window loads again: nothing more is said.
+    await queueSettles(async () => {
+      await m.startRestartRecovery()
+      events.emit({ type: 'workspace-changed', workspace: null })
+    })
+    expect(h.toasts).toHaveLength(1)
+    expect(h.starts).toEqual([])
+  })
+
+  it('a record whose entries are all over a day old: the start names them as expired, starts none, and the record goes', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    await startWith([entry(ws.path, 'a1', { at: new Date(Date.now() - 2 * 24 * 3600_000).toISOString() })], { reason: 'update' })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    expect(h.toasts[0].message).toContain('Not resumed: a1 (alpha): it waited more than a day.')
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+    expect(h.starts).toEqual([])
+  })
+
+  it('a quit with every agent idle keeps no record: its start offers what it resumes, and names no idle one', async () => {
+    const ws = workspace(join(dir, 'ws'), ['i1'])
+    h.workspaces = [ws]
+    await startWith([])
+    h.lives = [{ projectPath: join(ws.path, 'alpha'), agentId: 'i1', runId: 'r1', status: 'finished', sessionId: 's-i1', provider: 'claude-code' }]
+    await m.recordClosing('quit', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+  })
+
   it("an idle reviewer with a review in hand outside a lane (a loose card, HI-2046): it resumes, so the card isn't left waiting", async () => {
     const ws = workspace(join(dir, 'ws'), ['r1'], { reviewers: ['r1'] })
     h.workspaces = [ws]

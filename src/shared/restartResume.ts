@@ -43,6 +43,8 @@ export interface RestartEntry {
   state: RestartState
   /** Why it was skipped, held or failed, for the notice. */
   why?: string
+  /** A skip from before the queue (idle as Combwork closed, or expired) that a start's notice has named (HI-2909). */
+  reported?: boolean
   /** When it was last changed. */
   changedAt: string
 }
@@ -98,8 +100,14 @@ export function atStart(record: RestartRecord, now: number): RestartRecord {
   }
 }
 
-/** Whether a record still has anything to do or tell: an entry not final. */
-export const recordOpen = (r: RestartRecord | null): boolean => !!r?.entries.some((e) => !isFinal(e.state))
+/**
+ * A skip from before any start's queue (HI-2909): idle as Combwork closed, or a day old at this start. Final, but kept
+ * until a start's notice has named it, so the notice accounts for every agent that ran, those all skipped included.
+ */
+export const unreported = (e: RestartEntry): boolean => e.state === 'skipped' && (e.why === 'idle' || e.why === 'expired') && !e.reported
+
+/** Whether a record still has anything to do or tell: an entry not final, or a skip not named yet. */
+export const recordOpen = (r: RestartRecord | null): boolean => !!r?.entries.some((e) => !isFinal(e.state) || unreported(e))
 
 /** Reads a record from its file's text: null when it isn't one (damaged, another version). */
 export function parseRecord(text: string): RestartRecord | null {
