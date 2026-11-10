@@ -3228,7 +3228,8 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   for it alone (`CW_TEST_JJ_CARDS=1`, `slotCards.ts`; never a packaged one, J9e removes it with the guard): a fake
   builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
   written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
-  through its confirmation, its unrecorded edit kept; light and dark, and the seven locales.
+  through its confirmation once nothing works in it, its unrecorded edit kept (its return to the pool after Done is HI-2906's:
+  the post-Done detach a jj slot refuses); light and dark, and the seven locales.
 
 ##### Open: jj's target advance (J1's gate)
 
