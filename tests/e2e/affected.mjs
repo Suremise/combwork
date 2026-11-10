@@ -895,6 +895,8 @@ export const UNIT_SCANS = [
   { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'CW_USER_DATA', 'CW_TEST_QUIET'] },
   // The tools-connected log line (HI-2584): sessions.ts writes it, and suites read it only through lib.combworkToolsConnected.
   { test: 'tests/toolsConnectedLine.test.ts', paths: ['src/main/sessions.ts', 'tests/e2e/', 'tests/scenarios/', 'scripts/'], lines: ['tools connected'] },
+  // A test loading the real agentProcesses mocks every events export it uses (HI-2861).
+  { test: 'tests/eventsMocks.test.ts', paths: ['tests/', 'src/main/agentProcesses.ts'], lines: ['src/main/(events|agentProcesses|sessions)', "from '\\./events'"] },
   // Every caller of copilotTestEnv gives it `above` (#1308).
   { test: 'tests/fakeCopilotApi.test.ts', paths: ['tests/'], lines: ['copilotTestEnv'] },
   // Source scans of src/ for one rule each.
