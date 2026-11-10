@@ -2352,9 +2352,91 @@ changes. Git's runner and worker are untouched.
     revision, never a skipped run.
 - **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
   seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
-  `slotRelocation()` J2's, `lineHistory()` J3's, `queueIntegration()` J4's and J5's, `lineRepoReads()` and
+  `slotRelocation()` J2's port, routed by the project's platform once jj is one (J6: J2 reaches jj's port by injection
+  only, below), `lineHistory()` J3's, `queueIntegration()` J4's and J5's, `lineRepoReads()` and
   `lineRepoOps()` J6's, as is jj's descriptor (its capabilities, operations and closed gates, aligned with HI-2822's
   descriptor contract once that is on 1.5.0).
+
+##### jj's workspaces: slots and copies (1.5.0's J2, HI-2795)
+
+J2 built jj's workspace lifecycle port (`platform/jjWorkspacePort.ts`), a stale workspace's recovery
+(`platform/jjRecovery.ts`) and the pools' platform identity, and enables nothing: jj's port isn't in `workspacePorts.ts`'
+`PORTS` and `PlatformId` stays `'none' | 'git'` (agreed with J1, HI-2794: `JjPlatform` and `WorkspacePlatform =
+PlatformId | JjPlatform` are `workspacePort.ts`' types, so a jj in `project.json` stays J6's switch). A slot pool or copy
+pool gets jj's port only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`): the tests do; Combwork doesn't
+yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings); the evidence is jj 0.47.1's.
+- **Workspaces are made by `jj workspace add` only** (R2.6): never `jj git init`, never a Git worktree command on them.
+  `add` and `forget` snapshot the workspace they run from and refuse `--ignore-working-copy` (probed), so they run from
+  a **control workspace** of Combwork's per project (`<worktrees>/<project>/.cw-jj-control`, named `cw-<project
+  hash>-control`, sparse and empty: its snapshot is always empty), never lent, sized or tidied as a slot, its record
+  (board_meta `jj_control:…`: phase, store, name, folder, generation) checked before each use (its generation, no file
+  in it). Making it is the one command run from the project folder, which snapshots the project folder's working copy:
+  only under the store's repository lock, with the project folder quiet (no session, no process: jj's sharedFolder gate
+  is closed), as an explicit owned record; refused otherwise. A slot or copy is added with `--sparse-patterns full`,
+  `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
+  name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
+  child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
+  repository or workspace, is refused.
+- **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
+  operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
+  jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
+  were last updated at (`.jj/working_copy/checkout`, confirmed by reading at it) names another working-copy commit than
+  the head: stale, so unknown to every read, never clean, lent, reset or removed.
+- **No checked-out line** (jj 0.47.1 has no current bookmark): `line`, `shownLine`, `currentLine` and `heads().line`
+  answer none; `prepare`, `attach`, `createOnNewLine`, `detach`, `dropLine` and `restoreLine` are refused until J3/J4
+  freeze a card's line under jj, so no card starts in a jj slot. `checkout` (synchronous, no process) answers null.
+  `head`: `@`'s parent when `@` is empty with one parent, else `@`; unknown when stale, divergent or merge-parented.
+- **`dirty` is unknown** (a read can't see edits jj hasn't recorded: `--ignore-working-copy status` in a stale
+  workspace says "no changes"). The port's new optional **`record(folder, fence)`** is the explicit snapshot, a write,
+  only for the holder of the folder's operation: the pool calls it instead of `dirty` where it holds the slot (a warm,
+  a settle, a removal's guards); Git has none, so its git commands are unchanged (`tests/slotTraces.test.ts`). A
+  listing's read (`check`) and the card hooks' reads get unknown for jj: "can't check", or refused.
+- **Identity** (schema step 28, `workspace identity`): `slots` and `copies` gained `platform` (`'git'` for every row
+  before), `store`, `workspace` and `generation` (the folder's and its `.jj`'s file ids and birth time at creation), and
+  `copy_leases.intact`. A jj row is `jj` from the write that reserves it; its identity is recorded once made, and
+  checked against the folder before every change: a folder replaced at the same path (even a same-named workspace of
+  the same store) has another generation and is never changed or trashed. Unreadable file ids refuse.
+- **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
+  released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
+  with no port there is kept (`cantCheck`).
+- **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
+  forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
+  worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
+  before `trash()` (never the project, its store or above them), the journal cleared. A removal cut short keeps the
+  slot out of the pool (dirty; a copy with an error) and the next removal, or a takeover of its operation, resumes it
+  from its phase. A stale slot isn't removed.
+- **Copies**: a warming reservation (the lease and its `lease` operation in one write) is the only time Combwork writes
+  in a copy: made, or reset (`record` into the copy's own change, `jj new <revision>`, the old change abandoned only as
+  the copy's own: no descendant, bookmark or other workspace's), and checked **before the run** (exactly the revision:
+  `@-` is it, `@` empty after a record, not stale, not divergent, read at one operation) right before the handing
+  write. A stale or divergent copy is disposed of (forget, then the Recycle Bin: no snapshot, nothing abandoned; probed:
+  forget hides the copy's empty working-copy commit itself) and made again, never reset. While handed out nothing in
+  Combwork writes in it. **Credit** is taken after the quiescence barrier: a `recover`-kind verification operation
+  records the copy, checks the same invariant against its files, and stores `intact` (1 or 0) on the lease in the write
+  that frees the copy, so nothing reuses it or reads a result before. jj's check and review credit (J3's) requires
+  `intact = 1`; Git leases keep null.
+- **Stale recovery** (`recoverStale`): explicit only, J7's operation, never the pool's clean-up; its journal resumes it
+  after any stop. Phases: planned (the stale operation S and the workspace's commit then, WS, read pinned), preserved
+  (the files that differ from WS: WS's tracked files plus what git lists as not ignored by jj's rules, with no
+  repository of the workspace's own; their bytes copied outside every workspace, each fsynced, a manifest fsynced last,
+  read back; refused with nothing changed past 2,000 files or 512 MB, or on a link, a junction or another kind of file),
+  updated (a rescan right before `update-stale`, preserving again if anything changed; P1, its snapshot, found only by
+  its exact shape: parents `[S]`, a snapshot, this workspace; what P1 recorded, X, that the manifest doesn't is written
+  beside its path as `.cw-recovered-<token>-late` and X kept), restoring (path by path, journalled before each step:
+  the current file moved aside atomically, put back as preserved only when the updated version and the moved-aside one
+  both equal WS's; otherwise the current file stays and the preserved version goes beside it; nothing overwritten, a
+  name taken meanwhile skipped), restored (an owned record, X abandoned only when it is exactly the preserved delta and
+  nobody else's, the preserved copy to the Recycle Bin).
+- **Tests** (`CW_JJ_REAL=1` runs them on the pinned jj; without the fetched jj they're skipped): `tests/jjWorkspaces.test.ts`
+  (the port, colocated and not: made from the control without snapshotting the project folder, two agents, stale with
+  a local edit, divergence, removal with ignored files, a crash between forget and the trash, a same-store same-name
+  same-root replacement, an immutable copy under a source rewrite, an unsnapshotted edit in a copy, the control refused
+  when the project folder isn't quiet), `tests/jjSlotPool.test.ts` (the pools with jj's port injected: lend, release
+  and look by the holder's record, leases and a takeover across a restart, a removal cut short and resumed, a Git slot
+  finishing under Git, a copy's verification after its barrier, a source rewritten during a live run) and
+  `tests/jjRecovery.test.ts` (HI-2781's case, overlaps, a local deletion against an upstream edit, every stop resumed,
+  a write at the seam, writes after preservation and after the rescan, an unrelated divergent change, a junction,
+  diverged operation heads refused with nothing written).
 
 ##### Open: jj's target advance (J1's gate)
 

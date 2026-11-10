@@ -333,7 +333,14 @@ processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never G
 trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
 (`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
 with a code). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
-the pinned jj, `npm run jj:fetch`).
+the pinned jj, `npm run jj:fetch`). jj's workspaces (1.5.0's J2, HI-2795; SPEC §16.3.6, jj's workspaces):
+`platform/jjWorkspacePort.ts` is jj's workspace lifecycle port (`createJjWorkspacePort`: made by `jj workspace add` from
+a sparse, empty control workspace, reads pinned at one operation, line operations refused, `record` the explicit
+snapshot, removal journalled and checked by the folder's creation generation), `platform/jjRecovery.ts` a stale
+workspace's resumable recovery (`recoverStale`), and `schema/workspaceIdentityStep.ts` the slots' and copies' platform
+and identity columns. `slots.ts` and `copies.ts` take a port per row (`portOf`) and call `record` where they hold the
+folder; jj's port reaches them only by injection (not in `workspacePorts.ts`), from the tests (`tests/jjWorkspaces`,
+`jjSlotPool`, `jjRecovery`, over `tests/jjWorkspaceHarness.ts`).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
