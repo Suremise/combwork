@@ -9,8 +9,10 @@ import { tempDir } from './tempDir'
 type Snap = { files: Record<string, string>; at: string; atEmpty: boolean; parent: string } | null
 const require = createRequire(import.meta.url)
 type Tool = { name: string; input: string; cwd?: string }
-const { copySnapshot, copyChanges, copyWrites } = require('./scenarios/jjReviewCopy.cjs') as {
+type View = { state: string; lease: { returned: boolean } | null }
+const { copySnapshot, firstLook, copyChanges, copyWrites } = require('./scenarios/jjReviewCopy.cjs') as {
   copySnapshot: (folder: string, jj: (...a: string[]) => string) => Snap
+  firstLook: (view: View, snap: Snap, revision: string) => 'baseline' | 'seen' | null
   copyChanges: (a: Snap, b: Snap) => string[]
   copyWrites: (o: { tools: Tool[] }, copy: string) => string[]
 }
@@ -107,6 +109,43 @@ describe("what changed in a jj review copy while its reviewer had it", () => {
     expect(writes([{ name: 'Bash', input: 'jj commit -m x', cwd: 'C:\\ws\\alpha' }])).toEqual([])
     // Another copy whose name starts with this one's.
     expect(writes([{ name: 'Bash', input: 'jj new', cwd: `${COPY}0` }])).toEqual([])
+  })
+
+  it("a copy still being made (HI-2907): jj's @- on the revision before its files are written is no first look", () => {
+    // Combwork's lease operation: jj records the copy's workspace at the revision, then writes its files and checks it.
+    const dir = tempDir('jjcopy-')
+    mkdirSync(join(dir, '.jj', 'repo'), { recursive: true })
+    const jj = { at: 'f'.repeat(40) }
+    const look = (): Snap => copySnapshot(dir, (...a: string[]) => (a[a.indexOf('-r') + 1] === '@' ? `${jj.at} true` : REV))
+    const view: View = { state: 'creating', lease: { returned: false } }
+    const early = look()
+    expect(early).toMatchObject({ parent: REV, files: {} })
+    expect(firstLook(view, early, REV)).toBeNull()
+    // A free copy reset for the lease keeps its state until the operation ends: no first look either.
+    expect(firstLook({ state: 'free', lease: { returned: false } }, early, REV)).toBeNull()
+    expect(firstLook({ state: 'dirty', lease: { returned: false } }, early, REV)).toBeNull()
+    // The copy fills in, and jj's working copy moves to its checked-out commit: what the first look used to report.
+    writeFileSync(join(dir, 'greet.js'), "module.exports = (name) => 'Helo, ' + name.trim()\n")
+    writeFileSync(join(dir, 'README.md'), '# r\n')
+    jj.at = AT
+    expect(copyChanges(early, look()).sort()).toEqual(['added README.md', 'added greet.js', `jj's working copy moved: ${'f'.repeat(12)} → ${AT.slice(0, 12)}`])
+    // Handed over (leased): its first look, and a reviewer that only reads changes nothing after it.
+    view.state = 'leased'
+    const first = look()
+    expect(firstLook(view, first, REV)).toBe('baseline')
+    expect(copyChanges(first, look())).toEqual([])
+  })
+
+  it('a first look: only on the submitted revision; a copy given back before it was on it, with nothing to compare', () => {
+    const c = copy()
+    const snap = c.look()
+    expect(firstLook({ state: 'leased', lease: { returned: false } }, snap, 'c'.repeat(40))).toBeNull()
+    expect(firstLook({ state: 'leased', lease: null }, snap, REV)).toBeNull()
+    expect(firstLook({ state: 'leased', lease: { returned: false } }, null, REV)).toBeNull()
+    // Given back between two looks: 'returning' only once the operation that made it ready has ended.
+    expect(firstLook({ state: 'returning', lease: { returned: true } }, snap, REV)).toBe('seen')
+    // Given back while still being made, and its setup failed: never ready.
+    expect(firstLook({ state: 'creating', lease: { returned: true } }, snap, REV)).toBeNull()
   })
 
   it('a copy gone (given back and removed): nothing to compare, not counted as a change', () => {
