@@ -4,6 +4,7 @@
 // but for the acknowledgement and the leftovers' prune (proved absences, the port's). Decision A: nothing here moves a
 // bookmark or pushes.
 
+import { reconcileCard } from './workflow/reconciler'
 import { basename, resolve as resolvePath } from 'path'
 import type { JjLeftover, JjToCheckRow, JjWaitingCard } from '../shared/jjViews'
 import { boardRead } from './boardStore'
@@ -36,7 +37,13 @@ const commitOf = (platform: unknown, field: 'commitId' | 'changeId'): string | n
  */
 export async function jjWaiting(ws: WorkspaceService, projectPath: string): Promise<JjWaitingCard[]> {
   const wf = await workflowFor(ws, projectPath)
-  return wf ? waitingOf(wf, projectIdOf(ws, projectPath)) : []
+  const rows = wf ? waitingOf(wf, projectIdOf(ws, projectPath)) : []
+  // A card listed with no observation yet is reconciled soon, as a card's Work section read asks (HI-2896): an approval
+  // changes no jj operation or ref, so in a repository not colocated with Git nothing else would run one until the next
+  // jj command; what it records reaches the panel as a board change.
+  const name = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())?.name
+  if (name) for (const r of rows) if (!r.contained) reconcileCard(ws, r.card, name)
+  return rows
 }
 
 /** jjWaiting's reading of one workflow, by the project's canonical id (the records' scope). */
