@@ -2268,8 +2268,8 @@ works.
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
-| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
-| Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
+| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
+| Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
 | **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
 | **LFS** | As git does | — | **Not supported** | **gate: lfs** |
@@ -2686,7 +2686,8 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   abandon's boundary** (after its last await, never the journal's word): an owned pin moved or gone stops it
   (`interrupted`, the evidence left visible), and they are read again after the abandon and before any outcome, so a pin
   lost meanwhile is never reported as retained evidence (HR2's round 1).
-- **Outcomes:** a candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
+- **Outcomes** (the record's `outcome`, written with its `done`, says which; only `candidate` can credit J5's proof): a
+  candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
   (`conflict` with its files, hunks and pinned evidence; `notUpToDate` in the queue's existing words, sameness being
   §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
   signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
@@ -2725,6 +2726,85 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
   Git branch).
+
+##### jj's integration evidence (1.5.0's J5, HI-2798)
+
+Under decision A, J5 is the evidence side of the user's own integration (`platform/jjIntegration.ts`), and enables
+nothing: jj still has no `integration` capability. **It writes no jj operation**, so there is no `jj undo`, no
+`op restore` and no bookmark reset anywhere in it; the user moves the bookmark (by hand, or onto J4's candidate) and
+pushes. The reconciler's existing "integrated outside" path records the result once J6 composes jj's HistoryPort
+(`contains`, `lineHead`) from these functions. Its design is HI-2798/s11, s14, s17 and s20 (HR2's).
+- **The target's head as evidence** (`jjTargetHead`), read at the single operation head: the local bookmark, not
+  conflicted (`conflictedTarget`), its commit neither divergent (`divergentChange`) nor conflicted (`conflictedTarget`:
+  a conflicted result is never integrated); the export matrix holding (`partialExport` otherwise); and the heads and
+  Git's ref the same after the reads. **The export matrix** (probed on 0.47.1: a non-colocated store has no
+  `refs/heads` and no `@git` row until `jj git export`): colocated, the `T@git` row and the store's `refs/heads/T`
+  must both equal T (a missing row disagrees); non-colocated, a `@git` row needs the ref and both must equal T, and with
+  no row a ref present must equal T, its absence agreeing (a fresh store). A plain Git move jj hasn't imported shows as
+  a disagreement, never as the target.
+- **The proof** (`jjContains`): the head (equal to the caller's `at`, else `moved`); then a **J4 candidate bound to
+  exactly the reviewed input** (a done record with `outcome: 'candidate'`, no step or uncertain commits, its reviewed
+  revision and base equal to the change's, its owned `candidate` pin reading back its result now) that the head reaches
+  by exact commit id; else §16.3.2's test unchanged on the backing store (Git's `contains` at that head: ancestry,
+  a replaying commit, the whole target holding it). A divergent reviewed revision, or a divergent or conflicted proof
+  commit, is refused; change ids never count, not even as a hint. Every answer, a null included, is **fenced after its
+  last awaited read**: the target's head, the operation, Git's ref and the export matrix read again and compared (after
+  the proof, and again after retention's pin writes), so a plain Git move during the read is a refusal or unknown
+  (HR1's round 1). A refusal or unknown is never "not contained": LeftTarget is written only on a proved null.
+- **Retained bundles:** before it answers proved, every object the proof names (the reviewed revision, its base, the head,
+  and a separate proof commit) is pinned in a bundle with an immutable identity, `refs/cw/jj-integrated/<card>/<cycle>/
+  <bundle>/`, under J4's ownership rules (intent journalled, create-only, read back, owned only on its own create; a ref
+  there first is a race, never touched), and every pin read back held. A retry of the same integration reuses its
+  bundle only for exactly the same endpoints; a new integration (another head, or after a recorded fact, LeftTarget and
+  reintegration, even with identical endpoints) gets a new bundle; earlier bundles are never replaced. The bundle is
+  checked held at the fact's boundary, before and after its write, and on later passes `ensureRetained` creates a
+  missing pin again while its object resolves; an object gone makes that card's containment unknown. A proof survives
+  the original line abandoned, the target reset and both GCs (tested).
+- **Provenance:** `Integrated.data.platform.jj = { op, head, gitRef, via, bundle, candidate?, commit? }` (an optional
+  field like Started's and Submitted's; read whole or not at all, `jjFacts.ts`).
+- **Publish is observed, never done** (gate: publish stays closed for pushing). The remote: the bookmark's one tracked
+  remote; several tracked, or none tracked with several configured and no `origin`, is `ambiguousRemote`; its URL from
+  jj and from the store's config must agree. What the remote has is read from the remote (`ls-remote --refs`, no
+  prompt, exactly `refs/heads/T`), then the operation, the target's head and its export, the remote and both URLs are
+  read again, across the network read and **again after every awaited decision read, right before the settles** (which
+  are synchronous): any change writes nothing (HR1's round 1). The effective URL is Git's and jj's own answer, never
+  parsed by Combwork: exactly one value at every level, the same from the store's own config alone (`--local`), and
+  jj's. That last check **fingerprints, never interprets** (the Assistant's note after HR1's rounds 1–2 and HR2's round
+  3): before its awaited reads it takes a print of every source the decision rests on, the raw bytes of jj's operation
+  heads, the store's HEAD (an `onbranch` condition), the target's loose ref, the packed refs, Git's config environment,
+  and every config file Git reads, **found by Git, never parsed by Combwork** (the Assistant's note on HR1's round 4:
+  `git config --show-scope --show-origin -z --includes --list` gives every file a value comes from at every scope and
+  each include and includeIf target as Git decodes it, comments, quotes and continuations included; each scope's own
+  file is covered whether or not it exists yet). An include it can't resolve to a concrete file (a `~` path, a
+  condition it doesn't know) or an origin that isn't a file is unknown. The set is a **verified capture** (HR2's round
+  5): discover, print, discover again, print again; the second discovery ran wholly while the files it found held the
+  first print's bytes, so the set describes exactly them, and an include added during either discovery shows as a
+  different set or different bytes (unknown). Its end is a synchronous validator the caller runs **in its own
+  continuation** straight before the synchronous settles (HR2's round 6: an awaited helper's return is a microtask in
+  which a queued change could land): it takes the print again and checks the operation heads and the target's ref
+  against the moment. Whether J5 should settle
+  `published` automatically at all, or keep it re-verifiable, is put to Darren (the Assistant, after round 5). Any difference, whether or not it would matter (a mixed-case
+  `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
+  stays owed. A pushed commit the store lacks is `notFetched`.
+- **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
+  exists in any state, so a settled one (`published`, with the pushed id, or `notHeld`) is a tombstone that never comes
+  back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on
+  its own with a compare-and-set on its key, result and `owed` state: a late answer for one integration never settles
+  another; the network read is shared, the bookkeeping never coalesced.
+- **Recovery** reads and never rewinds: a crash between proof, pins, fact and obligation is met by proving again
+  (reusing an unconsumed bundle with the same endpoints), by the pins' journal, and by reconstructing obligations
+  idempotently. J4's attempts recover with J4's own functions.
+- **Tests:** `tests/jjIntegration.test.ts` (the export matrix, the remote's choice, the parsers, the obligations'
+  compare-and-set and reconstruction, the provenance reader) and `tests/jjIntegrationReal.test.ts` on the pinned jj
+  (`CW_JJ_REAL=1`), both Git-backed modes and a local bare remote: main set to each J4 candidate; a cherry-picked copy,
+  a merge and a copy with more in it by hand; a conflicted bookmark from two racing sets and a target at a conflicted
+  commit; a divergent reviewed revision; an export disagreement in each mode; two operation heads; candidate credit
+  refused for an older submission's candidate, failed, unfinished and interrupted records, and a moved candidate pin;
+  a manual squash surviving the original line abandoned, the target reset and both GCs; bundles across a target move,
+  a retry and a consumed bundle; a pin taken first, lost at the fact boundary and re-pinned; and publish: owed until
+  pushed, the exact pushed id, the remote advancing, `notHeld` after a reset, `notFetched`, two tracked remotes and
+  several untracked without origin, the remote URL and the target moving during `ls-remote`, two cards settled by one
+  push without coming back, and a reintegration's own obligation with a late answer for the earlier one.
 
 ##### Open: jj's target advance (J1's gate)
 
