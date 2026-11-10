@@ -841,14 +841,22 @@ public static class CombworkJobs {
   }
   /** Its whole membership as Members gives it (the job's and the running processes it follows), or null when unreadable. Under the turn. */
   static int[] MembersChecked(string id) {
-    var listed = ListChecked(id);
+    var mine = new List<int>();
+    foreach (var f in followed) if (f.Value.job == id) mine.Add(f.Key);
+    return Whole(ListChecked(id), mine, pid => { uint code; return GetExitCodeProcess(followed[pid].h, out code) ? (code == 259 ? 1 : 0) : -1; });
+  }
+  /**
+   * A membership read whole (MembersChecked, the OS's answers passed in: the unit tests give their own): the job's listed
+   * processes (null: unreadable) and each followed one that runs (stateOf: 1 runs, 0 has exited, -1 can't be told). Null
+   * when the list or any followed one's state can't be read.
+   */
+  public static int[] Whole(int[] listed, IEnumerable<int> followedIds, Func<int, int> stateOf) {
     if (listed == null) return null;
     var members = new List<int>(listed);
-    foreach (var f in followed) {
-      if (f.Value.job != id) continue;
-      uint code;
-      if (!GetExitCodeProcess(f.Value.h, out code)) return null;
-      if (code == 259) members.Add(f.Key);
+    foreach (int pid in followedIds) {
+      int state = stateOf(pid);
+      if (state < 0) return null;
+      if (state == 1) members.Add(pid);
     }
     return members.ToArray();
   }
@@ -1117,10 +1125,11 @@ public static class CombworkJobs {
         }
     }
     // Those asked about and not described that have gone, and only then the membership again: whatever a departed member
-    // started before it exited joined the job before this second look (HR1's round 1).
+    // started before it exited joined the job before this second look (HR1's round 1), read whole or not at all (round 2).
     var departed = new HashSet<int>();
     for (int i = 0; i < all.Length && i < max; i++) if (!described.Contains(all[i]) && Gone(all[i])) departed.Add(all[i]);
-    int[] now = departed.Count > 0 ? Members(id) : all;
+    int[] now = all;
+    if (departed.Count > 0) lock (turn) now = MembersChecked(id);
     return "{\"total\":" + Counted(all, max, described, departed, now, Gone) + ",\"adopted\":" + took + ",\"processes\":[" + b.Append("]}").ToString();
   }
   /**
@@ -1130,9 +1139,11 @@ public static class CombworkJobs {
    * it would hold its launch with nothing running in it. Everything else counts, so a job is never told empty while
    * something may run in it: each described, each still running or that can't be told, those past max (not looked at),
    * each member new by the second look (what a departed one started before it exited), and a departed id the job still
-   * lists unless it is still gone (goneNow): a later process may have its id.
+   * lists unless it is still gone (goneNow): a later process may have its id. now null (the second look couldn't be read
+   * whole): nothing is dropped, every member of before counts.
    */
   public static int Counted(int[] before, int max, HashSet<int> described, HashSet<int> departed, int[] now, Func<int, bool> goneNow) {
+    if (now == null) return before.Length;
     var listed = new HashSet<int>(now);
     var seen = new HashSet<int>(before);
     int n = 0;

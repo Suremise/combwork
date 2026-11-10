@@ -951,7 +951,7 @@ $r | ConvertTo-Json -Compress -Depth 4
 describe.runIf(process.platform === 'win32')("how many members a job's listing counts (HI-2858)", () => {
   const dir = tempDir('cw-counted-')
 
-  it('leaves out a member gone before it was described, and keeps one that runs, what it started, or past those described', async () => {
+  it('leaves out a member gone before it was described, and keeps one that runs, what it started, past those described, or all when unsure', async () => {
     const { HOST_SOURCE } = await import('../src/main/agentProcesses')
     const src = join(dir, 'host.cs')
     writeFileSync(src, HOST_SOURCE)
@@ -984,12 +984,24 @@ $r.notDescribedRuns = Count @(10, 20, 30) 10 @(10, 20) @() @(10, 20, 30) @()
 $r.describedLeft = Count @(10, 20) 10 @(10, 20) @() @(20) @(10)
 # Past those asked about: counted, not looked at; the departed one asked about is not.
 $r.pastMax = Count @(10, 20, 30) 2 @(10) @(20) @(10, 20, 30) @(20, 30)
+# HR1's round 2: the second look couldn't be read whole (null): nothing dropped, the departed member still counts.
+$r.secondUnread = Count @(10, 20) 10 @(20) @(10) $null @(10)
+# The second look read whole (Whole, the OS's answers given): listed processes and each followed one that runs (1), not
+# one that has exited (0); null when the list can't be read, or a followed one's state can't be told (-1).
+function ReadWhole($listed, $followed) {
+  $state = [Func[int,int]]{ param($id) [int]$followed[$id] }
+  $w = [CombworkJobs]::Whole([int[]]$listed, [int[]]@($followed.Keys), $state)
+  if ($null -eq $w) { 'unknown' } else { ($w | Sort-Object) -join ',' }
+}
+$r.wholeRead = ReadWhole @(10) @{ 20 = 1; 30 = 0 }
+$r.listUnread = ReadWhole $null @{ 20 = 1 }
+$r.followedUnread = ReadWhole @(10) @{ 20 = 1; 30 = -1 }
 $r | ConvertTo-Json -Compress
 `
     )
     const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: 120000 })
-    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as Record<string, number>
-    expect(r).toEqual({ goneMember: 0, stillListed: 0, childOfDeparted: 1, idTakenAgain: 1, notDescribedRuns: 3, describedLeft: 2, pastMax: 2 })
+    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as Record<string, number | string>
+    expect(r).toEqual({ goneMember: 0, stillListed: 0, childOfDeparted: 1, idTakenAgain: 1, notDescribedRuns: 3, describedLeft: 2, pastMax: 2, secondUnread: 2, wholeRead: '10,20', listUnread: 'unknown', followedUnread: 'unknown' })
   }, 120000)
 })
 
