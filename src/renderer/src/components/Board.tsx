@@ -1975,7 +1975,7 @@ export function TaskDialog() {
   }, [open, ready])
 
   // Whether the chosen project's rules review (#1625): Skip review is offered, and sent, only where they do.
-  const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null)
+  const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null, opened)
   const projectTargets = useProjectTargets(projects.find((p) => p.name === project)?.path ?? null, opened)
   // Another project chosen: its own branch, whatever the last one's pick (even a branch both list).
   useEffect(() => setNewTarget(''), [project])

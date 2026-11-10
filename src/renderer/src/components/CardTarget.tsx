@@ -3,7 +3,7 @@ import { msg, tr } from '@shared/i18n'
 import type { LaneStartInfo, TaskCard } from '@shared/types'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { call, errorMessage } from '../api'
-import { loadTasks, notify, useLanguage } from '../store'
+import { loadTasks, notify, useLanguage, useStore } from '../store'
 import { Icon, Tooltip, useBusy } from './ui'
 
 // A card's Merges into in the window (HI-2556, SPEC §16.6.2 G7b): the branch its work is made from and merges into,
@@ -21,11 +21,13 @@ const M = {
 
 /**
  * The branches a project's lanes and cards may merge into (main's `lanes:startInfo`); null while unknown or none to pick.
- * Read again whenever `opened` changes (HI-2830: the card dialog stays mounted, so each opening counts), as the project's
- * Work merges into and Other branches change meanwhile; the last list stays shown while the same project's is re-read.
+ * Read again whenever `opened` changes (HI-2830: the card dialog stays mounted, so each opening counts) and on each
+ * `workflow-changed` (HI-2851), as the project's Work merges into and Other branches change meanwhile; the last list
+ * stays shown while the same project's is re-read.
  */
 export function useProjectTargets(projectPath: string | null, opened: number): LaneStartInfo['targets'] {
   const [read, setRead] = useState<{ path: string; targets: LaneStartInfo['targets'] } | null>(null)
+  const version = useStore((s) => s.workflowVersion)
   useEffect(() => {
     let live = true
     if (!projectPath) return
@@ -35,7 +37,7 @@ export function useProjectTargets(projectPath: string | null, opened: number): L
     return () => {
       live = false
     }
-  }, [projectPath, opened])
+  }, [projectPath, opened, version])
   return read && read.path === projectPath ? read.targets : null
 }
 
