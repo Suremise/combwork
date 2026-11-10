@@ -252,15 +252,25 @@ const check = (name, ok, extra = '') => {
       await cancelCard()
     }
 
-    // --- HI-2851: gamma's rules gain Review while the dialog is closed: opened again, it offers Skip review; they lose it
-    // while the dialog is open (workflow-changed): the tick box goes. The dialog stays mounted, so neither is the first read.
+    // --- HI-2851: a gamma card's dialog (gamma doesn't review: no Review field); gamma's rules gain Review while it is
+    // closed: the same card opened again (the same project, so not a first read) offers Skip Review…; they lose it while
+    // the dialog is open (workflow-changed): the field goes.
     const gammaOptions = (review) => ({ preset: null, options: { review, ...(review === 'agent' ? { noSelfReview: true } : {}), finish: 'committed', folder: 'project', otherTargets: ['1.2.0'] } })
+    const gammaCard = (await inv('tasks:list')).find((c) => c.title === 'Switched to gamma')
+    const reviewField = edit.locator('[data-review-skip="reviewed"]')
+    await tile(gammaCard.number).click()
+    await edit.waitFor({ timeout: HUNG_MS })
+    check("HI-2851: a gamma card's dialog has no Review field while gamma doesn't review", !!(await lib.until(async () => (await edit.locator('.kind-field[data-kind]').count()) === 1, HUNG_MS)) && (await reviewField.count()) === 0)
+    await page.keyboard.press('Escape')
+    await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
     await inv('workflow:setOptions', gamma, gammaOptions('agent'))
-    await newCard()
-    check('HI-2851: gamma reviews now: the dialog opened again offers Skip review', !!(await lib.until(async () => (await skipBox.count()) === 1, HUNG_MS)))
+    await tile(gammaCard.number).click()
+    await edit.waitFor({ timeout: HUNG_MS })
+    check('…gamma reviewing now, the same card opened again offers Skip Review…', !!(await lib.until(async () => (await reviewField.count()) === 1 && (await edit.getByRole('button', { name: 'Skip Review…' }).count()) === 1, HUNG_MS)))
     await inv('workflow:setOptions', gamma, gammaOptions('none'))
-    check('…and gamma no longer reviewing, the open dialog stops offering it', !!(await lib.until(async () => (await skipBox.count()) === 0, HUNG_MS)))
-    await cancelCard()
+    check('…and gamma no longer reviewing, the open dialog stops offering it', !!(await lib.until(async () => (await reviewField.count()) === 0, HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
 
     // --- A project agent only proposes it, with its reason: the user keeps the review in the dialog; agents never set it.
     const skipProposed = await api('builder', 'POST', '/v1/tasks', { title: 'Rename the helper', skipReview: 'It only renames a file' })
