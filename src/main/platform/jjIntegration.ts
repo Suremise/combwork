@@ -661,7 +661,10 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   // right before the settles, which are synchronous.
   // Its last step is synchronous (HR1's round 2): the operation heads, the target's Git ref and the remote's URL read from
   // the files with no await between them and the settles, so nothing (a plain Git move included) can come in after them.
-  const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
+  // The check returns its synchronous tail as a validator (HR2's round 6): the caller runs it in its own continuation
+  // straight before the synchronous writes, so no awaited return (a microtask) comes between the last read and the CAS.
+  type Validator = () => JjReadUnknown | null
+  const still = async (where: string): Promise<JjRefused | JjReadUnknown | Validator> => {
     // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
     // source that can't be read, is unknown (whether or not the change would matter).
     // The files Git reads, found by Git, as a verified capture (HR2's round 5): discover, print, discover again, print
@@ -685,14 +688,18 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     const moved = await fence(deps, target, th, where)
     if (moved) return moved
     await deps.hook?.('finalFence')
-    if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
-    const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
-    if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
-    if (sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources) !== before) return jjUnknown('moved', `sources:${where}`)
-    return null
+    return (): JjReadUnknown | null => {
+      if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
+      const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
+      if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
+      if (sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources) !== before) return jjUnknown('moved', `sources:${where}`)
+      return null
+    }
   }
   const afterRemote = await still('afterRemote')
-  if (afterRemote) return afterRemote
+  if (typeof afterRemote !== 'function') return afterRemote
+  const afterRemoteNow = afterRemote()
+  if (afterRemoteNow) return afterRemoteNow
   const ancestor = async (a: string, b: string): Promise<boolean | JjReadUnknown> => {
     const r = await deps.git(['merge-base', '--is-ancestor', a, b])
     await deps.hook?.('ancestry')
@@ -717,7 +724,10 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     if (!held) decided.push({ o, to: 'notHeld' })
   }
   const beforeSettle = await still('beforeSettle')
-  if (beforeSettle) return beforeSettle
+  if (typeof beforeSettle !== 'function') return beforeSettle
+  // From here to the last settle: synchronous, one continuation. The validator's reads are the last before the writes.
+  const finalNow = beforeSettle()
+  if (finalNow) return finalNow
   const settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] = []
   const at = now()
   for (const { o, to } of decided) {

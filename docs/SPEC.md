@@ -2684,8 +2684,10 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   condition it doesn't know) or an origin that isn't a file is unknown. The set is a **verified capture** (HR2's round
   5): discover, print, discover again, print again; the second discovery ran wholly while the files it found held the
   first print's bytes, so the set describes exactly them, and an include added during either discovery shows as a
-  different set or different bytes (unknown). At its end, with no await between it and the synchronous settles, it takes
-  the print again and checks the operation heads and the target's ref against the moment. Whether J5 should settle
+  different set or different bytes (unknown). Its end is a synchronous validator the caller runs **in its own
+  continuation** straight before the synchronous settles (HR2's round 6: an awaited helper's return is a microtask in
+  which a queued change could land): it takes the print again and checks the operation heads and the target's ref
+  against the moment. Whether J5 should settle
   `published` automatically at all, or keep it re-verifiable, is put to Darren (the Assistant, after round 5). Any difference, whether or not it would matter (a mixed-case
   `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
   stays owed. A pushed commit the store lacks is `notFetched`.

@@ -424,6 +424,38 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
+  describe('round 6 (HR2): the final validation and the settles share one continuation', () => {
+    // Depths 1 and 2 land before the caller's continuation (2 is HR2's probe): never settled. Depth 3 lands after the
+    // synchronous settles have run, so the log shows the write first: no change comes between validation and write.
+    it.each([1, 2, 3])('a change queued %i microtask(s) deep at the final fence: never between the final validation and the settles', async (depth) => {
+      const w = await world(true)
+      const rows = memoryObligations()
+      w.setMain(w.T)
+      w.jj('git', 'push', '--bookmark', 'main')
+      reconstructObligations(rows, [{ card: 'HI-1', cycle: 1, bundle: `b0-${token()}`, target: 'main', result: w.T, at: 1 }])
+      // One log of the change and of every settle asked for, in the order they happened.
+      const log: string[] = []
+      const store = { ...rows, list: rows.list, create: rows.create, settle: (...a: Parameters<typeof rows.settle>) => (log.push('settle'), rows.settle(...a)) }
+      let fenced = 0
+      const change = (): void => {
+        log.push('change')
+        appendFileSync(join(w.store, 'config'), `[Remote "origin"]\n\turl = ${join(resolve(w.repo, '..'), 'different.git').split('\\').join('/')}\n`)
+      }
+      const queue = (n: number): void => queueMicrotask(() => (n <= 1 ? change() : queue(n - 1)))
+      const hook = (p: JjIntegrationPoint): void => {
+        if (p === 'finalFence' && ++fenced === 2) queue(depth)
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      await new Promise((r) => setImmediate(r))
+      expect(fenced).toBe(2)
+      if (depth < 3) {
+        expect(out, JSON.stringify(out)).not.toHaveProperty('settled')
+        expect(log).toEqual(['change'])
+        expect(rows.rows.map((r) => r.state)).toEqual(['owed'])
+      } else expect(log).toEqual(['settle', 'change'])
+    })
+  })
+
   describe('publish: observed, per integration (a local bare remote)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)
