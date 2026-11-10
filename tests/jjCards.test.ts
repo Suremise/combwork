@@ -5,7 +5,8 @@
 //   credited, reviewed and passed;
 // - the submission's refusals: an uncommitted edit, a merge working copy, a change id named, the slot's lease ended or an
 //   operation installed between the plan and the write (nothing written); a jj operation that leaves the slot as it was
-//   meanwhile gathers it again (submitted), a commit in the slot still refuses (HI-2890);
+//   meanwhile gathers it again (submitted), a commit in the slot still refuses, as does another agent's writer; the
+//   builder's own writer leaving gathers it again (HI-2890);
 // - attribution: another card's intermediate commit or its rewrite refused, the card's own rewrite allowed; a claim
 //   committed by another card between the plan and the write refuses the second (the provenance epoch);
 // - restart: the same card in its slot carries its base and work; on another target, refused;
@@ -140,6 +141,34 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       const sub = w.store.facts(card.id).findLast((f) => f.kind === 'Submitted')!
       expect(sub.data).toMatchObject({ revision: w.h.id(a.folder, `${a.identity.workspace}@-`) })
       expect(sub.data).not.toMatchObject({ revision: P })
+    })
+
+    it.each(['submit', 'move'] as const)("%s: the builder's writer leaving the slot between the plan and the write gathers it again; another agent's refuses (HI-2890)", async (how) => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'writer settles')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      const go = () => (how === 'submit' ? w.wf.submit(card.key, B1, { summary: 's' }) : w.wf.move(card.key, 'review', 'user'))
+      // The slot's rows as the stopped builder's session leaves them: its writer's run, still the builder's (held).
+      const WRITER = (run: string) => ({ held: true, print: `lease:open:slot-a:-:-:${run}` })
+      // Another agent's writer meanwhile: not held, refused, nothing written.
+      w.holds.set('L1', WRITER('run-1'))
+      w.wf.cfg.hooks = { beforeWrite: () => void w.holds.set('L1', { held: false, print: 'lease:open:slot-a:-:-:run-other' }) }
+      refusedBy(await go(), 'evidence.changed')
+      expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
+      // The builder's writer cleared as its exit settles (HR2's diagnostic): gathered again, submitted.
+      w.holds.set('L1', WRITER('run-1'))
+      let once = true
+      w.wf.cfg.hooks = {
+        beforeWrite: () => {
+          if (once) w.holds.set('L1', OPEN('slot-a'))
+          once = false
+        }
+      }
+      moved(await go())
+      w.wf.cfg.hooks = undefined
+      expect(once).toBe(false)
+      expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(true)
     })
 
     it("attribution: another card's intermediate commit, or its rewrite, refused; the card's own rewrite allowed", async () => {
