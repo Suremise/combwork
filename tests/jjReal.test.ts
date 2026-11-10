@@ -3,7 +3,7 @@
 // system-wide. Every repository is a throwaway one from tempDir(), with jj's and git's config isolated (a dummy identity,
 // no global config, no remote). The cases: the version, a missing tool, colocated and non-colocated repositories,
 // linked workspaces (one store), nested roots, the output cap and cancellation, and that detection never writes (the
-// .jj folder and the operation log unchanged, a raw edit never snapshotted).
+// .jj folder and the operation log unchanged, a raw edit never snapshotted, two operation heads never merged).
 //
 // Without the fetched jj this file is skipped, saying so; with CW_JJ_REAL=1 (a release's checks) its absence fails.
 import { execFileSync } from 'child_process'
@@ -208,6 +208,31 @@ describe.skipIf(!exe)(`the real jj (${TESTED_JJ.version})`, () => {
     ctxOf(await jjContextOf(root, runner))
     await runner.run(root, ['log', '-r', '@', '--no-graph', '-T', 'commit_id'])
     expect({ tree: treeHash(join(root, '.jj')), op: opId(root) }).toEqual(before)
+  })
+
+  it('two operation heads: detection is unknown and merges nothing (.jj, op heads and Git exactly as they were); one head again, it reads pinned (HI-2831)', async () => {
+    const root = make('two-heads', '--colocate')
+    const headsDir = join(root, '.jj', 'repo', 'op_heads', 'heads')
+    const [op] = readdirSync(headsDir)
+    // Two commands that started from the same operation: two heads, as two agents or an external jj leave them.
+    jj(root, '--ignore-working-copy', 'describe', '-r', '@-', '-m', 'h1')
+    jj(root, '--at-op', op, '--ignore-working-copy', 'describe', '-r', '@-', '-m', 'h2')
+    const heads = readdirSync(headsDir).sort()
+    expect(heads).toHaveLength(2)
+    const before = { jj: treeHash(join(root, '.jj')), git: treeHash(join(root, '.git')) }
+    expect(await jjContextOf(root, runner)).toMatchObject({ unknown: 'opHeads', detail: '2' })
+    expect(readdirSync(headsDir).sort()).toEqual(heads)
+    expect({ jj: treeHash(join(root, '.jj')), git: treeHash(join(root, '.git')) }).toEqual(before)
+    // The premise: an unpinned read that loads the repository merges them (a new single head), which detection never runs.
+    jj(root, '--ignore-working-copy', 'git', 'root')
+    const merged = readdirSync(headsDir)
+    expect(merged).toHaveLength(1)
+    expect(heads).not.toContain(merged[0])
+    // One head: detected, its reads pinned to it, and .jj still exactly as it was.
+    const settled = { jj: treeHash(join(root, '.jj')), git: treeHash(join(root, '.git')) }
+    ctxOf(await jjContextOf(root, runner))
+    expect(readdirSync(headsDir)).toEqual(merged)
+    expect({ jj: treeHash(join(root, '.jj')), git: treeHash(join(root, '.git')) }).toEqual(settled)
   })
 
   it("caps a real jj's output: ended, not an answer", async () => {

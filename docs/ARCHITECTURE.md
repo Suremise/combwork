@@ -332,7 +332,7 @@ ending jj's process tree by identity through `processTree.ts`, which cw-progress
 processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never Git's); only the pinned version is
 trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
 (`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
-with a code). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
+with a code; its jj reads pinned to the one operation head, unknown with several, HI-2831). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
 the pinned jj, `npm run jj:fetch`). J3 (HI-2796; SPEC §16.3.6, jj's history, attribution and evidence) adds jj's side
 of port 3, unregistered too (J6 composes it): `platform/jjView.ts` (the operation heads, a checkout record and colocated
 Git state, read from files, bounded, no process), `jjReads.ts` (reads pinned `--at-op` the single head, used only while
