@@ -3115,9 +3115,11 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
   result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
   proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
-  depends on is undone, its obligation and retained-bundle rows in the same transaction, then Done. Not contained: Git's
-  stale and carry-over rules on the jj head (J3's sameness). Refused or unknown: nothing written, never "not
-  integrated". **Not offered for jj in 1.5.0:** InTarget (Review), MergedInPart (Active) and LeftTarget (Done): each
+  depends on is undone, its obligation and retained-bundle rows in the same transaction, then Done (an Integrated fact
+  recorded while the rules were off is applied once they're on, with no second proof or rows). Not contained: Git's
+  stale and carry-over rules on the jj head (J3's sameness; a sameness that can't be read is unknown, never Stale).
+  Refused or unknown: nothing written, never "not integrated". J5's bundle journal is merged in one write, never
+  replaced, so a concurrent observer's proof never erases the bundle the Integrated fact names (HR1's round 1). **Not offered for jj in 1.5.0:** InTarget (Review), MergedInPart (Active) and LeftTarget (Done): each
   would need a containment decision outside J5's proof; `contains` stays a typed unknown.
 - **The records** (board migration 29, `schema/jjPublishStep.ts`), every key and query scoped by the project's canonical
   id: `jj_obligations` (HI-2873's publish obligations, indexed by target and state and by target and seq),
@@ -3140,10 +3142,10 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   while the follow lives).
 - **The watch** (`jjRepoWatch.ts`, the reconciler's beside the watcher's, by platform): one watch on the operation heads,
   one recursive watch on the store's refs, one on the store's folder for `packed-refs`, one minute's timer that re-arms
-  what is missing and rescans; every jj operation (a slot's commit included) schedules a run; a branch ref's move is its
-  line (a non-colocated store has none until an export: its bookmark moves are operations); a change under a bundle's pins
-  marks that bundle due, `packed-refs` or a re-armed watch marks every bundle due; disposed with the project's follow
-  (which sets its requests' fences first).
+  what is missing and reads the operation heads (nothing more on main: no file loop over refs); every jj operation (a
+  slot's commit included) and every branch ref's change (a raw Git move) schedules a run; a change under a bundle's pins
+  marks that bundle due, `packed-refs` or an armed watch (at the start, an open or reopen, too) marks every bundle due;
+  disposed with the project's follow (which sets its requests' fences first).
 - **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
   unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
   published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,

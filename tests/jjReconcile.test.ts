@@ -102,6 +102,48 @@ describe.skipIf(!jjExe)(`jj cards reconciled to Integrated (jj ${TESTED_JJ.versi
       await Promise.all([new JjPlatform(w.wf).reconcile(card, {}), new JjPlatform(other).reconcile(other.store.card(card.id), {})])
       expect(integrated(w, card.id)).toHaveLength(1)
       expect(rows(w, 'jj_obligations')).toHaveLength(1)
+      // The winner's bundle is still journalled after the loser's proof (HR1's round 1), and its deleted pin is repaired.
+      const bundle = jjIntegratedOf((integrated(w, card.id)[0].data as { platform?: unknown }).platform)!.bundle
+      expect(w.deps.records!.bundles(card.key, w.wf.state(card).cycle).map((b) => b.bundle)).toContain(bundle)
+      const pin = execFileSync('git', ['--git-dir', w.ctx.store, 'for-each-ref', '--format=%(refname)', `refs/cw/jj-integrated/`], { env: w.h.env, encoding: 'utf8' }).split(/\r?\n/).find((r) => r.includes(`/${bundle}/`))!
+      execFileSync('git', ['--git-dir', w.ctx.store, 'update-ref', '-d', pin], { env: w.h.env })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.invalidated('retained:*')
+      await jjp.afterRun()
+      expect(w.refAt(pin)).not.toBeNull()
+    })
+
+    it("sameness that can't be read after a not-contained proof writes nothing (never Stale)", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const { card } = await approved(w)
+      writeFileSync(join(a.folder, 'jjwork.txt'), 'changed\n')
+      w.h.jj(a.folder, 'squash')
+      // The proof reads the target (not contained); then the sameness check can't read it.
+      const integration = w.deps.integration
+      let calls = 0
+      w.deps.integration = async () => (++calls > 1 ? null : integration())
+      const unknowns: string[] = []
+      await new JjPlatform(w.wf).reconcile(card, { unknown: (u) => void unknowns.push(u) })
+      expect(unknowns.some((u) => u.startsWith('sameness'))).toBe(true)
+      expect(w.store.facts(card.id).some((f) => f.kind === 'Stale')).toBe(false)
+      expect(w.wf.state(card).stage).toBe('approved')
+    })
+
+    it('Integrated recorded while the rules were off is applied (Done) once they are on, with no second record', async () => {
+      const w = await world(colocated)
+      const { card, P } = await approved(w)
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+      w.wf.cfg.reconcileActs = false
+      await new JjPlatform(w.wf).reconcile(card, {})
+      expect(integrated(w, card.id)).toHaveLength(1)
+      expect(w.wf.state(card).stage).toBe('approved')
+      w.wf.cfg.reconcileActs = true
+      await new JjPlatform(w.wf).reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      expect(integrated(w, card.id)).toHaveLength(1)
+      expect(rows(w, 'jj_obligations')).toHaveLength(1)
+      expect(rows(w, 'jj_retained')).toHaveLength(1)
     })
 
     it('the approval replaced while the proof was made: nothing recorded', async () => {

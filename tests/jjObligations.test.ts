@@ -12,7 +12,7 @@ import { Worker } from 'worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { memoryObligations, type JjObligation, type RecheckPlan } from '../src/main/platform/jjIntegration'
-import { publishTargets, sqlObligations, type SqlDb } from '../src/main/platform/jjObligations'
+import { dueRetained, markRetainedDue, mergeBundles, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from '../src/main/platform/jjObligations'
 import { commitPublish, folderIdentity, type PublishCommitRequest } from '../src/main/platform/jjPublishCommit'
 import { publishTail, sourcesPrint, type PublishTailInput } from '../src/main/platform/jjPublishTail'
 import { admitted } from './admitted'
@@ -128,6 +128,36 @@ function repoAndTail(file: string, project = 'p1'): { req: PublishCommitRequest;
   return { req: { tail, project, file, identity: { repo: folderIdentity(jjRepo), store: folderIdentity(store) } }, jjRepo }
 }
 
+describe("retention's records and the bundles' journal (HR1's round 1 on HI-2882)", () => {
+  it('reopened with recently checked rows: all marked due, visited a fair page at a time, failures moved to the back', () => {
+    const d = database()
+    const db = d.open() as unknown as SqlDb
+    for (let i = 0; i < 12; i++) recordIntegration(db, 'p1', { card: `AM-${i}`, cycle: 1, bundle: `b1-x${i}aaaa`, target: 'main', result: C1, since: 1000 })
+    for (let i = 0; i < 12; i++) retainedVisited(db, 'p1', { card: `AM-${i}`, cycle: 1, bundle: `b1-x${i}aaaa` }, 1_000_000, 'held')
+    // Checked recently: none due by age.
+    expect(dueRetained(db, 'p1', 1_000_100, 6 * 3600_000, 8)).toEqual({ rows: [], more: false })
+    // Reopened: every row marked due once; the first page of 8 (two of them failing), then the rest.
+    markRetainedDue(db, 'p1', null)
+    const first = dueRetained(db, 'p1', 1_000_100, 6 * 3600_000, 8)
+    expect(first.rows).toHaveLength(8)
+    expect(first.more).toBe(true)
+    first.rows.forEach((r, i) => retainedVisited(db, 'p1', r, 1_000_200, i < 2 ? 'unknown:none' : 'held'))
+    const second = dueRetained(db, 'p1', 1_000_300, 6 * 3600_000, 8)
+    expect(second.rows).toHaveLength(4)
+    expect(second.more).toBe(false)
+    expect(second.rows.some((r) => first.rows.some((x) => x.card === r.card))).toBe(false)
+  })
+
+  it("two observers' journal writes from stale snapshots keep both bundles", () => {
+    const a = { bundle: 'b0-aaaaaa', endpoints: { revision: C1, base: C1, head: C1 }, pins: [{ ref: 'refs/cw/x/a', oid: C1, state: 'created' as const }] }
+    const b = { bundle: 'b0-bbbbbb', endpoints: { revision: C1, base: C1, head: C1 }, pins: [{ ref: 'refs/cw/x/b', oid: C1, state: 'created' as const }] }
+    const journal = mergeBundles(mergeBundles([], [a]), [b])
+    expect(journal.map((x) => x.bundle)).toEqual(['b0-aaaaaa', 'b0-bbbbbb'])
+    // A stale intent never undoes a created pin.
+    expect(mergeBundles(journal, [{ ...a, pins: [{ ...a.pins[0], state: 'intent' }] }])[0].pins[0].state).toBe('created')
+  })
+})
+
 describe('the publish commit (HI-2882/s16, s19, s22)', () => {
   it('commits the tail in one transaction: the same answer as the memory store; settled once', () => {
     const d = database()
@@ -171,6 +201,24 @@ describe('the publish commit (HI-2882/s16, s19, s22)', () => {
     expect(after.getSweep('main')).toBeNull()
     // The other follower's request, after the release: completes and settles.
     expect(commitPublish(d.open(), req, () => false)).toMatchObject({ settled: [{ to: 'published' }] })
+  })
+
+  it("the sources moved between main's decision and the worker's tail (an operation, the target's ref, packed refs, HEAD): moved, nothing written", () => {
+    const d = database()
+    const db = d.open()
+    sqlObligations(db as unknown as SqlDb, 'p1').create(owed('AM-1'))
+    const moves: ((store: string, jjRepo: string) => void)[] = [
+      (_s, j) => writeFileSync(join(j, 'op_heads', 'heads', 'b'.repeat(128)), ''),
+      (s) => writeFileSync(join(s, 'refs', 'heads', 'main'), `${'3'.repeat(40)}\n`),
+      (s) => writeFileSync(join(s, 'packed-refs'), `${'4'.repeat(40)} refs/heads/other\n`),
+      (s) => writeFileSync(join(s, 'HEAD'), 'ref: refs/heads/other\n')
+    ]
+    for (const move of moves) {
+      const { req, jjRepo } = repoAndTail(d.file)
+      move(req.tail.view.store, jjRepo)
+      expect(commitPublish(db, req, () => false)).toMatchObject({ jjUnknown: 'moved' })
+      expect(sqlObligations(d.open() as unknown as SqlDb, 'p1').owed('main')).toHaveLength(1)
+    }
   })
 
   it('cancelled before its commit, its repository replaced, or for another database: rolled back, nothing kept', () => {

@@ -40,6 +40,9 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
       const events: ObserveEvent[] = []
       const rw = jjRepoWatch(repo, (e) => void events.push(e), { watch: f.watch, intervalMs: 0, where })
       expect(rw.open()).toBe(3)
+      // Attached: every retained bundle marked due once (a pin deleted while Combwork was closed is checked, HR1's round 1).
+      expect(events).toEqual([{ kind: 'invalidated', project: repo, what: 'retained:*' }])
+      events.length = 0
       // A slot-only commit: a new operation, no bookmark moved.
       const slot = join(root, 'slot-x')
       h.jj(repo, 'workspace', 'add', '--name', 'slot-x', slot)
@@ -48,13 +51,15 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
       f.fire(join('op_heads', 'heads'), null)
       expect(events.some((e) => e.kind === 'folderMoved')).toBe(true)
       expect(events.some((e) => e.kind === 'lineMoved')).toBe(false)
-      // The bookmark moved by the user: an operation, and (colocated: its Git ref) its line. A non-colocated store holds
-      // no branch refs until an export, so there the operation alone schedules the run.
+      // The bookmark moved by the user: an operation; a branch ref's change (colocated: its Git ref) asks for a run, with
+      // nothing read on main (no line: jj's reconciliation needs none).
       events.length = 0
       h.jj(repo, 'bookmark', 'set', 'main', '-r', h.id(slot, 'slot-x@-'))
       rw.tick()
       expect(events.some((e) => e.kind === 'folderMoved')).toBe(true)
-      if (colocated) expect(events).toContainEqual(expect.objectContaining({ kind: 'lineMoved', line: 'main' }))
+      f.fire('refs', join('heads', 'main'))
+      expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'refs' })
+      expect(events.some((e) => e.kind === 'lineMoved')).toBe(false)
       // A change under a retained bundle's pins: that bundle due. 500 bundles: still three subscriptions.
       events.length = 0
       const head = h.id(repo, 'main')

@@ -518,19 +518,26 @@ export class JjPlatform implements PlatformAdapter {
     await reconcileJj(this.wf, card, hooks, {
       headNow: (_c, s) => this.revisionNow(card, s),
       same: async (_c, s, approved, head) => {
+        // Every read that can't be made (no context, the target refused or unknown, no merge base, a commit unread, the
+        // view moved, the replay unknown) is unknown, never "not the same" (HR1's round 1).
         const integ = await d.integration()
         const ctx = await this.ctxOf(this.wf!.folderOf(s))
         const th = integ && s.started?.target ? await jjTargetHead(integ, s.started.target) : null
-        if (!ctx || !th || isJjUnknown(th) || integrationRefused(th)) return { same: false, base: null }
+        if (!ctx || !th || isJjUnknown(th) || integrationRefused(th)) return { unknown: 'sameness: the target' }
         const b = await this.H.mergeBase(ctx.store, th.head, head)
-        const base = b && !isUnknown(b) ? b : null
-        if (!base) return { same: false, base: null }
+        if (isUnknown(b) || !b) return { unknown: 'sameness: the merge base' }
         const reads = new JjReads({ folder: this.wf!.folderOf(s), jjRepo: ctx.jjRepo }, this.runner())
         const op = reads.head()
-        if (isJjUnknown(op)) return { same: false, base }
+        if (isJjUnknown(op)) return { unknown: 'sameness: the heads' }
         const [a, n] = await Promise.all([reads.commitAt(op, approved.revision), reads.commitAt(op, head)])
-        if (isJjUnknown(a) || isJjUnknown(n) || !reads.stillAt(op)) return { same: false, base }
-        return { same: await jjSameRevision({ base: approved.base, commit: a }, { base, commit: n }, (x, y) => this.H.sameChange(ctx.store, x, y).then((v) => v === true)), base }
+        if (isJjUnknown(a) || isJjUnknown(n) || !reads.stillAt(op)) return { unknown: 'sameness: the commits' }
+        let unread = false
+        const same = await jjSameRevision({ base: approved.base, commit: a }, { base: b, commit: n }, async (x, y) => {
+          const v = await this.H.sameChange(ctx.store, x, y)
+          if (isUnknown(v)) unread = true
+          return v === true
+        })
+        return unread ? { unknown: 'sameness: the replay' } : { same, base: b }
       },
       prove: async (_c, s, approved) => {
         const integ = await d.integration()

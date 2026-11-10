@@ -5,16 +5,17 @@
 // one on the store's folder for `packed-refs` alone, and one minute's timer that re-arms what is missing or closed and
 // rescans. Its events, all scoped to this project's store:
 // - `folderMoved` (the project, its old and new single operation head) for a new operation;
-// - `lineMoved` for each `refs/heads/<name>` whose commit changed (Done cards on that target are looked at). A
-//   non-colocated store holds no branch refs until an export: there a bookmark's move is an operation, `folderMoved`;
+// - `invalidated` `refs` for any branch ref's change (a raw Git move included): a run, with nothing read on main (HR1's
+//   round 1: no file loop there; jj's reconciliation needs no line, its operations and its records say what to do);
 // - `invalidated` `retained:<card>:<cycle>:<bundle>` for a change under that bundle's pins, `retained:*` for packed refs
-//   or a watch re-armed (whatever happened unwatched is checked), and `tick` each minute (the adapter decides whether a
+//   or a watch armed or re-armed, at the start too (whatever happened while unwatched or closed is checked), and `tick`
+//   each minute (the adapter decides whether a
 //   run is due, its retention page).
-// Several operation heads emit nothing until they are one again; the next single head is a change. No process: the
-// rescans read the files.
+// Several operation heads emit nothing until they are one again; the next single head is a change. No process, and on
+// main no more than the operation heads' folder is read.
 
-import { existsSync, readdirSync, readFileSync, watch as fsWatch } from 'original-fs'
-import { join, relative, sep } from 'path'
+import { existsSync, watch as fsWatch } from 'original-fs'
+import { join } from 'path'
 import type { Disposable, ObserveEvent } from './history'
 import { jjContextOf } from './jjDetect'
 import { singleHead } from './jjView'
@@ -48,51 +49,12 @@ const defaultWatch: WatchFn = (dir, opts, fn) => {
   return w
 }
 
-/** The store's branch heads from its files: loose refs under refs/heads, then packed ones not shadowed. */
-export function headsFromFiles(store: string): Map<string, string> {
-  const out = new Map<string, string>()
-  const packed = (() => {
-    try {
-      return readFileSync(join(store, 'packed-refs'), 'utf8')
-    } catch {
-      return ''
-    }
-  })()
-  for (const l of packed.split(/\r?\n/)) {
-    const m = /^([0-9a-f]{40}) refs\/heads\/(.+)$/.exec(l.trim())
-    if (m) out.set(m[2], m[1])
-  }
-  const walk = (dir: string): void => {
-    let entries: import('original-fs').Dirent[]
-    try {
-      entries = readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const e of entries) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.isFile()) {
-        try {
-          const v = readFileSync(p, 'utf8').trim()
-          if (/^[0-9a-f]{40}$/.test(v)) out.set(relative(join(store, 'refs', 'heads'), p).split(sep).join('/'), v)
-        } catch {
-          // gone meanwhile: the next rescan reads it
-        }
-      }
-    }
-  }
-  walk(join(store, 'refs', 'heads'))
-  return out
-}
-
 /** Watches a jj project's repository (see the module's comment). */
 export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void, o: JjRepoWatchOptions = {}): JjRepoWatch {
   const watch = o.watch ?? defaultWatch
   let closed = false
   let where = o.where ?? null
   let head: string | null = null
-  let heads = new Map<string, string>()
   const subs = new Map<'ops' | 'refs' | 'store', WatchHandle>()
   const emit = (e: ObserveEvent): void => {
     if (!closed) onChange(e)
@@ -107,21 +69,11 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
     head = now
     emit({ kind: 'folderMoved', project, folder: project, from, to: now })
   }
-  const readHeads = (): void => {
-    if (!where) return
-    const now = headsFromFiles(where.store)
-    for (const name of new Set([...heads.keys(), ...now.keys()])) {
-      const a = heads.get(name) ?? null
-      const b = now.get(name) ?? null
-      if (a !== b) emit({ kind: 'lineMoved', project, line: name, from: a, to: b })
-    }
-    heads = now
-  }
   const onRef = (file: string | null): void => {
     const f = (file ?? '').split(/[\\/]/).join('/')
     const m = /^cw\/jj-integrated\/([^/]+)\/(\d+)\/([^/]+)\//.exec(f)
     if (m) invalidate(`retained:${m[1]}:${m[2]}:${m[3]}`)
-    if (!f || f.startsWith('heads/') || f === 'heads') readHeads()
+    if (!f || f.startsWith('heads/') || f === 'heads') invalidate('refs')
   }
   /** Opens what is missing (or closed), its folder there; a re-arm marks every retained bundle due once. */
   const arm = (): void => {
@@ -132,7 +84,7 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
       ['store', where.store, false, (f) => {
         if (f === 'packed-refs' || f === null) {
           invalidate('retained:*')
-          readHeads()
+          invalidate('refs')
         }
       }]
     ]
@@ -152,22 +104,19 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
         // not now: the next tick tries again
       }
     }
-    if (rearmed && started) invalidate('retained:*')
+    if (rearmed) invalidate('retained:*')
   }
-  let started = false
   const tick = (): void => {
     if (closed) return
     arm()
     readHead()
-    readHeads()
     invalidate('tick')
   }
   const begin = (): void => {
     if (closed || !where) return
     head = singleHead(where.jjRepo)
-    heads = headsFromFiles(where.store)
+    // Attached (an open, a reopen): its watches armed, which marks every retained bundle due once.
     arm()
-    started = true
   }
   if (where) begin()
   else

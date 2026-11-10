@@ -483,7 +483,8 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
  */
 export interface JjReconcilePorts {
   headNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
-  same(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }, head: string): Promise<{ same: boolean; base: string | null }>
+  /** Unknown (a read that couldn't be made, a view that moved): never taken for "not the same" (HR1's round 1). */
+  same(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }, head: string): Promise<{ same: boolean; base: string | null } | { unknown: string }>
   prove(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved>
   /** The rows an Integrated fact's transaction writes beside it (its obligation and retained bundle). */
   record(w: Write, row: { card: string; cycle: number; bundle: string; target: string; result: string; since: number }): void
@@ -550,6 +551,12 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
   card = wf.store.card(card.id)
   s = wf.state(card)
   if (card.stage !== 'approved') return
+  // Integrated already recorded this cycle (the rules off then, or another Combwork's): its effects applied once the rules
+  // act, with no new proof or rows (HR1's round 1), as Git's integration does.
+  if (s.integrated) {
+    if (wf.cfg.reconcileActs) await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && !!w.state().integrated && w.current !== 'done' && !wf.closeWaitsFor(w).length && void w.move('done', 'derived'))
+    return
+  }
   const snap = approvalOf(card, s)
   if (!snap) return
   const approved = { base: snap.base, revision: snap.revision, key: snap.key }
@@ -589,7 +596,9 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
   }
   if (s.head && s.head !== approved.revision && !s.stale) {
     const head = s.head
-    const { same, base } = o.sameness === 'change' ? await ports.same(card, s, approved, head) : { same: false, base: null }
+    const sm = o.sameness === 'change' ? await ports.same(card, s, approved, head) : { same: false, base: null }
+    if ('unknown' in sm) return hooks.unknown?.(sm.unknown)
+    const { same, base } = sm
     await wf.write(card, r, 'combwork', (w) => {
       if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
       if (same && base) {

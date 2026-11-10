@@ -7,7 +7,7 @@
 // answer whether it changed (a single row's `changes`); owed rows read whole (never truncated), settled history only
 // through `recheckPage`'s indexed, limited page.
 
-import type { JjObligation, ObligationKey, ObligationStore, PublishCheck, PublishSeen, RecheckSweep } from './jjIntegration'
+import type { JjBundle, JjObligation, ObligationKey, ObligationStore, PublishCheck, PublishSeen, RecheckSweep } from './jjIntegration'
 
 /** The SQL a store needs of a connection (node:sqlite's DatabaseSync, or the board's own). */
 export interface SqlDb {
@@ -102,13 +102,13 @@ export interface RetainedRow {
  * or older than `every`), oldest first, at most `limit`, from the index; and whether more are due after them.
  */
 export function dueRetained(db: SqlDb, project: string, now: number, every: number, limit: number): { rows: RetainedRow[]; more: boolean } {
-  const rows = db.prepare('SELECT card, cycle, bundle, checked_at AS checkedAt, outcome FROM jj_retained WHERE project = ? AND checked_at <= ? ORDER BY checked_at, card, cycle, bundle LIMIT ?').all(project, now - every, limit + 1) as RetainedRow[] // i18n-ignore: SQL
+  const rows = db.prepare('SELECT card, cycle, bundle, checked_at AS checkedAt, outcome FROM jj_retained WHERE project = ? AND (checked_at = 0 OR checked_at <= ?) ORDER BY checked_at, card, cycle, bundle LIMIT ?').all(project, now - every, limit + 1) as RetainedRow[] // i18n-ignore: SQL
   return { rows: rows.slice(0, limit), more: rows.length > limit }
 }
 
 /** Whether any of the project's retained rows is due (one indexed read: the minute tick's). */
 export function anyRetainedDue(db: SqlDb, project: string, now: number, every: number): boolean {
-  return !!db.prepare('SELECT 1 AS one FROM jj_retained WHERE project = ? AND checked_at <= ? LIMIT 1').get(project, now - every) // i18n-ignore: SQL
+  return !!db.prepare('SELECT 1 AS one FROM jj_retained WHERE project = ? AND (checked_at = 0 OR checked_at <= ?) LIMIT 1').get(project, now - every) // i18n-ignore: SQL
 }
 
 /** A visit recorded, whatever its outcome: the row to the back (`checked_at` now), its outcome kept for the window. */
@@ -120,4 +120,27 @@ export function retainedVisited(db: SqlDb, project: string, r: { card: string; c
 export function markRetainedDue(db: SqlDb, project: string, r: { card: string; cycle: number; bundle: string } | null): void {
   if (r) db.prepare('UPDATE jj_retained SET checked_at = 0 WHERE project = ? AND card = ? AND cycle = ? AND bundle = ?').run(project, r.card, r.cycle, r.bundle) // i18n-ignore: SQL
   else db.prepare('UPDATE jj_retained SET checked_at = 0 WHERE project = ?').run(project) // i18n-ignore: SQL
+}
+
+/**
+ * A card and cycle's journalled bundles merged with a newer write (HR1's round 1): each bundle kept by its id, a bundle
+ * another observer journalled never erased by a write made from an older snapshot; for one id, its pins merged by ref,
+ * the incoming state taken unless it is only an `intent` the stored one has gone past. Run inside the journal's write.
+ */
+export function mergeBundles(stored: readonly JjBundle[], incoming: readonly JjBundle[]): JjBundle[] {
+  const out = new Map<string, JjBundle>(stored.map((b) => [b.bundle, structuredClone(b)]))
+  for (const b of incoming) {
+    const had = out.get(b.bundle)
+    if (!had) {
+      out.set(b.bundle, structuredClone(b))
+      continue
+    }
+    const pins = new Map(had.pins.map((p) => [p.ref, p]))
+    for (const p of b.pins) {
+      const old = pins.get(p.ref)
+      pins.set(p.ref, old && p.state === 'intent' && old.state !== 'intent' ? old : { ...p })
+    }
+    out.set(b.bundle, { ...had, endpoints: { ...b.endpoints }, pins: [...pins.values()] })
+  }
+  return [...out.values()]
 }

@@ -21,7 +21,7 @@ import type { JjBundle, JjIntegrationDeps } from './platform/jjIntegration'
 import { boardConn, jjPort, storeLock } from './slotsApp'
 import { boardFile } from './boardStore'
 import { commitPublishOff } from './jjPublish'
-import type { SqlDb } from './platform/jjObligations'
+import { mergeBundles, type SqlDb } from './platform/jjObligations'
 import { SlotStore } from './slots'
 import type { WorkspaceService } from './workspace'
 
@@ -47,7 +47,21 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         git: (args) => gitOn(ctx.store, args),
         gitContains: (store, target, c, at) => historyFor('git').contains(store, target, c, at),
         lock: (fn) => storeLock(ctx.store, fn),
-        journal: (card: string, cycle: number, bundles: JjBundle[]) => journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).write(bundles)
+        // Merged in one write with what is journalled (HR1's round 1): an observer's older snapshot never erases a bundle
+        // another observer's proof journalled.
+        journal: (card: string, cycle: number, bundles: JjBundle[]) =>
+          boardConn(ws).write((db) => {
+            const key = `jj_bundles:${card.toLowerCase()}:${cycle}`
+            const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+            let stored: JjBundle[] = []
+            try {
+              const v = r ? (JSON.parse(r.value) as unknown) : []
+              stored = Array.isArray(v) ? (v as JjBundle[]) : []
+            } catch {
+              stored = []
+            }
+            db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(mergeBundles(stored, bundles))) // i18n-ignore: SQL
+          })
       }
     },
     slotHold: (lease, expect) => {

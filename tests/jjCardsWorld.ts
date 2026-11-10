@@ -14,7 +14,7 @@ import { gitHistory } from '../src/main/platform/gitHistory'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import type { JjCardDeps, JjPinRecord } from '../src/main/platform/jjPlatform'
 import type { JjBundle, JjIntegrationPoint } from '../src/main/platform/jjIntegration'
-import type { SqlDb } from '../src/main/platform/jjObligations'
+import { mergeBundles, type SqlDb } from '../src/main/platform/jjObligations'
 import { boardPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { commitPublishOff } from '../src/main/jjPublish'
@@ -89,7 +89,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
     lock: () => (fn) => fn(),
     git: gitOn,
     history: gitHistory,
-    integration: async () => ({ runner: h.runner, view: { jjRepo: ctx.jj.jjRepo, store: ctx.jj.store, colocated: ctx.jj.colocated }, folder: repo, git: (args) => gitOn(ctx.jj.store, args), gitContains: (s, t, c, at) => gitHistory.contains(s, t, c, at), lock: (fn) => fn(), journal: (card, cycle, b) => void bundles.set(`${card}:${cycle}`, structuredClone(b)), ...(o.hook ? { hook: o.hook } : {}) }),
+    integration: async () => ({ runner: h.runner, view: { jjRepo: ctx.jj.jjRepo, store: ctx.jj.store, colocated: ctx.jj.colocated }, folder: repo, git: (args) => gitOn(ctx.jj.store, args), gitContains: (s, t, c, at) => gitHistory.contains(s, t, c, at), lock: (fn) => fn(), journal: (card, cycle, b) => void bundles.set(`${card}:${cycle}`, mergeBundles(bundles.get(`${card}:${cycle}`) ?? [], b)), ...(o.hook ? { hook: o.hook } : {}) }),
     records: {
       projectId: () => 'p-jj',
       dbFile: () => boardFile(home),
