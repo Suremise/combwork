@@ -72,7 +72,7 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
-import { endOwnedWork } from './platform/ownedWork'
+import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
 import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
@@ -776,6 +776,9 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await sessions.writersSettled(3000)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
+  // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
+  // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
+  await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
   // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
   // with its job (kill on close) as Combwork exits.
   await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
@@ -1443,7 +1446,8 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
-  void endOwnedWork(() => true)
+  // The fallback when the quit couldn't wait (an updater's install, a crash's quit): synchronous, best effort.
+  endOwnedWorkNow()
   stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()

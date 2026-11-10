@@ -14,8 +14,9 @@ import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'path'
 import { git } from '../git'
 import { gitExe } from '../gitTool'
 import { withLauncherEnv } from '../gitWorker'
-import { boundedSpawn, endBoundedSpawns } from './boundedSpawn'
-import { onOwnerGone } from './ownedWork'
+import { rmSync } from 'original-fs'
+import { boundedSpawn, endBoundedSpawns, endBoundedSpawnsNow } from './boundedSpawn'
+import { onOwnerGone, ownedWorkStopped } from './ownedWork'
 import type { QueueGitResult } from './integration'
 import { agentMsg, say } from '../../shared/agentText'
 import type { GitScope, ScopedValue, SigningInfo, SigningStatus } from '../../shared/gitSigning'
@@ -231,6 +232,7 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
       return { ...withProgram, status: { kind: 'cantSign', message: say(T.noSshKey) } }
     }
     dir = await mkdtemp(join(tmpdir(), 'combwork-sign-'))
+    liveDirs.add(dir)
     if (key.value.startsWith('key::')) {
       file = join(dir, 'key.pub')
       await writeFile(file, `${key.value.slice(5).trim()}\n`)
@@ -252,9 +254,15 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
     live()
     return { ...withProgram, status: signerSaid('ssh', r) }
   } finally {
-    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+    if (dir) {
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      liveDirs.delete(dir)
+    }
   }
 }
+
+/** The checks' temp folders still there: a shutdown that can't wait removes them (endSigningNow). */
+const liveDirs = new Set<string>()
 
 // ---- The Git view's checks (Branches & remotes), HR1's HI-1185 round 1: each tracked from its admission (its settings
 // read included) to its end, so an owner closing or removed gives it up wherever it is, and nothing of it starts after.
@@ -269,6 +277,8 @@ const VIEW_CHECK_MS = 60_000
 interface Admitted {
   owner: string
   abort: AbortController
+  /** The whole operation, queued turn included, settled however it ends: what a close waits for. */
+  settled: Promise<void>
 }
 interface Running extends Admitted {
   gen: number
@@ -322,18 +332,28 @@ function viewDeps(root: string, signal: AbortSignal): SignDeps {
  * signer a bounded spawn owned by the folder. Rejects with SigningCancelled when its owner closes or is removed meanwhile.
  */
 export function viewSigning(root: string, force = false): Promise<SigningInfo> {
+  // Refused while Combwork quits or its owner is being closed (HR1's round 2): an IPC already on its way recreates nothing.
+  if (ownedWorkStopped() || [...closing].some((owner) => owner(root))) return Promise.reject(new SigningCancelled())
   const key = root.toLowerCase()
+  // Owned from this call, before its turn (HR1's round 2): a close finds it queued too, and waits for it.
+  const me: Admitted = { owner: root, abort: new AbortController(), settled: Promise.resolve() }
+  admitted.add(me)
   // The admission returns its check wrapped, so this turn ends once it is admitted, not once it has signed.
-  return inTurn(key, () => admit(root, key, force)).then((a) => a.check)
+  const check = inTurn(key, () => admit(root, key, force, me)).then((a) => a.check)
+  me.settled = check.then(
+    () => undefined,
+    () => undefined
+  )
+  return check
 }
 
-async function admit(root: string, key: string, force: boolean): Promise<{ check: Promise<SigningInfo> }> {
+async function admit(root: string, key: string, force: boolean, me: Admitted): Promise<{ check: Promise<SigningInfo> }> {
   const now = clock()
   for (const [k, r] of results) if (now - r.at >= VIEW_CHECK_MS) results.delete(k)
-  const me: Admitted = { owner: root, abort: new AbortController() }
-  admitted.add(me)
   let handedOn = false
   try {
+    // Given up while it waited its turn.
+    if (me.abort.signal.aborted) throw new SigningCancelled()
     const d = viewDeps(root, me.abort.signal)
     // The settings a check depends on, read each time (cheap): a change to them is checked at once, never a minute late.
     const read = await d.git(root, ['config', '--show-scope', '--get-regexp', '^(commit\\.gpgsign|gpg\\..*|user\\.(signingkey|name|email))$'])
@@ -375,16 +395,44 @@ async function admit(root: string, key: string, force: boolean): Promise<{ check
  * has ended and its signer and temp folder are gone.
  */
 export async function cancelSigningChecks(owner: (root: string) => boolean): Promise<void> {
-  const waits: Promise<unknown>[] = []
-  for (const a of admitted) if (owner(a.owner)) a.abort.abort()
-  for (const r of running.values()) if (owner(r.owner)) waits.push(r.done.catch(() => undefined))
-  for (const [k, r] of results) if (owner(r.owner)) results.delete(k)
-  await Promise.all(waits)
-  await endBoundedSpawns((o) => !!o && owner(o))
+  // No new admission for these owners while they close (HR1's round 2).
+  closing.add(owner)
+  try {
+    const waits: Promise<unknown>[] = []
+    // Every operation of theirs, queued, reading or signing: aborted, and waited for to its end.
+    for (const a of admitted) {
+      if (!owner(a.owner)) continue
+      a.abort.abort()
+      waits.push(a.settled)
+    }
+    for (const r of running.values()) if (owner(r.owner)) waits.push(r.done.catch(() => undefined))
+    for (const [k, r] of results) if (owner(r.owner)) results.delete(k)
+    await Promise.all(waits)
+    await endBoundedSpawns((o) => !!o && owner(o))
+    for (const [k, r] of results) if (owner(r.owner)) results.delete(k)
+  } finally {
+    closing.delete(owner)
+  }
+}
+
+/** The owners being closed now: refused new admissions until their close has ended. */
+const closing = new Set<(root: string) => boolean>()
+
+/** A shutdown that can't wait (will-quit): every check aborted, its signer's process ended, its temp folder removed. */
+function endSigningNow(): void {
+  for (const a of admitted) a.abort.abort()
+  endBoundedSpawnsNow()
+  for (const dir of liveDirs) {
+    try {
+      rmSync(dir, { recursive: true, force: true })
+    } catch {
+      // best effort, as the process exits
+    }
+  }
 }
 
 // Ended with their owner, through the platform-neutral registry (the app never imports this module for it).
-onOwnerGone(cancelSigningChecks)
+onOwnerGone(cancelSigningChecks, endSigningNow)
 
 /** For tests: how many view checks are admitted, in flight and kept now. */
 export const viewSigningCounts = (): { admitted: number; running: number; results: number; turns: number } => ({ admitted: admitted.size, running: running.size, results: results.size, turns: turns.size })

@@ -77,6 +77,17 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
   })
 }
 
+/** A shutdown that can't wait (will-quit): each live run's own process ended at once, synchronously (best effort). */
+export function endBoundedSpawnsNow(): void {
+  for (const child of live.keys()) {
+    try {
+      child.kill()
+    } catch {
+      // already gone
+    }
+  }
+}
+
 /** Ends the live bounded runs (of one owner, or all) and waits until each is gone: a workspace closing, Combwork quitting. */
 export async function endBoundedSpawns(owner?: (o: string) => boolean): Promise<void> {
   const ending: Promise<void>[] = []

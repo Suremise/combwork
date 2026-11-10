@@ -5214,10 +5214,14 @@ optional `signing` (jj has none, so nothing is shown).
 **The view's checks, their lifecycle** (HR1's round 1):
 - **Nothing blocks the main thread:** program lookup, the key file's start (at most 4 KB), the temp folder and the
   signer's tree all go through asynchronous calls (`endTreeAsync`, never `spawnSync`).
-- **Each check is tracked from its admission**, its settings read included, by owner (the folder). A workspace closing,
-  a project removed or Combwork quitting gives it up wherever it is (`platform/ownedWork.ts`, platform-neutral: the app
-  imports no platform's module for it). A check still reading starts nothing after; one signing has its signer ended.
-  The close waits until each has ended and its signer and temp folder are gone.
+- **Each check is owned from the call that asks for it**, before it waits its turn, by owner (the folder). A workspace
+  closing, a project removed or Combwork quitting gives it up wherever it is, queued, reading or signing
+  (`platform/ownedWork.ts`, platform-neutral: the app imports no platform's module for it). One still queued or reading
+  starts nothing after; one signing has its signer ended. The close waits until each has ended and its signer and temp
+  folder are gone, and refuses new checks for that owner while it runs (HR1's round 2).
+- **Quitting** awaits it in the quit sequence, before the app exits, installs or relaunches, and admits no new check
+  from then on; will-quit keeps a synchronous fallback (each signer's process ended, its temp folder removed) for a
+  shutdown that can't wait.
 - **One in flight per folder**, admissions in turn: a look with the same settings joins it (Check again included);
   changed settings cancel it and wait for it before starting anew; Check again with nothing in flight starts a fresh check.
 - **A finished check is kept apart** from what is in flight: written only by its own generation, reused for a minute

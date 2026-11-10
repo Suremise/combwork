@@ -2,7 +2,7 @@
 // temporary repositories for the queue's paths (each commit made is verified); an injected spawn for how the command is
 // built (the test-only eligibility seam), never a real agent or a user's key.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { existsSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 import { B1, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
@@ -11,7 +11,7 @@ import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import type { QueueConfig, QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { cancelSigningChecks, checkSigning, knownInstallation, resolveProgram, SigningCancelled, signerSaid, signingTestHooks, viewSigningCounts, viewSigningTestHooks, viewSigning, type SignDeps } from '../../src/main/platform/gitSigning'
 import { boundedSpawn, endBoundedSpawns } from '../../src/main/platform/boundedSpawn'
-import { endOwnedWork } from '../../src/main/platform/ownedWork'
+import { endAllOwnedWork, endOwnedWork, onOwnerGone, resetOwnedWorkForTests } from '../../src/main/platform/ownedWork'
 import { gitExe } from '../../src/main/gitTool'
 import { withLauncherEnv } from '../../src/main/gitWorker'
 import { git } from '../../src/main/git'
@@ -49,7 +49,7 @@ function signing(key: { key: string; pub: string }, o: Partial<WorkflowOptions> 
   const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [], ...o }))
   sh(e.project, 'checkout', '-q', '--detach')
   const allowed = slash(join(tempDir('allowed-'), 'allowed_signers'))
-  writeFileSync(allowed, `* ${require('fs').readFileSync(key.pub, 'utf8').trim()}\n`)
+  writeFileSync(allowed, `* ${readFileSync(key.pub, 'utf8').trim()}\n`)
   sh(e.project, 'config', 'gpg.format', 'ssh')
   sh(e.project, 'config', 'user.signingkey', key.key)
   sh(e.project, 'config', 'gpg.ssh.allowedSignersFile', allowed)
@@ -134,7 +134,7 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
     // Unlocked (a key with no passphrase now): the update and the merge both signed.
     const open = keyPair()
     sh(e.project, 'config', 'user.signingkey', open.key)
-    writeFileSync(sh(e.project, 'config', 'gpg.ssh.allowedSignersFile'), `* ${require('fs').readFileSync(open.pub, 'utf8').trim()}\n`)
+    writeFileSync(sh(e.project, 'config', 'gpg.ssh.allowedSignersFile'), `* ${readFileSync(open.pub, 'utf8').trim()}\n`)
     e.queue().resume('main')
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toContain('integrated')
     expect(verified(e, 'main')).toBe(true)
@@ -155,7 +155,7 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
     const open = keyPair()
     sh(e.project, 'config', 'user.signingkey', open.key)
-    writeFileSync(sh(e.project, 'config', 'gpg.ssh.allowedSignersFile'), `* ${require('fs').readFileSync(open.pub, 'utf8').trim()}\n`)
+    writeFileSync(sh(e.project, 'config', 'gpg.ssh.allowedSignersFile'), `* ${readFileSync(open.pub, 'utf8').trim()}\n`)
     e.queue().resume('main')
     expect((await e.queue(cfg).drain('main')).map((o) => o.outcome)).toContain('integrated')
     expect(verified(e, 'main')).toBe(true)
@@ -373,6 +373,60 @@ describe('the signing check (HI-1185)', () => {
       await expect(check).rejects.toBeInstanceOf(SigningCancelled)
       expect(runs).toHaveLength(0)
       expect(viewSigningCounts()).toMatchObject({ admitted: 0, running: 0, results: 0 })
+    })
+
+    it('a close while a read is held and two more wait their turn: all three given up, none starts a signer, and a new one is refused while it closes', async () => {
+      const { r, runs } = held()
+      let releaseRead: () => void = () => undefined
+      const gate = new Promise<void>((res) => (releaseRead = res))
+      const realGit = viewSigningTestHooks.deps
+      viewSigningTestHooks.deps = (root) => ({
+        ...realGit?.(root),
+        git: async (cwd, args) => {
+          await gate
+          const x = await git(cwd, args)
+          return { ok: x.ok, out: x.out, err: x.err, code: x.code }
+        }
+      })
+      const outcome = (p: Promise<unknown>): Promise<unknown> => p.then((v) => v, (e: unknown) => e)
+      const first = outcome(viewSigning(r))
+      const second = outcome(viewSigning(r))
+      const third = outcome(viewSigning(r, true))
+      await until(() => viewSigningCounts().admitted === 3, HUNG_MS)
+      const closed = cancelSigningChecks((o) => o === r)
+      // An IPC already on its way while the owner closes: refused, nothing recreated.
+      expect(await outcome(viewSigning(r))).toBeInstanceOf(SigningCancelled)
+      releaseRead()
+      await closed
+      for (const p of [first, second, third]) expect(await p).toBeInstanceOf(SigningCancelled)
+      expect(runs).toHaveLength(0)
+      expect(viewSigningCounts()).toEqual({ admitted: 0, running: 0, results: 0, turns: 0 })
+    })
+
+    it('quitting waits for the owned work to end (a held ender), and admits no new check after', async () => {
+      const { r } = held()
+      let releaseEnder: () => void = () => undefined
+      let armed = true
+      onOwnerGone(() => (armed ? new Promise<void>((res) => (releaseEnder = res)) : Promise.resolve()))
+      let quit = false
+      const quitting = endAllOwnedWork().then(() => (quit = true))
+      await until(() => viewSigningCounts().turns === 0, HUNG_MS)
+      expect(quit).toBe(false)
+      expect(await viewSigning(r).then((v) => v, (e: unknown) => e)).toBeInstanceOf(SigningCancelled)
+      releaseEnder()
+      await quitting
+      expect(quit).toBe(true)
+      armed = false
+      resetOwnedWorkForTests()
+    })
+
+    it('the quit sequence awaits it before the app exits, and will-quit keeps the synchronous fallback', () => {
+      const index = readFileSync(join(process.cwd(), 'src', 'main', 'index.ts'), 'utf8')
+      const quitNow = index.slice(index.indexOf('async function quitNow('), index.indexOf('async function quitLeftovers('))
+      const ends = quitNow.indexOf('await endAllOwnedWork()')
+      expect(ends).toBeGreaterThan(0)
+      for (const exit of ['installNow(', "exitBy('app.quit'"]) expect(quitNow.indexOf(exit)).toBeGreaterThan(ends)
+      expect(index.slice(index.indexOf("app.on('will-quit'"))).toContain('endOwnedWorkNow()')
     })
 
     it('its owner disposed while it signs: the signer ended, the check rejected, nothing kept', async () => {
