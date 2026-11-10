@@ -198,7 +198,7 @@ function jjRepo(dir, o = {}) {
     const gated = dialog.filter({ has: page.locator('[data-vc-store-gates]') })
     check('notes: refused, attributes used (.gitattributes eol)', !!(await until(async () => (await gated.locator('[data-gate="attributes"][data-gate-state="uses"]').count()) === 1 && /eol=lf/.test(await text(gated)))), await text(dialog))
     await shoot(gated, 'gates')
-    await gated.getByRole('button', { name: 'Close' }).click()
+    await gated.getByRole('button', { name: 'Close', exact: true }).click()
     check('…and notes stays Git', JSON.parse(fs.readFileSync(path.join(notes, '.combwork', 'project.json'), 'utf8')).platform === 'git')
 
     // --- A jj repository without colocated Git: jj greyed out, its reason in the tooltip.
