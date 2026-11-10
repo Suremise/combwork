@@ -951,7 +951,7 @@ $r | ConvertTo-Json -Compress -Depth 4
 describe.runIf(process.platform === 'win32')("how many members a job's listing counts (HI-2858)", () => {
   const dir = tempDir('cw-counted-')
 
-  it('leaves out a member gone before it was described, and keeps one that runs, or past those described', async () => {
+  it('leaves out a member gone before it was described, and keeps one that runs, what it started, or past those described', async () => {
     const { HOST_SOURCE } = await import('../src/main/agentProcesses')
     const src = join(dir, 'host.cs')
     writeFileSync(src, HOST_SOURCE)
@@ -961,28 +961,35 @@ describe.runIf(process.platform === 'win32')("how many members a job's listing c
       `param($src)
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
-# A case: the job's members, how many were asked to be described, those described, and those gone by then.
-function Count($all, $max, $described, $gone) {
-  $d = New-Object 'System.Collections.Generic.HashSet[int]'
-  foreach ($x in $described) { [void]$d.Add([int]$x) }
-  $isGone = [Func[int,bool]]{ param($id) $gone -contains $id }
-  [CombworkJobs]::Counted([int[]]$all, $max, $d, $isGone)
+# A case: the membership described (before), how many were asked about, those described, those asked about and not
+# described that had gone (departed), the membership read after that (now), and the ids gone at the last look (goneNow).
+function IdSet($xs) { $s = New-Object 'System.Collections.Generic.HashSet[int]'; foreach ($x in $xs) { [void]$s.Add([int]$x) }; ,$s }
+function Count($before, $max, $described, $departed, $now, $goneNow) {
+  $isGone = [Func[int,bool]]{ param($id) $goneNow -contains $id }
+  [CombworkJobs]::Counted([int[]]$before, $max, (IdSet $described), (IdSet $departed), [int[]]$now, $isGone)
 }
 $r = [ordered]@{}
-# The CI case: the CLI's tree just ended, one member listed that had gone by its description.
-$r.goneMember = Count @(10) 10 @() @(10)
+# The CI case: the CLI's tree just ended, one member listed that had gone by its description and has left the job.
+$r.goneMember = Count @(10) 10 @() @(10) @() @()
+# The same, the job still listing the exited member at the second look: still gone, not counted.
+$r.stillListed = Count @(10) 10 @() @(10) @(10) @(10)
+# HR1's case: a member starts a child after the first look, then exits before it is described. The child is a member by
+# the second look: the job isn't told empty.
+$r.childOfDeparted = Count @(10) 10 @() @(10) @(20) @()
+# A departed id the job lists again, running now (a later process got it and joined): it counts.
+$r.idTakenAgain = Count @(10) 10 @() @(10) @(10) @()
 # Two described, one not described that still runs (it can't be told from the description alone): it counts.
-$r.notDescribedRuns = Count @(10, 20, 30) 10 @(10, 20) @()
-# Gone and described both: one described counts whatever the look after says.
-$r.describedGone = Count @(10, 20) 10 @(10, 20) @(10)
-# Past those asked to be described: counted, not looked at.
-$r.pastMax = Count @(10, 20, 30) 2 @(10) @(20, 30)
+$r.notDescribedRuns = Count @(10, 20, 30) 10 @(10, 20) @() @(10, 20, 30) @()
+# Described members count whatever the second look says, gone from it or not.
+$r.describedLeft = Count @(10, 20) 10 @(10, 20) @() @(20) @(10)
+# Past those asked about: counted, not looked at; the departed one asked about is not.
+$r.pastMax = Count @(10, 20, 30) 2 @(10) @(20) @(10, 20, 30) @(20, 30)
 $r | ConvertTo-Json -Compress
 `
     )
     const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: 120000 })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as Record<string, number>
-    expect(r).toEqual({ goneMember: 0, notDescribedRuns: 3, describedGone: 2, pastMax: 2 })
+    expect(r).toEqual({ goneMember: 0, stillListed: 0, childOfDeparted: 1, idTakenAgain: 1, notDescribedRuns: 3, describedLeft: 2, pastMax: 2 })
   }, 120000)
 })
 

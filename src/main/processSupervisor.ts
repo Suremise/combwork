@@ -1116,17 +1116,31 @@ public static class CombworkJobs {
           first = false;
         }
     }
-    return "{\"total\":" + Counted(all, max, described, Gone) + ",\"adopted\":" + took + ",\"processes\":[" + b.Append("]}").ToString();
+    // Those asked about and not described that have gone, and only then the membership again: whatever a departed member
+    // started before it exited joined the job before this second look (HR1's round 1).
+    var departed = new HashSet<int>();
+    for (int i = 0; i < all.Length && i < max; i++) if (!described.Contains(all[i]) && Gone(all[i])) departed.Add(all[i]);
+    int[] now = departed.Count > 0 ? Members(id) : all;
+    return "{\"total\":" + Counted(all, max, described, departed, now, Gone) + ",\"adopted\":" + took + ",\"processes\":[" + b.Append("]}").ToString();
   }
   /**
-   * How many of a job's members (all, the first max of them asked to be described) Describe counts (HI-2858): each one
-   * described, and one not described unless it has gone by then. A member that exits between the job's list and its
-   * description (a console host, a CLI just ended) is no longer one: counted, it would hold its launch with nothing
-   * running in it. One not described that still runs, or can't be told, still counts; those past max aren't looked at.
+   * How many members a job's listing counts (HI-2858). before: the membership it described (the first max asked about),
+   * departed: those asked about, not described, that had gone by then; now: the membership read after that. A member
+   * that exits between the job's list and its description (a console host, a CLI just ended) is no longer one: counted,
+   * it would hold its launch with nothing running in it. Everything else counts, so a job is never told empty while
+   * something may run in it: each described, each still running or that can't be told, those past max (not looked at),
+   * each member new by the second look (what a departed one started before it exited), and a departed id the job still
+   * lists unless it is still gone (goneNow): a later process may have its id.
    */
-  public static int Counted(int[] all, int max, HashSet<int> described, Func<int, bool> gone) {
+  public static int Counted(int[] before, int max, HashSet<int> described, HashSet<int> departed, int[] now, Func<int, bool> goneNow) {
+    var listed = new HashSet<int>(now);
+    var seen = new HashSet<int>(before);
     int n = 0;
-    for (int i = 0; i < all.Length; i++) if (i >= max || described.Contains(all[i]) || !gone(all[i])) n++;
+    for (int i = 0; i < before.Length; i++) {
+      int p = before[i];
+      if (i >= max || described.Contains(p) || !departed.Contains(p) || (listed.Contains(p) && !goneNow(p))) n++;
+    }
+    foreach (int p in now) if (!seen.Contains(p)) n++;
     return n;
   }
   /** Whether no process runs by this id now: none has it, or the one that has it has exited (its object still held). */
