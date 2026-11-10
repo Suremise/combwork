@@ -137,6 +137,8 @@ async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
 }
 // The longest a wait here waits: a bound for a hung run (the retries' pauses grow to 30 s), never how long it takes.
 const HUNG_MS = 45_000
+// The HI-2906 tests' own bound: their retries' pauses (1 s, 2 s, 4 s...) and the jj runs of each settle, under a loaded run.
+const RETRY_TEST_MS = 90_000
 
 describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED_JJ.version}), HI-2866`, () => {
   for (const colocated of [true, false]) {
@@ -164,7 +166,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.h.jj(row.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${row.identity!.workspace}@-`, '-T', 'commit_id').trim()).toBe(w.main())
       })
 
-      it("(a) busy at the first record check (HI-2906): its builder's session still in the slot at release; lent, not dirty, then detached and ready once it has gone, with no other call", async () => {
+      it("(a) busy at the first record check (HI-2906): its builder's session still in the slot at release; lent, not dirty, then detached and ready once it has gone, with no other call", { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row, key } = await integrated(w, 4)
         // The lease ends with the builder's session still in the folder: the drain's look can't record it (not quiet), so
@@ -186,7 +188,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(again.ok && again.slot.name).toBe(row.name)
       })
 
-      it('(b) quiet lost between a clean look and the detach, gone before it returns (HI-2906): the latch retries it; ready', async () => {
+      it('(b) quiet lost between a clean look and the detach, gone before it returns (HI-2906): the latch retries it; ready', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row, key } = await integrated(w, 6)
         w.hooks.busyInNextDetach = true
@@ -210,7 +212,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.pool.settleWaitOf(row.name)).toBeNull()
       })
 
-      it('an operation taking the slot while a retry waits (HI-2906): the retry does nothing to it, its wait ends, nothing re-armed', async () => {
+      it('an operation taking the slot while a retry waits (HI-2906): the retry does nothing to it, its wait ends, nothing re-armed', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row, key } = await integrated(w, 9)
         w.sessions.add(row.folder.toLowerCase())
@@ -225,7 +227,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(await w.port.line(row.folder)).toBe(key)
       })
 
-      it('(e) close while a retry waits, and during a running retry (HI-2906): nothing re-armed, the running settle awaited', async () => {
+      it('(e) close while a retry waits, and during a running retry (HI-2906): nothing re-armed, the running settle awaited', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row } = await integrated(w, 8)
         w.sessions.add(row.folder.toLowerCase())

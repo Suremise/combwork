@@ -261,6 +261,15 @@ const onDb = (fn) => {
     // What held it meanwhile, as the app logged each retry (HI-2906), for the record.
     const appLog = path.join(userData, 'logs', 'combwork.log')
     for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /isn't quiet|detaching|detached/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
+    // Not back: the processes still naming this run's folders (read only, nothing ended), for what holds the slot.
+    if (!back) {
+      try {
+        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+        for (const l of ps.split(/\r?\n/).filter(Boolean)) console.log(`INFO process: ${l.slice(0, 400)}`)
+      } catch (e) {
+        console.log(`INFO process listing failed: ${e}`)
+      }
+    }
     if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')
