@@ -29,7 +29,8 @@ const ws = path.join(work, 'ws')
 const shop = path.join(ws, 'shop')
 const notes = path.join(ws, 'notes')
 const loose = path.join(ws, 'loose')
-const shots = path.join(work, 'shots')
+// Beside the suite's other files, so --keep-files keeps them with a passed run.
+const shots = lib.WORK
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -67,7 +68,6 @@ function jjRepo(dir, o = {}) {
 ;(async () => {
   fs.rmSync(work, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
-  fs.mkdirSync(shots, { recursive: true })
   fs.writeFileSync(jjConfig, '[user]\nname = "Combwork Test"\nemail = "test@example.invalid"\n[ui]\npaginate = "never"\n')
   fs.writeFileSync(gitConfig, `[user]\n\tname = ${lib.TEST_GIT_IDENTITY.name}\n\temail = ${lib.TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`)
 
