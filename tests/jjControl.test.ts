@@ -178,6 +178,54 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(readFileSync(join(now.ws!, 'stray.txt'), 'utf8')).toBe('x\n')
     })
 
+    it("replaced or given a file during the control's proof (after its generations were read), or during removal's journal write: no add or forget, the replacement kept (HR1's round 2)", async () => {
+      const h = harness()
+      const { repo, root, base } = h.repo(`ctlj${colocated ? 'c' : 'n'}`, colocated)
+      let onProved: (() => void) | null = null
+      const port = h.portWith({
+        remakeAllowed: () => true,
+        controlProved: () => {
+          const f = onProved
+          onProved = null
+          f?.()
+        }
+      })
+      expect((await port.create(repo, join(root, 'slot-a'), base)).ok).toBe(true)
+      const key = `jj_control:${repo.toLowerCase()}`
+      const rec = (): Rec => h.journals.rows.get(key) as Rec
+      const ops = (): string => h.jj(repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
+      const replace = (ws: string): void => {
+        renameSync(ws, `${ws}-old`)
+        cpSync(`${ws}-old`, ws, { recursive: true })
+        rmSync(`${ws}-old`, { recursive: true, force: true })
+      }
+      // Byte for byte, between the proof's reads and its check: refused, nothing run, the replacement kept.
+      const ws1 = rec().ws!
+      onProved = () => replace(ws1)
+      let before = ops()
+      expect((await port.create(repo, join(root, 'slot-b'), base)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(existsSync(join(ws1, '.jj'))).toBe(true)
+      // A file added there instead (on the control the next creation makes): refused, the file kept.
+      expect((await port.create(repo, join(root, 'slot-b'), base)).ok).toBe(true)
+      const ws2 = rec().ws!
+      onProved = () => writeFileSync(join(ws2, 'stray.txt'), 'x\n')
+      before = ops()
+      expect((await port.create(repo, join(root, 'slot-c'), base)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(readFileSync(join(ws2, 'stray.txt'), 'utf8')).toBe('x\n')
+      rmSync(join(ws2, 'stray.txt'))
+      // During removal's journal write (after its proof): no forget, the slot still registered, the replacement kept.
+      const identity = (await port.identity!(join(root, 'slot-b')))!
+      const journal = h.journals.of('remove-b')
+      const wrapped = { ...journal, write: async (v: unknown) => (await journal.write(v), replace(ws2)) }
+      before = ops()
+      expect((await port.remove(repo, join(root, 'slot-b'), { identity, journal: wrapped } as never)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(h.jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).toContain(identity.workspace)
+      expect(existsSync(join(ws2, '.jj'))).toBe(true)
+    })
+
     it('two simultaneous makings: one control; replaced while the recovery waits for the lock: kept, a fresh one made', async () => {
       const w = setup('ctlf')
       const [a, b] = await Promise.all([w.port.create(w.repo, join(w.root, 'slot-a'), w.base), w.port.create(w.repo, join(w.root, 'slot-b'), w.base)])

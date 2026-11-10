@@ -18,7 +18,7 @@
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
 import { createHash, randomUUID } from 'crypto'
-import { existsSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'original-fs'
 import { lstat, mkdir, readdir, readFile, realpath, rmdir, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
@@ -71,6 +71,8 @@ export interface JjPortDeps {
   remakeAllowed?: () => boolean
   /** Told when a control was made (the project folder's working copy recorded once), for the log. */
   made?: (repo: string, ws: string) => void
+  /** A test's seam (HI-2887): run after a control proof's awaited reads, before its synchronous check. */
+  controlProved?: () => void
   /** The store's repository lock (R1.1: one store, one lock), held around add, forget and the control's making. */
   lock: <T>(store: string, fn: () => Promise<T>) => Promise<T>
   /** The Recycle Bin (trash.ts), or a test's. */
@@ -332,13 +334,60 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   }
 
   /**
-   * The control as the journal says now, proved now (HR1's round 1 on HI-2887): run inside a consumer's store lock right
-   * before its add or forget, so a control replaced, or given a file, while the consumer waited for the lock is never
-   * the cwd of a snapshotting write. Its path, or null.
+   * The control proved for one use (HR1's rounds 1–2 on HI-2887, J5's and J7's pattern): every awaited read first (the
+   * record, both generations, the checkout's name, its store, the empty sparse state, and the bytes of its checkout
+   * record and its repository pointer), then `check()`, synchronous, which the consumer calls in the same continuation
+   * immediately before starting its add or forget, with nothing awaited between: the journal still exactly that record,
+   * both folders' identities (file id and birth time) still those, the folder still holding nothing but `.jj`/`.git`, and
+   * those two files' bytes still the ones read. Any change: the use is refused (the next look recovers by the residue
+   * rules). Null when the control isn't usable now.
    */
-  const controlNow = async (repo: string, ctx: JjContext): Promise<string | null> => {
+  const controlProof = async (repo: string, ctx: JjContext): Promise<{ path: string; check: () => boolean } | null> => {
+    const c = deps.control(repo)
     const r = controlReads(repo, ctx)
-    return r.usable(r.recNow())
+    const rec = r.recNow()
+    if (!rec) return null
+    const path = rec.token ? rec.ws : c.folder
+    if (!path) return null
+    const pointer = join(path, '.jj', 'repo')
+    const checkout = join(path, '.jj', 'working_copy', 'checkout')
+    // The bytes first, then the proof (its checkout name read after them): the final check compares these bytes.
+    const bytes = await Promise.all([readFile(pointer).catch(() => null), readFile(checkout).catch(() => null)])
+    if (!bytes[0] || !bytes[1]) return null
+    if ((await r.usable(rec)) !== path) return null
+    const snap = JSON.stringify(rec)
+    const sameBytes = (file: string, was: Buffer): boolean => {
+      try {
+        return readFileSync(file).equals(was)
+      } catch {
+        return false
+      }
+    }
+    const gen = (p: string, withJj: boolean): string | null => {
+      try {
+        const a = statSync(p, { bigint: true })
+        if (!a.isDirectory() || a.ino === 0n) return null
+        if (!withJj) return `${a.ino}:${a.birthtimeNs}`
+        const b = statSync(join(p, '.jj'), { bigint: true })
+        return b.isDirectory() && b.ino !== 0n ? `${a.ino}:${b.ino}:${a.birthtimeNs}` : null
+      } catch {
+        return null
+      }
+    }
+    const check = (): boolean => {
+      if (JSON.stringify(r.recNow()) !== snap) return false
+      if (rec.token ? gen(rec.tokenFolder!, false) !== rec.tokenGeneration || gen(path, true) !== rec.wsGeneration : gen(path, true) !== rec.generation) return false
+      let files: string[]
+      try {
+        files = readdirSync(path)
+      } catch {
+        return false
+      }
+      if (!files.every((f) => f === '.jj' || f === '.git')) return false
+      return sameBytes(pointer, bytes[0]!) && sameBytes(checkout, bytes[1]!)
+    }
+    deps.controlProved?.()
+    return check() ? { path, check } : null
   }
 
   /**
@@ -752,8 +801,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!from) return step(false, JJ_REFUSED.control)
       const name = nameFor(await repoHash(repo), folder)
       return deps.lock(ctx.store, async () => {
-        // The control proved again here, right before its add (HR1's round 1 on HI-2887): replaced or not empty since, refused.
-        if ((await controlNow(repo, ctx)) !== from) return step(false, JJ_REFUSED.control)
+        // The control proved for this add, inside the lock; its synchronous check right before the add starts (HI-2887).
+        const proof = await controlProof(repo, ctx)
+        if (!proof || proof.path !== from || !proof.check()) return step(false, JJ_REFUSED.control)
         // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's.
         const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true })
         if (!r.ok) return step(false, r.err)
@@ -797,8 +847,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       await deps.lock(ctx.store, async () => {
         for (const w of l) {
           if (!gone.some((g) => samePath(g, w.root))) continue
-          // The control proved again right before each forget (HR1's round 1 on HI-2887).
-          if ((await controlNow(repo, ctx)) !== from) return
+          // The control proved for each forget; its synchronous check right before the forget starts (HI-2887).
+          const proof = await controlProof(repo, ctx)
+          if (!proof || proof.path !== from || !proof.check()) return
           await jj(from, ['workspace', 'forget', '--', w.name], { write: true })
         }
       })
@@ -945,9 +996,12 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const forgot = await deps.lock(ctx.store, async () => {
           if (!(await fenced())) return null
           if (existsSync(folder) && !(await owns(folder, identity))) return 'identity' as const
-          // The control proved again right before the forget (HR1's round 1 on HI-2887).
-          if ((await controlNow(repo, ctx)) !== from) return 'control' as const
+          // The control proved for the forget; the journal's intent written; then, with nothing awaited, its synchronous
+          // check and the forget's start (HI-2887).
+          const proof = await controlProof(repo, ctx)
+          if (!proof || proof.path !== from) return 'control' as const
           if (phase === 'start') await journal.write({ phase: 'forgetting', workspace: identity.workspace, folder, generation: identity.generation, store: identity.store })
+          if (!proof.check()) return 'control' as const
           return jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true })
         })
         if (forgot === null) return step(false, JJ_REFUSED.fence)
