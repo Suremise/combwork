@@ -447,7 +447,7 @@ describe('the restart queue (HI-1707)', () => {
     })
   })
 
-  // HI-2909: rc.1's install after a team pause resumed the builders but not the hive pool HR1–HR3, parked idle ("finished")
+  // HI-2909: rc.1's install after a team pause resumed the builders but not the reviewer pool HR1–HR3, parked idle ("finished")
   // with no lane naming them, and its notice named neither. A pool lane's reviewers resume with it, and an agent left
   // idle is named as not resumed, with why.
   it('a pause, an update and the restart with a pool lane: its reviewers resume, and the notice names every agent that ran', async () => {
