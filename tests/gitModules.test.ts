@@ -14,6 +14,8 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 import { composeConfigEnv, forgetGitLfsVersion, gitFilesNeeded, gitFilesUse, insidePath, prepareGitFiles, resolveSubmoduleUrl, type GitFilesExec } from '../src/main/platform/gitModules'
 import { gitFilesExec } from '../src/main/platform/gitModulesRun'
+import { gitIntegration } from '../src/main/platform/gitIntegration'
+import type { CandidateHost } from '../src/main/platform/integration'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -540,3 +542,89 @@ describe.skipIf(!lfsInstalled)('Git LFS (git-lfs installed)', () => {
 })
 
 it.skipIf(lfsInstalled)('Git LFS: skipped here, git-lfs is not installed on this machine', () => undefined)
+
+describe("the merge queue's candidate (HR2's round 2): LFS files from the card's merge left for the files step", () => {
+  /** The queue's host over real git, in the test's environment; `skip`: Set up submodules and LFS on. */
+  function host(project: string, folder: string, skip: boolean): CandidateHost {
+    return {
+      project,
+      folder,
+      signTimeoutMs: 30_000,
+      reads: {},
+      identity: async () => ({ name: 'Combwork Test', email: 'test@example.invalid' }),
+      skipSmudge: async () => skip,
+      run: async (cwd, args, opts) => {
+        try {
+          const out = execFileSync('git', args, { cwd, env: { ...opts?.env, ...ENV }, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+          return { ok: true, code: 0, out, err: '' }
+        } catch (e) {
+          const x = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string }
+          return { ok: false, code: x.status ?? 1, out: String(x.stdout ?? ''), err: String(x.stderr ?? '') }
+        }
+      }
+    }
+  }
+  /** A target E and a card R that adds a filter=lfs file, under a smudge filter that fails unless the smudge is skipped. */
+  function strictFilterProject(name: string): { p: string; E: string; R: string } {
+    const p = repo(name, { 'base.txt': 'base\n' })
+    const E = g(p, 'rev-parse', 'HEAD')
+    g(p, 'config', 'filter.lfs.clean', 'cat')
+    g(p, 'config', 'filter.lfs.smudge', 'if test "$GIT_LFS_SKIP_SMUDGE" = 1; then cat; else echo UNSKIPPED_SMUDGE >&2; exit 1; fi')
+    g(p, 'config', 'filter.lfs.required', 'true')
+    g(p, 'switch', '-q', '-c', 'card')
+    const R = commitAll(p, 'card adds an asset', { '.gitattributes': '*.dat filter=lfs\n', 'asset.dat': 'pointer\n' })
+    g(p, 'switch', '-q', 'main')
+    return { p, E, R }
+  }
+
+  for (const style of ['merge', 'squash', 'rebase'] as const) {
+    it(`a ${style} with the setting on runs no smudge in the queue's folder`, async () => {
+      const { p, E, R } = strictFilterProject(`queue-lfs-${style}`)
+      const out = await gitIntegration.candidate(host(p, join(root, `queue-lfs-${style}-folder`), true), { card: 'HI-1', base: E, revision: R, expected: E, style, message: async () => 'merge' })
+      expect(out, JSON.stringify(out)).toHaveProperty('result')
+    })
+  }
+
+  it('off, the folder is checked out as before (the smudge runs, and here fails)', async () => {
+    const { p, E, R } = strictFilterProject('queue-lfs-off')
+    const out = await gitIntegration.candidate(host(p, join(root, 'queue-lfs-off-folder'), false), { card: 'HI-1', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    expect(out).not.toHaveProperty('result')
+    expect(JSON.stringify(out)).toContain('smudge filter lfs failed')
+  })
+
+  it("strict's update (the target merged into the card) runs no smudge either", async () => {
+    const { p, R } = strictFilterProject('queue-lfs-update')
+    const E2 = commitAll(p, 'target moves on', { 'more.txt': 'more\n' })
+    const out = await gitIntegration.update(host(p, join(root, 'queue-lfs-update-folder'), true), { card: 'HI-1', revision: R, base: g(p, 'merge-base', R, E2), expected: E2, target: 'main', entry: 'e1', how: 'merge', message: () => 'update' })
+    expect(out, JSON.stringify(out)).toHaveProperty('updated')
+  })
+
+  it.skipIf(!lfsInstalled)("with real git-lfs: the card's new LFS file is a pointer after the candidate, and the files step fills it", async () => {
+    const work = join(root, 'queue-real-lfs-work')
+    mkdirSync(work)
+    g(work, 'init', '-q', '-b', 'main')
+    g(work, 'lfs', 'install', '--local')
+    commitAll(work, 'base', { 'base.txt': 'base\n' })
+    const origin = join(root, 'queue-real-lfs.git')
+    g(root, 'init', '-q', '--bare', origin)
+    const url = `file:///${origin.split('\\').join('/')}`
+    g(work, 'push', '-q', url, 'main')
+    g(work, 'switch', '-q', '-c', 'card')
+    const content = `${'y'.repeat(3000)}\n`
+    put(work, { '.gitattributes': '*.bin filter=lfs diff=lfs merge=lfs -text\n', 'big.bin': content })
+    commitAll(work, 'card adds an LFS file')
+    g(work, 'push', '-q', url, 'card')
+    const p = join(root, 'queue-real-lfs')
+    execFileSync('git', ['clone', '-q', url, p], { env: ENV, stdio: 'pipe' })
+    g(p, 'lfs', 'install', '--local')
+    g(p, 'fetch', '-q', 'origin', 'card:card')
+    const E = g(p, 'rev-parse', 'main')
+    const R = g(p, 'rev-parse', 'card')
+    const folder = join(root, 'queue-real-lfs-folder')
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    expect(out, JSON.stringify(out)).toHaveProperty('result')
+    expect(readFileSync(join(folder, 'big.bin'), 'utf8')).toMatch(/^version https:\/\/git-lfs/)
+    expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
+    expect(readFileSync(join(folder, 'big.bin'), 'utf8')).toBe(content)
+  })
+})

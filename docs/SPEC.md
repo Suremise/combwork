@@ -6644,7 +6644,9 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   turned on since, is done then); a copy after every make or reset; the queue's folder before its install and checks
   each time (a run of "Combwork (merge queue)"). A failure leaves the slot or copy not ready with why and the run's log,
   as a setup failure does; in the queue it is a red check. While the setting is on, Combwork's own checkouts of these
-  folders run with `GIT_LFS_SKIP_SMUDGE=1` (that process only), so every LFS download happens in the step.
+  folders run with `GIT_LFS_SKIP_SMUDGE=1` (that process only), so every LFS download happens in the step: a slot's
+  make and switch, a copy's make and reset, and every git the queue runs in its own folder (its add and checkouts, the
+  test merge, squash or rebase, strict's update, their aborts and resets), never one in the project's folder.
 - **The run:** one of Combwork's runs (the slot's, the copy's credited to its reviewer, the queue's), its gits with no
   shell in the run's job, within the setup's time limit, ended with it, with no prompt (`GIT_TERMINAL_PROMPT=0`,
   `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`) and logged.

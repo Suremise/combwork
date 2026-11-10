@@ -69,9 +69,8 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   const key = (p: string): string => resolve(p).toLowerCase()
   const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
   const there = existsSync(f)
-  const opts = (await h.skipSmudge?.()) ? { env: { ...process.env, ...SKIP_SMUDGE } } : {}
   if (listed && there) {
-    const co = await h.run(f, ['checkout', '--detach', '-f', at], opts)
+    const co = await h.run(f, ['checkout', '--detach', '-f', at])
     if (!co.ok) return again(co.err)
     await h.run(f, ['clean', '-fdq'])
     return null
@@ -85,8 +84,22 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
     }
   }
   if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
-  const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at], opts)
+  const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at])
   return add.ok ? null : again(add.err)
+}
+
+/**
+ * HI-1182 (HR2's round 2): with Set up submodules and LFS on, every git the queue runs that checks files out in its own
+ * folder (its worktree's add and checkouts, the merge, squash or rebase and their aborts and resets) leaves LFS files as
+ * pointers (GIT_LFS_SKIP_SMUDGE, over that command's own environment: Combwork's commit environment, hooks and signing
+ * kept), so the files step after the candidate fills them, bounded and attributed. Never a command in the project's own
+ * folder (an advance there checks out real files, as before); off, the host as it is.
+ */
+async function smudgeHost(h: CandidateHost): Promise<CandidateHost> {
+  if (!(await h.skipSmudge?.().catch(() => false))) return h
+  const queueFolder = (p: string): boolean => resolve(p).toLowerCase() === resolve(h.folder).toLowerCase()
+  const mine = (cwd: string, args: string[]): boolean => queueFolder(cwd) || (args[0] === 'worktree' && args[1] === 'add' && args.some(queueFolder))
+  return { ...h, run: (cwd, args, opts) => (mine(cwd, args) ? h.run(cwd, args, { ...opts, env: { ...(opts?.env ?? process.env), ...SKIP_SMUDGE } }) : h.run(cwd, args, opts)) }
 }
 
 /** Its commits' options: Combwork's environment, and the signing bound when the repository signs. */
@@ -367,7 +380,8 @@ export const gitIntegration: IntegrationPort = {
    * test merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a
    * retest after the target moved updates afresh, never on an earlier update.
    */
-  async update(h, c) {
+  async update(host, c) {
+    const h = await smudgeHost(host)
     const { revision, base, expected } = c
     const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
@@ -423,7 +437,8 @@ export const gitIntegration: IntegrationPort = {
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
    */
-  async candidate(h, c) {
+  async candidate(host, c) {
+    const h = await smudgeHost(host)
     const id = await h.identity()
     if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [h.project] }
