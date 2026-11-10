@@ -26,6 +26,7 @@
 
 import { randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
@@ -297,6 +298,8 @@ export class CopyStore {
         const at = this.iso()
         // The project being deleted (#1447): no copy leased or made until its reservation ends.
         if (deletingIn(db, this.project)) return { ok: false as const, size: 0 }
+        // The platform fence (HI-2799): a copy's lease is an admission on the project's repository, refused while it switches.
+        admitOrThrow(db, this.project, o.platform ?? 'git')
         const all = (db.prepare('SELECT * FROM copies WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(copyOfRow)
         const leased = (c: Copy): boolean => !!db.prepare('SELECT 1 FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.project, c.name)
         // Only a copy of this pool's platform (HI-2795, R2.6): a Git copy is never reused by a jj pool.

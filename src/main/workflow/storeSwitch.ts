@@ -1,0 +1,420 @@
+// A switch between Git and jj (HI-2799, J6; SPEC §16.6.5): the repository's, stricter than §16.6.5's "from the next card".
+// Every project of the workspace on the repository whose choice is Git or jj (and the one switched, None → jj too) moves
+// together, named in the warning; nothing may still run on the repository (lanes, cards in flight, the merge queue, slot
+// and copy leases); to jj, the repository must use nothing jj doesn't support and jj must confirm it; back to Git, jj's
+// state must be one Git can take (exported, unconflicted). The design is HI-2799/s11 to s26.
+//
+// The guarantee (s17 to s26): the platform fence (platform/platformFence.ts), rows in the workspace database every
+// admission reads in its own write transaction. In lock order (the store's repository lock, then the workflow writes, then
+// each project.json's own lock):
+//   A   one write: the fence `switching`, each member's before and after, the members' rows. From its commit on, every
+//       admission of a member (and of any Git or jj project on the store) is refused, so what the drain reads next is
+//       final: an admission is either committed before A (the drain sees it) or refused.
+//   the drain, read after A: anything still running rolls the fence back, nothing written, and refuses.
+//   each member's project.json written.
+//   B   one write: the fence `settled`, each member's current choice the one its disk shows.
+// A failure between A and B is settled in the switch's own `finally`, still under the lock, from what each member's disk
+// shows (reconcile); recovery (`recoverFences`) does the same for a switch whose owner is gone, under the same lock.
+
+import { createHash, randomUUID } from 'crypto'
+import { basename, join } from 'path'
+import { listLanes } from '../lanes'
+import { createLogger, userText } from '../logger'
+import { CombworkError, combworkError } from '../combworkError'
+import { foundKey, platformIdOf, projectPlatform } from '../platform/registry'
+import { PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
+import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
+import { setKept } from '../../shared/workflow/projectWorkflow'
+import { withValues } from '../../shared/advanced'
+import type { ProjectConfig } from '../../shared/types'
+import { onAfterRefresh, openWorkspaces, type WorkspaceService } from '../workspace'
+import { cardsInFlight } from './optionsForm'
+import { workflowFor } from './service'
+import { queueChanged } from './queueHost'
+import { workflowChanged } from './rulesets'
+import { workflowWrite } from './writes'
+import { withFolderRepoLocks } from '../platform/repoPorts'
+import { commonGitDir } from '../repoLock'
+import { readKeptJson } from '../fsutil'
+import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
+import { SlotStore } from '../slots'
+import { CopyStore } from '../copies'
+import { boardConn } from '../slotsApp'
+import { jjContextOf } from '../platform/jjDetect'
+import { assessJj, REPO_GATES } from '../platform/jjCompat'
+import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows } from '../platform/jjViews'
+import { isJjUnknown, JjReads } from '../platform/jjReads'
+import { readOpHeads } from '../platform/jjView'
+import { jjRunner } from '../platform/jjRunner'
+import { beginSwitch, type BeginMember, FENCE_KEY, fenceOrNull, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
+import { metaOf, projectIdOf } from '../platform/fenceAdmit'
+
+const log = createLogger('workflow')
+
+/** The switches this process is making now, by owner token: recovery never settles one of them. */
+const ACTIVE = new Set<string>()
+
+/** The repository a project's detection names (its Git store, colocated jj's the same), or none. */
+async function storeOf(path: string): Promise<string | 'none'> {
+  const d = projectPlatform(path, 'none').detected
+  const root = d.platform === 'git' || (d.platform === 'jj' && d.jj?.colocated) ? d.root : null
+  if (!root) return 'none'
+  return commonGitDir(root).then(
+    (s) => storeKey(s),
+    () => 'none'
+  )
+}
+
+/** What a project's project.json holds of what a switch changes (its platform as in force). */
+const snapOf = (cfg: ProjectConfig, path: string): Snap => ({
+  platform: platformIdOf(path, cfg.platform),
+  ...(typeof cfg.platformFound === 'string' ? { platformFound: cfg.platformFound } : {}),
+  ...(cfg.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(cfg.workflow)) as unknown } : {})
+})
+
+/** A project's snapshot read from its disk (recovery's), or null when unreadable. */
+async function diskSnap(path: string): Promise<Snap | null> {
+  const cfg = await readKeptJson<ProjectConfig | null>(join(path, '.combwork', 'project.json'), null).catch(() => null)
+  return cfg ? snapOf(cfg, path) : null
+}
+
+interface Member {
+  id: string
+  path: string
+  name: string
+  from: PlatformId
+}
+
+interface Group {
+  store: string
+  members: Member[]
+  token: string
+}
+
+/**
+ * The group a switch of `path` moves (s20): every project of this workspace on its repository whose choice is Git or jj,
+ * plus the project itself; its token hashes what the warning shows (each member, its choice and options, the fence's
+ * generation and the store), so a member joining or changing after it refuses the switch.
+ */
+async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null> {
+  const store = await storeOf(path)
+  if (store === 'none') return null
+  const projects = ws.info()?.projects ?? []
+  const members: (Member & { snap: Snap })[] = []
+  for (const p of projects) {
+    const isSelf = p.path.toLowerCase() === path.toLowerCase()
+    const cfg = await ws.projectConfig(p.path).catch(() => null)
+    if (!cfg) continue
+    const from = platformIdOf(p.path, cfg.platform)
+    if (!isSelf && from === 'none') continue
+    if (!isSelf && (await storeOf(p.path)) !== store) continue
+    members.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from, snap: snapOf(cfg, p.path) })
+  }
+  members.sort((a, b) => a.id.localeCompare(b.id))
+  const gen = boardRead(ws, (db) => {
+    const f = readFence(metaOf(db), store)
+    return f && typeof f === 'object' ? f.generation : 0
+  })
+  const token = createHash('sha256')
+    .update(JSON.stringify([store, gen, members.map((m) => [m.id, m.path.toLowerCase(), m.from, createHash('sha256').update(JSON.stringify(m.snap)).digest('hex')])]))
+    .digest('hex')
+    .slice(0, 32)
+  return { store, members: members.map(({ snap: _s, ...m }) => m), token }
+}
+
+/** Another open workspace with a project on the store: its admissions can't be fenced from here (s17). */
+async function otherWorkspaceOn(ws: WorkspaceService, store: string): Promise<string | null> {
+  for (const other of openWorkspaces()) {
+    if (other === ws || !other.path) continue
+    for (const p of other.info()?.projects ?? []) if ((await storeOf(p.path)) === store) return basename(other.path)
+  }
+  return null
+}
+
+/** What still runs on the group's repository (none of it changed by a switch). */
+async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promise<SwitchDrain> {
+  const d: SwitchDrain = { lanes: [], cards: [], queue: [], slots: [], copies: [] }
+  for (const m of members) {
+    for (const l of await listLanes(ws, { project: m.name })) if (l.state === 'active' || l.state === 'paused') d.lanes.push({ project: m.name, id: l.id, name: l.name, builder: l.builder.name })
+    for (const c of await cardsInFlight(ws, { path: m.path, name: m.name })) d.cards.push({ project: m.name, number: c.number, title: c.title })
+    const wf = await workflowFor(ws, m.path).catch(() => null)
+    if (wf?.store.cards().some((c) => {
+      const s = wf.state(c)
+      return !!s.started && s.stage !== 'todo' && s.stage !== 'done' && wf.rulesetOf(c, s).options.finish === 'combworkMerges'
+    })) d.queue.push(m.name)
+    for (const l of new SlotStore(boardConn(ws), m.id).openLeases()) d.slots.push({ project: m.name, slot: l.slot, agent: l.agent })
+    for (const l of new CopyStore(boardConn(ws), m.id).unfreed()) d.copies.push({ project: m.name, copy: l.copy, kind: l.kind })
+  }
+  return d
+}
+
+/** jj itself confirms a colocated repository on exactly this store, with the tested jj (s11 §3c). */
+async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
+  const d = await jjContextOf(path)
+  if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code or SQL, never shown as text
+  if ('unknown' in d) return d.unknown === 'tool' ? { why: 'jjTool', state: d.tool?.state ?? 'unknown' } : { why: 'jjUnknown', code: d.unknown } // i18n-ignore: a code or SQL, never shown as text
+  if (!d.jj.colocated) return { why: 'jjSeparate' } // i18n-ignore: a code or SQL, never shown as text
+  if (storeKey(d.jj.store) !== store) return { why: 'jjUnknown', code: 'disagrees' } // i18n-ignore: a code or SQL, never shown as text
+  return null
+}
+
+/** To jj: each repository gate's finding, and jj's own limits (always). */
+async function gatesOf(path: string, store: string): Promise<GateCheck[]> {
+  const root = projectPlatform(path, 'none').detected.root ?? path
+  const a = await assessJj(root, store)
+  return REPO_GATES.map((g): GateCheck => {
+    const f = a[g]
+    return 'clear' in f ? { gate: g, clear: true } : 'uses' in f ? { gate: g, uses: f.uses } : { gate: g, unknown: f.unknown }
+  })
+}
+
+const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly string[]).includes(g))
+
+/**
+ * Back to Git (s11 §3): one operation head, no conflicted local bookmark, every local bookmark exported (its `@git` and
+ * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
+ */
+async function fallbackOf(path: string): Promise<FallbackProblem[]> {
+  const d = await jjContextOf(path)
+  if (!('jj' in d)) return [{ code: 'unknown', detail: 'unknown' in d ? d.unknown : 'noRepo' }] // i18n-ignore: a code or SQL, never shown as text
+  const c = d.jj
+  const heads = readOpHeads(c.jjRepo)
+  if (!heads || heads.length !== 1) return [{ code: 'heads', n: heads?.length ?? 0 }]
+  const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, jjRunner)
+  const r = await reads.pinned(async (op) => {
+    const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_TEMPLATE])
+    if (isJjUnknown(out)) return out
+    const rows = parseBookmarkRows(out)
+    if (!rows) return { jjUnknown: 'malformed' as const, detail: 'bookmarkList' } // i18n-ignore: a code or SQL, never shown as text
+    const conflicted = await reads.run(op, ['log', '--no-graph', '-r', 'conflicts() & ::bookmarks()', '-n', '5', '-T', 'commit_id ++ "\\n"'])
+    if (isJjUnknown(conflicted)) return conflicted
+    return { rows, conflicted: conflicted.split('\n').filter(Boolean) }
+  })
+  if (isJjUnknown(r)) return [{ code: 'unknown', detail: `${r.jjUnknown}${r.detail ? `: ${r.detail}` : ''}`.slice(0, 300) }]
+  const out: FallbackProblem[] = []
+  const git = await gitBranches(c.store)
+  if (!git) return [{ code: 'unknown', detail: 'gitRefs' }] // i18n-ignore: a code or SQL, never shown as text
+  const tracked = new Map(r.value.rows.filter((b) => b.remote === 'git').map((b) => [b.name, b.commit]))
+  for (const b of r.value.rows) {
+    if (b.remote !== null) continue
+    if (b.conflict) out.push({ code: 'conflictedBookmark', name: b.name })
+    else if (b.commit && (tracked.get(b.name) !== b.commit || git.get(b.name) !== b.commit)) out.push({ code: 'notExported', name: b.name })
+  }
+  for (const commit of r.value.conflicted) out.push({ code: 'conflictedCommit', commit })
+  return out
+}
+
+/** A store-wide switch's warning and its refusal, read without changing anything (the dialog's, and the switch's own). */
+export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
+  const g = await groupOf(ws, path)
+  const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [] } }
+  if (!g) return { refused: { why: to === 'jj' ? 'noJj' : 'noGit' }, store: none } // i18n-ignore: a code or SQL, never shown as text
+  const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members) }
+  let refused: SwitchRefusal | null = null
+  const other = await otherWorkspaceOn(ws, g.store)
+  if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
+  if (to === 'jj') {
+    refused ??= await jjReady(path, g.store)
+    store.gates = await gatesOf(path, g.store)
+    store.unsupported = UNSUPPORTED
+    if (!refused && store.gates.some((x) => !('clear' in x))) refused = { why: 'gates' } // i18n-ignore: a code or SQL, never shown as text
+  } else {
+    store.fallback = await fallbackOf(path)
+    if (!refused && store.fallback.length) refused = { why: 'fallback' } // i18n-ignore: a code or SQL, never shown as text
+  }
+  if (!refused && !drainEmpty(store.drain)) refused = { why: 'drain' } // i18n-ignore: a code or SQL, never shown as text
+  // A switch of the store under way (or its fence unreadable: fail closed).
+  const fence = boardRead(ws, (db) => readFence(metaOf(db), g.store))
+  if (!refused && fence !== null && (typeof fence !== 'object' || fence.state === 'switching')) refused = { why: 'switching' } // i18n-ignore: a code or SQL, never shown as text
+  return { refused, store }
+}
+
+const refusalError = (r: SwitchRefusal): CombworkError => {
+  const t = switchRefusalText(r)
+  // agent-text: switchRefusalText
+  return new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
+}
+
+/** Runs one fence write in the workspace database. */
+const fenceWrite = <T>(ws: WorkspaceService, fn: (meta: Meta) => T): Promise<T> => boardWrite(ws, async () => boardWriteOp(ws, (db) => fn(metaOf(db))))
+
+/** Seams for the tests' pauses (s17's deterministic two-project tests): awaited at each named point when set. */
+export const storeSwitchSeams: { at?: (point: 'afterBegin' | 'afterDrain' | 'afterWrite' | 'beforeSettle', o: { members: readonly string[]; generation: number }) => Promise<void> | void; write?: (path: string, partial: Partial<ProjectConfig>) => Promise<void> } = {}
+
+/**
+ * Switches the repository of `path` between Git and jj (or a None project to jj, with its group), as the warning showed:
+ * `expected` the project's platform shown, `token` the group shown. Under the store's repository lock throughout.
+ */
+export async function storeSwitch(ws: WorkspaceService, path: string, from: PlatformId, to: PlatformId, o: { token?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+  const g0 = await groupOf(ws, path)
+  if (!g0) throw refusalError({ why: to === 'jj' ? 'noJj' : 'noGit' }) // i18n-ignore: a code or SQL, never shown as text
+  const paths = g0.members.map((m) => m.path)
+  return withFolderRepoLocks(paths, () => workflowWrite(() => switchLocked(ws, path, from, to, o)), { quiet: true, project: path })
+}
+
+async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId, to: PlatformId, o: { token?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {
+  // A dead owner's switch of this store is settled first, under this same lock (s20 §2).
+  const g = await groupOf(ws, path)
+  if (!g) throw refusalError({ why: to === 'jj' ? 'noJj' : 'noGit' }) // i18n-ignore: a code or SQL, never shown as text
+  await recoverStore(ws, g.store)
+  const self = g.members.find((m) => m.path.toLowerCase() === path.toLowerCase())!
+  if (self.from !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[self.from] }, { kind: 'conflict' })
+  o.guard?.(self.from)
+  if (typeof o.token !== 'string' || o.token !== g.token) throw refusalError({ why: 'groupChanged' }) // i18n-ignore: a code or SQL, never shown as text
+  const check = await checkStoreSwitch(ws, path, to)
+  if (check.refused) throw refusalError(check.refused)
+  // Each member's before and after, as its project.json holds them now (no other workflow write runs meanwhile).
+  const begin: BeginMember[] = []
+  for (const m of g.members) {
+    const cfg = await ws.projectConfig(m.path)
+    const before = snapOf(cfg, m.path)
+    const mDetected = projectPlatform(m.path, to).detected
+    const after: Snap = { platform: to, platformFound: foundKey(mDetected), ...(before.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(setKept(cfg.workflow!, to))) as unknown } : {}) }
+    begin.push({ id: m.id, path: m.path, before, after })
+  }
+  const owner = { token: randomUUID(), pid: process.pid, profile: ws.path ?? '' }
+  ACTIVE.add(owner.token)
+  let fence: Fence | null = null
+  try {
+    fence = await fenceWrite(ws, (meta) => beginSwitch(meta, g.store, begin, owner))
+    if (!fence) throw refusalError({ why: 'switching' }) // i18n-ignore: a code or SQL, never shown as text
+    const ids = begin.map((m) => m.id)
+    await storeSwitchSeams.at?.('afterBegin', { members: ids, generation: fence.generation })
+    // Nothing more can be admitted on the store: what runs now is final (s17). Anything still running: back, nothing written.
+    const drain = await drainOf(ws, g.members)
+    await storeSwitchSeams.at?.('afterDrain', { members: ids, generation: fence.generation })
+    if (!drainEmpty(drain)) {
+      await fenceWrite(ws, (meta) => settle(meta, g.store, fence!.generation, Object.fromEntries(begin.map((m) => [m.id, m.before]))))
+      fence = null
+      throw refusalError({ why: 'drain' }) // i18n-ignore: a code or SQL, never shown as text
+    }
+    for (const m of begin) {
+      const partial: Partial<ProjectConfig> = { platform: m.after.platform, platformFound: m.after.platformFound, ...(m.after.workflow !== undefined ? { workflow: m.after.workflow as ProjectConfig['workflow'] } : {}) }
+      if (storeSwitchSeams.write) await storeSwitchSeams.write(m.path, partial)
+      else await ws.mutateProjectConfig(m.path, () => partial, { existing: true })
+    }
+    await storeSwitchSeams.at?.('afterWrite', { members: ids, generation: fence.generation })
+    await storeSwitchSeams.at?.('beforeSettle', { members: ids, generation: fence.generation })
+    const settled = await fenceWrite(ws, (meta) => settle(meta, g.store, fence!.generation, Object.fromEntries(begin.map((m) => [m.id, m.after]))))
+    if (!settled) throw new Error('the platform fence moved during its own switch') // i18n-ignore: an internal error, for the log
+    fence = null
+  } finally {
+    // Failed between A and B: settled from what each member's disk shows, still under the lock (s20 §2, s23 §1).
+    if (fence) await settleFromDisk(ws, g.store, fence.generation).catch((e) => log.warn(`settling the platform fence of ${userText(g.store)} after a failed switch`, e))
+    ACTIVE.delete(owner.token)
+  }
+  log.info(`${g.members.map((m) => userText(m.name)).join(', ')} switched their version control from ${from} to ${to} (the repository's)`)
+  await ws.refresh().catch((e) => log.warn('refreshing after a switch of version control', e))
+  for (const m of g.members) {
+    workflowChanged(ws, m.path)
+    queueChanged(ws, m.path, '')
+  }
+  return { from, to }
+}
+
+/**
+ * Settles a store's switching fence from its members' disks (s23 §1, s26): forward when every member shows its after,
+ * else each member showing its after written back to its before (read back), the rest untouched; stuck (left switching,
+ * fail closed, said in the log and a notice) when any member shows neither or can't be read. The caller holds the store's
+ * repository lock and the workflow writes.
+ */
+async function settleFromDisk(ws: WorkspaceService, store: string, generation: number): Promise<'forward' | 'back' | 'stuck' | 'none'> {
+  const f = boardRead(ws, (db) => fenceOrNull(metaOf(db), store))
+  if (!f || f.state !== 'switching' || f.generation !== generation) return 'none'
+  const disk: Record<string, Snap | null> = {}
+  for (const [id, m] of Object.entries(f.members)) if (m.attempt) disk[id] = await diskSnap(m.path)
+  const r = reconcile(f, disk)
+  if ('stuck' in r) {
+    log.warn(`The platform switch of ${userText(store)} can't be settled: ${r.stuck.map((id) => userText(id)).join(', ')} changed by hand meanwhile or unreadable; their work stays refused until they show their before or after`)
+    return 'stuck'
+  }
+  if ('back' in r) {
+    for (const id of r.back) {
+      const m = f.members[id]
+      const b = m.attempt!.before
+      await ws.mutateProjectConfig(m.path, (cfg) => ({ platform: b.platform, platformFound: b.platformFound, ...(b.workflow !== undefined ? { workflow: b.workflow as ProjectConfig['workflow'] } : cfg.workflow !== undefined ? { workflow: undefined } : {}) }), { existing: true })
+      const now = await diskSnap(m.path)
+      if (!now || JSON.stringify(now) !== JSON.stringify(b)) {
+        log.warn(`Rolling back the platform switch of ${userText(store)}: ${userText(m.path)} doesn't read back as before; its work stays refused`)
+        return 'stuck'
+      }
+    }
+  }
+  const currents = Object.fromEntries(Object.entries(f.members).filter(([, m]) => m.attempt).map(([id, m]) => [id, 'forward' in r ? m.attempt!.after : m.attempt!.before]))
+  await fenceWrite(ws, (meta) => settle(meta, store, generation, currents))
+  return 'forward' in r ? 'forward' : 'back'
+}
+
+/** Whether a fence's owner may still be switching: this process's own switch, or another process still alive. */
+function ownerLive(f: Fence): boolean {
+  const o = f.owner
+  if (!o) return false
+  if (ACTIVE.has(o.token)) return true
+  if (o.pid === process.pid) return false
+  try {
+    process.kill(o.pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Recovery of one store (s20 §2): its switching fence settled from the disks, unless its owner is live. Caller holds the lock. */
+async function recoverStore(ws: WorkspaceService, store: string): Promise<void> {
+  const f = boardRead(ws, (db) => readFence(metaOf(db), store))
+  if (!f || typeof f !== 'object' || f.state !== 'switching' || ownerLive(f)) return
+  await settleFromDisk(ws, store, f.generation)
+}
+
+/**
+ * Recovery of every switching fence in the workspace whose owner is gone (at a refresh and before a switch): each under
+ * its store's repository lock and the workflow writes, the fence read again there. A live owner's is never touched.
+ */
+export async function recoverFences(ws: WorkspaceService): Promise<void> {
+  const rows = boardRead(ws, (db) => db.prepare("SELECT key, value FROM board_meta WHERE key LIKE 'platform\\_fence:%' ESCAPE '\\'").all() as { key: string; value: string }[]) // i18n-ignore: a code or SQL, never shown as text
+  for (const row of rows) {
+    const store = row.key.slice('platform_fence:'.length)
+    const f = boardRead(ws, (db) => readFence(metaOf(db), store))
+    if (!f || typeof f !== 'object' || f.state !== 'switching' || ownerLive(f)) continue
+    const paths = Object.values(f.members).map((m) => m.path)
+    await withFolderRepoLocks(paths, () => workflowWrite(() => recoverStore(ws, store)), { quiet: true }).catch((e) => log.warn(`recovering the platform switch of ${userText(store)}`, e))
+  }
+}
+
+/**
+ * A fence member's own switch outside the repository's (jj → None, Git → None: s23 §2's "every later change of a member"):
+ * its `current` set to what its project.json shows now, in one fence write, so its admissions are held to its new
+ * choice. A project in no fence: nothing.
+ */
+export async function noteMemberChoice(ws: WorkspaceService, path: string): Promise<void> {
+  const cfg = await ws.projectConfig(path)
+  const id = projectIdOf(cfg, path)
+  const snap = snapOf(cfg, path)
+  await fenceWrite(ws, (meta) => {
+    const m = meta.get(`platform_member:${id}`)
+    const store = m ? (JSON.parse(m) as { store?: string }).store : undefined
+    if (!store) return
+    const f = fenceOrNull(meta, store)
+    if (!f || !f.members[id]) return
+    meta.set(FENCE_KEY(store), JSON.stringify({ ...f, members: { ...f.members, [id]: { ...f.members[id], current: snap } } } satisfies Fence))
+  })
+}
+
+/** Each workspace's last map and recovery, chained: one at a time, a refresh during one waits for it. */
+const after = new WeakMap<WorkspaceService, Promise<void>>()
+onAfterRefresh((ws) => {
+  const run = (after.get(ws) ?? Promise.resolve()).then(() => mapStores(ws)).then(() => recoverFences(ws)).catch((e) => log.warn('the platform fence after a refresh', e))
+  after.set(ws, run)
+})
+
+/** A refresh's store map (s20 §3): each project's repository as detected, written only when it changed. */
+export async function mapStores(ws: WorkspaceService): Promise<void> {
+  const rows: [string, string | 'none'][] = []
+  for (const p of ws.info()?.projects ?? []) {
+    const cfg = await ws.projectConfig(p.path).catch(() => null)
+    rows.push([projectIdOf(cfg, p.path), await storeOf(p.path)])
+  }
+  const changed = boardRead(ws, (db) => rows.some(([id, s]) => metaOf(db).get(`platform_store:${id}`) !== (s === 'none' ? 'none' : storeKey(s))))
+  if (changed) await fenceWrite(ws, (meta) => rows.forEach(([id, s]) => mapStore(meta, id, s)))
+}
+

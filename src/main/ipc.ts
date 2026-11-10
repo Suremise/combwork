@@ -145,6 +145,7 @@ import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
+import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
 import { checkRepoTools } from './platform/repoPorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
@@ -1037,7 +1038,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
     'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
-    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
+    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
@@ -1789,6 +1790,12 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
     // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
     'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
+    // A jj project's views (HI-2799): read-only, pinned, off main (jj's worker); only a project the window shows.
+    'jj:repo': (p) => jjRepoView(workspace.assertProject(p)),
+    'jj:history': (p) => jjHistory(workspace.assertProject(p)),
+    'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
+    'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
+    'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

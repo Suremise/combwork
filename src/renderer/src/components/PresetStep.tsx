@@ -97,7 +97,7 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
     <div className="vc-step" data-preset-step={platform}>
       <div className="vc-step-head">
         <h3>{tr(M.title)}</h3>
-        <span className="s-desc">{tr(platform === 'none' ? M.introNone : M.intro)}</span>
+        <span className="s-desc">{tr(platform === 'git' ? M.intro : M.introNone)}</span>
       </div>
       <div className="vc-step-presets" role="radiogroup" aria-label={tr(M.presets)}>
         {presets.map((p) => (

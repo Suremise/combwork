@@ -15,6 +15,7 @@ import { at, GitProblem, GitSetupNotes, HistorySection, useGitRead } from './Git
 import { BranchesSection } from './GitBranches'
 import { switchAfterInit, switchPlatform, useWorkflowForm, VersionControlHeader } from './VersionControlHeader'
 import { PresetStep } from '../components/PresetStep'
+import { JjBookmarksSection, JjCompareSection, JjConflictsSection, JjHistorySection, JjRepoSection } from './JjSections'
 
 /**
  * The project's Version Control tab (#1416, SPEC §16.6; the Git tab before 1.0, its id still `changes`): the header
@@ -53,7 +54,8 @@ function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): vo
   const asked = useRef<string | null>(null)
   const detected = project.platform?.detected
   const readGit = !!s && s.isRepo && !s.gitProblem
-  const differ = !!s && !s.gitProblem && !!detected && !detected.other && readGit !== (detected.platform === 'git')
+  // A jj repository colocated with Git (HI-2799) is jj's to detect, as another system is: git reads it too.
+  const differ = !!s && !s.gitProblem && !!detected && !detected.other && detected.platform !== 'jj' && readGit !== (detected.platform === 'git')
   const key = `${project.path}:${readGit}`
   useEffect(() => {
     // Agreeing again (however detection caught up: this refresh, F5, another's) rearms it for the next change (HR6's
@@ -192,6 +194,16 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
               </div>
             ) : section === 'queue' ? (
               <GitQueueSection project={project} />
+            ) : section === 'jjRepo' ? (
+              <JjRepoSection project={project} />
+            ) : section === 'jjHistory' ? (
+              <JjHistorySection project={project} />
+            ) : section === 'jjCompare' ? (
+              <JjCompareSection project={project} />
+            ) : section === 'jjBookmarks' ? (
+              <JjBookmarksSection project={project} />
+            ) : section === 'jjConflicts' ? (
+              <JjConflictsSection project={project} />
             ) : s && !s.isRepo && !s.gitProblem ? (
               <GitSetupNotes project={project} />
             ) : section === 'changes' ? (

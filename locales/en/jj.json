@@ -1,0 +1,210 @@
+{
+  "jj.badge.conflict": {
+    "defaultMessage": "conflicted",
+    "description": "A badge on a jj commit storing unresolved conflicts (HI-2799). Lower case."
+  },
+  "jj.badge.divergent": {
+    "defaultMessage": "divergent",
+    "description": "A badge on a jj commit whose change id names several commits (HI-2799). Lower case."
+  },
+  "jj.badge.divergentTip": {
+    "defaultMessage": "This change id names more than one commit: refer to this one by its commit id. Combwork never picks one.",
+    "description": "Tooltip of the divergent badge in jj’s History (HI-2799)."
+  },
+  "jj.badge.empty": {
+    "defaultMessage": "empty",
+    "description": "A badge on a jj commit with no changes (HI-2799). Lower case."
+  },
+  "jj.badge.workingCopy": {
+    "defaultMessage": "working copy",
+    "description": "A badge on the jj working-copy commit (@) of the project folder (HI-2799). Lower case."
+  },
+  "jj.bookmarks.conflict": {
+    "defaultMessage": "conflicted: {sides}",
+    "description": "A conflicted jj bookmark (HI-2799): it names several commits ({sides}, short ids)."
+  },
+  "jj.bookmarks.name": {
+    "defaultMessage": "Bookmark",
+    "description": "A column of jj’s Bookmarks (HI-2799): the name (and remote)."
+  },
+  "jj.bookmarks.none": {
+    "defaultMessage": "No bookmarks.",
+    "description": "jj’s Bookmarks section (HI-2799) when there are none."
+  },
+  "jj.bookmarks.notInGit": {
+    "defaultMessage": "not the same in Git",
+    "description": "A badge on a jj bookmark whose Git branch differs (HI-2799): not exported yet, or Git moved it. Lower case. Keep Git."
+  },
+  "jj.bookmarks.note": {
+    "defaultMessage": "Bookmarks are created, moved and pushed with jj itself: Combwork only shows them.",
+    "description": "A note in jj’s Bookmarks section (HI-2799). Keep jj."
+  },
+  "jj.bookmarks.target": {
+    "defaultMessage": "Points at",
+    "description": "A column of jj’s Bookmarks (HI-2799): the change and commit it names."
+  },
+  "jj.compare.ambiguous": {
+    "defaultMessage": "{rev} names {n, plural, one {# commit} other {# commits}}: pick one by its commit id.",
+    "description": "jj’s Compare (HI-2799): the id is ambiguous (a divergent change id, or a prefix of several): Combwork never picks one."
+  },
+  "jj.compare.bad": {
+    "defaultMessage": "Type a bookmark, a change id or a commit id.",
+    "description": "jj’s Compare (HI-2799): a field holds something else (spaces, symbols)."
+  },
+  "jj.compare.capped": {
+    "defaultMessage": "The diff is long: only its start is shown.",
+    "description": "Under a jj diff in Compare (HI-2799) cut at its limit."
+  },
+  "jj.compare.files": {
+    "defaultMessage": "{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}",
+    "description": "jj’s Compare (HI-2799): how many files differ."
+  },
+  "jj.compare.from": {
+    "defaultMessage": "From",
+    "description": "A field of jj’s Compare (HI-2799): the older revision (a bookmark, change id or commit id)."
+  },
+  "jj.compare.go": {
+    "defaultMessage": "Compare",
+    "description": "The button of jj’s Compare (HI-2799)."
+  },
+  "jj.compare.none": {
+    "defaultMessage": "Nothing is called {rev}.",
+    "description": "jj’s Compare (HI-2799): no revision has that name or id."
+  },
+  "jj.compare.pick": {
+    "defaultMessage": "Use This One",
+    "description": "A button beside one of the commits an ambiguous id names in jj’s Compare (HI-2799): puts its commit id in the field."
+  },
+  "jj.compare.placeholder": {
+    "defaultMessage": "Bookmark, change or commit id",
+    "description": "Placeholder of jj’s Compare fields (HI-2799)."
+  },
+  "jj.compare.to": {
+    "defaultMessage": "To",
+    "description": "A field of jj’s Compare (HI-2799): the newer revision."
+  },
+  "jj.conflicts.files": {
+    "defaultMessage": "{n, plural, one {# conflicted file} other {# conflicted files}}",
+    "description": "Under a conflicted jj commit (HI-2799)."
+  },
+  "jj.conflicts.intro": {
+    "defaultMessage": "jj can keep a conflict in a commit and carry on. These commits store conflicts; resolve them with jj in a terminal (jj resolve).",
+    "description": "The top of jj’s Conflicts section (HI-2799). Keep jj and jj resolve (a command)."
+  },
+  "jj.conflicts.none": {
+    "defaultMessage": "No commit stores a conflict.",
+    "description": "jj’s Conflicts section (HI-2799) when there are none."
+  },
+  "jj.history.capped": {
+    "defaultMessage": "Only the latest {n, number} are shown.",
+    "description": "Under jj’s History (HI-2799) when there are more commits than shown."
+  },
+  "jj.ids.tip": {
+    "defaultMessage": "Change {change}\nCommit {commit}",
+    "description": "Tooltip of a jj commit’s ids (HI-2799): both in full."
+  },
+  "jj.integrate.card": {
+    "defaultMessage": "{card} {title}: commit {commit} into {target}",
+    "description": "A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into."
+  },
+  "jj.integrate.contained": {
+    "defaultMessage": "In {target}: can’t check yet.",
+    "description": "Under a passed jj card (HI-2799): whether its reviewed work is in its target. Combwork can’t check it yet (a later version records it); never read as not integrated."
+  },
+  "jj.integrate.head": {
+    "defaultMessage": "Waiting for you to integrate",
+    "description": "A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves."
+  },
+  "jj.integrate.how": {
+    "defaultMessage": "For example, then move {target} to the rebased commit with jj bookmark set:",
+    "description": "Above a jj command suggested to integrate a passed card (HI-2799): rebase it onto its target, then move the target bookmark. Keep jj bookmark set (a command)."
+  },
+  "jj.integrate.noMerge": {
+    "defaultMessage": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
+    "description": "A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj."
+  },
+  "jj.integrate.none": {
+    "defaultMessage": "No card is waiting.",
+    "description": "Under “Waiting for you to integrate” (HI-2799) when no card has passed."
+  },
+  "jj.readFailed": {
+    "defaultMessage": "Couldn’t read it: {error}",
+    "description": "A jj section couldn’t be read (HI-2799). {error} says why."
+  },
+  "jj.reading": {
+    "defaultMessage": "Reading…",
+    "description": "While a jj section of the Version Control tab is read (HI-2799)."
+  },
+  "jj.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "A button in a jj section of the Version Control tab (HI-2799): reads it again."
+  },
+  "jj.repo.colocated": {
+    "defaultMessage": "{colocated, select, yes {Colocated with Git: Git sees the same history.} other {Not colocated with Git.}}",
+    "description": "The jj Repository section (HI-2799): whether a .git is beside .jj. Keep Git."
+  },
+  "jj.repo.edits": {
+    "defaultMessage": "jj has no uncommitted changes: edits are recorded in the working-copy commit when jj snapshots them.",
+    "description": "A note in the jj Repository section (HI-2799), in place of Git’s Changes. Keep jj."
+  },
+  "jj.repo.op": {
+    "defaultMessage": "Operation {op}",
+    "description": "The jj Repository section (HI-2799): jj’s current operation (its id, short), which every view is read at."
+  },
+  "jj.repo.root": {
+    "defaultMessage": "Repository at {root}",
+    "description": "The jj Repository section (HI-2799): the repository’s folder."
+  },
+  "jj.repo.unsupported": {
+    "defaultMessage": "Not supported with jj in Combwork",
+    "description": "A heading of the jj Repository section (HI-2799): what Combwork doesn’t do or support with jj. Keep jj."
+  },
+  "jj.repo.version": {
+    "defaultMessage": "jj {version}",
+    "description": "The jj Repository section (HI-2799): the jj version Combwork uses. Keep jj."
+  },
+  "jj.repo.workspace": {
+    "defaultMessage": "{name}: change {change}, commit {commit}",
+    "description": "A jj workspace in the Repository section (HI-2799): its name and its working copy’s change id and commit id (short)."
+  },
+  "jj.repo.workspaces": {
+    "defaultMessage": "Workspaces",
+    "description": "A heading of the jj Repository section (HI-2799): jj’s workspaces (working folders) of this repository, Combwork’s slots among them."
+  },
+  "jj.row.change": {
+    "defaultMessage": "Change",
+    "description": "A column of jj’s History (HI-2799): the change id (stable across rewrites)."
+  },
+  "jj.row.commit": {
+    "defaultMessage": "Commit",
+    "description": "A column of jj’s History (HI-2799): the commit id (this exact version)."
+  },
+  "jj.row.description": {
+    "defaultMessage": "Description",
+    "description": "A column of jj’s History (HI-2799)."
+  },
+  "jj.row.noDescription": {
+    "defaultMessage": "(no description)",
+    "description": "A jj commit with an empty description (HI-2799)."
+  },
+  "jj.unknown.heads": {
+    "defaultMessage": "jj’s operation log has {detail} heads: Combwork reads nothing until jj reconciles them (any jj command in a terminal does).",
+    "description": "A jj section can’t be read (HI-2799): jj’s operation log diverged (or can’t be read). {detail} is how many heads, or “unreadable”. Keep jj."
+  },
+  "jj.unknown.moved": {
+    "defaultMessage": "The repository changed while it was read: refresh to read it again.",
+    "description": "A jj section can’t be read (HI-2799): jj recorded an operation while Combwork read."
+  },
+  "jj.unknown.noRepo": {
+    "defaultMessage": "No jj repository was found here.",
+    "description": "A jj section can’t be read (HI-2799): the project folder has no jj repository (any more). Keep jj."
+  },
+  "jj.unknown.other": {
+    "defaultMessage": "jj couldn’t answer ({code}).",
+    "description": "A jj section can’t be read (HI-2799). {code} is a short code for why, kept in English, with jj’s own words after it. Keep jj."
+  },
+  "jj.unknown.tool": {
+    "defaultMessage": "jj isn’t installed, or isn’t the version Combwork is tested with, so nothing is read through it.",
+    "description": "A jj section can’t be read (HI-2799): the jj tool. Keep jj."
+  }
+}
