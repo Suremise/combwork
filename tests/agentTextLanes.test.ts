@@ -91,7 +91,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'left', heldBy: 'B1', program: 'node', more: 3 }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'lastRun', heldBy: 'B1' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer', idle: false }),
-    ...(['busy', 'watching', 'queued', 'failed', 'refused'] as const).flatMap((why) => [status({ reason: 'startWait', why, agent: 'B1' }), status({ reason: 'startWait', why })]),
+    ...(['busy', 'watching', 'queued', 'failed', 'refused', 'stopped'] as const).flatMap((why) => [status({ reason: 'startWait', why, agent: 'B1' }), status({ reason: 'startWait', why })]),
     status({ reason: 'startWait', why: 'dependencies', waitsFor: 'HI-9' }),
     status({ reason: 'startWait', why: 'dependencies' }),
     status({ reason: 'startWait', why: 'fresh', agent: 'B1' }),
