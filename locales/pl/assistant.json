@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "W tym obszarze roboczym nie jest włączone żadne konto {cli}, więc Asystent nie może się uruchomić. Dodaj konto i je zaloguj.",
+  "assistant.banner.noAccountAny": "W tym obszarze roboczym nie jest włączone żadne konto, więc Asystent nie może się uruchomić. Dodaj konto dowolnego agenta kodującego obsługiwanego przez Combwork i je zaloguj: Asystent używa pierwszego w Twojej kolejności kont.",
+  "assistant.banner.noAccountFor": "{others, select, yes {Asystent działa na {cli}, a w tym obszarze roboczym nie jest włączone żadne konto {cli}, więc nie może się uruchomić. Dodaj konto albo wybierz w ustawieniach Asystenta konto innego agenta kodującego.} other {Asystent działa na {cli}, a w tym obszarze roboczym nie jest włączone żadne konto {cli}, więc nie może się uruchomić. Dodaj konto i je zaloguj.}}",
+  "assistant.banner.signedOut": "{name}, konto {cli} Asystenta, jest wylogowane, więc Asystent nie może się uruchomić. Zaloguj je ponownie w Ustawienia → Konta i połączenia.",
   "assistant.chooseConnections.agent": "Agent",
   "assistant.chooseConnections.next": "Po zmianie",
   "assistant.chooseConnections.now": "Teraz",

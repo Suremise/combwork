@@ -143,6 +143,8 @@ Every agent, and the Assistant, runs on a **connection**. They're in **Settings 
 - **Several off here:** they're named, with **Choose in Settings**.
 - **None added yet:** they offer to add one.
 
+The Assistant runs on the CLI of its connection (**Assistant Settings…**); until you choose one, on the first account in your order that's on here, whatever its coding agent. Its panel names only that: with no account at all it asks you to add one, for any coding agent Combwork supports; if its account is signed out, it names the connection to sign in again; and if you chose a coding agent with no account on here while another's is, **Assistant Settings…** lets you switch.
+
 A notice says so once, until you add an account or dismiss it.
 
 **The list.** Each account is a card with the same fields in the same place:

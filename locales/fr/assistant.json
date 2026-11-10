@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "Aucun compte {cli} n’est activé dans cet espace de travail : l’Assistant ne peut donc pas démarrer. Ajoutes-en un et connecte-le.",
+  "assistant.banner.noAccountAny": "Aucun compte n’est activé dans cet espace de travail : l’Assistant ne peut donc pas démarrer. Ajoutes-en un pour n’importe quel agent de code pris en charge par Combwork et connecte-le : l’Assistant utilise le premier dans ton ordre des comptes.",
+  "assistant.banner.noAccountFor": "{others, select, yes {L’Assistant utilise {cli}, et aucun compte {cli} n’est activé dans cet espace de travail : il ne peut donc pas démarrer. Ajoutes-en un, ou choisis le compte d’un autre agent de code dans les paramètres de l’Assistant.} other {L’Assistant utilise {cli}, et aucun compte {cli} n’est activé dans cet espace de travail : il ne peut donc pas démarrer. Ajoutes-en un et connecte-le.}}",
+  "assistant.banner.signedOut": "{name}, le compte {cli} de l’Assistant, est déconnecté : l’Assistant ne peut donc pas démarrer. Reconnecte-le dans Paramètres → Comptes et connexions.",
   "assistant.chooseConnections.agent": "Agent",
   "assistant.chooseConnections.next": "Après",
   "assistant.chooseConnections.now": "Maintenant",

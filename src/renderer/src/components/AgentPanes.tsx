@@ -13,7 +13,7 @@ import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, footerChoices, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
 import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
-import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
+import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
 import { shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { templateTitle } from '@shared/templateDefaults'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
@@ -1550,7 +1550,8 @@ export function PaneFooter({
   onContext,
   onTranscript,
   transcriptAdvice,
-  settingsName
+  settingsName,
+  provider: cli
 }: {
   project: ProjectInfo
   a: AgentInfo
@@ -1559,12 +1560,14 @@ export function PaneFooter({
   onTranscript?: () => void
   transcriptAdvice?: string
   settingsName?: string
+  /** Its CLI where the caller knows better than agentProviderOf (HI-2899: the Assistant's, as its launch picks it). */
+  provider?: ProviderId
 }) {
   useLanguage()
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
   const { usage, pending } = useLiveUsageState(project, a.id)
-  const provider = agentProviderOf(a)
+  const provider = cli ?? agentProviderOf(a)
   const live = a.live
   // Who the connection it runs on is signed in as (HI-1756), for its hover.
   const connections = useConnections()
