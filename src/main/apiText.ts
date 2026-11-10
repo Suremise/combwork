@@ -177,6 +177,7 @@ export const API = {
     isolatedNeedsCheck: agentMsg({ id: 'api.check.isolatedNeedsCheck', text: '--isolated runs a check in a copy of its own: use it with --check <name>' }),
     leaseArgs: agentMsg({ id: 'api.check.leaseArgs', text: 'lease, pid, after and before are required' }),
     noVcs: agentMsg({ id: 'api.check.noVcs', text: 'This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card\'s files' }),
+    noCopies: agentMsg({ id: 'api.check.noCopies', text: "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot", note: 'HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0).' }),
     onlyIsolated: agentMsg({ id: 'api.check.onlyIsolated', text: 'Only an agent\'s isolated check puts its launcher in a check copy\'s job' }),
     waiting: agentMsg({ id: 'api.check.waiting', text: 'waiting for {what}' })
   },

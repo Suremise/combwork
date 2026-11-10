@@ -276,7 +276,7 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
  * write, and the lock isn't re-entrant, so a take inside one already held runs straight through.
  */
 const heldStores = new AsyncLocalStorage<ReadonlySet<string>>()
-function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
+export function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
   const key = store.toLowerCase()
   const held = heldStores.getStore()
   if (held?.has(key)) return fn()
@@ -289,7 +289,7 @@ function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
  * lock, the Recycle Bin, the slots' bindings in the workspace database (jjSlotPrep.ts), and §16.3.2's containment on
  * the store for a slot's reuse.
  */
-function jjPort(): JjWorkspacePort {
+export function jjPort(): JjWorkspacePort {
   const known = workspacePortOf('jj')
   if (known) return known as JjWorkspacePort
   const port = createJjWorkspacePort({

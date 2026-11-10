@@ -820,6 +820,19 @@ export class FactStore {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
 
+  /** The provenance epoch's key: the project's stable id (never its name or key, which a rename changes), else its scope. */
+  private epochKey(): string {
+    return `provenance_epoch:${(this.scope.projectId?.() ?? this.scope.project).toLowerCase()}`
+  }
+
+  /**
+   * The project's provenance epoch (HI-2868): how many submissions and adoptions its cards have had recorded, moved in
+   * each one's own transaction. Read in the write under way if there is one.
+   */
+  provenanceEpoch(): number {
+    return this.conn.read((db) => Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.epochKey()) as { value: string } | undefined)?.value ?? 0))
+  }
+
   private metaKey(key: string): string {
     return `workflow:${this.scope.project.toLowerCase()}:${key}`
   }
@@ -838,6 +851,9 @@ export class FactStore {
         const seq = nextSeq(card)
         const full = { ...f, seq, card, at: at() } as Fact<K>
         w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
+        // The project's provenance epoch (HI-2868): moved in the same transaction as every accepted submission or adoption,
+        // so an intent that decided on the provenance before it (jj's attribution) sees it moved in its own write.
+        if (f.kind === 'Submitted' || f.kind === 'Adopted') w.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(this.epochKey())
         return full
       }
       const tx: Tx = {

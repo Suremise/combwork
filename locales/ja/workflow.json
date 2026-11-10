@@ -343,6 +343,8 @@
   "workflow.refused.move.useIntent.next": "代わりに{intent}を使ってください。",
   "workflow.refused.paths.excluded.message": "{card}：{path}は{folder}の中にあります。バージョン管理のないプロジェクトでは、ここは作業に含まれません。",
   "workflow.refused.paths.excluded.next": "{folder}の外にある作業ファイルだけを宣言してください。カードのパスはプロジェクトの作業を絞り込むもので、広げることはありません。",
+  "workflow.refused.platform.jjRefused.message": "{why, select, mergeWorkingCopy {{card}：スロットの作業コピーに親が複数あるため、その作業は一本のコミットの列になっていません。} notFromBase {{card}：スロットの作業がカードのベース {base} から始まっていません。} otherCard {{card}：コミット {commit} は {other} の作業です。} divergent {{card}：コミット {commit} は jj で分岐しています（その変更に表示されるコミットが複数あります）。} conflicted {{card}：コミット {commit} に未解決の競合があります。} tooLong {{card}：作業のコミットが {max, number} 件を超えています。} unbound {{card}：スロットはもうこのカード用に準備されていません。} isolated {{card}：jj プロジェクトにはまだチェック用のコピーがありません。} other {{card}：jj が拒否しました。}}",
+  "workflow.refused.platform.jjRefused.next": "{why, select, mergeWorkingCopy {jj commit で作業をコミットし、作業コピーを親が一つの空の状態にしてから、もう一度提出してください。} notFromBase {作業をカードのベースにリベースするか、カードを開始し直してください。} otherCard {そのカードのコミットをこのカードの作業から外して（それらを除いてリベースして）から、もう一度提出してください。} divergent {jj で分岐を解消してから（どちらかを破棄するか書き直して）、もう一度試してください。} conflicted {jj で競合を解消してから、もう一度試してください。} tooLong {いくつかのコミットを squash でまとめてから、もう一度提出してください。} unbound {カードを戻して、開始し直してください。} isolated {--isolated を付けずに、カードのスロットでチェックをもう一度実行してください。} other {jj でスロットを確認してから、もう一度試してください。}}",
   "workflow.refused.platform.unknown.message": "{card}：Combworkは{what}を読み取れなかったため、ルール「{rule}」を確認できません。",
   "workflow.refused.platform.unknown.next": "「プロバイダーのセットアップ」またはフォルダーを確認してから、もう一度試してください。",
   "workflow.refused.platform.targetGone.message": "{card}は{target}で開始されましたが、このブランチはもうこのリポジトリにありません。",

@@ -89,13 +89,24 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   return out
 }
 
+/**
+ * HI-2868 (J9b1): jj's card work is built behind `start.platformReady`, which stays in every jj ruleset until J9e turns
+ * it on. Tests of the runtime compile jj rulesets without it through this seam alone; J9e removes the seam.
+ */
+let jjCardsReady = false
+
+/** For tests only (HI-2868): compile jj rulesets without `start.platformReady`; false again when done. */
+export function setJjCardsReadyForTests(on: boolean): void {
+  jjCardsReady = on
+}
+
 function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   const g = Object.fromEntries(MOVES.map((m) => [m, [] as GuardId[]])) as Record<MoveId, GuardId[]>
   const review = o.review !== 'none'
   const agent = reviewerAgent(o.review)
   if (o.dependenciesDone) g.start.push('start.notBlocked', 'start.dependenciesIntegrated')
   // HI-2799: a jj card can't start yet (its slot's line under jj is a later card's): refused first, whatever else holds.
-  if (o.platform === 'jj') g.start.push('start.platformReady')
+  if (o.platform === 'jj' && !jjCardsReady) g.start.push('start.platformReady')
   if (o.folder === 'slots') g.start.push('start.slotAvailable')
   g.submit.push('submit.notDuplicate')
   if (needsChange(o)) g.submit.push('submit.ready', 'submit.clean')

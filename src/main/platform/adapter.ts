@@ -31,11 +31,13 @@ export interface StartPlan {
   deliverables?: Manifest
   /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */
   baselineGen?: number
+  /** What only this platform records of the start (`Started.platform`; jj's workspace and its identity, HI-2868). */
+  platform?: Record<string, unknown>
 }
 
 /** A submission's platform side: the revision with its fixed endpoints, key and files, and the guards' platform inputs. */
 export type SubmitPlan =
-  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[] }
+  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[]; platform?: Record<string, unknown> }
   | { ok: false; refusal: GuardRefusal }
 
 /** What a finish needs from the platform, gathered before the transaction. */

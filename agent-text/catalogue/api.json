@@ -528,6 +528,10 @@
   "api.check.leaseArgs": {
     "text": "lease, pid, after and before are required"
   },
+  "api.check.noCopies": {
+    "text": "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot",
+    "note": "HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0)."
+  },
   "api.check.noVcs": {
     "text": "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files"
   },
