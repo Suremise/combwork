@@ -33,8 +33,13 @@ import { jjAttribute, type JjAttribution } from './jjAttribution'
 import { jjBoundary, isRefused as boundaryRefused, type Owner, type StoreLock } from './jjBoundary'
 import { jjCheckEnd, jjCheckStart, jjCredit, jjSameRevision } from './jjChecks'
 import { jjContextOf, type JjContext } from './jjDetect'
-import { jjChainOf, jjPlatform, recordedIds, type JjChainEntry } from './jjFacts'
-import { isRefused as integrationRefused, jjTargetHead, type JjIntegrationDeps } from './jjIntegration'
+import { jjChainOf, jjIntegratedPlatform, jjPlatform, recordedIds, type JjChainEntry, type JjIntegratedIds } from './jjFacts'
+import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHead, observePublish, type JjBundle, type JjIntegrationDeps, type PublishObserved, type PublishTailInput } from './jjIntegration'
+import { jjUnknown } from './jjReads'
+import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
+import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
+import { reconcileJj } from '../workflow/reconcile'
+import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, type JjRunner } from './jjRunner'
 import { jjLineKey } from './jjSlotPrep'
@@ -112,7 +117,24 @@ export interface JjCardDeps {
   pins: { read(ref: string): JjPinRecord | null; write(ref: string, rec: JjPinRecord): Promise<void> }
   /** The Git store's history (Git's port, asked on the store's own folder). */
   history?: HistoryPort
+  /**
+   * J9b2's (HI-2882): the project's canonical id (its rows' scope), the workspace database's file, a synchronous read and
+   * an async write on it (the board's connections), a card and cycle's journalled bundles, and a publish commit sent to
+   * the publish worker with its own cancel fence. Absent: nothing reconciled to Integrated, nothing observed.
+   */
+  records?: {
+    projectId: () => string
+    dbFile: () => string
+    read: <T>(fn: (db: SqlDb) => T) => T
+    write: (fn: (db: SqlDb) => void) => Promise<void>
+    bundles: (card: string, cycle: number) => JjBundle[]
+    publish: (req: PublishCommitRequest) => { answer: Promise<PublishCommitAnswer>; cancel(): void }
+  }
 }
+
+/** The retention pass's page and how often each retained bundle is verified again (HI-2882/s13 §2). */
+export const RETAIN_PAGE = 8
+export const RETAIN_EVERY_MS = 6 * 60 * 60 * 1000
 
 /** A jj refusal of a card's move, worded by its code (`platform.jjRefused`). */
 type JjWhy = 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound'
@@ -301,7 +323,13 @@ export class JjPlatform implements PlatformAdapter {
    */
   async content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null> {
     const e = this.evidence(card, s, o, primed)
-    return e === null ? null : e.replace(/^epoch:\d+\|/, '')
+    if (e === null) return null
+    const parts = e.split('|').filter((x) => !x.startsWith('epoch:'))
+    // A card not started yet (HI-2887, HB6's proof): its start itself makes jj workspaces (the control's, its slot's),
+    // each a jj operation, so the single head moves under it. Leaving the head out here, only that start's own move
+    // gathers it once more (its slot now there, nothing made again); a target that moved is read afresh by that pass.
+    const todo = (primed as Primed | null)?.view === null
+    return (todo ? parts.filter((x) => !x.startsWith('head:')) : parts).join('|')
   }
 
   /** The slot's head as J2 reads it, pinned: `@-` when `@` is empty with one parent, else `@`. */
@@ -485,8 +513,118 @@ export class JjPlatform implements PlatformAdapter {
     return th ? th.head : null
   }
 
-  /** Reconciliation is J9b2's (HI-2882): nothing written for a jj card here. */
-  async reconcile(_card: CardRecord, _hooks: ReconcileHooks): Promise<void> {}
+  /**
+   * A jj card's reconciliation (HI-2882's J9b2): the workflow's `reconcileJj` with this adapter's reads: the slot's head,
+   * J3's sameness, J5's proof for the approved submission, and the Integrated write's rows (obligation, retained bundle).
+   */
+  async reconcile(card: CardRecord, hooks: ReconcileHooks): Promise<void> {
+    const d = this.deps
+    if (!this.wf || !d?.records) return
+    const rec = d.records
+    await reconcileJj(this.wf, card, hooks, {
+      headNow: (_c, s) => this.revisionNow(card, s),
+      same: async (_c, s, approved, head) => {
+        // Every read that can't be made (no context, the target refused or unknown, no merge base, a commit unread, the
+        // view moved, the replay unknown) is unknown, never "not the same" (HR1's round 1).
+        const integ = await d.integration()
+        const ctx = await this.ctxOf(this.wf!.folderOf(s))
+        const th = integ && s.started?.target ? await jjTargetHead(integ, s.started.target) : null
+        if (!ctx || !th || isJjUnknown(th) || integrationRefused(th)) return { unknown: 'sameness:target' } // i18n-ignore: a protocol code, for the log
+        const b = await this.H.mergeBase(ctx.store, th.head, head)
+        if (isUnknown(b) || !b) return { unknown: 'sameness:mergeBase' } // i18n-ignore: a protocol code, for the log
+        const reads = new JjReads({ folder: this.wf!.folderOf(s), jjRepo: ctx.jjRepo }, this.runner())
+        const op = reads.head()
+        if (isJjUnknown(op)) return { unknown: 'sameness:heads' } // i18n-ignore: a protocol code, for the log
+        const [a, n] = await Promise.all([reads.commitAt(op, approved.revision), reads.commitAt(op, head)])
+        if (isJjUnknown(a) || isJjUnknown(n) || !reads.stillAt(op)) return { unknown: 'sameness:commits' } // i18n-ignore: a protocol code, for the log
+        let unread = false
+        const same = await jjSameRevision({ base: approved.base, commit: a }, { base: b, commit: n }, async (x, y) => {
+          const v = await this.H.sameChange(ctx.store, x, y)
+          if (isUnknown(v)) unread = true
+          return v === true
+        })
+        return unread ? { unknown: 'sameness:replay' } : { same, base: b } // i18n-ignore: a protocol code, for the log
+      },
+      prove: async (_c, s, approved) => {
+        const integ = await d.integration()
+        if (!integ || !s.started?.target) return { unknown: 'notComposed' }
+        const project = rec.projectId()
+        const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
+        const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
+        if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
+        if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
+        if (!p.containment || !p.provenance) return { contained: false }
+        return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
+      },
+      record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row))
+    })
+  }
+
+  /**
+   * The repository watch's invalidation (HI-2882/s13 §2–3): a bundle's pins changed (that row due), packed refs or a watch
+   * re-armed (every row due), each wanting a run; the minute's tick wants one only while any row is due.
+   */
+  async invalidated(what: string): Promise<boolean> {
+    const rec = this.deps?.records
+    if (!rec) return false
+    const project = rec.projectId()
+    if (what === 'tick') return rec.read((db) => anyRetainedDue(db, project, Date.now(), RETAIN_EVERY_MS))
+    if (what === 'retained:*') {
+      await rec.write((db) => markRetainedDue(db, project, null))
+      return true
+    }
+    const m = /^retained:(.+):(\d+):([^:]+)$/.exec(what)
+    if (m) await rec.write((db) => markRetainedDue(db, project, { card: m[1], cycle: Number(m[2]), bundle: m[3] }))
+    return true
+  }
+
+  /**
+   * Once per reconciliation run (HI-2882/s13, the reconciler's): each target's publish observation (J5's, its tail in the
+   * publish worker's transaction, cancelled with `signal`), then one fair page of retained bundles verified (J5's
+   * `ensureRetained`), every visit recorded whatever its outcome. `more`: due bundles remain after the page.
+   */
+  async afterRun(signal?: AbortSignal): Promise<{ more: boolean }> {
+    const d = this.deps
+    const rec = d?.records
+    if (!this.wf || !d || !rec) return { more: false }
+    const integ = await d.integration()
+    if (!integ) return { more: false }
+    const project = rec.projectId()
+    const reader: SqlDb = {
+      prepare: (sql) => ({
+        all: (...a) => rec.read((db) => db.prepare(sql).all(...a)),
+        get: (...a) => rec.read((db) => db.prepare(sql).get(...a)),
+        run: () => {
+          throw new Error('the publish observation writes only in its worker') // i18n-ignore: a programming error, never shown
+        }
+      })
+    }
+    for (const target of rec.read((db) => publishTargets(db, project))) {
+      if (signal?.aborted) return { more: false }
+      const identity = { repo: folderIdentity(integ.view.jjRepo), store: folderIdentity(integ.view.store) }
+      const commit = async (tail: PublishTailInput): Promise<PublishObserved> => {
+        const h = rec.publish({ tail, project, file: rec.dbFile(), identity })
+        const cancel = (): void => h.cancel()
+        signal?.addEventListener('abort', cancel, { once: true })
+        if (signal?.aborted) h.cancel()
+        try {
+          const a = await h.answer
+          return 'stale' in a ? jjUnknown('moved', a.stale) : a
+        } finally {
+          signal?.removeEventListener('abort', cancel)
+        }
+      }
+      await observePublish({ ...integ, ...(signal ? { signal } : {}), commit }, target, sqlObligations(reader, project))
+    }
+    const page = rec.read((db) => dueRetained(db, project, Date.now(), RETAIN_EVERY_MS, RETAIN_PAGE))
+    for (const row of page.rows) {
+      if (signal?.aborted) return { more: false }
+      const r = await ensureRetained(integ, row.card, row.cycle, rec.bundles(row.card, row.cycle), row.bundle)
+      const outcome = isJjUnknown(r) ? `unknown:${r.jjUnknown}` : integrationRefused(r) ? `refused:${r.refused}` : 'held'
+      await rec.write((db) => retainedVisited(db, project, row, Date.now(), outcome))
+    }
+    return { more: page.more }
+  }
 
   /**
    * A jj check (§16.13, J3's bracket, s10 §4), in one call: the run's folder's view, B1 (the snapshot under the store's

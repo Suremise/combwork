@@ -17,7 +17,7 @@ import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
-import { branchExists, projectTargets } from './targets'
+import { branchExists, forwardSources, projectTargets } from './targets'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
@@ -128,7 +128,9 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
-  if (window && targets.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, targets)
+  // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
+  const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
+  if (sources.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, sources)
   return views
 }
 
@@ -141,9 +143,9 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
   return out
 }
 
-/** A target's forward merges (HI-2679): the project's other targets, and how far behind each it is. */
-async function forwardOfTarget(projectPath: string, to: string, targets: readonly string[]): Promise<QueueForward> {
-  const others = targets.filter((b) => b !== to)
+/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources), and how far behind each it is. */
+async function forwardOfTarget(projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
+  const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
   for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
   return { others, behind }
@@ -450,7 +452,7 @@ const FORWARD_TEXT = {
   description: msg({ id: 'service.forward.description', defaultMessage: 'Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.', description: 'HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there.' }),
   byUser: msg({ id: 'service.forward.byUser', defaultMessage: 'you', description: 'HI-2679: who asked for a forward merge, in its card’s description: the user.' }),
   byAssistant: msg({ id: 'service.forward.byAssistant', defaultMessage: 'the Assistant', description: 'HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant.' }),
-  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} and {to} must be two different branches this project merges work into: {targets}.', description: 'HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.' }),
+  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.', description: 'HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.' }),
   missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
   raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
@@ -458,7 +460,8 @@ const FORWARD_TEXT = {
 
 /**
  * Brings `to` up to date with `from` (HI-2679, SPEC §16.9): a forward merge, the user's or the Assistant's alone (`actor`;
- * the Assistant's guard checked again inside each write). Both must be the project's existing targets, and different.
+ * the Assistant's guard checked again inside each write). `to` must be one of the project's existing targets, `from` another
+ * of them or the repository's default branch (HI-2885: main into the next version, after a release).
  * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
  * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
  */
@@ -468,7 +471,9 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   const wf = await workflowFor(ws, projectPath)
   if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
   const all = [t.default, ...t.others]
-  if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
+  // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
+  const sources = await forwardSources(ws, projectPath, all)
+  if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
   const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys

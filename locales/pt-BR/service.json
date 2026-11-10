@@ -74,7 +74,7 @@
   "service.forward.missing": "{unknown, select, yes {O Combwork não consegue ler o branch {branch}, então nada foi posto na fila.} other {Não há nenhum branch {branch} neste repositório, então nada foi posto na fila.}}",
   "service.forward.noGit": "Este projeto não faz merge de trabalho pela fila de merge do Combwork, então não tem nada para atualizar.",
   "service.forward.notAgents": "Só o usuário ou o Assistente atualiza um branch com outro.",
-  "service.forward.notTargets": "{from} e {to} precisam ser dois branches diferentes em que este projeto faz merge de trabalho: {targets}.",
+  "service.forward.notTargets": "Não é possível trazer {from} para {to}: {to} precisa ser um branch em que este projeto faz merge de trabalho ({targets}), e {from} outro branch entre {sources}.",
   "service.forward.raced": "O cartão do merge de atualização mudou enquanto era posto na fila, então nada mais foi feito: veja o cartão e peça de novo se for preciso.",
   "service.forward.title": "Atualizar {to} com {from}",
   "service.fsutil.keptBusy": "{file} está sendo salvo por outro programa: nada foi alterado. Tente de novo em instantes.",

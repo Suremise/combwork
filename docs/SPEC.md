@@ -3037,6 +3037,34 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   publication, resumed without a second write) and `tests/jjSlotPoolPrep.test.ts` (the pool's own prepare, settle after
   integration, kept when not integrated, and the recovery action).
 
+##### jj's control workspace (HI-2887)
+
+Every jj slot and copy is added and forgotten from a control workspace of Combwork's own (J2's, s21 §4: sparse and empty,
+so its own snapshot records nothing). jj can only add that first workspace from the project folder (`workspace add`
+refuses `--ignore-working-copy`, probed on 0.47.1), which snapshots the user's working copy. **Darren's decision (r9 on
+HI-2887, 10 Nov): it's made automatically**, the first time a jj slot is needed, provided no Combwork agent works in the
+project folder. J2's rename probe of the project folder (which an editor or terminal open in it always fails) is replaced
+by a **launch hold** (`launchHolds.ts`): under the store's lock the making holds the project folder, refused while any
+session is admitted or live in it; a session's start is admitted where its folder becomes known (sessions.ts' `start`,
+before anything is launched), waiting while a hold covers it; each side one synchronous step; released however the
+making ends. Logged, and the user guide's jj section says it.
+- **Each making is its own attempt**, its record journalled before each step and decided again inside the store's lock:
+  `intent` (a fresh token), `folder` (a token folder Combwork makes itself, empty, under `.cw-jj-controls`, its
+  generation recorded), `ready` (`jj workspace add <token>/ws` under the attempt's own name `cw-<hash>-control-<token>`,
+  `ws`'s generation recorded). A ready control is used only while both generations, its checkout's name, its store and
+  its empty sparse state hold.
+- **Recovery never deletes anything unproved:** an interrupted attempt is never adopted (a child with no recorded
+  baseline proves nothing); an empty token folder of its own is removed (`rmdir`, never recursive); anything else, and any
+  registration under its name, is kept as a residue the record lists, reported, for the user to remove (the pool's prune
+  forgets a residue registration whose folder is gone, from the next control: no snapshot). A first set-up interrupted
+  before it was ever ready is made again; **a control that was ready once and is lost is made again automatically too**
+  (Darren's (a) on HI-2887, 10 Nov: under the same condition, recording the working copy again); the port refuses it
+  unless its composition allows it (`remakeAllowed`, the app's: true).
+- **Tests:** `tests/jjControl.test.ts` (the real jj, both modes: made with the project folder held open and an uncommitted
+  edit recorded into the user's `@`, refused with an agent there; each crash point; a replaced `ws`; a user's file kept;
+  an empty attempt folder removed; a lost control refused without `remakeAllowed`, made again with it; two makings at once; a
+  replacement while the lock is awaited), `tests/launchHolds.test.ts`.
+
 ##### jj cards in the runtime, through Review (1.5.0's J9b1, HI-2868)
 
 J9b is split: J9b1 (this) a jj card's start, submission, checks and sameness, through Review to Approved; J9b2 (HI-2882)
@@ -3133,6 +3161,53 @@ Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-
   J9e removes it with the seam.
 - **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
   project's worktrees folder is absent before its first slot).
+##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
+
+Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
+Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
+- **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
+  the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
+  journalled bundles, every bundle an Integrated fact already names as consumed, no J4 candidates: the user's own merge,
+  fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
+  result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
+  proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
+  depends on is undone, its obligation and retained-bundle rows in the same transaction, then Done (an Integrated fact
+  recorded while the rules were off is applied once they're on, with no second proof or rows). Not contained: Git's
+  stale and carry-over rules on the jj head (J3's sameness; a sameness that can't be read is unknown, never Stale).
+  Refused or unknown: nothing written, never "not integrated". J5's bundle journal is merged in one write, never
+  replaced, so a concurrent observer's proof never erases the bundle the Integrated fact names (HR1's round 1). **Not offered for jj in 1.5.0:** InTarget (Review), MergedInPart (Active) and LeftTarget (Done): each
+  would need a containment decision outside J5's proof; `contains` stays a typed unknown.
+- **The records** (board migration 29, `schema/jjPublishStep.ts`), every key and query scoped by the project's canonical
+  id: `jj_obligations` (HI-2873's publish obligations, indexed by target and state and by target and seq),
+  `jj_oblig_targets` (each target's settle sequence and re-check sweep) and `jj_retained` (each Integrated card's retained
+  bundle, when it was last verified and how). `sqlObligations` (platform/jjObligations.ts) is HI-2873's store in SQL: each
+  change one compare-and-set statement, owed rows read whole (never truncated), settled history only through the indexed,
+  limited re-check page; nothing cached in memory.
+- **The publish observation** runs once per reconciliation run per target with owed or settled rows (the adapter's
+  `afterRun`, which the reconciler calls after each project run, unfinished cards or none). J5's `observePublish` decides
+  on main as before (its processes through jj's worker); its synchronous tail (the validator's file reads, then the
+  re-check and the settles: `jjPublishTail.ts`) runs in **jj's publish worker** (`jjPublishWorker.ts`) on a connection of
+  its own, in one `BEGIN IMMEDIATE` transaction: the request's cancel fence (a shared flag the follow sets synchronously
+  as it drops), the repository's and the store's identity (their folders' file ids and birth times), the database binding,
+  the tail, the fence again, the commit; anything failing rolls it back. Two Combworks are independent observers: SQLite
+  serializes their transactions and the compare-and-sets keep one winner; no owner. `checkThis` stays for the window
+  (J9c): nothing automatic moves it.
+- **Retention:** each run verifies a fair page of 8 due retained bundles (J5's `ensureRetained`), oldest first; a visit
+  completes its due whatever the outcome (kept for the window), so a broken bundle never starves the rest. Due: marked by
+  an invalidation, or verified longer than 6 hours ago. While more are due, a continuation run follows after 2 s (a timer,
+  while the follow lives).
+- **The watch** (`jjRepoWatch.ts`, the reconciler's beside the watcher's, by platform): one watch on the operation heads,
+  one recursive watch on the store's refs, one on the store's folder for `packed-refs`, one minute's timer that re-arms
+  what is missing and reads the operation heads (nothing more on main: no file loop over refs); every jj operation (a
+  slot's commit included) and every branch ref's change (a raw Git move) schedules a run; a change under a bundle's pins
+  marks that bundle due, `packed-refs` or an armed watch (at the start, an open or reopen, too) marks every bundle due;
+  disposed with the project's follow (which sets its requests' fences first).
+- **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
+  unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
+  published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,
+  project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
+  before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
+  pins, re-armed, disposed).
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -5144,6 +5219,16 @@ along the other's first-parent history it lacks (`git rev-list --count --first-p
 merge commit or squashed counts once, a rebased one per commit), kept by both heads (at most 64 pairs), null when a head
 can't be read; the window's listing includes every existing target, so a destination with nothing queued shows while it
 is behind. Automatic forward merges are later (they would refuse cycles).
+
+**`main` as a source (HI-2885, design s10).** A forward merge's `to` is one of the project's targets; its `from` is
+another of them or the repository's default branch (`G.defaultBranch`: `main` after a release, into the next version),
+whether or not that is a target, only when git names it and it exists (`forwardSources`, targets.ts); anything else is
+refused, naming both lists. The queue card's sources are that set, so a project with one target shows Bring Up to Date…
+with `main`. A forward entry counts as already in the destination only when its frozen source is an ancestor of it
+(merged or fast-forwarded), never by the same tree or a squash: one whose files the destination holds already (it was
+brought up to date with the release branch, and only the pull request's merge commit is new) is still merged, a `--no-ff`
+merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
+refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
 
 #### 16.9.2 Advancing the target
 

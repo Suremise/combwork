@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **`main` into the next version after a release** (HI-2885). **Bring Up to Date…** on a merge queue's card now offers the repository's default branch (`main`) too, even when it isn't one of the branches the project merges work into, and even when the project merges into only one. It lands as a merge commit through the merge checks even when the next version already has every file of `main`'s, where before it was taken as merged already and nothing was merged.
+
 ## 1.3.0 — 2026-11-10
 
 ### Added

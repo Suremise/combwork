@@ -175,4 +175,14 @@ export interface PlatformAdapter {
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
   observe(onChange: (e: ObserveEvent) => void): Disposable
+  /**
+   * Once per reconciliation run of the project, after its cards (HI-2882, jj's): the platform's own passes (jj's publish
+   * observations and retained bundles). `more`: work remains for a continuation run. Absent: nothing.
+   */
+  afterRun?(signal?: AbortSignal): Promise<{ more: boolean }>
+  /**
+   * Something its repository watch says may have changed, or its tick (HI-2882): `what` as the watch names it. Whether a
+   * reconciliation run is wanted for it. Absent: always.
+   */
+  invalidated?(what: string): Promise<boolean>
 }

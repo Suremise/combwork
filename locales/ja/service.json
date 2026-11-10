@@ -74,7 +74,7 @@
   "service.forward.missing": "{unknown, select, yes {Combworkはブランチ{branch}を読み取れないため、何もキューに追加しませんでした。} other {このリポジトリにはブランチ{branch}がないため、何もキューに追加しませんでした。}}",
   "service.forward.noGit": "このプロジェクトはCombworkのマージキューで作業をマージしないため、最新にするものはありません。",
   "service.forward.notAgents": "ブランチを別のブランチで最新にできるのは、ユーザーかアシスタントだけです。",
-  "service.forward.notTargets": "{from}と{to}は、このプロジェクトが作業をマージする異なる2つのブランチである必要があります：{targets}。",
+  "service.forward.notTargets": "{from}を{to}に取り込めません。{to}はこのプロジェクトが作業をマージするブランチ（{targets}）、{from}は{sources}のうちの別のブランチである必要があります。",
   "service.forward.raced": "キューに追加する間に最新化のマージのカードが変更されたため、それ以上は何もしませんでした。カードを確認し、必要ならもう一度依頼してください。",
   "service.forward.title": "{to}を{from}で最新にする",
   "service.fsutil.keptBusy": "{file}は別のプログラムが保存中です。何も変更していません。少し待ってからもう一度お試しください。",
