@@ -49,8 +49,8 @@ const A = {
   }),
   stop: agentMsg({
     id: 'contract.agent.stop',
-    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`, and end anything you started that won't end by itself before your card ends, unless the user wants it running.",
-    note: '#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once.'
+    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`, and end anything you started that won't end by itself before your card ends, unless the user wants it running. End a process only by its handle or the identity you took (pid and start time, job), never by name or a `ps`/`grep` pattern: other lanes' runs (cw-progress, tests) share the machine.",
+    note: "#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once. HI-2865: an agent of another project ended every lane's cw-progress runs with `ps -ef | grep cw-progress | xargs kill` (Git Bash's ps lists all the user's processes); their tests ended with exit 143."
   }),
   inboxRule: agentMsg({
     id: 'contract.inbox.rule',
