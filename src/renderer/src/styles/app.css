@@ -15423,3 +15423,8 @@ button.progress-lane-retry {
 .ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
 .ignore-rule-file .monaco { height: 100%; }
+
+/* jj's leftovers (HI-2869): a long path wraps rather than pushing its button out of the panel. */
+.jj-leftovers code {
+  overflow-wrap: anywhere;
+}

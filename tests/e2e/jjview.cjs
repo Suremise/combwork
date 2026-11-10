@@ -200,8 +200,11 @@ function jjRepo(dir, o = {}) {
       }
     })()
     check('…the journal keeps the kept one only', control.residues.length === 1 && control.residues[0].path === kept && fs.existsSync(kept), JSON.stringify(control))
+    // The switch's notices would cover the panels: hidden for their shots (the window's own, as is).
+    const quiet = await page.addStyleTag({ content: '.toasts { display: none !important; }' })
     await shoot(toCheck, 'to-check')
     await shoot(leftovers, 'leftovers')
+    await quiet.evaluate((el) => el.remove())
     await toCheck.locator('[data-jj-to-check-row="SHOP-1"] [data-jj-mark-checked]').click()
     const ask = dialog.filter({ hasText: 'Mark SHOP-1 as checked?' })
     check('Mark as checked asks first, saying nothing changes in the repository', !!(await until(async () => (await ask.count()) === 1 && /changes nothing in the repository/.test(await text(ask)), HUNG_MS)), await text(dialog))
