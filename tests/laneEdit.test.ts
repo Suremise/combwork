@@ -176,6 +176,38 @@ describe('editLanes (HI-2898)', () => {
     expect(rec.pending).toBeUndefined()
   })
 
+  it("refuses to bring back a card taken off that was started since and returned to Todo, keeping its work (HR1's round 1)", async () => {
+    const [a, b] = [await make('A'), await make('B')]
+    const l = await start('b1', [a, b])
+    const r = await edit({ op: 'remove', lane: l.id, rev: 0, card: b })
+    expect(r.undo?.back).toEqual([{ number: b, head: expect.anything(), work: false }])
+    // Started by another agent outside the lane, then back in Todo, given to nobody: its start stays in its facts.
+    await doing(b, 'b3')
+    await run(() => tasks.updateTask(b, { column: 'todo', agent: null }, user))
+    await expect(edit({ op: 'undo', undo: r.undo! })).rejects.toThrow(/changed since/)
+    expect((await raw(l.id)).cards).toEqual([a])
+    // Even with its history head as the edit left it, work it gained since refuses the undo.
+    const forged = { ...r.undo!, back: [{ number: b, head: (await card(b)).history.at(-1)?.id ?? null, work: false }] }
+    await expect(edit({ op: 'undo', undo: forged })).rejects.toThrow(/keeps work/)
+    // And with no record of the card at all, nothing comes back.
+    await expect(edit({ op: 'undo', undo: { ...r.undo!, back: [] } })).rejects.toThrow(/changed since/)
+    expect((await raw(l.id)).cards).toEqual([a])
+  })
+
+  it('refuses to bring back a card taken off that was given to another agent since, restoring nothing', async () => {
+    const [a, b] = [await make('A'), await make('B')]
+    const l = await start('b1', [a, b])
+    const r = await edit({ op: 'remove', lane: l.id, rev: 0, card: b })
+    await run(() => tasks.updateTask(b, { agent: 'b3' }, user))
+    await expect(edit({ op: 'undo', undo: r.undo! })).rejects.toThrow(/changed since/)
+    expect((await raw(l.id)).cards).toEqual([a])
+    expect((await card(b)).agent).toBe('b3')
+    // Given back to nobody: the same state, but a new history entry, so still refused.
+    await run(() => tasks.updateTask(b, { agent: null }, user))
+    await expect(edit({ op: 'undo', undo: r.undo! })).rejects.toThrow(/changed since/)
+    expect((await raw(l.id)).cards).toEqual([a])
+  })
+
   it('refuses a card from another project, a Done one, one not in To do, one already there, and one on another lane', async () => {
     const [a, b, x] = [await make('A'), await make('B'), await make('X')]
     const other = await make('Other', { project: 'beta' })
@@ -307,7 +339,7 @@ describe('editLanes (HI-2898)', () => {
     const [a, b] = [await make('A'), await make('B')]
     const l = await start('b1', [a, b])
     await doing(a, 'b1')
-    await expect(edit({ op: 'undo', undo: { lanes: [{ before: { lane: l.id, cards: [b, a], pending: null }, rev: 0 }], card: null } })).rejects.toThrow(/keep their places/)
+    await expect(edit({ op: 'undo', undo: { lanes: [{ before: { lane: l.id, cards: [b, a], pending: null }, rev: 0 }], card: null, back: [] } })).rejects.toThrow(/keep their places/)
     expect((await raw(l.id)).cards).toEqual([a, b])
   })
 

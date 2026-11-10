@@ -100,7 +100,10 @@ export function laneEditOf(v: unknown): LaneEdit {
       if (lanes.length === 2 && lanes[0].before.lane === lanes[1].before.lane) return bad()
       const c = u.card
       if (c !== null && (!isObj(c) || !isCard(c.number) || !agentOrNull(c.before) || !agentOrNull(c.after) || (c.head !== null && (typeof c.head !== 'string' || !HISTORY_ID.test(c.head))))) return bad()
-      return { op: 'undo', undo: { lanes, card: c === null ? null : { number: c.number as number, before: c.before as string | null, after: c.after as string | null, head: c.head as string | null } } }
+      const back = u.back
+      if (!Array.isArray(back) || back.length > MAX_LIST) return bad()
+      const backs = back.map((x: unknown) => (isObj(x) && isCard(x.number) && (x.head === null || (typeof x.head === 'string' && HISTORY_ID.test(x.head))) && typeof x.work === 'boolean' ? { number: x.number, head: x.head as string | null, work: x.work } : bad()))
+      return { op: 'undo', undo: { lanes, card: c === null ? null : { number: c.number as number, before: c.before as string | null, after: c.after as string | null, head: c.head as string | null }, back: backs } }
     }
     default:
       return bad()
@@ -249,6 +252,8 @@ interface Plan {
   brings: { card: number; into: LaneRecord; leaving: LaneRecord | null } | null
   /** An undo's card: its agent put back, while it is as the edit left it. */
   undoCard: LaneEditUndo['card']
+  /** An undo's cards brought back, as the edit left them. */
+  back: LaneEditUndo['back']
   /** Each project's own Merges into, for the target check. */
   def: Map<string, string | null>
 }
@@ -259,7 +264,7 @@ const placeAt = (list: readonly number[], at: number | undefined): number => (at
 function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<string, string | null>): Plan {
   if (e.op === 'undo') {
     const ls = e.undo.lanes.map((u) => ({ lane: laneSeen(ws, lanes, u.before.lane, u.rev), next: [...(u.before.pending ?? u.before.cards)], restore: { cards: [...u.before.cards], pending: u.before.pending ? [...u.before.pending] : null } }))
-    return { op: e.op, card: e.undo.card?.number ?? null, lanes: ls, brings: null, undoCard: e.undo.card, def }
+    return { op: e.op, card: e.undo.card?.number ?? null, lanes: ls, brings: null, undoCard: e.undo.card, back: e.undo.back, def }
   }
   if (e.op === 'transfer') {
     const from = laneSeen(ws, lanes, e.from.lane, e.from.rev)
@@ -267,23 +272,23 @@ function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<s
     if (from === to) refuse(ws, 409, M.already, { card: cardRef(e.card) })
     const into = working(to).filter((n) => n !== e.card)
     into.splice(placeAt(into, e.at), 0, e.card)
-    return { op: e.op, card: e.card, lanes: [{ lane: from, next: working(from).filter((n) => n !== e.card) }, { lane: to, next: into }], brings: { card: e.card, into: to, leaving: from }, undoCard: null, def }
+    return { op: e.op, card: e.card, lanes: [{ lane: from, next: working(from).filter((n) => n !== e.card) }, { lane: to, next: into }], brings: { card: e.card, into: to, leaving: from }, undoCard: null, back: [], def }
   }
   const l = laneSeen(ws, lanes, e.lane, e.rev)
   const list = working(l)
   if (e.op === 'cancel') {
     if (!l.pending) refuse(ws, 409, M.noQueued, { lane: pairOf(l) })
-    return { op: e.op, card: null, lanes: [{ lane: l, next: [...l.cards], cancel: true }], brings: null, undoCard: null, def }
+    return { op: e.op, card: null, lanes: [{ lane: l, next: [...l.cards], cancel: true }], brings: null, undoCard: null, back: [], def }
   }
-  if (e.op === 'remove') return { op: e.op, card: e.card, lanes: [{ lane: l, next: list.filter((n) => n !== e.card) }], brings: null, undoCard: null, def }
+  if (e.op === 'remove') return { op: e.op, card: e.card, lanes: [{ lane: l, next: list.filter((n) => n !== e.card) }], brings: null, undoCard: null, back: [], def }
   if (e.op === 'move') {
     const next = list.filter((n) => n !== e.card)
     next.splice(Math.max(0, Math.min(next.length, Number.isInteger(e.to) ? e.to : next.length)), 0, e.card)
-    return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: null, undoCard: null, def }
+    return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: null, undoCard: null, back: [], def }
   }
   const next = [...list]
   next.splice(placeAt(list, e.at), 0, e.card)
-  return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: { card: e.card, into: l, leaving: null }, undoCard: null, def }
+  return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: { card: e.card, into: l, leaving: null }, undoCard: null, back: [], def }
 }
 
 /** The last entry of a card's history: what an undo of its assignment is bound to (an entry is never written twice). */
@@ -299,6 +304,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
   const on = await lanesEnforced()
   let before: LaneListState[] = []
   let cardUndo: LaneEditUndo['card'] = null
+  let back: LaneEditUndo['back'] = []
   let queued: { lane: string; queuedAfter: number | null }[] = []
   const done = await mutateInBoard(
     ws,
@@ -311,6 +317,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
     async (lanes, p, checks) => {
       before = p.lanes.map((x) => stateOf(x.lane))
       cardUndo = null
+      back = []
       queued = []
       const defOf = (l: LaneRecord): string | null => p.def.get(l.project.toLowerCase()) ?? null
       // Checked under the board's lock, before anything is written, on the board as it is now.
@@ -323,8 +330,8 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         // An undo sets the applied list back too: its fixed start kept there as well.
         if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)
         keepsDependencies(ws, x.lane, was, x.next)
-        // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, but
-        // from the lane it leaves in this undo, and without the earlier-work check (it had none as it left).
+        // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, from
+        // the lane it leaves in this undo; its earlier work, assignment and history are checked against the token below.
         if (p.op === 'undo') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null, fresh: true, work: false, def: defOf(x.lane) })
       }
       if (p.brings) bringable(ws, lanes, p.brings.into, p.brings.card, { leaving: p.brings.leaving, fresh: true, work: true, def: defOf(p.brings.into) })
@@ -332,6 +339,20 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
       // to another agent than the lane's builder is given to nobody, so the lane takes it next; taken back by an undo only
       // while it is exactly as the edit left it.
       await inWorkspace(ws, async () => {
+        // An undo brings a card back only as the edit left it (HR1's round 1): its last history entry the same (not
+        // started, given to anyone or moved since), given to nobody or to the lane's builder, and with no earlier work it
+        // didn't have then. Checked before the undo gives any card its agent back.
+        if (p.op === 'undo') {
+          for (const x of p.lanes) {
+            const was = working(x.lane)
+            for (const n of x.next.filter((c) => !was.includes(c))) {
+              const b = p.back.find((y) => y.number === n)
+              const c = await getTask(n, ws)
+              if (!b || headOf(c) !== b.head || (c.agent && c.agent !== x.lane.builder.id && c.agent !== p.undoCard?.after)) refuse(ws, 409, M.cardChanged, { card: cardRef(n) })
+              if (!b.work && keepsWork(ws, x.lane, n)) refuse(ws, 409, M.kept, { card: cardRef(n) })
+            }
+          }
+        }
         if (p.brings) {
           const n = p.brings.card
           const into = p.brings.into
@@ -372,12 +393,25 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         }
         l.updatedAt = new Date().toISOString()
       }
+      // What its undo needs of each card it took off a lane (as it leaves this change: Move here's after its assignment).
+      if (p.op !== 'undo') {
+        await inWorkspace(ws, async () => {
+          for (const [i, x] of p.lanes.entries()) {
+            const b = before[i]
+            const now = working(x.lane)
+            for (const n of (b.pending ?? b.cards).filter((c) => !now.includes(c) && !back.some((y) => y.number === c))) {
+              const head = cardUndo?.number === n ? cardUndo.head : headOf(await getTask(n, ws))
+              back.push({ number: n, head, work: keepsWork(ws, x.lane, n) })
+            }
+          }
+        })
+      }
       return p
     }
   )
   // The revision each lane's save left it at: write() moved it on, on these records, in the save's transaction.
   const revOf = new Map(done.lanes.map((x) => [x.lane.id, x.lane.listRev ?? 0]))
-  const undo: LaneEditUndo | null = done.op === 'undo' ? null : { lanes: before.map((b) => ({ before: { lane: b.lane, cards: b.cards, pending: b.pending }, rev: revOf.get(b.lane) ?? 0 })), card: cardUndo }
+  const undo: LaneEditUndo | null = done.op === 'undo' ? null : { lanes: before.map((b) => ({ before: { lane: b.lane, cards: b.cards, pending: b.pending }, rev: revOf.get(b.lane) ?? 0 })), card: cardUndo, back }
   log.info(`Lane edit (${done.op}) by the user: ${done.lanes.map((x) => `${x.lane.id} ${userText((x.lane.pending ?? x.lane.cards).map((n) => `#${n}`).join(', '))}`).join('; ')}`)
   // The builders of the lanes it changed, started on them if they aren't running (as laneStartCall does for the user's
   // and the Assistant's update of a lane); one that is running reads its list with cw_lane next.

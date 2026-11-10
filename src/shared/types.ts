@@ -4451,12 +4451,18 @@ export interface LaneListState {
 
 /**
  * What undoing a window edit of lanes needs (HI-2898): each lane's list before it and the revision the edit left it at,
- * and the card's agent before and after when the edit changed it, with the card's history entry the edit left (its
- * token: any change of the card since moves it on). Undone whole or not at all.
+ * the card's agent before and after when the edit changed it, with the card's history entry the edit left (its token:
+ * any change of the card since moves it on), and the cards it would bring back. Undone whole or not at all.
  */
 export interface LaneEditUndo {
   lanes: { before: Omit<LaneListState, 'rev'>; rev: number }[]
   card: { number: number; before: string | null; after: string | null; head: string | null } | null
+  /**
+   * Each card the undo would bring back onto a lane (one the edit took off, or Move here's), as the edit left it: its last
+   * history entry, and whether it kept work from an earlier start then. The undo is refused once one of them changed
+   * since (started, given to an agent, moved), or gained such work (HR1's round 1).
+   */
+  back: { number: number; head: string | null; work: boolean }[]
 }
 
 /** What a window edit of lanes did (HI-2898): for its notification, and its Undo (null: nothing to undo). */

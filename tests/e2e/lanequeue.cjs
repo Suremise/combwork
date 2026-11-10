@@ -108,6 +108,8 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('…its card in flight with a lock, not movable', (await row(la, a1).locator('.progress-lane-queue-lock').count()) === 1 && !/\bmovable\b/.test((await row(la, a1).getAttribute('class')) ?? ''))
   check('…its waiting cards with grips and ×', (await lane(la).locator('.progress-lane-queue-row.movable .progress-lane-queue-grip').count()) === 3 && (await lane(la).locator('.progress-lane-queue-remove').count()) === 3)
   const toast = (re) => page.locator('.toast', { hasText: re }).last()
+  // The theme's repaint drawn: two animation frames after its condition (a condition, never a fixed time).
+  const painted = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true)))))
   // The pop-ups sit over the panel's bottom right: closed before a click there (each has its ×).
   const clearToasts = async () => {
     for (let i = 0; i < 20 && (await page.locator('.toast .popup-close').count()); i++) await page.locator('.toast .popup-close').first().click().catch(() => undefined)
@@ -138,7 +140,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(250)
+    await painted()
     await page.screenshot({ path: path.join(shots, `queue-refused-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -221,7 +223,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(250)
+    await painted()
     await page.screenshot({ path: path.join(shots, `ended-today-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
