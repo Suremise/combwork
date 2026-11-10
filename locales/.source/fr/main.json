@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "Resumed: {names}.",
   "main.restart.why.expired": "it waited more than a day",
   "main.restart.why.held": "its working folder is held for other work (resume it by hand)",
+  "main.restart.why.idle": "it was idle, with no card or lane waiting for it",
   "main.restart.why.movedOn": "it has a newer conversation",
   "main.restart.why.notReady": "it didn't get ready in time, so it was stopped",
   "main.restart.why.notStopped": "it didn't get ready in time and hasn't stopped yet; the others resume once it has",
