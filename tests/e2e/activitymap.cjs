@@ -203,15 +203,19 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await rings.filter({ hasText: 'HB2' }).click()
     check("a click on HB2's ring shows its map alone", !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'single' && /HB2/.test(await page.locator('.activity-map-centre').evaluate((e) => e.textContent).catch(() => '')), HUNG_MS, 250)))
 
-    // --- Hide finished, as the list has it: both agents idle, no map; off again, the map is back.
+    // --- Hide finished, as the list has it, on a frozen snapshot that has settled (nothing new comes in to redraw it, HR2's
+    // round 2): both agents idle, no map; off again, the map is back.
     await head.locator('.activity-pick').first().click()
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+    if ((await head.getByRole('button', { name: 'Pause', exact: true }).count()) === 1) await head.getByRole('button', { name: 'Pause', exact: true }).click()
+    await head.getByRole('button', { name: 'Refresh', exact: true }).click()
+    await lib.until(async () => (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1 && (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
     await head.locator('.activity-hide input').check()
-    check('the project tab, Hide finished on and both agents idle: no map, as the list shows nothing', !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250)))
+    check('the project tab, frozen, Hide finished on and both agents idle: no map, as the list shows nothing', !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250)))
     await head.locator('.activity-hide input').uncheck()
-    check('…Hide finished off: the shared map again', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
+    check('…Hide finished off, still frozen: the shared map again', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)) && (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1)
 
     // --- The workspace's Activity (the activity bar): its own Hide finished (on), then its shared map, and its held read.
     await page.locator('.activity-btn[aria-label="Activity"]').click()

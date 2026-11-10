@@ -252,6 +252,24 @@ describe("the map's model", () => {
     expect(buildMapModel([agent('A', { turns: { sessionId: 's', version: 'v', total: 1, turns: [{ itemId: 1, at: null, prompt: '', reply: '', lastKind: 'tool', tools: [big] }] } })], 0).agents[0].capped).toBe(true)
   })
 
+  it("keys a long script's kept calls by their place in the whole script: a call added past the cut pulses once, the rest keep their keys (HR2, round 2)", () => {
+    const script = (calls: string[], callsMore: number): ActivityTurns => ({ sessionId: 's', version: 'v', total: 1, turns: [{ itemId: 1, at: null, prompt: '', reply: '', lastKind: 'tool', tools: [{ itemId: 2, name: 'Script', summary: '', at: null, until: null, failed: false, done: false, calls, callsMore }] }] })
+    const before = buildMapModel([agent('A', { turns: script(Array.from({ length: SCRIPT_CALLS }, () => 'Read'), 100) })], 0)
+    // One more call: the kept tail moves on by one, its first call left out.
+    const after = buildMapModel([agent('A', { turns: script([...Array.from({ length: SCRIPT_CALLS - 1 }, () => 'Read'), 'Edit'], 101) })], 0)
+    const keys = (m: typeof before) => m.calls.filter((c) => c.kind !== 'prompt').map((c) => c.key)
+    expect(keys(before).at(-1)).toBe('A-s\n2.499')
+    expect(keys(after).at(-1)).toBe('A-s\n2.500')
+    expect(keys(after).slice(0, -1)).toEqual(keys(before).slice(1))
+    const next = (() => {
+      let n = 0
+      return () => `p${++n}`
+    })()
+    const base = diffPulses(null, before.calls, next, undefined, before.sessions)
+    const r = diffPulses(base.seen, after.calls, next, base.sessions, after.sessions)
+    expect(r.pulses.map((p) => [p.station, p.back])).toEqual([['edit', false]])
+  })
+
   it('caps one huge turn at MAP_CALLS calls, the latest, and says the counts are partial', () => {
     const huge = Array.from({ length: MAP_CALLS + 250 }, (_, i) => ({ name: i % 2 ? 'Read' : 'Bash' }))
     const m = buildMapModel([agent('A', { turns: turnsOf('s', [huge]) })], 0)

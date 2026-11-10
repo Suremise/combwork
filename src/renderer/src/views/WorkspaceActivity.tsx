@@ -402,8 +402,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   // --- The map (HI-2903): exactly one agent in the filter, its map; else the shared map of the agents the tabs show,
   // every key host-qualified (an agent's activityAgentKey, a session's sk).
   const mode = mapMode(view.agents)
-  // Its agents whatever Hide finished says (an idle agent is drawn idle): the shared map's those running, one agent's map
-  // its agent even when it isn't.
+  // Its agents: the list's own tabs, by the same filters (Agents, Cards, Hide finished, the tab kept).
   const entries = useMemo<MapEntry[]>(() => {
     const out = shownHosts.flatMap((h) => {
       const input = inputs.get(hk(h.path))!

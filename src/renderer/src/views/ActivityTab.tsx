@@ -315,13 +315,13 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
 
   // --- The map (HI-2903): exactly one agent in the filter, its map; else the shared map of the agents the tabs show.
   const mode = mapMode(view.agents)
-  // Its agents whatever Hide finished says (an idle agent is drawn idle): the shared map's those running, one agent's
-  // map its agent even when it isn't.
+  // Its agents: the list's own tabs, by the same filters (Agents, Cards, Hide finished, the tab kept), so a filter changed
+  // on a frozen snapshot changes the map as it changes the list (HR2's round 2).
   const entries = useMemo<MapEntry[]>(
     () => mapTabs(input, view, mode, view.tab).map((t) => ({ key: t.agentId, path: project.path, agentId: t.agentId, name: t.name, tab: t, input, live: project.agents.find((a) => a.id === t.agentId)?.live ?? null })),
     // The live state is the project's now (its provider and session): taken in with the drawn reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, view.agents, view.cards, input]
+    [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
   const entriesKey = entries.map((e) => `${e.key}:${e.live?.sessionId ?? ''}`).join('|')
   // eslint-disable-next-line react-hooks/exhaustive-deps

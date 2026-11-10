@@ -255,7 +255,9 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
         for (let j = tool.calls.length - 1; j >= 0; j--) {
           // Over budget: the next is never read.
           if (full()) break walk
-          one(tool.calls[j], () => '', `${sk}\n${tool.itemId}.${j}`, tool, last)
+          // Keyed by the call's place in the whole script (the calls left out before the kept ones, then j): the same call
+          // keeps its key as the kept tail moves on (HR2's round 2).
+          one(tool.calls[j], () => '', `${sk}\n${tool.itemId}.${(tool.callsMore ?? 0) + j}`, tool, last)
         }
         if (tool.callsMore) capped = true
       } else {
