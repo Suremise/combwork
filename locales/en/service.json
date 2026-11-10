@@ -344,8 +344,8 @@
     "description": "HI-2679: a forward merge refused: asked by a project agent or a script."
   },
   "service.forward.notTargets": {
-    "defaultMessage": "{from} and {to} must be two different branches this project merges work into: {targets}.",
-    "description": "HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them."
+    "defaultMessage": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
+    "description": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch."
   },
   "service.forward.raced": {
     "defaultMessage": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
