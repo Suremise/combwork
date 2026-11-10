@@ -186,6 +186,8 @@ export function audit({ root = ROOT, extra = {}, keep = false, dir: given } = {}
     // The repository's packages, by a junction: tsc looks for them in node_modules beside the copy.
     symlinkSync(join(root, 'node_modules'), modules, 'junction')
     cpSync(join(root, 'src'), join(dir, 'src'), { recursive: true })
+    // What src/ imports from beside it (jjTool.ts's resources/tested-vcs.json), so the copy compiles as the source does.
+    cpSync(join(root, 'resources'), join(dir, 'resources'), { recursive: true })
     const source = new Map(Object.entries(extra).map(([file, text]) => [file, text.split(/\r?\n/)]))
     for (const [file, text] of Object.entries(extra)) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
