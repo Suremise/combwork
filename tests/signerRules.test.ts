@@ -2,7 +2,7 @@
 // Combwork's (validated before anything is dropped), a session's environment with the signer, which calls are signing
 // calls, and the known installations whatever the variables' case.
 import { describe, expect, it } from 'vitest'
-import { decodeArgv, encodeArgv, isKnownSigner, isSignLauncher, isSigningCall, knownSignerPaths, lastScoped, signerKind, withoutOurEntries, withSessionSigner, SIGN_ENV } from '../src/main/platform/signerRules'
+import { decodeArgv, encodeArgv, interpreterOf, isKnownSigner, quoteArgMsvc, signerRun, isSignLauncher, isSigningCall, knownSignerPaths, lastScoped, signerKind, withoutOurEntries, withSessionSigner, SIGN_ENV } from '../src/main/platform/signerRules'
 
 const L = 'C:\\Program Files\\Combwork\\resources\\bin\\cw-sign.exe'
 const signer = { launcher: L, exec: 'C:\\Program Files\\Combwork\\Combwork.exe', script: 'C:\\x\\cw-sign.js', timeoutMs: 120_000 }
@@ -122,6 +122,39 @@ describe('known installations', () => {
     expect(isKnownSigner('C:\\Program Files\\Git\\usr\\bin\\gpg.exe', ['C:\\Program Files\\Git'], env)).toBe(true)
     expect(isKnownSigner('C:\\tools\\gpg.exe', ['C:\\Program Files\\Git'], env)).toBe(false)
     expect(knownSignerPaths([], {})).toEqual([])
+  })
+})
+
+describe('running a signer as git for Windows runs it (HR2, round 1)', () => {
+  it("quotes an argument as git's quote_arg_msvc does", () => {
+    expect(quoteArgMsvc('plain')).toBe('plain')
+    expect(quoteArgMsvc('')).toBe('""')
+    expect(quoteArgMsvc('a b')).toBe('"a b"')
+    expect(quoteArgMsvc('a"b')).toBe('"a\\"b"')
+    expect(quoteArgMsvc('C:\\dir\\')).toBe('"C:\\dir\\\\"')
+    expect(quoteArgMsvc('a\\"b')).toBe('"a\\\\\\"b"')
+    expect(quoteArgMsvc('a\\b')).toBe('a\\b')
+    expect(quoteArgMsvc('x*y')).toBe('"x*y"')
+    expect(quoteArgMsvc("it's")).toBe('"it\'s"')
+    expect(quoteArgMsvc('k&x%NOPE%^y')).toBe('k&x%NOPE%^y')
+  })
+  it("reads a #! line's interpreter as git's parse_interpreter does", () => {
+    expect(interpreterOf('s', '#!/bin/sh\necho')).toBe('sh')
+    expect(interpreterOf('s', '#!/usr/bin/env node\n')).toBe('env')
+    expect(interpreterOf('s', '#!C:\\tools\\perl.exe -w\r\n')).toBe('perl.exe')
+    expect(interpreterOf('s', '#!sh\n')).toBeNull()
+    expect(interpreterOf('s', '#!/bin/sh')).toBeNull()
+    expect(interpreterOf('s.exe', '#!/bin/sh\n')).toBeNull()
+    expect(interpreterOf('s', 'echo\n')).toBeNull()
+    expect(interpreterOf('s', null)).toBeNull()
+  })
+  it('starts a .cmd or .bat through cmd /c with git\'s command line, a script through its interpreter, the rest as it is', () => {
+    const find = (n: string): string | null => (n === 'sh' ? 'C:\\Git\\usr\\bin\\sh.exe' : null)
+    expect(signerRun('C:\\s\\my signer.cmd', 'C:/s/my signer.cmd', ['-Y', 'sign', 'k ey&x'], '@echo off', find, 'C:\\Windows\\cmd.exe')).toEqual({ file: 'C:\\Windows\\cmd.exe', args: ['/c', '""C:/s/my signer.cmd" -Y sign "k ey&x""'], verbatim: true })
+    expect(signerRun('C:\\s\\s.BAT', 'C:\\s\\s.BAT', ['-bsau', 'a"b'], null, find, 'cmd.exe').args[1]).toBe('"C:\\s\\s.BAT -bsau "a\\"b""')
+    expect(signerRun('C:\\s\\signer', 'C:/s/signer', ['-Y', 'sign'], '#!/bin/sh\n', find, 'cmd.exe')).toEqual({ file: 'C:\\Git\\usr\\bin\\sh.exe', args: ['C:/s/signer', '-Y', 'sign'], verbatim: false })
+    expect(signerRun('C:\\s\\op-ssh-sign.exe', 'op-ssh-sign', ['-Y', 'sign'], null, find, 'cmd.exe')).toEqual({ file: 'C:\\s\\op-ssh-sign.exe', args: ['-Y', 'sign'], verbatim: false })
+    expect(signerRun('C:\\s\\signer', 'C:/s/signer', ['x'], '#!/bin/missing\n', find, 'cmd.exe')).toEqual({ file: 'C:\\s\\signer', args: ['x'], verbatim: false })
   })
 })
 

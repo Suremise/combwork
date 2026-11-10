@@ -61,6 +61,9 @@ static class CwSign {
   static extern uint WaitForSingleObject(IntPtr handle, uint ms);
 
   [DllImport("kernel32.dll")]
+  static extern uint GetConsoleCP();
+
+  [DllImport("kernel32.dll")]
   static extern bool GetExitCodeProcess(IntPtr process, out uint code);
 
   [StructLayout(LayoutKind.Sequential)]
@@ -135,7 +138,10 @@ static class CwSign {
       si.StartupInfo.StdError = errChild;
       si.AttributeList = list;
       ProcessInformation pi;
-      if (!CreateProcessW(null, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, true, ExtendedStartupInfoPresent | CreateUnicodeEnvironment | CreateNoWindow, environment, null, ref si, out pi)) throw new Exception("CreateProcess " + Marshal.GetLastWin32Error());
+      // Its console is this process's when it has one (HR2's round 1): a signer cw-sign.js passes on as it is sees the
+      // console git's signer always saw. Without one (git started with none), none is made: no window shows.
+      uint flags = ExtendedStartupInfoPresent | CreateUnicodeEnvironment | (GetConsoleCP() == 0 ? CreateNoWindow : 0);
+      if (!CreateProcessW(null, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, true, flags, environment, null, ref si, out pi)) throw new Exception("CreateProcess " + Marshal.GetLastWin32Error());
       CloseHandle(pi.Thread);
       return new Started {
         Process = pi.Process,

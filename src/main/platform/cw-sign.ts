@@ -12,10 +12,10 @@
 
 import '../../shared/agentText/processDialect'
 import { spawn } from 'child_process'
-import { statSync } from 'fs'
-import { resolve } from 'path'
+import { closeSync, openSync, readSync, statSync } from 'fs'
+import { delimiter, join, resolve } from 'path'
 import { agentMsg, say } from '../../shared/agentText'
-import { GPG_NO_PROMPT, NEEDS, SIGN_ENV, decodeArgv, envGet, gitRootOfExecPath, isKnownSigner, isSignLauncher, isSigningCall, resolveProgramWith, signerKind, withoutOurEntries } from './signerRules'
+import { GPG_NO_PROMPT, NEEDS, SIGN_ENV, decodeArgv, envGet, gitRootOfExecPath, isKnownSigner, isSignLauncher, isSigningCall, resolveProgramWith, signerKind, signerRun, withoutOurEntries } from './signerRules'
 import { configuredSigner, gitOf } from './signerPick'
 
 const T = {
@@ -78,6 +78,34 @@ const isFile = async (p: string): Promise<boolean> => {
   }
 }
 
+/** A file's first bytes as text (git reads at most 99 of them for a #! line), or null. */
+function head(p: string): string | null {
+  try {
+    const fd = openSync(p, 'r')
+    try {
+      const buf = Buffer.alloc(99)
+      return buf.subarray(0, readSync(fd, buf, 0, 99, 0)).toString('latin1')
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return null
+  }
+}
+
+/** An interpreter as git looks it up (compat/mingw.c path_lookup): the name with .exe, in PATH's folders in order. */
+function findExe(name: string, env: NodeJS.ProcessEnv): string | null {
+  for (const dir of (envGet(env, 'PATH') ?? '').split(delimiter).filter(Boolean)) {
+    const p = join(dir, /\.exe$/i.test(name) ? name : `${name}.exe`)
+    try {
+      if (statSync(p).isFile()) return p
+    } catch {
+      // not here
+    }
+  }
+  return null
+}
+
 async function main(): Promise<void> {
   const args = decodeArgv(process.env[SIGN_ENV.argv])
   if (!args) return fail(say(T.noArgs))
@@ -101,8 +129,15 @@ async function main(): Promise<void> {
   const exec = envGet(process.env, 'GIT_EXEC_PATH')
   const known = isSigningCall(args) && isKnownSigner(program, exec ? [gitRootOfExecPath(exec)] : [], clean)
   if (!known) {
-    // As before: git's arguments, the console it has, nothing added.
-    const c = spawn(program, args, { stdio: 'inherit', env: clean, windowsHide: true })
+    // As before: started as git starts it (a .cmd or .bat through cmd, a #! script through its interpreter), git's
+    // arguments, the console it has (cw-sign.exe's, shared), nothing added.
+    const run = signerRun(program, /[\\/]/.test(name) ? name : program, args, head(program), (n) => findExe(n, clean), envGet(clean, 'ComSpec') ?? 'cmd.exe')
+    let c: ReturnType<typeof spawn>
+    try {
+      c = spawn(run.file, run.args, { stdio: 'inherit', env: clean, windowsVerbatimArguments: run.verbatim })
+    } catch (e) {
+      return fail(say(T.notStarted, { program, detail: e instanceof Error ? e.message : String(e) }))
+    }
     c.on('error', (e) => fail(say(T.notStarted, { program, detail: e.message })))
     c.on('close', (code) => process.exit(code ?? 1))
     return

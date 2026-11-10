@@ -192,6 +192,98 @@ export function withSessionSigner(env: Record<string, string>, signer: SessionSi
   return out
 }
 
+// ---- Running a signer as git for Windows runs it (HR2's HI-2867 round 1): cw-sign passes on every signer it doesn't
+// change, and git runs .cmd and .bat files, and #! scripts through their interpreter, where Node's spawn can't (EINVAL).
+
+/**
+ * An argument quoted as git for Windows quotes one on a command line (compat/mingw.c quote_arg_msvc): as it is unless
+ * empty, holding whitespace, *, ?, { or ', a double quote, or backslashes before a quote or the end; then in double
+ * quotes, each quote escaped and the backslashes before one doubled.
+ */
+export function quoteArgMsvc(arg: string): string {
+  let force = arg === ''
+  let n = 0
+  for (let i = 0; i < arg.length; ) {
+    const c = arg[i]
+    if (/\s/.test(c) || c === '*' || c === '?' || c === '{' || c === "'") force = true
+    else if (c === '"') n++
+    else if (c === '\\') {
+      let count = 0
+      while (arg[i] === '\\') {
+        count++
+        i++
+      }
+      if (arg[i] === '"' || i >= arg.length) n += count * 2 + 1
+      continue
+    }
+    i++
+  }
+  if (!force && n === 0) return arg
+  let out = '"'
+  for (let i = 0; i < arg.length; ) {
+    const c = arg[i]
+    if (c === '"') out += '\\"'
+    else if (c === '\\') {
+      let count = 0
+      while (arg[i] === '\\') {
+        count++
+        out += '\\'
+        i++
+      }
+      if (i >= arg.length) {
+        out += '\\'.repeat(count)
+        break
+      }
+      if (arg[i] === '"') out += `${'\\'.repeat(count)}\\"`
+      else out += arg[i]
+    } else out += c
+    i++
+  }
+  return `${out}"`
+}
+
+/**
+ * A #! script's interpreter as git for Windows reads it (compat/mingw.c parse_interpreter): never for a .exe; the first
+ * line of at most 99 bytes, `#!` then a path, the name after its last / (else \), up to a space. Null for anything else.
+ */
+export function interpreterOf(program: string, head: string | null): string | null {
+  if (/\.exe$/i.test(program) || head === null || head.length < 4 || !head.startsWith('#!')) return null
+  const text = head.slice(0, 99)
+  const end = text.search(/[\r\n]/)
+  if (end < 0) return null
+  const body = text.slice(2, end)
+  let at = body.lastIndexOf('/')
+  if (at < 0) at = body.lastIndexOf('\\')
+  if (at < 0) return null
+  return body.slice(at + 1).split(' ')[0]
+}
+
+/** How to start a signer git would start: the file and its arguments, and whether they are a command line as written. */
+export interface SignerRun {
+  file: string
+  args: string[]
+  /** The arguments are one command line, already quoted (cmd's): Node's windowsVerbatimArguments. */
+  verbatim: boolean
+}
+
+/**
+ * How git for Windows would start `program` (resolved; `argv0` the name it was given as) with `args`: a #! script
+ * through its interpreter found on PATH (`findExe`: the name with .exe, as git looks it up), the script and the
+ * arguments after it; a .cmd or .bat file through `cmd /c` with the command line git builds (each part quoted as git
+ * quotes it), as Windows runs a batch file CreateProcess is given, so cmd reads it exactly as before; anything else as
+ * it is.
+ */
+export function signerRun(program: string, argv0: string, args: readonly string[], head: string | null, findExe: (name: string) => string | null, comspec: string): SignerRun {
+  const interp = interpreterOf(program, head)
+  if (interp) {
+    const found = findExe(interp)
+    if (found) return { file: found, args: [argv0, ...args], verbatim: false }
+  }
+  // Windows runs a batch file it is given as `cmd /c "<the command line>"`: cmd takes the outer quotes off again.
+  if (/\.(cmd|bat)$/i.test(program)) return { file: comspec, args: ['/c', `"${[argv0, ...args].map(quoteArgMsvc).join(' ')}"`], verbatim: true }
+  return { file: program, args: [...args], verbatim: false }
+}
+
 /** Which signer git is calling, by its arguments: ssh-keygen's are `-Y <op>`, gpg's the rest. */
 export const signerKind = (args: readonly string[]): 'ssh' | 'openpgp' => (args[0] === '-Y' ? 'ssh' : 'openpgp')
 

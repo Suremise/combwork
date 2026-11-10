@@ -161,6 +161,59 @@ describe.skipIf(!ready)('ssh signing through cw-sign', () => {
     expect(c.err).not.toContain('Combwork')
   })
 
+  // HR2's round 1: a signer git runs that Node's spawn can't (a .cmd or .bat, a #! script) is reached as git reaches it,
+  // its arguments as cmd or the interpreter got them from git, its words and failure the same, with and without Combwork.
+  describe('custom signers git runs, reached as git reaches them', () => {
+    /** The signer's stderr and git's exit, without Combwork and with it (the buffer file's random name taken out). */
+    function both(r: string, extra: Record<string, string> = {}): { plain: { status: number | null; err: string }; wrapped: { status: number | null; err: string } } {
+      const norm = (s: string): string => s.replace(/\.git_signing_buffer_tmp\w+/g, '<buffer>').replace(/\r/g, '')
+      const attempt = (env: Record<string, string>): { status: number | null; err: string } => {
+        const c = git(r, ['commit', '-q', '--allow-empty', '-m', 'x'], env)
+        return { status: c.status, err: norm(c.stderr) }
+      }
+      return { plain: attempt({ ...base, ...extra }), wrapped: attempt(session(signer, extra)) }
+    }
+    /** Git's own folders on PATH, where its interpreters are (read once the test's environment is made). */
+    const shPath = (): Record<string, string> => ({ PATH: `${GB};${base.PATH ?? ''}` })
+
+    it('a .cmd ssh signer, with a key path holding spaces, &, %, ^', () => {
+      const d = tempDir('cmd-')
+      const signerFile = join(d, 'custom signer.cmd')
+      writeFileSync(signerFile, '@echo off\r\necho CUSTOM_SIGNER_REACHED [%*] 1>&2\r\nexit /b 9\r\n')
+      const r = repo('ssh', `${slash(d)}/k ey&x%NOPE%^y`)
+      git(r, ['config', 'gpg.ssh.program', slash(signerFile)])
+      const { plain, wrapped } = both(r)
+      expect(plain.err).toContain('CUSTOM_SIGNER_REACHED')
+      expect(wrapped).toEqual(plain)
+    })
+
+    it("a .bat gpg signer, with a key id holding a quote, %, ^ and &, reading git's payload", () => {
+      const d = tempDir('bat-')
+      const signerFile = join(d, 'signer.bat')
+      writeFileSync(signerFile, '@echo off\r\nmore > nul\r\necho BAT_SIGNER_REACHED [%*] 1>&2\r\nexit /b 7\r\n')
+      const r = repo('openpgp', 'a"b %NOPE% ^& c')
+      git(r, ['config', 'gpg.program', slash(signerFile)])
+      // git's own run is what cmd makes of it (here the & splits the line): the same with Combwork.
+      const { plain, wrapped } = both(r)
+      expect(wrapped).toEqual(plain)
+      git(r, ['config', 'user.signingkey', 'b %NOPE% ^ c'])
+      const reached = both(r)
+      expect(reached.plain.err).toContain('BAT_SIGNER_REACHED')
+      expect(reached.wrapped).toEqual(reached.plain)
+    })
+
+    it('a #! script, through its interpreter as git finds it', () => {
+      const d = tempDir('sh-')
+      const signerFile = join(d, 'signer')
+      writeFileSync(signerFile, '#!/bin/sh\necho "SH_SIGNER_REACHED [$*]" >&2\nexit 5\n')
+      const r = repo('ssh', `${slash(d)}/k ey&x%NOPE%^y`)
+      git(r, ['config', 'gpg.ssh.program', slash(signerFile)])
+      const { plain, wrapped } = both(r, shPath())
+      expect(plain.err).toContain('SH_SIGNER_REACHED')
+      expect(wrapped).toEqual(plain)
+    })
+  })
+
   it("refuses, signing nothing, when the session's entries aren't exactly Combwork's (never a guess, never unsigned)", () => {
     const r = repo('ssh', slash(sshKey(join(GB, 'ssh-keygen.exe'), '')))
     const c = commit(r, { ...session(), [SIGN_ENV.ours]: '3' })

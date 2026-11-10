@@ -5467,8 +5467,11 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **What changes:** only a known installation's (the check's list above) signing call (gpg's detach-sign, `ssh-keygen -Y
   sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
   no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
-  default: long enough for a hardware key's touch). Verification and every other signer run exactly as git gave them, as
-  before: the protection is for known installations only.
+  default: long enough for a hardware key's touch). Verification and every other signer run as before, the protection
+  being for known installations only: started as git for Windows starts them (HR2's round 1), a `.cmd` or `.bat` through
+  `cmd /c` with git's own command line (each part quoted as git's `quote_arg_msvc` quotes it, so cmd reads it as it
+  did), a `#!` script through its interpreter looked up on PATH as git looks it up, anything else as it is, with git's
+  arguments, stdio and exit; sharing the launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
