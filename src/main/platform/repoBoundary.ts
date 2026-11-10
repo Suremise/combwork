@@ -2,8 +2,8 @@
 // at or above it, read from files with no process, which decides the platform that answers for the folder. A nearer `.jj`
 // hides every repository above it, readable or not: a non-colocated jj workspace inside a Git working tree is jj's, and
 // an unreadable `.jj` is unknown, never permission to ask the Git repository above it. A `.jj` with a `.git` beside it
-// naming the same store is a colocated pair (Git's context, as before); with any other `.git` beside it, Git's own
-// repository at that level answers, as before (no repository above it is reached: whether jj can use it is J0's).
+// naming the same store is a colocated pair (Git's context, as before); a valid one naming another store is unknown;
+// a stray or damaged `.jj` beside a `.git` leaves Git's own repository there, as before.
 //
 // A leaf (HR1's s13 answer): it imports only the file system, `path` and nothing of Combwork's, so the repository lock
 // (repoLock.ts), the context ports (repoPorts.ts) and J0's detection (jjDetect.ts) can all read it without a cycle. Every
@@ -78,7 +78,7 @@ export async function gitCommonDir(root: string): Promise<string | null> {
 }
 
 /** Why a jj workspace's store couldn't be read (J0's codes, `jjNotDir` added). */
-export type BoundaryUnknown = 'jjNotDir' | 'noRepo' | 'emptyPointer' | 'repoGone' | 'storeType' | 'backend' | 'gitStore' | 'levels'
+export type BoundaryUnknown = 'jjNotDir' | 'noRepo' | 'emptyPointer' | 'repoGone' | 'storeType' | 'backend' | 'gitStore' | 'colocatedDisagrees' | 'levels'
 
 /**
  * A jj workspace root's shared repository and Git store, from its files as J0 reads them: `.jj/repo` (the folder, or a
@@ -121,12 +121,14 @@ export async function boundaryOf(folder: string): Promise<Boundary> {
     const jjKind = await kindOf(join(dir, '.jj'))
     const gitKind = await kindOf(join(dir, '.git'))
     if (jjKind !== null && gitKind !== null) {
-      // A `.git` at the same level is Git's own repository there, nothing above it: a colocated pair when the `.jj` names
-      // the same store; otherwise (a stray or damaged `.jj` beside it, another store) still Git's, as before HI-2896.
-      // Whether jj can use it is J0's to say (jjContextOf: unknown or `disagrees`), never the boundary's.
+      // A `.git` at the same level: a colocated pair when the `.jj` is a valid jj repository naming the same store; a
+      // valid one naming another store (or a `.git` that names none) is unknown, never answered by Git (HR1's round 1:
+      // two repositories claim the folder). A stray or damaged `.jj` beside it (not a readable jj repository) leaves
+      // Git's own repository there, as before HI-2896.
       const s = jjKind === 'dir' ? await jjStoreOf(dir) : null
-      const common = s && !('unknown' in s) ? await gitCommonDir(dir) : null
-      return s && !('unknown' in s) && common && samePath(common, s.store) ? { colocated: { root: dir, store: s.store } } : { git: { root: dir } }
+      if (!s || 'unknown' in s) return { git: { root: dir } }
+      const common = await gitCommonDir(dir)
+      return common && samePath(common, s.store) ? { colocated: { root: dir, store: s.store } } : { unknown: 'colocatedDisagrees', root: dir, detail: common ?? join(dir, '.git') }
     }
     if (jjKind !== null) {
       if (jjKind !== 'dir') return { unknown: 'jjNotDir', root: dir, detail: join(dir, '.jj') }

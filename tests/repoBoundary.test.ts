@@ -37,6 +37,7 @@ const { boundaryOf, gitVeto } = await import('../src/main/platform/repoBoundary'
 const { commonGitDir, withRepoLock } = await import('../src/main/repoLock')
 const { repoContext, withFolderRepoLocks, excludeFile, mainTree, trustRoot } = await import('../src/main/platform/repoPorts')
 const { storeLock } = await import('../src/main/slotsApp')
+const { gitCantRead } = await import('../src/main/platform/workspacePorts')
 const { fileLockDepth } = await import('../src/main/fsutil')
 const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
 
@@ -130,6 +131,31 @@ describe('the boundary: the nearest marker decides (s13 §1)', () => {
     expect(await boundaryOf(stray)).toEqual({ git: { root: resolve(stray) } })
     expect(await gitVeto(stray)).toBeNull()
     expect(real(await commonGitDir(stray))).toBe(real(join(stray, '.git')))
+  })
+
+  it('a valid .jj naming another store than the .git beside it is unknown (HR1’s round 1): no Git answer, read, context or lock', async () => {
+    const co = gitRepo(join(base, `conflict-${++n}`))
+    const other = join(base, `conflict-other-${n}.git`)
+    sh(base, 'init', '-q', '--bare', other)
+    mkdirSync(join(co, '.jj', 'repo', 'store'), { recursive: true })
+    writeFileSync(join(co, '.jj', 'repo', 'store', 'type'), 'git')
+    writeFileSync(join(co, '.jj', 'repo', 'store', 'git_target'), other)
+    expect(await boundaryOf(co)).toMatchObject({ unknown: 'colocatedDisagrees', root: resolve(co) })
+    expect(await gitVeto(co)).toMatchObject({ why: 'colocatedDisagrees' })
+    // commonGitDir's fast path (it reads `.git` itself) is vetoed too.
+    await expect(commonGitDir(co)).rejects.toThrow(/isn't colocated with Git/)
+    expect(await gitCantRead(co)).toBe(true)
+    expect(await repoContext(co)).toBeNull()
+    let ran = false
+    await expect(withFolderRepoLocks([co], async () => void (ran = true))).rejects.toThrow(/couldn't read the jj repository/)
+    await expect(withRepoLock(co, async () => void (ran = true))).rejects.toThrow(/isn't colocated with Git/)
+    expect(ran).toBe(false)
+    expect(lockTrace).toEqual([])
+    // A stray .jj beside a .git (not a readable jj repository) is still Git's: the ordinary fixture.
+    const stray = gitRepo(join(base, `conflict-stray-${n}`))
+    mkdirSync(join(stray, '.jj', 'repo'), { recursive: true })
+    expect(await boundaryOf(stray)).toEqual({ git: { root: resolve(stray) } })
+    expect(await withFolderRepoLocks([stray], async () => 'git')).toBe('git')
   })
 
   it('the store itself (a bare Git dir inside .jj) is Git’s: its own lock is never vetoed', async () => {
@@ -245,6 +271,36 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
     // The child asks while B holds: queued behind B's hold on the store's lock file (B's and its own), not run.
     const file = join(realpathSync(w.store), REPO_LOCK_FILE)
     await vi.waitUntil(() => fileLockDepth(file) >= 2 || order.includes('child'))
+    expect(order).toEqual(['B in'])
+    bGo.open()
+    await b
+    await child
+    expect(order).toEqual(['B in', 'B out', 'child'])
+  })
+
+  it('an inherited claim that expires while the take waits for its other store: taken again, never run while another holds it (HR1’s round 1)', async () => {
+    const { lo: x, hi: y } = twoStores()
+    const order: string[] = []
+    // H holds Y, so the child waits for it.
+    const hIn = gate()
+    const hGo = gate()
+    const h = withRepoLock(y, async () => (hIn.open(), await hGo.wait))
+    await hIn.wait
+    // A holds X; its child asks for X (left to A) and Y (waited for), and A returns without waiting for it.
+    let child: Promise<void> | null = null
+    await withRepoLock(x, async () => {
+      child = withFolderRepoLocks([x, y], async () => void order.push('child'))
+      await vi.waitUntil(() => fileLockDepth(join(realpathSync(join(y, '.git')), REPO_LOCK_FILE)) >= 2)
+    })
+    // B takes X once A released it, and holds it.
+    const bIn = gate()
+    const bGo = gate()
+    const b = withRepoLock(x, async () => (order.push('B in'), bIn.open(), await bGo.wait, order.push('B out')))
+    await bIn.wait
+    // Y is freed: the child has its own lock, finds A's claim on X gone, and takes X itself, behind B.
+    hGo.open()
+    await h
+    await vi.waitUntil(() => fileLockDepth(join(realpathSync(join(x, '.git')), REPO_LOCK_FILE)) >= 2 || order.includes('child'))
     expect(order).toEqual(['B in'])
     bGo.open()
     await b

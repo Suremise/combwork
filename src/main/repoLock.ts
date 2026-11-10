@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks'
+import { existsSync } from 'original-fs'
 import { app } from 'electron'
 import { realpath } from 'original-fs/promises'
 import { basename, join } from 'path'
@@ -137,7 +138,9 @@ export async function commonGitDir(folder: string): Promise<string> {
   const known = commonDirSync(folder)
   // Never git's answer for a folder a nearer non-colocated `.jj` holds (HI-2896, s13 §1): git would name a repository
   // above it, or none; an unreadable `.jj` is refused the same way.
-  const veto = known ? null : await gitVeto(folder)
+  // A `.git` read here with a `.jj` beside it is asked of the boundary too (HR1's round 1): a valid jj repository naming
+  // another store is unknown, not Git's.
+  const veto = known && !existsSync(join(folder, '.jj')) ? null : await gitVeto(folder)
   if (veto) throw combworkError(msg({ id: 'git.repoLock.jjFolder', defaultMessage: "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.", description: 'An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git.' }), { folder }, { kind: 'conflict' })
   const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = known ?? (r?.ok ? r.out.trim() : '')
@@ -184,26 +187,49 @@ export const storeKeyOf = (store: string): string => store.replace(/\//g, '\\').
  * out of order): it takes the lock only if it is free at once, else refuses.
  */
 export async function takeStores<T>(stores: readonly { store: string; folder: string }[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
+  // A take whose inherited claim expired while it waited for its own locks is made again from the start (HR1's round 1
+  // on HI-2896): owners only ever stop being live, so this ends once every store it needs is held by it or a live owner.
+  for (;;) {
+    const r = await takeOnce(stores, fn, opts)
+    if (r !== RETAKE) return r as T
+  }
+}
+
+/** takeOnce's answer when a store it relied on an inherited owner for was released while it waited: nothing of fn ran. */
+const RETAKE: unique symbol = Symbol('retake')
+
+async function takeOnce<T>(stores: readonly { store: string; folder: string }[], fn: () => Promise<T>, opts: RepoLockOptions): Promise<T | typeof RETAKE> {
   const inherited = owners.getStore() ?? []
   const held = heldStoreKeys()
   const byKey = new Map<string, { store: string; folder: string }>()
+  // The stores this take leaves to a live inherited owner: each checked again right before fn runs.
+  const relied = new Set<string>()
   for (const s of stores) {
     const k = storeKeyOf(s.store)
-    if (!held.has(k) && !byKey.has(k)) byKey.set(k, s)
+    if (held.has(k)) relied.add(k)
+    else if (!byKey.has(k)) byKey.set(k, s)
   }
-  if (!byKey.size) return fn()
+  const stillHeld = (): boolean => {
+    if (!relied.size) return true
+    const now = new Set(inherited.filter((o) => o.live).flatMap((o) => [...o.keys]))
+    return [...relied].every((k) => now.has(k))
+  }
+  if (!byKey.size) return stillHeld() ? fn() : RETAKE
   const keys = [...byKey.keys()].sort()
   const top = [...held].sort().pop()
   const owner: StoreOwner = { keys: new Set(keys), live: true }
-  const inner = async (): Promise<T> => {
+  const inner = async (): Promise<T | typeof RETAKE> => {
     try {
+      // Every inherited claim still live once this take's own locks are in (it may have waited for them): else none of
+      // fn runs, its locks are released, and the take is made again, now taking those stores itself.
+      if (!stillHeld()) return RETAKE
       return await owners.run([...inherited, owner], fn)
     } finally {
       // Not live before the first lock is released: a continuation of fn that runs later takes the lock again.
       owner.live = false
     }
   }
-  const from = (i: number): Promise<T> => {
+  const from = (i: number): Promise<T | typeof RETAKE> => {
     if (i === keys.length) return inner()
     const s = byKey.get(keys[i])!
     // Ordered before a store held outside this take: never waited for (s13 §2's order rule).

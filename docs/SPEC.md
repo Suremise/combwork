@@ -3289,8 +3289,9 @@ s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports,
 - **The boundary** (`platform/repoBoundary.ts`, a leaf: file reads only, asynchronous, bounded): a folder's platform is
   its nearest marker's. A `.jj` with no `.git` beside it is jj's, whatever Git repository is above; an unreadable one
   (no repo, an empty pointer, another backend, no store, a `.jj` file, levels exhausted) is unknown, never Git's; a
-  `.jj` beside a `.git` naming the same store is a colocated pair (Git's context), beside any other `.git` still Git's
-  own repository there (no repository above is reached; whether jj can use it is J0's). Every first-match helper of
+  `.jj` beside a `.git` naming the same store is a colocated pair (Git's context); a valid `.jj` naming another store is
+  unknown (two repositories claim the folder, HR1's round 1), and `commonGitDir`'s own `.git` fast path asks the boundary
+  whenever a `.jj` sits beside it; a stray or damaged `.jj` beside a `.git` leaves Git's own repository there. Every first-match helper of
   `repoPorts` takes it (`repoContext`, `repoContexts`, `withFolderRepoLocks`, `mainTree`, `trustRoot`, `excludeFile`,
   `ignoredIn`, `fileListOf`, `currentLine`); a non-colocated folder's context is `platform: 'jj'` with its store, its
   exclude file the store's `info/exclude` (Combwork's skill copies kept out there too), its main tree the repository's
@@ -3303,7 +3304,9 @@ s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports,
 - **One lock owner** (`repoLock.takeStores`): every take (`withRepoLock`, `withRepoLocks`, the ports' `withRepoLocks`,
   `slotsApp.storeLock`) resolves to stores, each once by its key, sorted, before any platform grouping. Each physical
   take is an owner, live until just before its first release; a nested take runs through only for a store a live
-  inherited owner holds (a continuation outliving its take takes the lock again). A nested take of a store ordered
+  inherited owner holds (a continuation outliving its take takes the lock again), and that claim is checked again once
+  the take's own locks are in: one that expired while it waited releases them, runs nothing, and the take is made again,
+  taking that store itself (HR1's round 1). A nested take of a store ordered
   before one already held never waits: taken if free at once, else refused (`git.repoLock.order`). Across processes both
   aliases of a store name one lock file, taken in the same order.
 - **A colocation change** (the user's `jj git colocation enable/disable` moves the store between `.jj/repo/store/git`
