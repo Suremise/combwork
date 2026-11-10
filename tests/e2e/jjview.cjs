@@ -43,7 +43,6 @@ const jjConfig = path.join(home, 'jj.toml')
 const gitConfig = path.join(home, 'gitconfig')
 const gitEnvOfTools = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_NOSYSTEM: '1', XDG_CONFIG_HOME: home, JJ_CONFIG: jjConfig, NO_COLOR: '1' }) })
 const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
 const heads = (cwd) => fs.readdirSync(path.join(cwd, '.jj', 'repo', 'op_heads', 'heads'))
 
@@ -106,7 +105,6 @@ function jjRepo(dir, o = {}) {
     await lib.openWorkspace(inv, page, ws)
     const vcTab = page.locator('.tabs .tab', { hasText: 'Version Control' })
     const head = page.locator('[data-vc-head]')
-    const fact = page.locator('[data-vc-fact]')
     const offer = page.locator('[data-vc-offer]')
     const dialog = page.locator('.dialog')
     const sections = () => page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))
@@ -123,9 +121,9 @@ function jjRepo(dir, o = {}) {
       await vcTab.first().click()
       await until(async () => (await head.count()) === 1, HUNG_MS)
     }
-    const section = async (id) => {
-      await page.locator(`.git-sections [data-section="${id}"]`).click()
-      return page.locator(`[data-jj-section="${id.replace(/^jj/, '').toLowerCase()}"]`)
+    const section = async (name) => {
+      await page.locator(`.git-sections [data-section="${name}"]`).click()
+      return page.locator(`[data-jj-section="${name.replace(/^jj/, '').toLowerCase()}"]`)
     }
 
     // --- shop as Git: Git's UI kept, jj found and offered.
