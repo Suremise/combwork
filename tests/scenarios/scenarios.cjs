@@ -903,18 +903,18 @@ const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|M
 
 // jj scenarios (HI-2800): the git commands that move HEAD, the index or a ref (gitMutations.cjs, unit-tested), the jj
 // rule the session contract adds in a jj project, and the pinned jj run in the project with the scenario's own config.
-const { gitMutations } = require('./gitMutations.cjs')
+const { gitMutations, commandText } = require('./gitMutations.cjs')
 // The signing-blocker scenario (HI-2867): what gets round a signing failure (signingBypass.cjs, unit-tested).
 const { signingBypasses } = require('./signingBypass.cjs')
 const platformRule = (platform) => require('../../src/shared/combworkGuidance.ts').platformRule(platform)
-/** Runs the pinned jj in the scenario's project (its config the scenario's: harness.cjs jjScenarioEnv); `allowFail`: '' on failure. */
+/** Runs the pinned jj in the scenario's project (its config the scenario's: harness.cjs jjScenarioEnv), or `cwd`; `allowFail`: '' on failure. */
 function jjIn(c, ...args) {
   const opts = typeof args[args.length - 1] === 'object' ? args.pop() : {}
   const path = require('path')
   const { portableJj } = require('../jjPortable.cjs')
   const env = { ...require('../e2e/lib.cjs').gitEnv(), JJ_CONFIG: path.join(path.dirname(c.ws), 'jj.toml'), NO_COLOR: '1' }
   try {
-    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     if (opts.allowFail) return ''
     throw e
@@ -926,6 +926,99 @@ const jjOpHeads = (c) => {
     return require('fs').readdirSync(require('path').join(c.alpha, '.jj', 'repo', 'op_heads', 'heads')).length
   } catch {
     return 0
+  }
+}
+// jj's card scenarios (HI-2870, J9d): what nothing an agent does may do in a jj project, a failed attempt too (moving a
+// bookmark or a tag, pushing, setting up a repository: jjPublishes.cjs, unit-tested).
+const { publishes } = require('./jjPublishes.cjs')
+/** jj's Pair (preset('jj', 'pair') in src/shared/workflow/options.ts, which the harness can't load): a reviewer agent, cards in slots, the user integrating. */
+const JJ_PAIR = { review: 'agent', noSelfReview: true, preChecks: [], folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, commands: {} }
+/** The project's bookmarks, local and remote, as jj lists them (no snapshot). */
+const jjBookmarks = (c) => jjIn(c, '--ignore-working-copy', 'bookmark', 'list', '--all-remotes')
+/** A revision's commit as `<commit id> <change id> <empty> <parent commit ids…>`, read without a snapshot, or '' if it can't be read. */
+const jjCommitOf = (c, rev) => jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', 'commit_id ++ " " ++ change_id ++ " " ++ empty ++ " " ++ parents.map(|p| p.commit_id()).join(" ") ++ "\\n"', { allowFail: true }).trim()
+/** Whether the project's jj repository is consistent: one operation head, no conflicted or divergent commit (or why not). */
+const jjConsistent = (c) => {
+  const heads = jjOpHeads(c)
+  const bad = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', 'conflicts() | divergent()', '-T', 'commit_id ++ "\\n"').trim() : 'several heads'
+  return { ok: heads === 1 && bad === '', why: `${heads} heads; ${bad}` }
+}
+/**
+ * A jj project for jj's card scenarios (HI-2870): alpha's repository made a colocated jj one and switched to jj through
+ * Combwork, as the window does; jj's Pair with its branch as the target bookmark; `builder` building, `reviewer` reviewing.
+ * The harness turns jj card starts on in this test copy (sc.jjCards: CW_TEST_JJ_CARDS, before J9e lifts the guard).
+ */
+async function jjCardProject(c, { builder = 'coder', reviewer = 'implementer' } = {}) {
+  c.git('config', 'user.email', 'agent@example.com')
+  c.git('config', 'user.name', 'Agent')
+  // The test git config converts line endings (core.autocrlf), which jj doesn't: off in this repository, as a jj user's is.
+  c.git('config', 'core.autocrlf', 'false')
+  c.target = c.git('branch', '--show-current').trim()
+  jjIn(c, 'git', 'init', '--colocate')
+  const check = await c.inv('workflow:checkPlatform', c.alpha, 'jj')
+  const used = (check?.store?.gates ?? []).filter((g) => !g.clear)
+  if (used.length || check?.refused) throw new Error(`setup: the switch to jj is refused: ${JSON.stringify({ refused: check?.refused, gates: used })}`)
+  await c.inv('workflow:setPlatform', c.alpha, 'jj', { expected: 'git', token: check?.store?.token })
+  await setWorkflow(c, { ...JJ_PAIR, target: c.target }, 'pair')
+  await c.inv('agents:update', c.alpha, c.agents[builder].id, { workflowRole: 'builder' })
+  await c.inv('agents:update', c.alpha, c.agents[reviewer].id, { workflowRole: 'reviewer' })
+}
+/** Card `key`'s latest submission's jj record (Submitted.platform: `jj` its ids and chain, `jjSlot` the slot it came from), or null. */
+const jjSubmitted = (o, key) => {
+  const d = factsOf(o, key, 'Submitted').at(-1)?.data
+  return d ? { revision: d.revision, base: d.base, jj: d.platform?.jj ?? null, slot: d.platform?.jjSlot ?? null } : null
+}
+/** The jj checks every jj card scenario makes of the session under test: no git mutation, nothing moved or published, jj consistent. */
+const jjSafetyChecks = (o, c) => {
+  const mutations = gitMutations(o)
+  const published = publishes(o)
+  const consistent = jjConsistent(c)
+  const bookmarks = jjBookmarks(c)
+  return [
+    ['ran no git command that changes HEAD, the index, a branch or a ref', mutations.length === 0, mutations.join(' | ')],
+    ['moved no bookmark or tag, pushed nothing and set up no repository (no attempt either)', published.length === 0, published.join(' | ')],
+    ["the project's bookmarks are as they were", bookmarks === c.bookmarks, bookmarks],
+    ['left jj consistent: one operation head, no conflicted or divergent commit', consistent.ok, consistent.why]
+  ]
+}
+/**
+ * Card `key` of `who` submitted from its jj slot, as a builder does (HI-2870): moved into Doing as the user moves it, so
+ * Combwork gives it to `who` in its slot; `who` stopped; `files` written in the slot and committed with jj commit; then
+ * submitted through the Agent API with `who`'s token. Its number, slot folder, jj workspace and submitted revision.
+ */
+async function jjSlotSubmission(c, key, who, card, files, summary) {
+  const n = await c.card(key, { ...card, agent: who })
+  await userMove(c, n, 'doing')
+  await builderStopped(c, key, who)
+  const slot = ((await c.inv('tasks:facts', n)) ?? []).find((f) => f.kind === 'Started')?.data?.slot
+  const folder = ((await c.inv('slots:list', c.alpha)) ?? []).find((s) => s.name === slot)?.folder
+  if (!folder) throw new Error(`setup: #${n}'s slot (${slot}) has no folder`)
+  for (const [rel, text] of Object.entries(files)) require('fs').writeFileSync(require('path').join(folder, rel), text)
+  jjIn(c, 'commit', '-m', card.title, { cwd: folder })
+  const r = await c.as(who, 'POST', `/v1/tasks/%23${n}/submit`, { summary })
+  if (r.status !== 200) throw new Error(`setup: #${n}'s submission: ${r.status} ${JSON.stringify(r.body)}`)
+  const s = ((await c.inv('tasks:facts', n)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+  const workspace = s?.platform?.jjSlot?.workspace ?? s?.platform?.jj?.workspace
+  if (!s?.revision || !workspace) throw new Error(`setup: #${n}'s submission has no jj record: ${JSON.stringify(s)}`)
+  return { n, folder, workspace, revision: s.revision, base: s.base }
+}
+/** What Git and jj each see in a jj review copy (HR2 on HI-2870/s7): its .git, Git's HEAD and status, and jj's @ and @-. */
+function jjCopySeen(c, folder) {
+  const gitIn = (...a) => {
+    try {
+      return require('child_process').execFileSync('git', a, { cwd: folder, encoding: 'utf8', env: require('../e2e/lib.cjs').baseEnv(), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim()
+    } catch (e) {
+      return `error: ${String(e.stderr ?? e.message).trim().split('\n')[0]}`
+    }
+  }
+  return {
+    dotGit: require('fs').existsSync(require('path').join(folder, '.git')),
+    gitHead: gitIn('rev-parse', 'HEAD'),
+    gitStatus: gitIn('status', '--short'),
+    jjAt: jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'commit_id ++ " empty=" ++ empty', { cwd: folder, allowFail: true }).trim(),
+    jjParent: jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id', { cwd: folder, allowFail: true }).trim(),
+    submitted: c.sub?.revision ?? null,
+    base: c.sub?.base ?? null
   }
 }
 
@@ -2191,6 +2284,130 @@ module.exports.SCENARIOS = [
         ['ran no jj git init', inits.length === 0, inits.map((t) => t.input).join(' | ')],
         ['left jj consistent: one operation head, no conflicted or divergent commit', heads === 1 && bad === '', `${heads} heads; ${bad}`],
         ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
+      ]
+    }
+  },
+  {
+    id: 'jj-card-submit',
+    title: "A builder given a jj card in its slot (HI-2870): it records the work with jj commit, submits the commit under the slot's empty working copy by its commit id, runs no git command that moves HEAD, the index or a ref, and moves no bookmark",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // The pinned jj on Combwork's PATH and the agent's, and jj card starts on in this test copy (CW_TEST_JJ_CARDS).
+    jj: true,
+    jjCards: true,
+    // Combwork gives the card to Coder in its slot and starts it with the card's line (BuilderPlaced): the prompt below is
+    // a model's only as the line says it; the fakes are typed their steps after it.
+    startedByCombwork: true,
+    async setup(c) {
+      await jjCardProject(c)
+      const n = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js adds a second line, the comment "// Hi", at its end. Nothing else changes.', agent: 'coder' })
+      await userMove(c, n, 'doing')
+      c.bookmarks = jjBookmarks(c)
+      c.defaultAt = jjCommitOf(c, 'default@')
+    },
+    prompt: (c) => `Work on card #${c.cards.a}: Combwork has started it for you in your slot.`,
+    fake: (c) => `skill work-on-card then shell: node -e "require('fs').appendFileSync('greet.js', '// Hi\\n')" then shell: jj commit -m "Greeting says Hi" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: greet.js says Hi.\n\nWhat changed: the comment line at the end of greet.js. Checks: none needed for a comment.' })}`,
+    expect: (o, c) => {
+      const s = jjSubmitted(o, 'a')
+      const ws = s?.slot?.workspace ?? s?.jj?.workspace ?? ''
+      const [, , empty, ...parents] = (ws ? jjCommitOf(c, `${ws}@`) : '').split(' ')
+      const work = s?.revision ? jjIn(c, '--ignore-working-copy', 'file', 'show', '-r', s.revision, 'greet.js', { allowFail: true }) : ''
+      const said = (o.cards.a?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text).join('\n')
+      const named = ran(o, 'cw_submit').map((x) => argsOf(x).revision).filter(Boolean)
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['read the work-on-card or card-loop skill', read(o, 'work-on-card') || read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['submitted it (a Submitted fact; the card in Review)', !!s && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${calls}`],
+        ['the work is in the submitted commit', /\/\/ Hi/.test(work), JSON.stringify({ revision: s?.revision, work })],
+        ["the slot's working copy is empty, on the submitted commit (committed with jj commit)", !!s && empty === 'true' && parents.length === 1 && parents[0] === s.revision, JSON.stringify({ ws, empty, parents, revision: s?.revision })],
+        ['any revision it named is a commit id, never a change id', named.every((r) => /^[0-9a-f]{7,40}$/i.test(String(r)) && String(s?.revision ?? '').startsWith(String(r).toLowerCase())), named.join(', ')],
+        ['its summary names the submitted commit by its commit id', !!s?.revision && said.includes(s.revision.slice(0, 7)), said.slice(0, 300)],
+        ...jjSafetyChecks(o, c),
+        ["left the project's own working copy as it was", jjCommitOf(c, 'default@') === c.defaultAt, `${c.defaultAt} → ${jjCommitOf(c, 'default@')}`],
+        ['never moved it on itself (no move to Passed or Done, no verdict)', !finishedItself(o, c.cards.a), calls]
+      ]
+    },
+    // The fake's summary is written before the commit exists, so it names none.
+    fakeSkips: ['its summary names the submitted commit by its commit id']
+  },
+  {
+    id: 'jj-card-review',
+    title: "A reviewer given a jj card (HI-2870): it reads the submitted change in the review copy, at the revision and base its start names, gives its verdict, and changes nothing: no git command that moves HEAD, the index or a ref, no bookmark moved",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    jj: true,
+    jjCards: true,
+    // Combwork gives the card in Review to Coder, the project's free reviewer, and starts it with its line.
+    startedByCombwork: true,
+    async setup(c) {
+      await jjCardProject(c, { builder: 'implementer', reviewer: 'coder' })
+      c.sub = await jjSlotSubmission(c, 'r', 'implementer', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with the name trimmed.' }, { 'greet.js': "module.exports = (name) => 'Helo, ' + name.trim()\n" }, 'Done: greet.js trims the name.')
+      c.bookmarks = jjBookmarks(c)
+      c.copies = new Set()
+    },
+    // The review copies Combwork lends Coder while it works, and what Git and jj each see there (HR2 on HI-2870/s7).
+    async during(c) {
+      for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) {
+        if (v.lease?.kind !== 'review' || v.lease.agent !== c.agents.coder.id || c.copies.has(v.folder)) continue
+        c.copies.add(v.folder)
+        c.copySeen = jjCopySeen(c, v.folder)
+      }
+    },
+    prompt: (c) => `Review card #${c.cards.r}. Give your verdict.`,
+    fake: (c) => `skill review-agent-work then cw cw_start_review {"card":"#${c.cards.r}"} then cw cw_verdict ${JSON.stringify({ card: `#${c.cards.r}`, pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1 finding.\n\n1. greet.js says "Helo, <name>": make it "Hello, <name>".' })}`,
+    observe: (o, c) => [["what Git and jj see in the review copy (HR2's question on HI-2870/s7)", !!c.copySeen, JSON.stringify(c.copySeen ?? null)]],
+    expect: (o, c) => {
+      const copyReply = o.tools.map((t) => t.result).find((r) => /Review in .+? at [0-9a-f]{7,}/.test(r)) ?? ''
+      const copy = (copyReply.match(/Review in (.+?) at [0-9a-f]{7,}/) ?? [])[1] ?? [...c.copies][0] ?? ''
+      const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
+      const within = (dir, top) => { const d = norm(dir).replace(/\/$/, ''); const t = norm(top).replace(/\/$/, ''); return d === t || d.startsWith(`${t}/`) }
+      const inCopy = copy ? o.tools.filter((t) => !/^(Write|Edit|MultiEdit)$/i.test(t.name) && (norm(t.input).includes(norm(copy)) || (!!t.cwd && within(t.cwd, copy)))) : []
+      const verdict = factsOf(o, 'r', 'Verdict').at(-1)?.data
+      const said = (o.cards.r?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text).join('\n')
+      const [, , empty, ...parents] = jjCommitOf(c, `${c.sub.workspace}@`).split(' ')
+      return [
+        ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
+        ['started the review with cw_start_review, and Combwork lent it a review copy', ran(o, 'cw_start_review').length > 0 && (c.copies.size > 0 || !!copyReply), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['read the change in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
+        ['failed it, naming the "Helo" typo', !!verdict && verdict.pass === false && /helo/i.test(said), `${JSON.stringify(verdict && { pass: verdict.pass })} ${said.slice(0, 300)}`],
+        ...jjSafetyChecks(o, c),
+        ["left the builder's slot as it was: its working copy empty on the submitted commit", empty === 'true' && parents.length === 1 && parents[0] === c.sub.revision, JSON.stringify({ empty, parents, revision: c.sub.revision })]
+      ]
+    },
+    fakeSkips: ['read the change in the review copy']
+  },
+  {
+    id: 'jj-card-passed',
+    title: "A builder told its jj card passed review (HI-2870): it merges nothing, pushes nothing and moves no bookmark, leaves the card waiting for the user to integrate, and says so",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    jj: true,
+    jjCards: true,
+    async setup(c) {
+      await jjCardProject(c)
+      c.sub = await jjSlotSubmission(c, 'p', 'coder', { title: 'Greeting says Hi', description: 'greet.js says "Hi, <name>".' }, { 'greet.js': "module.exports = (name) => 'Hi, ' + name\n" }, 'Ready for review: greet.js says Hi.')
+      await c.startAgent('implementer')
+      const started = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.p}/start-review`)
+      if (started.status !== 200) throw new Error(`setup: start review: ${JSON.stringify(started.body)}`)
+      const passed = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.p}/verdict`, { pass: true, comment: 'Round 1: PASSED. greet.js says Hi.' })
+      if (passed.status !== 200) throw new Error(`setup: the verdict: ${JSON.stringify(passed.body)}`)
+      await c.inv('session:stop', c.alpha, c.agents.implementer.id).catch(() => undefined)
+      c.column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
+      if (c.column !== 'passed') throw new Error(`setup: the passed jj card is in ${c.column}, not Passed (waiting for the user to integrate)`)
+      c.bookmarks = jjBookmarks(c)
+    },
+    prompt: (c) => `[CW] #${c.cards.p} passed review (Implementer). Carry on with it as your skills say.`,
+    fake: (c) => `skill work-on-card then cw cw_read_task {"number":${c.cards.p}} then say #${c.cards.p} passed review. Nothing for me to merge: it waits in Approved for you to integrate it, its work kept in its slot.`,
+    observe: (o) => [['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')]],
+    expect: (o, c) => {
+      const n = c.cards.p
+      const moved = movesOf(o, n).filter((x) => x.ok)
+      const merges = o.tools.filter((t) => /(^|\s)(git|jj)(\.exe)?\s+(merge|rebase|squash|new\s+\S+\s+\S+)/i.test(commandText(t.input ?? '')) && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
+      const said = [o.finalReply ?? '', ...(o.cards.p?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text)].join('\n')
+      const [, , empty, ...parents] = jjCommitOf(c, `${c.sub.workspace}@`).split(' ')
+      return [
+        ['moved the card nowhere (no report of a merge, no move): it stays in Passed', moved.length === 0 && o.cards.p?.column === 'passed', `${o.cards.p?.column}; ${moved.map((x) => x.tool).join(',')}`],
+        ['ran no merge, rebase or squash to integrate it', merges.length === 0, merges.map((t) => t.input.slice(0, 120)).join(' | ')],
+        ...jjSafetyChecks(o, c),
+        ["kept the reviewed work in its slot: the working copy empty on the submitted commit", empty === 'true' && parents.length === 1 && parents[0] === c.sub.revision, JSON.stringify({ empty, parents, revision: c.sub.revision })],
+        ['said the card waits for the user to integrate it', /integrat/i.test(said), said.slice(0, 300)]
       ]
     }
   },

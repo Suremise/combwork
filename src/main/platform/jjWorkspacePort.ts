@@ -19,7 +19,7 @@
 
 import { createHash, randomUUID } from 'crypto'
 import { existsSync } from 'original-fs'
-import { lstat, readdir, readFile, realpath, stat } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readFile, realpath, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -310,6 +310,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     if (existsSync(c.folder)) return null
     return deps.lock(ctx.store, async () => {
       if (!(await deps.projectQuiet(repo))) return null
+      // jj makes the folder but not its parent (the project's worktrees folder, absent until a first slot: HI-2870).
+      await mkdir(dirname(c.folder), { recursive: true })
       await c.journal.write({ phase: 'creating', store: ctx.store, workspace: name, folder: c.folder })
       // The explicit owned record of the project folder: the one snapshot of it Combwork takes, under the lock, quiet.
       const add = await jj(repo, ['workspace', 'add', c.folder, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
@@ -644,7 +646,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!from) return step(false, JJ_REFUSED.control)
       const name = nameFor(await repoHash(repo), folder)
       return deps.lock(ctx.store, async () => {
-        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's.
+        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's; its
+        // parent made first, which jj doesn't make (HI-2870).
+        await mkdir(dirname(folder), { recursive: true })
         const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true })
         if (!r.ok) return step(false, r.err)
         // Read back (rule 3): listed at that root, its working copy an empty child of exactly `at`, same store.

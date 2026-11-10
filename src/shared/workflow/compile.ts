@@ -100,6 +100,17 @@ export function setJjCardsReadyForTests(on: boolean): void {
   jjCardsReady = on
 }
 
+/**
+ * HI-2870 (J9d): the scenarios' switch, so the jj-slot guidance's scenarios can start jj cards in a test profile before
+ * J9e. Only an unpackaged build with `CW_TEST_JJ_CARDS=1` turns the seam on; a packaged build never does, whatever its
+ * environment. J9e removes it with the seam. Returns whether it turned it on.
+ */
+export function jjCardsTestSwitch(packaged: boolean, flag: string | undefined): boolean {
+  if (packaged || flag !== '1') return false
+  jjCardsReady = true
+  return true
+}
+
 function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   const g = Object.fromEntries(MOVES.map((m) => [m, [] as GuardId[]])) as Record<MoveId, GuardId[]>
   const review = o.review !== 'none'

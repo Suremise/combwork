@@ -265,4 +265,15 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
     expect((await h.port.create(repo, join(root, 'slot-a'), base)).err).toBe(JJ_REFUSED.control)
     expect(readdirSync(root)).toEqual([])
   })
+
+  it("a project's first slot makes the worktrees folder the control and the slot go in, which jj doesn't make (HI-2870)", async () => {
+    const h = harness()
+    const { repo, root, base } = h.repo('first', true)
+    // As the app has it: the control and the slots in the project's worktrees folder, absent before its first slot.
+    const worktrees = join(root, 'not-yet', 'project')
+    const port = h.portWith({ control: (r) => ({ folder: join(worktrees, '.cw-jj-control'), journal: h.journals.of(`jj_control:${r.toLowerCase()}`) }) })
+    expect(await port.create(repo, join(worktrees, 'slot-a'), base)).toEqual({ ok: true, err: '' })
+    expect(readFileSync(join(worktrees, 'slot-a', 'base.txt'), 'utf8')).toBe('base\n')
+    expect((h.journals.of(`jj_control:${repo.toLowerCase()}`).read() as { phase?: string } | null)?.phase).toBe('ready')
+  })
 })
