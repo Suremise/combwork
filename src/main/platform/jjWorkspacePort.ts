@@ -19,7 +19,7 @@
 
 import { createHash, randomUUID } from 'crypto'
 import { existsSync } from 'original-fs'
-import { lstat, readdir, readFile, realpath, stat } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readFile, realpath, rmdir, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -287,60 +287,104 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   }
 
   /**
-   * The project's control workspace (s21 §4): sparse and empty, the cwd of every add and forget. Made once, from the
-   * project folder (which snapshots the project folder's working copy: so only when it's quiet, under the store's lock),
-   * its generation and empty sparse state checked before each use. Null (refused) when it can't be proved.
+   * The project's control workspace (s21 §4; HI-2887's design s7–s20): sparse and empty, the cwd of every add and forget.
+   * Each making is its own attempt, under the store's lock, its record journalled before each step, and decided again
+   * inside the lock from the record as it is then:
+   * - `intent` (a fresh token): a token folder Combwork then makes itself, empty, under `.cw-jj-controls`;
+   * - `folder` (its generation recorded): `jj workspace add <token>/ws` under the attempt's own name
+   *   (`cw-<hash>-control-<token>`), from the project folder (which snapshots its working copy: only when it is quiet);
+   * - `ready` (`ws`'s own generation recorded right after the add): used only while its token folder's and `ws`'s
+   *   generations, its checkout's name, its store and its empty sparse state all still hold.
+   * An interrupted attempt is never adopted (a child with no recorded baseline proves nothing) and nothing unproved is
+   * ever deleted: an empty token folder of its own is removed (not recursively); anything else, and any registration
+   * under its name, is kept as a residue the record lists (the pool's prune forgets a residue registration whose folder is
+   * gone, from the next control: no snapshot of the project folder). A new attempt takes a fresh token and name, so it
+   * never collides with an earlier one. Null (refused) when it can't be proved, or the project folder isn't quiet.
    */
   const control = async (repo: string, ctx: JjContext): Promise<string | null> => {
     const c = deps.control(repo)
     const hash = await repoHash(repo)
-    const name = `${ownedPrefix(hash)}control` // i18n-ignore: a jj workspace name, not wording
-    const rec = c.journal.read() as { phase?: string; store?: string; workspace?: string; folder?: string; generation?: string } | null
-    const ok = async (): Promise<boolean> => {
-      if (!rec || rec.phase !== 'ready' || !rec.folder || !samePath(rec.folder, c.folder) || rec.workspace !== name || !rec.store || !samePath(rec.store, ctx.store)) return false
-      if ((await generationOf(c.folder)) !== rec.generation) return false
-      // Empty sparse state: no file but .jj in it.
-      const files = (await readdir(c.folder).catch(() => null)) ?? null
+    type Residue = { path: string; name?: string; why: string }
+    type Rec = { phase?: string; token?: string; name?: string; store?: string; tokenFolder?: string; tokenGeneration?: string; ws?: string; wsGeneration?: string; residues?: Residue[]; folder?: string; workspace?: string; generation?: string }
+    const recNow = (): Rec | null => {
+      const v = c.journal.read()
+      return v && typeof v === 'object' && !('unreadable' in v) ? (v as Rec) : null
+    }
+    const folderGen = async (p: string): Promise<string | null> => {
+      const s = await stat(p, { bigint: true }).catch(() => null)
+      return s && s.isDirectory() && s.ino !== 0n ? `${s.ino}:${s.birthtimeNs}` : null
+    }
+    const emptySparse = async (p: string): Promise<boolean> => {
+      const files = await readdir(p).catch(() => null)
       return !!files && files.every((f) => f === '.jj' || f === '.git')
     }
-    if (await ok()) return c.folder
-    // A record that doesn't match (another store, name or folder): refused, never taken for an ordinary slot.
-    const ours = !!rec && rec.workspace === name && !!rec.folder && samePath(rec.folder, c.folder) && !!rec.store && samePath(rec.store, ctx.store)
-    if (rec && !ours) return null
-    if (rec?.phase === 'ready') return null
+    const usable = async (rec: Rec | null): Promise<string | null> => {
+      if (!rec || rec.phase !== 'ready' || !rec.store || !samePath(rec.store, ctx.store)) return null
+      // A J9a record (one control, no token): its folder's generation and empty sparse state, as before.
+      if (!rec.token) {
+        if (!rec.folder || !samePath(rec.folder, c.folder) || (await generationOf(c.folder)) !== rec.generation) return null
+        return (await emptySparse(c.folder)) ? c.folder : null
+      }
+      if (!rec.ws || !rec.tokenFolder || !rec.name) return null
+      if ((await folderGen(rec.tokenFolder)) !== rec.tokenGeneration || (await generationOf(rec.ws)) !== rec.wsGeneration) return null
+      if ((await checkoutOf(rec.ws))?.name !== rec.name) return null
+      const there = await contextOf(rec.ws)
+      if (!there || !samePath(there.store, ctx.store)) return null
+      return (await emptySparse(rec.ws)) ? rec.ws : null
+    }
+    const fast = await usable(recNow())
+    if (fast) return fast
     return deps.lock(ctx.store, async () => {
-      // An interrupted making (HI-2887): decided by jj's own list, under the lock. Added: ready. Not added: a half-made
-      // folder holding nothing but jj's own files is ours to trash, then made again; anything else in it is left alone.
-      if (rec?.phase === 'creating') {
+      // Everything decided from the record as it is now, inside the lock (another caller may have made it ready).
+      const rec = recNow()
+      if (rec?.store && !samePath(rec.store, ctx.store)) return null
+      const now = await usable(rec)
+      if (now) return now
+      const residues: Residue[] = [...(rec?.residues ?? [])]
+      const keep = (r: Residue): void => {
+        if (!residues.some((x) => samePath(x.path, r.path) && x.name === r.name)) residues.push(r)
+      }
+      if (rec) {
+        // The attempt the record names, preserved or cleaned up only where it is provably Combwork's and empty.
+        const tokenFolder = rec.token ? rec.tokenFolder : rec.folder
+        const name = rec.token ? rec.name : rec.workspace
         const op = await pinned(repo)
         if (isUnknown(op)) return null
         const listed = await listAt(repo, op)
         if (isUnknown(listed)) return null
-        const me = listed.find((w) => w.name === name)
-        if (me) {
-          if (!samePath(await realOr(me.root), await realOr(c.folder))) return null
-          const generation = await generationOf(c.folder)
-          if (!generation) return null
-          await c.journal.write({ phase: 'ready', store: ctx.store, workspace: name, folder: c.folder, generation })
-          return c.folder
+        const registered = !!name && listed.some((w) => w.name === name)
+        if (registered) keep({ path: rec.ws ?? tokenFolder ?? '', name, why: rec.phase === 'ready' ? 'lost' : 'unrecorded' }) // i18n-ignore: a residue's protocol code, for the log and the window's own words
+        if (tokenFolder && existsSync(tokenFolder)) {
+          const ours = !!rec.token && !!rec.tokenGeneration && (await folderGen(tokenFolder)) === rec.tokenGeneration
+          const files = await readdir(tokenFolder).catch(() => null)
+          if (ours && files && files.length === 0 && !registered) {
+            // Its own, empty: removed (rmdir fails on anything inside, so nothing unproved goes).
+            await rmdir(tokenFolder).catch(() => keep({ path: tokenFolder, why: 'notEmpty' })) // i18n-ignore: a residue's protocol code, for the log and the window's own words
+          } else keep({ path: tokenFolder, ...(name ? { name } : {}), why: ours ? 'notEmpty' : 'unproved' }) // i18n-ignore: a residue's protocol code, for the log and the window's own words
         }
-        if (existsSync(c.folder)) {
-          const files = await readdir(c.folder).catch(() => null)
-          if (!files || !files.every((f) => f === '.jj' || f === '.git')) return null
-          await deps.trash(c.folder)
-          if (existsSync(c.folder)) return null
-        }
-        await c.journal.clear()
-      } else if (existsSync(c.folder)) return null
+        await c.journal.write({ phase: 'idle', store: ctx.store, residues })
+      }
       if (!(await deps.projectQuiet(repo))) return null
-      await c.journal.write({ phase: 'creating', store: ctx.store, workspace: name, folder: c.folder })
-      // The explicit owned record of the project folder: the one snapshot of it Combwork takes, under the lock, quiet.
-      const add = await jj(repo, ['workspace', 'add', c.folder, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
+      const token = randomUUID().replace(/-/g, '').slice(0, 12)
+      const name = `${ownedPrefix(hash)}control-${token}` // i18n-ignore: a jj workspace name, not wording
+      // Beside J9a's single control folder (a J9a control there stays as it was, a residue if it can't be used).
+      const attempts = join(dirname(c.folder), '.cw-jj-controls')
+      const tokenFolder = join(attempts, token)
+      const ws = join(tokenFolder, 'ws')
+      const base = { store: ctx.store, token, name, tokenFolder, residues }
+      await c.journal.write({ phase: 'intent', ...base })
+      await mkdir(attempts, { recursive: true }).catch(() => undefined)
+      if (!(await mkdir(tokenFolder).then(() => true, () => false))) return null
+      const tokenGeneration = await folderGen(tokenFolder)
+      if (!tokenGeneration) return null
+      await c.journal.write({ phase: 'folder', ...base, tokenGeneration })
+      // The explicit owned record of the project folder: the one snapshot of it this attempt takes, under the lock, quiet.
+      const add = await jj(repo, ['workspace', 'add', ws, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
       if (!add.ok) return null
-      const generation = await generationOf(c.folder)
-      if (!generation) return null
-      await c.journal.write({ phase: 'ready', store: ctx.store, workspace: name, folder: c.folder, generation })
-      return c.folder
+      const wsGeneration = await generationOf(ws)
+      if (!wsGeneration) return null
+      await c.journal.write({ phase: 'ready', ...base, tokenGeneration, ws, wsGeneration })
+      return ws
     })
   }
 
