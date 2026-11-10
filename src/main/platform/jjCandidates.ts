@@ -73,6 +73,11 @@ export interface JjAttemptRecord {
   commits: string[]
   /** The candidate's commit (the duplicates' head, the squash, the merge). */
   result?: string
+  /**
+   * How a finished attempt ended, written with its `done`: a candidate, or the failure that returns the card. Only a
+   * `candidate` record can credit containment (J5, HI-2798/s14 §2′); a done record without it is never one.
+   */
+  outcome?: 'candidate' | 'conflict' | 'notUpToDate'
   pins: JjPin[]
   abandoned?: string[]
   kept?: string[]
@@ -678,6 +683,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       const kept = await a.abandon(rec.commits)
       if (kept.length) throw new Stop('kept')
       await a.held()
+      rec.outcome = fail.fail === 'conflict' ? 'conflict' : 'notUpToDate'
       await a.phase('done')
       const evidence = fail.fail === 'conflict' ? (conflicts?.evidence ?? []) : [...rec.commits]
       return { ...fail, evidence, refs: a.owned(), record: structuredClone(rec) }
@@ -690,6 +696,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
     const at = a.head()
     if (!(await a.commits(at, visibleOf([result.commit]))).length) throw new Stop('gone', result.commit)
     await a.held()
+    rec.outcome = 'candidate'
     await a.phase('done')
     const stays = rec.commits.filter((c) => !(rec.abandoned ?? []).includes(c) && c !== rec.result).concat(result.commit)
     return { candidate: { result: result.commit, commits: (await a.commits(at, visibleOf(stays))).map((c) => c.commit), change: result.change, op: at, refs: a.owned() }, record: structuredClone(rec) }
