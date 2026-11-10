@@ -31,6 +31,22 @@ function copySnapshot(folder, jj) {
 }
 
 /**
+ * Whether a look at a review copy (`view`, its `copies:list` row; `snap`, its snapshot) can be its first (HI-2907): only
+ * once Combwork has it ready, never while its lease's operation is still making or resetting it (jj records `@` on the
+ * revision before the copy's files are written, so a look then sees them appear later, as the reviewer's edits).
+ * 'baseline': lent and ready, on `revision`: what later looks are compared with. 'seen': ready and already given back, on
+ * `revision` (a quick reviewer's whole review between two looks): it was on it, with nothing left to compare. Else null.
+ */
+function firstLook(view, snap, revision) {
+  if (!snap || snap.parent !== revision || !view?.lease) return null
+  // 'leased' is set by the write that ends the lease's operation, after the copy is made, reset and checked; 'returning'
+  // only by that write or after it. Before then the copy is 'creating', or keeps the state it had when free.
+  if (view.state === 'leased' && !view.lease.returned) return 'baseline'
+  if (view.state === 'returning' && view.lease.returned) return 'seen'
+  return null
+}
+
+/**
  * What changed between two snapshots of one copy, a line each: a file edited, added or removed (without a jj command), or
  * jj's working copy or its parent moved (a commit, `jj new`, `jj describe`, `jj edit`). Empty when nothing did.
  */
@@ -91,4 +107,4 @@ function copyWrites(o, copy) {
   return out
 }
 
-module.exports = { copySnapshot, copyChanges, copyWrites, filesOf }
+module.exports = { copySnapshot, firstLook, copyChanges, copyWrites, filesOf }
