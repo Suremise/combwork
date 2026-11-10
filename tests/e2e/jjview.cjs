@@ -55,7 +55,7 @@ function project(dir, cfg) {
 function jjRepo(dir, o = {}) {
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, '.gitignore'), '.combwork/\n')
-  jj(dir, 'git', 'init', ...(o.loose ? [] : ['--colocate']))
+  jj(dir, 'git', 'init', o.loose ? '--no-colocate' : '--colocate')
   fs.writeFileSync(path.join(dir, 'base.txt'), 'base\n')
   if (o.attributes) fs.writeFileSync(path.join(dir, '.gitattributes'), '*.txt text eol=lf\n')
   jj(dir, 'commit', '-m', 'base')
@@ -232,14 +232,17 @@ function jjRepo(dir, o = {}) {
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
     await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1)
     await section('jjRepo')
+    // The window's language, as a change of it reaches the window (vcswitch's way).
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-      await inv('settings:update', { language })
+      await speak(language)
       const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
-      const want = cat['git.section.jjRepo']
-      check(`${language}: jj's sections in the language`, !!want && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want))), await text(page.locator('.git-sections')))
+      // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
+      const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
+      check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]))), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
     }
-    await inv('settings:update', { language: 'en' })
+    await speak('en')
   } finally {
     await app.close().catch(() => undefined)
   }
