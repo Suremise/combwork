@@ -235,15 +235,17 @@ function jjRepo(dir, o = {}) {
     await section('jjRepo')
     // The window's language, as a change of it reaches the window (vcswitch's way).
     const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    const base = (await inv('app:info')).language
+    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-      await speak(language)
+      await speak({ ...base, code: language, locale: language, messages: catalogue(language) })
       const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
       // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
       const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
       check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]))), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
     }
-    await speak('en')
+    await speak(base)
   } finally {
     await app.close().catch(() => undefined)
   }
