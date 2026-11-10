@@ -32,6 +32,18 @@ describe('forwardDirection (HI-2892)', () => {
     expect(forwardDirection('hotfix', 'main', 'main')).toEqual({ dir: 'backward', why: 'default' })
   })
 
+  it("a version named as the default (git's fallback to the checked-out branch) is ordered as a version, never as main (HR1's round 1)", () => {
+    expect(forwardDirection('1.5.0', '1.4.0', '1.5.0')).toEqual({ dir: 'backward', why: 'older' })
+    expect(forwardDirection('1.4.0', '1.5.0', '1.5.0')).toEqual({ dir: 'forward' })
+    expect(forwardDirection('1.5.0', '1.4.0', '1.4.0')).toEqual({ dir: 'backward', why: 'older' })
+    expect(forwardDirection('1.4.0', '1.5.0', '1.4.0')).toEqual({ dir: 'forward' })
+    expect(forwardDirection('v1.4.0', '1.4.0', 'v1.4.0')).toEqual({ dir: 'unknown', why: 'sameVersion' })
+    expect(forwardDirection('1.4.0', 'release/1.4.0', 'release/1.4.0')).toEqual({ dir: 'unknown', why: 'sameVersion' })
+    // Nor does it order a branch that isn't a version.
+    expect(forwardDirection('1.5.0', 'next', '1.5.0')).toEqual({ dir: 'unknown', why: 'unordered' })
+    expect(forwardDirection('next', '1.5.0', '1.5.0')).toEqual({ dir: 'unknown', why: 'unordered' })
+  })
+
   it('no default branch named: main is only a name, so it orders nothing', () => {
     expect(forwardDirection('main', '1.5.0', null)).toEqual({ dir: 'unknown', why: 'unordered' })
     expect(forwardDirection('1.5.0', 'main', null)).toEqual({ dir: 'unknown', why: 'unordered' })

@@ -29,17 +29,18 @@ export function branchVersion(branch: string): string | null {
 /**
  * The direction of bringing `to` up to date with `from` (`defaultBranch`: the repository's default branch, or null when
  * git names none). Two versions: older into newer is forward, newer into older backward, the same version under two
- * names unknown. The default branch into any other is forward; any other into it backward. Anything else is unknown.
+ * names unknown: decided first, whatever git names as the default (HR1's round 1: with no main or master, git's default
+ * is the checked-out branch, which may be a version). Then the default branch, when it isn't a version itself, into any
+ * other is forward, and any other into it backward. Anything else is unknown.
  */
 export function forwardDirection(from: string, to: string, defaultBranch: string | null): ForwardDirection {
-  if (defaultBranch && from === defaultBranch && to !== defaultBranch) return { dir: 'forward' }
-  if (defaultBranch && to === defaultBranch && from !== defaultBranch) return { dir: 'backward', why: 'default' } // i18n-ignore: codes, never shown
   const [a, b] = [branchVersion(from), branchVersion(to)]
-  if (a === null || b === null) return { dir: 'unknown', why: 'unordered' } // i18n-ignore: codes, never shown
-  const c = compareVersions(a, b)
-  if (c === null) return { dir: 'unknown', why: 'unordered' } // i18n-ignore: codes, never shown
-  if (c < 0) return { dir: 'forward' }
-  return c > 0 ? { dir: 'backward', why: 'older' } : { dir: 'unknown', why: 'sameVersion' } // i18n-ignore: codes, never shown
+  const c = a !== null && b !== null ? compareVersions(a, b) : null
+  if (c !== null) return c < 0 ? { dir: 'forward' } : c > 0 ? { dir: 'backward', why: 'older' } : { dir: 'unknown', why: 'sameVersion' } // i18n-ignore: codes, never shown
+  const main = defaultBranch && branchVersion(defaultBranch) === null ? defaultBranch : null
+  if (main && from === main && to !== main) return { dir: 'forward' }
+  if (main && to === main && from !== main) return { dir: 'backward', why: 'default' } // i18n-ignore: codes, never shown
+  return { dir: 'unknown', why: 'unordered' } // i18n-ignore: codes, never shown
 }
 
 /** A forward merge's recorded override (HI-2892): the user's explicit choice of a backward or unknown pair, and who asked. */

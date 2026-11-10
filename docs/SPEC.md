@@ -5211,8 +5211,10 @@ next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) d
 default branch as the project's own platform port names it and only while it exists (none named or readable: nothing
 counts as `main`): two versions (`X.Y.Z[-pre]` or `X.Y`, an optional `v`, read on the whole name or its last `/`
 segment, compared by semver) give `forward` older into newer and `backward` (`older`) newer into older, and `unknown`
-(`sameVersion`) for one version under two names; the default branch into any other is `forward`, any other into it
-`backward` (`default`: a release reaches it through its pull request); any other pair is `unknown` (`unordered`).
+(`sameVersion`) for one version under two names, decided first, whichever is the default (HR1's round 1: with no
+`main` or `master`, git's default is the checked-out branch, which may be a version); then the default branch, unless
+its name is a version, into any other is `forward`, any other into it `backward` (`default`: a release reaches it
+through its pull request); any other pair is `unknown` (`unordered`).
 Ancestry decides nothing: no graph test tells which branch was made from which (one containing the other is equally a
 release behind its next version and a next version built on it), so a pair the names don't order is unknown, never
 permitted. Only `forward` is permitted by default:

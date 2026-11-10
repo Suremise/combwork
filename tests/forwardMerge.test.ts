@@ -259,6 +259,36 @@ async function oldForward(w: WS, repo: string, from: string, to: string): Promis
   return { number: card.number, key: wf.store.card(card.number).key }
 }
 
+/**
+ * HR1's round 1: a repository with no main or master, only 1.4.0 and 1.5.0 (made from it, a fix on 1.4.0 since), 1.5.0
+ * checked out: git's default branch falls back to it. The project merges into 1.5.0, listing 1.4.0.
+ */
+async function versionsOnly(): Promise<{ w: WS; repo: string }> {
+  const ws = join(base, `ws-${++n}`)
+  const repo = join(ws, 'p')
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
+  git(repo, 'init', '-q', '-b', '1.4.0')
+  for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
+  git(repo, 'add', '-A')
+  git(repo, 'commit', '-qm', 'the release')
+  git(repo, 'branch', '1.5.0')
+  writeFileSync(join(repo, 'fix.txt'), 'the release fix\n')
+  git(repo, 'add', '-A')
+  git(repo, 'commit', '-qm', 'the release fix')
+  git(repo, 'checkout', '-q', '1.5.0')
+  writeFileSync(join(repo, 'work.txt'), 'the next version\n')
+  git(repo, 'add', '-A')
+  git(repo, 'commit', '-qm', 'the next version')
+  const { platform: _p, ...pair } = preset('git', 'pair')
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, preChecks: [], mergeChecks: [], target: '1.5.0', otherTargets: ['1.4.0'] } } }))
+  const w = createWorkspaceService()
+  await w.open(ws)
+  opened.push(w)
+  return { w, repo }
+}
+
 const drain = async (w: WS, repo: string, target: string) => {
   const wf = (await workflowFor(w, repo))!
   return inWorkspace(w, () => new MergeQueue(wf, { folder: join(base, `queue-${++n}`), runCheck: async () => ({ ok: true, output: '' }) }).drain(target))
@@ -320,6 +350,21 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     await inWorkspace(w, () => controls.queueCardChange(w, old.number, user, 'removeFromQueue', 'not this way'))
     expect(wf.state(wf.store.card(old.number)).stage).toBe('done')
     expect(git(repo, 'rev-parse', '1.4.0')).toBe(b14)
+  })
+
+  it("no main or master, the checked-out 1.5.0 git's default: still ordered by version, never as main (HR1's round 1)", async () => {
+    const { w, repo } = await versionsOnly()
+    const { defaultBranch } = await import('../src/main/workflow/targets')
+    // The premise: git's default here is the checked-out version branch.
+    expect(await defaultBranch(w, repo)).toBe('1.5.0')
+    const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    expect(views.find((v) => v.target === '1.4.0')?.forward).toBeUndefined()
+    expect(views.find((v) => v.target === '1.5.0')?.forward).toEqual({ others: ['1.4.0'], behind: [{ from: '1.4.0', commits: 1 }] })
+    await expect(inWorkspace(w, () => controls.forwardMerge(w, repo, '1.5.0', '1.4.0', user))).rejects.toThrow(/1\.4\.0 is an older version than 1\.5\.0/)
+    const [b14, b15] = [git(repo, 'rev-parse', '1.4.0'), git(repo, 'rev-parse', '1.5.0')]
+    const old = await oldForward(w, repo, '1.5.0', '1.4.0')
+    expect(await drain(w, repo, '1.4.0')).toMatchObject([{ card: old.key, outcome: 'returned', reason: 'direction' }])
+    expect([git(repo, 'rev-parse', '1.4.0'), git(repo, 'rev-parse', '1.5.0')]).toEqual([b14, b15])
   })
 
   it('a card with its override recorded keeps it through Retry: the source frozen again, queued, merged', async () => {
