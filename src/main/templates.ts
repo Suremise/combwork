@@ -36,8 +36,9 @@ import type { AgentBranchStatus, AgentDef, PageLayout, ProjectConfig, ProviderId
 import { answerFor, badAnswers, loadFallback, optionNamed, optionOf, type ConnectionAnswers, type ConnectionOption, type ConnectionsApplied, type ConnectionsPlan, type PickedAgent } from '../shared/templateConnections'
 import { accountOnIn, connectionsOn } from '../shared/accounts'
 import { agentWorkflowRole } from '../shared/workflow/roles'
+import { platformHasOption } from '../shared/workflow/options'
 import { hasWorkflow, loadedMaxAgents, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
-import type { PlatformId } from '../shared/platform/descriptors'
+import { needsRepository, type PlatformId } from '../shared/platform/descriptors'
 import { ownPreferenceChange, workflowForm } from './workflow/optionsForm'
 import { workflowChanged } from './workflow/rulesets'
 import { config } from './config'
@@ -606,7 +607,7 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
     const offered = form.presets.find((p) => p.id === t.suggestedPreset)?.options
     // Read again as any section is: what Combwork makes goes through the same whitelist.
     // Their size as their Maximum agents (HI-2001): the team the template is.
-    if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(form.platform === 'git' && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), maxAgents: t.agents.length }, t.suggestedPreset), form.platform) ?? section
+    if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(platformHasOption(form.platform, 'reviewerMode') && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), maxAgents: t.agents.length }, t.suggestedPreset), form.platform) ?? section
   }
   return {
     platform: form.platform,
@@ -615,8 +616,9 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
     section,
     // Its Maximum agents isn't one of the changes it fills in: the user's load saves it with the agents (HI-2058).
     overlay: section ? overlayTemplateWorkflow({ ...section, options: Object.fromEntries(Object.entries(section.options).filter(([k]) => k !== 'maxAgents')) as TemplateWorkflow['options'] }, form) : null,
-    needsGit: form.platform === 'none' && !section && sections.includes('git'),
-    alsoGit: form.platform === 'none' && !!section && sections.includes('git')
+    // A section of a platform that needs a repository (Git's) the project, using one that needs none (None), can't use yet.
+    needsGit: !needsRepository(form.platform) && !section && sections.some(needsRepository),
+    alsoGit: !needsRepository(form.platform) && !!section && sections.some(needsRepository)
   }
 }
 

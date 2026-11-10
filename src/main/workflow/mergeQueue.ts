@@ -25,6 +25,7 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
@@ -587,7 +588,7 @@ export class MergeQueue {
   /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
   private pushes(): boolean {
     const o = this.wf.cfg.options()
-    return o.platform === 'git' && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
+    return merges(o.platform) && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
   }
 
   /** The message of Combwork's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
@@ -716,7 +717,7 @@ export class MergeQueue {
   /** Whether the target follows its remote, as the project's options are now (G21 isn't a rule), on a platform that can. */
   private follows(card: CardRecord, s: CardState): boolean {
     const o = this.wf.cfg.options()
-    if (!(o.platform === 'git' && o.finish === 'combworkMerges' && o.followRemote === true)) return false
+    if (!(merges(o.platform) && o.finish === 'combworkMerges' && o.followRemote === true)) return false
     const port = this.integration(card, s)
     return !!(port.destination && port.fetchHead && port.prePush && port.publish)
   }

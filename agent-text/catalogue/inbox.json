@@ -37,7 +37,7 @@
   },
   "inbox.cardEvents.withMore": {
     "text": "{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)",
-    "note": "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it."
+    "note": "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087), else by a card loop's step waiting for the agent's check (HI-2808). body: that event's own line; n and more: how many other events came with it."
   },
   "inbox.carried.notice": {
     "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",

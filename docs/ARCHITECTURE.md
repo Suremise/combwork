@@ -297,7 +297,9 @@ Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the con
 `platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
 platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
 pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
-`reconcileHistory` and `attributeFolder`.
+`reconcileHistory` and `attributeFolder`. A card's move to another target (`workflow/retargetCard.ts`, HI-2821) asks its
+platform's optional `ownWork` proof (Git's in `platform/gitOwnWork.ts`; absent, the move isn't offered) and holds the refs
+through port 1's `holdRefs`; `tests/retargetTraces.test.ts` holds its git commands.
 Port 4's candidate half (HI-2790's R7): `platform/integration.ts` holds the contract (`IntegrationPort`'s `update`,
 `candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/gitIntegration.ts` is Git's (the queue's
 worktree made or reused, strict's update, the test merge in each style and its cleanup, moved from `mergeQueue.ts`), with
@@ -323,8 +325,12 @@ module from outside Git's implementation is a classified edge (Git implementatio
 historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
 "platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
 `slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and the 1.5.0 J card
-implementing each one's port routes it by the project's platform. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, or a
-changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+implementing each one's port routes it by the project's platform. Its `SWITCHES` justify, per file, the switches on a
+platform's id (`platform === 'git'`) left outside the descriptors, adapters and registry (HI-2822): everything else reads
+the descriptor's workflow facts (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in
+`shared/platform/descriptors.ts`; jj's integration is `user`, neither merging nor accepting: HI-2799's option A), a
+capability, a gate or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one,
+a changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 jj (1.5.0's J0, HI-2793; SPEC §16.3.6, jj's runner and detection) is not a platform yet: `platform/jjRunner.ts` is its
 bounded runner (the standalone `jj.exe`, its version against `resources/tested-vcs.json` through `shared/jjTool.ts`,
 reads with `--ignore-working-copy` and config overrides, an output cap, a time limit, cancellation and shutdown, each

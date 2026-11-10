@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, REASONS_PER_SUITE, UNIT_ONLY, 
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, noCombworkProblems, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource, suiteStartsCombwork } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -37,7 +37,7 @@ import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
-type Suite = { name: string; needs?: string[]; serial?: string }
+type Suite = { name: string; needs?: string[]; serial?: string; noCombwork?: string }
 type Area = { paths: string[]; suites: string[] }
 const suites = SUITES as Suite[]
 const names = suites.map((s) => s.name)
@@ -168,6 +168,40 @@ describe('the e2e suite list', () => {
       })
     }
     expect(unexplained).toEqual([])
+  })
+
+  // HI-2833: claudemanagedreal ran claude -p without Combwork, unmarked, and tested-clis refused Claude Code's entry only at
+  // the release (HI-2819). Caught here, at the card, instead.
+  it('marks a real suite noCombwork exactly when it starts no test Combwork (HI-2833)', () => {
+    expect(noCombworkProblems(suites, dir)).toEqual([])
+    const unmarked = suites.map((s) => (s.name === 'claudemanagedreal' ? { ...s, noCombwork: undefined } : s))
+    expect(noCombworkProblems(unmarked, dir)).toEqual([expect.stringMatching(/^claudemanagedreal: starts no test Combwork .*mark it noCombwork/)])
+    expect(suiteStartsCombwork('wakepaste-codex', dir)).toMatch(/^wakepaste-cli\/run\.cjs:\d+$/)
+    // On sources of its own: each way a suite starts one, what only looks like it, and a fake suite (no CLI) unasked.
+    const own = tempDir('cw-nocombwork-')
+    try {
+      const write = (name: string, body: string): void => writeFileSync(join(own, `${name}.cjs`), `// ${name}\n${body}\n`)
+      write('bylib', "const lib = require('./lib.cjs')\nawait lib.launch({ userData })")
+      write('byelectron', 'const app = await _electron.launch({ env })')
+      write('bydestructured', 'const { launch } = lib\nconst h = await launch({ userData })')
+      write('byhelper', "require('./helper.cjs')")
+      writeFileSync(join(own, 'helper.cjs'), 'module.exports = () => lib.launch({})\n')
+      write('itself', "// lib.launch( is not used here\nspawn(cli, ['-p']) // not lib.launch(\nbrowser.launch({})\nconst relaunch = () => relaunch()")
+      write('fake', 'spawn(cli)')
+      const ownSuites = [
+        { name: 'bylib', needs: ['claude'] },
+        { name: 'byelectron', needs: ['codex'], noCombwork: 'wrongly' },
+        { name: 'bydestructured', needs: ['copilot'] },
+        { name: 'byhelper', needs: ['opencode'] },
+        { name: 'itself', needs: ['claude'] },
+        { name: 'fake' },
+        { name: 'fake', needs: ['packaged'] }
+      ]
+      expect(noCombworkProblems(ownSuites, own)).toEqual([expect.stringMatching(/^byelectron: marked noCombwork, but starts a test Combwork \(byelectron\.cjs:2\)/), expect.stringMatching(/^itself: starts no test Combwork/)])
+      expect(suiteStartsCombwork('byhelper', own)).toBe('helper.cjs:1')
+    } finally {
+      rmSync(own, { recursive: true, force: true })
+    }
   })
 
   it('suites that run side by side take their port from the runner, not a fixed number', () => {

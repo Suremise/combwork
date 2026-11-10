@@ -5,7 +5,7 @@ import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as 
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
-import { infoAt, modelCaps, modelIdName, serverModelLabel } from '@shared/models'
+import { accountInfo, infoAt, modelCaps, modelIdName, serverModelLabel } from '@shared/models'
 import { signInHostLine } from '../signInHost'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { launchedName } from '@shared/connectionLabel'
@@ -1576,7 +1576,10 @@ export function PaneFooter({
   const chose = footerChoices(a, live)
   // The models of the GitHub host its project resolves to (HI-2779), for a CLI signing in on one; else the CLI's catalogue.
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const pinfo = infoAt(providers[provider], { projectPath: project.path, workspacePath })
+  // A running session's on its launch's sign-in account: that account's own models and default (HI-2852).
+  const launchedOn = live?.launchedConnection
+  const hostInfo = infoAt(providers[provider], { projectPath: project.path, workspacePath })
+  const pinfo = launchedOn ? accountInfo(hostInfo, { id: launchedOn.id, kind: launchedOn.server ? 'server' : 'signIn' }) : hostInfo
   const shown = agentModelShown(provider, chose.model, chose.modelGlobal, pinfo, live ? live.modelId || usage?.model || null : null)
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server

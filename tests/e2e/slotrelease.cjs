@@ -40,7 +40,12 @@ const check = (name, ok, extra = '') => {
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 
-/** Ends a test Combwork from outside, as a crash would: its main process first, then all it started, each by pid and start time. */
+/**
+ * Ends a test Combwork from outside, as a crash would: its main process first, then all it started, each by pid and start
+ * time. True once its main process has exited and none of those it ended still runs as the same process (HI-2836, as
+ * slotbroker's, HI-2316): under load an Electron child outlived the main process's exit, still holding the profile's
+ * single-instance lock, and the next start on the profile quit as "already running".
+ */
 async function endFromOutside(app, spare = []) {
   const proc = app.process()
   const gone = new Promise((r) => (proc.exitCode !== null ? r(true) : proc.once('exit', () => r(true))))
@@ -48,8 +53,9 @@ async function endFromOutside(app, spare = []) {
   const list = processes()
   const top = id && list.find((p) => p.pid === id.pid && Math.abs(p.started - id.started) <= 1)
   // `spare`: what an agent left running, which outlives the crash (as a detached process would).
-  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid))) : 0
-  return ended > 0 && !!(await lib.until(() => gone, HUNG_MS))
+  const rest = top ? descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid)) : []
+  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, rest) : 0
+  return ended > 0 && !!(await lib.until(() => gone, HUNG_MS)) && !!(await lib.until(() => lib.stillSame([{ pid: top.pid, started: top.started }, ...rest]).length === 0, HUNG_MS, 250))
 }
 
 ;(async () => {

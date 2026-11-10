@@ -168,14 +168,21 @@ describe('Start the next version (HI-2807)', () => {
     const { w, repo } = await project()
     const plan = await inWorkspace(w, () => nv.nextVersionPlan(w, repo))
     expect(plan).toMatchObject({ from: '1.3.0', name: '1.4.0', listed: false, start: { commit: head(repo, '1.3.0') } })
-    const [r] = await Promise.all([
-      inWorkspace(w, () => nv.startNextVersion(w, repo, { name: plan.name, from: { ref: plan.from, commit: plan.start!.commit }, base: plan.base })),
-      inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, target: '1.3.0', otherTargets: ['main'], stageNames: { review: 'Check' } } }).catch((e: Error) => e))
-    ])
+    // The save beside it starts once the start holds the repository's lock and the turn of workflow writes: its `check`
+    // runs first thing there. Each call finds its repository (git) before it queues for the lock, so started together
+    // either could get in first, and a save first leaves the plan's base stale, refused as it should be (the next test):
+    // HI-2842, seen under a wide unit run's load.
+    let held!: () => void
+    const holding = new Promise<void>((resolve) => (held = resolve))
+    const start = inWorkspace(w, () => nv.startNextVersion(w, repo, { name: plan.name, from: { ref: plan.from, commit: plan.start!.commit }, base: plan.base, check: () => held() }))
+    await Promise.race([holding, start])
+    const beside = inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, target: '1.3.0', otherTargets: ['main'], stageNames: { review: 'Check' } } }).catch((e: Error) => e))
+    const [r, saved] = await Promise.all([start, beside])
     expect(r).toMatchObject({ name: '1.4.0', from: '1.3.0', added: true, commit: head(repo, '1.3.0') })
     expect(head(repo, '1.4.0')).toBe(head(repo, '1.3.0'))
-    const o = await options(w, repo)
-    expect(o.target === '1.4.0' || o.target === '1.3.0').toBe(true)
+    // The save waited its turn and went after it, over it.
+    expect(saved).not.toBeInstanceOf(Error)
+    expect((await options(w, repo)).target).toBe('1.3.0')
   })
 
   it('refuses a release that moved since it was shown, a name already taken, and options changed meanwhile, changing nothing', async () => {

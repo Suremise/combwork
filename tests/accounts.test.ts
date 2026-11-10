@@ -83,6 +83,8 @@ beforeAll(async () => {
   })
   // A kill ends the terminal, its exit run, as node-pty's does.
   terminals.onKill = (key) => logins.get(key.split(':').at(-1)!)?.(1)
+  // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
+  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)

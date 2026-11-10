@@ -20,6 +20,13 @@ import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
 const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
+const CANDIDATE_LOGS = { notSame: NOT_SAME, ...CANDIDATE_TEXT }
+export type CandidateLogKind = keyof typeof CANDIDATE_LOGS
+
+/** The card's log when its candidate isn't what was reviewed, which says why (exported for the canary test, HI-2827). */
+export function candidateLog(kind: CandidateLogKind, c: { card: string; revision: string; expected: string; target?: string }): string {
+  return say(CANDIDATE_LOGS[kind], { card: c.card, revision: c.revision.slice(0, 7), target: c.target ?? '', expected: c.expected.slice(0, 7) })
+}
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -402,7 +409,7 @@ export const gitIntegration: IntegrationPort = {
     if (isUnknown(head)) return again(gitSaid(head))
     // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
     if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: head }))) {
-      return { fail: 'notSame', log: say(NOT_SAME, { card: c.card, revision: revision.slice(0, 7), target: c.target, expected: expected.slice(0, 7) }) }
+      return { fail: 'notSame', log: candidateLog('notSame', { card: c.card, revision, target: c.target, expected }) }
     }
     await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.entry)}`, head])
     return { updated: head }
@@ -520,14 +527,14 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
     if (isUnknown(head)) return again(gitSaid(head))
     result = head
   }
-  const notUp = (m: (typeof CANDIDATE_TEXT)[keyof typeof CANDIDATE_TEXT]): CandidateTestFail => ({ fail: 'notUpToDate', log: say(m, { card: c.card, revision: revision.slice(0, 7), expected: expected.slice(0, 7) }) })
+  const notUp = (kind: Exclude<CandidateLogKind, 'notSame'>): CandidateTestFail => ({ fail: 'notUpToDate', log: candidateLog(kind, { card: c.card, revision, expected }) })
   const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, result])
-  if (anc.code === 1) return notUp(CANDIDATE_TEXT.notOnTop)
+  if (anc.code === 1) return notUp('notOnTop')
   if (anc.code !== 0) return again(anc.err)
   const twoParents = await h.run(h.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
   if (!twoParents.ok) return again(twoParents.err)
-  if (twoParents.out.trim()) return notUp(CANDIDATE_TEXT.mergeCommit)
-  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp(CANDIDATE_TEXT.rebasedNotSame)
+  if (twoParents.out.trim()) return notUp('mergeCommit')
+  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp('rebasedNotSame')
   await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.card)}`, result])
   return { result }
 }

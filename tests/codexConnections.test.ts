@@ -56,6 +56,8 @@ beforeAll(async () => {
   writeFileSync(kept, '{"kept":true}\n')
   config.settings.providers.codex.enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'codex.exe' })) as never
+  // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
+  vi.spyOn(provider('codex'), 'listModels').mockResolvedValue(null)
   statusSpy = vi.spyOn(provider('codex'), 'accountStatus').mockImplementation(async (_exe, env) => {
     checked.set(env.CODEX_HOME!, env)
     return { ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' }

@@ -19,7 +19,7 @@ import { branchChange, changeGroups, noteAgent, noteChange, recordedHere, record
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
-import { fallbackEfforts, infoAt, modelGroups } from '../shared/models'
+import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
@@ -1105,6 +1105,10 @@ route('GET', '/v1/providers', async () => {
   const here = contextWorkspace()
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
+    // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
+    const at = infoAt(info, { workspacePath: here?.path ?? null })
+    // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
+    const models = offeredModels(p.id, at, s)
     return {
       id: p.id,
       name: p.name,
@@ -1114,16 +1118,16 @@ route('GET', '/v1/providers', async () => {
       // The version this Combwork release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
       problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
-      defaultModel: infoAt(info, { workspacePath: here?.path ?? null })?.defaultModel ?? null,
-      // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
-      // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
-      models: modelGroups(p.id, infoAt(info, { workspacePath: here?.path ?? null }), s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
+      // The CLI's own home's; each connection says its own account's (HI-2856).
+      defaultModel: at?.defaultModel ?? null,
+      models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names.
-      ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
+      // with its own account's default and, where they aren't the provider's, its models (HI-2856).
+      ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
     }
   })
 })

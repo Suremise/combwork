@@ -1917,7 +1917,7 @@ export function TaskDialog() {
   // Bumped as the fields open, so the dialog draws again with them (#548): when every field already holds what it is set
   // to (the first New Card), no state changes, React skips that render, and Escape answers with the first render's view
   // (made before `orig` was filled), asking to discard an empty card.
-  const [, setOpened] = useState(0)
+  const [opened, setOpened] = useState(0)
 
   // Filled from the card when it opens (later changes by agents show in its comments and history), before anything is
   // drawn or answered: a render with the last card's fields (or none) would show them, and take them for edits (#288).
@@ -1975,8 +1975,8 @@ export function TaskDialog() {
   }, [open, ready])
 
   // Whether the chosen project's rules review (#1625): Skip review is offered, and sent, only where they do.
-  const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null)
-  const projectTargets = useProjectTargets(projects.find((p) => p.name === project)?.path ?? null)
+  const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null, opened)
+  const projectTargets = useProjectTargets(projects.find((p) => p.name === project)?.path ?? null, opened)
   // Another project chosen: its own branch, whatever the last one's pick (even a branch both list).
   useEffect(() => setNewTarget(''), [project])
   if (open === null || (!isNew && (!card || !ready))) return null

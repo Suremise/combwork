@@ -197,17 +197,31 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const wantOrder = [l7, l6, l2, l3, l1, l4, l5]
   check('the lanes show, a row each: running first (newest first), then paused, then ended and abandoned as they finished', !!(await until(async () => (await order()).join() === wantOrder.join(), HUNG_MS)), JSON.stringify({ got: await order(), want: wantOrder }))
   const row1 = section.locator(`.progress-lane[data-lane="${l1}"]`)
-  const top1 = await row1.locator('.progress-lane-top').innerText()
+  // The row's text and segments each follow their own update, which can land after the rows' order under load (HI-2817):
+  // each is waited for, never read once, and the last read is the diagnostic.
   // #3 is back in Review while #4 is being fixed in Doing: the lane is on #4, the card being built (#512).
   // #2 passed but not merged (the rules on, one card at a time): why it waits takes the name's room (#1279), the name is
-  // in its accessible name.
-  const label1 = (await row1.getAttribute('aria-label')) ?? ''
-  check('a lane says its pair, why it waits, the card being worked and finished/total; its name in its accessible name', /B1 \/ R1/.test(top1) && top1.includes(`waiting: ${K(n2)} not merged`) && new RegExp(`${K(n4)}\\b`).test(top1) && /2\/8/.test(top1) && /lanes and loops/.test(label1), JSON.stringify({ top1, label1 }))
+  // in its accessible name. #1 went to Done just above: 2/8.
+  let top1 = ''
+  let label1 = ''
+  const topRight = async () => {
+    top1 = await row1.locator('.progress-lane-top').innerText()
+    label1 = (await row1.getAttribute('aria-label')) ?? ''
+    return /B1 \/ R1/.test(top1) && top1.includes(`waiting: ${K(n2)} not merged`) && new RegExp(`${K(n4)}\\b`).test(top1) && /2\/8/.test(top1) && /lanes and loops/.test(label1)
+  }
+  check('a lane says its pair, why it waits, the card being worked and finished/total; its name in its accessible name', !!(await until(topRight, HUNG_MS)), JSON.stringify({ top1, label1 }))
   const segClass = async (n) => (await row1.locator(`.lane-seg[data-card="${n}"]`).getAttribute('class')) ?? ''
   const want = { [n1]: 'done', [n2]: 'passed', [n3]: 'review', [n4]: 'doing', [n5]: 'todo', [n6]: 'blocked', [n7]: 'blocked', [n8]: 'todo' }
-  const got = {}
-  for (const n of lane1) got[n] = await segClass(n)
-  check('one segment per card, in order, by state', lane1.every((n) => got[n].split(' ').includes(want[n])) && (await row1.locator('.lane-seg').count()) === 8, JSON.stringify(got))
+  let got = {}
+  let segs = 0
+  const segsRight = async () => {
+    const now = {}
+    for (const n of lane1) now[n] = await segClass(n)
+    got = now
+    segs = await row1.locator('.lane-seg').count()
+    return lane1.every((n) => got[n].split(' ').includes(want[n])) && segs === 8
+  }
+  check('one segment per card, in order, by state', !!(await until(segsRight, HUNG_MS)), JSON.stringify({ got, segs }))
   check('a failed round is marked on its segment (and not on the card back in Review)', got[n4].includes('failed') && !got[n3].includes('failed'), JSON.stringify(got))
   const widths = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check('segments are equal widths', Math.max(...widths) - Math.min(...widths) <= 1, JSON.stringify(widths))
@@ -223,7 +237,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   check('…and still under reduced motion', reduced === 'none', reduced)
   const row2 = section.locator(`.progress-lane[data-lane="${l2}"]`)
-  check("a long lane folds its finished cards into one '✓ n'", ((await row2.locator('.lane-seg.finished').innerText().catch(() => '')) === '✓ 18') && (await row2.locator('.lane-seg[data-card]').count()) === 4)
+  // Its first 18 went to Done just above, so this is waited for too (HI-2817).
+  const folded = async () => JSON.stringify({ finished: await row2.locator('.lane-seg.finished').innerText().catch(() => ''), cards: await row2.locator('.lane-seg[data-card]').count() })
+  check("a long lane folds its finished cards into one '✓ n'", !!(await until(async () => (await folded()) === JSON.stringify({ finished: '✓ 18', cards: 4 }), HUNG_MS)), await folded())
   // A paused lane says why in the paused colour (#1279), and that it is paused in its accessible name.
   const paused3 = section.locator(`[data-lane="${l3}"]`)
   check('a paused, an ended and an abandoned lane say so', /paused/.test((await paused3.getAttribute('aria-label')) ?? '') && (await paused3.locator('.progress-lane-why.paused').count()) === 1 && /merged/.test(await section.locator(`[data-lane="${l4}"]`).innerText()) && /abandoned/.test(await section.locator(`[data-lane="${l5}"]`).innerText()))

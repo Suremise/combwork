@@ -20,7 +20,9 @@
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
-//   its session doesn't start (no SessionStart: Combwork sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
+//   its session doesn't start (no SessionStart: Combwork sees it starting; nothing written, its title included, and no MCP
+//   server connected) until fake-start-go-<agent> (HI-1707: never ready; HI-2816). With fake-start-write-<agent>, it first
+//   writes a line of its start to its transcript.
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
@@ -132,6 +134,8 @@
 //   read each time, #234) it acts out a CLI that says Haiku takes Auto, doesn't (as 2.1.289), or says nothing about Auto
 //   (no model has supportsAutoMode): asked for Auto with Haiku, it runs in Auto only when it said Haiku takes it, else
 //   in Manual, and reports the mode it really runs in. Without the file it runs in the mode it was asked for.
+//   Its `reply` (HI-2852) names another recorded reply in tests/fixtures to answer initialize with: a home (a connection's
+//   folder) whose account offers other models, as Claude Code offers each account its own.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -218,7 +222,7 @@ if (args[0] === 'auth') {
   process.stdout.write('', () => process.exit(out ? 1 : 0))
   return
 }
-/** fake-models.json in the test home ({ haikuAuto }), or null (#234). */
+/** fake-models.json in the test home ({ haikuAuto, reply }), or null (#234, HI-2852). */
 function fakeModels() {
   try {
     return JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-models.json'), 'utf8'))
@@ -251,7 +255,8 @@ if (args.includes('-p') && args.includes('stream-json')) {
       const m = JSON.parse(buf.slice(0, i))
       buf = buf.slice(i + 1)
       if (m.type !== 'control_request' || m.request?.subtype !== 'initialize') continue
-      const recorded = withHaikuAuto(JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'claude-initialize.json'), 'utf8')))
+      const named = fakeModels()?.reply
+      const recorded = withHaikuAuto(JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', typeof named === 'string' && /^[\w.-]+\.json$/.test(named) ? named : 'claude-initialize.json'), 'utf8')))
       const reply = process.env.FAKE_CLAUDE_MODELS === 'fail' ? { type: 'control_response', response: { subtype: 'error', request_id: m.request_id, error: 'not supported' } } : { ...recorded, response: { ...recorded.response, request_id: m.request_id } }
       process.stdout.write(JSON.stringify(reply) + '\n')
     }
@@ -1560,6 +1565,10 @@ async function main() {
     process.stdout.write('', () => process.exit(1))
     return
   }
+  // Held (fake-start-hold-<agent>): not started at all until fake-start-go-<agent>, so nothing written to its transcript
+  // meanwhile, its title included (HI-2816). fake-start-write-<agent>: a line of its start written first, held or not.
+  if (take('fake-start-write')) write({ type: 'system', subtype: 'informational', content: 'Session resumed', level: 'info' })
+  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   // --name: Claude Code keeps it as the session's name (a custom title, as /rename does).
   if (opts['--name']) {
     if (take('fake-title-untimed')) fs.appendFileSync(transcript, JSON.stringify({ type: 'custom-title', customTitle: opts['--name'], sessionId }) + '\n')
@@ -1575,7 +1584,6 @@ async function main() {
       })()
     : null
   void connectOwnServer(server, held)
-  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
   setInterval(() => void whileIdle(), 200)

@@ -88,7 +88,9 @@ const providerRules = (c) => (c?.policies ?? []).filter((p) => p.action === 'pro
     fs.writeFileSync(path.join(alpha, 'opencode.json'), JSON.stringify({ model: 'elsewhere/x9' }))
     await lib.setAgentLaunch(inv, alpha, agent.id, { overrides: { keepProjectConfigOut: false } })
     const hostile = await launch('on, the project setting elsewhere/x9')
-    check("…the project's other provider is never used: the turn fails at once instead", modelOf(hostile.turn) === 'elsewhere/x9' && hostile.end?.outcome === 'failed', JSON.stringify({ model: modelOf(hostile.turn), end: hostile.end }))
+    // Combwork sets the connection's model on the session at every start (HI-2767), so the project's model never applies:
+    // the turn runs on the connection's own, and the allowlist still denies every other provider.
+    check("…the project's other provider is never used: the turn runs on the connection's own model, every other provider still denied", modelOf(hostile.turn) === 'mylab/m7' && hostile.end?.outcome === 'succeeded' && providerRules(hostile.written).slice(0, 2).join() === '*:deny,mylab:allow' && !lines().some((e) => e.kind === 'turn' && (modelOf(e) ?? '').startsWith('elsewhere/')), JSON.stringify({ model: modelOf(hostile.turn), end: hostile.end, rules: providerRules(hostile.written) }))
 
     // --- On, with no model: refused, saying what to do.
     fs.rmSync(path.join(alpha, 'opencode.json'), { force: true })
