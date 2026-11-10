@@ -3064,8 +3064,13 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   so another card's submission meanwhile gathers the intent again once instead of refusing it.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
   transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
-- **Submission:** J3's boundary (the snapshot under the store's lock, its owner the card's lease and slot rows and its
-  stage); a predicted submission only reads. Refused: something recorded or a non-empty `@` (`submit.empty`, commit it
+- **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
+  its builder's and (a card lease) this card's, with no operation or job in the slot and no writer but its builder's
+  under this lease, beside what it read. A submission and a check need it held at entry (refused `unbound` otherwise,
+  nothing read or written), at every boundary await (held and unchanged), and in the final write (its print in the
+  evidence): an ended or foreign lease is refused, never compared with itself.
+- **Submission:** J3's boundary (the snapshot under the store's lock, its owner the card's held lease and slot rows and
+  its stage); a predicted submission only reads. Refused: something recorded or a non-empty `@` (`submit.empty`, commit it
   with `jj commit`); `@` with more than one parent, the chain not from the binding's base, a divergent or conflicted
   commit, more than 500 commits, or a commit another card recorded (`platform.jjRefused`, worded by its reason); the
   slot not bound to this card's key. A revision an agent names is a hex prefix the Git store resolves to exactly the
@@ -3079,7 +3084,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   the zero oid), read back, its ownership recorded (`owned` true; a ref there before any intent of ours at the same
   commit `false`; an interrupted create whose ref is there `uncertain`; at another commit the action fails and nothing
   is overwritten), and only then the slot's binding's submitted commits advanced, seq-ordered (`submittedSeq`: an older
-  submission's record never replaces a newer one's). No ref is ever deleted here; reclaiming only `owned` ones is later.
+  submission's record never replaces a newer one's). The action is bound to its own submission (HR2's round 1): the
+  Submitted fact records the slot it was made from (`platform.jjSlot`: folder, line key, store, workspace, generation),
+  the pin is made in that store, and only that binding is advanced, while still bound to that key at that generation:
+  a restart in another slot or under a new key, or a removed folder, is never filled from a late action. No ref is ever deleted here; reclaiming only `owned` ones is later.
 - **Checks:** J3's bracket in one adapter call: B1 (the snapshot) and the revision read at its head, the run, then
   always the end (its write record, J3's stat fallback, B2) whatever the run did, and the credit. **No check copies**:
   the new capability `checkCopies` (Git's) is what a check copy needs, apart from `isolation` (slots); the check API,

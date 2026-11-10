@@ -47,13 +47,14 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         journal: (card: string, cycle: number, bundles: JjBundle[]) => journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).write(bundles)
       }
     },
-    slotHold: (lease) => {
+    slotHold: (lease, expect) => {
       const store = slots()
       const l = store.lease(lease)
       if (!l) return null
       const s = store.slot(l.slot)
       if (!s) return null
-      return `lease:${l.to ? 'ended' : 'open'}:${l.slot}:${s.op ? s.op.token : '-'}:${s.job ?? '-'}:${s.writer ? s.writer.run : '-'}`
+      const held = !l.to && l.slot === expect.slot && l.agent === expect.agent && (l.card === null || l.card === expect.card) && !s.op && !s.job && (!s.writer || (s.writer.lease === lease && s.writer.agent === expect.agent))
+      return { held, print: `lease:${l.to ? 'ended' : 'open'}:${l.slot}:${l.agent}:${l.card ?? '-'}:${s.op ? s.op.token : '-'}:${s.job ?? '-'}:${s.writer ? s.writer.run : '-'}` }
     },
     pins: {
       read: (ref) => {

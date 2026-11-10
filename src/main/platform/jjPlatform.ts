@@ -64,6 +64,24 @@ export const CHAIN_MAX = 500
 const COMMIT_PREFIX = /^[0-9a-f]{7,40}$/
 const ZERO_OID = '0000000000000000000000000000000000000000'
 
+/** The slot a jj submission was made from (`Submitted.platform.jjSlot`, HR2's round 1): its folder, line key and binding. */
+export interface JjSubmittedSlot {
+  folder: string
+  key: string
+  store: string
+  workspace: string
+  generation: string
+}
+
+/** A submission's slot from its fact, or null when it has none (a fact from before) or any field isn't a string. */
+export function jjSubmittedSlotOf(platform: unknown): JjSubmittedSlot | null {
+  const v = platform && typeof platform === 'object' ? (platform as { jjSlot?: unknown }).jjSlot : null
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const keys = ['folder', 'key', 'store', 'workspace', 'generation'] as const
+  return keys.every((k) => typeof o[k] === 'string' && (o[k] as string).length) ? { folder: o.folder as string, key: o.key as string, store: o.store as string, workspace: o.workspace as string, generation: o.generation as string } : null
+}
+
 /** A pin's ownership record (HI-2868/s13 §2), board_meta `jj_pin:<ref>`. */
 export interface JjPinRecord {
   seq: number
@@ -84,8 +102,12 @@ export interface JjCardDeps {
   git: (store: string, args: readonly string[]) => Promise<{ ok: boolean; out: string; err: string }>
   /** J5's reads for the project (its control workspace), null while they can't be made. */
   integration: () => Promise<JjIntegrationDeps | null>
-  /** The card's lease and slot as rows say now, synchronously (read in the write under way): a fingerprint, null when gone. */
-  slotHold: (lease: string) => string | null
+  /**
+   * The card's lease and slot as rows say now, synchronously (read in the write under way, HR2's round 1): `held` only
+   * while the lease is open, on the card's slot, its builder's and (a card lease) this card's, with no operation or job in
+   * the slot and no writer but its builder's under this lease; `print` what was read, for the evidence. Null when gone.
+   */
+  slotHold: (lease: string, expect: { slot: string; agent: string; card: number }) => { held: boolean; print: string } | null
   /** A pin's ownership record, read synchronously, and written. */
   pins: { read(ref: string): JjPinRecord | null; write(ref: string, rec: JjPinRecord): Promise<void> }
   /** The Git store's history (Git's port, asked on the store's own folder). */
@@ -100,6 +122,8 @@ interface Primed {
   view: JjContext | null
   folder: string | null
   lease: string | null
+  /** Who the lease must be for: its slot, its builder, the card. */
+  holder: { slot: string; agent: string; card: number } | null
   target: string | null
   /** The project's own view, for a card not started (its operation heads, its store's refs). */
   project: JjContext | null
@@ -149,6 +173,37 @@ export class JjPlatform implements PlatformAdapter {
 
   private unknownRefusal(card: CardRecord, what: Unknown, rule: string): GuardRefusal {
     return { rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } }
+  }
+
+  /** Who a started card's lease must be for: its slot, its builder and the card (null: it started without a slot). */
+  private holderOf(card: CardRecord, s: CardState): { slot: string; agent: string; card: number } | null {
+    return s.started?.slot && s.started.builder ? { slot: s.started.slot, agent: s.started.builder, card: card.id } : null
+  }
+
+  /** The lease's hold as the evidence prints it: what was read, and whether it holds. */
+  private holdPrint(lease: string | null, holder: { slot: string; agent: string; card: number } | null): string {
+    if (!lease || !holder || !this.deps) return '-'
+    const h = this.deps.slotHold(lease, holder)
+    return h ? `${h.held ? 'held' : 'not'}:${h.print}` : 'gone'
+  }
+
+  /**
+   * The card's owner for J3's boundaries (HR2's round 1): held at entry (else null: refused before anything is read),
+   * then still held and unchanged at every await; `alsoStage` the card still in the stage it was in.
+   */
+  private ownerOf(card: CardRecord, s: CardState, alsoStage: boolean): Owner | null {
+    const d = this.deps
+    const lease = s.started?.lease ?? null
+    const holder = this.holderOf(card, s)
+    if (!d || !lease || !holder) return null
+    const first = d.slotHold(lease, holder)
+    if (!first?.held) return null
+    return {
+      still: () => {
+        const now = d.slotHold(lease, holder)
+        return !!now?.held && now.print === first.print && (!alsoStage || this.wf!.store.card(card.id).stage === s.stage)
+      }
+    }
   }
 
   /** The card's own keys, from its Started facts (every cycle's). */
@@ -204,9 +259,9 @@ export class JjPlatform implements PlatformAdapter {
 
   async prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown> {
     if (!this.wf) return null
-    if (!s.started || s.stage === 'todo') return { view: null, folder: null, lease: null, target: card.target || o.target || null, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
+    if (!s.started || s.stage === 'todo') return { view: null, folder: null, lease: null, holder: null, target: card.target || o.target || null, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
     const folder = this.wf.folderOf(s)
-    return { view: s.started.line ? await this.ctxOf(folder) : null, folder, lease: s.started.lease ?? null, target: s.started.target ?? null, project: null } satisfies Primed
+    return { view: s.started.line ? await this.ctxOf(folder) : null, folder, lease: s.started.lease ?? null, holder: this.holderOf(card, s), target: s.started.target ?? null, project: null } satisfies Primed
   }
 
   /**
@@ -234,7 +289,7 @@ export class JjPlatform implements PlatformAdapter {
     const fp = `jj|${now.head}|${now.checkout.workspace}|${now.git ?? ''}`
     const co = readCheckout(p.view.workspace)
     const ptr = co && d.port() ? d.port()!.pointerSync(p.view.store, co.workspace) : null
-    parts.push(fp, `gen:${generationSync(p.folder)}`, `ptr:${ptr === 'unreadable' ? 'unreadable' : ptr ? `${ptr.prep}:${ptr.key}:${ptr.generation}` : '-'}`, `slot:${p.lease ? (d.slotHold(p.lease) ?? 'gone') : '-'}`)
+    parts.push(fp, `gen:${generationSync(p.folder)}`, `ptr:${ptr === 'unreadable' ? 'unreadable' : ptr ? `${ptr.prep}:${ptr.key}:${ptr.generation}` : '-'}`, `slot:${this.holdPrint(p.lease, p.holder)}`)
     if (p.target) parts.push(`target:${refSync(this.H, p.view.store, `refs/heads/${p.target}`)}`)
     return parts.join('|')
   }
@@ -311,9 +366,8 @@ export class JjPlatform implements PlatformAdapter {
       op = got.op
       at = got.value
     } else {
-      const lease = s.started.lease ?? null
-      const hold = lease ? d.slotHold(lease) : null
-      const owner: Owner = { still: () => !!lease && hold !== null && d.slotHold(lease) === hold && this.wf!.store.card(card.id).stage === s.stage }
+      const owner = this.ownerOf(card, s, true)
+      if (!owner) return { ok: false, refusal: this.refused(card, 'unbound') }
       const b = await jjBoundary({ ...ctx, folder }, owner, { lock: d.lock(ctx.store) }, this.runner())
       if (boundaryRefused(b)) return { ok: false, refusal: b.refused === 'moved' || b.refused === 'owner' ? { rule: 'evidence.changed', values: { card: card.key } } : this.unknownRefusal(card, withDetail(unknown(UNREADABLE.state, { folder }), b.detail ?? b.refused), 'submit') }
       // Something recorded: the folder had changes jj hadn't seen (an uncommitted edit): commit them first.
@@ -375,7 +429,10 @@ export class JjPlatform implements PlatformAdapter {
     if (args.guards.includes('submit.trailer')) inputs.untrailered = null
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(reads, op, ctx.store, chain, o)
     const entries: JjChainEntry[] = chain.map((c) => ({ commit: c.commit, change: c.change }))
-    return { ok: true, revision: P.commit, base: mb, key: ch.key, files: ch.files, commits: chain.map((c) => c.commit), inputs, warnings: [], platform: jjPlatform({ changeId: P.change, commitId: P.commit, workspace, operation: op }, entries) }
+    // The slot it was submitted from, as bound then (HR2's round 1): its retention and reuse record follow this, never the
+    // card's later state.
+    const slot: JjSubmittedSlot = { folder, key: s.started.line, store: ctx.store, workspace, generation: bound.generation }
+    return { ok: true, revision: P.commit, base: mb, key: ch.key, files: ch.files, commits: chain.map((c) => c.commit), inputs, warnings: [], platform: { ...jjPlatform({ changeId: P.change, commitId: P.commit, workspace, operation: op }, entries), jjSlot: slot } }
   }
 
   /** G12: the first commit of the chain not authored with jj's configured identity, or `missing`. */
@@ -448,9 +505,8 @@ export class JjPlatform implements PlatformAdapter {
       const mismatch = await this.names(ctx.store, run.revision, rev)
       if (mismatch) return mismatch
     }
-    const lease = s.started?.lease ?? null
-    const hold = lease ? d.slotHold(lease) : null
-    const owner: Owner = { still: () => !!lease && hold !== null && d.slotHold(lease) === hold }
+    const owner = this.ownerOf(card, s, false)
+    if (!owner) return this.refused(card, 'unbound')
     const r = { view: ctx, folder, revision: rev, owner, lock: d.lock(ctx.store) }
     const start = await jjCheckStart(r, observePort, { runner: this.runner() })
     let ok = false
@@ -467,9 +523,11 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /**
-   * A submission's pin (HI-2868/s13 §2), the runtime's post-write action: create-only in the Git store, read back, its
-   * ownership journalled; only once it is held, the slot's binding's submitted commits advanced (seq-ordered). Never
-   * deletes or moves a ref. False for another kind.
+   * A submission's pin (HI-2868/s13 §2), the runtime's post-write action, bound to its own submission (HR2's round 1):
+   * its fact says the store, the slot and the binding it was made from (`jjSlot`) and its chain; the pin is made in that
+   * store, create-only, read back, its ownership journalled; only once it is held, that same binding's submitted commits
+   * advanced, and only while the slot is still bound to that key at that generation (seq-ordered): a later cycle, another
+   * slot or a removed folder is never filled from it. Never deletes or moves a ref. False for another kind.
    */
   async perform(kind: string, payload: Record<string, unknown>): Promise<boolean> {
     if (kind !== 'pin') return false
@@ -480,13 +538,11 @@ export class JjPlatform implements PlatformAdapter {
     const revision = String(payload.revision)
     const seq = Number(payload.submission)
     const cardId = Number(payload.card)
-    const card = this.wf.store.card(cardId)
-    const s = this.wf.state(card)
-    if (!s.started?.line) throw new Error(`card ${cardId} has no jj line`) // i18n-ignore: an action's failure, recorded on the action
-    const folder = this.wf.folderOf(s)
-    const ctx = await this.ctxOf(folder)
-    if (!ctx) throw new Error(`no jj repository at ${folder}`) // i18n-ignore: an action's failure, recorded on the action
-    const store = ctx.store
+    const sub = this.wf.store.facts(cardId).find((f) => f.kind === 'Submitted' && f.seq === seq)
+    const platform = sub ? (sub.data as { platform?: unknown; revision?: unknown }) : null
+    const slot = platform ? jjSubmittedSlotOf(platform.platform) : null
+    if (!sub || !slot || platform?.revision !== revision) throw new Error(`card ${cardId}'s submission ${seq} has no jj slot for ${revision.slice(0, 12)}`) // i18n-ignore: an action's failure, recorded on the action
+    const store = slot.store
     const read = async (): Promise<string | null> => {
       const r = await d.git(store, ['rev-parse', '--verify', '--quiet', ref])
       return r.ok ? r.out.trim() : null
@@ -519,11 +575,10 @@ export class JjPlatform implements PlatformAdapter {
       await d.pins.write(ref, rec)
     }
     if ((await read()) !== revision) throw new Error(`${ref} no longer holds ${revision.slice(0, 12)}`) // i18n-ignore: an action's failure, recorded on the action
-    // Held: the binding's submitted commits from exactly this submission's chain (its fact), seq-ordered.
-    const sub = this.wf.store.facts(cardId).find((f) => f.kind === 'Submitted' && f.seq === seq)
-    const chain = sub ? jjChainOf((sub.data as { platform?: unknown }).platform) : null
-    const identity = await port.identity!(folder)
-    if (chain && identity && chain.at(-1)?.commit === revision) await port.submitted(folder, s.started.line, chain.map((c) => c.commit), identity, seq)
+    // Held: the submission's own binding's submitted commits from exactly its chain, while the slot it was made from is
+    // still bound to its key at its generation (port.submitted's compare and swap, seq-ordered); a folder gone, nothing.
+    const chain = jjChainOf(platform!.platform)
+    if (chain && chain.at(-1)?.commit === revision) await port.submitted(slot.folder, slot.key, chain.map((c) => c.commit), { store: slot.store, workspace: slot.workspace, generation: slot.generation }, seq)
     return true
   }
 

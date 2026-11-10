@@ -46,6 +46,9 @@ afterEach(() => {
 })
 
 const opts = { ...preset('jj', 'pair', { quick: [], tests: [], target: 'main' }), preChecks: [], mergeChecks: [] }
+const OPEN = (slot: string) => ({ held: true, print: `lease:open:${slot}:-:-:-` })
+const ENDED = (slot: string) => ({ held: false, print: `lease:ended:${slot}:-:-:-` })
+const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}:op-1:-:-` })
 
 /** A jj project with a workspace database, two slots, J9a's port on its bindings, and a Workflow composed with jj's deps. */
 async function world(colocated: boolean) {
@@ -72,7 +75,8 @@ async function world(colocated: boolean) {
   }
   /** The slot each builder is lent (B1: slot-a, B2: slot-b). */
   const slotOf = (builder: string) => slots[builder === 'B2' ? 'slot-b' : 'slot-a']
-  const holds = new Map<string, string>([['L1', 'lease:open:slot-a:-:-:-'], ['L2', 'lease:open:slot-b:-:-:-']])
+  /** Each lease's hold as the app's slotHold answers it: open and held, or ended or busy (not held), with what was read. */
+  const holds = new Map<string, { held: boolean; print: string }>([['L1', OPEN('slot-a')], ['L2', OPEN('slot-b')]])
   const pins = new Map<string, JjPinRecord>()
   const gitOn = (gitDir: string, args: readonly string[]) => {
     try {
@@ -199,13 +203,23 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       const change = w.h.jj(a.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', P, '-T', 'change_id').trim()
       refusedBy(await w.wf.submit(card.key, B1, { summary: 's', revision: change }), 'check.revisionMismatch')
       // The lease ended, then an operation installed, between the plan and the write: nothing written.
-      for (const hold of ['lease:ended:slot-a:-:-:-', 'lease:open:slot-a:op-1:-:-']) {
+      for (const hold of [ENDED('slot-a'), BUSY('slot-a')]) {
         w.wf.cfg.hooks = { beforeWrite: () => void w.holds.set('L1', hold) }
         refusedBy(await w.wf.submit(card.key, B1, { summary: 's' }), 'evidence.changed')
         w.wf.cfg.hooks = undefined
-        w.holds.set('L1', 'lease:open:slot-a:-:-:-')
+        w.holds.set('L1', OPEN('slot-a'))
         expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
         expect(w.store.pendingActions().some((x) => x.kind === 'pin')).toBe(false)
+      }
+      // Already ended, or busy, before the submission began (HR2's round 1): refused at once, nothing written; a check too.
+      for (const hold of [ENDED('slot-a'), BUSY('slot-a')]) {
+        w.holds.set('L1', hold)
+        expect(refusedBy(await w.wf.submit(card.key, B1, { summary: 's' }), 'platform.jjRefused').values).toMatchObject({ why: 'unbound' })
+        let ran = false
+        expect(await new JjPlatform(w.wf).checkRun(card, w.wf.state(card), { command: 't', exec: async () => ((ran = true), { ok: true }) })).toMatchObject({ rule: 'platform.jjRefused', values: { why: 'unbound' } })
+        expect(ran).toBe(false)
+        expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
+        w.holds.set('L1', OPEN('slot-a'))
       }
       moved(await w.wf.submit(card.key, B1, { summary: 's', revision: P.slice(0, 10) }))
     })
@@ -321,6 +335,53 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       // The first submission's action again (late): it never lowers the newer record.
       expect(await w.wf.platformOf(card).perform('pin', act1.payload)).toBe(true)
       expect(w.port.pointerSync(a.identity.store, a.identity.workspace)).toMatchObject({ submittedSeq: seq2 })
+    })
+
+    it("a late pin fills only its own submission's binding: never a restart's in another slot or under a new key; a removed folder only retained", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const b = w.slots['slot-b']
+      const card = await started(w, 'late pin')
+      const oldKey = w.wf.state(card).started!.line!
+      const P = w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: '1' }))
+      const late = w.store.pendingActions().find((x) => x.kind === 'pin' && x.card === card.id)!
+      const seq = Number((late.payload as { submission: number }).submission)
+      // Returned by review, put back, started again by B2 in slot-b (empty on main), its pin still pending.
+      moved(await w.wf.startReview(card.key, R1))
+      moved(await w.wf.verdict(card.key, R1, { pass: false, comment: 'again', failKind: 'content' }))
+      moved(await w.wf.putBack(card.key, B1, { why: 'another builder' }))
+      moved(await w.wf.start(card.key, B2))
+      expect(await w.prepare(card.id, 'B2')).toEqual({ ok: true, err: '' })
+      const newB = w.port.pointerSync(b.identity.store, b.identity.workspace)
+      expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
+      expect(w.refAt(`refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(P)
+      // slot-b's binding untouched; slot-a's, still bound to the old key at its generation, records the submission.
+      expect(w.port.pointerSync(b.identity.store, b.identity.workspace)).toEqual(newB)
+      expect(w.port.pointerSync(a.identity.store, a.identity.workspace)).toMatchObject({ key: oldKey, submitted: [P], submittedSeq: seq })
+      // A second late action for the first submission, with the old folder removed: retained, nothing else, no throw.
+      rmSync(a.folder, { recursive: true, force: true })
+      expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
+      expect(w.refAt(`refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(P)
+      expect(w.port.pointerSync(b.identity.store, b.identity.workspace)).toEqual(newB)
+    })
+
+    it('a late pin after a restart in the same slot (a new key, carried) fills nothing', async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'same slot')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: '1' }))
+      const late = w.store.pendingActions().find((x) => x.kind === 'pin' && x.card === card.id)!
+      moved(await w.wf.startReview(card.key, R1))
+      moved(await w.wf.verdict(card.key, R1, { pass: false, comment: 'again', failKind: 'content' }))
+      moved(await w.wf.putBack(card.key, B1, { why: 'later' }))
+      moved(await w.wf.start(card.key, B1))
+      expect(await w.prepare(card.id)).toEqual({ ok: true, err: '' })
+      const carried = w.port.pointerSync(a.identity.store, a.identity.workspace)
+      expect(carried).toMatchObject({ key: w.wf.state(card).started!.line })
+      expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
+      expect(w.port.pointerSync(a.identity.store, a.identity.workspace)).toEqual(carried)
     })
 
     it('checks: an unchanged run counted, a transient edit not, a throw still ends the bracket; --isolated refused, running nothing', async () => {
