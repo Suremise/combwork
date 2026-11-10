@@ -995,8 +995,14 @@ async function jjSlotSubmission(c, key, who, card, files) {
   if (!folder) throw new Error(`setup: #${n}'s slot (${slot}) has no folder`)
   for (const [rel, text] of Object.entries(files)) require('fs').writeFileSync(require('path').join(folder, rel), text)
   jjIn(c, 'commit', '-m', card.title, { cwd: folder })
-  // Submitted as the user moves it (as inReview's): a stopped agent's token is no longer valid.
-  await userMove(c, n, 'review')
+  // Submitted as the user moves it (as inReview's): a stopped agent's token is no longer valid. Refused evidence.changed
+  // right after the commit now and then (HI-2890, carded: a jj operation between the move's read and its write), the
+  // user's move is made again once, as its refusal says, and said: the setup's step, not the subject's.
+  await userMove(c, n, 'review').catch(async (e) => {
+    if (!/evidence\.changed/.test(String(e.message))) throw e
+    console.log(`  (setup: #${n}'s move to Review refused evidence.changed, HI-2890: made again once)`)
+    await userMove(c, n, 'review')
+  })
   const s = ((await c.inv('tasks:facts', n)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
   const workspace = s?.platform?.jjSlot?.workspace ?? s?.platform?.jj?.workspace
   if (!s?.revision || !workspace) throw new Error(`setup: #${n}'s submission has no jj record: ${JSON.stringify(s)}`)
@@ -2340,13 +2346,28 @@ module.exports.SCENARIOS = [
       c.sub = await jjSlotSubmission(c, 'r', 'implementer', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with the name trimmed.' }, { 'greet.js': "module.exports = (name) => 'Helo, ' + name.trim()\n" })
       c.bookmarks = jjBookmarks(c)
       c.copies = new Set()
+      c.copyFirst = new Map()
+      c.copyChanged = new Set()
+      c.copyLooks = 0
     },
-    // The review copies Combwork lends Coder while it works, and what Git and jj each see there (HR2 on HI-2870/s7).
+    // The review copies Combwork lends Coder while it works, and what Git and jj each see there (HR2 on HI-2870/s7); each
+    // looked at again while it is still Coder's, so an edit or a jj record there is seen (HR2's round 1). Its first look
+    // once Combwork has it ready (on the submitted revision); none once it is given back (Combwork cleans it then).
     async during(c) {
+      const { copySnapshot, copyChanges } = require('./jjReviewCopy.cjs')
       for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) {
-        if (v.lease?.kind !== 'review' || v.lease.agent !== c.agents.coder.id || c.copies.has(v.folder)) continue
-        c.copies.add(v.folder)
-        c.copySeen = jjCopySeen(c, v.folder)
+        if (v.lease?.kind !== 'review' || v.lease.agent !== c.agents.coder.id || v.lease.returned) continue
+        const now = copySnapshot(v.folder, (...a) => jjIn(c, '--ignore-working-copy', ...a, { cwd: v.folder, allowFail: true }))
+        if (!c.copies.has(v.folder)) {
+          if (!now || now.parent !== c.sub.revision) continue
+          c.copies.add(v.folder)
+          c.copyFirst.set(v.folder, now)
+          c.copySeen = jjCopySeen(c, v.folder)
+          continue
+        }
+        if (!now) continue
+        c.copyLooks++
+        for (const x of copyChanges(c.copyFirst.get(v.folder), now)) c.copyChanged.add(x)
       }
     },
     prompt: (c) => `Review card #${c.cards.r}. Give your verdict.`,
@@ -2361,8 +2382,16 @@ module.exports.SCENARIOS = [
       const verdict = factsOf(o, 'r', 'Verdict').at(-1)?.data
       const said = (o.cards.r?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text).join('\n')
       const [, , empty, ...parents] = jjCommitOf(c, `${c.sub.workspace}@`).split(' ')
+      const started = factsOf(o, 'r', 'ReviewStarted').at(-1)?.data
+      const written = [...new Set([copy, ...c.copies].filter(Boolean))].flatMap((x) => require('./jjReviewCopy.cjs').copyWrites(o, x))
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
+        ['reviewed the submitted revision: its review started at it, and the copy was on it', started?.revision === c.sub.revision && c.copies.size > 0, JSON.stringify({ started: started?.revision ?? null, submitted: c.sub.revision, copies: c.copies.size })],
+        // What its tool calls did there, however quick it was (HR2's round 1)…
+        ['changed nothing in the review copy: no file edited, nothing recorded with jj there', written.length === 0 && c.copyChanged.size === 0, [...written, ...c.copyChanged].join('; ')],
+        // …and the copy itself looked at again while still Coder's: a copy given back before then proves nothing either way
+        // (a fake's whole review is quicker than a look: fakeSkips).
+        ["its copy's files and jj records unchanged while it had it, looked at again", c.copyLooks > 0 && c.copyChanged.size === 0, `${c.copyLooks} looks after the first; ${[...c.copyChanged].join('; ')}`],
         ['started the review with cw_start_review, and Combwork lent it a review copy', ran(o, 'cw_start_review').length > 0 && (c.copies.size > 0 || !!copyReply), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['read the change in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
         ['failed it, naming the "Helo" typo', !!verdict && verdict.pass === false && /helo/i.test(said), `${JSON.stringify(verdict && { pass: verdict.pass })} ${said.slice(0, 300)}`],
@@ -2370,7 +2399,7 @@ module.exports.SCENARIOS = [
         ["left the builder's slot as it was: its working copy empty on the submitted commit", empty === 'true' && parents.length === 1 && parents[0] === c.sub.revision, JSON.stringify({ empty, parents, revision: c.sub.revision })]
       ]
     },
-    fakeSkips: ['read the change in the review copy']
+    fakeSkips: ['read the change in the review copy', "its copy's files and jj records unchanged while it had it, looked at again"]
   },
   {
     id: 'jj-card-passed',

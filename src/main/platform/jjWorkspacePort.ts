@@ -73,6 +73,8 @@ export interface JjPortDeps {
   made?: (repo: string, ws: string) => void
   /** A test's seam (HI-2887): run after a control proof's awaited reads, before its synchronous check. */
   controlProved?: () => void
+  /** A test's seam (HI-2870): run once a slot's parent folder is made, before the control's proof for its add. */
+  slotParentMade?: () => void
   /** The store's repository lock (R1.1: one store, one lock), held around add, forget and the control's making. */
   lock: <T>(store: string, fn: () => Promise<T>) => Promise<T>
   /** The Recycle Bin (trash.ts), or a test's. */
@@ -801,12 +803,14 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!from) return step(false, JJ_REFUSED.control)
       const name = nameFor(await repoHash(repo), folder)
       return deps.lock(ctx.store, async () => {
+        // Its parent made first, which jj doesn't make (HI-2870): before the control's proof, so nothing is awaited
+        // between the proof's final check and the add (HI-2887).
+        await mkdir(dirname(folder), { recursive: true })
+        deps.slotParentMade?.()
         // The control proved for this add, inside the lock; its synchronous check right before the add starts (HI-2887).
         const proof = await controlProof(repo, ctx)
         if (!proof || proof.path !== from || !proof.check()) return step(false, JJ_REFUSED.control)
-        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's; its
-        // parent made first, which jj doesn't make (HI-2870).
-        await mkdir(dirname(folder), { recursive: true })
+        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's.
         const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true })
         if (!r.ok) return step(false, r.err)
         // Read back (rule 3): listed at that root, its working copy an empty child of exactly `at`, same store.

@@ -60,4 +60,4 @@ function publishes(o) {
   return (o.tools ?? []).filter((t) => SHELL_TOOL.test(t.name)).flatMap((t) => publishesIn(commandText(t.input ?? '')))
 }
 
-module.exports = { publishes, publishesIn }
+module.exports = { publishes, publishesIn, jjCall }

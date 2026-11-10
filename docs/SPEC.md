@@ -3159,8 +3159,15 @@ Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-
   every attempt, a failed one too; unit-tested), the bookmarks unchanged and jj consistent. Before J9e they start jj
   cards through `CW_TEST_JJ_CARDS=1` (`jjCardsTestSwitch`, compile.ts), honoured only by an unpackaged build;
   J9e removes it with the seam.
+  - `jj-card-review` also checks the review copy is left as it was (HR2's round 1; `tests/scenarios/jjReviewCopy.cjs`,
+    unit-tested): the reviewer's tool calls (a file tool's edit there; a jj command that records, or a command that
+    writes files, run there), and the copy's files and jj's `@` and its parent looked at again while it is still the
+    reviewer's. Its review starts at the submitted revision.
+  - The fixture is a colocated repository only: a separate (non-colocated) one can't be switched to jj in 1.5.0
+    (`switchRefused`'s `jjSeparate`), so it has no cards to review.
 - **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
-  project's worktrees folder is absent before its first slot).
+  project's worktrees folder is absent before its first slot), inside the store's lock and before the control's proof:
+  nothing is awaited between that proof's final check and the add (HI-2887).
 ##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
 
 Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
