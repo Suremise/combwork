@@ -973,6 +973,7 @@ interface CombworkMessageValues {
   'board.work.base': undefined
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
+  'board.work.change': { commits: number; change: string | number }
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
@@ -1005,6 +1006,8 @@ interface CombworkMessageValues {
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
+  'board.work.via': { via: string }
+  'board.work.workspace': undefined
   'board.workQueue.advance': { target: string | number }
   'board.workQueue.advancing': { target: string | number }
   'board.workQueue.answerFailed': undefined

@@ -2585,8 +2585,8 @@ merges under jj.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
-  and a `jj rebase -r <commit> -d <target>` to start from, its containment "can't check yet" until J5 records the user's
-  integration, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
+  and a `jj rebase -r <commit> -d <target>` to start from, and its last containment observation for exactly that
+  approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
   `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
@@ -3215,6 +3215,56 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### The window for jj cards (1.5.0's J9c, HI-2869)
+
+What the window shows of jj cards and the user's acts on them; design HI-2869/s7 to s16 (HR2's). Behind
+`start.platformReady` like the rest until J9e (HI-2874). Decision A holds: nothing here moves a bookmark or pushes; the
+only writes are an acknowledgement, the containment record and the leftovers' prune.
+- **Containment record** (`reconcile.ts`): each J5 proof of an Approved jj card that finds it not in its target yet
+  (`notYet`) or can't say (`unknown`, with J5's reason) writes `jj_contained:<project>:<card>:<cycle>` in `board_meta`:
+  the exact approval observed (submission, revision, base, line key, jj commit, target), what was seen and when. Ordered
+  by a **generation** reserved from the project's `jj_contained_gen:<project>` counter in a board write before the proof
+  starts, never by a clock: it's written only while the card is still that approval (checked in the write) and over no
+  record or a lower generation's, so an older observation finishing later writes nothing. The Integrated transaction
+  deletes it. **Waiting for you to integrate** (`jj:waiting`, `jjWindow.ts`) shows a record only when all six of its
+  identity fields equal the card's now; any other is *not checked yet*.
+- **Publish records to check** (`jj:toCheck`): the project's unresolved `checkThis` rows (§ J9b2's publish pass), 50 a
+  page in (target, flag time, card, cycle, bundle) order, the cursor that whole key (rows flagged at the same moment page
+  once each). Each row says what was recorded (published to which remote, or no longer in its target) and what differs
+  now. **Mark as checked** (`jj:markChecked`, after a confirmation) is an acknowledgement only: one compare-and-set that
+  sets `check.resolvedAt` while the row is exactly the one shown (the project's, its key and target, still `checkThis`,
+  the same flag time, not resolved); `seen` and the differences are kept, and nothing in the repository or remote changes.
+- **Leftovers from setting up jj slots** (`jj:leftovers`): HI-2887's residues of the control workspace (an interrupted or
+  lost set-up, a folder not empty or not proved Combwork's), at most 100 listed with the total, each with **Show in
+  folder**; Combwork never deletes them. Before listing, a bounded prune (`pruneResidues`, under the store's lock) drops
+  a residue only on a **proved absence**: its path's `lstat` says ENOENT or ENOTDIR (any other error keeps it) and its
+  name isn't registered at the pinned operation head. The last step runs inside the journal's own write (the journal's
+  `update`, in the board write's transaction, after any wait for its lock: HR2's round 1), reading nothing
+  asynchronously: the record still exactly the one read, the operation heads unchanged, each `lstat` again; anything
+  else writes nothing. 16 a batch from a rotating cursor kept in the journal, so every residue is reached.
+- **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
+  Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
+  card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
+- **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
+  a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
+  `slots:recoverStale`, its refusal said (busy, no longer stale, not the recorded workspace, or jj's failure).
+- **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
+  change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
+  was proved (`via`: history, replay, the same tree, a prepared candidate).
+- **Tests:** `tests/jjReconcile.test.ts` (the record for exactly the approval, an older observation dropped, newer ones
+  replacing it at equal and earlier clocks, gone with Integrated; not shown for another approval), `tests/jjWindow.test.ts`
+  (paging more than a page flagged at once across targets, other projects' and resolved rows out; Mark as checked's
+  compare-and-set; a slot journal's `update` deciding on what is stored then), `tests/jjControl.test.ts` (the prune:
+  present, registered, unreadable and changed-meanwhile residues kept, rotating batches; a leftover recreated, or a
+  residue added, while the write waits for its lock), and the e2e suites `jjview` (the publish records and leftovers,
+  seeded, Mark as checked, Refresh) and `jjwindow`: a real jj card in the app, colocated (a non-colocated project can't
+  be switched to before J9f, HI-2896, which checks these views there). An unpackaged build starts jj cards before J9e
+  through HI-2870's switch (`CW_TEST_JJ_CARDS=1`, `jjCardsTestSwitch`; never a packaged one, J9e removes it): a fake
+  builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
+  written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
+  through its confirmation once nothing works in it, its unrecorded edit kept (its return to the pool after Done is HI-2906's:
+  the post-Done detach a jj slot refuses); light and dark, and the seven locales.
 
 ##### Open: jj's target advance (J1's gate)
 

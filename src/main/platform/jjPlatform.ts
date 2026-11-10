@@ -570,7 +570,8 @@ export class JjPlatform implements PlatformAdapter {
         if (!p.containment || !p.provenance) return { contained: false }
         return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
       },
-      record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row))
+      record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
+      projectId: () => rec.projectId()
     })
   }
 

@@ -107,9 +107,9 @@
     "defaultMessage": "{card} {title}: commit {commit} into {target}",
     "description": "A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into."
   },
-  "jj.integrate.contained": {
-    "defaultMessage": "In {target}: can’t check yet.",
-    "description": "Under a passed jj card (HI-2799): whether its reviewed work is in its target. Combwork can’t check it yet (a later version records it); never read as not integrated."
+  "jj.integrate.change": {
+    "defaultMessage": "change {change}",
+    "description": "Beside a passed jj card’s reviewed commit (HI-2869): its jj change id (short). “change” is jj’s term."
   },
   "jj.integrate.head": {
     "defaultMessage": "Waiting for you to integrate",
@@ -126,6 +126,38 @@
   "jj.integrate.none": {
     "defaultMessage": "No card is waiting.",
     "description": "Under “Waiting for you to integrate” (HI-2799) when no card has passed."
+  },
+  "jj.integrate.notChecked": {
+    "defaultMessage": "Not checked yet whether it’s in {target}.",
+    "description": "Under a passed jj card (HI-2869): Combwork hasn’t looked yet, since its review passed, whether its reviewed work is in its target bookmark ({target})."
+  },
+  "jj.integrate.notYet": {
+    "defaultMessage": "Not in {target} as of {when}.",
+    "description": "Under a passed jj card (HI-2869): Combwork last looked and its reviewed work wasn’t in its target bookmark ({target}) yet. {when} is how long ago it looked (already translated, such as “5 minutes ago”)."
+  },
+  "jj.integrate.unknown": {
+    "defaultMessage": "Couldn’t check whether it’s in {target} ({when}): {why, select, conflictedTarget {{target} is conflicted} divergentChange {its change is divergent} partialExport {{target} isn’t the same in Git} ambiguousRemote {it isn’t clear which remote {target} follows} notFetched {the remote has a commit Combwork hasn’t fetched} other {jj couldn’t read it}}.",
+    "description": "Under a passed jj card (HI-2869): Combwork’s last look couldn’t say whether its reviewed work is in its target bookmark ({target}); never read as not integrated. {when}: how long ago (already translated). {why} picks the reason: keep the select keys."
+  },
+  "jj.leftovers.head": {
+    "defaultMessage": "Left over from setting up jj slots",
+    "description": "A heading of the jj Repository section (HI-2869): folders an interrupted or lost set-up of jj slots kept because Combwork couldn’t prove they were its own; the user removes them."
+  },
+  "jj.leftovers.hint": {
+    "defaultMessage": "Combwork never deletes these: remove each one yourself once you’ve looked at it.",
+    "description": "Under “Left over from setting up jj slots” (HI-2869)."
+  },
+  "jj.leftovers.more": {
+    "defaultMessage": "{n, plural, one {# more not shown} other {# more not shown}}",
+    "description": "Under “Left over from setting up jj slots” (HI-2869): how many more there are than the list shows."
+  },
+  "jj.leftovers.show": {
+    "defaultMessage": "Show in folder",
+    "description": "A button beside a leftover folder (HI-2869): opens it in the file manager."
+  },
+  "jj.leftovers.why": {
+    "defaultMessage": "{why, select, unrecorded {a set-up that didn’t finish} lost {a set-up that was lost} notEmpty {not empty} unproved {not provably Combwork’s} other {kept}}{name, select, none {} other {, registered as {name}}}",
+    "description": "Why a folder under “Left over from setting up jj slots” was kept (HI-2869), and the jj workspace name it’s registered under (none: keep that branch empty). Keep the select keys."
   },
   "jj.ops.absent": {
     "defaultMessage": "none",
@@ -390,6 +422,38 @@
   "jj.row.noDescription": {
     "defaultMessage": "(no description)",
     "description": "A jj commit with an empty description (HI-2799)."
+  },
+  "jj.toCheck.changed": {
+    "defaultMessage": "That record changed since it was shown: look again.",
+    "description": "A notice after Mark as checked was refused (HI-2869): the record changed meanwhile (checked elsewhere, or seen again)."
+  },
+  "jj.toCheck.differs": {
+    "defaultMessage": "{what, select, remote {Its remote changed: {was} → {now}} url {Its remote’s address changed} pushed {The remote now has {now} (it had {was})} inRemote {The remote no longer has it} held {{now, select, yes {It’s back in its target} other {It’s no longer in its target}}} other {Something differs}}",
+    "description": "What differs now for a publish record under “Publish records to check” (HI-2869). {was} and {now} are names or short commit ids (in held: yes or no). Keep the select keys."
+  },
+  "jj.toCheck.head": {
+    "defaultMessage": "Publish records to check",
+    "description": "A heading of the jj Repository section (HI-2869): integrations whose recorded publish state (pushed to the remote, or no longer held) no longer matches what Combwork sees; the user checks each."
+  },
+  "jj.toCheck.mark": {
+    "defaultMessage": "Mark as checked",
+    "description": "A button on a row under “Publish records to check” (HI-2869): the user has checked it; it leaves the list. Nothing in the repository changes."
+  },
+  "jj.toCheck.markMessage": {
+    "defaultMessage": "It leaves this list. Combwork changes nothing in the repository or on the remote: this only records that you’ve looked.",
+    "description": "The confirmation before Mark as checked (HI-2869)."
+  },
+  "jj.toCheck.markTitle": {
+    "defaultMessage": "Mark {card} as checked?",
+    "description": "The title of the confirmation before Mark as checked (HI-2869). {card} is a card key."
+  },
+  "jj.toCheck.more": {
+    "defaultMessage": "Show more",
+    "description": "A button under “Publish records to check” (HI-2869): the next page of records."
+  },
+  "jj.toCheck.row": {
+    "defaultMessage": "{card}: {result} into {target} was recorded {was, select, published {as published to {remote}} other {as no longer in {target}}} ({when}).",
+    "description": "A row under “Publish records to check” (HI-2869). {card} a card key; {result} a short commit id; {target} a bookmark; {remote} a remote’s name; {when} how long ago it was recorded (already translated). Keep the select keys."
   },
   "jj.unknown.heads": {
     "defaultMessage": "jj’s operation log has {detail} heads: Combwork reads nothing until jj reconciles them (any jj command in a terminal does).",

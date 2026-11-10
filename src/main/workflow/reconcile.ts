@@ -488,6 +488,8 @@ export interface JjReconcilePorts {
   prove(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved>
   /** The rows an Integrated fact's transaction writes beside it (its obligation and retained bundle). */
   record(w: Write, row: { card: string; cycle: number; bundle: string; target: string; result: string; since: number }): void
+  /** The project's canonical id: the containment record's scope (HI-2869). */
+  projectId(): string
 }
 
 /** J5's answer for an approved submission: contained (with what to record), not contained, or why it couldn't say. */
@@ -495,6 +497,62 @@ export type JjProved =
   | { contained: true; method: 'merge' | 'fastForward' | 'squash' | 'sameTree'; result: string; bundle: string; platform: Record<string, unknown> }
   | { contained: false }
   | { unknown: string }
+
+/** The window's containment record of a jj card's cycle (HI-2869/s13, s16), board_meta, by the project's canonical id. */
+export const containedKey = (project: string, card: string, cycle: number): string => `jj_contained:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`
+const containedGenKey = (project: string): string => `jj_contained_gen:${project.toLowerCase()}`
+
+/** A containment record as the window reads it: the exact approval it was observed for, and what was observed. */
+export interface JjContained {
+  gen: number
+  submission: number
+  revision: string
+  base: string
+  key: string | null
+  commit: string | null
+  target: string
+  state: 'notYet' | 'unknown'
+  why?: string
+  at: number
+}
+
+/** A new observation's generation, from the project's counter, moved in its own board write (monotonic, never a clock). */
+async function reserveContained(wf: Workflow, project: string): Promise<number> {
+  let gen = 0
+  await wf.locked(async () =>
+    wf.store.tx((tx) =>
+      tx.sql((db) => {
+        db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(containedGenKey(project)) // i18n-ignore: SQL
+        gen = Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(containedGenKey(project)) as { value: string }).value) // i18n-ignore: SQL
+      })
+    )
+  )
+  return gen
+}
+
+/**
+ * The observation recorded for the window (HI-2869/s13, s16): only while the card is still exactly the approval observed
+ * (its cycle, stage, approved submission, endpoints, jj commit and target, checked in the write), and only over no record
+ * or a lower generation's (an older observation finishing later writes nothing).
+ */
+async function noteContained(wf: Workflow, card: CardRecord, s: CardState, snap: ApprovalSnapshot, project: string, gen: number, seen: { state: 'notYet' | 'unknown'; why?: string }): Promise<void> {
+  await wf.write(card, null, 'outside', (w) => {
+    if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(wf.store.card(card.id), w.state()))) return
+    w.tx.sql((db) => {
+      const k = containedKey(project, card.key, s.cycle)
+      const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string } | undefined // i18n-ignore: SQL
+      let stored = 0
+      try {
+        stored = had ? Number((JSON.parse(had.value) as { gen?: number }).gen ?? 0) : 0
+      } catch {
+        stored = 0
+      }
+      if (had && stored >= gen) return
+      const rec: JjContained = { gen, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, state: seen.state, ...(seen.why ? { why: seen.why } : {}), at: Date.now() }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(k, JSON.stringify(rec)) // i18n-ignore: SQL
+    })
+  })
+}
 
 /** What a jj proof was made for: the card's exact approval, rechecked in the Integrated write (HI-2882/s10 §2). */
 interface ApprovalSnapshot {
@@ -561,8 +619,15 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
   if (!snap) return
   const approved = { base: snap.base, revision: snap.revision, key: snap.key }
   if (approved.revision !== s.started!.base) {
+    // HI-2869: this observation's generation, reserved before anything is read (the window's containment record is
+    // ordered by it, never by a clock).
+    const gen = await reserveContained(wf, ports.projectId())
     const p = await ports.prove(card, s, approved)
-    if ('unknown' in p) return hooks.unknown?.(p.unknown)
+    if ('unknown' in p) {
+      await noteContained(wf, card, s, snap, ports.projectId(), gen, { state: 'unknown', why: p.unknown })
+      return hooks.unknown?.(p.unknown)
+    }
+    if (!p.contained) await noteContained(wf, card, s, snap, ports.projectId(), gen, { state: 'notYet' })
     if (p.contained) {
       await hooks.afterRead?.()
       await wf.write(card, r, 'outside', (w) => {
@@ -574,6 +639,8 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
         if (!f) return
         w.written.push(f as Fact)
         ports.record(w, { card: card.key, cycle: s.cycle, bundle: p.bundle, target: snap.target, result: p.result, since: Date.now() })
+        // Integrated: its containment record goes with it (the card leaves "Waiting for you to integrate").
+        w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(containedKey(ports.projectId(), card.key, s.cycle))) // i18n-ignore: SQL
         if (wf.cfg.reconcileActs && w.current !== 'done') w.move('done', 'derived')
       })
       return
