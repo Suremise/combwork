@@ -10,16 +10,16 @@ import { git } from '../git'
 import { again, isAgain } from './again'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
-import { CANDIDATE_TEXT } from './candidateText'
+import { CANDIDATE_TEXT, UPDATE_NOT_SAME } from './candidateText'
 import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, RecoveryFound } from './integration'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
 import { destinationOf, fetchHeadOf, prePushOf, publishOf, redactTransport } from './gitTransport'
-import { agentMsg, say } from '../../shared/agentText'
+import { say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
-const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
+const NOT_SAME = UPDATE_NOT_SAME
 const CANDIDATE_LOGS = { notSame: NOT_SAME, ...CANDIDATE_TEXT }
 export type CandidateLogKind = keyof typeof CANDIDATE_LOGS
 

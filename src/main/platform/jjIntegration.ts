@@ -15,7 +15,7 @@ import { readFileSync } from 'original-fs'
 import { createHash } from 'crypto'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import type { JjAttemptRecord, JjPin } from './jjCandidates'
-import { parseRefs } from './jjCandidates'
+import { parseRefs, validUpdate } from './jjCandidates'
 import type { JjVia } from './jjFacts'
 import type { StoreLock } from './jjBoundary'
 import { isJjUnknown, JjReads, jjUnknown, type JjCommit, type JjReadUnknown } from './jjReads'
@@ -193,14 +193,27 @@ export interface JjProof {
 const methodOf = (style: JjAttemptRecord['style'], result: string): Containment => (style === 'rebase' ? { method: 'fastForward' } : style === 'squash' ? { method: 'squash', commit: result } : { method: 'merge' })
 
 /** Whether a J4 record credits this reviewed input (s14 §2′), its pin read now: the candidate's commit, or null. */
-async function boundCandidate(deps: JjIntegrationDeps, req: JjProofRequest, r: JjAttemptRecord): Promise<string | null | JjReadUnknown> {
-  if (r.outcome !== 'candidate' || r.phase !== 'done' || r.step || r.uncertain?.length || r.card !== req.card) return null
+async function boundCandidate(deps: JjIntegrationDeps, req: JjProofRequest, r: JjAttemptRecord, pins: { ref: string; oid: string }[]): Promise<string | null | JjReadUnknown> {
+  if ((r.kind ?? 'candidate') !== 'candidate' || r.outcome !== 'candidate' || r.phase !== 'done' || r.step || r.uncertain?.length || r.card !== req.card) return null
   if (r.revision !== req.change.revision || r.base !== req.change.base || !r.result) return null
   const pin = r.pins.find((p) => p.state === 'created' && p.ref.endsWith('/candidate'))
   if (!pin || pin.oid !== r.result) return null
+  // Built on strict's update (HI-2853/s10): only a merge or squash, and only on a valid update for exactly this reviewed
+  // input and this candidate's target head, found among the card's records and its result pin read now. Else no credit.
+  if (r.updated) {
+    if (r.style === 'rebase') return null
+    const u = (req.candidates ?? []).find((x) => x.attempt === r.updated!.attempt)
+    const v = await validUpdate(deps.git, u, { card: req.card, revision: req.change.revision, base: req.change.base, expected: r.expected, attempt: r.updated.attempt, result: r.updated.result })
+    if (isJjUnknown(v)) return v
+    if (v !== true) return null
+    const upin = u!.pins.find((p) => p.state === 'created' && p.ref.endsWith('/candidate'))!
+    pins.push({ ref: upin.ref, oid: upin.oid })
+  }
   const now = await refNow(deps, pin.ref)
   if (isJjUnknown(now)) return now
-  return now === r.result ? r.result : null
+  if (now !== r.result) return null
+  pins.push({ ref: pin.ref, oid: pin.oid })
+  return r.result
 }
 
 /**
@@ -221,8 +234,11 @@ export async function jjContains(deps: JjIntegrationDeps, req: JjProofRequest): 
   let containment: Containment | null = null
   let via: JjVia | null = null
   let candidate: { attempt: string; result: string } | undefined
+  // The J4 pins a candidate's credit rests on (its own, and its update's): read again at the answer (HI-2853/s10 §2).
+  let boundPins: { ref: string; oid: string }[] = []
   for (const r of req.candidates ?? []) {
-    const c = await boundCandidate(deps, req, r)
+    const used: { ref: string; oid: string }[] = []
+    const c = await boundCandidate(deps, req, r, used)
     if (isJjUnknown(c)) return c
     if (!c) continue
     const reach = await reads.run(th.op, ['log', '--no-graph', '-r', `${c} & ::${th.head}`, '-T', 'commit_id ++ "\\n"'])
@@ -231,6 +247,7 @@ export async function jjContains(deps: JjIntegrationDeps, req: JjProofRequest): 
     containment = methodOf(r.style, c)
     via = 'candidate'
     candidate = { attempt: r.attempt, result: c }
+    boundPins = used
     break
   }
   if (!containment) {
@@ -264,6 +281,8 @@ export async function jjContains(deps: JjIntegrationDeps, req: JjProofRequest): 
   await deps.hook?.('afterRetain')
   const afterRetain = await fence(deps, req.target, th, 'afterRetain')
   if (afterRetain) return afterRetain
+  // Last, synchronously and in the answer's own continuation: every pin the credit rests on still at its commit.
+  for (const b of boundPins) if (refFromFiles(deps.view.store, b.ref) !== b.oid) return jjUnknown('moved', `bound:${b.ref}`)
   return { containment, provenance: { op: th.op, head: th.head, gitRef: th.gitRef, via: via!, bundle: kept.bundle.bundle, ...(candidate ? { candidate } : {}), ...(proofCommit && via !== 'candidate' ? { commit: proofCommit } : {}) }, bundles: kept.bundles }
 }
 

@@ -2692,6 +2692,19 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
   signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
   a cancel, a race, a pin refused, a commit kept back), with the record for recovery.
+- **Strict's update** (G8, `prepareJjUpdate`, HI-2853; its design HI-2853/s7 and s10): the reviewed revision R brought
+  up to date with the target's head E on the same machinery, as private commits: already up to date (E an ancestor of
+  R) is `updated: null`, nothing written; `merge` makes a fresh commit with parents R then E (so a conflict's hunks show
+  the card's side first, `oursIs: 'card'`, as Git's merge of the target into the card), `rebase` duplicates R's suffix
+  onto E (a merge in it returns the card). Conflicts are read from every commit made, then §16.3.2's replay
+  (`jjSameRevision`), else `notSame` in Git's words. Its record is `kind: 'update'`, `outcome: 'updated'`, a **leaf**
+  (never carrying an update of its own), never a candidate by itself. A merge or squash candidate built on it records
+  `updated: { attempt, result }` and is built from U; a rebase candidate ignores an update and records none.
+  **`validUpdate`** decides whether an update may be built on or credited: done, `updated`, no step or uncertain
+  commits, a leaf, the same card, attempt, reviewed R and base, **the same target head as the candidate's**, and its
+  result pin read now. It runs before any write of a candidate (invalid: refused unwritten) and again in J5's credit; J5
+  reads every pin the credit rests on once more, synchronously, at its answer. A drop of an update under a live merge
+  candidate keeps U and its pins (the guard).
 - **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
   operations carrying its marker walking back from the single head to its planned operation (at most 200), never by
   description or change id. A marked operation's commits are owned only when it was validated in the attempt (the

@@ -14,7 +14,7 @@ import { jjContextOf } from '../src/main/platform/jjDetect'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { readOpHeads } from '../src/main/platform/jjView'
 import type { RunResult } from '../src/main/platform/repoContext'
-import { isCandidate, isInterrupted, prepareJjCandidate, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle } from '../src/main/platform/jjCandidates'
+import { isCandidate, isInterrupted, pinPrefix, prepareJjCandidate, prepareJjUpdate, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle } from '../src/main/platform/jjCandidates'
 import {
   bundlePrefix,
   ensureRetained,
@@ -96,9 +96,15 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       ...more
     })
     const candDeps = (): JjCandidateDeps => ({ runner: h.runner, view: { jjRepo: d.jj.jjRepo, store }, folder: control, git: gitOn(store), lock: (fn) => fn(), owner: { still: () => true }, journal: () => undefined, sameChange: (a, b) => gitHistory.sameChange(store, a, b), identity: { name: 'Q', email: 'q@example.invalid' } })
-    const candidate = async (style: JjCandidateStyle, revision = R): Promise<JjAttemptRecord> => {
-      const out = await prepareJjCandidate(candDeps(), { card: 'HI-1', attempt: token(), revision, base: fBase, expected: h.id(repo, 'main'), style, message: `HI-1 ${style}` })
+    const candidate = async (style: JjCandidateStyle, revision = R, updated?: JjAttemptRecord): Promise<JjAttemptRecord> => {
+      const out = await prepareJjCandidate(candDeps(), { card: 'HI-1', attempt: token(), revision, base: fBase, expected: h.id(repo, 'main'), style, message: `HI-1 ${style}`, ...(updated ? { updated } : {}) })
       if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      return out.record
+    }
+    /** Strict's update of R against main now (HI-2853). */
+    const updateOf = async (): Promise<JjAttemptRecord> => {
+      const out = await prepareJjUpdate(candDeps(), { card: 'HI-1', attempt: token(), revision: R, base: fBase, expected: h.id(repo, 'main'), how: 'merge', message: 'HI-1 update' })
+      if (!('record' in out) || !('updated' in out) || !out.updated) throw new Error(JSON.stringify(out))
       return out.record
     }
     const req = (more: Partial<JjProofRequest> = {}): JjProofRequest => ({ card: 'HI-1', cycle: 1, target: 'main', change: { base: fBase, revision: R }, bundles: bundles.get('HI-1/1') ?? [], consumed: [], token: token(), ...more })
@@ -112,7 +118,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     }
     const refsUnder = async (prefix: string): Promise<string> => (await git(['for-each-ref', '--format=%(objectname) %(refname)', prefix])).out
     const setMain = (rev: string): void => void jj('bookmark', 'set', 'main', '-r', rev, '--allow-backwards')
-    return { repo, builder, control, store, remote, fBase, T, R, deps, candDeps, candidate, req, jj, log, ref, refsUnder, setMain, bundles, git, colocated }
+    return { repo, builder, control, store, remote, fBase, T, R, deps, candDeps, candidate, updateOf, req, jj, log, ref, refsUnder, setMain, bundles, git, colocated }
   }
   type World = Awaited<ReturnType<typeof world>>
   const candDepsOf = (w: World): JjCandidateDeps => w.candDeps()
@@ -453,6 +459,45 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
         expect(log).toEqual(['change'])
         expect(rows.rows.map((r) => r.state)).toEqual(['owed'])
       } else expect(log).toEqual(['settle', 'change'])
+    })
+  })
+
+  describe.each([true, false] as const)("candidates built on strict's update (HI-2853/s10), colocated: %s", (colocated) => {
+    it.each(['merge', 'squash'] as const)('a %s candidate on a valid update: credited by that candidate', async (style) => {
+      const w = await world(colocated)
+      const u = await w.updateOf()
+      const rec = await w.candidate(style, w.R, u)
+      w.setMain(rec.result!)
+      const p = proved(await jjContains(w.deps(), w.req({ candidates: [rec, u] })))
+      expect(p.provenance).toMatchObject({ via: 'candidate', candidate: { attempt: rec.attempt } })
+    })
+
+    it('no credit through a missing, interrupted, unpinned or wrong-target update: replay decides', async () => {
+      const w = await world(colocated)
+      const u = await w.updateOf()
+      const rec = await w.candidate('merge', w.R, u)
+      w.setMain(rec.result!)
+      const viaOf = async (records: JjAttemptRecord[]): Promise<string | undefined> => proved(await jjContains(w.deps(), w.req({ candidates: records }))).provenance?.via
+      expect(await viaOf([rec])).not.toBe('candidate')
+      expect(await viaOf([rec, { ...u, phase: 'pinned', outcome: undefined }])).not.toBe('candidate')
+      expect(await viaOf([rec, { ...u, expected: w.fBase }])).not.toBe('candidate')
+      expect(await viaOf([{ ...rec, style: 'rebase' }, u])).not.toBe('candidate')
+      const upin = `${pinPrefix('HI-1', u.attempt)}candidate`
+      await w.git(['update-ref', upin, w.fBase])
+      expect(await viaOf([rec, u])).not.toBe('candidate')
+    })
+
+    it("the update's pin changed during the proof (after retention): moved, never a proof", async () => {
+      const w = await world(colocated)
+      const u = await w.updateOf()
+      const rec = await w.candidate('merge', w.R, u)
+      w.setMain(rec.result!)
+      const upin = `${pinPrefix('HI-1', u.attempt)}candidate`
+      const hook = async (p: JjIntegrationPoint): Promise<void> => {
+        if (p === 'afterRetain') await w.git(['update-ref', upin, w.fBase])
+      }
+      const out = await jjContains(w.deps({ hook }), w.req({ candidates: [rec, u] }))
+      expect(out, JSON.stringify(out)).toMatchObject({ jjUnknown: 'moved' })
     })
   })
 
