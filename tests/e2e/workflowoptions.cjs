@@ -343,6 +343,14 @@ async function theForm(page, app, inv) {
     // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
     check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
+    // G21 (HI-1183): the target following its remote, shown beside G18, off; on, G18 shows on and can't be turned off.
+    const follow = row('followRemote').locator('[role="switch"]')
+    check('…G21 shown in Merging after G18 while Combwork merges, off', (await inGroup('merging')).join(',').includes('pushTarget,followRemote') && (await follow.getAttribute('aria-checked')) === 'false')
+    await follow.click()
+    check('…G21 on: G18 shown on and fixed', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'true' && (await push.isDisabled()), HUNG_MS)))
+    await themes('follow', row('followRemote'))
+    await follow.click()
+    check('…G21 off again: G18 back as it was, off and free', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'false' && !(await push.isDisabled()), HUNG_MS)))
     await push.click()
     await themes('push', row('pushTarget'))
     // G6's third value (#1184): offered by name, chosen, and saved below.

@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "¿Combwork se cerró por quedarse sin memoria?",
   "tips.mergeBranch.text": "⑂ junto a una rama en Control de versiones → Ramas y remotos la fusiona en la rama que elijas, una fusión cada vez. La rama de una tarjeta que no está en Hecho pregunta antes, y la tarjeta queda marcada como fusionada fuera de las reglas.",
   "tips.mergeBranch.title": "Fusiona una rama a mano",
+  "tips.mergeFollowRemote.text": "¿Compartes main con otras personas? Activa “La rama de destino sigue a su remoto” en Control de versiones → Flujo de trabajo: la cola de fusión hace fetch antes de cada fusión de prueba, prueba sobre el último commit del remoto y hace push solo si nadie lo hizo mientras tanto; si alguien lo hizo, vuelve a probar.",
+  "tips.mergeFollowRemote.title": "Fusiona contra el remoto de tu equipo",
   "tips.mergeMessage.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo fija el mensaje del commit de la fusión: el de Combwork nombra la tarjeta y el propio de la rama mantiene las claves de tarjeta fuera de tu historial. Con Squash, cada tarjeta entra entonces como un solo commit con el mensaje de su autor.",
   "tips.mergeMessage.title": "Fusiones con tus propios mensajes de commit",
   "tips.mergePush.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo puede hacer push de la rama de destino después de cada fusión, nunca forzado. Si el remoto lo rechaza, la cola se pausa y explica por qué: haz pull y reanuda, o desactívalo y reanuda.",

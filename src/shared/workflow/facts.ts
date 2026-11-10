@@ -164,6 +164,22 @@ export const FOCUSED_SKIP_GATE = 'focusedSkip'
 export const SLOT_DIRTY_GATE = 'slotDirty'
 
 /**
+ * HI-1183: the merge queue's question when a follow-mode publication's outcome is unknown and the remote doesn't show it
+ * (§16.9.4): Approve, it was published (the card Done); Decline, it wasn't (tested again). Bound to the entry and result.
+ */
+export const QUEUE_PUBLISH_GATE = 'queuePublish'
+
+/** A follow-mode attempt's endpoint as a fact keeps it (HI-1183): never a credential. */
+export interface PublishFact {
+  remote: string
+  endpoint: string
+  ref: string
+  onto: string
+  snapshot: string
+  digest: string
+}
+
+/**
  * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
  * skip its review (HI-1734), each with the agent's suggested reason. One click does it as the user, with the reason, and
  * answers the question.
@@ -183,7 +199,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -229,7 +245,12 @@ export const decisionAnswers = (r: Pick<FactData['ApprovalRequested'], 'kind' | 
 /** The most requests one decision answers (HI-1932). */
 export const DECISION_ANSWERS_MAX = 20
 
-export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused'
+/**
+ * `pushRefused` and `notPublished` (HI-1183, follow mode): the publication was refused (the project's pre-push hook, or the
+ * remote: a hook, a protected branch) before anything was written, or the user said an unknown one wasn't published;
+ * both transient, the card queued again.
+ */
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished'
 
 /**
  * Why the queue returned a card for its focused tests (G20, HI-1367), with `IntegrationFailed.focused`: none chosen for
@@ -318,8 +339,13 @@ export interface FactData {
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
-  IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
-  IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
+  /**
+   * `publish` (HI-1183, follow mode): the attempt's endpoint as it may be kept (the remote's name, its URL without
+   * credentials, the full ref), the remote's head it was tested on (`onto`), and its protected snapshot's id and digest
+   * (queueTransportStore.ts). Its phases are `prePush` and `push`, never `files`/`ref`: nothing local moves in it.
+   */
+  IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null; publish?: PublishFact }
+  IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' | 'prePush' | 'push' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
   /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
   /** `conflicts` (HI-1181): a conflict's files and hunks as the queue's folder had them, bounded (shared/workflow/conflicts.ts). */

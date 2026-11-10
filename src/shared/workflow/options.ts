@@ -73,6 +73,13 @@ export interface WorkflowOptions {
    */
   pushTarget: boolean
   /**
+   * G21 (HI-1183): the target follows its remote. The merge queue fetches the branch the target tracks before each test
+   * merge, tests on the remote's head, and publishes there first (an exact compare-and-swap), bringing the local target up
+   * to date after (SPEC §16.9.4). Implies G18's push. Not a rule, as G18: left out of every ruleset, read from the
+   * project's options as they are when the queue runs. Off by default: local targets behave as before.
+   */
+  followRemote: boolean
+  /**
    * G19 (HI-1697; the branch's own by default since HI-1997): the message of the commit Combwork's merge makes (a merge commit, or a squash's commit): Combwork's, the
    * card's key and title with its `Combwork-` trailers, or the branch's own, with neither. Not a rule, as G18: left out of
    * every ruleset (`ruleOptions`), the queue reads it from the project's options as they are when it merges.
@@ -220,6 +227,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   target: '',
   strict: false,
   pushTarget: false,
+  followRemote: false,
   // G19 (HI-1997, Darren's decision): the branch's own message in every preset, so card titles never reach a history unasked.
   commitMessage: 'branch',
   mergeChecks: [],
@@ -471,6 +479,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   targetOwn: (v) => v === true,
   strict: bool,
   pushTarget: bool,
+  followRemote: bool,
   commitMessage: oneOf<CommitMessage>(['combwork', 'branch']),
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
@@ -518,7 +527,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall'] },
-    { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
+    { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'followRemote', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
@@ -602,6 +611,8 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'strict') return o.finish === 'combworkMerges'
   // G18 (#1179): only the merge queue pushes.
   if (key === 'pushTarget') return o.finish === 'combworkMerges'
+  // G21 (HI-1183): only the merge queue fetches and publishes.
+  if (key === 'followRemote') return o.finish === 'combworkMerges'
   // G19 (HI-1697): only the merge queue makes a merge's commit, and Rebase makes none (the branch's commits land).
   if (key === 'commitMessage') return o.finish === 'combworkMerges' && o.style !== 'rebase'
   if (key === 'sharedFolderWarning') return o.folder === 'project'

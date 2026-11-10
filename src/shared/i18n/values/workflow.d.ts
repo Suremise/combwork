@@ -26,6 +26,7 @@ interface CombworkMessageValues {
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
   'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
+  'workflow.forYou.queuePublish': { card: string | number; result: string | number; endpoint: string | number; target: string | number }
   'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; files: number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
@@ -206,6 +207,8 @@ interface CombworkMessageValues {
   'workflow.option.focusedTests.title': undefined
   'workflow.option.folder.desc': undefined
   'workflow.option.folder.title': undefined
+  'workflow.option.followRemote.desc': undefined
+  'workflow.option.followRemote.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
   'workflow.option.loopRounds.desc': undefined
@@ -537,6 +540,9 @@ interface CombworkMessageValues {
   'workflow.unreadable.ignored': { folder: string | number }
   'workflow.unreadable.line': { branch: string | number }
   'workflow.unreadable.pathOutside': { path: string | number }
+  'workflow.unreadable.remoteBehind': { target: string | number; endpoint: string | number }
+  'workflow.unreadable.remoteHead': { branch: string | number; endpoint: string | number; target: string | number }
+  'workflow.unreadable.remoteSetup': { target: string | number }
   'workflow.unreadable.replay': { revision: string | number; onto: string | number }
   'workflow.unreadable.replayedFiles': undefined
   'workflow.unreadable.reviewers': { card: string | number }
@@ -579,6 +585,7 @@ interface CombworkMessageValues {
   'workflow.why.finish': undefined
   'workflow.why.focusedTests': undefined
   'workflow.why.folder': undefined
+  'workflow.why.followRemote': undefined
   'workflow.why.identity': undefined
   'workflow.why.maxAgents': undefined
   'workflow.why.mergeChecks': undefined

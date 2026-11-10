@@ -21,8 +21,13 @@ import type { Disposable, ObserveEvent } from './history'
 import { historyFor, observePort } from './historyPorts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
-import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
+import { isUnknown, unknown, withDetail, type Containment, type Maybe, type Unknown } from './types'
+import { isAgain } from './again'
+import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
+
+/** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
+const SLOT_FETCH_MS = 60_000
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -153,7 +158,10 @@ export class GitPlatform implements PlatformAdapter {
         const here = await this.start(card, { ...o, folder: 'project' })
         return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
       }
-      const th = await G.lineHead(this.project, target)
+      // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
+      const followed = await this.followedHead(o, target, dry)
+      if (isUnknown(followed)) return followed
+      const th = followed ?? (await G.lineHead(this.project, target))
       if (isUnknown(th)) return th
       if (!th) return unknown(UNREADABLE.head, { where: target })
       const line = await this.lineFor(card)
@@ -196,6 +204,32 @@ export class GitPlatform implements PlatformAdapter {
     if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
+  }
+
+  /**
+   * G21 (HI-1183, §16.9.4): the head a slotted card starts from when its target follows its remote: the remote's branch
+   * fetched (in the sealed context, bounded), pinned at `refs/cw/fetch/<target>` until the card's line holds it. Null when
+   * the target doesn't follow its remote (or a dry plan). A remote it can't use, a fetch that fails, or a local target with
+   * commits the remote lacks refuses the start with why: never the local head instead.
+   */
+  private async followedHead(o: WorkflowOptions, target: string, dry: boolean): Promise<Maybe<string | null>> {
+    // G21 is in no ruleset: read from the project's options as they are now, as the queue reads it.
+    if (dry || o.finish !== 'combworkMerges' || this.wf.cfg.options().followRemote !== true) return null
+    const h = projectHost(this.project)
+    const d = await destinationOf(h, target)
+    if (isAgain(d)) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.again.message)
+    if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
+    const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
+    if ('failed' in f) return withDetail(unknown(UNREADABLE.remoteHead, { branch, endpoint: d.snapshot.display, target }), f.failed)
+    const local = await G.lineHead(this.project, target)
+    if (isUnknown(local)) return local
+    if (local && local !== f.head) {
+      const behind = await G.isAncestor(this.project, local, f.head)
+      if (isUnknown(behind)) return behind
+      if (!behind) return unknown(UNREADABLE.remoteBehind, { target, endpoint: d.snapshot.display })
+    }
+    return f.head
   }
 
   /** Whether a start here asks for a slot (#1438): the app's lending, while the rules are enforced. */

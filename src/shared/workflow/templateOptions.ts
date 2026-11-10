@@ -50,7 +50,7 @@ export const TEMPLATE_CARRIED = [
  * identity's name and email aren't carried either: `identity` is, as on or off only, made from the loading project's own
  * git identity.
  */
-export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
+export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'followRemote', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
 
 export type CarriedKey = (typeof TEMPLATE_CARRIED)[number]
 

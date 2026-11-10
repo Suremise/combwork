@@ -30,6 +30,7 @@ const Q = {
   waitsApproval: agentMsg({ id: 'queue.paused.approval', text: 'it moves on once the user answers, in For you, whether to update {target} now', note: "What a queue paused for the user's answer waits for (#1406): whether to update a checked-out target now (Resume doesn't stand in for it). {target}: the branch." }),
   waitsMergeChoice: agentMsg({ id: 'queue.paused.mergeChoice', text: 'it moves on once the user chooses, in For you, how Combwork merges this project (merge style and commit message)', note: "What a queue paused for the project's merge style waits for (#1406)." }),
   waitsStuck: agentMsg({ id: 'queue.paused.stuck', text: 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)', note: 'What a queue paused on an interrupted advance waits for (#1406): Decide in For you, or Resume once settled.' }),
+  waitsPublish: agentMsg({ id: 'queue.paused.publish', text: 'it moves on once the user says whether its push reached the remote (their answer in For you), or Resume finds it there', note: 'What a queue paused on an unknown publication waits for (HI-1183, follow mode): Approve or Decline in For you; Resume looks at the remote again.' }),
   waitsFix: agentMsg({ id: 'queue.paused.fix', text: 'it moves on once the user fixes what stopped it and resumes it', note: "What a queue paused on a step that needs the user waits for (#1406): git's error, a push (G18, #1179), then Resume." }),
   waitsFolder: agentMsg({ id: 'queue.paused.folder', text: 'it moves on once the user puts right the folder {target} is checked out in and resumes it', note: 'What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch.' }),
   waitsRules: agentMsg({ id: 'queue.paused.rules', text: 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)', note: "What a queue paused while workflow rules weren't enforced waits for (#1406): Combwork resumes it once they are." }),
@@ -51,6 +52,8 @@ const Q = {
   checkFailed: agentMsg({ id: 'queue.failure.check.failed', text: '{what} failed on the merged result', note: '{what}: the check (queue.failure.check.*): it failed on the work merged with its target.' }),
   hook: agentMsg({ id: 'queue.failure.hook', text: 'a git hook refused its merge commit', note: 'What came back: a git hook refused the merge commit.' }),
   targetMoved: agentMsg({ id: 'queue.failure.targetMoved', text: '{target} moved while it was being merged', note: 'What came back: its target branch moved during the merge.' }),
+  pushRefused: agentMsg({ id: 'queue.failure.pushRefused', text: 'publishing it to {target}’s remote was refused (a pre-push hook or the remote); it is tested again after Resume', note: 'What came back (HI-1183, follow mode): the project’s pre-push hook or the remote refused the push of the merge; nothing was published.' }),
+  notPublished: agentMsg({ id: 'queue.failure.notPublished', text: 'the user said its publication to {target}’s remote didn’t happen; it is tested again', note: 'What came back (HI-1183, follow mode): an unknown publication the user said wasn’t published.' }),
   folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
   notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
   notUpToDateFiles: agentMsg({ id: 'queue.failure.notUpToDate.files', text: '{head}: a conflict in {files}', note: "HI-1181 round 1: Strict's update conflicted. {head}: queue.failure.notUpToDate. {files}: its files and where, as a conflict's are." }),
@@ -199,6 +202,8 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
   switch (reason) {
     case 'approval':
     case 'mergeChoice':
+    // G21 (HI-1183): an unknown publication waits for the user's answer (Resume only looks at the remote again).
+    case 'publishUnknown':
       return 'answer'
     case 'needsYou':
       return stuck ? 'answer' : 'fix'
@@ -208,6 +213,14 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
     case 'pushFailed':
     case 'pushNoRemote':
     case 'pushUnreadable':
+    // HI-1183: the remote's refusal, and follow mode's remote put right (what it tracks, its address, a sign-in, a pull).
+    case 'pushRefused':
+    case 'publishRefused':
+    case 'noUpstream':
+    case 'remoteAmbiguous':
+    case 'remoteUnsupported':
+    case 'fetchFailed':
+    case 'remoteDiverged':
       return 'fix'
     case 'wrongBranch':
     case 'staged':
@@ -225,7 +238,7 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
 function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
   switch (pauseWait(q.reason, q.stuck)) {
     case 'answer':
-      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : say(Q.waitsStuck)
+      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : q.reason === 'publishUnknown' ? say(Q.waitsPublish) : say(Q.waitsStuck)
     case 'fix':
       return say(Q.waitsFix)
     case 'folder':
@@ -327,6 +340,10 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
       return say(Q.hook)
     case 'targetMoved':
       return say(Q.targetMoved, { target: f.target })
+    case 'pushRefused':
+      return say(Q.pushRefused, { target: f.target })
+    case 'notPublished':
+      return say(Q.notPublished, { target: f.target })
     case 'folderBusy':
       return say(Q.folderBusy, { target: f.target })
     case 'notUpToDate': {

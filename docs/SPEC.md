@@ -2140,7 +2140,14 @@ The **integration** capability's mechanics. The queue's state machine, its facts
 - `publish(ctx, target, owed)` → `Published { pushed }` · `UpToDate { pushed }` · `NotHeld` (the target no longer
   contains the owed result: reset since) · `Rejected` · `Failed { why }` · `NoRemote` · `Unknown` (Git: G18's settle,
   `MergeQueue.settlePush`, §16.9.1 step 7: the target's head read once, proved to contain the owed result, and that
-  **captured commit id** pushed to the destination ref, never the moving line; `pushed` is that id).
+  **captured commit id** pushed to the destination ref, never the moving line; `pushed` is that id). A remote's own
+  refusal (`[remote rejected]`: a hook, a protected branch) is `Refused { why }` (HI-1183), its words kept.
+- Follow mode (G21, HI-1183, §16.9.4), optional (a platform without them has no follow mode, and the option isn't
+  shown): `destination(target)` → the one publication endpoint and its transport snapshot · `noUpstream` ·
+  `remoteAmbiguous` · `remoteUnsupported`; `fetchHead(snapshot, pin)` → that fetch's own head, pinned; `prePush(snapshot,
+  lease, result)` → `ok` · `refused` · `timedOut`; `publish(snapshot, lease, result)` → `pushed` · `atResult` · `stale` ·
+  `refused` · `unknown`; `redact(text, snapshot)`. Git's are `platform/gitTransport.ts`; jj has no integration port, so
+  none (HB3, 10 Nov).
 - Further outcomes a later platform reports (the type carries them from R7/R8 so the queue handles them before jj
   exists, each a pause naming it, never success): `divergentChange`, `conflictedTarget`, `staleWorkspace`,
   `partialExport`.
@@ -2261,7 +2268,7 @@ works.
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
-| Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
+| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
 | **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
@@ -3532,6 +3539,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
 | G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Combwork merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
+| G21 | **The target branch follows its remote** | On / Off (default Off) | The merge queue (§16.9.4), Combwork merges only, Git only. Fetches the branch the target tracks before each test merge, tests on its head, publishes there first (an exact compare-and-swap) and catches the local target up after; implies G18. Not a rule, as G18: in no ruleset, read as the options are when the queue runs (HI-1183). |
 | G20 | **Each card's focused tests pass on the merged result** | On / Off, with the project's commands `focused.pick` (optional) and `focused.run` | `submit.focusedChosen`; the merge queue's step 5 (§16.9.1), Combwork merges only. Built [HI-1367]. |
 | G19 | **Commit message** | Combwork's: the card's key and title, with trailers · The branch's own, with no card key or trailers (default, HI-1997) | The message of the queue's merge commit or squash commit (§16.9.1 step 4); shown when Combwork merges with Merge commit or Squash (Rebase makes no commit of its own). The branch's own leaves out the `Combwork-` trailers its commits carry (HI-2588; an old-name one of a commit from before 1.1 is history, kept as written: HI-2594); the branch's commits keep theirs. Not a rule, as G18: in no ruleset, read as the options are when the queue merges (HI-1697). |
 | — | Card loops: wake reviewers and builders, rounds, wait (hours), design check wait (minutes) | On, 10, 6, 30 | Workflow options since HI-1766 (§16.6.7), for None and Git, a group of their own. |
@@ -3567,6 +3575,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 | G18 push after merging | — | Off | Off | Pushing reaches your remote and its sign-in: it stays yours unless you turn it on (#1179). |
+| G21 target follows its remote | — | Off | Off | Following a remote reaches it and its sign-in before every merge: it stays yours unless you turn it on (HI-1183). |
 | G19 commit message | — | The branch's own | The branch's own | Card titles name people and details a public history shouldn't keep (Darren, HI-1997); Combwork's, chosen, links each merge to its card (HI-1697). |
 | Maximum agents | 1 | 2 | 12 | The team each is for (Darren's decision, HI-2001), so the Assistant never adds agents nobody planned for; All off 12. |
 
@@ -5090,6 +5099,84 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
 **None:** no queue; Accepted is immediate [#1121 c, OP-16].
 
 Later, not 1.0: batching, speculative merges, stacked cards [note §13].
+
+#### 16.9.4 A target that follows its remote (G21) <a id="spec-follow-remote"></a>
+
+**Built [HI-1183]** (the design agreed with HR1 and HR2 on the card, s7 to s20). With *The target branch follows its
+remote* on (Git, Combwork merges; off by default, so a local target behaves exactly as §16.9.1 and §16.9.2 say), the
+target **is** the branch it tracks on its remote: the queue tests on the remote's head and publishes there first, and a
+card is Done once the remote has its merge. G21 implies G18 (the form shows G18 on and fixed); it is in no ruleset and is
+read as the options are when the queue runs.
+
+**The endpoint, captured once for an attempt.** The target must track a remote branch (`branch.<target>.remote`, not
+`.`, and `.merge`): G18's fallback to the only remote or `origin` doesn't apply; none pauses `noUpstream`. Its push URL
+is read as git resolves it then (`git remote get-url --push --all`, rewrites applied): exactly one, else
+`remoteAmbiguous` (the URLs, without credentials, named); a relative filesystem path is made absolute against the
+project, so the sealed context and recovery reach the same repository. A shallow repository pauses `remoteUnsupported`. The snapshot
+holds that URL, the full ref, where the project's objects are, and an allowlist of transport and sign-in settings as
+resolved (`credential.*`, `http.*` per URL too, `core.sshCommand`, `ssh.variant`, `protocol.*`), never `url.*`,
+`remote.*`, `include*` or `core.hooksPath`.
+
+**The sealed context.** Every fetch, publication and verification runs git with `GIT_DIR` a bare gitdir Combwork makes
+in a temp folder for that one operation (removed after it), `GIT_OBJECT_DIRECTORY` the project's common objects (and its
+alternates), `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` an empty file, git's own variables removed from its
+environment, and G18's non-interactive environment. Its only configuration is the snapshot's, plus its own: no gc or
+maintenance, no commit graph, no hooks. A live edit of the user's configuration (a new `insteadOf` or `pushInsteadOf`,
+an include) is never read by these children, so it can't redirect one; nothing of the user's configuration is edited.
+The URL is used literally, never the remote's name.
+
+**Secrets.** A fact (`IntegrationStarted.publish`) keeps only the remote's name, the URL without userinfo, query or
+fragment, the ref, the remote head tested on, and the snapshot's id and SHA-256 digest. The snapshot is in
+`queue-transport.json` in Combwork's profile, encrypted with safeStorage (DPAPI), keyStore.ts's pattern (one atomic
+write, no `.bak`), decrypted only to build a sealed context, never sent to a window, a reply, a log or diagnostics;
+removed once its entry has an outcome. Each is owned by its project's target, and only that target's queue host drops
+leftovers no begun publication of the target needs, between its entries under its lease, so another target's clean-up
+never takes one between its save and its `IntegrationStarted`. git's words kept
+for a pause or a log are redacted first (URL userinfo, any URL's query and fragment, authorization and bearer values,
+each secret value of the snapshot, its URL's query values included). Where it can't be kept safely, the queue pauses `remoteUnsupported`.
+
+**The queue's steps** (§16.9.1, changed only as follows):
+1. **Fetch first:** the snapshot's ref fetched into the sealed context and its head pinned in the project at
+   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). A failed fetch pauses
+   `fetchFailed` with git's words. The local target at the fetched head or behind it goes on; one with commits the
+   remote lacks pauses `remoteDiverged` (never forced, never merged silently). An owed G18 push or catch-up is settled
+   first, as today.
+2. **Test on the remote's head** (`onto`): strict's update, the test merge, the merge checks (`CW_CHECK_BASE`) and "already
+   in the target" use it; the local head stays the advance's `expected`. A card found in that head (published by someone
+   else) is recorded from it (`Integrated` by outside, the blocker rule applying), never from the local target, and the
+   local catch-up is owed.
+3. **Publish** (the advance): the result proved to contain `onto` (else nothing is published), the snapshot kept,
+   `IntegrationStarted` with its record, then two journal phases:
+   - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
+     remote's name and the URL without credentials as its arguments and git's own line for an object-name source on its
+     stdin (`<X> <X> <ref> <onto>`). Refused: nothing published, the entry fails (`pushRefused`, transient), the card is
+     queued again and the queue pauses `publishRefused` with its words; ran too long, `hookTimedOut`.
+   - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>`. The remote takes it
+     only while its ref is exactly `onto`, and it is a fast-forward by construction, so the lease never discards remote
+     history. Pushed, or at the result already (`atResult`: the lease never applied, counted only because the result
+     is there): `Integrated`, the push logged as made, and the local catch-up owed in the same write. Stale lease or not a
+     fast-forward (someone pushed meanwhile): the entry fails (`targetMoved`), is queued again and tested from step 1,
+     toward the 3-retests pause. The remote's own refusal (`[remote rejected]`): `publishRefused` with its words, which
+     name a protected branch only when the remote does.
+   - **Unknown** (a timeout, a signal, an error after the send began, a lost acknowledgement, or a crash or lost lease
+     in phase `push`): verified at the snapshot's endpoint (a fresh fetch). There, Done. Anything else (absent, even
+     exactly at `onto`, moved, deleted, unreadable, or the snapshot missing or not matching its digest): paused
+     `publishUnknown`, the entry left begun with its pins and snapshot, and For you asks once (Approve: it was
+     published, Done; Decline: it wasn't, tested again). Never pushed or tested again before the remote shows it or the
+     user answers; Resume looks again. A crash in phase `prePush` sent nothing: tested again.
+4. **The owed catch-up** (store meta `queue.catchUp:<target>`, settled before the next entry): a recorded step first, by
+   §16.9.2's recovery table (`files`, `ref`, `rollback`, journalled in the meta); then from the local head as it is now
+   (another ancestor of the result gets its own journalled plan, never an earlier one's files). Not checked out: a
+   compare-and-swap. Checked out: §16.9.2's conditions, files and ref (Ask each time was asked before publishing). A
+   condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
+   A local target moved to something that doesn't lead to the result is left as it is (step 1 then pauses
+   `remoteDiverged`). Nothing here reopens, retests or publishes again.
+
+**Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
+seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
+remote lacks refuses the start with why: never the local head instead.
+
+**The one residue:** a hook is the user's own code, run in the project with the project's configuration.
 
 ### 16.10 Slots, review copies and sessions
 
@@ -7802,7 +7889,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Combwork's commits) |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
-| Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |
+| Remote targets: fetch before testing, push after (Team with a shared remote) | **Built [HI-1183]:** G21 (§16.6.2, §16.9.4) |
 | Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |
 | Pin refs for submitted revisions; hooks and signing pauses in the queue; Combwork's commit identity | P5 (in scope, §16.9) |

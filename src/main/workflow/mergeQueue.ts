@@ -17,7 +17,7 @@ import { git, GIT_PREFIX } from '../git'
 import { onOutputSettled, withLauncherEnv } from '../gitWorker'
 import { gitExe } from '../gitTool'
 import { endTree } from '../progressReporters/wrapper'
-import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
+import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type IntegrationFailReason, type PublishFact, type QueueEntry } from '../../shared/workflow/facts'
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, readResults, reviewProved, standingFocusedRun, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
 import { boundedRead, pathChanges, runPick } from './focusedRun'
@@ -37,7 +37,8 @@ import { reconcile } from './reconcile'
 import { leftWake, returnedComment, returnedWake } from './queueState'
 import { mergeMessage, updateMessage } from './mergeMessage'
 import { again, isAgain } from '../platform/again'
-import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, QueueGitResult } from '../platform/integration'
+import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, PublishReply, QueueGitOptions, QueueGitResult, TransportSnapshot } from '../platform/integration'
+import type { TransportStore } from './transportSnapshots'
 import { integrationFor, queueIntegration } from '../platform/integrationPorts'
 // Git's commit reading (HI-2790: moved to the platform with the candidate steps), named here for its tests.
 export { commitFailed, readCommitStream, type CommitChild, type CommitStream } from '../platform/gitCommits'
@@ -176,9 +177,18 @@ export interface QueueConfig {
    * `beforeRetry` (HI-2019: a failed read's wait is over, before the entry is admitted again).
    */
   hooks?: QueueHooks
+  /**
+   * G21 (HI-1183): where follow mode keeps an attempt's transport snapshot (queueTransportStore.ts in the app, encrypted;
+   * a memory one in tests). Left out, follow mode pauses `remoteUnsupported`: nowhere safe to keep one.
+   */
+  transport?: TransportStore
 }
 
-export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback' | 'beforeRetry'
+/**
+ * Follow mode's seams too (HI-1183): `beforePublish` (phase push written, before the publication), `afterPublish` (its
+ * reply in, before it is acted on), and the owed catch-up's `beforeCatchUpFiles` and `beforeCatchUpRef`.
+ */
+export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback' | 'beforeRetry' | 'beforePublish' | 'afterPublish' | 'beforeCatchUpFiles' | 'beforeCatchUpRef'
 export type QueueHooks = Partial<Record<QueueHook, (entry: string) => void | Promise<void>>>
 
 // How the queue runs a command, and what it answered: the integration port's types (platform/integration.ts, HI-2790).
@@ -236,8 +246,14 @@ export interface QueueStepInfo {
  * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
  * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
  * `mergeChoice` (HI-1697): an upgraded project's merge style and commit message wait for the user's answer in For you.
+ * `pushRefused` (HI-1183): the remote (or, in follow mode, the project's pre-push hook) refused the push, its words kept.
+ * Follow mode's (G21, HI-1183, §16.9.4): `noUpstream` (the target tracks no remote branch), `remoteAmbiguous` (its remote
+ * has several push URLs, or none), `remoteUnsupported` (a shallow repository, or nowhere safe to keep the snapshot),
+ * `fetchFailed` (git's words), `remoteDiverged` (the local target has commits its remote lacks), `publishUnknown` (a
+ * publication's outcome unknown and the remote not showing it: For you asks), `publishRefused` (the project's pre-push
+ * hook or the remote refused the publication: nothing published, the card queued again).
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'mergeChoice' | 'focusedSkip'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'pushRefused' | 'mergeChoice' | 'focusedSkip' | 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported' | 'fetchFailed' | 'remoteDiverged' | 'publishUnknown' | 'publishRefused'
 
 /**
  * G18 (#1179): the push of a target Combwork owes after merging into it, as store meta per target: the merge's result, its
@@ -264,11 +280,49 @@ export function pushOwedOf(value: string | null): PushOwed | null {
 }
 
 /**
+ * G21 (HI-1183, §16.9.4): the local target's catch-up Combwork owes once a merge is published to its remote, as store meta
+ * per target: from the local head (`from`) to the published result (`to`), the merged card and entry. Written in the same
+ * transaction as the merge's `Integrated`, settled before the next entry; a checked-out target's steps journalled here
+ * (`folder`, `files`, `phase`), so a crash or a lost lease is recovered by §16.9.2's table. Never a reason to retest,
+ * roll back or publish again: the card is Done once its remote has it.
+ */
+export interface CatchUp {
+  from: string
+  to: string
+  card: string
+  entry: string
+  folder?: string
+  files?: string[]
+  phase?: 'files' | 'ref' | 'rollback'
+}
+
+export const catchUpKey = (target: string): string => `queue.catchUp:${target}`
+
+/** The catch-up Combwork owes a target, if any (an unreadable value counts as none). */
+export function catchUpOf(value: string | null): CatchUp | null {
+  if (!value) return null
+  try {
+    const v = JSON.parse(value) as Partial<CatchUp>
+    if (typeof v.from !== 'string' || typeof v.to !== 'string' || typeof v.card !== 'string' || typeof v.entry !== 'string') return null
+    const phase = v.phase === 'files' || v.phase === 'ref' || v.phase === 'rollback' ? v.phase : undefined
+    return { from: v.from, to: v.to, card: v.card, entry: v.entry, ...(typeof v.folder === 'string' ? { folder: v.folder } : {}), ...(Array.isArray(v.files) ? { files: v.files.filter((x): x is string => typeof x === 'string') } : {}), ...(phase ? { phase } : {}) }
+  } catch {
+    return null
+  }
+}
+
+/** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
+export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
+
+/**
  * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
  * fast-forward moves the target forward (#1184); a squash into the card's own target is a squash; else a merge commit.
  */
 /** An entry's begun advance into a checked-out target, as the port's recovery reads it (its journal's last phase). */
-const begun = (e: QueueEntry): BegunAdvance => ({ target: e.target, expected: e.started!.expected, result: e.started!.result, files: e.started!.files ?? [], folder: e.started!.checkedOut!, phase: e.phases.at(-1) ?? 'started' })
+const begun = (e: QueueEntry): BegunAdvance => {
+  const last = e.phases.at(-1)
+  return { target: e.target, expected: e.started!.expected, result: e.started!.result, files: e.started!.files ?? [], folder: e.started!.checkedOut!, phase: last === 'files' || last === 'ref' || last === 'rollback' ? last : 'started' }
+}
 
 function methodOf(style: FactData['IntegrationRequested']['style'], cardTarget: string | null | undefined, target: string): 'merge' | 'squash' | 'fastForward' {
   if (style === 'rebase') return 'fastForward'
@@ -505,8 +559,15 @@ export class MergeQueue {
     // G20 (HI-1367): lifted once its skipped focused tests are decided (the reviewer's answer or the user's); the entry is
     // tested again from its test merge and takes that decision (`skipDecided`).
     if (p?.reason === 'focusedSkip' && !this.skipAsking(p.card) && (await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'focusedSkip')))) return this.runOnce(target)
+    // G21 (HI-1183): an unknown publication waits for the user's answer (Resume verifies it again, below).
+    if (p?.reason === 'publishUnknown') return this.fenced(target, () => this.publishAnswered(target, p.card)).catch(lostIsNull)
     if (p || this.cfg.teamPaused?.()) return null
     return this.fenced(target, async () => {
+      // G21 (HI-1183): a begun publication settled first (verified at its own endpoint), then the local catch-up it owes.
+      const published = await this.settlePublications(target)
+      if (published) return this.thenPush(target, published)
+      const behind = await this.settleCatchUp(target)
+      if (behind) return behind
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
       const owed = await this.settlePush(target)
       if (owed) return owed
@@ -518,6 +579,8 @@ export class MergeQueue {
 
   /** After an entry's merge, the push of its target it owes (G18), before the next entry; its outcome stays the merge's. */
   private async thenPush(target: string, o: QueueOutcome | null): Promise<QueueOutcome | null> {
+    // G21 (HI-1183): a published merge's local catch-up first (its pause, if any, is saved: the outcome stays the merge's).
+    if (o?.outcome === 'integrated' && (await this.settleCatchUp(target))) return o
     if (o?.outcome === 'integrated') await this.settlePush(target)
     return o
   }
@@ -525,7 +588,7 @@ export class MergeQueue {
   /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
   private pushes(): boolean {
     const o = this.wf.cfg.options()
-    return merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
+    return merges(o.platform) && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
   }
 
   /** The message of Combwork's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
@@ -629,7 +692,9 @@ export class MergeQueue {
       await this.clearOwed(target, owed.result, await this.pushedBy(pending, pushed))
       return null
     }
-    return 'rejected' in r ? this.pausePush(target, owed, 'pushRejected', r.rejected) : this.pausePush(target, owed, 'pushFailed', r.failed)
+    if ('rejected' in r) return this.pausePush(target, owed, 'pushRejected', r.rejected)
+    // HI-1183: the remote's own refusal (a hook, a protected branch), its words as it gave them.
+    return 'refused' in r ? this.pausePush(target, owed, 'pushRefused', r.refused) : this.pausePush(target, owed, 'pushFailed', r.failed)
   }
 
   /** Pauses the target's queue for its owed push (never in place of a pause saved meanwhile), naming the merged card. */
@@ -637,6 +702,415 @@ export class MergeQueue {
     const m = message?.trim().slice(0, 4000) || undefined
     await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: owed.card, ...(m ? { message: m } : {}) }, true))
     return { card: owed.card, entry: owed.entry, outcome: 'paused', reason, ...(m ? { message: m } : {}) }
+  }
+
+  // ---- Follow mode (G21, HI-1183, SPEC §16.9.4): the target is the branch it tracks on its remote. The endpoint is
+  // captured once for an attempt and every fetch and publication runs in the platform's sealed context (the port's
+  // destination, fetchHead, prePush, publish). The publication is the advance: an exact compare-and-swap at the remote,
+  // journalled (phases prePush, push) after IntegrationStarted. Once the remote has the result the card is Done, and the
+  // local target's catch-up is owed (as G18's push is), never a reason to retest, roll back or publish again. A reply
+  // that doesn't say plainly is verified, and stays unknown (For you asks) unless the remote shows the result.
+
+  /** What each entry's last test in follow mode was made on (its remote head and snapshot), for an approval of it. */
+  private tested = new Map<string, { onto: string; result: string; snap: TransportSnapshot }>()
+
+  /** Whether the target follows its remote, as the project's options are now (G21 isn't a rule), on a platform that can. */
+  private follows(card: CardRecord, s: CardState): boolean {
+    const o = this.wf.cfg.options()
+    if (!(merges(o.platform) && o.finish === 'combworkMerges' && o.followRemote === true)) return false
+    const port = this.integration(card, s)
+    return !!(port.destination && port.fetchHead && port.prePush && port.publish)
+  }
+
+  /**
+   * §16.9.4 step 1: the endpoint captured for this attempt, the remote's branch fetched into the entry's own pin (its head
+   * that fetch's, never a shared tracking ref's), and the local target behind it or at it; one with commits the remote
+   * lacks pauses `remoteDiverged`, never forced and never merged silently.
+   */
+  private async followFetch(card: CardRecord, s: CardState, entry: QueueEntry, target: string, local: string): Promise<Again | { pause: PauseReason; files?: string[]; message?: string } | { onto: string; snap: TransportSnapshot }> {
+    const I = this.integration(card, s)
+    const h = this.host({})
+    const d = await I.destination!(h, target)
+    if (isAgain(d)) return d
+    if ('pause' in d) return { pause: d.pause, ...(d.files?.length ? { files: d.files } : {}) }
+    const f = await I.fetchHead!(h, d.snapshot, fetchPin(entry.id))
+    if ('failed' in f) return { pause: 'fetchFailed', message: f.failed }
+    if (f.head !== local) {
+      const behind = await I.contains(this.project, local, f.head)
+      if (isUnknown(behind)) return again(gitSaid(behind))
+      if (!behind) return { pause: 'remoteDiverged', files: [target, `${d.snapshot.remote}/${d.snapshot.ref.replace(/^refs\/heads\//, '')}`] }
+    }
+    return { onto: f.head, snap: d.snapshot }
+  }
+
+  /**
+   * Follow mode's advance: the result proved to contain the remote head it was tested on (so the lease is a fast-forward),
+   * the snapshot kept in the protected store, `IntegrationStarted` with its record (never a secret), then the publication.
+   */
+  private async advancePublish(card: CardRecord, entry: QueueEntry, target: string, expected: string, onto: string, result: string, folder: string | null, snap: TransportSnapshot): Promise<Advance> {
+    const I = this.integration(card, this.wf.state(card))
+    const on = await I.contains(this.project, onto, result)
+    if (isUnknown(on)) return again(gitSaid(on))
+    if (!on) return { pause: 'needsYou', message: `The test merge ${result.slice(0, 12)} doesn't contain ${onto.slice(0, 12)}, the remote's head it was tested on, so Combwork didn't publish it.` } // i18n-ignore: git's side of a pause, in English as git's are
+    const saved = await this.cfg.transport?.save(this.project, target, snap)
+    if (!saved) return { pause: 'remoteUnsupported' }
+    const publish: PublishFact = { remote: snap.remote, endpoint: snap.display, ref: snap.ref, onto, snapshot: saved.id, digest: saved.digest }
+    const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: folder, publish })
+    if (started !== 'started') await this.cfg.transport!.drop(saved.id)
+    if (started === 'rulesOff') return { pause: 'rulesOff' }
+    if (started === 'ask') return folder ? { outcome: await this.askAdvance(card, entry, target, expected, result, folder) } : 'retest'
+    if (started === 'proofGone') return 'retest'
+    if (started === 'denied' || started === 'held' || started === 'waiting') return started
+    await this.cfg.hooks?.afterStarted?.(entry.id)
+    return this.publishBegun(card, entry, target, snap, publish, result)
+  }
+
+  /** The project's pre-push hook (phase prePush: nothing sent), then the publication (phase push), then its reply acted on. */
+  private async publishBegun(card: CardRecord, entry: QueueEntry, target: string, snap: TransportSnapshot, rec: PublishFact, result: string): Promise<Advance> {
+    const I = this.integration(card, this.wf.state(card))
+    const h = this.host({})
+    this.stillHolds(target)
+    await this.phase(card, entry, 'prePush')
+    const hook = await I.prePush!(h, snap, rec.onto, result)
+    if (hook !== 'ok') {
+      await this.unpublished(card, entry, target, 'pushRefused')
+      return 'refused' in hook ? { pause: 'publishRefused', message: hook.refused } : { pause: 'hookTimedOut', message: hook.timedOut }
+    }
+    this.stillHolds(target)
+    await this.phase(card, entry, 'push')
+    await this.cfg.hooks?.beforePublish?.(entry.id)
+    this.stillHolds(target)
+    const reply = await I.publish!(h, snap, rec.onto, result)
+    await this.cfg.hooks?.afterPublish?.(entry.id)
+    return this.publishReplied(card, entry, target, snap, rec, result, reply)
+  }
+
+  /**
+   * A publication's reply: published (or at the result already) → done; refused before anything was written (the lease,
+   * a fast-forward: the remote moved) → tested again; refused by the remote → paused with its words; anything else is
+   * verified at the endpoint, and stays unknown (For you) unless the remote shows the result.
+   */
+  private async publishReplied(card: CardRecord, entry: QueueEntry, target: string, snap: TransportSnapshot, rec: PublishFact, result: string, reply: PublishReply): Promise<Advance> {
+    if (reply === 'pushed' || reply === 'atResult') return 'done'
+    if ('stale' in reply) {
+      await this.unpublished(card, entry, target, 'targetMoved')
+      return 'moved'
+    }
+    if ('refused' in reply) {
+      await this.unpublished(card, entry, target, 'pushRefused')
+      return { pause: 'publishRefused', message: reply.refused }
+    }
+    const v = await this.verifyPublished(card, entry.id, snap, result)
+    if (v === 'published') return 'done'
+    return { outcome: await this.askPublished(target, card, entry, rec, result, typeof v === 'object' ? `${reply.unknown}\n${v.unreadable}` : reply.unknown) }
+  }
+
+  /** Whether the endpoint has the result now: a fresh fetch in the attempt's own sealed context, into the entry's pin. */
+  private async verifyPublished(card: CardRecord, entry: string, snap: TransportSnapshot, result: string): Promise<'published' | 'absent' | { unreadable: string }> {
+    const I = this.integration(card, this.wf.state(card))
+    const f = await I.fetchHead!(this.host({}), snap, fetchPin(entry))
+    if ('failed' in f) return { unreadable: f.failed }
+    const has = await I.contains(this.project, result, f.head)
+    if (isUnknown(has)) return { unreadable: gitSaid(has) }
+    return has ? 'published' : 'absent'
+  }
+
+  /** Not published (nothing was written): the entry failed, transient, the card queued again, its snapshot dropped. */
+  private async unpublished(card: CardRecord, entry: QueueEntry, target: string, reason: IntegrationFailReason): Promise<void> {
+    await this.dropSnapshot(card, entry.id)
+    this.tested.delete(entry.id)
+    await this.moved(card, entry, target, reason)
+  }
+
+  /** An entry's protected snapshot dropped, by its IntegrationStarted's record (none: nothing to drop). */
+  private async dropSnapshot(card: CardRecord, entry: string): Promise<void> {
+    const f = this.wf.store.facts(card.id).filter((x) => x.kind === 'IntegrationStarted' && (x.data as FactData['IntegrationStarted']).entry === entry).at(-1)
+    const id = (f?.data as FactData['IntegrationStarted'] | undefined)?.publish?.snapshot
+    if (id) await this.cfg.transport?.drop(id)
+  }
+
+  /**
+   * A target's snapshots its begun publications no longer need (crash leftovers), dropped by its own queue's host between
+   * its entries, under its lease (HR2's round 2): never another target's, which may be between its save and its
+   * IntegrationStarted.
+   */
+  async pruneSnapshots(target: string): Promise<void> {
+    if (!this.cfg.transport) return
+    const keep = new Set<string>()
+    for (const card of this.wf.store.cards()) {
+      const e = openEntry(this.wf.state(card))
+      if (e?.state === 'started' && e.started?.publish && e.target === target) keep.add(e.started.publish.snapshot)
+    }
+    await this.cfg.transport.dropExcept(this.project, target, keep)
+  }
+
+  /**
+   * An unknown publication the remote doesn't show: paused `publishUnknown` (the attempt, its pins and snapshot kept),
+   * and For you asks, once: Approve, it was published; Decline, it wasn't (tested again). Never pushed or tested again
+   * before the remote shows it or the user answers (HR2's s14).
+   */
+  private async askPublished(target: string, card: CardRecord, entry: QueueEntry, rec: PublishFact, result: string, message: string): Promise<QueueOutcome> {
+    const out = await this.pause(target, card, entry, 'publishUnknown', undefined, message)
+    await this.write(card, (w) => {
+      if (w.state().requests.some((r) => r.gate === QUEUE_PUBLISH_GATE && r.entry === entry.id)) return
+      this.wf.askUser(w, 'approve', QUEUE_PUBLISH_GATE, workflowText(FOR_YOU.queuePublish, { card: card.key, target, endpoint: rec.endpoint, result: result.slice(0, 12) }), { unbound: true, entry: entry.id, result })
+    })
+    return out
+  }
+
+  /** The user's answer to an unknown publication: approved, declined, or none yet (still open, or never asked). */
+  private publishAnswer(card: CardRecord, e: QueueEntry): 'approved' | 'declined' | undefined {
+    const s = this.wf.state(card)
+    const asked = Object.values(s.made).filter((r) => r.gate === QUEUE_PUBLISH_GATE && r.entry === e.id).at(-1)
+    if (!asked || s.requests.some((r) => r.request === asked.request)) return undefined
+    const a = s.approvals.filter((x) => x.request === asked.request).at(-1)?.answer
+    return a === 'approved' || a === 'declined' ? a : undefined
+  }
+
+  /**
+   * Begun publications of a target settled before anything else (a restart, a lost lease, Resume, an answer): one that
+   * never reached phase push sent nothing (tested again); one in phase push takes the user's answer, else is verified at
+   * its own endpoint (its protected snapshot, never the configuration as it is now): shown there, Done; else unknown.
+   */
+  private async settlePublications(target: string): Promise<QueueOutcome | null> {
+    for (const card of this.wf.store.cards()) {
+      const e = openEntry(this.wf.state(card))
+      if (!e || e.state !== 'started' || !e.started?.publish || e.target !== target) continue
+      const o = await this.settlePublication(card, e)
+      if (o) return o
+    }
+    return null
+  }
+
+  private async settlePublication(card: CardRecord, e: QueueEntry): Promise<QueueOutcome | null> {
+    const rec = e.started!.publish!
+    const result = e.started!.result
+    const target = e.target
+    if (e.phases.at(-1) !== 'push') {
+      await this.unpublished(card, e, target, 'targetMoved')
+      return null
+    }
+    const lift = (): Promise<boolean> => this.wf.locked(() => this.wf.store.clearQueuePause(target, 'publishUnknown'))
+    const answer = this.publishAnswer(card, e)
+    if (answer === 'declined') {
+      await this.unpublished(card, e, target, 'notPublished')
+      await lift()
+      return null
+    }
+    let shown = answer === 'approved'
+    let message = ''
+    if (!shown) {
+      const snap = await this.cfg.transport?.load(rec.snapshot, rec.digest)
+      if (!snap) return this.askPublished(target, card, e, rec, result, `Combwork no longer has this push's protected settings, so it can't look at ${rec.endpoint} the way it pushed.`) // i18n-ignore: the pause's detail, in English as git's are
+      const v = await this.verifyPublished(card, e.id, snap, result)
+      shown = v === 'published'
+      message = typeof v === 'object' ? v.unreadable : `${rec.ref} at ${rec.endpoint} doesn't contain ${result.slice(0, 12)}.` // i18n-ignore: the pause's detail, in English as git's are
+    }
+    if (!shown) return this.askPublished(target, card, e, rec, result, message)
+    const s = this.wf.state(card)
+    const requested = this.wf.store.facts(card.id).find((x) => x.kind === 'IntegrationRequested' && (x.data as FactData['IntegrationRequested']).entry === e.id)?.data as FactData['IntegrationRequested'] | undefined
+    const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
+    await this.integrated(card, e, s.approved?.revision ?? e.revision, target, result, method, 'combwork', { afterAdvance: true, published: { from: e.started!.expected } })
+    await this.dropSnapshot(card, e.id)
+    await lift()
+    return { card: card.key, entry: e.id, outcome: 'integrated', result, retests: 0 }
+  }
+
+  /** The paused queue's answer to its unknown publication: none yet, it stays paused; answered, settled, and the queue goes on. */
+  private async publishAnswered(target: string, key: string): Promise<QueueOutcome | null> {
+    const card = this.wf.store.cardByKey(key)
+    const e = card ? openEntry(this.wf.state(card)) : undefined
+    if (!card || !e || e.state !== 'started' || !e.started?.publish) {
+      // Settled meanwhile (another Combwork, a restart): the pause lifted.
+      return (await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'publishUnknown'))) ? this.runOnce(target) : null
+    }
+    if (!this.publishAnswer(card, e)) return null
+    const o = await this.settlePublication(card, e)
+    return this.thenPush(target, o ?? (await this.runOnce(target)))
+  }
+
+  /** In a published merge's `Integrated` write: the local target's catch-up owed, and its push recorded as made (HI-1924's log). */
+  private oweCatchUp(w: Write, entry: string, target: string, from: string, to: string, pushed: boolean): void {
+    w.tx.setMeta(catchUpKey(target), JSON.stringify({ from, to, card: w.card.key, entry } satisfies CatchUp))
+    if (pushed) w.tx.setMeta(pushLogKey(target), JSON.stringify(pushesSettled(pushLogOf(w.tx.meta(pushLogKey(target))), [{ entry, state: 'pushed', at: new Date().toISOString() }])))
+  }
+
+  /** The integration port of a catch-up's merged card (its platform's), or null when the card is gone. */
+  private catchUpPort(c: CatchUp): IntegrationPort | null {
+    const card = this.wf.store.cardByKey(c.card)
+    return card ? this.integration(card, this.wf.state(card)) : null
+  }
+
+  /** Replaces the owed catch-up (null: clears it), only while it is still the one for `to` (a newer merge's is kept). */
+  private setCatchUp(target: string, to: string, next: CatchUp | null): Promise<void> {
+    return this.wf.locked(() =>
+      this.wf.store.tx((tx) => {
+        if (catchUpOf(tx.meta(catchUpKey(target)))?.to === to) tx.setMeta(catchUpKey(target), next ? JSON.stringify(next) : '')
+      })
+    )
+  }
+
+  /**
+   * Settles the local target's owed catch-up (§16.9.4): a recorded step first, by §16.9.2's recovery table (HR2's s10
+   * note), then a fresh one from the local head as it is now (another ancestor of the result gets its own journalled
+   * plan). Not checked out: a compare-and-swap. Checked out: the advance's conditions, files and ref, journalled. A
+   * condition pauses the queue naming the merged card; the user's edits and ref changes are never overwritten.
+   */
+  private async settleCatchUp(target: string): Promise<QueueOutcome | null> {
+    for (let i = 0; i < 3; i++) {
+      const c = catchUpOf(this.wf.store.meta(catchUpKey(target)))
+      if (!c) return null
+      // Its merged card gone from the board: nothing to name a pause on, and no platform to ask; left to the user (cleared).
+      if (!this.catchUpPort(c)) {
+        await this.setCatchUp(target, c.to, null)
+        return null
+      }
+      const folder = c.folder
+      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder)) : await this.catchUpFresh(target, c)
+      if (r !== 'again') return r
+    }
+    return null
+  }
+
+  private async catchUpRecorded(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null | 'again'> {
+    const I = this.catchUpPort(c)!
+    const h = this.host({})
+    const f = await I.recoveryState(h, { target, expected: c.from, result: c.to, files: c.files ?? [], folder, phase: c.phase! })
+    if (f.found === 'integrated' || f.found === 'requeue') {
+      await this.setCatchUp(target, c.to, null)
+      return null
+    }
+    if (f.found === 'residue') {
+      await this.setCatchUp(target, c.to, null)
+      return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
+    }
+    if (f.found === 'rerun') {
+      await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+      return 'again'
+    }
+    if (f.found === 'rollback') return this.catchUpRollback(target, c, folder)
+    if (f.found === 'swap') {
+      await this.cfg.hooks?.beforeCatchUpRef?.(c.entry)
+      this.stillHolds(target)
+      if (!(await I.swap(h, target, c.from, c.to))) return this.catchUpRollback(target, c, folder)
+      return this.catchUpConfirm(target, c, folder)
+    }
+    return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
+  }
+
+  private async catchUpFresh(target: string, c: CatchUp): Promise<QueueOutcome | null | 'again'> {
+    const I = this.catchUpPort(c)!
+    const h = this.host({})
+    const local = await I.targetHead(this.project, target)
+    // Unreadable now: still owed, read again at the next look.
+    if (isUnknown(local)) return null
+    const done = async (): Promise<null> => {
+      await this.setCatchUp(target, c.to, null)
+      return null
+    }
+    if (!local || local === c.to) return done()
+    const has = await I.contains(this.project, c.to, local)
+    if (isUnknown(has)) return null
+    if (has) return done()
+    const behind = await I.contains(this.project, local, c.to)
+    if (isUnknown(behind)) return null
+    // Commits the remote lacks (the user's, since): left as they are; the next entry's fetch pauses `remoteDiverged`.
+    if (!behind) return done()
+    const where = await I.checkouts(h)
+    if (isUnknown(where)) return null
+    const folder = where[target] ? resolve(where[target]) : null
+    if (folder) return this.guarded(folder, () => this.catchUpChecked(target, { ...c, from: local }, folder))
+    const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
+    return lock(async (): Promise<null | 'again'> => {
+      const now = await I.checkouts(h)
+      if (isUnknown(now)) return null
+      if (now[target]) return 'again'
+      this.stillHolds(target)
+      if (await I.swap(h, target, local, c.to)) return done()
+      return 'again'
+    })
+  }
+
+  /** A checked-out target's catch-up from `c.from` (the local head now), under the lock and the folder's fence. */
+  private async catchUpChecked(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null | 'again'> {
+    const I = this.catchUpPort(c)!
+    const h = this.host({})
+    const now = await I.checkouts(h)
+    if (isUnknown(now)) return null
+    if (!now[target] || resolve(now[target]).toLowerCase() !== folder.toLowerCase()) return 'again'
+    const busy = this.cfg.folderBusy?.(folder)
+    if (busy) return this.catchUpPause(target, c, 'folderBusy', busy.length ? busy : [folder])
+    const cond = await I.conditions(h, folder, target, c.from, c.to)
+    if (isAgain(cond)) return null
+    if (cond === 'retest') return 'again'
+    if ('pause' in cond) return this.catchUpPause(target, c, cond.pause, cond.files)
+    // Its plan journalled before anything moves (from the local head it found: never an earlier plan's files).
+    const plan: CatchUp = { from: c.from, to: c.to, card: c.card, entry: c.entry, folder, files: cond.files, phase: 'files' }
+    await this.setCatchUp(target, c.to, plan)
+    await this.cfg.hooks?.beforeCatchUpFiles?.(c.entry)
+    this.stillHolds(target)
+    const rt = await I.moveFiles(h, folder, c.from, c.to)
+    if (!rt.ok) {
+      const sides = await I.sides(h, folder, cond.files, c.from, c.to)
+      if (sides && sides.every((f) => f.side === 'expected' || (f.side === 'other' && f.staged === 'expected'))) {
+        // Nothing moved: the plan left without a phase, and a file the user edited since pauses, named.
+        await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+        const ed = await I.edited(h, folder, cond.files)
+        return Array.isArray(ed) && ed.length ? this.catchUpPause(target, c, 'unstagedChanges', ed) : null
+      }
+      return this.catchUpPause(target, plan, 'needsYou', undefined, rt.err, await I.stuck(h, target, folder, c.from, c.to, cond.files, 'files'))
+    }
+    const ref: CatchUp = { ...plan, phase: 'ref' }
+    await this.setCatchUp(target, c.to, ref)
+    await this.cfg.hooks?.beforeCatchUpRef?.(c.entry)
+    this.stillHolds(target)
+    if (!(await I.swap(h, target, c.from, c.to))) return this.catchUpRollback(target, ref, folder)
+    return this.catchUpConfirm(target, ref, folder)
+  }
+
+  /** The ref moved under the catch-up: its files back to where they were (phase rollback), and looked at again; refused, terminal. */
+  private async catchUpRollback(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null | 'again'> {
+    const I = this.catchUpPort(c)!
+    const h = this.host({})
+    await this.setCatchUp(target, c.to, { ...c, folder, phase: 'rollback' })
+    this.stillHolds(target)
+    const back = await I.moveFiles(h, folder, c.to, c.from)
+    if (!back.ok) return this.catchUpPause(target, c, 'needsYou', undefined, back.err, await I.stuck(h, target, folder, c.from, c.to, c.files ?? [], 'rollback'))
+    await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+    return 'again'
+  }
+
+  /** After the catch-up's swap: cleared, and a folder switched in that instant is §16.9.2's residue (paused, the files listed). */
+  private async catchUpConfirm(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null> {
+    const I = this.catchUpPort(c)!
+    let after = await I.folderLine(folder)
+    for (let i = 0; isUnknown(after) && i < CONFIRM_TRIES; i++) {
+      await wait(CONFIRM_RETRY_MS)
+      after = await I.folderLine(folder)
+    }
+    this.stillHolds(target)
+    await this.setCatchUp(target, c.to, null)
+    if (isUnknown(after) || after !== target) return this.catchUpPause(target, c, 'needsYou', undefined, undefined, await I.stuck(this.host({}), target, folder, c.from, c.to, c.files ?? [], 'done'))
+    return null
+  }
+
+  /** A catch-up's pause, naming the published card (Done already); a stuck one asks For you on it, as an advance's does. */
+  private async catchUpPause(target: string, c: CatchUp, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck): Promise<QueueOutcome> {
+    const card = this.wf.store.cardByKey(c.card)
+    const entry = card ? this.wf.state(card).entries.find((x) => x.id === c.entry) : undefined
+    if (card && entry) return this.pause(target, card, entry, reason, files, message, stuck)
+    const m = message?.trim().slice(0, 4000) || undefined
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: c.card, ...(files?.length ? { files } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }, !stuck))
+    return { card: c.card, entry: c.entry, outcome: 'paused', reason, ...(files?.length ? { files } : {}), ...(m ? { message: m } : {}) }
+  }
+
+  /** Resume's check of a stuck catch-up (§16.9.2's terminal state, as recovery would find it now): its files, or null. */
+  async catchUpStuck(target: string): Promise<string[] | null> {
+    const c = catchUpOf(this.wf.store.meta(catchUpKey(target)))
+    const I = c ? this.catchUpPort(c) : null
+    if (!c?.phase || !c.folder || !I) return null
+    const f = await I.recoveryState(this.host({}), { target, expected: c.from, result: c.to, files: c.files ?? [], folder: c.folder, phase: c.phase })
+    return f.found === 'stuck' || f.found === 'residue' ? (f.stuck?.files.map((x) => x.path) ?? []) : null
   }
 
   /**
@@ -772,10 +1246,21 @@ export class MergeQueue {
       const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
       let expected: string
       let result: string
+      // G21 (HI-1183, §16.9.4): the target follows its remote, as the options are now. `onto` is the remote's head the test
+      // merge is made on (the local head otherwise); `expected` stays the local head, the advance's own compare-and-swap.
+      const follow = this.follows(card, s)
+      let onto: string
+      let snap: TransportSnapshot | undefined
+      // Follow mode's approved test merge is only the one tested on a fetch this Combwork still has (its remote head and
+      // snapshot): after a restart, it is tested, and asked about, again.
+      const kept = ready && follow ? this.tested.get(entry.id) : undefined
+      if (ready && follow && kept?.result !== ready.result) ready = undefined
       if (ready) {
         // Approved: the advance at once, on the test merge and checks the user was asked about (its result pinned on the
         // card's queue ref). The target moving since is caught below, and the entry is tested again.
         ;({ expected, result } = ready)
+        onto = kept?.onto ?? expected
+        snap = kept?.snap
         ready = undefined
       } else {
         step('testMerge', null)
@@ -787,12 +1272,29 @@ export class MergeQueue {
           continue
         }
         if (!head) return this.pause(target, card, entry, 'needsYou')
-        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
-        const found = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        onto = head
+        if (follow) {
+          // The remote's branch fetched first, with the endpoint captured for this attempt (§16.9.4 step 1).
+          const f = await this.followFetch(card, s, entry, target, head)
+          if (isAgain(f)) {
+            const o = await readFailed(f)
+            if (o) return o
+            continue
+          }
+          if ('pause' in f) return this.pause(target, card, entry, f.pause, f.files, f.message)
+          onto = f.onto
+          snap = f.snap
+        }
+        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read (the
+        // remote's, following it).
+        const found = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, onto)
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
-          if (s.forward) await this.integrated(card, entry, revision, target, head, 'merge', 'outside') // no advance: the blocker rule applies
+          if (s.forward) await this.integrated(card, entry, revision, target, onto, 'merge', 'outside') // no advance: the blocker rule applies
+          // G21 (HR2's HI-1183 round 1): found in the remote's head just fetched, which is the target: recorded from that
+          // head (reconcile would read the local target, still behind), the blocker rule applying, and the local catch-up owed.
+          else if (follow) await this.integrated(card, entry, revision, target, onto, 'merge', 'outside', { catchUp: { from: head } })
           else await reconcile(this.wf, card)
           // HI-2709: not closed while a dependency added meanwhile isn't Done (reconcile writes nothing then): it waits.
           const held = this.wf.state(card).stage !== 'done' ? this.wf.queueWaitingOn(card.id) : []
@@ -803,11 +1305,11 @@ export class MergeQueue {
 
         // The test merge, in the queue's own worktree, at the expected revision; under strict (G8) of the reviewed revision
         // brought up to date with it there first (#1352), the card's line untouched.
-        step('testMerge', expected)
+        step('testMerge', onto)
         let updated: string | undefined
         // Rebase and fast-forward (#1184) puts the change on top of the target in the test merge itself: no update first.
         if (this.wf.rulesetOf(card, s).options.strict && this.wf.rulesetOf(card, s).options.style !== 'rebase') {
-          const up = await this.upToDate(card, s, entry, revision, base || (await this.integration(card, s).mergeBase(this.host(reads), revision, expected)), expected, reads)
+          const up = await this.upToDate(card, s, entry, revision, base || (await this.integration(card, s).mergeBase(this.host(reads), revision, onto)), onto, reads)
           if (isAgain(up)) {
             const o = await readFailed(up)
             if (o) return o
@@ -817,7 +1319,7 @@ export class MergeQueue {
           if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts)
           updated = up.updated ?? undefined
         }
-        const test = await this.testMerge(card, s, revision, expected, reads, updated, base)
+        const test = await this.testMerge(card, s, revision, onto, reads, updated, base)
         if (isAgain(test)) {
           const o = await readFailed(test)
           if (o) return o
@@ -830,8 +1332,8 @@ export class MergeQueue {
 
         // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
         // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
-        step('checks', expected)
-        const checks = await this.mergeChecks(card, result, entry, expected)
+        step('checks', onto)
+        const checks = await this.mergeChecks(card, result, entry, onto)
         if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
         // Missing review proof or a missing runner isn't the work's fault: the same revision may go back (requeue.allowed).
         if (checks.kind === 'focused') return this.returnCard(card, entry, revision, target, 'focused', checks.focused.why === 'noProof' || checks.focused.why === 'noRunner', undefined, undefined, undefined, undefined, undefined, checks.focused)
@@ -841,6 +1343,8 @@ export class MergeQueue {
           continue
         }
         await this.cfg.hooks?.afterChecks?.(entry.id)
+        // Follow mode: what this result was tested on, for an approval of it (Ask each time) to publish exactly that.
+        if (follow && snap) this.tested.set(entry.id, { onto, result, snap })
       }
 
       // The last check before the target moves: still approved (a decision since cancels the entry).
@@ -880,8 +1384,13 @@ export class MergeQueue {
       if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
       const method = methodOf(this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
       // The record of its own advance: written whatever (HI-2709: its blockers were decided in IntegrationStarted's write).
-      const integrate = async (): Promise<void> => void (await this.integrated(card, entry, revision, target, result, method, 'combwork', { afterAdvance: true }))
-      const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
+      // Follow mode's advance is the publication (§16.9.4): `Integrated` then owes the local target's catch-up, not a push.
+      const integrate = async (): Promise<void> => {
+        await this.integrated(card, entry, revision, target, result, method, 'combwork', { afterAdvance: true, ...(follow ? { published: { from: expected } } : {}) })
+        // Its snapshot no longer needed once the outcome is written (never before: recovery verifies with it).
+        if (follow) await this.dropSnapshot(card, entry.id)
+      }
+      const adv = follow && snap ? await this.advancePublish(card, entry, target, expected, onto, result, folder, snap) : follow ? 'retest' : folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
       if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
       // A read failed before anything was touched (no IntegrationStarted, nothing settled), the lock released: again.
@@ -1323,11 +1832,11 @@ export class MergeQueue {
   }
 
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
-  private async moved(card: CardRecord, entry: QueueEntry, target: string): Promise<void> {
+  private async moved(card: CardRecord, entry: QueueEntry, target: string, reason: IntegrationFailReason = 'targetMoved'): Promise<void> {
     await this.write(card, (w) => {
       // Cancelled meanwhile: not queued again (the queue's next look skips it as cancelled).
       if (!this.isOpen(w, entry)) return
-      w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason: 'targetMoved', transient: true }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason, transient: true }) // i18n-ignore: a fact's kind and codes, not text
       const s = w.state()
       w.fact('IntegrationRequested', { entry: `${card.key}/e${s.lastSeq + 1}`, revision: entry.revision, key: s.latest?.key ?? null, target, style: w.ruleset!.options.style })
     })
@@ -1452,7 +1961,7 @@ export class MergeQueue {
    * written, while a card it depends on isn't Done. Only the record of the queue's own advance (`afterAdvance`) is
    * written whatever: the target has moved, its blockers decided in IntegrationStarted's write.
    */
-  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside', opts: { afterAdvance?: boolean } = {}): Promise<'written' | 'waiting' | 'already'> {
+  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside', opts: { afterAdvance?: boolean; published?: { from: string }; catchUp?: { from: string } } = {}): Promise<'written' | 'waiting' | 'already'> {
     return this.write(card, (w) => {
       // One Integrated per cycle, whoever writes it (the queue, or another Combwork's recovery or observation).
       const st = w.state()
@@ -1462,7 +1971,11 @@ export class MergeQueue {
       const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'combwork', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
       w.written.push(f)
       w.move('done', 'derived')
-      if (by === 'combwork') this.owePush(w, entry.id, target, result)
+      // G21 (HI-1183): published to the remote, so pushed already (the push log says so) and the local catch-up owed.
+      if (by === 'combwork' && opts.published) this.oweCatchUp(w, entry.id, target, opts.published.from, result, true)
+      else if (by === 'combwork') this.owePush(w, entry.id, target, result)
+      // Found published by someone else (follow mode): the local target's catch-up owed, no push of Combwork's logged.
+      else if (opts.catchUp && opts.catchUp.from !== result) this.oweCatchUp(w, entry.id, target, opts.catchUp.from, result, false)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
       return 'written' as const
     })
@@ -1510,6 +2023,8 @@ export class MergeQueue {
       const s = this.wf.state(card)
       const e = openEntry(s)
       if (!e || e.state !== 'started' || !e.started || (target !== undefined && e.target !== target)) continue
+      // G21 (HI-1183): a begun publication is settled by its queue's next look (settlePublications), never by this table.
+      if (e.started.publish) continue
       const { expected, result, checkedOut } = e.started
       const I = this.integration(card, s)
       const h = this.host({})
@@ -1618,10 +2133,11 @@ export class MergeQueue {
   async stillStuck(target: string): Promise<string[] | null> {
     for (const card of this.wf.store.cards()) {
       const e = openEntry(this.wf.state(card))
-      if (!e || e.state !== 'started' || !e.started || e.target !== target || !e.started.checkedOut) continue
+      if (!e || e.state !== 'started' || !e.started || e.target !== target || !e.started.checkedOut || e.started.publish) continue
       const f = await this.integration(card, this.wf.state(card)).recoveryState(this.host({}), begun(e))
       return f.found === 'stuck' || f.found === 'residue' ? (f.stuck?.files.map((x) => x.path) ?? []) : null
     }
-    return null
+    // G21 (HI-1183): a published merge's catch-up stopped part way is the same terminal state.
+    return this.catchUpStuck(target)
   }
 }

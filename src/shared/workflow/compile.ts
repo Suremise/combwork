@@ -60,7 +60,7 @@ export function canonical(v: unknown): string {
  * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 

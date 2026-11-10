@@ -336,6 +336,8 @@ interface CombworkMessageValues {
   'tips.memorySnapshot.title': undefined
   'tips.mergeBranch.text': undefined
   'tips.mergeBranch.title': undefined
+  'tips.mergeFollowRemote.text': undefined
+  'tips.mergeFollowRemote.title': undefined
   'tips.mergeMessage.text': undefined
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined

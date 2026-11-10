@@ -237,7 +237,7 @@ export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): 
   const pending = new Set(pushPendingOf(wf.store.meta(pushPendingKey(target))).map((p) => p.entry))
   const settled = new Map(pushLogOf(wf.store.meta(pushLogKey(target))).map((p) => [p.entry, p.state]))
   const o = wf.cfg.options()
-  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
+  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
   return recent.map((r) => {
     const took = r.entry ? entryTook(of(r.card), r.entry) : null
     const push: QueueRecent['push'] = r.outcome !== 'merged' || r.by !== 'combwork' || !r.entry ? undefined : pending.has(r.entry) ? 'pending' : (settled.get(r.entry) ?? (pushesNow ? 'unknown' : undefined))
