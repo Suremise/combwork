@@ -50,7 +50,8 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, listLanes, stampLaneProjects } from './lanes'
+import { endLane, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
@@ -1596,6 +1597,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
     },
+    // The user's edit of a running lane's list (HI-2898): every field checked here, then by laneEdits as it saves.
+    'lanes:edit': (edit) => editLanes(currentWorkspace(), laneEditOf(edit)),
+    'lanes:endedSince': (since) => (workspace.path ? lanesEndedSince(currentWorkspace(), endedSinceOf(since)) : []),
     'lanes:retryFresh': (id) => {
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return retryFreshStart(currentWorkspace(), id)

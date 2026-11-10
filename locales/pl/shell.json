@@ -68,6 +68,7 @@
   "shell.command.help.shortcuts": "Skróty klawiszowe",
   "shell.command.help.tips": "Wskazówki…",
   "shell.command.hooks.adminSnippet": "Fragment dla administratora Claude Code…",
+  "shell.command.lanes.undoEdit": "Cofnij zmianę toru",
   "shell.command.layout": "Układ: {layout}",
   "shell.command.mcp.import": "Skopiuj serwery MCP projektu do obszaru roboczego",
   "shell.command.notes.open": "Otwórz notatkę wspólną",

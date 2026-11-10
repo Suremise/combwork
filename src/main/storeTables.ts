@@ -1,6 +1,7 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import { boardLock, boardOpen, boardWriteOp, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import type { WorkspaceService } from './workspace'
 import { countedWrite } from './dbWrites'
 import { transaction } from './db'
 import { placeKey, withFileLock } from './fsutil'
@@ -124,9 +125,34 @@ async function saveTableLocked(path: string, store: TableStore, docs: readonly u
   })
 }
 
+/**
+ * saveTable inside a change of the board (HI-2898: a window's lane edit, saved with the card it changes): the same
+ * writes, in that change's transaction (a savepoint), so they commit or roll back with it. `guard` runs first, with
+ * nothing awaited before the writes. Only inside boardWrite; saveTable's refusal there stays for every other caller.
+ */
+export function saveTableInBoard(ws: WorkspaceService, store: TableStore, docs: readonly unknown[], guard?: () => void): void {
+  const path = resolve(ws.path!)
+  if (!inBoardWrite(path)) throw new Error(`The ${store} were saved in a board change outside one`) // i18n-ignore: a mistake in Combwork's code, never shown
+  guard?.()
+  boardWriteOp(ws, (db) => saveEntriesOn(path, store, docs, {}, db, true))
+  // Its cache is left for the next save to read again: this one may yet roll back with the board's change.
+  committed.delete(cacheKey(path, store))
+  if (store === 'lanes') noteLanesSaved(path)
+}
+
 /** saveTable's transaction. */
 function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, lease: DbLease, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
-  const db = lease.db.writer
+  const next = saveEntriesOn(path, store, docs, meta, lease.db.writer, false, also)
+  // A closed workspace's last save keeps nothing (its database is closed again at once).
+  if (lease.kept && next) remember(path, next.place, store, next.gen, next.docs)
+  else committed.delete(cacheKey(path, store))
+}
+
+/**
+ * saveTable's writes on a connection, in a transaction of their own, or (`inner`) in a savepoint of the caller's; what
+ * it wrote, for the cache.
+ */
+function saveEntriesOn(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, db: ReturnType<typeof workspaceDb>['writer'], inner: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): { place: string; gen: number; docs: Map<string, string> } | null {
   const def = TABLE_DEFS[store]
   // Its workspace's place resolved once, as the save enters: its generation, and what the cache records.
   const place = placeKey(path)
@@ -135,7 +161,8 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
   const texts = docs.map((d) => JSON.stringify(d))
   let had = committed.get(cacheKey(path, store))
   const next = new Map<string, string>()
-  transaction(db, () => {
+  const inTransaction = inner ? savepoint : transaction
+  inTransaction(db, () => {
     // A store others write too (the runtime's lanes, #1291) is compared with what the table has now.
     if (!had || had.gen !== gen || def.shared) had = { path, place, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
     const before = had.docs
@@ -178,9 +205,23 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
     also?.(db)
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
-  // A closed workspace's last save keeps nothing (its database is closed again at once).
-  if (lease.kept) remember(path, place, store, gen, next)
-  else committed.delete(cacheKey(path, store))
+  return { place, gen, docs: next }
+}
+
+/** fn in a savepoint of the transaction under way: undone alone if it throws, else part of that transaction. */
+function savepoint<T>(db: ReturnType<typeof workspaceDb>['writer'], fn: () => T): T {
+  db.exec('SAVEPOINT table_save')
+  try {
+    const out = fn()
+    db.exec('RELEASE table_save')
+    return out
+  } catch (e) {
+    if (db.isTransaction) {
+      db.exec('ROLLBACK TO table_save')
+      db.exec('RELEASE table_save')
+    }
+    throw e
+  }
 }
 
 /** Each lane's or watch's place, by id. */

@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Reordena ya un carril en marcha",
   "tips.laneBranchSquash.text": "Tras fusionar con squash la tarjeta de un agente, Combwork actualiza su rama antes de su siguiente tarjeta, para que cada revisión muestre solo el trabajo de esa tarjeta. Lo que no puede hacer con seguridad lo pregunta en Para ti; Configuración → Avanzado hace que pregunte siempre.",
   "tips.laneBranchSquash.title": "La rama de un agente, al día entre tarjetas",
+  "tips.laneEdit.text": "En la pestaña Carriles del panel Progreso, abre un carril en marcha para arrastrar sus tarjetas en espera a un nuevo orden, quitar una o agregar otra con Agregar tarjeta… o arrastrándola desde el tablero. Ctrl+Z lo deshace.",
+  "tips.laneEdit.title": "Cambia tú mismo las tarjetas de un carril",
   "tips.laneGates.text": "En el panel Progreso, un carril dice en su cabecera por qué espera, y una muesca roja en el segmento de una tarjeta significa que su última petición fue rechazada: pasa el puntero por encima para ver por qué y qué hacer.",
   "tips.laneGates.title": "Mira por qué un carril no avanza",
   "tips.laneNext.text": "Con las reglas del flujo de trabajo aplicadas, cuando una tarjeta de un carril está en Hecho, Combwork le da la siguiente a su autor en cuanto termina su turno, así el carril sigue sin que tú ni el Asistente tengan que pedírselo.",

@@ -296,7 +296,7 @@ export const AREAS = [
   // The close commands (HI-1368): run as a workspace closes and as Combwork quits, after the drain of its writes.
   { paths: ['src/main/closeCommand/', 'src/main/dbWrites.ts', 'src/shared/closeCommand.ts', 'src/shared/commands.ts', 'src/main/openGate.ts', 'src/renderer/src/components/CloseCommandPanel.tsx', 'src/renderer/src/components/CommandsSettings.tsx', 'tests/e2e/onclose/', 'tests/e2e/onopen.cjs'], suites: ['onclose', 'onopen', 'quit', 'closewindow'] },
   { paths: ['src/main/progress.ts', 'src/main/progressService.ts', 'src/shared/progress.ts', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/ShowAllList.tsx', 'src/shared/progressTabs.ts', 'tests/e2e/progresstabs.cjs'], suites: ['progress', 'progressgates', 'progresslanes', 'progressreport', 'progressstates', 'progresstabs', 'replysize'] },
-  { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost'] },
+  { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost', 'lanequeue'] },
   // Branches next to their cards (#1424).
   { paths: ['src/shared/branchCards.ts', 'tests/e2e/gitbranchcards.cjs'], suites: ['gitbranchcards'] },
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
@@ -340,6 +340,7 @@ export const AREAS = [
   { paths: ['src/main/mergeSlots.ts', 'src/main/mergeSlotHost.ts', 'src/shared/mergeSlot.ts', 'src/renderer/src/components/MergeSlots.tsx'], suites: ['mergeslot', 'progresslanes', 'replysize'] },
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
+  { paths: ['src/main/laneEdits.ts', 'src/renderer/src/laneEdits.ts', 'src/shared/laneQueueEdit.ts', 'src/shared/laneDay.ts', 'tests/e2e/lanequeue.cjs'], suites: ['lanequeue'] },
   // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
   { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.

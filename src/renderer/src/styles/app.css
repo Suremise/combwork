@@ -12986,6 +12986,144 @@ button.progress-run-show:focus-visible {
 .progress-lane-queue-row.unrecorded {
   opacity: 0.7;
 }
+/* A running lane's queue, editable in the Lanes tab (HI-2898): a card waiting its turn drags by its grip (or Alt+Up and
+   Alt+Down), × takes it off; the card under way shows a lock; a line shows where a dragged card goes. */
+.progress-lane-queue-row.movable {
+  cursor: grab;
+  border-radius: 3px;
+}
+.progress-lane-queue-row.movable:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.progress-lane-queue-row.dragging {
+  opacity: 0.45;
+}
+.progress-lane-queue-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.progress-lane-queue-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.progress-lane-queue-grip,
+.progress-lane-queue-lock {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.progress-lane-queue-remove {
+  flex-shrink: 0;
+  margin: -2px 0;
+  opacity: 0;
+}
+.progress-lane-queue-row.movable:hover .progress-lane-queue-remove,
+.progress-lane-queue-row.movable:focus-within .progress-lane-queue-remove {
+  opacity: 1;
+}
+.progress-lane-queue-add {
+  margin-top: 4px;
+}
+/* Add Card…: a search and the matching cards, a line each. */
+.progress-lane-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.progress-lane-picker > .search-box {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.progress-lane-picker-list {
+  flex: 1 1 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.progress-lane-picker-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.progress-lane-picker-card:hover,
+.progress-lane-picker-card:focus-visible {
+  background: var(--bg-hover);
+}
+.progress-lane-picker-none {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+/* A refused change, in place under its lane, with Move here for a card another lane has. */
+.progress-lane-refusal {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.progress-lane-refusal > .codicon {
+  flex-shrink: 0;
+  color: var(--warning);
+  line-height: 18px;
+}
+.progress-lane-refusal-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.progress-lane-cancel-change {
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+/* A card dragged from the board over a running lane: it takes the card last. */
+.progress-lane.card-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+/* Ended today, collapsed at the top of the Lanes tab. */
+.progress-lanes-ended {
+  margin: 0 8px 6px;
+}
+.progress-lanes-ended-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.progress-lanes-ended .progress-lane {
+  margin: 0 0 6px;
+}
+.progress-lane-ended .progress-lane-top {
+  gap: 6px;
+}
+.progress-lane-ended-took {
+  font-variant-numeric: tabular-nums;
+}
 /* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
 .progress-attention {
   display: flex;

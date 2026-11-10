@@ -1256,6 +1256,23 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 
 With no lanes and no merge going on, the panel is just the runs, as before.
 
+#### Editing a lane's cards <a id="editing-a-lanes-cards"></a>
+
+In the **Lanes** tab, open a running lane (the chevron before its name) to change its cards yourself, without asking the Assistant or the builder:
+
+- **Move a card:** drag a card waiting its turn by its row to another place; a line shows where it goes. With the keyboard, Tab to the card and press **Alt+Up** or **Alt+Down**.
+- **Take a card off:** the **×** at the end of its row, or **Delete** on it. It goes back to the board, in Todo: nothing is deleted.
+- **Add a card:** **Add Card…** at the end of the cards opens a search: type part of a key or a title, then click a card or press **Enter** for the first. Or drag a card from the board (the **Tasks** view) onto the lane's row, where it goes last, or into its open cards, where you drop it. A card given to another agent is taken off that agent, so the lane takes it.
+- **Only cards still waiting their turn move.** The card being worked shows a lock, and it and the cards before it (done, in review, approved) keep their places.
+
+A change made while a card is being worked waits until that card is Done, as a change by the Assistant or the builder does: it shows under the lane's bar (*Next, once HI-12 is Done: …*) with **Cancel Change**, which drops it. Between cards it applies at once. Either way, the builder reads its cards as they are next.
+
+When Combwork can't make a change, it says why under the lane and changes nothing: a card of another project, one that's Done or not in Todo any more, one placed before a card it depends on, one keeping work from an earlier start, or a lane that changed meanwhile (look again and try again). A card on another running lane is refused with **Move Here**, which takes it off that lane and adds it to this one in one step.
+
+Each change says what it did in a notification with **Undo**, and **Ctrl+Z** in the tab undoes the last change you made in this window. An undo puts back exactly what was there, or nothing: it's refused once the lane or the card changed since (a card started, someone else changed the lane or gave the card to an agent).
+
+**Ended today**, at the top of the tab, lists the lanes that ended or were abandoned today (since midnight, your time), collapsed until you open it: each with its builder and reviewer, merged or abandoned, its cards and how long it ran, and its merge commit (click it to copy). Open a lane for its cards as it left them. A lane that ended today shows there, not again in the list below.
+
 #### Slots, pools and copies in the Progress panel <a id="slots-pools-and-copies-in-the-progress-panel"></a>
 
 - **A lane's slot:** its row names the slot its builder works in, *HI-B1 / HI-R1 · slot-b* (or the builder's own worktree from before 1.0, *· hb2*). Click it for Version Control → **Branches & remotes**, where the project's slots are listed. Point at the row: its hover says whether the slot is ready or being prepared, since when the lane has had it, and the branch of the card being built there.

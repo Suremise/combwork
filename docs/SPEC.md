@@ -7862,7 +7862,42 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     its own card in flight), the cards added, those taken off, each one another running lane's list will have (its
     queued list when it has one, else its cards) as moving to that lane's builder's lane, and the whole new list when the cards it keeps change order: *Next, once
     HI-12 is Done: HI-14 added, HI-9 moves to HB6’s lane*. None when nothing is queued (it goes once it applies) or the
-    queued list is the same; Pulse keeps its one-height row and its *list changes after* header. Editing it is HI-1927's.
+    queued list is the same; Pulse keeps its one-height row and its *list changes after* header. Editing it is HI-2898's
+    (below), with **Cancel Change** after the line.
+  - **Editing a lane's cards** (HI-2898, carrying HI-1927; Darren 10 Nov: the picker and dragging from the board, Move
+    here, the local day): in the Lanes tab, a running lane's open cards show its working list (its queued list when it
+    has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down), comes off
+    with × or Delete (back to the board, never deleted); Add Card… searches the project's Todo cards by key or title, and
+    a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
+    (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
+    on hold, another agent's) keeps its places in every edit; the card in flight shows a lock.
+    - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
+      `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a
+      queued list edits that list. **Cancel Change** drops the queued list only. The builders of the lanes it changed are
+      started on them if they aren't running, as an update by the user or the Assistant does.
+    - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
+      one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
+      a lane gone, ended or at another revision is refused, nothing saved. Every check is made again at the write, under
+      the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
+      facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
+      before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:
+      `cw_lane start` keeps its own rules.
+    - **One board change:** the lanes and the card assignment an edit makes are saved in one transaction
+      (`mutateInBoard`, `saveTableInBoard`), the lanes' stale-read check kept. A card brought into a lane (Add, Move
+      here) that is given to another agent than the lane's builder is given to nobody through the card-change owner, so
+      the lane takes it next; given to the builder or nobody, it is left as it is.
+    - **Move here:** a card another running lane has is refused, naming its builder, with **Move Here**: the card off
+      that lane and onto this one in the same change (both lists, the assignment), or nothing.
+    - **Undo:** a notification with Undo, and Ctrl+Z in the tab, for the last change made in the window. It puts back
+      each lane's `cards` and `pending` exactly, and the card's agent, only while each lane is still at the revision
+      the edit left and the card is as it left it (its agent, Todo, and the history entry it left as the last: a token a
+      later change always moves on). A card started since makes it refused (queued is not as it was); never partial.
+  - **Ended today** (HI-2898): a collapsed row atop the Lanes tab, hidden with none, of the lanes that ended or were
+    abandoned since local midnight (`lanes:endedSince`, calendar days: 23 or 25 hours on a summer-time change), read
+    again as the lanes change, at midnight, on focus and each minute (a change of date, clock or time zone). Each shows
+    its builder and reviewer, name, merged or abandoned, its cards, how long it ran (start to end) and its merge commit
+    (copied with a click), and opens to its cards as it left them, read only. They show there only, not again in the
+    tab's list; Pulse keeps its lanes ended in the last hour.
   - **A lane's wait time** (HI-1926): main stamps each running lane's status when its key (reason, card, ask) first
     appears (`stampWait`, kept per workspace in memory, one for every window, bounded, a lane leaving it when it stops
     running) as `status.since`; a wait already under way at the first listing (Combwork started, the workspace opened) is

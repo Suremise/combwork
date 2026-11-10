@@ -290,6 +290,8 @@ interface CombworkMessageValues {
   'tips.laneApplyNow.title': undefined
   'tips.laneBranchSquash.text': undefined
   'tips.laneBranchSquash.title': undefined
+  'tips.laneEdit.text': undefined
+  'tips.laneEdit.title': undefined
   'tips.laneGates.text': undefined
   'tips.laneGates.title': undefined
   'tips.laneNext.text': undefined

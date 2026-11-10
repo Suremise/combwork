@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Eine laufende Lane jetzt umsortieren",
   "tips.laneBranchSquash.text": "Nachdem die Karte eines Agenten per Squash gemergt wurde, bringt Combwork seinen Branch vor der nächsten Karte auf den neuesten Stand, sodass jedes Review nur die Arbeit dieser Karte zeigt. Was es nicht sicher tun kann, fragt es unter „Für dich“; Einstellungen → Erweitert lässt es jedes Mal fragen.",
   "tips.laneBranchSquash.title": "Der Branch eines Agenten bleibt zwischen Karten aktuell",
+  "tips.laneEdit.text": "Öffne im Tab „Lanes“ des Fortschrittspanels eine laufende Lane, um ihre wartenden Karten in eine neue Reihenfolge zu ziehen, eine herauszunehmen oder eine mit „Karte hinzufügen…“ oder durch Ziehen vom Board hinzuzufügen. Strg+Z macht es rückgängig.",
+  "tips.laneEdit.title": "Die Karten einer Lane selbst ändern",
   "tips.laneGates.text": "Im Fortschrittspanel sagt eine Lane in ihrer Kopfzeile, worauf sie wartet, und eine rote Kerbe am Segment einer Karte bedeutet, dass ihre letzte Anfrage abgelehnt wurde: Zeige mit der Maus darauf, um zu sehen, warum und was als Nächstes.",
   "tips.laneGates.title": "Sieh, warum eine Lane nicht weitergeht",
   "tips.laneNext.text": "Mit durchgesetzten Workflow-Regeln gibt Combwork, sobald eine Karte einer Lane erledigt ist, die nächste ihrem Bearbeiter, sobald dessen Durchgang vorbei ist. So geht die Lane ohne Anstoß von dir oder dem Assistenten weiter.",

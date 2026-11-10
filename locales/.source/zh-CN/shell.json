@@ -68,6 +68,7 @@
   "shell.command.help.shortcuts": "Keyboard Shortcuts",
   "shell.command.help.tips": "Tips…",
   "shell.command.hooks.adminSnippet": "Claude Code Admin Snippet…",
+  "shell.command.lanes.undoEdit": "Undo Lane Change",
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "Copy Project MCP Servers to Workspace",
   "shell.command.notes.open": "Open Shared Note",

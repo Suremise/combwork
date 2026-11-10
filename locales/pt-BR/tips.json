@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Reordene uma raia em andamento agora",
   "tips.laneBranchSquash.text": "Depois que o cartão de um agente é mesclado com squash, o Combwork atualiza o branch dele antes do próximo cartão, para que cada revisão mostre só o trabalho daquele cartão. O que não puder fazer com segurança, ele pergunta em Para você; Configurações → Avançado faz com que pergunte toda vez.",
   "tips.laneBranchSquash.title": "O branch de um agente em dia entre cartões",
+  "tips.laneEdit.text": "Na aba Raias do painel Progresso, abra uma raia em andamento para arrastar os cartões em espera para uma nova ordem, tirar um ou adicionar outro com Adicionar cartão… ou arrastando-o do quadro. Ctrl+Z desfaz.",
+  "tips.laneEdit.title": "Altere você mesmo os cartões de uma raia",
   "tips.laneGates.text": "No painel Progresso, uma raia diz no cabeçalho o que está aguardando, e um entalhe vermelho no segmento de um cartão significa que o último pedido dele foi recusado: passe o mouse para ver o motivo e o próximo passo.",
   "tips.laneGates.title": "Veja por que uma raia não avança",
   "tips.laneNext.text": "Com as regras do fluxo de trabalho aplicadas, quando um cartão de uma raia está concluído, o Combwork entrega o próximo ao executor assim que o turno dele termina, e a raia segue sem que você ou o Assistente precisem pedir.",

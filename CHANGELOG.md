@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- **Edit a lane's cards yourself** (HI-2898). In Progress → Lanes, open a running lane and drag its waiting cards into another order (or Alt+Up and Alt+Down), take one off with × or Delete (it stays on the board), or add one with **Add Card…** or by dragging it from the board onto the lane.
+  - **As the Assistant's changes are:** a change made while a card is being worked waits until that card is Done, shown under the lane with **Cancel Change**; between cards it applies at once. The card being worked and the cards before it keep their places.
+  - **Refused in place, with why**, nothing changed: a card that's Done, not in Todo, of another project, keeping earlier work or placed before a card it depends on, or a lane that changed meanwhile. A card on another lane offers **Move Here**, which moves it in one step.
+  - **Undo** in the notification, or **Ctrl+Z** in the tab, puts the last change back exactly, or not at all once something changed since.
+- **Today's ended lanes** (HI-2898). **Ended today**, at the top of Progress → Lanes, lists the lanes that ended or were abandoned since midnight, with their builder and reviewer, cards, merge commit and how long they ran, each opening to its cards.
+
 ### Fixed
 
 - **The Assistant's banner no longer assumes Claude Code** (HI-2899). On a fresh install the Assistant panel said *No Claude Code account is on in this workspace*, though the Assistant runs on any coding agent's account. Now it names only the coding agent the Assistant would really start on: with no account at all it asks you to add one, for any coding agent; with only a Codex account it starts on Codex, with no banner; if its account is signed out, it names that connection to sign in again; and where you chose a coding agent with no account here while another's is, **Assistant Settings…** lets you switch.
