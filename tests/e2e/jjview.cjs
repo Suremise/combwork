@@ -301,7 +301,8 @@ function jjRepo(dir, o = {}) {
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-operations-${language}.png`) })
       await section('jjRepo')
     }
-    // loose's header (not colocated, Git refused) in each language: its fact in the language's words.
+    // loose's header (not colocated, Git refused) in each language: its fact in the language's words (its tab found in English).
+    await speak(english)
     await toTab('loose')
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
       await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
