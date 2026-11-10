@@ -25,7 +25,8 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : [])
-const inHome = (l) => typeof l.cwd === 'string' && path.resolve(l.cwd).toLowerCase() === path.resolve(assistantHome).toLowerCase()
+// The Assistant runs in the workspace's folder (or its home): a launch there is its, the project alpha having no agents.
+const inHome = (l) => typeof l.cwd === 'string' && [ws, assistantHome].some((d) => path.resolve(l.cwd).toLowerCase() === path.resolve(d).toLowerCase())
 const homeAgent = () => JSON.parse(fs.readFileSync(path.join(assistantHome, '.combwork', 'project.json'), 'utf8')).agents?.[0] ?? null
 
 ;(async () => {
