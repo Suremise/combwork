@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { chooseRemote, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations, refFromFiles, remoteUrlFromFiles } from '../src/main/platform/jjIntegration'
+import { chooseRemote, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations, refFromFiles, sourcesPrint } from '../src/main/platform/jjIntegration'
 import { tempDir } from './tempDir'
 import { jjIntegratedOf, jjIntegratedPlatform } from '../src/main/platform/jjFacts'
 
@@ -100,17 +100,65 @@ describe('the synchronous final reads (HR1 round 2): a ref and a remote URL from
     writeFileSync(join(store, 'refs', 'heads', 'main'), 'ref: refs/heads/other\n')
     expect(refFromFiles(store, 'refs/heads/main')).toBeUndefined()
   })
-  it("exactly one url in exactly one section; several, none or an include undefined", () => {
-    const store = tempDir('jjint-cfg-')
-    const cfg = (t: string): void => writeFileSync(join(store, 'config'), t)
-    cfg('[core]\n\tbare = true\n[remote "origin"]\n\turl = C:/r/remote.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n[remote "up"]\n\turl = https://x\n')
-    expect(remoteUrlFromFiles(store, 'origin')).toBe('C:/r/remote.git')
-    expect(remoteUrlFromFiles(store, 'up')).toBe('https://x')
-    expect(remoteUrlFromFiles(store, 'none')).toBeUndefined()
-    cfg('[remote "origin"]\n\turl = a\n\turl = b\n')
-    expect(remoteUrlFromFiles(store, 'origin')).toBeUndefined()
-    cfg('[remote "origin"]\n\turl = a\n[include]\n\tpath = other\n')
-    expect(remoteUrlFromFiles(store, 'origin')).toBeUndefined()
+})
+
+describe("the sources' fingerprint (the Assistant's note): raw bytes, any change a difference, unreadable unknown", () => {
+  const setup = () => {
+    const top = tempDir('jjint-print-')
+    const store = join(top, 'store')
+    const jjRepo = join(top, 'jjrepo')
+    mkdirSync(join(store, 'refs', 'heads'), { recursive: true })
+    mkdirSync(join(jjRepo, 'op_heads', 'heads'), { recursive: true })
+    writeFileSync(join(jjRepo, 'op_heads', 'heads', 'f'.repeat(128)), '')
+    writeFileSync(join(store, 'config'), '[remote "origin"]\n\turl = A\n')
+    writeFileSync(join(store, 'refs', 'heads', 'main'), `${id('a')}\n`)
+    const print = (): string | undefined => sourcesPrint(store, jjRepo, 'main')
+    return { top, store, jjRepo, print }
+  }
+  it('is stable when nothing changes', () => {
+    const w = setup()
+    expect(w.print()).toBeDefined()
+    expect(w.print()).toBe(w.print())
+  })
+  it("differs for a mixed-case remote section appended (HR2's round 3: never interpreted, so never ignored)", () => {
+    const w = setup()
+    const a = w.print()
+    writeFileSync(join(w.store, 'config'), '[remote "origin"]\n\turl = A\n[Remote "origin"]\n\turl = B\n')
+    expect(w.print()).not.toBe(a)
+  })
+  it('follows includes (and includeIf, nested, relative to the file naming them): a change in an included file differs', () => {
+    const w = setup()
+    mkdirSync(join(w.store, 'sub'))
+    writeFileSync(join(w.store, 'config'), '[remote "origin"]\n\turl = A\n[include]\n\tpath = extra.cfg\n[includeIf "gitdir:x"]\n\tpath = sub/cond.cfg\n')
+    writeFileSync(join(w.store, 'extra.cfg'), '[core]\n\tx = 1\n')
+    writeFileSync(join(w.store, 'sub', 'cond.cfg'), '[Include]\n\tpath = deeper.cfg\n')
+    writeFileSync(join(w.store, 'sub', 'deeper.cfg'), '')
+    const a = w.print()
+    expect(a).toBeDefined()
+    writeFileSync(join(w.store, 'extra.cfg'), '[remote "origin"]\n\turl = B\n')
+    const b = w.print()
+    expect(b).not.toBe(a)
+    writeFileSync(join(w.store, 'sub', 'deeper.cfg'), '[remote "origin"]\n\turl = C\n')
+    expect(w.print()).not.toBe(b)
+  })
+  it('a ref, the packed refs or the operation heads changing differs; a `~` include or too deep a chain is unknown', () => {
+    const w = setup()
+    const a = w.print()
+    writeFileSync(join(w.store, 'packed-refs'), `${id('b')} refs/heads/other\n`)
+    const b = w.print()
+    expect(b).not.toBe(a)
+    writeFileSync(join(w.store, 'refs', 'heads', 'main'), `${id('c')}\n`)
+    const c = w.print()
+    expect(c).not.toBe(b)
+    writeFileSync(join(w.jjRepo, 'op_heads', 'heads', 'e'.repeat(128)), '')
+    expect(w.print()).not.toBe(c)
+    writeFileSync(join(w.store, 'config'), '[include]\n\tpath = ~/x.cfg\n')
+    expect(w.print()).toBeUndefined()
+    writeFileSync(join(w.store, 'config'), '[include]\n\tpath = config\n')
+    expect(w.print()).toBeDefined()
+    for (let i = 0; i < 12; i++) writeFileSync(join(w.store, `c${i}.cfg`), `[include]\n\tpath = c${i + 1}.cfg\n`)
+    writeFileSync(join(w.store, 'config'), '[include]\n\tpath = c0.cfg\n')
+    expect(w.print()).toBeUndefined()
   })
 })
 

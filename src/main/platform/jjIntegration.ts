@@ -12,7 +12,8 @@
 // from these and the reconciler records `Integrated { by: 'outside' }` with this provenance (jjFacts.ts).
 
 import { readFileSync } from 'original-fs'
-import { join } from 'path'
+import { createHash } from 'crypto'
+import { dirname, isAbsolute, join, resolve } from 'path'
 import type { JjAttemptRecord, JjPin } from './jjCandidates'
 import { parseRefs } from './jjCandidates'
 import type { JjVia } from './jjFacts'
@@ -28,6 +29,9 @@ const SEP = '\u001f'
 const ZERO = '0'.repeat(40)
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length > 0)
 const refSafe = (s: string): string => s.replace(/[^A-Za-z0-9._-]/g, '-')
+/** How deep includes are followed, and how many config files at most, for the sources' fingerprint. */
+export const INCLUDE_DEPTH = 10
+export const INCLUDE_MAX = 32
 
 /** Why the evidence is refused: the port's further outcomes (R7/R8) and the publish's own. Never "not contained". */
 export type JjRefusal = 'conflictedTarget' | 'divergentChange' | 'partialExport' | 'ambiguousRemote' | 'disagree' | 'notFetched'
@@ -472,33 +476,60 @@ export function refFromFiles(store: string, ref: string): string | null | undefi
 }
 
 /**
- * A remote's URL read synchronously from the store's `config` (where jj's remotes are too): exactly one `url` in exactly
- * one `[remote "<name>"]` section; anything else (none, several, an include that could change it) undefined.
+ * A fingerprint of every source the publish decision rests on (the Assistant's design note, after HR1's rounds 1–2 and
+ * HR2's round 3): jj's operation heads, the target's loose ref and the store's packed refs, and the store's `config` with
+ * every file it includes (followed, at most INCLUDE_DEPTH deep and INCLUDE_MAX files, relative to the file naming them).
+ * Raw bytes only, never interpreted beyond finding the include paths: any difference between two prints means something
+ * changed, whether or not it matters. Undefined when any source can't be read (an include past the bounds, a `~` path, a
+ * read error but "not there"): unknown, never equal.
  */
-export function remoteUrlFromFiles(store: string, remote: string): string | undefined {
-  let text: string
-  try {
-    text = readFileSync(join(store, 'config'), 'utf8')
-  } catch {
-    return undefined
-  }
-  if (/^\s*\[\s*include/im.test(text)) return undefined
-  let inSection = false
-  let sections = 0
-  const urls: string[] = []
-  for (const raw of text.split(/\r?\n/)) {
-    const l = raw.trim()
-    if (l.startsWith('[')) {
-      const m = /^\[\s*remote\s+"((?:[^"\\]|\\.)*)"\s*\]$/.exec(l)
-      inSection = !!m && m[1].replace(/\\(.)/g, '$1') === remote
-      if (inSection) sections++
-      continue
+export function sourcesPrint(store: string, jjRepo: string, target: string): string | undefined {
+  const h = createHash('sha256')
+  const heads = readOpHeads(jjRepo)
+  if (!heads) return undefined
+  h.update(`heads:${[...heads].sort().join(',')}\n`)
+  const file = (f: string): Buffer | null | undefined => {
+    try {
+      return readFileSync(f)
+    } catch (e) {
+      const code = (e as { code?: string }).code
+      return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
     }
-    if (!inSection) continue
-    const kv = /^url\s*=\s*(.*)$/i.exec(l)
-    if (kv) urls.push(kv[1].replace(/^"(.*)"$/, '$1'))
   }
-  return sections === 1 && urls.length === 1 ? urls[0] : undefined
+  const add = (label: string, b: Buffer | null | undefined): boolean => {
+    if (b === undefined) return false
+    h.update(`${label}:${b === null ? '-' : createHash('sha256').update(b).digest('hex')}\n`)
+    return true
+  }
+  if (!add('ref', file(join(store, 'refs', 'heads', ...target.split('/'))))) return undefined
+  if (!add('packed', file(join(store, 'packed-refs')))) return undefined
+  const seen = new Set<string>()
+  const walk = (f: string, depth: number): boolean => {
+    if (depth > INCLUDE_DEPTH || seen.size >= INCLUDE_MAX) return false
+    const key = resolve(f).toLowerCase()
+    if (seen.has(key)) return true
+    seen.add(key)
+    const b = file(f)
+    if (b === undefined || !add(`config:${key}`, b)) return false
+    if (b === null) return true
+    let inInclude = false
+    for (const raw of b.toString('utf8').split(/\r?\n/)) {
+      const l = raw.trim()
+      if (l.startsWith('[')) {
+        inInclude = /^\[\s*include(if)?\b/i.test(l)
+        continue
+      }
+      if (!inInclude) continue
+      const m = /^path\s*=\s*(.*)$/i.exec(l)
+      if (!m) continue
+      const v = m[1].trim().replace(/^"(.*)"$/, '$1')
+      if (!v || v.startsWith('~')) return false
+      if (!walk(isAbsolute(v) ? v : join(dirname(f), v), depth + 1)) return false
+    }
+    return true
+  }
+  if (!walk(join(store, 'config'), 0)) return undefined
+  return h.digest('hex')
 }
 
 /** Parses `jj git remote list` (`name url` a line). */
@@ -550,10 +581,14 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     const chosen = chooseRemote(target, rows, [...remotes.keys()])
     if (isRefused(chosen)) return chosen
     if (chosen === null) return { remote: null, url: null, rows }
-    const cfg = await deps.git(['config', '--get', `remote.${chosen}.url`])
-    if (!cfg.ok) return jjUnknown('failed', cfg.err)
+    // The effective URL as Git and jj give it (never parsed here): exactly one value at every level, the same from the
+    // store's own config alone, and jj's.
+    const all = await deps.git(['config', '--get-all', `remote.${chosen}.url`])
+    const own = await deps.git(['config', '--local', '--get-all', `remote.${chosen}.url`])
+    if (!all.ok || !own.ok) return jjUnknown('failed', all.err || own.err)
     const url = remotes.get(chosen)!
-    if (cfg.out.trim() !== url) return refused('disagree', `${url} | ${cfg.out.trim()}`)
+    const values = lines(all.out)
+    if (values.length !== 1 || lines(own.out).join('\n') !== values[0] || values[0] !== url) return refused('disagree', `${url} | ${values.join(' ')} | ${own.out.trim()}`)
     return { remote: chosen, url, rows }
   }
   const th = await jjTargetHead(deps, target)
@@ -574,6 +609,10 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   // Its last step is synchronous (HR1's round 2): the operation heads, the target's Git ref and the remote's URL read from
   // the files with no await between them and the settles, so nothing (a plain Git move included) can come in after them.
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
+    // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
+    // source that can't be read, is unknown (whether or not the change would matter).
+    const before = sourcesPrint(deps.view.store, deps.view.jjRepo, target)
+    if (before === undefined) return jjUnknown('failed', `sources:${where}`)
     const r2 = await remoteNow(th.op)
     if (isJjUnknown(r2) || isRefused(r2)) return r2
     if (r2.remote !== r1.remote || r2.url !== r1.url) return jjUnknown('moved', `remote:${where}`)
@@ -584,7 +623,7 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
     const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
     if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
-    if (remoteUrlFromFiles(deps.view.store, r1.remote!) !== r1.url) return jjUnknown('moved', `url:${where}`)
+    if (sourcesPrint(deps.view.store, deps.view.jjRepo, target) !== before) return jjUnknown('moved', `sources:${where}`)
     return null
   }
   const afterRemote = await still('afterRemote')

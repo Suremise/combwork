@@ -6,7 +6,7 @@
 //
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { execFile, execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { appendFileSync, mkdirSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
@@ -362,7 +362,9 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     const cases = [
       ['a Git move of the target at the final remote read', 'finalRemote', 'ref'],
       ['a Git move of the target after the final fence', 'finalFence', 'ref'],
-      ['the remote URL changed in Git config after the final fence', 'finalFence', 'url']
+      ['the remote URL changed in Git config after the final fence', 'finalFence', 'url'],
+      ["a mixed-case remote section appended after the final fence (HR2's round 3)", 'finalFence', 'section'],
+      ['an included config file changed after the final fence', 'finalFence', 'include']
     ] as const
     it.each(cases)('%s: refused or unknown, every row still owed', async (_name, point, what) => {
       const w = await world(true)
@@ -370,12 +372,20 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       w.setMain(w.T)
       w.jj('git', 'push', '--bookmark', 'main')
       reconstructObligations(store, [{ card: 'HI-1', cycle: 1, bundle: `b0-${token()}`, target: 'main', result: w.T, at: 1 }])
+      const extra = join(w.store, 'extra.cfg')
+      if (what === 'include') {
+        writeFileSync(extra, '')
+        await w.git(['config', 'include.path', 'extra.cfg'])
+      }
       // The first pass through each point is the check after the network read; the second is the one before the settles.
       let seen = 0
       const hook = async (p: JjIntegrationPoint): Promise<void> => {
         if (p !== point || ++seen !== 2) return
+        const elsewhere = join(resolve(w.repo, '..'), 'elsewhere.git').split('\\').join('/')
         if (what === 'ref') await w.git(['update-ref', 'refs/heads/main', w.fBase])
-        else await w.git(['config', 'remote.origin.url', join(resolve(w.repo, '..'), 'elsewhere.git')])
+        else if (what === 'url') await w.git(['config', 'remote.origin.url', elsewhere])
+        else if (what === 'section') appendFileSync(join(w.store, 'config'), `[Remote "origin"]\n\turl = ${elsewhere}\n`)
+        else writeFileSync(extra, `[remote "origin"]\n\turl = ${elsewhere}\n`)
       }
       const out = await observePublish(w.deps({ hook }), 'main', store)
       expect(seen).toBe(2)
