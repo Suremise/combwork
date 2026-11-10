@@ -18,7 +18,8 @@ const events: { type: string; leftovers?: { processes: unknown[] } }[] = []
 const toasts: { title: string; message?: string }[] = []
 vi.mock('../src/main/events', () => ({
   emit: (e: { type: string }) => events.push(e),
-  toast: (_level: string, title: string, message?: string) => toasts.push({ title, message })
+  toast: (_level: string, title: string, message?: string) => toasts.push({ title, message }),
+  onCombworkEvent: () => () => undefined
 }))
 // Combwork's profile, where what is listed is kept (#614): this file's own, never the shared test root.
 const profile = vi.hoisted(() => ({ dir: '' }))
