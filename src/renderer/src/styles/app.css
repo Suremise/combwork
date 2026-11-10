@@ -11425,14 +11425,20 @@ textarea.input.task-blocked-input {
 .for-you-show-work {
   margin-top: 4px;
 }
-/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. */
+/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. It fills the tab's body and
+   scrolls in it, as the other sections' .scroll-page does (HI-2894: unbounded, it grew past the body, which doesn't
+   scroll, so the queues further down couldn't be reached). Its parts keep their height: the page scrolls instead. */
 .git-queue {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 12px;
   overflow-y: auto;
-  min-height: 0;
+}
+.git-queue > * {
+  flex-shrink: 0;
 }
 .git-queue-target {
   display: flex;

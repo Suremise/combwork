@@ -98,7 +98,8 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
   // HI-2893: past branches' queues, their history only, folded under the live ones.
   const past = views.filter((v) => v.past && v.recent.length > 0).sort(byTarget)
   return (
-    <div className="git-queue" role="region" aria-label={tr(M.region)}>
+    // Focusable (HI-2894): the page scrolls with the keyboard too, its history tables' own scroll inside it.
+    <div className="git-queue" role="region" aria-label={tr(M.region)} tabIndex={0}>
       {!shown.length && !past.length && <div className="pane-empty">{tr(M.none)}</div>}
       {shown.map((v) => (
         <section key={v.target} className="git-queue-target" data-target={v.target}>
