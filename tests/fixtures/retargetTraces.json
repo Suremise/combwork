@@ -1,0 +1,85 @@
+{
+  "prove: moves": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>"
+  ],
+  "prove: nothing to bring": [
+    "<repo> :: rev-list --count --stdin"
+  ],
+  "prove: firstParent": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin"
+  ],
+  "prove: otherRef": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin"
+  ],
+  "prove: reflog": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>"
+  ],
+  "prove: rebase": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin"
+  ],
+  "prove: reflog cut short": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin"
+  ],
+  "prove: anchor": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>"
+  ],
+  "check: a card in Doing": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>"
+  ],
+  "check: a reviewed card": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base <id> <id>"
+  ],
+  "check: a target that is gone": [
+    "<repo> :: rev-parse --verify -q refs/heads/1.2.0"
+  ],
+  "move": [
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: rev-list --count --first-parent --stdin",
+    "<repo> :: for-each-ref --format=%(objectname) %(refname)",
+    "<repo> :: worktree list --porcelain",
+    "<repo> :: rev-list --count --stdin",
+    "<repo> :: merge-base --is-ancestor <id> <id>"
+  ]
+}

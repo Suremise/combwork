@@ -33,7 +33,7 @@ import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
-import { dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
+import { accountInfo, dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
   AgentDef,
@@ -47,6 +47,7 @@ import type {
   ModelSwitch,
   RuntimeFacts,
   McpServerDef,
+  AgentInstallInfo,
   McpServerInfo,
   PermissionMode,
   ProjectConfig,
@@ -184,6 +185,8 @@ const MOVED_FRESH = {
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
 const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
+/** A stop's causes that are someone's Stop (HI-2815): the user's, the Assistant's, an agent's; not a lane's end, a closed window or one unsaid. */
+const STOPPED_ON_PURPOSE: ReadonlySet<StopCause> = new Set<StopCause>(['you', 'assistant', 'agent'])
 /** The statuses of an agent in a turn (or starting one): reached from any other, its next turn has begun (HI-2312). */
 const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
@@ -558,6 +561,8 @@ interface LiveSession {
   turnSeen?: object
   /** This launch resumes a conversation (a failed start's Retry resumes it again). */
   resumed?: boolean
+  /** A resumed launch's transcript size just before its spawn (HI-2816; -1 none found): only growth past it says the CLI is up. */
+  resumedBytes?: number
   /** The Combwork Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
   /** This launch gave its conversation instructions of Combwork's own (SessionRecord.promptAdded): recorded with it. */
@@ -1785,6 +1790,9 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
+    // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
+    // switch to jj or back is told to a running agent at its next start.
+    if (mcpServers[TOOLS_SERVER] && !assistant && pc.platform === 'jj') mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: 'jj' } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -2000,6 +2008,8 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw combworkError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // Started again (the user, a lane update, a Retry, a switch's resume): someone's earlier Stop no longer holds it (HI-2815).
+    this.stoppedOnPurpose.delete(id)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
     // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
     startBegins(projectPath, agentId)
@@ -2361,17 +2371,24 @@ class SessionManager {
     // A /rename in the CLI since the session was last named in Combwork is the newer name: Combwork takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
+    // The CLI's title not known now (HI-2839 review round 1): no --name, so the CLI keeps its own title, whatever it is.
+    let titleUnknown = false
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
-      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      // As its transcript has it now (HI-2839): a /rename just before Stop is in no history yet, and missing it here passes
+      // the older name with --name, which Claude Code keeps as the title over the user's.
+      const read = await this.resumeUsage(projectPath, opts.resumeId).catch(() => null)
       times.mark('usage')
-      adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
+      titleUnknown = !read?.known
+      if (titleUnknown) log.info(`Session ${existing.id} is resumed without --name: its CLI's title couldn't be read in time`)
+      else adopted = cliRename({ ...existing, usage: read!.usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
         log.info(`Session ${existing.id} takes the name ${userText(adopted)} it was given in the CLI`)
       }
     }
     const sessionName = adopted || opts.name?.trim() || existing?.name || (assistant ? `${ASSISTANT_NAME}${mode ? ` · ${mode}` : ''} · ${formatDateTime(new Date())}` : autoName(projectPath, agent, count))
+    // What the launch passes as --name: none while the CLI's title isn't known (above).
+    const launchName = titleUnknown ? '' : sessionName
     const key = this.key(projectPath, agentId)
     const runId = run
     const state: LiveSessionState = {
@@ -2416,7 +2433,7 @@ class SessionManager {
           quietExit: true,
           // What the setup command starts is the launch's too (an `npm install` left running).
           ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
-          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
+          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: launchName, resume: !!opts.resumeId })
         })
         // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
         this.writerSpawned(runId)
@@ -2429,7 +2446,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
+      await this.launch(projectPath, agent, { sessionId, name: launchName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -2532,6 +2549,8 @@ class SessionManager {
 
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
+  /** When each agent was last stopped at someone's request and not started since (HI-2815, stoppedOnPurposeAt), by liveId. */
+  private stoppedOnPurpose = new Map<string, number>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
   private switchResuming = new Set<string>()
   /**
@@ -2734,6 +2753,15 @@ class SessionManager {
    * `restarting` once its exit was typed (its run ending, or ended and about to resume), null for none. Either way not free
    * for a new conversation (HI-2739: a lane started meanwhile owes it one instead).
    */
+  /**
+   * When an agent was last stopped at someone's request (HI-2815: the user, the Assistant or an agent, through stop()),
+   * in ms since the epoch; 0 if never, or once it has been started again since (start()). While it is set, nothing of
+   * Combwork's own starts it: neither a lane's new conversation owed before it (HI-2034) nor its lane's next card.
+   */
+  stoppedOnPurposeAt(projectPath: string, agentId: string): number {
+    return this.stoppedOnPurpose.get(liveId(projectPath, agentId)) ?? 0
+  }
+
   switchUnderWay(projectPath: string, agentId: string): 'waiting' | 'restarting' | null {
     const op = this.switches.get(liveId(projectPath, agentId))
     return !op ? null : op.typed ? 'restarting' : 'waiting'
@@ -2853,7 +2881,10 @@ class SessionManager {
     // Performance metrics for this launch go to the workspace it started in (none, if that closes meanwhile).
     const metrics = metricsHandle(workspaceOf(projectPath))
     const { sessionId } = opts
-    const info = providerService.info(adapter.id)
+    // The account it launches on (HI-2852): a sign-in account's own models and default, as its folder says; a server's
+    // connection and a launch on the CLI's own home, the CLI's catalogue.
+    const modelAccount = conn ? ({ id: conn.id, kind: conn.server ? 'server' : 'signIn' } as const) : null
+    const info = accountInfo(providerService.info(adapter.id), modelAccount) ?? providerService.info(adapter.id)
     if (!info.path) throw combworkError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
 
     let resume = opts.resume
@@ -2970,7 +3001,7 @@ class SessionManager {
       mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
-      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
+      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, modelAccount, eff.effort) ? null : eff.effort,
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
@@ -3043,6 +3074,9 @@ class SessionManager {
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
     times?.mark('folderSteady')
+    // A resumed conversation's transcript as it is before its CLI can write (HI-2816): the transcript fallback counts only
+    // what it gains from here, however soon the CLI writes and whenever Combwork first looks. Not found: any counts.
+    if (l.resumed) l.resumedBytes = await this.liveTranscript(l).then((t) => (t ? stat(t).then((s) => s.size) : -1)).catch(() => -1)
     // Its connection, the last await (HI-1755): its choice as saved now (read under the lock saves take), resolved again,
     // must still be the one prepared. From here to the spawn nothing awaits, so no save lands between. Another chosen,
     // or the one prepared removed: this launch ends, and it starts again on the choice saved now (launchOnChosen).
@@ -3316,6 +3350,8 @@ class SessionManager {
   stop(projectPath: string, agentId?: string, cause?: StopCause): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
+      // Someone's Stop (HI-2815): what Combwork owed it since (a lane's new conversation) doesn't start it again.
+      if (cause && STOPPED_ON_PURPOSE.has(cause)) this.stoppedOnPurpose.set(liveId(projectPath, a), Date.now())
       // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
       this.switches.get(liveId(projectPath, a))?.cancel('stopped')
       const l = this.live.get(liveId(projectPath, a))
@@ -5260,8 +5296,11 @@ class SessionManager {
   /** What follows from the live transcript growing: status, usage, details, compaction, cost. */
   private async transcriptChanged(l: LiveSession, projectPath: string, agentId: string, src: string, size: number, force: boolean, hooks: number): Promise<void> {
     const sessionId = l.state.sessionId
-    // Fallback if hooks never arrive: a transcript means the session is up.
-    if (l.state.status === 'starting') {
+    // Fallback if hooks never arrive: a transcript means the session is up. Not a resumed conversation's as it was, there
+    // before its CLI started (HI-2816: a held or slow resume showed ready, and deliveries tried to type into it): only
+    // what it gained since its size before the spawn.
+    const before = l.resumed ? (l.resumedBytes ?? -1) : -1
+    if (l.state.status === 'starting' && size > before) {
       this.fact(l.state, { lifecycle: 'running' })
       l.state.status = 'ready'
       this.emitState(l.state)
@@ -6362,6 +6401,13 @@ class SessionManager {
     if (windowChanged && st.sessionId) emit({ type: 'usage-changed', projectPath: st.projectPath, sessionId: st.sessionId })
   }
 
+  /** Its CLI's models as its launch's account offers them (HI-2852: a sign-in account's own; a server's, the CLI's). */
+  private launchedInfo(st: LiveSessionState): AgentInstallInfo {
+    const info = providerService.info(st.provider)
+    const c = st.launchedConnection
+    return (c ? accountInfo(info, { id: c.id, kind: c.server ? 'server' : 'signIn' }) : info) ?? info
+  }
+
   /**
    * Whether the session runs another model than its launch gave it, after a report (HI-2609, modelSwitched): the same
    * object while that stands unchanged (so nothing is sent again), a new one when it starts or the model changes again,
@@ -6372,7 +6418,7 @@ class SessionManager {
     const st = l.state
     if (!d.modelId || st.launchedConnection?.server) return st.modelSwitch
     if (d.modelAt && Date.parse(d.modelAt) < Date.parse(st.startedAt)) return st.modelSwitch
-    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, providerService.info(st.provider))
+    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, this.launchedInfo(st))
     if (!s) return undefined
     const was = st.modelSwitch
     return was && was.launched === s.launched && was.running === s.running ? was : { ...s, since: new Date().toISOString() }
@@ -6388,7 +6434,7 @@ class SessionManager {
     log.warn(`${userText(label)}: its CLI reports model ${s.running}, not ${s.launched} as launched`)
     if (l.modelSwitchTold) return
     l.modelSwitchTold = true
-    const info = providerService.info(st.provider)
+    const info = this.launchedInfo(st)
     const values = { agent: label, cli: l.adapter.descriptor.name, launched: modelIdName(st.provider, s.launched, info), running: modelIdName(st.provider, s.running, info) }
     toast('warning', tr(M.modelSwitchTitle, values), tr(M.modelSwitch, values), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }
@@ -8246,6 +8292,41 @@ class SessionManager {
       if (window) return { ...usage, contextWindow: window }
     }
     return usage
+  }
+
+  /** How long a resume waits for the worker's turn on its transcript (HI-2839): past it, the history's usage, or none. */
+  resumeReadWaitMs = 3000
+
+  /**
+   * A stopped session's usage as its resume adopts a CLI /rename from it (HI-2839): the history's only while it has the
+   * whole transcript (its size and time as read); behind it (the import queued as the launch ended hasn't run yet), the
+   * transcript's, read by the worker from where it stopped. When the worker has the file's turn (that import under way),
+   * waited for up to `resumeReadWaitMs` rather than never (#1177: a start never waits long on it). `known` false: neither
+   * (that wait ran out, the read failed, the transcript couldn't be looked at), so the CLI's title now isn't known and the
+   * usage given is none: the resume passes no --name rather than a name that may be older than the CLI's (review round 1).
+   * No transcript: what the history or the record keeps, as `usage()` gives it (the CLI has nothing newer to resume from).
+   */
+  private async resumeUsage(projectPath: string, sessionId: string): Promise<{ usage: SessionUsage | null; known: boolean }> {
+    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+    const p = await this.anyTranscript(projectPath, sessionId)
+    if (!p) return { usage: await this.usage(projectPath, sessionId, undefined, { noWait: true }), known: true }
+    const st = await stat(p).catch(() => null)
+    if (!st) return { usage: null, known: false }
+    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    if (stored && stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs) return { usage: withScreenStopsIn(this.titled(stored.usage), rec?.screenStops), known: true }
+    const provider = await this.sessionProvider(projectPath, sessionId)
+    const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
+    let usage = await this.usageFor(projectPath, p, sessionId, provider, { ...o, noWait: true })
+    if (!usage) {
+      let timer: NodeJS.Timeout | undefined
+      const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), this.resumeReadWaitMs)))
+      try {
+        usage = await Promise.race([this.usageFor(projectPath, p, sessionId, provider, o), late])
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    return usage ? { usage: withScreenStopsIn(usage, rec?.screenStops), known: true } : { usage: null, known: false }
   }
 
   /** A usage from the history with the title its CLI gives the session now (Codex's and Copilot's own index), when it has none. */

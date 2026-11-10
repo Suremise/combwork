@@ -235,7 +235,7 @@ With `handover` (the default), `from` must be running and idle: it is asked to w
 
 These read-only calls are open to every caller:
 
-`GET /v1/providers` — the coding-agent providers: whether each is turned on and installed (`enabled`, `installed`, `version`, `problem`), and the `models`, `efforts` and `modes` a connection can use, and whether it can take `context200k`. `models` are the ones the installed CLI reports (else the fallback list in Settings), and `efforts` the effort fallback list: a model may take fewer levels. `connections`: the CLI's connections usable in the caller's workspace (`id`, `name`), in the order of accounts (below). From api.version 12 (HI-2108) there is no `isDefault`: there is no default provider (decision A).
+`GET /v1/providers` — the coding-agent providers: whether each is turned on and installed (`enabled`, `installed`, `version`, `problem`), and the `models`, `efforts` and `modes` a connection can use, and whether it can take `context200k`. `models` and `defaultModel` are the ones the installed CLI reports in its own home (else the fallback list in Settings), and `efforts` the effort fallback list: a model may take fewer levels. `connections`: the CLI's connections usable in the caller's workspace (`id`, `name`), in the order of accounts (below), each with its own account's models (HI-2856): `defaultModel`, its account's default (null: none known, the CLI chooses), and `models`, only when its account offers other models than the provider's `models` (a sign-in account's as the CLI lists them in that account's folder, as Claude Code offers each account its own; a server connection's its own list). A connection without `models` offers the provider's. From api.version 12 (HI-2108) there is no `isDefault`: there is no default provider (decision A).
 
 Each agent's `folder` (#1451) is where it works now (its running session's folder, else where a new conversation of its would start), short: a slot's name, `project` for the project folder, `home: <name>` for a retired home, or the path of a 0.9 worktree not migrated yet; `slot` the slot's name while it is in one, and `branch` that slot's line (the card last started there; a carried slot's own branch), else null. No agent has a worktree of its own in 1.0.
 
@@ -962,7 +962,7 @@ The Assistant's `combwork` server always runs (even with this setting or the Age
 
 | Tool | Endpoint | Control |
 |---|---|---|
-| `cw_list_providers` | `GET /v1/providers` | any |
+| `cw_list_providers` | `GET /v1/providers` (a line a provider; `provider`: that one's entry in full, HI-2814) | any |
 | `cw_agent_activity` | `GET /v1/projects/{name}/agents/{agent}/activity` (`detail: true`: `?detail=true`) | any |
 | `cw_activate_project` | `POST /v1/projects/{name}/activate` | Control agents |
 | `cw_add_agent` | `POST /v1/projects/{name}/agents` | Control agents |

@@ -6,7 +6,7 @@
 // on it switches together, after a drain and, to jj, a compatibility assessment): main's checks, said here as reasons.
 
 import { msg, type Msg } from '../i18n/msg'
-import type { Detection, Gate, PlatformId } from './descriptors'
+import { needsRepository, type Detection, type Gate, type PlatformId } from './descriptors'
 
 /** A platform's name as Combwork shows it (glossary 2.1). */
 export const PLATFORM_NAME: Record<PlatformId, Msg> = {
@@ -60,15 +60,16 @@ export const storeWide = (from: PlatformId, to: PlatformId, found?: Detection): 
 
 /** Whether a project can switch to `to` from what is detected now: null when it can (main checks the rest). */
 export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal | null {
+  // A platform that needs no repository (None) is never refused; one that does, only where detection finds its own.
+  if (!needsRepository(to)) return null
   if (to === 'jj') {
     if (found.platform !== 'jj') return { why: 'noJj' } // i18n-ignore: a reason's key, not text
     return found.jj?.colocated ? null : { why: 'jjSeparate' } // i18n-ignore: a reason's key, not text
   }
-  if (to !== 'git') return null
   if (found.other) return { why: 'otherFound', vcs: found.other } // i18n-ignore: a reason's key, not text
   // A colocated jj repository has Git beside it: back to Git (main checks it is ready, `fallback`).
   if (found.platform === 'jj') return found.jj?.colocated ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
-  return found.platform === 'git' ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
+  return found.platform === to ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
 }
 
 /** A refusal's message and values. */

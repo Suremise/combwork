@@ -95,6 +95,7 @@ interface CombworkMessageValues {
   'service.fsutil.notCopied': { name: string | number }
   'service.git.exitCode': { code: string | number }
   'service.git.failed': { command: string | number; why: string | number }
+  'service.git.gitlinkUnread': { path: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
   'service.gitCompare.noBranch': { branch: string | number }

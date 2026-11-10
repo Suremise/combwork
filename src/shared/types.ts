@@ -7,6 +7,7 @@ import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
+import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -572,6 +573,16 @@ export interface ModelCatalog {
   context?: string
 }
 
+/**
+ * What a sign-in account's own folder says of its models (HI-2852: a CLI offers each account its own): its catalogue
+ * (null: none read and none kept for this version, so the fallback list, never another account's), and the model it
+ * runs when none is passed (its folder's settings, else its catalogue's default; null: unknown).
+ */
+export interface AccountModels {
+  catalog: ModelCatalog | null
+  defaultModel: string | null
+}
+
 export interface WindowState {
   x?: number
   y?: number
@@ -656,6 +667,8 @@ export interface AppConfig {
   observedDefaultEffort?: Record<ProviderId, Record<string, EffortLevel>>
   /** Per provider: the last good model catalog its CLI gave, keyed by the CLI version, so pickers fill at once on start. */
   modelCatalogs?: Record<ProviderId, ModelCatalog>
+  /** Per sign-in account (its id, HI-2852): the last good catalogue its CLI gave in the account's own folder. */
+  accountModelCatalogs?: Record<string, ModelCatalog>
   /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
   /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
@@ -1948,11 +1961,22 @@ export interface CopyView {
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
 export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number } | { op: 'quit'; agent: string }
 
+/** HI-1182: what a project folder uses of submodules and Git LFS (Version Control → Slots and copies), and git-lfs's version line (null: not installed, or LFS unused). */
+export interface GitFilesStatus {
+  submodules: number
+  lfs: boolean
+  lfsVersion: string | null
+  /** Whether an LFS filter is configured (git lfs install); without one, LFS files stay pointers. */
+  lfsFilter: boolean
+}
+
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
   setup?: string
   archive?: string
   copy?: string
+  /** HI-1182: false turns off setting up submodules and Git LFS in slots and copies (left out: on, where either is used). */
+  gitFiles?: boolean
 }
 
 export interface ProjectProviderConfig {
@@ -3754,6 +3778,8 @@ export interface GitDiff {
   original: string
   modified: string
   binary: boolean
+  /** HI-2864: either side is a submodule (mode 160000). Its sides are git's own `Subproject commit` lines; a file's or link's side is its content. */
+  gitlink?: GitlinkChange
 }
 
 /** A recent workspace as a window sees it (File → Open Recent, the welcome page; #144). */
@@ -3816,6 +3842,12 @@ export interface AgentInstallInfo {
   hostCatalogs?: Record<string, ModelCatalog>
   /** Which host check each folder resolves to (HI-2779): workspaces (their default) and projects with settings of their own, lower-cased. */
   hostRouteOf?: Record<string, string>
+  /**
+   * Each Combwork sign-in account's own models (HI-2852), by its id: what the CLI offers in that account's folder, read
+   * after the CLI's check and published as each read lands. Absent: a CLI whose accounts aren't read (no listing, no
+   * connection folders). `catalog` above is the CLI's own home's.
+   */
+  accountCatalogs?: Record<string, AccountModels>
 }
 
 /**
@@ -4435,8 +4467,8 @@ export interface LaneStatus {
   agent?: string
   /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
   part?: 'builder' | 'reviewer'
-  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation; `stopped` (HI-2815): someone stopped its builder. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */

@@ -1,18 +1,18 @@
 {
   "codex": {
     "version": "0.167.0",
-    "testedAt": "2026-11-08",
-    "record": "1f8dc3f0c1c3"
+    "testedAt": "2026-11-09",
+    "record": "2d4adc67c1ba"
   },
   "claude-code": {
-    "version": "2.1.319",
-    "testedAt": "2026-11-08",
-    "record": "1f8dc3f0c1c3"
+    "version": "2.1.321",
+    "testedAt": "2026-11-09",
+    "record": "2d4adc67c1ba"
   },
   "copilot": {
     "version": "1.0.107",
     "testedAt": "2026-11-09",
-    "record": "4124a332367d",
+    "record": "2d4adc67c1ba",
     "also": [
       {
         "version": "1.0.106",
@@ -22,12 +22,12 @@
   },
   "antigravity": {
     "version": "1.5.0",
-    "testedAt": "2026-11-08",
-    "record": "1f8dc3f0c1c3"
+    "testedAt": "2026-11-09",
+    "record": "2d4adc67c1ba"
   },
   "opencode": {
     "version": "2.2.6",
     "testedAt": "2026-11-09",
-    "record": "10d96dd540ce"
+    "record": "2d4adc67c1ba"
   }
 }

@@ -3,7 +3,7 @@
 // commits), the guarded abandon's revset, and the parsers of refs, conflicted files and operations. The real jj's
 // behaviour is jjCandidatesReal.test.ts'.
 import { describe, expect, it } from 'vitest'
-import { deltaProblem, guardedSet, parseConflicted, parseOpLine, parseRefs, pinPrefix, rootFile, shapeProblem } from '../src/main/platform/jjCandidates'
+import { deltaProblem, guardedSet, parseConflicted, parseOpLine, parseRefs, pinPrefix, rootFile, shapeProblem, validUpdate } from '../src/main/platform/jjCandidates'
 
 const op = (c: string): string => c.repeat(128)
 const id = (c: string): string => c.repeat(40)
@@ -115,5 +115,39 @@ describe('parsers', () => {
   it("a pin's prefix and a file's fileset", () => {
     expect(pinPrefix('HI-1/x y', 'abc123')).toBe('refs/cw/jj/HI-1-x-y/abc123/')
     expect(rootFile('a "b"\\c')).toBe('root-file:"a \\"b\\"\\\\c"')
+  })
+})
+
+describe("strict's update: what validUpdate accepts (HI-2853/s10 §2)", () => {
+  const prefix = pinPrefix('HI-1', 'upd001')
+  const u = {
+    attempt: 'upd001', card: 'HI-1', kind: 'update' as const, how: 'merge' as const, style: 'merge' as const, revision: id('1'), base: id('2'), expected: id('3'),
+    phase: 'done' as const, baseOp: op('a'), ops: [], commits: [id('4')], result: id('4'), outcome: 'updated' as const,
+    pins: [{ ref: `${prefix}candidate`, oid: id('4'), state: 'created' as const }]
+  }
+  const want = { card: 'HI-1', revision: id('1'), base: id('2'), expected: id('3'), attempt: 'upd001', result: id('4') }
+  const gitAt = (oid: string | null) => async () => ({ ok: true, out: oid ? `${oid} ${prefix}candidate\n` : '', buf: Buffer.alloc(0), err: '', code: 0 })
+  it('accepts exactly a finished, leaf update for this input and target, its pin holding its result now', async () => {
+    expect(await validUpdate(gitAt(id('4')), u, want)).toBe(true)
+  })
+  it('refuses, saying why', async () => {
+    const g = gitAt(id('4'))
+    expect(await validUpdate(g, undefined, want)).toBe('missing')
+    expect(await validUpdate(g, { ...u, kind: undefined }, want)).toBe('notUpdated')
+    expect(await validUpdate(g, { ...u, kind: 'candidate' }, want)).toBe('notUpdated')
+    expect(await validUpdate(g, { ...u, phase: 'pinned' }, want)).toBe('notUpdated')
+    expect(await validUpdate(g, { ...u, outcome: 'conflict' }, want)).toBe('notUpdated')
+    expect(await validUpdate(g, { ...u, step: { name: 'update', parent: op('a'), shape: { kind: 'new', parents: [] } } }, want)).toBe('unsettled')
+    expect(await validUpdate(g, { ...u, uncertain: [id('9')] }, want)).toBe('unsettled')
+    expect(await validUpdate(g, { ...u, updated: { attempt: 'zzzzzz', result: id('5') } }, want)).toBe('unsettled')
+    expect(await validUpdate(g, { ...u, card: 'HI-2' }, want)).toBe('foreign')
+    expect(await validUpdate(g, u, { ...want, attempt: 'other1' })).toBe('foreign')
+    expect(await validUpdate(g, { ...u, revision: id('6') }, want)).toBe('input')
+    expect(await validUpdate(g, { ...u, base: id('6') }, want)).toBe('input')
+    expect(await validUpdate(g, { ...u, expected: id('6') }, want)).toBe('expected')
+    expect(await validUpdate(g, u, { ...want, result: id('6') })).toBe('result')
+    expect(await validUpdate(g, { ...u, pins: [] }, want)).toBe('unpinned')
+    expect(await validUpdate(gitAt(id('7')), u, want)).toBe('pinMoved')
+    expect(await validUpdate(gitAt(null), u, want)).toBe('pinMoved')
   })
 })

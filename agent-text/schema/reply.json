@@ -545,6 +545,42 @@
   "reply.project.read": {
     "placeholders": {}
   },
+  "reply.provider.connection": {
+    "placeholders": {
+      "name": "plain",
+      "id": "plain",
+      "own": "select",
+      "models": "plural",
+      "hasModel": "select",
+      "model": "plain"
+    }
+  },
+  "reply.provider.more": {
+    "placeholders": {}
+  },
+  "reply.provider.row": {
+    "placeholders": {
+      "name": "plain",
+      "id": "plain",
+      "on": "select",
+      "installed": "select",
+      "hasVersion": "select",
+      "version": "plain",
+      "hasTested": "select",
+      "tested": "plain",
+      "compared": "plain",
+      "hasModel": "select",
+      "model": "plain",
+      "models": "plural",
+      "hasEfforts": "select",
+      "efforts": "plain",
+      "modes": "plain",
+      "hasConnections": "select",
+      "connections": "plain",
+      "hasProblem": "select",
+      "problem": "plain"
+    }
+  },
   "reply.queue.cancelled": {
     "placeholders": {
       "key": "plain",

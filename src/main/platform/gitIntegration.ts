@@ -4,13 +4,14 @@
 // platform's reads (head, sameChange) are platform/git.ts's as before. The queue's worktree is made or reused (never
 // removed or pruned), a failure leaves it clean at the target's head, and a result is kept on `refs/cw/queue/*`.
 
+import { SKIP_SMUDGE } from './gitModules'
 import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
 import { git } from '../git'
 import { again, isAgain } from './again'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
-import { CANDIDATE_TEXT } from './candidateText'
+import { CANDIDATE_TEXT, UPDATE_NOT_SAME } from './candidateText'
 import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, RecoveryFound } from './integration'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
@@ -23,7 +24,14 @@ import { withLauncherEnv } from '../gitWorker'
 import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
-const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
+const NOT_SAME = UPDATE_NOT_SAME
+const CANDIDATE_LOGS = { notSame: NOT_SAME, ...CANDIDATE_TEXT }
+export type CandidateLogKind = keyof typeof CANDIDATE_LOGS
+
+/** The card's log when its candidate isn't what was reviewed, which says why (exported for the canary test, HI-2827). */
+export function candidateLog(kind: CandidateLogKind, c: { card: string; revision: string; expected: string; target?: string }): string {
+  return say(CANDIDATE_LOGS[kind], { card: c.card, revision: c.revision.slice(0, 7), target: c.target ?? '', expected: c.expected.slice(0, 7) })
+}
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -102,6 +110,20 @@ async function preSign(h: CandidateHost, f: string, who: string[]): Promise<Cand
   if (status.kind === 'cantSign') return { pause: 'signing', message: status.message }
   if (status.kind === 'unreadable') return again(status.message)
   return null
+}
+
+/**
+ * HI-1182 (HR2's round 2): with Set up submodules and LFS on, every git the queue runs that checks files out in its own
+ * folder (its worktree's add and checkouts, the merge, squash or rebase and their aborts and resets) leaves LFS files as
+ * pointers (GIT_LFS_SKIP_SMUDGE, over that command's own environment: Combwork's commit environment, hooks and signing
+ * kept), so the files step after the candidate fills them, bounded and attributed. Never a command in the project's own
+ * folder (an advance there checks out real files, as before); off, the host as it is.
+ */
+async function smudgeHost(h: CandidateHost): Promise<CandidateHost> {
+  if (!(await h.skipSmudge?.().catch(() => false))) return h
+  const queueFolder = (p: string): boolean => resolve(p).toLowerCase() === resolve(h.folder).toLowerCase()
+  const mine = (cwd: string, args: string[]): boolean => queueFolder(cwd) || (args[0] === 'worktree' && args[1] === 'add' && args.some(queueFolder))
+  return { ...h, run: (cwd, args, opts) => (mine(cwd, args) ? h.run(cwd, args, { ...opts, env: { ...(opts?.env ?? process.env), ...SKIP_SMUDGE } }) : h.run(cwd, args, opts)) }
 }
 
 /** Its commits' options: Combwork's environment, and the signing bound when the repository signs. */
@@ -382,7 +404,8 @@ export const gitIntegration: IntegrationPort = {
    * test merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a
    * retest after the target moved updates afresh, never on an earlier update.
    */
-  async update(h, c) {
+  async update(host, c) {
+    const h = await smudgeHost(host)
     const { revision, base, expected } = c
     const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
@@ -428,7 +451,7 @@ export const gitIntegration: IntegrationPort = {
     if (isUnknown(head)) return again(gitSaid(head))
     // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
     if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: head }))) {
-      return { fail: 'notSame', log: say(NOT_SAME, { card: c.card, revision: revision.slice(0, 7), target: c.target, expected: expected.slice(0, 7) }) }
+      return { fail: 'notSame', log: candidateLog('notSame', { card: c.card, revision, target: c.target, expected }) }
     }
     await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.entry)}`, head])
     return { updated: head }
@@ -440,7 +463,8 @@ export const gitIntegration: IntegrationPort = {
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
    */
-  async candidate(h, c) {
+  async candidate(host, c) {
+    const h = await smudgeHost(host)
     const id = await h.identity()
     if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [h.project] }
@@ -551,14 +575,14 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
     if (isUnknown(head)) return again(gitSaid(head))
     result = head
   }
-  const notUp = (m: (typeof CANDIDATE_TEXT)[keyof typeof CANDIDATE_TEXT]): CandidateTestFail => ({ fail: 'notUpToDate', log: say(m, { card: c.card, revision: revision.slice(0, 7), expected: expected.slice(0, 7) }) })
+  const notUp = (kind: Exclude<CandidateLogKind, 'notSame'>): CandidateTestFail => ({ fail: 'notUpToDate', log: candidateLog(kind, { card: c.card, revision, expected }) })
   const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, result])
-  if (anc.code === 1) return notUp(CANDIDATE_TEXT.notOnTop)
+  if (anc.code === 1) return notUp('notOnTop')
   if (anc.code !== 0) return again(anc.err)
   const twoParents = await h.run(h.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
   if (!twoParents.ok) return again(twoParents.err)
-  if (twoParents.out.trim()) return notUp(CANDIDATE_TEXT.mergeCommit)
-  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp(CANDIDATE_TEXT.rebasedNotSame)
+  if (twoParents.out.trim()) return notUp('mergeCommit')
+  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp('rebasedNotSame')
   await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.card)}`, result])
   return { result }
 }

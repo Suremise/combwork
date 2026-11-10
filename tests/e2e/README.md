@@ -629,8 +629,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 - **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --repo "<the main checkout>"
   --report "$env:LOCALAPPDATA\combwork-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
   upgrade start; `--repo` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
-  <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
-  checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
+  <a release candidate's installer>` adds scenario 10, the upgrade from that RC, checked by the RC's version as scenario 4
+  is by `--previous`'s (HI-2834): from a 1.1 RC (partly converted), the names upgrade, HI-2587, moves what is still old;
+  from a later RC (such as 1.3.0-rc.1), the upgrade keeps Combwork's names and carries its workspace over, with Git
+  mapped. Pass the release's earlier RC to check the upgrade a tester of it gets). It drives the
   mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
   catalogue in the workspace holding `--repo` (`<workspace>\.combwork\mcp\windows-sandbox`), else a combwork-mcp checkout

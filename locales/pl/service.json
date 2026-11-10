@@ -82,6 +82,7 @@
   "service.fsutil.notCopied": "Nie udało się skopiować: {name}",
   "service.git.exitCode": "kod wyjścia {code}",
   "service.git.failed": "Polecenie {command} nie powiodło się: {why}",
+  "service.git.gitlinkUnread": "Nie udało się odczytać, na którym commicie jest podmoduł {path}.",
   "service.git.outside": "Ścieżka wychodzi poza projekt",
   "service.git.tooLarge": "Plik jest za duży, by pokazać różnice ({kb, number} KB).",
   "service.gitCompare.noBranch": "Nie ma już tutaj gałęzi {branch}.",

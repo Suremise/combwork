@@ -93,6 +93,8 @@ export interface CandidateHost {
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
   reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus> }
+  /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
+  skipSmudge?: () => Promise<boolean>
 }
 
 /** The change a candidate is built of: the card, its reviewed revision and base, its candidate key, and the target's head tested on. */

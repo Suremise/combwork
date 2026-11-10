@@ -1,6 +1,6 @@
 import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
-import { assistantSkillsLine, controlRules, combworkInstructions, journalRule, sessionContract } from '../shared/combworkGuidance'
+import { assistantSkillsLine, controlRules, combworkInstructions, journalRule, platformRule, sessionContract } from '../shared/combworkGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'
@@ -29,6 +29,7 @@ function guidanceHash(): string {
       combworkInstructions('{project}', 'agent'),
       combworkInstructions('{project}', 'agent', false),
       combworkInstructions('', 'assistant'),
+      platformRule('jj'),
       controlRules('look'),
       controlRules('agents'),
       controlRules('projects'),

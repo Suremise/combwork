@@ -23,6 +23,7 @@ import type {
   CopyView,
   SlotTestOp,
   SlotOptions,
+  GitFilesStatus,
   SlotView,
   HeldWriter,
   BoardState,
@@ -173,7 +174,7 @@ import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
-import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjRepoView, JjResolved, JjView } from './jjViews'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjView } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -442,7 +443,9 @@ export interface CombworkRequests {
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
-  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
+  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize' | 'gitFiles', value: string | number | boolean | null) => { slots: SlotOptions; copies: { size?: number } }
+  /** HI-1182: what the project folder uses of submodules and Git LFS, and git-lfs's version; null when git couldn't say. */
+  'slots:gitFiles': (projectPath: string) => GitFilesStatus | null
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
@@ -1089,6 +1092,10 @@ export interface CombworkRequests {
   'jj:bookmarks': (projectPath: string) => JjView<JjBookmarksView>
   'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
   'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
+  /** jj's operations, newest first, a page from the head or from `from` (HI-2800). */
+  'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
+  /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
+  'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
   'git:info': (projectPath: string) => GitRepoInfo
   /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
   'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null

@@ -1081,9 +1081,9 @@ describe('G15 and G17 in the form (#1445)', () => {
   })
 
   it("the scripts' origins: a slot's setup, archive and copied files fall back to the project's from before 1.0, then the levels', else none", () => {
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, { global: { copy: 'global' } })).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
-    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, { global: { copy: '.env' } })).toEqual({ setup: '', archive: '', copy: '.env' })
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, { global: { copy: 'global' } })).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json' })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, { global: { copy: 'global' } })).toEqual({ setup: 'npm install', archive: '', copy: '.env*', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, { global: { copy: '.env' } })).toEqual({ setup: '', archive: '', copy: '.env', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, { global: { copy: 'global' } })).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json', gitFiles: true })
   })
 })
 
@@ -1401,6 +1401,21 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
     await setSlotSetting(w, repo, 'copiesSize', 3)
     await setSlotSetting(w, repo, 'copiesSize', null)
     expect((await w.projectConfig(repo)).copies).toEqual({})
+  })
+
+  it('Set up submodules and LFS (HI-1182): off is stored, on (or null) removes it, anything else is refused', async () => {
+    const { setSlotSetting } = await import('../src/main/slotSettings')
+    const { w, repo } = await workspace({})
+    await setSlotSetting(w, repo, 'setup', 'npm ci')
+    await setSlotSetting(w, repo, 'gitFiles', false)
+    expect((await w.projectConfig(repo)).slots).toEqual({ setup: 'npm ci', gitFiles: false })
+    expect(slotOptionsOf(await w.projectConfig(repo), {}).gitFiles).toBe(false)
+    await setSlotSetting(w, repo, 'gitFiles', true)
+    expect((await w.projectConfig(repo)).slots).toEqual({ setup: 'npm ci' })
+    await setSlotSetting(w, repo, 'gitFiles', false)
+    await setSlotSetting(w, repo, 'gitFiles', null)
+    expect(slotOptionsOf(await w.projectConfig(repo), {}).gitFiles).toBe(true)
+    await expect(setSlotSetting(w, repo, 'gitFiles', 'yes')).rejects.toThrow('Set up submodules and LFS is on or off.')
   })
 
   it("Combwork's and the workspace's copied files (HI-1765): set, none or inherit at each level, the project's own winning, each with its origin", async () => {

@@ -210,6 +210,14 @@ const beta = path.join(fx.ws, 'beta')
     check('…no old rules set by it: the Review card still has none, the lanes as they were', (await badge(r))?.oldRules === false && JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])) === JSON.stringify(before), JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])))
     check('…the legend lists the rename', !!(await hover(bar, (t) => t.includes('Ready'))), await tipText())
 
+    // From here the workflow changes (Solo, the rules turned off and on) restart the project's agents for it in the
+    // background (HI-2694): one working just then (R1, on a wake) is asked about in a dialog, whenever that comes, and the
+    // dialog takes the window's clicks and hovers (HI-2816: rc.1's loaded run, at the lane header's link and the Merges
+    // tab). Nothing here is about it: answered Later whenever it is in an action's way.
+    await page.addLocatorHandler(page.locator('.overlay', { hasText: 'for the new workflow?' }), async (d) => {
+      console.log(`INFO answered Later: ${(await d.innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120)}`)
+      await d.getByRole('button', { name: 'Later', exact: true }).click()
+    })
     // A change of the stages themselves (Solo: no review, nothing merging; HR4's round 1): the lanes and cards under old
     // rules keep their own stages, by the names now.
     const solo = (await inv('workflow:form', fx.alpha)).presets.find((p) => p.id === 'solo')?.options

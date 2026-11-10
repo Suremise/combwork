@@ -99,6 +99,11 @@ interface CombworkMessageValues {
   'git.gate.signing.why': undefined
   'git.gate.submodules.name': undefined
   'git.gate.submodules.why': undefined
+  'git.gitlink.binary': undefined
+  'git.gitlink.dirty': undefined
+  'git.gitlink.hideGit': undefined
+  'git.gitlink.showGit': undefined
+  'git.gitlink.summary': { change: string; path: string | number; from: string | number; to: string | number }
   'git.head.detachedAt': { commit: string | number }
   'git.head.noCommits': undefined
   'git.history.branch': undefined
@@ -263,6 +268,7 @@ interface CombworkMessageValues {
   'git.section.jjCompare': undefined
   'git.section.jjConflicts': undefined
   'git.section.jjHistory': undefined
+  'git.section.jjOperations': undefined
   'git.section.jjRepo': undefined
   'git.section.queue': undefined
   'git.section.workflow': undefined

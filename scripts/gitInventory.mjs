@@ -67,12 +67,12 @@ for (const [kind, fs] of Object.entries(hits)) {
 }
 
 if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ counts, audit: { unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams }, edges: EDGES, seams: SEAMS, text }, null, 2))
+  console.log(JSON.stringify({ counts, audit: { unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches }, edges: EDGES, seams: SEAMS, text }, null, 2))
 } else {
   console.log('# Git dependency inventory (HI-2781, rerun for HI-2792)\n')
   console.log(JSON.stringify(counts, null, 2))
   console.log(`\n## The audit: ${EDGES.length} classified edges, ${Object.keys(SEAMS).length} files with seams`)
-  const bad = [...a.unlisted.map((x) => `unlisted: ${x}`), ...a.stale.map((x) => `stale: ${x}`), ...a.extraNames.map((x) => `name: ${x}`), ...a.seams.map((x) => `seam: ${x}`)]
+  const bad = [...a.unlisted.map((x) => `unlisted: ${x}`), ...a.stale.map((x) => `stale: ${x}`), ...a.extraNames.map((x) => `name: ${x}`), ...a.seams.map((x) => `seam: ${x}`), ...a.switches.map((x) => `switch: ${x}`)]
   console.log(bad.length ? bad.join('\n') : 'every edge and seam classified')
   for (const [c, es] of Object.entries(byClass)) {
     console.log(`\n### ${c} (${es.length})`)

@@ -14,7 +14,7 @@
 //
 // Pure: given a `Meta` (a transaction's board_meta), so its rules are tested without a database or a repository.
 
-import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
+import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 
 /** A transaction's board_meta: read and write by key (null removes). */
 export interface Meta {
@@ -164,7 +164,7 @@ export function admit(meta: Meta, id: string, compiled: PlatformId): AdmitRefusa
     if (!m) return SWITCHING
     // A participant of the switch under way is refused whatever it compiled; a former member outside it (one that
     // left the group for None) is held to its own current choice, as a settled fence holds every member.
-    if (f.state === 'switching' && (participates(f, m) || m.current.platform !== 'none')) return SWITCHING
+    if (f.state === 'switching' && (participates(f, m) || needsRepository(m.current.platform))) return SWITCHING
     return m.current.platform === compiled ? null : { why: 'changed', now: m.current.platform } // i18n-ignore: a code, never shown as text
   }
   const mapped = mappedStore(meta, id)

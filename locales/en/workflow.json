@@ -1867,6 +1867,30 @@
     "defaultMessage": "From the project’s setup command before 1.0",
     "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before 1.0."
   },
+  "workflow.slots.gitFiles": {
+    "defaultMessage": "Set up submodules and LFS",
+    "description": "A switch under “Slots and copies” (HI-1182): whether Combwork checks out the repository’s submodules and fetches its Git LFS files in each slot and copy it makes. Keep LFS (Git LFS, a product’s name)."
+  },
+  "workflow.slots.gitFilesDesc": {
+    "defaultMessage": "Before the setup script, checks out submodules and fetches Git LFS files in each new slot, in each review and check copy, and in the merge queue’s folder. Without it, they have empty submodule folders and LFS pointer files.",
+    "description": "What the switch “Set up submodules and LFS” does (HI-1182; glossary 2.5: slot, review copy). Keep Git LFS (a product’s name); pointer files are the small text files Git LFS keeps in place of the real ones."
+  },
+  "workflow.slots.gitFilesLfs": {
+    "defaultMessage": "It uses Git LFS ({version}).",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): the project uses Git LFS, and git-lfs is installed. {version} is git-lfs’s own version line, such as git-lfs/3.8.1 (GitHub; windows amd64; go 1.27.3). Keep Git LFS."
+  },
+  "workflow.slots.gitFilesNoFilter": {
+    "defaultMessage": "It uses Git LFS, but it isn’t set up for this repository: slots and copies can’t be prepared until you run git lfs install.",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): git-lfs is installed but its filter isn’t configured, so LFS files would stay pointer files. Keep Git LFS and the command git lfs install as they are."
+  },
+  "workflow.slots.gitFilesNoLfs": {
+    "defaultMessage": "It uses Git LFS, but git-lfs isn’t installed: slots and copies can’t be prepared until it is. Turning this off skips the step, but where your git config requires the LFS filter, git itself still can’t check files out.",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): the project uses Git LFS and the git-lfs program can’t be found. Keep Git LFS and git-lfs (a product and its program)."
+  },
+  "workflow.slots.gitFilesSubmodules": {
+    "defaultMessage": "{n, plural, one {This project has # submodule.} other {This project has # submodules.}}",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): how many submodules the project folder’s repository has."
+  },
   "workflow.slots.heading": {
     "defaultMessage": "Slots and copies",
     "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Combwork lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."

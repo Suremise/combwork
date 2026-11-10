@@ -12,7 +12,7 @@ import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
-import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
+import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, storeWide, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
 import { checkStoreSwitch, noteMemberChoice, storeSwitch } from './storeSwitch'
 import { setKept } from '../../shared/workflow/projectWorkflow'
@@ -74,7 +74,9 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
     ...(store ? { store: store.store } : {}),
     lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })),
     inFlight: same ? [] : await cardsInFlight(ws, project),
-    gitFolder: to === 'none' && now.detected.platform === 'git',
+    // Git's repository stays in the folder, unused, when switched to a platform that needs none (the warning says Git's: a
+    // colocated jj repository is jj's, HI-2799).
+    gitFolder: !needsRepository(to) && now.detected.platform === 'git',
     queue: !same && (await queueInFlight(ws, project.path))
   }
 }

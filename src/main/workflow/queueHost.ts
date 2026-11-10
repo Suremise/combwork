@@ -348,6 +348,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
+    gitFiles: checks.gitFiles,
+    gitFilesOn: checks.gitFilesOn,
     // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),

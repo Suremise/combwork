@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
   "slots.setting.bad": "That isn’t a slot setting Combwork has.",
   "slots.setting.badSize": "The number of review and check copies is a whole number from {min, number} to {max, number}.",
+  "slots.setting.badSwitch": "Set up submodules and LFS is on or off.",
   "slots.setting.badText": "A slot script or list of files is text of at most {max, number} characters."
 }

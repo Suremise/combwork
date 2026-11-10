@@ -348,8 +348,8 @@
     "description": "What isn’t supported in a jj project (HI-2799): agents running git themselves (reset, rebase, merge) in a jj workspace."
   },
   "git.gate.plainGit.why": {
-    "defaultMessage": "Some git commands confuse jj’s view of the repository; guidance for agents comes later.",
-    "description": "Why plain git commands aren’t supported in a jj project (HI-2799). Keep git and jj."
+    "defaultMessage": "Agents are told to use jj, but a git command that moves HEAD, the index or a branch can still confuse jj’s view of the repository.",
+    "description": "Why plain git commands aren’t supported in a jj project (HI-2799, HI-2800: agents in a jj project are told to use jj). Keep git, jj and HEAD."
   },
   "git.gate.publish.name": {
     "defaultMessage": "Pushing after a merge",
@@ -364,16 +364,16 @@
     "description": "What Combwork can’t do with a jj project (HI-2799): move its workspace or project folder, or repair a moved one."
   },
   "git.gate.relocation.why": {
-    "defaultMessage": "No move of a jj workspace has been validated: a move is refused.",
-    "description": "Why moving is not supported with jj (HI-2799). Keep jj."
+    "defaultMessage": "No move of a jj workspace has been validated: after a move, Repair leaves jj’s workspaces as they are.",
+    "description": "Why moving is not supported with jj (HI-2799, HI-2800): Repair (after a moved workspace or project) doesn’t repair jj’s own workspaces. Keep jj; Repair is the button’s name."
   },
   "git.gate.sharedFolder.name": {
     "defaultMessage": "Agents sharing the project folder",
     "description": "What isn’t supported with jj (HI-2799): several agents working in the project folder itself rather than in their own folders."
   },
   "git.gate.sharedFolder.why": {
-    "defaultMessage": "Each card needs its own jj workspace: the shared folder isn’t validated with jj.",
-    "description": "Why the shared folder isn’t supported with jj (HI-2799). Keep jj; a jj workspace is a working folder jj makes."
+    "defaultMessage": "Cards never run in the project folder: each would need its own jj workspace.",
+    "description": "Why the shared folder isn’t supported with jj (HI-2799, HI-2800): cards never run in a jj project’s folder. Keep jj; a jj workspace is a working folder jj makes."
   },
   "git.gate.signing.name": {
     "defaultMessage": "Commit signing",
@@ -390,6 +390,26 @@
   "git.gate.submodules.why": {
     "defaultMessage": "jj doesn’t support submodules.",
     "description": "Why jj can’t be used with submodules (HI-2799). Keep jj."
+  },
+  "git.gitlink.binary": {
+    "defaultMessage": "The file’s side is binary: its content can’t be shown.",
+    "description": "HI-2864: in place of git's lines for a submodule replaced by a binary file (or the reverse): that file isn't text."
+  },
+  "git.gitlink.dirty": {
+    "defaultMessage": "Its folder has uncommitted changes inside.",
+    "description": "HI-2864: after a submodule's row in the Changes tab: the submodule's own folder has changes not committed in it."
+  },
+  "git.gitlink.hideGit": {
+    "defaultMessage": "Hide git’s diff",
+    "description": "HI-2864: the same button once git's own lines are shown: hides them again."
+  },
+  "git.gitlink.showGit": {
+    "defaultMessage": "Show git’s diff",
+    "description": "HI-2864: a button under a submodule's row in the Changes tab: shows the change as git itself writes it (\"Subproject commit …\" lines)."
+  },
+  "git.gitlink.summary": {
+    "defaultMessage": "{change, select, moved {Submodule {path}: {from} → {to}} added {Submodule {path} added at {to}} removed {Submodule {path} removed (was {from})} toFile {Submodule {path} ({from}) replaced by a file} toLink {Submodule {path} ({from}) replaced by a symbolic link} fromFile {A file replaced by submodule {path} ({to})} other {A symbolic link replaced by submodule {path} ({to})}}",
+    "description": "HI-2864: a change to a submodule (a git repository inside the project, kept at one commit) in a diff or a card's list of changed files. {path}: its folder. {from}/{to}: the commit before and after (short ids). {change} picks the kind: moved to another commit, added, removed, replaced by a file or symbolic link, or a file or symbolic link replaced by it. Keep the select keys. Glossary: submodule, commit."
   },
   "git.head.detachedAt": {
     "defaultMessage": "detached at {commit}",
@@ -1046,6 +1066,10 @@
   "git.section.jjHistory": {
     "defaultMessage": "History",
     "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its commits, each with its change id and commit id."
+  },
+  "git.section.jjOperations": {
+    "defaultMessage": "Operations",
+    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2800): jj's operation log, each operation by its name, and a preview of undoing one. Use jj's own word for operation in your language's jj documentation, else translate it."
   },
   "git.section.jjRepo": {
     "defaultMessage": "Repository",

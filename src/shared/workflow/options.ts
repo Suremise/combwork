@@ -6,7 +6,7 @@
 // them; the Version Control tab (#1278) edits them.
 
 import { msg, type Msg } from '../i18n/msg'
-import type { PlatformId } from '../platform/descriptors'
+import { accepts, hasCapability, hasGate, merges, type PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
@@ -251,13 +251,13 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
  * before a preset is chosen (§16.7.4). None has no G17, so no level sets it there.
  */
 export function allOff(platform: PlatformId): WorkflowOptions {
-  if (platform === 'none') {
-    const { reviewerMode: _g17, ...none } = BASE
-    return { ...none, platform, finish: 'accept' }
-  }
-  // jj (HI-2799): slots only (gate sharedFolder closed), and the user integrates (option A).
-  if (platform === 'jj') return { ...BASE, platform, finish: 'userIntegrates', folder: 'slots' }
-  return { ...BASE, platform, finish: 'notChecked' }
+  // A platform that accepts work where it is (None) finishes by accepting; one that merges, Not checked; one its user
+  // integrates (jj, HI-2799: option A), You integrate (HI-2822: by the descriptor's integration, never the id). Slots only
+  // where the gate sharedFolder is closed (jj). G17 only where its form has it.
+  const finish = merges(platform) ? 'notChecked' : accepts(platform) ? 'accept' : 'userIntegrates'
+  const off: WorkflowOptions = { ...BASE, platform, finish, ...(hasGate(platform, 'sharedFolder') ? { folder: 'slots' as const } : {}) }
+  if (!platformHasOption(platform, 'reviewerMode')) delete off.reviewerMode
+  return off
 }
 
 /** G17 as a ruleset or options have it: unset (a ruleset from before P7, None) is one reviewer per lane. */
@@ -277,26 +277,27 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   const quickAndTests = [...checks.quick, ...checks.tests]
   // The commands of the checks it names (§16.13: a run counts as a check only as its command).
   const commandsOf = (names: string[]): Record<string, string> => Object.fromEntries(names.filter((n) => checks.commands?.[n]).map((n) => [n, checks.commands![n]]))
-  if (platform === 'none') {
-    const solo: WorkflowOptions = { ...allOff('none'), dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
+  // Accepted where it is (None): the presets differ only in their review and checks.
+  if (accepts(platform)) {
+    const solo: WorkflowOptions = { ...allOff(platform), dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
     if (id === 'solo') return solo
     if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair }
     return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team }
   }
   // jj (HI-2799): each card in a slot (a jj workspace), the user integrating what passed (option A); Pair a reviewer agent
   // with the quick checks, Team review by an agent then you, with the tests too. No merge step: no merge checks or style.
-  if (platform === 'jj') {
-    const solo: WorkflowOptions = { ...allOff('jj'), target: checks.target || 'main', identity: checks.identity ?? null, stopOwnRuns: true, dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
+  if (!merges(platform)) {
+    const solo: WorkflowOptions = { ...allOff(platform), target: checks.target || 'main', identity: checks.identity ?? null, stopOwnRuns: true, dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
     if (id === 'solo') return solo
     if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair }
     return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team }
   }
-  if (id === 'solo') return { ...allOff('git'), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true, maxAgents: PRESET_TEAM.solo }
+  if (id === 'solo') return { ...allOff(platform), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true, maxAgents: PRESET_TEAM.solo }
   // §16.19.1: a reviewer agent, the agent merges (merge-ready, then reported), each card in the agent's worktree, the
   // quick checks before review; the repository's default branch as the target.
   if (id === 'pairAgent')
     return {
-      ...allOff('git'),
+      ...allOff(platform),
       review: 'agent',
       noSelfReview: true,
       preChecks: checks.quick,
@@ -315,7 +316,7 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   // each card in a slot brought up to date before it (G15), one reviewer per lane (G17). The target is the repository's
   // default branch, named (`main` in the table), so a repository whose default is another branch isn't given one it lacks.
   const pair: WorkflowOptions = {
-    ...allOff('git'),
+    ...allOff(platform),
     review: 'agent',
     noSelfReview: true,
     preChecks: checks.quick,
@@ -362,8 +363,8 @@ export const CONTRADICTIONS = {
 export type Contradiction = keyof typeof CONTRADICTIONS
 
 
-/** `targetOwn` (#1419): a Git project's target set by its own options. Worked out as options are resolved. */
-export const ownsTarget = (o: WorkflowOptions, targetFrom: string): boolean => o.platform === 'git' && !!o.target && targetFrom === 'project'
+/** `targetOwn` (#1419): a merging (Git) project's target set by its own options. Worked out as options are resolved. */
+export const ownsTarget = (o: WorkflowOptions, targetFrom: string): boolean => merges(o.platform) && !!o.target && targetFrom === 'project'
 
 export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'agentThenYou'
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'
@@ -424,16 +425,16 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (reviewerAgent(o.review) && !o.noSelfReview) out.push('selfReview')
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
   if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
-  if (o.platform === 'none') {
-    if (o.finish !== 'accept') out.push('combworkMergesNeedsGit')
-    if (o.folder !== 'project') out.push('noneHasNoSlots')
-  } else if (o.platform === 'jj') {
-    // HI-2799: no automatic advance (option A) and no shared folder (gate sharedFolder) under jj.
-    if (o.finish !== 'userIntegrates') out.push('jjYouIntegrate')
-    if (o.folder !== 'slots') out.push('jjNeedsSlots')
-  } else {
-    if (o.finish === 'userIntegrates') out.push('jjYouIntegrate')
-    if (o.finish === 'accept') out.push('combworkMergesNeedsGit')
+  // By the platform's descriptor (HI-2822): acceptance is the finisher of a platform that accepts, and only of one; You
+  // integrate that of a platform its user integrates (jj, HI-2799: option A, no automatic advance), and never of one that
+  // merges; separate folders need isolation, and a closed gate sharedFolder needs slots (jj).
+  const merging = merges(o.platform)
+  const userIntegrates = !merging && !accepts(o.platform)
+  if (!userIntegrates && (accepts(o.platform) ? o.finish !== 'accept' : o.finish === 'accept')) out.push('combworkMergesNeedsGit')
+  if (userIntegrates ? o.finish !== 'userIntegrates' : merging && o.finish === 'userIntegrates') out.push('jjYouIntegrate')
+  if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
+  if (hasGate(o.platform, 'sharedFolder') && o.folder !== 'slots') out.push('jjNeedsSlots')
+  if (merging) {
     if ((o.finish === 'combworkMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
     // G15 depends on G11 alone (#1445): only a slot is brought up to date.
@@ -442,7 +443,7 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
     if (o.focusedTests && o.finish === 'combworkMerges' && !o.commands[FOCUSED_RUN]?.trim()) out.push('focusedNeedsRunner')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
-  if (where.subfolder && o.platform === 'git' && (o.finish === 'combworkMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
+  if (where.subfolder && merging && (o.finish === 'combworkMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
   return out
 }
 
@@ -551,6 +552,9 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   ]
 }
 
+/** Whether a platform's form has an option (G17 is Git's alone: None's has none). */
+export const platformHasOption = (platform: PlatformId, key: OptionKey): boolean => FORM_GROUPS[platform].some((g) => g.options.includes(key))
+
 /**
  * The rule options the form edits for a platform, in its order (the names, N5, and the preferences, HI-1766, aren't rules:
  * a preset leaves them, and they never make the options Custom; nor does Maximum agents, which a preset sets: HI-2001).
@@ -616,7 +620,7 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).
   if (key === 'slotsUpToDate') return o.folder === 'slots'
   if (key === 'reviewerMode') return reviewerAgent(o.review)
-  return FORM_GROUPS[o.platform].some((g) => g.options.includes(key))
+  return platformHasOption(o.platform, key)
 }
 
 /** Whether every check and balance is off (§16.6.4): the section then says what never turns off. */

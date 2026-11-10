@@ -93,6 +93,7 @@
   "service.fsutil.notCopied": "{name} could not be copied",
   "service.git.exitCode": "exit code {code}",
   "service.git.failed": "{command} failed: {why}",
+  "service.git.gitlinkUnread": "Couldn't read which commit submodule {path} is at.",
   "service.git.outside": "Path is outside the project",
   "service.git.tooLarge": "File is too large to diff ({kb, number} KB).",
   "service.gitCompare.noBranch": "There's no branch {branch} here any more.",

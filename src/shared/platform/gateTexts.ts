@@ -27,11 +27,11 @@ export const GATE_TEXT: Record<Gate, { name: Msg; why: Msg }> = {
   },
   relocation: {
     name: msg({ id: 'git.gate.relocation.name', defaultMessage: 'Moving the workspace or project', description: 'What Combwork can’t do with a jj project (HI-2799): move its workspace or project folder, or repair a moved one.' }),
-    why: msg({ id: 'git.gate.relocation.why', defaultMessage: 'No move of a jj workspace has been validated: a move is refused.', description: 'Why moving is not supported with jj (HI-2799). Keep jj.' })
+    why: msg({ id: 'git.gate.relocation.why', defaultMessage: 'No move of a jj workspace has been validated: after a move, Repair leaves jj’s workspaces as they are.', description: 'Why moving is not supported with jj (HI-2799, HI-2800): Repair (after a moved workspace or project) doesn’t repair jj’s own workspaces. Keep jj; Repair is the button’s name.' })
   },
   plainGit: {
     name: msg({ id: 'git.gate.plainGit.name', defaultMessage: 'Plain git commands by agents', description: 'What isn’t supported in a jj project (HI-2799): agents running git themselves (reset, rebase, merge) in a jj workspace.' }),
-    why: msg({ id: 'git.gate.plainGit.why', defaultMessage: 'Some git commands confuse jj’s view of the repository; guidance for agents comes later.', description: 'Why plain git commands aren’t supported in a jj project (HI-2799). Keep git and jj.' })
+    why: msg({ id: 'git.gate.plainGit.why', defaultMessage: 'Agents are told to use jj, but a git command that moves HEAD, the index or a branch can still confuse jj’s view of the repository.', description: 'Why plain git commands aren’t supported in a jj project (HI-2799, HI-2800: agents in a jj project are told to use jj). Keep git, jj and HEAD.' })
   },
   advance: {
     name: msg({ id: 'git.gate.advance.name', defaultMessage: 'Combwork merging', description: 'What Combwork doesn’t do with jj (HI-2799): merge reviewed work into the target itself (the merge queue’s last step).' }),
@@ -43,6 +43,6 @@ export const GATE_TEXT: Record<Gate, { name: Msg; why: Msg }> = {
   },
   sharedFolder: {
     name: msg({ id: 'git.gate.sharedFolder.name', defaultMessage: 'Agents sharing the project folder', description: 'What isn’t supported with jj (HI-2799): several agents working in the project folder itself rather than in their own folders.' }),
-    why: msg({ id: 'git.gate.sharedFolder.why', defaultMessage: 'Each card needs its own jj workspace: the shared folder isn’t validated with jj.', description: 'Why the shared folder isn’t supported with jj (HI-2799). Keep jj; a jj workspace is a working folder jj makes.' })
+    why: msg({ id: 'git.gate.sharedFolder.why', defaultMessage: 'Cards never run in the project folder: each would need its own jj workspace.', description: 'Why the shared folder isn’t supported with jj (HI-2799, HI-2800): cards never run in a jj project’s folder. Keep jj; a jj workspace is a working folder jj makes.' })
   }
 }

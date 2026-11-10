@@ -20,9 +20,10 @@ import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { git, readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
+import { inMetadataDir } from '../../shared/platform/metadataDirs'
 import { unknown, type Maybe } from './types'
 import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
@@ -189,6 +190,8 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
+    // jj's store (HI-2800): every jj command writes there, and none of it is the project's work.
+    if (inMetadataDir(rel)) return
     // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
     // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a
     // question about their time is unknown.
@@ -468,12 +471,14 @@ export class Observer implements ObservePort {
     for (const p of list) {
       const path = resolve(p.path)
       // Never a repository found above a Git project whose own is gone: only the one detection named.
-      const repo = p.platform === 'git' && p.root ? commonDirOf(p.root) : null
+      // A platform whose deliverables are commits has its refs watched (Git's: ObservePort's Git half); one whose are
+      // declared paths, its folder's write record (None's). By the descriptor's deliverables (HI-2822), never the id.
+      const repo = deliversCommits(p.platform) && p.root ? commonDirOf(p.root) : null
       want.set(path.toLowerCase(), { path, platform: p.platform, repo: repo && resolve(repo) })
     }
     this.projects = want
     const repos = new Set([...want.values()].flatMap((p) => (p.repo ? [p.repo.toLowerCase()] : [])))
-    const folders = new Set([...want.values()].flatMap((p) => (p.platform === 'none' ? [p.path.toLowerCase()] : [])))
+    const folders = new Set([...want.values()].flatMap((p) => (declaresPaths(p.platform) ? [p.path.toLowerCase()] : [])))
     for (const [k, r] of this.repos) {
       if (repos.has(k) && !this.held(r.common)) continue
       r.close()
@@ -491,7 +496,7 @@ export class Observer implements ObservePort {
         const repo = p.repo
         this.repos.set(repo.toLowerCase(), new RepoWatch(repo, (e) => this.fan(repo, e), (f) => this.held(f)))
       }
-      if (p.platform === 'none' && !this.folders.has(p.path.toLowerCase()) && !this.held(p.path)) {
+      if (declaresPaths(p.platform) && !this.folders.has(p.path.toLowerCase()) && !this.held(p.path)) {
         const path = p.path
         this.folders.set(path.toLowerCase(), new FolderLog(path, (paths) => this.fanProject(path, { kind: 'written', project: path, folder: path, paths })))
       }

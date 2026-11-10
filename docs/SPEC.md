@@ -768,7 +768,7 @@ Each provider's adapter reads its own transcripts into one usage shape. Codex: r
 - **Old sessions' timelines in 1-hour steps** (HI-1648, Darren's decisions of 27 Oct): a session last active longer ago than **Settings → Advanced → Usage history: keep full detail for** (`cw.usage.timelineDetailDays`, 14 days by default, 1 to 3,650) has its timeline merged into 1-hour steps per model and flags, as `boundTimeline` merges a long one (`coarsenTimeline`, `shared/usageTimeline.ts`): tokens, requests and charges stay exact (charges sharing an hour become one, their sum), and only where a share of it began or ended inside an hour blurs (a lane's span, or its cards shared out again after their holds change). Its rows (`usage_rows`, what every usage view, card cost, Performance and the Overviews add up) aren't touched. Done in the usage worker, never on main: at a workspace's opening (after the import) and about daily, in batches of about 50 ms queued behind other work, each session in its own transaction (checked again inside it: still that fine and that old), never a running session's; Combwork's log says how many sessions and rows it merged. Then the space goes back to the disk: a file from before this (`auto_vacuum` off) is vacuumed whole once, which makes it incremental; after that `PRAGMA incremental_vacuum` gives back the free pages, and a WAL checkpoint (TRUNCATE) shrinks the file at once. Measured on a copy of a busy workspace's history: 91 sessions' 7,609 old rows became 222, in 57 ms; the one vacuum took 0.44 s and the file went from 63.3 MB to 44.9 MB (most of it 3,636 pages already free), its totals identical. Most of what was left was the parsers' saved states of recent sessions (28 MB in `usage_sessions`), not the timeline: since HI-1912 a state keeps only what the parser reads of each request (Claude Code's four token counts, not its whole usage block) and is saved brotli-compressed (quality 4), its format part of its shape so one saved another way is read afresh. On the same copy the 277 states went from 28.3 MB to 1.9 MB (the largest from 3.4 MB to 0.19 MB, saved in about 6 ms and taken up in about 5 ms rather than 10) and the file, vacuumed, from 44.9 MB to 18.4 MB.
 - Sessions started outside Combwork are kept in it too (source `external`), for the Sessions list, which reads one again only when its file changed; they never count in totals, and one adopted is Combwork's from its next record. Purging what Combwork keeps is its own card (#1138); it never clears the usage history, which always stays (Darren, 20 Oct).
 
-**Busy actions** (a shared pattern: `useBusy()`, `BusyButton` and `Modal`'s `busy`/`error`; `confirm({ run })`; `runOnce()` for buttons without a dialog): while an action runs its button shows a spinner and an "…ing" label, the dialog's other controls are disabled, Escape, × and clicks outside don't close it, and repeat clicks do nothing; a failure keeps the dialog open with the error (the button offers **Try Again** where it helps). Used by Start, Remove Project (its label says what it does: Hiding…, Removing from Combwork…, Moving to the Recycle Bin…; no stages reported), the card's Save, Delete, Archive and Comment, Compact, Agent Settings, Stop All Agents, Delete note and Delete MCP server; Resume All and Remove Agent show a spinner on their button or tab. **Starting and resuming an agent** (#1177): from the click until `session:start` answers (the session runs, or the start failed) the agent is marked starting in the window (`whileStarting`, `starting` keyed by project and agent, with the session resumed); the button clicked shows a spinner and "Resuming…" or "Starting…" (Retry Setup and Start Without Setup each their own) and is `aria-busy`, and every other way to start that agent (its pane's buttons, its menus, the Assistant's panel and header, the project's menu, the project header's Resume and Agents ▾ starts, the Sessions tab's Resume of a session it would run) is disabled meanwhile; a second start of an agent already starting is ignored. Asking first (a running session to stop, an expired cache) counts as part of it, and so does adding an agent for it (a project without agents, a session no agent can run: held under the project, `ADDING_AGENT`, then under the agent added). In main, a start that takes over a second logs which steps took over a second (`StepTimes`: `[sessions] Resume of <agent> in <project> took 43.1 s: usage 42.0 s`), and the usage worker logs a query (one it answers at once, not after its jobs) that took over a second to answer, so a slow start can be traced to its step. A start never waits for the usage history's import: nothing in it waits for the worker's job queue, and the one read it makes of the session's transcript (for a name given in the CLI) is `noWait`, so the worker answers it with nothing rather than queue it behind the import's turn on that file (the name is then adopted at a later resume) (`tests/startDuringImport.test.ts`, which holds the import inside that turn). Questions (confirm, choose, prompt) render above every other dialog, and Escape closes only the topmost dialog.
+**Busy actions** (a shared pattern: `useBusy()`, `BusyButton` and `Modal`'s `busy`/`error`; `confirm({ run })`; `runOnce()` for buttons without a dialog): while an action runs its button shows a spinner and an "…ing" label, the dialog's other controls are disabled, Escape, × and clicks outside don't close it, and repeat clicks do nothing; a failure keeps the dialog open with the error (the button offers **Try Again** where it helps). Used by Start, Remove Project (its label says what it does: Hiding…, Removing from Combwork…, Moving to the Recycle Bin…; no stages reported), the card's Save, Delete, Archive and Comment, Compact, Agent Settings, Stop All Agents, Delete note and Delete MCP server; Resume All and Remove Agent show a spinner on their button or tab. **Starting and resuming an agent** (#1177): from the click until `session:start` answers (the session runs, or the start failed) the agent is marked starting in the window (`whileStarting`, `starting` keyed by project and agent, with the session resumed); the button clicked shows a spinner and "Resuming…" or "Starting…" (Retry Setup and Start Without Setup each their own) and is `aria-busy`, and every other way to start that agent (its pane's buttons, its menus, the Assistant's panel and header, the project's menu, the project header's Resume and Agents ▾ starts, the Sessions tab's Resume of a session it would run) is disabled meanwhile; a second start of an agent already starting is ignored. Asking first (a running session to stop, an expired cache) counts as part of it, and so does adding an agent for it (a project without agents, a session no agent can run: held under the project, `ADDING_AGENT`, then under the agent added). In main, a start that takes over a second logs which steps took over a second (`StepTimes`: `[sessions] Resume of <agent> in <project> took 43.1 s: usage 42.0 s`), and the usage worker logs a query (one it answers at once, not after its jobs) that took over a second to answer, so a slow start can be traced to its step. A start never waits for the usage history's import: nothing in it waits for the worker's job queue, and the one read it makes of the session's transcript (for a name given in the CLI) never queues behind the import: it asks without waiting first (`noWait`), and only when the worker has the file's turn waits for it, for at most 3 s (`resumeReadWaitMs`); past that (or when the read fails, or the transcript can't be looked at) the CLI's title isn't known, so the resume passes no `--name` at all and the CLI keeps its own title, while Combwork's record keeps its name until a later resume reads the CLI's (`tests/startDuringImport.test.ts`, which holds the import inside that turn). A name given with the resume itself is passed as before. That read takes the usage history only while the history has the whole transcript (its size and time as read): a `/rename` just before Stop is in the transcript before the import queued as the launch ended has run, and a resume reading only the history then passed the older name back with `--name`, which Claude Code keeps as its title (HI-2839; `tests/usageHistory.test.ts`). Questions (confirm, choose, prompt) render above every other dialog, and Escape closes only the topmost dialog.
 **Dialogs dim the window buttons.** A backdrop (`.overlay`: a dialog, nested or not, or the command palette) dims the whole page, but Windows paints the native minimise, maximise/restore and close buttons over it (`titleBarOverlay`). So the page tells main how many backdrops are up (`useBackdrop()` keeps them per window, in order; `window:setBackdrops`), and main dims the buttons' background and symbols the same way: black at the backdrop's 45% once for each, as the page's layers stack (`shared/titleBar.ts`; a question over a card is two), back to the theme's colours when the last one goes. The same stack decides which backdrop Escape is for: the top one only, so Escape with the palette over a card closes the palette. Main keeps each window's theme colours and dimmed state (`main/titleBar.ts`), so a theme change while a dialog is up stays dimmed in the new theme's colours, each window is on its own, and a page that reloads starts undimmed. The buttons keep working, and Windows still highlights them on hover. The overlay exists on Windows and Linux only; elsewhere there is nothing to dim.
 
 **Footer usage belongs to its conversation**: the usage an agent's footer shows (context, cost) is held with the project and session it was read for (`src/shared/liveUsage.ts`); after a switch it shows `– ctx` until the new conversation's own usage is read, never the previous one's, and a refresh that fails keeps the same conversation's numbers, faded, with a note in the tooltip.
@@ -874,7 +874,8 @@ A provider is two pieces:
 
 **Models and capabilities from the CLIs** (#125). The CLI is the source of truth wherever it can say; where it can't, the lists are manual (never scraped or fetched) and every one is editable in Settings, so nobody waits for a Combwork release.
 - **Where they come from.** An adapter's `listModels` asks the installed CLI for its models and what each can do, at start and on every refresh (Check now, a changed CLI path), with a timeout, never blocking start. Claude Code: the Agent SDK's `initialize` control request (`claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config` in a folder of Combwork's own, in the sessions' environment), which sends no prompt and uses no tokens; the CLI is closed as soon as it answers. Only `models` (and `unavailable_models`) is read: `account` and the reply's other personal fields are never read, logged or stored. Each model gives its value, resolved id, name, `supportedEffortLevels` and `supportsAutoMode`; the pickers (and the Agent API's model list) show an alias with the model it stands for, "Opus (Opus 5.5)" (#248), a pinned version as the CLI names it; the `default` entry isn't offered (it is "Claude Code default") and its resolved model is the CLI's default model. Codex: `codex debug models` (hidden models left out; `supported_reasoning_levels`, `default_reasoning_level`). The replies are the CLIs' protocols, not documented commands, so they are read defensively: unknown fields ignored, a missing or odd field falls back for that field, a reply without models is a failure (logged without personal data). Per-model flags are trusted only when the reply uses them at all: then a Claude model without effort levels has none (Haiku), and one without `supportsAutoMode` no Auto. Contract tests run against recorded replies in `tests/fixtures` (personal fields removed), which the fake CLIs answer with too.
-- **Cache.** The last good catalog per provider is kept in config.json (`modelCatalogs`), keyed by the CLI version, so pickers fill at once on start while the fresh read runs ("as it last said; asking again"); a different version's is not used. Only the latest refresh's answer is kept.
+- **Per account** (HI-2852). A CLI offers each account its own models (Claude Code 2.1.321: one account offered Fable 5.2 while another, and `~/.claude`, offered Fable 5.1), so a CLI that lists its models and keeps connection folders (`capabilities.connections.homeEnv`) is also asked in each Combwork sign-in account's own folder (its home variable set to it, the account's sign-in variables left out, as its sign-in check runs). The reads start after the CLI's check and are never awaited by it (detection, `detectWaitMs` and a launch never wait for an account), at most two at once in turns of their own (a launch's sign-in check never queues behind one), at most one per account (a request meanwhile reads it once more after), and each is published as it lands (`AgentInstallInfo.accountCatalogs`, by account id: its catalogue and its default, the folder's `settings.json` model, else the catalogue's). An account is read when the CLI is checked (start, Check again, Check now, its settings changing), when it is added, and when it becomes signed in. A read whose account was removed or made again, whose CLI copy or version changed, or that a newer read of it superseded is dropped, never kept or published. Wherever the account is known, its models are the ones used (`accountInfo`, one selector for both processes): its connection's model and effort pickers and the mode warning, the default the dialog names, the save checks (`effortUsable`), the launch (its dialect's model id, its default, its compaction), and a running agent's footer and model-switch names. An account with nothing read and nothing kept for the version has none (the fallback list, which says so), never the CLI home's list or another account's. Server accounts and an account on the CLI's own home keep the CLI's catalogue. Provider-level views (Settings → <provider>'s *Models now* and prices, Dialects, `GET /v1/providers` and `cw_list_providers`) stay the CLI home's.
+- **Cache.** The last good catalog per provider is kept in ui-state.json (`modelCatalogs`), and each account's (`accountModelCatalogs`, removed with the account), keyed by the CLI version, so pickers fill at once on start while the fresh read runs ("as it last said; asking again"); a different version's is not used. Only the latest refresh's answer is kept. A failed read uses that one's own last answer for the version, logged ("didn't say which models it has: using its last answer", or the fallback list).
 - **Pickers.** Models: the CLI's (unavailable ones shown, not offered), else the fallback. Effort pickers (global, project, agent, Assistant) offer the levels of the model that would run (`models.ts` `modelCaps`); without the CLI's word, the effort fallback. A saved effort the model doesn't take stays chosen and is shown as such ("Extra high (not offered with Opus 4.6)", with a warning), never changed behind the user's back. A model without effort (Haiku) says so.
 - **Default effort.** The footer and the pickers' Inherit option show the model's own default when nothing is set or reported: "Medium (default)". It is the CLI's config (Codex's `model_reasoning_effort`), else its catalog (Codex's `default_reasoning_level`), else the effort a session started without one reported for that model (Claude Code's status line; `observedDefaultEffort`, the newest 50 models per provider). Unknown: nothing shown, as before.
 - **Fallbacks in Settings → each provider:** **Models (fallback)**, used only when the CLI can't be asked (not installed, too old, an unexpected reply), with where the models come from now ("From Claude Code 2.1.289", "Fallback (Claude Code couldn't be asked)"); **Effort levels (fallback)**, used when the CLI doesn't report a model's own (its names also name the CLI's levels, in the pickers and the agent's footer alike); and the prices (§9), which list the CLI's models too (#436: a listed model without a price is a row marked "No price: enter one"; a priced one the CLI no longer lists stays, greyed, "not in <provider>'s list"; a provider whose cost is only estimated (no `reportsCost`) says so, with a link to its `pricingUrl`). Each can be edited (add, remove, rename; models marked Older) and has **Reset to defaults**. The lists are folded while the CLI's answer is in use and they are Combwork's own. Defaults stay in code (the descriptor's `modelGroups` and `effortLevels`, `SHIPPED_PRICES`); only an edited list is stored (`modelFallback`, `effortFallback`), so improved shipped defaults reach users who never edited them.
@@ -1058,7 +1059,7 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - **With `provider`:** they must agree (409). **Alone:** its CLI is the agent's, and on another CLI it is that change of CLI (refused while running; model, effort, mode, context, last session and the old connection cleared). Whether the CLI changes is decided again against the agent as saved under the lock (changed meanwhile: refused whole).
   - **Left out:** kept. **`null` or `""`:** cleared (the CLI's default). **`provider` alone:** no connection of its own (the CLI's default; starts refused while none is on).
 - **Status:** each agent row has `connection` (the one chosen, `{ id, name, problem? }`, or null), `launchedConnection` (the account its run is on, with `connection`, the connection on it the run launched with: HI-2406) and `switchPending`. A project agent isn't told the name of one not on in its workspace.
-- **`GET /v1/connections`, `GET /v1/connections/{ref}`** (`connectionsFor`, `connectionShown`): a project agent sees only those on in its workspace (`id`, `name`, `cli`, `kind`, `signedIn`; another one is 404 by id or name); the workspace token and the Assistant see every one, with `on`, `default`, `email` and `plan`. Nobody sees a token, a key, where a login is kept, its settings or defaults; `details=true` widens nothing. cw_list_providers lists each CLI's connections on here.
+- **`GET /v1/connections`, `GET /v1/connections/{ref}`** (`connectionsFor`, `connectionShown`): a project agent sees only those on in its workspace (`id`, `name`, `cli`, `kind`, `signedIn`; another one is 404 by id or name); the workspace token and the Assistant see every one, with `on`, `default`, `email` and `plan`. Nobody sees a token, a key, where a login is kept, its settings or defaults; `details=true` widens nothing. cw_list_providers lists each CLI's connections on here. It is a line a CLI since HI-2814 (`providerListText`: on, installed and tested, default model, how many models, efforts, modes, connections, a problem), the entry of `GET /v1/providers` in full only for the one its `provider` names: every CLI's JSON outgrew the reply's budget (12,000 characters) with OpenCode, the fifth, and models' labels and modes' descriptions were most of it. The API route is unchanged.
 
 **The rows and templates name connections** (S2, HI-1769):
 - **One rule for every row** (`connectionOf`, `src/shared/connectionLabel.ts`), the launch's own (`resolveConnection`), so the window and a start never disagree:
@@ -1607,7 +1608,8 @@ fix (Provider Setup, Retry).
 The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
 
 ```ts
-interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string }
+interface PlatformDescriptor { id: 'none' | 'git' | 'jj'; capabilities: Capability[]; revisionShort(id: string): string
+  integration: 'merge' | 'accept' | 'user'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
 interface PlatformAdapter {
   detect(folder): Detection                               // §16.3.5
   head(where: Folder): Revision | Unknown                 // revisions: reads without side effects (no snapshot)
@@ -1957,7 +1959,8 @@ These hold for every port, in 1.4.0 and after.
    behaviour in none; a behaviour change found needed is its own card. The proof is the existing tests at each boundary
    (and, for the queue and slots, a command trace before and after: the same git commands in the same order).
 2. **No switch on a platform id** outside its adapter and its descriptor (AGENTS.md's rule for providers). A caller
-   asks a port, or reads a capability; it never writes `if (platform === 'git')`, nor "if not Git, then None".
+   asks a port, or reads a capability or the descriptor's facts (its integration, deliverables, repository and
+   operations: HI-2822); it never writes `if (platform === 'git')`, nor "if not Git, then None".
 3. **Unknown fails closed** (§16.3.1). Every read answers a value or `Unknown`; a timeout, a crash of the tool, an
    output past its bound and an answer from a host that lost its lease are unknown. A cache keeps only what §16.3.2
    says it may (a merge's containment; a squash's not-found for 30 s), and never turns unknown into known. **A zero exit
@@ -2265,8 +2268,8 @@ works.
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
-| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
-| Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
+| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
+| Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
 | **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
 | **LFS** | As git does | — | **Not supported** | **gate: lfs** |
@@ -2369,8 +2372,8 @@ changes. Git's runner and worker are untouched.
   seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
   `slotRelocation()` J2's port, routed by the project's platform once jj is one (J6: J2 reaches jj's port by injection
   only, below), `queueIntegration()` J4's and J5's, `lineRepoReads()` and `lineRepoOps()` J6's, as is jj's
-  descriptor (its capabilities, operations and closed gates, aligned with HI-2822's descriptor contract once that is on
-  1.5.0). `lineHistory()`: J3 supplies jj's history and evidence (below) unregistered; J6 composes them into jj's
+  descriptor (its capabilities, operations and closed gates, with HI-2822's workflow facts: integration `user`, the user
+  integrating under option A; deliverables `commits`; a repository needed). `lineHistory()`: J3 supplies jj's history and evidence (below) unregistered; J6 composes them into jj's
   adapter and routes `lineHistory()` before it enables jj.
 - **Several operation heads** (found by J3, HI-2831): detection's `jj git root` loads the repository, and with two
   operation heads any command that does, `--ignore-working-copy` included, writes a merge operation. HI-2831 fixes
@@ -2533,7 +2536,7 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   records the copy, checks the same invariant against its files, and stores `intact` (1 or 0) on the lease in the write
   that frees the copy, so nothing reuses it or reads a result before. jj's check and review credit (J3's) requires
   `intact = 1`; Git leases keep null.
-- **Stale recovery** (`recoverStale`): explicit only, J7's operation, never the pool's clean-up; its journal resumes it
+- **Stale recovery** (`recoverStale`): explicit only, never the pool's clean-up (under decision A, J7 wires no UI for it: it recovers Combwork-owned slots, none of which exist until jj cards start; HI-2840); its journal resumes it
   after any stop. Phases: planned (the stale operation S and the workspace's commit then, WS, read pinned), preserved
   (the files that differ from WS: WS's tracked files plus what git lists as not ignored by jj's rules, with no
   repository of the workspace's own; their bytes copied outside every workspace, each fsynced, a manifest fsynced last,
@@ -2683,11 +2686,25 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   abandon's boundary** (after its last await, never the journal's word): an owned pin moved or gone stops it
   (`interrupted`, the evidence left visible), and they are read again after the abandon and before any outcome, so a pin
   lost meanwhile is never reported as retained evidence (HR2's round 1).
-- **Outcomes:** a candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
+- **Outcomes** (the record's `outcome`, written with its `done`, says which; only `candidate` can credit J5's proof): a
+  candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
   (`conflict` with its files, hunks and pinned evidence; `notUpToDate` in the queue's existing words, sameness being
   §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
   signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
   a cancel, a race, a pin refused, a commit kept back), with the record for recovery.
+- **Strict's update** (G8, `prepareJjUpdate`, HI-2853; its design HI-2853/s7 and s10): the reviewed revision R brought
+  up to date with the target's head E on the same machinery, as private commits: already up to date (E an ancestor of
+  R) is `updated: null`, nothing written; `merge` makes a fresh commit with parents R then E (so a conflict's hunks show
+  the card's side first, `oursIs: 'card'`, as Git's merge of the target into the card), `rebase` duplicates R's suffix
+  onto E (a merge in it returns the card). Conflicts are read from every commit made, then §16.3.2's replay
+  (`jjSameRevision`), else `notSame` in Git's words. Its record is `kind: 'update'`, `outcome: 'updated'`, a **leaf**
+  (never carrying an update of its own), never a candidate by itself. A merge or squash candidate built on it records
+  `updated: { attempt, result }` and is built from U; a rebase candidate ignores an update and records none.
+  **`validUpdate`** decides whether an update may be built on or credited: done, `updated`, no step or uncertain
+  commits, a leaf, the same card, attempt, reviewed R and base, **the same target head as the candidate's**, and its
+  result pin read now. It runs before any write of a candidate (invalid: refused unwritten) and again in J5's credit; J5
+  reads every pin the credit rests on once more, synchronously, at its answer. A drop of an update under a live merge
+  candidate keeps U and its pins (the guard).
 - **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
   operations carrying its marker walking back from the single head to its planned operation (at most 200), never by
   description or change id. A marked operation's commits are owned only when it was validated in the attempt (the
@@ -2722,6 +2739,194 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
   Git branch).
+
+##### jj's integration evidence (1.5.0's J5, HI-2798)
+
+Under decision A, J5 is the evidence side of the user's own integration (`platform/jjIntegration.ts`), and enables
+nothing: jj still has no `integration` capability. **It writes no jj operation**, so there is no `jj undo`, no
+`op restore` and no bookmark reset anywhere in it; the user moves the bookmark (by hand, or onto J4's candidate) and
+pushes. The reconciler's existing "integrated outside" path records the result once J6 composes jj's HistoryPort
+(`contains`, `lineHead`) from these functions. Its design is HI-2798/s11, s14, s17 and s20 (HR2's).
+- **The target's head as evidence** (`jjTargetHead`), read at the single operation head: the local bookmark, not
+  conflicted (`conflictedTarget`), its commit neither divergent (`divergentChange`) nor conflicted (`conflictedTarget`:
+  a conflicted result is never integrated); the export matrix holding (`partialExport` otherwise); and the heads and
+  Git's ref the same after the reads. **The export matrix** (probed on 0.47.1: a non-colocated store has no
+  `refs/heads` and no `@git` row until `jj git export`): colocated, the `T@git` row and the store's `refs/heads/T`
+  must both equal T (a missing row disagrees); non-colocated, a `@git` row needs the ref and both must equal T, and with
+  no row a ref present must equal T, its absence agreeing (a fresh store). A plain Git move jj hasn't imported shows as
+  a disagreement, never as the target.
+- **The proof** (`jjContains`): the head (equal to the caller's `at`, else `moved`); then a **J4 candidate bound to
+  exactly the reviewed input** (a done record with `outcome: 'candidate'`, no step or uncertain commits, its reviewed
+  revision and base equal to the change's, its owned `candidate` pin reading back its result now) that the head reaches
+  by exact commit id; else §16.3.2's test unchanged on the backing store (Git's `contains` at that head: ancestry,
+  a replaying commit, the whole target holding it). A divergent reviewed revision, or a divergent or conflicted proof
+  commit, is refused; change ids never count, not even as a hint. Every answer, a null included, is **fenced after its
+  last awaited read**: the target's head, the operation, Git's ref and the export matrix read again and compared (after
+  the proof, and again after retention's pin writes), so a plain Git move during the read is a refusal or unknown
+  (HR1's round 1). A refusal or unknown is never "not contained": LeftTarget is written only on a proved null.
+- **Retained bundles:** before it answers proved, every object the proof names (the reviewed revision, its base, the head,
+  and a separate proof commit) is pinned in a bundle with an immutable identity, `refs/cw/jj-integrated/<card>/<cycle>/
+  <bundle>/`, under J4's ownership rules (intent journalled, create-only, read back, owned only on its own create; a ref
+  there first is a race, never touched), and every pin read back held. A retry of the same integration reuses its
+  bundle only for exactly the same endpoints; a new integration (another head, or after a recorded fact, LeftTarget and
+  reintegration, even with identical endpoints) gets a new bundle; earlier bundles are never replaced. The bundle is
+  checked held at the fact's boundary, before and after its write, and on later passes `ensureRetained` creates a
+  missing pin again while its object resolves; an object gone makes that card's containment unknown. A proof survives
+  the original line abandoned, the target reset and both GCs (tested).
+- **Provenance:** `Integrated.data.platform.jj = { op, head, gitRef, via, bundle, candidate?, commit? }` (an optional
+  field like Started's and Submitted's; read whole or not at all, `jjFacts.ts`).
+- **Publish is observed, never done** (gate: publish stays closed for pushing). The remote: the bookmark's one tracked
+  remote; several tracked, or none tracked with several configured and no `origin`, is `ambiguousRemote`; its URL from
+  jj and from the store's config must agree. What the remote has is read from the remote (`ls-remote --refs`, no
+  prompt, exactly `refs/heads/T`), then the operation, the target's head and its export, the remote and both URLs are
+  read again, across the network read and **again after every awaited decision read, right before the settles** (which
+  are synchronous): any change writes nothing (HR1's round 1). The effective URL is Git's and jj's own answer, never
+  parsed by Combwork: exactly one value at every level, the same from the store's own config alone (`--local`), and
+  jj's. That last check **fingerprints, never interprets** (the Assistant's note after HR1's rounds 1–2 and HR2's round
+  3): before its awaited reads it takes a print of every source the decision rests on, the raw bytes of jj's operation
+  heads, the store's HEAD (an `onbranch` condition), the target's loose ref, the packed refs, Git's config environment,
+  and every config file Git reads, **found by Git, never parsed by Combwork** (the Assistant's note on HR1's round 4:
+  `git config --show-scope --show-origin -z --includes --list` gives every file a value comes from at every scope and
+  each include and includeIf target as Git decodes it, comments, quotes and continuations included; each scope's own
+  file is covered whether or not it exists yet). An include it can't resolve to a concrete file (a `~` path, a
+  condition it doesn't know) or an origin that isn't a file is unknown. The set is a **verified capture** (HR2's round
+  5): discover, print, discover again, print again; the second discovery ran wholly while the files it found held the
+  first print's bytes, so the set describes exactly them, and an include added during either discovery shows as a
+  different set or different bytes (unknown). Its end is a synchronous validator the caller runs **in its own
+  continuation** straight before the synchronous settles (HR2's round 6: an awaited helper's return is a microtask in
+  which a queued change could land): it takes the print again and checks the operation heads and the target's ref
+  against the moment. Whether J5 should settle
+  `published` automatically at all, or keep it re-verifiable, is put to Darren (the Assistant, after round 5). Any difference, whether or not it would matter (a mixed-case
+  `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
+  stays owed. A pushed commit the store lacks is `notFetched`.
+- **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
+  exists in any state, so a settled one (`published`, with the pushed id, or `notHeld`) is a tombstone that never comes
+  back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on
+  its own with a compare-and-set on its key, result and `owed` state: a late answer for one integration never settles
+  another; the network read is shared, the bookkeeping never coalesced.
+- **Recovery** reads and never rewinds: a crash between proof, pins, fact and obligation is met by proving again
+  (reusing an unconsumed bundle with the same endpoints), by the pins' journal, and by reconstructing obligations
+  idempotently. J4's attempts recover with J4's own functions.
+- **Tests:** `tests/jjIntegration.test.ts` (the export matrix, the remote's choice, the parsers, the obligations'
+  compare-and-set and reconstruction, the provenance reader) and `tests/jjIntegrationReal.test.ts` on the pinned jj
+  (`CW_JJ_REAL=1`), both Git-backed modes and a local bare remote: main set to each J4 candidate; a cherry-picked copy,
+  a merge and a copy with more in it by hand; a conflicted bookmark from two racing sets and a target at a conflicted
+  commit; a divergent reviewed revision; an export disagreement in each mode; two operation heads; candidate credit
+  refused for an older submission's candidate, failed, unfinished and interrupted records, and a moved candidate pin;
+  a manual squash surviving the original line abandoned, the target reset and both GCs; bundles across a target move,
+  a retry and a consumed bundle; a pin taken first, lost at the fact boundary and re-pinned; and publish: owed until
+  pushed, the exact pushed id, the remote advancing, `notHeld` after a reset, `notFetched`, two tracked remotes and
+  several untracked without origin, the remote URL and the target moving during `ls-remote`, two cards settled by one
+  push without coming back, and a reintegration's own obligation with a late answer for the earlier one.
+
+##### jj's recovery, agents and compatibility (1.5.0's J7, HI-2800)
+
+J7 finishes jj's user and agent flows under decision A (HI-2794). Its design is HI-2800/s12, s16 and s19 (HR2's).
+**Reconciled with A** (the Assistant's OK on HI-2800; the items dropped are recorded on HI-2840, option B): Combwork runs
+no jj write, so "a previewed undo" is a read-only preview of the user's own `jj op revert`; no jj card starts, so agents
+get no jj slot, and their guidance is for the sessions the user opens in the project folder. **Not built here**: a
+Combwork-run undo, a UI for J2's `recoverStale` (it recovers Combwork-owned slots, and none exist until jj cards
+start), and the skills' jj-slot workflow.
+- **Operations** (`platform/jjOperations.ts`, `platform/jjOpView.ts`; IPC `jj:operations`, `jj:operationPreview`; the
+  window's Operations section): jj's operation log, 50 a page (an older page read `--at-op` its first operation), each
+  operation by jj's own description, its user, workspace, time and snapshot flag. Every read is pinned at the single
+  head H (J3's `JjReads.pinned`: `op log`, `debug object operation` and `debug object view` pinned write nothing, probed
+  on 0.47.1), and the answer stands only while H is still the head.
+- **The preview reads the whole view.** For an operation O with parent P, jj 0.47.1's `debug object view` of P, O and H
+  (the Rust Debug form of its `View`) is read by a strict parser (`viewEntries`): exactly the fields `head_ids`,
+  `local_bookmarks`, `local_tags`, `remote_views` (each remote's bookmarks and tags, every ref's target **and** tracking
+  state), `git_refs`, `git_heads` and `wc_commit_ids`, each nested shape checked (a target `Resolved(Some|None)` or
+  `Conflicted([…])`), flattened to keyed entries (`bookmark:main`, `remote:origin:bookmark:main`, `gitref:…`,
+  `githead:<ws>`, `wc:<ws>`, `head:<commit>`). An unknown, missing or reordered field, text that doesn't parse, a
+  duplicate key, over 4 MB of text, over 5,000 entries in a dimension or over 200 commits in a list is no preview at
+  all, never a partial one. jj is pinned (J0), so this shape is the contract; another version's is never read. The parse
+  and comparison run on jj's worker (`runner.preview`).
+- **What O did**: every entry whose value differs between P and O, and the commits it made visible or hid
+  (`at_operation(O, ::visible_heads()) ~ at_operation(P, ::visible_heads())` and the reverse, read at H; never `all()`,
+  which on 0.47.1 also takes in commits a revset names, so a hidden one would count as visible). **Later overlap**: an
+  entry O changed whose value at H isn't O's; descendants at H of what O made visible; what O made that is gone at H;
+  what O hid that is back.
+- **The command** (`jj op revert <full id>`, never with `--at-op`, which could make divergent operations) is offered
+  only when E1–E8 all hold, else the preview says which failed: **E1** the tested jj, one operation head, the H shown;
+  **E2** O has one parent (not the root, not a merge of operations); **E3** the three views whole within the bounds;
+  **E4** O changed no `wc:` entry (the user's command would update files there, which a pinned read can't see: commit,
+  describe or edit of `@`, a snapshot, a workspace added or forgotten); **E5** each `gitref:` O changed is jj's export
+  of the jj ref it changed to the same value (`refs/heads/<b>` with `bookmark:<b>`, `refs/tags/<t>` with `tag:<t>`),
+  O changed no `githead:`, and O isn't jj's import or fetch (its description `import git refs`, `import git head` or
+  `fetch from git remote…`, 0.47.1's words: an import changes both sides alike); **E6** no later overlap; **E7** the
+  project folder's workspace not stale at H (J2's read; unknown counts as stale); **E8** (HR2's round 1) Git's actual
+  state is what jj recorded at H: every ref jj imports (`refs/heads`, `refs/tags`, `refs/remotes` but a remote's
+  `HEAD`), read with read-only git (`for-each-ref` on the store, never an import), at the commit its `gitref:` names (an
+  annotated tag's peeled commit counts), none recorded that Git lacks, nothing conflicted, and, colocated, the project
+  workspace's HEAD at its `githead:` (`unimported` otherwise: a plain Git move leaves jj's operation heads as they were,
+  and the user's command would import it first). A clean metadata-only operation (a bookmark created or deleted, a
+  remote bookmark tracked or untracked) is eligible.
+- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command. E8's Git
+  reads sit inside **J5's verified capture** (HR2's round 2; the Assistant's call to reuse it): `rawSourcesPrint`
+  (`platform/jjSourcesPrint.ts`, extracted from J5's `sourcesPrint`, whose own sources are unchanged) prints the raw
+  bytes of every source they rest on, in both Git-backed modes: jj's operation heads, the store's HEAD (and a colocated
+  workspace's own HEAD), the packed refs, every loose ref under `refs/heads`, `refs/tags` and `refs/remotes`, a reftable,
+  and the store's config. Print, read, print again (equal: the answers belong to those bytes), and the same print
+  checked once more at the answer, after the last awaited read: any change is no answer (`moved`). The `moment` hashes
+  H, the print and Git's answers.
+- **Off main's thread** (HR2's round 3: a print walks and hashes every loose ref, 4,000 tags about 260 ms): the prints
+  run on jj's worker (`runner.print`), and the final answer is one synchronous task there (`platform/jjPreviewTask.ts`):
+  the preview worked out, then the print taken again and compared, nothing awaited between the check and the answer it
+  carries; main only relays it and reads nothing after. That is enough here because the preview writes nothing and the
+  user acts later, if at all: no write follows the check, as one did J5's compare-and-set (the Assistant's note). The
+  Operations print is bounded (`OPERATIONS_PRINT_BOUNDS`: 20,000 files and 2,000 folders in its trees, 16 MB read in
+  all): past any, no command (`bounds`). The byte bound limits what is read, not only what is accepted (HR2's round 4):
+  each file's size is checked on its opened handle against what is left of the budget, one past it refused unread, and
+  read up to one byte past that size, its bytes taken only when exactly that size was read (grown or shrunk meanwhile:
+  unknown). J5's few small sources are read whole as before. Measured on 4,000 loose tags (`tests/jjOperationsReal.test.ts`): the longest
+  stall of the event loop during a preview, 221.6 ms with the prints and answer on that thread, 20.2 ms with them on jj's
+  worker. **Copy** asks main again with that moment
+  (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the
+  window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
+  first records any unrecorded edits, as its own snapshot operation S, before reverting.
+- **The proof** (`tests/jjOperationsReal.test.ts`, the pinned jj): each preview writes nothing (the operation heads, the
+  project's checkout record and its files the same before and after). Where a command is offered the test runs exactly
+  it from the project folder and checks the revert R against the operation it applied to, B: every entry outside "what O
+  did" equal at R and B, and O's own back to P's. B is H, or S when jj recorded edits first, found by its provenance
+  (its parent H, a snapshot in the project's workspace) and its exact delta (only that workspace's `wc:`, its Git HEAD
+  and `head:` entries); the edit's bytes are in S's working-copy commit and still on disk. Cases: a bookmark created
+  with an unrelated one after (with and without an unrecorded edit), a bookmark deleted, tracking only (eligible, then
+  overlap once tracked again), the same bookmark moved since, a commit made on what O rewrote, a merge of operations, a
+  racing set, a commit and a workspace added, an import of a plain Git branch move, a stale project workspace, two heads
+  (nothing read), the head moving between the preview and Copy, and a plain Git move jj hasn't imported (of the very
+  branch, between the preview and Copy and before a preview; a Git-only branch; HEAD), each with the operation heads
+  unchanged. The parser and the rules on recorded and built
+  views: `tests/jjOpView.test.ts`.
+- **Stale workspaces** are explained, never recovered: the preview's refusal and the guide say what `jj workspace
+  update-stale` can do to unrecorded edits (HI-2781: they can end up in a separate divergent revision).
+- **Agents** (agent text, `contract.agent.jj`): a session whose project's platform is jj gets one more line after the
+  contract (`platformRule`, like the latest handover's pointer: the project's part of a launch): record work with jj,
+  run no git command that changes HEAD, the index, branches or refs, nor `jj git init`; `git status` may show what jj
+  already recorded; no card starts, and the user integrates. Claude Code gets it in the combwork server's instructions
+  (`CW_PLATFORM`, set at launch from the project's config, part of the tools' signature), the others in the launch's
+  guidance (`sessions.combworkGuidance`). The gate plainGit stays closed; its reason now says agents are told. The
+  scenario `jj-plain-git` (a colocated project switched to jj through Combwork, asked to commit a fix) checks the line
+  was given, the fix recorded in a described jj commit, no git command that moves HEAD, the index, a branch or a ref
+  (`tests/scenarios/gitMutations.cjs`, unit-tested), no `jj git init`, and jj left consistent.
+- **Compatibility**:
+  - **Files**: `.jj` is a platform's own folder whatever the project's platform (`shared/platform/metadataDirs.ts`):
+    hidden in the Files tab (`repoMetadataDirs`), skipped by search's walk and the files watcher, refused by the
+    document tools, never a None project's deliverable (a non-colocated jj repository is None), and never a project
+    write in the workflow's write log.
+  - **Moves** (gate relocation): Repair of a moved `.combwork` folder's projects (`combworkMove.repairWorktrees`)
+    leaves a worktree that is a jj workspace (a `.jj` in it) as it is: git's repair would make only git's half right.
+    Combwork's own slots and agents' worktrees (`workspaceMove`) are Git's, and no jj slot exists.
+  - **Non-colocated**: `.combwork` is kept out in the `info/exclude` of jj's own Git store (`platform/jjKeepOut.ts`,
+    `.jj/repo/store/git_target`; probed: jj 0.47.1 honours it in every workspace), at each refresh and before each
+    launch, from the repository's own workspace or a linked one (its `.jj/repo` pointer followed as J0's detection does,
+    HR2's round 1), each project's line anchored at its workspace root; what jj recorded before stays tracked. Trust: its root is the folder itself (`git: false`); a colocated project's is Git's main
+    working tree, the jj root. A git-based build finds no repository there: a documented limit, no promise.
+  - **The Changes tab's status** already runs with `--no-optional-locks` (`GIT_PREFIX`), so it takes no index lock while
+    jj writes: no change (the audit's result, HR2's correction).
+  - **Tools**: jj's readiness stays lazy (no startup check) and shows in Copy Diagnostics and the Version Control tab.
+- **Documented limits match the gates**: the user guide's *What jj doesn't support in Combwork* has exactly one item per
+  closed gate, each tagged with its gate (`tests/jjLimits.test.ts` holds it to `PLATFORMS.jj.gates` and to each gate's
+  name in `GATE_TEXT`).
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -2870,10 +3075,12 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - Git-facing UI (the Git view, Provider Setup's Git row, the view types that keep their Git names);
   - common (the folder fence);
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
-  - defect with its card: HI-2753's move proof still runs git in `retargetCard.ts` (HI-2821).
+  - defect with its card: none left. HI-2821 moved HI-2753's move proof behind port 3's optional `ownWork` (Git's in `platform/gitOwnWork.ts`), its hold through port 1's `holdRefs`; a platform without `ownWork` doesn't offer the move (rule 6).
 - **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0; the J card implementing each one's port routes it by the project's platform (J0's section above).
-- **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, or a changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+- **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, a changed seam count, or a changed count of platform-id switches (HI-2822). `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
+- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`, jj `user`: the user integrates, option A), what a code card delivers (`deliverables`: Git and jj `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git and jj). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, a gate (jj's closed `sharedFolder`: slots only), or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
+- **The switch guard:** `tests/gitAudit.mjs`'s `SWITCHES` lists, per file, the switches on a platform's id left outside the descriptors, the adapters and the registry, each justified: Git-facing text that names Git (the project status's `git at`, the tab's fact line), git's own status read on Git's page, and HI-1997's one-time step over stored Git options. `tests/gitAudit.test.ts` fails on a new one, or one gone.
 
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
 existing tests that prove it unchanged (HI-2781 part 2's selection menu); none adds jj code; R9 ends 1.4.0's refactor
@@ -3353,12 +3560,13 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
   Assistant's (`tasks.setTarget`, the card dialog, `cw_create_task`/`cw_update_task`, the Agent API's `target`), only
-  while its branch has no work (never started, or each line it had is gone or already in its target, and the folder it
+  in On Hold or Todo (HI-2825: On Hold too) while its branch has no work (never started, or each line it had is gone or already in its target, and the folder it
   worked in holds nothing uncommitted, tracked or not: its slot while still on its line, the project folder whatever is
   there: `ownWork`): no rebase of started work. Its old lines, empty, are deleted with the change (`dropEmptyLines`,
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
-  new target. Both name only
+  new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
+  never an empty name (HI-2825). Both name only
 - **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
   branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
   in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`
@@ -3757,7 +3965,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
     linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**
-    (#1435's switch, read-only here, with a link to Advanced).
+    (#1435's switch, read-only here, with a link to Advanced). Where the project folder uses submodules or Git LFS (or it
+    is off): **Set up submodules and LFS** (`slots.gitFiles`, HI-1182, §16.10.10), a switch, with what it uses.
   - **Project Settings:** no slot rows (HI-1765 removed its Slots and copies link): the setup command's catalog row stays,
     hidden, for `cw_update_setting`, and the copied files are `project.slotCopy`. Settings → Version Control's Combwork defaults (Git)
     and Workspace defaults set **Files copied into new slots** for the projects under them
@@ -4993,7 +5202,11 @@ switches to "The agent merges", and one started afterwards reports its merge.
   read "HI-2046 is in Doing; latest comment by HR1: Round 2: PASSED", and HB2 took the card as merged): a card watch's
   line for a card moved back to work by the queue (`queueReturnOf` in `watches.ts`, `WakeAbout.queueReturn`) is the
   return's own words in place of where it is and its latest comment, with others or alone; an inbox item telling
-  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). Its **reviewer is
+  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). Without a return
+  that holds, such an item leads with a card loop's step waiting for the agent's check, a design or a follow-up (HI-2808:
+  a pool reviewer started for a card got the pool's line and the follow-up's loop wake as "2 changes, read the card",
+  and often reviewed the card or asked what to do rather than answer with `cw_loop_step`; its loop wake's
+  `meta.awaitsCheck`, still due while unread, since a loop wake is the latest per agent and card and is cancelled once not due). Its **reviewer is
   woken when the builder submits it again** (HI-2143: HR2's watch on HI-2122, any move counted, began in Review before its
   pass; the card left and came back, and the watch, comparing only where it was, never fired, while Combwork's loop wake left
   it to that watch): a watch on any move counts a card that left and came back unless every move since was the watcher's
@@ -6580,6 +6793,75 @@ checked every agent and process by hand.
   **After any restart** the team runs: nothing of a pause is kept.
 - **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
 
+#### 16.10.10 Submodules and Git LFS [HI-1182]
+
+Slots, review and check copies and the merge queue's folder are linked worktrees (§16.10.1): git makes them with empty
+submodule folders, and Combwork's checkouts there leave LFS files as pointers. In a Git repository that uses either,
+Combwork sets them up itself (`src/main/platform/gitModules.ts`; the design agreed on the card, HI-1182/s7–s16). jj
+refuses such repositories (§16.3, HI-2799's gates), so the step is the Git workspace port's (`filesNeeded`) alone.
+
+- **The setting:** Version Control → Slots and copies' **Set up submodules and LFS** (project.json `slots.gitFiles`:
+  `false` turns it off; left out, it is on). Shown where the project folder uses submodules or LFS, or where it is off,
+  with what it uses (`slots:gitFiles`: its submodules, LFS and git-lfs's version, or that git-lfs is missing or not set
+  up). Slots, copies and the queue read it as it is when they run.
+- **Detected per folder at its revision**, read before any run starts (one `git ls-files` for a tracked `.gitmodules`
+  and any file under `filter=lfs`, nested `.gitattributes` counted): a folder that uses neither runs nothing. A read
+  that fails is a preparation failure, never "unused".
+- **When:** before the setup script and before every ready, being idempotent: a slot as it is made and at every
+  preparation for a card (after its switch, or on the line it is on: a step that failed or was ended, or the setting
+  turned on since, is done then); a copy after every make or reset; the queue's folder before its install and checks
+  each time (a run of "Combwork (merge queue)"). A failure leaves the slot or copy not ready with why and the run's log,
+  as a setup failure does; in the queue it is a red check. While the setting is on, Combwork's own checkouts of these
+  folders run with `GIT_LFS_SKIP_SMUDGE=1` (that process only), so every LFS download happens in the step: a slot's
+  make and switch, a copy's make and reset, and every git the queue runs in its own folder (its add and checkouts, the
+  test merge, squash or rebase, strict's update, their aborts and resets), never one in the project's folder.
+- **The run:** one of Combwork's runs (the slot's, the copy's credited to its reviewer, the queue's), its gits with no
+  shell in the run's job, within the setup's time limit, ended with it, with no prompt (`GIT_TERMINAL_PROMPT=0`,
+  `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`) and logged.
+- **Submodules, with no config written:** never `git submodule sync`, a top-level `--init` (both write the shared
+  `.git/config`, so the project folder's) or `foreach`. Before anything changes, each first-level submodule's folder must
+  be missing, empty or this worktree's own clone (its `.git` file naming `<worktree git dir>/modules/<name>`, whose
+  `core.worktree` is that folder, by real paths, no link on the way, and that clone itself strictly inside the
+  worktree's `modules` folder with no link from there down to it); anything else stops the step, naming it, and
+  nothing is touched. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
+  work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
+  resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the
+  environment, before whatever the run's environment carries, so the user's still win; a URL override, `active = false`
+  and `update = none` are git's to honour. A linked worktree clones its submodules into its own git dir, so each folder
+  clones each once. Nested ones: `git submodule update --init --recursive` inside each first-level clone checked again to
+  be this worktree's own, with `GIT_CEILING_DIRECTORIES` at the superproject: their config writes stay in those
+  private clones.
+- **Removed submodules:** a copy removes the folder of one its revision no longer has only when its own private clone
+  claims it (core.worktree a literal path strictly inside the copy, no link, its `.git` naming that clone back, no
+  gitlink there now), by `git clean -ffdx` of that path with literal pathspecs; its clone stays. Read from the copy's
+  git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
+  another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
+  with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
+- **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
+  status reports it (a user's `ignore` setting honoured).
+- **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A
+  submodule's LFS files are smudged as the user's own git-lfs filter config says. git-lfs missing, or no LFS filter set
+  up (`git lfs install`, without which `git lfs pull` leaves pointers), fails the preparation, saying so; where the
+  user's config requires the filter, git's own checkout fails first, setting or not.
+- **A moved gitlink in diffs** (HI-2864, design HI-2864/s10; `src/shared/gitlink.ts`, `components/GitlinkDiff.tsx`):
+  the Changes tab's diff, its comparison of two branches and a card's Work section show a submodule's change as one row,
+  "Submodule lib/sub: 0bbdde2 → 0fc182f" (added, removed, and replaced by or replacing a file or symbolic link worded
+  as such; the full ids in its tooltip), in place of the empty diff git's commit couldn't be read into. **Show git's
+  diff** shows git's own `Subproject commit` lines; a side that is a file or link keeps its real content there.
+  - **Told by its mode, never by a failed read**: one `git --literal-pathspecs diff --raw -z --no-abbrev --no-renames`
+    of that path per diff opened (the comparison's two commits, or the ref against the working tree). Only a side of
+    mode 160000 is a gitlink, so one whose commit is in the parent's store is still one. A blob's id is never shown.
+  - **The working tree's commit** is git's own patch line for that path (`--submodule=short`, its gitlink section
+    only), read for every working gitlink side: raw gives zeros once the checkout moved, and a checkout dirty at the
+    index's commit has raw's id but only the patch says `-dirty` ("uncommitted changes inside"; that section has no
+    `index` line, so it is taken as the gitlink's only where raw says both sides are gitlinks, and only as the one
+    section). A line that can't be read is an error with Retry, never an empty side or a guessed id. An unpopulated folder shows the
+    index's commit; a deleted one, the submodule removed. A ref that isn't a commit yet (no commit in the repository)
+    has no committed side to be a gitlink.
+  - **The Work section** reads a submission's files as raw rows (`filesChanged`: the same paths and letters as
+    `--name-status`), and a row with a gitlink side keeps each side (`FileChange.gitlink`), stored with the submission:
+    earlier submissions show their paths as before. Output that isn't raw rows is unknown, never a partial list.
+
 ### 16.11 Lanes, with or without the Assistant
 
 #### 16.11.1 Combwork owns the lane's card list
@@ -6721,7 +7003,16 @@ builder outside slots it renews (HI-2232, below): another running agent is left 
 status changes and the 30 s tick, builders and reviewers alike, whether or not a card is due, and with the workflow
 rules off too: only Combwork's own card starts need them) launches each owed agent
 once free (`launchFresh`: as Start Lane would, the lane's brief, a new conversation, or started if it stopped
-meanwhile). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
+meanwhile by itself). **Someone's Stop stops it** (HI-2815): an agent stopped by the user, the Assistant or an agent
+(`sessions.stop` with that cause, `stoppedOnPurposeAt`) after its entry's `since` is owed nothing more: the entry is
+removed, before the launch or at its checks (`still`), and nothing is launched; the lane stays, and updating it starts a
+stopped builder on it (`resumeLaneBuilder`, HI-1900). Nor does the card pass start a card on a builder so stopped
+(`lookAt`, and `stillDue` at the start's write): its card waits, `startWait` `stopped` (*AL-3 waits to start: B1 was
+stopped; it goes on once B1 is started again…*), from the Stop on, whether or not its old run has exited yet (a graceful
+exit takes a while, its status idle meanwhile: HR2's round 2), until anything starts the agent (by hand, a lane update,
+a Retry: `start()` clears the mark; a run still live is never taken for a restart), so the pass that drops its owed conversation never gives it its due card instead [HR2's
+round 1]. A stop no one asked for (a lane's end, `lane`; a closed window; Combwork's own) holds nothing. Before, the pass took the stopped agent for free and started it
+again within a second of the user's Stop (assistant-control's *Builder stopped*). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
 role, the same entry, unblocked) is checked again at every boundary the session layer gives: just before the old run
 stops and again before the new launch spawns (`newConversation`'s `allowed`, each call; a stopped agent's start's
 `allowed`) [HR1's round 1]; the entry is removed by its id only after the launch. **Bounded**: within Settings → Advanced → *Lanes: longest Combwork waits
@@ -7928,7 +8219,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Push the target after Combwork merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Combwork's commits) |
-| Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
+| Submodules and Git LFS in slots and review copies | **Built [HI-1182]:** set up as a run of Combwork's in slots, review and check copies and the queue's folder, before the setup and every ready (§16.10.10); Version Control → Slots and copies' **Set up submodules and LFS** |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | **Built [HI-1183]:** G21 (§16.6.2, §16.9.4) |
 | Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |

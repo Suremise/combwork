@@ -12,6 +12,7 @@ import { childEnv } from '../ptyHost'
 import type { WorkspaceService } from '../workspace'
 import { QUEUE_CHECK_MINUTES, QUEUE_NETWORK_CODES } from '../../shared/advanced'
 import { progressRuns, queueChecks, type Spawn } from './queueChecks'
+import { slotWorkspaces } from '../platform/workspacePorts'
 
 const log = createLogger('queue')
 
@@ -31,6 +32,11 @@ export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?
     logDir: queueLogDir(),
     timeoutMs: () => Math.max(1, Number(advanced.get(QUEUE_CHECK_MINUTES)) || 90) * 60_000,
     networkCodes: () => advanced.pattern(QUEUE_NETWORK_CODES),
-    setupCommand: async () => (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
+    setupCommand: async () => (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? '',
+    // HI-1182: Version Control → Slots and copies' Set up submodules and LFS, as it is now (unreadable: as its default, on).
+    gitFilesOn: async () => (await ws.projectConfig(projectPath).catch(() => null))?.slots?.gitFiles !== false,
+    project: projectPath,
+    // The queue's folder is a worktree made as slots are: their platform's step.
+    files: slotWorkspaces().files
   })
 }

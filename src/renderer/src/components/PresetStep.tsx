@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm } from '@shared/types'
-import type { PlatformId } from '@shared/platform/descriptors'
+import { merges, type PlatformId } from '@shared/platform/descriptors'
 import { identityShown, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { PRESET_SUMMARY, PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { asksPreset, STEP_PRESETS, suggestPreset } from '@shared/workflow/presetStep'
@@ -97,7 +97,7 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
     <div className="vc-step" data-preset-step={platform}>
       <div className="vc-step-head">
         <h3>{tr(M.title)}</h3>
-        <span className="s-desc">{tr(platform === 'git' ? M.intro : M.introNone)}</span>
+        <span className="s-desc">{tr(merges(platform) ? M.intro : M.introNone)}</span>
       </div>
       <div className="vc-step-presets" role="radiogroup" aria-label={tr(M.presets)}>
         {presets.map((p) => (

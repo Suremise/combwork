@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 127
+const FIXTURES_VERSION = 129
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -900,6 +900,32 @@ const editSkill = (c, name) => require('fs').appendFileSync(require('path').join
 
 /** The successful tool calls whose input runs `needle` (a script by name), with their output. */
 const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name) && t.input.includes(needle))
+
+// jj scenarios (HI-2800): the git commands that move HEAD, the index or a ref (gitMutations.cjs, unit-tested), the jj
+// rule the session contract adds in a jj project, and the pinned jj run in the project with the scenario's own config.
+const { gitMutations } = require('./gitMutations.cjs')
+const platformRule = (platform) => require('../../src/shared/combworkGuidance.ts').platformRule(platform)
+/** Runs the pinned jj in the scenario's project (its config the scenario's: harness.cjs jjScenarioEnv); `allowFail`: '' on failure. */
+function jjIn(c, ...args) {
+  const opts = typeof args[args.length - 1] === 'object' ? args.pop() : {}
+  const path = require('path')
+  const { portableJj } = require('../jjPortable.cjs')
+  const env = { ...require('../e2e/lib.cjs').gitEnv(), JJ_CONFIG: path.join(path.dirname(c.ws), 'jj.toml'), NO_COLOR: '1' }
+  try {
+    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    if (opts.allowFail) return ''
+    throw e
+  }
+}
+/** How many operation heads the project's jj repository has, from its files (no jj command: an unpinned one merges them). */
+const jjOpHeads = (c) => {
+  try {
+    return require('fs').readdirSync(require('path').join(c.alpha, '.jj', 'repo', 'op_heads', 'heads')).length
+  } catch {
+    return 0
+  }
+}
 
 /** A test suite that says it takes minutes (its tests take a few seconds), for the cw-progress scenarios (#167). */
 const SLOW_TESTS = {
@@ -2080,6 +2106,45 @@ module.exports.SCENARIOS = [
       ['left the project folder as it was', !/export /.test(c.read('math.js') ?? ''), c.read('math.js') ?? ''],
       ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ]
+  },
+  {
+    id: 'jj-plain-git',
+    title: 'In a jj project (colocated with Git), asked to commit a fix: it records it with jj, runs no git command that moves HEAD, the index or a ref, and no jj git init (HI-2800)',
+    // The pinned jj on Combwork's PATH and the agent's (harness.cjs jjScenarioEnv).
+    jj: true,
+    async setup(c) {
+      c.write('math.js', 'module.exports.add = (a, b) => a - b\n')
+      c.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '-A')
+      c.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'math')
+      // The project's repository made a colocated jj one, then the project switched to jj through Combwork, as the window does.
+      // The test git config converts line endings (core.autocrlf), which jj doesn't: off in this repository, as a jj user's is.
+      c.git('config', 'core.autocrlf', 'false')
+      jjIn(c, 'git', 'init', '--colocate')
+      const check = await c.inv('workflow:checkPlatform', c.alpha, 'jj')
+      const used = (check?.store?.gates ?? []).filter((g) => !g.clear)
+      if (used.length || check?.refused) throw new Error(`setup: the switch to jj is refused: ${JSON.stringify({ refused: check?.refused, gates: used })}`)
+      await c.inv('workflow:setPlatform', c.alpha, 'jj', { expected: 'git', token: check?.store?.token })
+      c.jjBefore = jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id').trim()
+    },
+    prompt: 'math.js has a bug: add subtracts instead of adding. Fix it and commit the fix.',
+    fake: `shell: node -e "require('fs').writeFileSync('math.js', 'module.exports.add = (a, b) => a + b\\n')" then shell: jj commit -m "Fix add"`,
+    expect: (o, c) => {
+      const mutations = gitMutations(o)
+      const inits = o.tools.filter((t) => /jj(\.exe)?\s+git\s+init/i.test(t.input ?? '') && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
+      const heads = jjOpHeads(c)
+      // The fix recorded in a commit jj made since the setup: described, with math.js adding.
+      const made = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', `(::@ | ::visible_heads()) ~ ::${c.jjBefore}`, '-T', 'commit_id ++ " " ++ description.first_line() ++ "\\n"').split('\n').filter(Boolean) : []
+      const fixed = made.filter((l) => l.split(' ').slice(1).join(' ').trim() && /a \+ b/.test(jjIn(c, '--ignore-working-copy', 'file', 'show', '-r', l.split(' ')[0], 'math.js', { allowFail: true })))
+      const bad = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', 'conflicts() | divergent()', '-T', 'commit_id ++ "\\n"').trim() : 'several heads'
+      return [
+        ['its launch carried the jj rule (HI-2800)', (o.measures?.customChars ?? 0) >= platformRule('jj').length, String(o.measures?.customChars)],
+        ['recorded the fix in a described jj commit', fixed.length > 0, made.join(' | ')],
+        ['ran no git command that changes HEAD, the index, a branch or a ref', mutations.length === 0, mutations.join(' | ')],
+        ['ran no jj git init', inits.length === 0, inits.map((t) => t.input).join(' | ')],
+        ['left jj consistent: one operation head, no conflicted or divergent commit', heads === 1 && bad === '', `${heads} heads; ${bad}`],
+        ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
+      ]
+    }
   },
   {
     id: 'probe-outside-project',
@@ -4297,6 +4362,77 @@ module.exports.SCENARIOS = [
     fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
   },
   {
+    id: 'assistant-next-version-ask',
+    title: "The Assistant told the user is about ready for the next version (HI-2811): puts starting it to the user first, changing nothing (no cw_branch, no retarget)",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    // An intent the user hasn't confirmed (HI-2811's design, HR1): a question about what it would do alone was answered,
+    // rightly, with nothing to decide (Codex, 0 of 3), so the prompt leaves the step to be agreed.
+    prompt: "I think alpha's 1.3.0 is feature-complete, so we're about ready for 1.4.0.",
+    // A fake has nothing to decide: it reads the board, as a model may, and its run checks only that nothing changed.
+    fake: 'cw cw_list_tasks {"project":"alpha"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      return [
+        ['put the decision to the user (a reply naming 1.4.0 that asks)', s.asks('1.4.0'), (o.replies ?? []).filter((r) => String(r).includes('1.4.0')).map((r) => String(r).slice(-250)).join(' | ') || s.said.slice(-300)],
+        ['started no version and moved nothing (no cw_branch, no cw_queue retarget, no card target)', !called(o, 'cw_branch').length && !s.retargets.length && !s.byCard.length, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['no 1.4.0 branch, and alpha still merges into 1.3.0', !s.branches.includes('1.4.0') && s.targets?.target === '1.3.0' && !(s.targets?.otherTargets ?? []).length, JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ["the Todo card still has its own 1.3.0, and the lane's card is still in Doing on it", s.todoTarget === '1.3.0' && s.laneOn13 && s.laneCardDoing, JSON.stringify({ todo: s.todoTarget, lane: s.lane })]
+      ]
+    },
+    fakeSkips: ['put the decision to the user (a reply naming 1.4.0 that asks)']
+  },
+  {
+    id: 'assistant-next-version',
+    title: "The Assistant told to start the next version (HI-2811): starts it with cw_branch nextVersion, then offers the move its reply previewed and asks, moving nothing itself",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    prompt: "We're done adding features to 1.3.0 in alpha. Start 1.4.0.",
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      return [
+        ['started it with cw_branch nextVersion, which worked', s.started.length > 0, o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['1.4.0 exists, alpha merges into it, and 1.3.0 is another branch work can merge into', s.branches.includes('1.4.0') && s.targets?.target === '1.4.0' && (s.targets?.otherTargets ?? []).includes('1.3.0'), JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ["offered the Todo card's move (its key) and put it to the user", s.asks(c.todoKey), s.said.slice(-600)],
+        ['moved no card itself (no cw_queue retarget, no card target)', !s.retargets.length && !s.byCard.length && s.todoTarget === '1.3.0', JSON.stringify({ calls: o.combworkCalls.map((x) => x.tool), todo: s.todoTarget })],
+        ["the running lane stays on 1.3.0, its card in Doing", s.laneOn13 && s.laneCardDoing, JSON.stringify(s.lane)]
+      ]
+    },
+    fakeSkips: ["offered the Todo card's move (its key) and put it to the user"]
+  },
+  {
+    id: 'assistant-next-version-retarget',
+    title: "The Assistant told to start the next version and move what can follow (HI-2811): cw_branch nextVersion, then cw_queue retarget with the preview its reply gave; the Todo card moves, the running lane stays on the release",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    prompt: "Start 1.4.0 for alpha, and move whatever can follow it over to 1.4.0: I've checked them, go ahead.",
+    // A fake's script is fixed: it can't name the preview its cw_branch reply gives, so it asks cw_queue retarget by
+    // branch, which only previews and moves nothing; the checks of the move are a model's (fakeSkips), never a fake run's.
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.3.0","target":"1.4.0"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      const offered = callsWithReplies(o, 'cw_branch').map((x) => /\bpreview (rt-[\w-]+)/.exec(x.reply)?.[1]).filter(Boolean)
+      return [
+        ['started it with cw_branch nextVersion, which worked', s.started.length > 0, o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['1.4.0 exists, alpha merges into it, and 1.3.0 is another branch work can merge into', s.branches.includes('1.4.0') && s.targets?.target === '1.4.0' && (s.targets?.otherTargets ?? []).includes('1.3.0'), JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ['moved it with cw_queue retarget naming the preview cw_branch gave, the Todo card among its items', s.retargets.some((x) => offered.includes(String(argsOf(x).preview)) && (argsOf(x).items ?? []).map(String).includes(c.todoKey)), JSON.stringify({ offered, retargets: s.retargets.map((x) => argsOf(x)) })],
+        ['the Todo card follows 1.4.0 now (no target of its own)', (s.todoTarget ?? null) === null, JSON.stringify(s.todoTarget)],
+        ["the running lane stays on 1.3.0, its card in Doing and not moved", s.laneOn13 && s.laneCardDoing && !(o.facts?.l ?? []).some((f) => f.kind === 'Retargeted'), JSON.stringify({ lane: s.lane, facts: (o.facts?.l ?? []).map((f) => f.kind) })]
+      ]
+    },
+    fakeSkips: ['moved it with cw_queue retarget naming the preview cw_branch gave, the Todo card among its items', 'the Todo card follows 1.4.0 now (no target of its own)']
+  },
+  {
     id: 'assistant-add-agent-connection',
     title: "The Assistant adds an agent on another agent's connection (HI-2108): names the connection, never a provider, model, effort, mode or context",
     role: 'assistant',
@@ -4434,18 +4570,82 @@ async function team(c) {
  * A lane registered as its builder (`key`) registers its own (cw_lane start, with its own token), which starts nobody:
  * a lane a script records starts its stopped agents on its brief (HI-1900, HI-1934), and the scenarios start them
  * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
+ * `keepRunning`: left running instead, as a builder that registers its own lane is, for Combwork to start the lane's
+ * first card on (combworkStartedLaneCard). The stop here is the user's Stop, and since HI-2815 Combwork starts no lane
+ * card on a builder someone stopped (HI-2819, found by 1.3.0-rc.2's scenarios).
  */
-async function builderLane(c, key, body) {
+async function builderLane(c, key, body, { keepRunning = false } = {}) {
   const id = c.agents[key].id
   const live = async () => (await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id)
   // Already running when the setup started its card first (HI-2270: card-loop-design-check).
   if (!(await live())) await c.startAgent(key)
   const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
   if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
+  if (keepRunning) return r
   await c.inv('session:stop', c.alpha, id)
   const lib = require('../e2e/lib.cjs')
   if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
+}
+/**
+ * The Start the next version scenarios' alpha (HI-2811): Work merges into 1.3.0 (a branch; 1.4.0 not yet), a Todo card
+ * `a` with its own Merges into 1.3.0, and Implementer's lane running on 1.3.0 with its card `l` in Doing. A card that
+ * follows Work merges into moves with it by itself, so only one with its own target is offered (retarget.ts); and a
+ * target the same as the project's is no target of the card's (targets.ts pickTarget), so `a`'s is set while alpha
+ * merges into 1.2.0, 1.3.0 listed. Checked as the preview Start the next version makes, so no check passes on nothing.
+ */
+async function nextVersionSetup(c) {
+  c.git('branch', '1.2.0')
+  c.git('branch', '1.3.0')
+  await pairInProject(c, { target: '1.2.0', otherTargets: ['1.3.0'] })
+  await c.card('a', { title: 'Add a dark mode toggle', description: 'A toggle in the settings page that switches the theme.' })
+  await c.inv('tasks:setTarget', c.cards.a, '1.3.0')
+  await pairInProject(c, { target: '1.3.0', otherTargets: [] })
+  const a = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
+  if (a?.target !== '1.3.0') throw new Error(`setup: #${c.cards.a} has no Merges into 1.3.0 of its own: ${JSON.stringify(a?.target)}`)
+  c.todoKey = a.key
+  await swapRoles(c)
+  // Built in alpha's own folder (pairInProject), on the branch it has checked out: the release's, as a lane on it is.
+  c.git('checkout', '-q', '1.3.0')
+  const l = await c.card('l', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+  await userMove(c, l, 'doing')
+  await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [l] })
+  const p = await c.inv('workflow:nextVersionPreview', c.alpha, '1.3.0', '1.4.0')
+  const moves = (p?.cards?.move ?? []).map((x) => x.number)
+  const kept = (p?.cards?.keep ?? []).filter((x) => x.why === 'started').map((x) => x.number)
+  if (!(moves.length === 1 && moves[0] === c.cards.a && kept.includes(l) && (p?.lanes ?? []).length === 1 && !(p?.laneMoves ?? []).length)) throw new Error(`setup: Start the next version wouldn't offer #${c.cards.a} alone and keep the lane: ${JSON.stringify(p)}`)
+}
+/**
+ * After the run (HI-2811): the running lanes still on 1.3.0, as Start the next version's own preview reads each lane's
+ * Merges into (retarget.ts: its recorded ruleset's target), by id.
+ */
+async function nextVersionAfter(c) {
+  const p = await c.inv('workflow:nextVersionPreview', c.alpha, '1.3.0', '1.4.0')
+  return { lanesOn13: (p?.lanes ?? []).map((x) => x.id), laneMoves: (p?.laneMoves ?? []).map((x) => x.id) }
+}
+/** What the next version scenarios check (HI-2811), from what the run left. */
+function nextVersionState(o, c) {
+  const lane = (o.lanes ?? []).find((x) => (x.cards ?? []).some((y) => (y?.number ?? y) === c.cards.l)) ?? null
+  const started = (o.facts?.l ?? []).find((f) => f.kind === 'Started')?.data?.target ?? null
+  return {
+    started: ran(o, 'cw_branch').filter((x) => argsOf(x).action === 'nextVersion'),
+    // A retarget that moves (named a preview): one asking only for a preview moves nothing.
+    retargets: ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget' && argsOf(x).preview),
+    byCard: retargetWays(o).byCard,
+    branches: o.branches ?? [],
+    targets: o.targets ?? null,
+    todoTarget: o.cards.a?.target ?? null,
+    lane: lane && { state: lane.state, target: lane.target ?? null, cards: (lane.cards ?? []).map((y) => y?.number ?? y), started },
+    // On 1.3.0 as Combwork reads a running lane's Merges into (its ruleset's, which the lane list shows only when the
+    // lane named one: nextVersionAfter), its card started on it.
+    laneOn13: !!lane && ['active', 'paused'].includes(lane.state) && (o.after?.lanesOn13 ?? []).includes(lane.id) && started === '1.3.0',
+    laneCardDoing: o.cards.l?.column === 'doing',
+    // Everything it said in its turn: its answer can come before what it says of the lane it then watches (its lane's
+    // builder is stopped, so the lane stalls), and its last words be about that watch.
+    said: (o.replies ?? []).join('\n\n'),
+    // A reply that puts a decision to the user and names `what` (not one about the stalled lane only).
+    asks: (what) => (o.replies ?? []).some((r) => asksTheUser(r) && String(r).includes(what))
+  }
 }
 /** The states of a delivery that has reached its agent's current launch, or been read: never uncertain or ended. */
 const DELIVERY_REACHED = ['offered', 'received', 'acked']
@@ -4460,8 +4660,8 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
   return (deliveries ?? []).some((x) => x.kind === 'task' && x.card === n && DELIVERY_REACHED.includes(x.state) && /^m\d+$/.test(x.id) && new RegExp(`\\b${x.id}\\b`).test(shown ?? ''))
 }
 /**
- * Combwork's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Combwork starts it on the stopped builder
- * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
+ * Combwork's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Combwork starts it on the builder,
+ * left running by builderLane (HI-2029, laneStarts; HI-2819: never one the user stopped, HI-2815), about a second after it. Waited for until it has landed (laneStartLanded), so nothing of
  * the start is still on its way as the subject looks at the board.
  */
 async function combworkStartedLaneCard(c, key, n) {
@@ -4504,8 +4704,9 @@ async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2', column: cColumn })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
   for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
-    await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
-    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await combworkStartedLaneCard(c, key, cards[0])
+    const started = (key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')
+    await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` }, { keepRunning: started })
+    if (started) await combworkStartedLaneCard(c, key, cards[0])
   }
 }
 /**

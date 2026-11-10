@@ -29,8 +29,8 @@
 
 import { CONFLICT_LIMITS, parseConflicts, type ConflictFile, type ConflictsRecord } from '../../shared/workflow/conflicts'
 import { say } from '../../shared/agentText'
-import { CANDIDATE_TEXT } from './candidateText'
-import type { CandidateTestFail } from './integration'
+import { CANDIDATE_TEXT, UPDATE_NOT_SAME } from './candidateText'
+import type { CandidateFail, CandidateTestFail } from './integration'
 import type { Owner, StoreLock } from './jjBoundary'
 import { jjSameRevision } from './jjChecks'
 import { isJjUnknown, JjReads, jjUnknown, parseCommitLine, type JjCommit, type JjMaybe, type JjReadUnknown } from './jjReads'
@@ -73,6 +73,21 @@ export interface JjAttemptRecord {
   commits: string[]
   /** The candidate's commit (the duplicates' head, the squash, the merge). */
   result?: string
+  /**
+   * How a finished attempt ended, written with its `done`: a candidate, an update (strict's, HI-2853), or the failure
+   * that returns the card. Only a `candidate` record can credit containment (J5, HI-2798/s14 §2′); a done record without
+   * it is never one.
+   */
+  outcome?: 'candidate' | 'updated' | 'conflict' | 'notUpToDate' | 'notSame'
+  /** A candidate (absent: one, as every record before HI-2853) or strict's update; an update never credits by itself. */
+  kind?: 'candidate' | 'update'
+  /** An update's way: the target merged into the reviewed revision, or the revision rebased onto it. */
+  how?: 'merge' | 'rebase'
+  /**
+   * A merge or squash candidate built on an update (HI-2853/s10): the update attempt and its result. Only candidates
+   * carry it (an update is a leaf); a rebase candidate ignores an update and never records one.
+   */
+  updated?: { attempt: string; result: string }
   pins: JjPin[]
   abandoned?: string[]
   kept?: string[]
@@ -186,6 +201,61 @@ export interface JjCandidateRequest {
   style: JjCandidateStyle
   /** A squash's or a merge's description. */
   message: string
+  /**
+   * Strict's update this candidate is built on (merge and squash; a rebase ignores it): the update's record from the
+   * card's journal, validated before anything is written (`validUpdate`); invalid, the candidate is refused unwritten.
+   */
+  updated?: JjAttemptRecord
+}
+
+/** Strict's update (G8, HI-2853): the reviewed revision brought up to date with the target's head as private commits. */
+export interface JjUpdateRequest {
+  card: string
+  attempt: string
+  revision: string
+  base: string
+  /** The target's head it is brought up to date with. */
+  expected: string
+  how: 'merge' | 'rebase'
+  /** A merge's description. */
+  message: string
+}
+
+/** An update that returns the card: a conflict, or not the same change, with its evidence. */
+export type JjUpdateFail = CandidateFail & { evidence: string[]; refs: string[]; record: JjAttemptRecord }
+
+export type JjUpdateOutcome = { updated: string; record: JjAttemptRecord } | { updated: null } | JjUpdateFail | { pause: 'signing'; message: string } | JjInterrupted | JjReadUnknown
+
+/** What an update must be to be built on or credited (HI-2853/s10 §2): its reviewed input, target, attempt and result. */
+export interface UpdateWanted {
+  card: string
+  revision: string
+  base: string
+  expected: string
+  attempt: string
+  result?: string
+}
+
+/**
+ * Whether a record is a finished update for exactly this input (HI-2853/s10 §2), its result pin read now: true, or why
+ * not (a code), or unknown when the pin can't be read. Run before a candidate is built on it and again when J5 credits
+ * the chain. An update is a leaf; a record of no kind is a candidate and never an update.
+ */
+export async function validUpdate(git: (args: readonly string[]) => Promise<RunResult>, u: JjAttemptRecord | undefined, want: UpdateWanted): Promise<true | string | JjReadUnknown> {
+  if (!u) return 'missing'
+  if (u.kind !== 'update' || u.phase !== 'done' || u.outcome !== 'updated') return 'notUpdated'
+  if (u.step || u.uncertain?.length || u.updated) return 'unsettled'
+  if (u.card !== want.card || u.attempt !== want.attempt) return 'foreign'
+  if (u.revision !== want.revision || u.base !== want.base) return 'input'
+  if (u.expected !== want.expected) return 'expected'
+  if (!u.result || !COMMIT_ID.test(u.result) || (want.result !== undefined && u.result !== want.result)) return 'result'
+  const pin = u.pins.find((p) => p.state === 'created' && p.ref === `${pinPrefix(u.card, u.attempt)}candidate`)
+  if (!pin || pin.oid !== u.result) return 'unpinned'
+  const r = await git(['for-each-ref', '--format=%(objectname) %(refname)', pin.ref])
+  if (!r.ok) return jjUnknown('failed', r.err)
+  const m = parseRefs(r.out)
+  if (!m) return jjUnknown('malformed', r.out)
+  return m.get(pin.ref) === u.result ? true : 'pinMoved'
 }
 
 const SEP = '\u001f'
@@ -539,7 +609,7 @@ class Attempt {
  * conflicted commit naming it) and their hunks in git's marker style, bounded by CONFLICT_LIMITS. A conflict of more than
  * two sides can't be written in git's style: listed, its text not read (`notText`).
  */
-async function conflictsOf(a: Attempt, op: string, commits: readonly JjCommit[]): Promise<{ files: string[]; record: ConflictsRecord; evidence: string[] } | null> {
+async function conflictsOf(a: Attempt, op: string, commits: readonly JjCommit[], oursIs: ConflictsRecord['oursIs'] = 'target'): Promise<{ files: string[]; record: ConflictsRecord; evidence: string[] } | null> {
   const conflicted = commits.filter((c) => c.conflict)
   if (!conflicted.length) return null
   const seen = new Map<string, { commit: string; sides: number }>()
@@ -584,7 +654,7 @@ async function conflictsOf(a: Attempt, op: string, commits: readonly JjCommit[])
     }
     read.push(parseConflicts(file, text, true, room))
   }
-  return { files, record: { oursIs: 'target', files: read, ...(files.length > CONFLICT_LIMITS.files ? { filesLeft: files.length - CONFLICT_LIMITS.files } : {}) }, evidence: conflicted.map((c) => c.commit) }
+  return { files, record: { oursIs, files: read, ...(files.length > CONFLICT_LIMITS.files ? { filesLeft: files.length - CONFLICT_LIMITS.files } : {}) }, evidence: conflicted.map((c) => c.commit) }
 }
 
 /** The head of a set of commits: the one no other in it names as a parent (null unless exactly one). */
@@ -618,8 +688,23 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
   if (isJjUnknown(exp)) return exp
   if (!reads.stillAt(h0)) return jjUnknown('moved')
   if (rev.divergent || exp.divergent) return jjUnknown('ambiguous', 'divergent')
+  // Strict's update to build on (merge and squash; a rebase ignores it): validated before anything is written, else
+  // refused unwritten (HI-2853/s10 §2). Its result visible and not divergent at h0.
+  let from = req.revision
+  let updated: JjAttemptRecord['updated']
+  if (req.updated && req.style !== 'rebase') {
+    const v = await validUpdate(deps.git, req.updated, { card: req.card, revision: req.revision, base: req.base, expected: req.expected, attempt: req.updated.attempt })
+    if (isJjUnknown(v)) return v
+    if (v !== true) return jjUnknown('malformed', `update:${v}`)
+    const u = await reads.commitAt(h0, `${req.updated.result} & ::visible_heads()`)
+    if (isJjUnknown(u)) return u.jjUnknown === 'none' ? jjUnknown('malformed', 'update:hidden') : u
+    if (u.divergent || u.conflict) return jjUnknown('malformed', 'update:unsettled')
+    if (!reads.stillAt(h0)) return jjUnknown('moved')
+    from = req.updated.result!
+    updated = { attempt: req.updated.attempt, result: from }
+  }
 
-  const rec: JjAttemptRecord = { attempt: req.attempt, card: req.card, style: req.style, revision: req.revision, base: req.base, expected: req.expected, phase: 'planned', baseOp: h0, ops: [], commits: [], pins: [] }
+  const rec: JjAttemptRecord = { attempt: req.attempt, card: req.card, kind: 'candidate', style: req.style, revision: req.revision, base: req.base, expected: req.expected, phase: 'planned', baseOp: h0, ops: [], commits: [], pins: [], ...(updated ? { updated } : {}) }
   const a = new Attempt(deps, rec)
   try {
     a.check()
@@ -638,11 +723,11 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       rec.result = headOf(d.added)!.commit
     } else if (req.style === 'merge') {
       await a.phase('writing')
-      const d = await a.write('merge', ['new', req.expected, req.revision, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected, req.revision] })
+      const d = await a.write('merge', ['new', req.expected, from, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected, from] })
       rec.result = d.added[0].commit
     } else {
       await a.phase('writing')
-      const m = await a.write('scratch', ['new', req.expected, req.revision, '--no-edit', '-m', `combwork scratch ${req.attempt}`], { kind: 'new', parents: [req.expected, req.revision] }) // i18n-ignore: a protocol detail for logs and tests, never shown
+      const m = await a.write('scratch', ['new', req.expected, from, '--no-edit', '-m', `combwork scratch ${req.attempt}`], { kind: 'new', parents: [req.expected, from] }) // i18n-ignore: a protocol detail for logs and tests, never shown
       const merged = m.added[0].commit
       const s = await a.write('squash', ['new', req.expected, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected] })
       const empty = s.added[0].commit
@@ -678,6 +763,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       const kept = await a.abandon(rec.commits)
       if (kept.length) throw new Stop('kept')
       await a.held()
+      rec.outcome = fail.fail === 'conflict' ? 'conflict' : 'notUpToDate'
       await a.phase('done')
       const evidence = fail.fail === 'conflict' ? (conflicts?.evidence ?? []) : [...rec.commits]
       return { ...fail, evidence, refs: a.owned(), record: structuredClone(rec) }
@@ -690,9 +776,94 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
     const at = a.head()
     if (!(await a.commits(at, visibleOf([result.commit]))).length) throw new Stop('gone', result.commit)
     await a.held()
+    rec.outcome = 'candidate'
     await a.phase('done')
     const stays = rec.commits.filter((c) => !(rec.abandoned ?? []).includes(c) && c !== rec.result).concat(result.commit)
     return { candidate: { result: result.commit, commits: (await a.commits(at, visibleOf(stays))).map((c) => c.commit), change: result.change, op: at, refs: a.owned() }, record: structuredClone(rec) }
+  } catch (e) {
+    if (e instanceof Stop) return a.interrupted(e)
+    throw e
+  }
+}
+
+/**
+ * Strict's update for jj (G8, HI-2853/s7, s10): the reviewed revision R brought up to date with the target's head E as
+ * private commits, on J4's machinery (the same session, journalled steps, create-only pins and guarded abandons; recovery
+ * and drop are J4's). Already up to date (E an ancestor of R): `{ updated: null }`, nothing written. Merge: a fresh
+ * commit with parents R then E (git's merge of the target into the card, so the card's side is written first in a
+ * conflict); rebase: R's suffix duplicated onto E (a merge in it returns the card). Conflicts read from every commit made;
+ * then §16.3.2's replay (`jjSameRevision`) or `notSame`. Success: `outcome: 'updated'`, its result pinned (`…/candidate`),
+ * never a candidate by itself.
+ */
+export async function prepareJjUpdate(deps: JjCandidateDeps, req: JjUpdateRequest): Promise<JjUpdateOutcome> {
+  if (!ATTEMPT.test(req.attempt)) return jjUnknown('malformed', 'attempt')
+  for (const c of [req.revision, req.base, req.expected]) if (!COMMIT_ID.test(c)) return jjUnknown('malformed', c)
+  const reads = new JjReads({ folder: deps.folder, jjRepo: deps.view.jjRepo }, deps.runner, { signal: deps.signal, timeout: deps.timeout })
+  const h0 = reads.head()
+  if (isJjUnknown(h0)) return h0
+  const ok = await reads.supported()
+  if (isJjUnknown(ok)) return ok
+  const signing = await reads.configAt(h0, 'signing.behavior')
+  if (isJjUnknown(signing)) return signing
+  if (signing === 'own' || signing === 'force') return { pause: 'signing', message: `signing.behavior = ${signing}` } // i18n-ignore: a protocol detail for logs and tests, never shown
+  const rev = await reads.commitAt(h0, req.revision)
+  if (isJjUnknown(rev)) return rev
+  const exp = await reads.commitAt(h0, req.expected)
+  if (isJjUnknown(exp)) return exp
+  if (rev.divergent || exp.divergent) return jjUnknown('ambiguous', 'divergent')
+  const upToDate = await reads.run(h0, ['log', '--no-graph', '-r', `${req.expected} & ::${req.revision}`, '-T', 'commit_id ++ "\\n"'])
+  if (isJjUnknown(upToDate)) return upToDate
+  if (!reads.stillAt(h0)) return jjUnknown('moved')
+  if (lines(upToDate).length) return { updated: null }
+
+  const rec: JjAttemptRecord = { attempt: req.attempt, card: req.card, kind: 'update', how: req.how, style: req.how, revision: req.revision, base: req.base, expected: req.expected, phase: 'planned', baseOp: h0, ops: [], commits: [], pins: [] }
+  const a = new Attempt(deps, rec)
+  try {
+    a.check()
+    await a.phase('planned')
+    await a.hook('planned')
+    const say3 = (m: (typeof CANDIDATE_TEXT)[keyof typeof CANDIDATE_TEXT]): string => say(m, { card: req.card, revision: req.revision.slice(0, 7), expected: req.expected.slice(0, 7) })
+    if (req.how === 'rebase') {
+      const suffix = await a.commits(h0, `${req.base}..${req.revision}`)
+      if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
+      if (!suffix.length) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
+      await a.phase('writing')
+      const d = await a.write('update', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
+      rec.result = headOf(d.added)!.commit
+    } else {
+      await a.phase('writing')
+      const d = await a.write('update', ['new', req.revision, req.expected, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.revision, req.expected] })
+      rec.result = d.added[0].commit
+    }
+    await a.phase('written')
+    await a.hook('written')
+    await a.pinAll()
+    const op = a.head()
+    const made = await a.commits(op, visibleOf(rec.commits))
+    const result = made.find((c) => c.commit === rec.result)
+    if (!result) throw new Stop('gone', rec.result)
+    if (made.some((c) => c.divergent)) throw new Stop('raced', 'divergent')
+    const conflicts = await conflictsOf(a, op, made, req.how === 'merge' ? 'card' : 'target')
+    let fail: CandidateFail | null = conflicts ? { fail: 'conflict', files: conflicts.files, log: '', conflicts: conflicts.record } : null
+    if (!fail && !(await jjSameRevision({ base: req.base, commit: rev }, { base: req.expected, commit: result }, deps.sameChange))) {
+      fail = { fail: 'notSame', log: say(UPDATE_NOT_SAME, { card: req.card, revision: req.revision.slice(0, 7), target: '', expected: req.expected.slice(0, 7) }) }
+    }
+    a.check()
+    if (fail) {
+      const kept = await a.abandon(rec.commits)
+      if (kept.length) throw new Stop('kept')
+      await a.held()
+      rec.outcome = fail.fail === 'conflict' ? 'conflict' : 'notSame'
+      await a.phase('done')
+      const evidence = fail.fail === 'conflict' ? (conflicts?.evidence ?? []) : [...rec.commits]
+      return { ...fail, evidence, refs: a.owned(), record: structuredClone(rec) }
+    }
+    const at = a.head()
+    if (!(await a.commits(at, visibleOf([result.commit]))).length) throw new Stop('gone', result.commit)
+    await a.held()
+    rec.outcome = 'updated'
+    await a.phase('done')
+    return { updated: result.commit, record: structuredClone(rec) }
   } catch (e) {
     if (e instanceof Stop) return a.interrupted(e)
     throw e

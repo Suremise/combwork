@@ -16,6 +16,7 @@ import { CombworkError } from '../combworkError'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
+import { merges } from '../../shared/platform/descriptors'
 import { branchExists, projectTargets } from './targets'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
@@ -182,12 +183,12 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
     if (!s.started || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
     const t = s.started.target
-    if (o.platform !== 'git' || o.finish !== 'combworkMerges' || !t) continue
+    if (!merges(o.platform) || o.finish !== 'combworkMerges' || !t) continue
     inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
   }
   const o = wf.currentRuleset(false).options
   let current: string | null = null
-  if (o.platform === 'git' && o.finish === 'combworkMerges') {
+  if (merges(o.platform) && o.finish === 'combworkMerges') {
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
@@ -236,7 +237,7 @@ export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): 
   const pending = new Set(pushPendingOf(wf.store.meta(pushPendingKey(target))).map((p) => p.entry))
   const settled = new Map(pushLogOf(wf.store.meta(pushLogKey(target))).map((p) => [p.entry, p.state]))
   const o = wf.cfg.options()
-  const pushesNow = o.platform === 'git' && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
+  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
   return recent.map((r) => {
     const took = r.entry ? entryTook(of(r.card), r.entry) : null
     const push: QueueRecent['push'] = r.outcome !== 'merged' || r.by !== 'combwork' || !r.entry ? undefined : pending.has(r.entry) ? 'pending' : (settled.get(r.entry) ?? (pushesNow ? 'unknown' : undefined))
@@ -391,7 +392,7 @@ export async function branchQueueCard(ws: WorkspaceService, projectPath: string,
     const s = wf.state(card)
     if (!s.started || s.started.line !== branch || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
-    if (o.platform !== 'git' || o.finish !== 'combworkMerges') continue
+    if (!merges(o.platform) || o.finish !== 'combworkMerges') continue
     const target = s.entries.at(-1)?.target ?? s.started.target ?? ''
     const v = target ? queueView(ws, wf, projectPath, target) : null
     const at = v?.queued.findIndex((q) => q.card === card.id) ?? -1

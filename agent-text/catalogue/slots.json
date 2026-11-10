@@ -29,6 +29,11 @@
     "note": "An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32).",
     "audience": "both"
   },
+  "slots.setting.badSwitch": {
+    "text": "Set up submodules and LFS is on or off.",
+    "note": "An error (HI-1182): a request to change the setting “Set up submodules and LFS” gave something other than on or off. Keep the setting’s name as Combwork shows it.",
+    "audience": "both"
+  },
   "slots.setting.badText": {
     "text": "A slot script or list of files is text of at most {max, number} characters.",
     "note": "An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000).",

@@ -179,6 +179,8 @@ export const EDGES = [
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
   { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
+  { file: 'src/main/platform/jjOperations', module: 'src/main/git', class: 'impl', names: ['git'], why: "an operation preview reads the colocated store's refs and HEAD to compare with jj's record (HI-2800, E8): read-only git calls, never an import" },
+  { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
   { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
   { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
@@ -221,7 +223,6 @@ export const EDGES = [
   { file: 'src/main/slotCards', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: "a card's slot preparation under the repository lock (R4 kept the lock order)" },
   { file: 'src/main/slotMigration', module: 'src/main/worktrees', class: 'historic', names: ['listWorktreesOrNull'], op: 'migrateSlots (0.9 → 1.0)', why: "1.0's slot migration adopts 0.9 worktrees" },
   { file: 'src/main/storage', module: 'src/main/unusedWorktrees', class: 'impl', names: ['unusedWorktreeFolders'], why: "the Storage view's 0.9 worktree folders" },
-  { file: 'src/main/tasks', module: 'src/main/platform/refHold', class: 'defect', names: ['RefHold'], card: 'HI-2821', why: "a card's move to another target holds git's ref locks (HI-2753)" },
   { file: 'src/main/templates', module: 'src/main/worktrees', class: 'impl', names: ['RepoReads', 'WorktreeRef', 'branchStatus'], why: "templates' 0.9 worktree branch status" },
   { file: 'src/main/tray', module: 'src/main/branchWatch', class: 'gitUi', why: "the tray's branch status" },
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/git', class: 'impl', names: ['GIT_PREFIX', 'git'], why: "the queue's own git when its config gives no runner (tests; the app passes QueueRunner's)" },
@@ -235,9 +236,6 @@ export const EDGES = [
   { file: 'src/main/workflow/queueRunner', module: 'src/main/gitTool', class: 'impl', names: ['GitExe', 'PATH_GIT', 'gitExe', 'gitExeGone'], why: "the queue's runner: Git's tool" },
   { file: 'src/main/workflow/queueRunner', module: 'src/main/gitWorker', class: 'impl', names: ['GitOutcome', 'GitRequest', 'onOutputSettled', 'withLauncherEnv'], why: "the queue's runner: Git's request and outcome" },
   { file: 'src/main/workflow/queueRunner', module: 'src/main/workflow/gitHost', class: 'impl', names: ['GitHost', 'HostResult', 'startGitHost'], why: "the queue's runner: Git's host process" },
-  { file: 'src/main/workflow/retargetCard', module: 'src/main/git', class: 'defect', names: ['git'], card: 'HI-2821', why: "a card's move to another target proves its own work with git's refs, worktrees and reflog in common workflow code (HI-2753)" },
-  { file: 'src/main/workflow/retargetCard', module: 'src/main/platform/git', class: 'defect', names: ['commonDirFast', 'isAncestor', 'lineHead', 'mergeBase'], card: 'HI-2821', why: 'as above: its line heads, merge bases and ancestry' },
-  { file: 'src/main/workflow/retargetCard', module: 'src/main/platform/refHold', class: 'defect', names: ['RefHold', 'RefHoldRefused', 'holdRefs'], card: 'HI-2821', why: "as above: its compare and swap holds git's ref locks" },
   { file: 'src/main/workspace', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace (Git's slots and 0.9 worktrees)" },
   { file: 'src/renderer/src/commands', module: 'src/shared/gitRepo', class: 'gitUi', why: "the Version Control tab's sections, for its commands" },
   { file: 'src/renderer/src/components/AgentDialogs', module: 'src/shared/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
@@ -269,7 +267,7 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 19 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185)" },
+  'src/main/ipc': { calls: { lineRepoReads: 19, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
   'src/main/projectAgents': { calls: { lineRepoOps: 1 }, why: "the 0.9 worktree merge through RepoOps (R3)" },
   'src/main/repoOpsIpc': { calls: { lineRepoOps: 1 }, why: "the window's repository operations (R3)" },
@@ -281,6 +279,7 @@ export const SEAMS = {
   'src/main/workflow/nextVersion': { calls: { lineRepoReads: 2, lineRepoOps: 2 }, why: "Start the next version: the window's repository reads and operations (R2, R3)" },
   'src/main/workflow/optionsForm': { calls: { lineHistory: 2 }, why: "the default target for kept targets and a changed form: reached with the project's path alone (HI-2792)" },
   'src/main/workflow/queueChecks': { calls: { lineHistory: 2 }, why: "the queue's check brackets (R6)" },
+  'src/main/workflow/queueChecksApp': { calls: { slotWorkspaces: 1 }, why: "the queue's folder's submodules and LFS step: a worktree made as slots are, their platform's (HI-1182)" },
   'src/main/workflow/queueControls': { calls: { lineHistory: 9, queueIntegration: 1 }, why: "forwarding, the default target and Resume's condition: the queue's controls name no card (R8, HI-2792)" },
   'src/main/workflow/queueHost': { calls: { queueIntegration: 2 }, why: "the host's pin clean-up (R8)" },
   'src/main/workflow/queueRunner': { calls: { queueIntegration: 2 }, why: "the runner's workspace removal (R8)" },
@@ -289,6 +288,42 @@ export const SEAMS = {
   'src/main/workflow/runLink': { calls: { lineHistory: 2 }, why: "a run's checked-out revision, before its card is known (HI-2792)" },
   'src/main/workflow/targets': { calls: { lineHistory: 3 }, why: "a lane's target and own-work reads, and empty lines dropped (R6)" },
   'src/main/workspaceMove': { calls: { slotWorkspaces: 4, slotRelocation: 1 }, why: "Repair's worktree steps: the pool's platform's relocation (HI-2792; §16.3.6's gate: relocation)" }
+}
+
+/**
+ * A switch on a platform's id (`platform === 'git'`, `d.platform !== 'none'`), HI-2822's grep: SPEC §16.3.6's rule 2 says a
+ * caller asks a port or reads the descriptor (a capability, its integration, deliverables, repository or operations).
+ */
+const SWITCH = /platform\)?\s*[!=]==?\s*'(git|none)'/g
+
+/** Where a switch belongs: the descriptors, the platforms' adapters and the registry that picks between them. */
+const SWITCH_HOME = /^src\/(shared\/platform\/descriptors|main\/platform\/(registry|adapters|adapter|git[A-Z]?\w*|none[A-Z]?\w*))$/
+
+/**
+ * The switches left outside their home, per file, each justified (HI-2822): Git-facing text that names Git, and Git's own
+ * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
+ */
+export const SWITCHES = {
+  'src/main/copies': { n: 1, why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/slots': { n: 1, why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/workflow/platformSwitch': { n: 1, why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
+  'src/main/workflow/storeSwitch': { n: 1, why: "a project's repository store is read as Git's common directory (Git's, or colocated jj's): Git's data (HI-2799)" },
+  'src/main/servers': { n: 1, why: "the project's status names what was found in Git's words for agents (`git at {root}`, api.project.vcsGit): Git-facing text" },
+  'src/main/workflow/commitMessageStep': { n: 2, why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): historic, Git's data alone" },
+  'src/renderer/src/views/VersionControl': { n: 1, why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
+  'src/renderer/src/views/VersionControlHeader': { n: 1, why: "the tab's fact line says the folder is a Git repository at its root (git.vc.fact.repo, .subfolder): Git-facing text" }
+}
+
+/** Each file's count of switches on a platform's id, outside their home. */
+export function switchCounts(root, over = {}) {
+  const out = {}
+  for (const { file, text } of filesOf(root, over)) {
+    const f = file.replace(/\.tsx?$/, '')
+    if (SWITCH_HOME.test(f)) continue
+    const n = [...text.matchAll(SWITCH)].length
+    if (n) out[f] = n
+  }
+  return out
 }
 
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
@@ -310,5 +345,7 @@ export function audit(root, over = {}) {
     const want = SEAMS[file]?.calls ?? {}
     return [...new Set([...Object.keys(have), ...Object.keys(want)])].filter((s) => (have[s] ?? 0) !== (want[s] ?? 0)).map((s) => `${file}: ${s}() ×${have[s] ?? 0}, listed ×${want[s] ?? 0}`)
   })
-  return { found, unlisted, stale, extraNames, seams }
+  const switched = switchCounts(root, over)
+  const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
+  return { found, unlisted, stale, extraNames, seams, switches }
 }

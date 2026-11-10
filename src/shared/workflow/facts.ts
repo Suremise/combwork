@@ -7,6 +7,7 @@
 
 import type { ConflictsRecord } from './conflicts'
 import type { FocusedChoice, FocusedTest } from './focused'
+import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 
@@ -33,6 +34,8 @@ export interface FileChange {
   path: string
   /** git's letter (A, M, D, R…), or None's A / M / D against the card's start. */
   status: string
+  /** HI-2864: Git only, either side a submodule (mode 160000): what each side is, a gitlink's commit with it. */
+  gitlink?: { from: GitlinkSide; to: GitlinkSide }
 }
 
 /** None: a card's paths with their content hashes (never contents), §16.3.3. */
@@ -362,7 +365,7 @@ export interface FactData {
    * original run, its agent its own).
    */
   FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string; acceptedBy?: string }
-  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[]; platform?: Record<string, unknown> }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
   /**

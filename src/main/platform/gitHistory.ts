@@ -7,6 +7,7 @@
 import { git, gitReading } from '../git'
 import * as G from './git'
 import type { HistoryPort } from './history'
+import { gitOwnWork } from './gitOwnWork'
 import { unknown } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 
@@ -44,6 +45,8 @@ export const gitHistory: HistoryPort = {
   firstParents: (repo, base, head) => G.firstParents(repo, base, head),
   commits: (repo, range, opts) => G.commits(repo, range, opts),
   workspaceNow: (folder, o) => G.worktreeNow(folder, o),
+  // retargetCard.ts's own-work proof (HI-2821), moved to gitOwnWork.ts unchanged.
+  ownWork: gitOwnWork,
 
   // targets.ts's dropEmptyLines (HI-2556): the worktrees' checked-out branches from git's porcelain list.
   async checkedOutLines(repo) {

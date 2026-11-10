@@ -4,7 +4,7 @@
 // are written by helpers beside this one (`setKept` for a switch of platform, `setPresetAsked` for the answer), never by
 // replacing the object.
 
-import type { PlatformId } from '../platform/descriptors'
+import { merges, type PlatformId } from '../platform/descriptors'
 import type { PresetAsked, ProjectWorkflow } from '../types'
 
 /** What a save sets: the platform in force, the preset the options started from, and the options the project sets. */
@@ -17,8 +17,9 @@ export type WorkflowWrite = Pick<ProjectWorkflow, 'platform' | 'preset' | 'optio
  */
 export function writeWorkflow(current: ProjectWorkflow | null | undefined, next: WorkflowWrite): ProjectWorkflow {
   const { commitMessageChosen: was, ...rest } = current ?? {}
-  if (next.platform !== 'git') return { ...rest, ...(was ? { commitMessageChosen: was } : {}), platform: next.platform, preset: next.preset, options: next.options }
-  const before = current?.platform === 'git' ? current.options?.commitMessage : undefined
+  // G19 is an option of a platform that merges (HI-2822: by its descriptor, never the id).
+  if (!merges(next.platform)) return { ...rest, ...(was ? { commitMessageChosen: was } : {}), platform: next.platform, preset: next.preset, options: next.options }
+  const before = current?.platform === next.platform ? current.options?.commitMessage : undefined
   const combwork = next.options.commitMessage === 'combwork'
   const chosen = combwork && (was || before !== 'combwork')
   return { ...rest, ...(chosen ? { commitMessageChosen: true as const } : {}), platform: next.platform, preset: next.preset, options: next.options }
