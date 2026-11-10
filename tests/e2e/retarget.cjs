@@ -12,6 +12,7 @@
 //   Another card in flight there moved from its dialog's Merges into (open for a started card), its line kept.
 // - HI-2825: cards never started, On Hold: the Assistant's update sets one's Merges into with its column and blocked;
 //   another's dialog saves its Merges into, the card staying On Hold.
+// - HI-2830: the project's branches changed while the card dialog is closed: opened again, it lists them as they are now.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -217,6 +218,17 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await page.locator('.dialog').first().screenshot({ path: path.join(fx.shots, 'retarget-dialog-never-started.png') }).catch(() => undefined)
     await page.keyboard.press('Escape')
     await page.locator('.dialog select#card-target').waitFor({ state: 'detached', timeout: HUNG_MS })
+    // HI-2830: the project's branches changed while the dialog is closed (Work merges into integration, 1.2.0 the other):
+    // opened again, its Merges into lists them as they are now (1.2.0 a choice of its own), not as it first read them.
+    await targets('integration', '1.2.0')
+    await q.openByTitle(page, nU)
+    const again = page.locator('.dialog select#card-target')
+    await again.waitFor({ timeout: HUNG_MS })
+    const relisted = await waitHung(async () => ((await again.locator('option[value="1.2.0"]').count()) === 1 ? true : null)).catch(() => null)
+    check("HI-2830: the dialog opened again lists the project's branches as they are now", !!relisted, JSON.stringify(await again.locator('option').allInnerTexts().catch(() => [])))
+    await page.keyboard.press('Escape')
+    await page.locator('.dialog select#card-target').waitFor({ state: 'detached', timeout: HUNG_MS })
+    await targets('1.2.0', 'integration')
     // Back to alpha's Version Control tab (the board view hides the project's tabs).
     await waitHung(async () => {
       if (await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().isVisible().catch(() => false)) return true
