@@ -332,6 +332,11 @@
       "why": "plain"
     }
   },
+  "service.git.gitlinkUnread": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
   "service.git.outside": {
     "placeholders": {}
   },
