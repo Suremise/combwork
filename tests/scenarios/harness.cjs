@@ -572,6 +572,18 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
   }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  // Advanced settings (HI-2867): the scenario's own (sc.advanced), then the run's (--advanced), in its profile's advanced.json.
+  const advancedValues = { ...sc.advanced, ...opts.advanced }
+  if (Object.keys(advancedValues).length) {
+    const advFile = path.join(userData, 'advanced.json')
+    let had = {}
+    try {
+      had = JSON.parse(fs.readFileSync(advFile, 'utf8'))
+    } catch {
+      // none yet
+    }
+    fs.writeFileSync(advFile, JSON.stringify({ ...had, format: 1, values: { ...had.values, ...advancedValues } }, null, 2))
+  }
 
   const port = opts.port ?? 47930
   const started = Date.now()

@@ -309,6 +309,8 @@ export const AREAS = [
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
   { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
+  // Agents' signer (HI-2867): the launcher and cw-sign.js, built outside the asar (packaged-sign runs them as installed).
+  { paths: ['src/main/platform/cw-sign.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/signerPick.ts', 'resources/cw-sign/', 'scripts/buildSignLauncher.mjs'], suites: ['packaged-sign'] },
   { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'placement', 'swap', 'repolock', 'maxagents'] },
   // Maximum agents (HI-2001): the option, its migration, its refusals and the Load dialog's offer.
   { paths: ['tests/e2e/maxagents.cjs', 'src/shared/agentLimits.ts', 'src/renderer/src/components/ManyAgentsNote.tsx', 'src/main/workflow/preferences.ts', 'src/shared/workflow/preferences.ts'], suites: ['maxagents', 'agents24'] },
@@ -318,7 +320,7 @@ export const AREAS = [
   // port (its contract, lookup and Git's implementation, Git's commit stream reading, and `again`): a change there is a
   // change to the queue's test merge, strict's update, the journaled advance, a restart's recovery, the push and the lease's
   // workspace removal.
-  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/gitSigning.ts', 'src/main/platform/boundedSpawn.ts', 'src/main/platform/ownedWork.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
+  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/gitSigning.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/boundedSpawn.ts', 'src/main/platform/ownedWork.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
   // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
@@ -626,7 +628,7 @@ export const AREAS = [
   { paths: ['tests/e2e/layoutReport.cjs'], suites: ['i18nreport', 'i18nshots'] },
   { paths: ['tests/e2e/i18nshots/', 'locales/', 'src/renderer/src/views/ProjectTabs.tsx', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/Popups.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/main/progress.ts'], suites: ['i18nshots'] },
   // The installer's copies (npm run dist first).
-  { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'] },
+  { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'] },
   // Combwork's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
   { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.

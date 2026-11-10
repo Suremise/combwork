@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Read your agents at a glance",
   "tips.agentWorkflowRole.text": "Each agent's Role in the workflow, in Agent Settings, says whether it builds cards, reviews them, or either. Start Lane offers builders and reviewers by it.",
   "tips.agentWorkflowRole.title": "Builders and reviewers",
+  "tips.agentsSignedCommits.text": "In a repository that signs commits, an agent's commit signs with nobody there or fails at once, saying why, instead of waiting for a passphrase nobody can type. Signing stays on; your git settings never change. Settings → Advanced turns it off.",
+  "tips.agentsSignedCommits.title": "Agents' signed commits don't wait for you",
   "tips.agentsTempFolder.text": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
   "tips.agentsTempFolder.title": "Keep agents' temp files out of Windows' Temp",
   "tips.allKeysToCli.text": "In an agent's pane, Combwork's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",

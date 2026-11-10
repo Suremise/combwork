@@ -861,11 +861,12 @@ describe("the installer's suites check the packaged build they test (#274)", () 
     expect(repeatStatus({ repeat: 1, runs: [{ ok: true }], before: 'abc', after: 'abc', buildStale: false, packagedStale: 'x' }).valid).toBe(false)
   })
 
-  it("a run of only the installer's suites doesn't need the dev build in out/, unless packaged-progress checks it", () => {
+  it("a run of only the installer's suites doesn't need the dev build in out/, unless packaged-progress or packaged-sign checks it", () => {
     const pk = suites.filter((s) => (s.needs ?? []).includes('packaged'))
-    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'])
+    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'])
     expect(needsDevBuild(pk, {})).toBe(false)
     expect(needsDevBuild(pk, { CW_PROGRESS_CHECK_DEV: '1' })).toBe(true)
+    expect(needsDevBuild(pk, { CW_SIGN_CHECK_DEV: '1' })).toBe(true)
     expect(needsDevBuild([...pk, suites.find((s) => s.name === 'board')!], {})).toBe(true)
     expect(needsDevBuild([], {})).toBe(true)
   })

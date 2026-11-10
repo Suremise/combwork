@@ -590,6 +590,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.sessions.signFailFast.desc': undefined
+  'settings.advanced.cw.sessions.signFailFast.title': undefined
+  'settings.advanced.cw.sessions.signTimeoutSeconds.desc': undefined
+  'settings.advanced.cw.sessions.signTimeoutSeconds.title': undefined
   'settings.advanced.cw.sessions.terminalType.desc': undefined
   'settings.advanced.cw.sessions.terminalType.title': undefined
   'settings.advanced.cw.showDeveloperFeatures.desc': undefined

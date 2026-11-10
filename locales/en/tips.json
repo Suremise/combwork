@@ -87,6 +87,14 @@
     "defaultMessage": "Builders and reviewers",
     "description": "A tip's title. Glossary: builder, reviewer."
   },
+  "tips.agentsSignedCommits.text": {
+    "defaultMessage": "In a repository that signs commits, an agent's commit signs with nobody there or fails at once, saying why, instead of waiting for a passphrase nobody can type. Signing stays on; your git settings never change. Settings → Advanced turns it off.",
+    "description": "A tip (HI-2867). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.agentsSignedCommits.title": {
+    "defaultMessage": "Agents' signed commits don't wait for you",
+    "description": "A tip's title (HI-2867): an agent's commit in a repository that signs never waits for a passphrase."
+  },
   "tips.agentsTempFolder.text": {
     "defaultMessage": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
     "description": "A tip (HI-2496). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Agents' temp folder is an advanced setting's title)."

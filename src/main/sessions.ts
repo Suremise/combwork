@@ -4,11 +4,12 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
+import { withSessionSigner, type SessionSigner } from './platform/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
@@ -1364,6 +1365,8 @@ class SessionManager {
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
   /** Combwork's bin folder (cw-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
+  /** Agents' signer (HI-2867, index.ts): cw-sign.exe and what it runs; null without a built launcher. */
+  signer: Omit<SessionSigner, 'timeoutMs'> | null = null
   combworkMcp: CombworkMcpProvider = () => null
   /** Combwork's guidance for agents (the combwork MCP server's instructions), for providers that need it at launch. */
   combworkGuidance: (projectPath: string) => Promise<string> = async () => ''
@@ -3033,7 +3036,9 @@ class SessionManager {
       // Its temp folder's variables last, over the account's and server's (HI-2496): none set, the environment as before.
       // Without Combwork's tools (HI-2670), only what its hooks report status with: no project, agent or API variables,
       // no cw-progress on its PATH.
-      env: withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
+      // Its signer last (HI-2867): with Combwork's tools and the Advanced switch on, its commits sign through cw-sign,
+      // never waiting for a passphrase; entries of another Combwork's signer are dropped either way.
+      env: withSessionSigner(withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
         // Claude Code's hook commands (HI-2777: SessionStart, the admin snippet's status line) read where to post and the
         // auth file's header from these, so no command names a port or holds the token.
@@ -3050,7 +3055,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
-      }))), this.binDir), tempDir)
+      }))), this.binDir), tempDir), this.signer && policy.tools && advanced.get<boolean>(SIGN_FAIL_FAST) ? { ...this.signer, timeoutMs: advanced.number(SIGN_TIMEOUT) * 1000 } : null)
     }
     // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
     if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)

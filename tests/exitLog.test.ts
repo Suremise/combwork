@@ -45,13 +45,13 @@ describe('crash dumps (#985)', () => {
 })
 
 describe('every way out is logged (#985)', () => {
-  // The main process's own files; the combwork MCP server, cw-progress and a close command's runner (HI-1368: its own
-  // build entry, started detached as Node) are processes of their own.
+  // The main process's own files; the combwork MCP server, cw-progress, a close command's runner (HI-1368: its own
+  // build entry, started detached as Node) and cw-sign (HI-2867: git's signer in agents' sessions) are processes of their own.
   const files = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
       const p = join(dir, e.name)
       if (e.isDirectory()) return e.name === 'mcp' || e.name === 'progressReporters' ? [] : files(p)
-      return e.name.endsWith('.ts') && e.name !== 'cw-close-runner.ts' ? [p] : []
+      return e.name.endsWith('.ts') && e.name !== 'cw-close-runner.ts' && e.name !== 'cw-sign.ts' ? [p] : []
     })
 
   it('ends or restarts the app only inside exitBy()', () => {

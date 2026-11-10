@@ -19,6 +19,7 @@ import { boundedSpawn, endBoundedSpawns, endBoundedSpawnsNow } from './boundedSp
 import { onOwnerGone, ownedWorkStopped } from './ownedWork'
 import type { QueueGitResult } from './integration'
 import { agentMsg, say } from '../../shared/agentText'
+import { NEEDS, isKnownSigner, lastScoped, resolveProgramWith } from './signerRules'
 import type { GitScope, ScopedValue, SigningInfo, SigningStatus } from '../../shared/gitSigning'
 
 /** How long a check waits on its signer before ending it (a few seconds: a signer that asks takes longer). */
@@ -54,12 +55,9 @@ const said = (r: QueueGitResult): string => `${r.err}\n${r.out}`.trim() || say(T
 async function scoped(d: SignDeps, args: string[], regexp = false): Promise<ScopedValue | null | { failed: string }> {
   const r = await d.git(d.cwd, [...d.who, 'config', '--show-scope', ...args])
   if (r.ok) {
-    const line = r.out.split(/\r?\n/).filter(Boolean).at(-1) ?? ''
-    const tab = line.indexOf('\t')
-    let value = tab < 0 ? line : line.slice(tab + 1)
     // --get-regexp's lines are `<scope>\t<key> <value>`: the value after the key.
-    if (regexp) value = value.slice(value.indexOf(' ') + 1)
-    return { scope: scopeOf(tab < 0 ? '' : line.slice(0, tab)), value: value.trim() }
+    const last = lastScoped(r.out, regexp) ?? { scope: '', value: '' }
+    return { scope: scopeOf(last.scope), value: last.value }
   }
   if (r.code === 1 && !r.timedOut && !r.notRun && !r.signal) return null
   return { failed: said(r) }
@@ -91,19 +89,7 @@ export async function resolveProgram(name: string, cwd: string, env: NodeJS.Proc
       return false
     }
   }
-  const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
-  const extKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATHEXT') ?? 'PATHEXT'
-  const exts = process.platform === 'win32' ? [...(env[extKey] ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean), ''] : ['']
-  const tryAll = async (base: string): Promise<string | null> => {
-    for (const ext of exts) if (await isFile(base + ext)) return base + ext
-    return null
-  }
-  if (/[\\/]/.test(name)) return tryAll(isAbsolute(name) ? name : resolve(cwd, name))
-  for (const dir of (env[pathKey] ?? '').split(delimiter).filter(Boolean)) {
-    const found = await tryAll(join(dir, name))
-    if (found) return found
-  }
-  return null
+  return resolveProgramWith(isFile, name, cwd, env)
 }
 
 /** A file's start (at most `max` bytes), asynchronously; null when it can't be read. */
@@ -147,16 +133,8 @@ function gitRoots(execPath?: string): string[] {
 /** Whether a resolved program is a known installation Combwork runs by itself (the same rule, configured or default). */
 export function knownInstallation(path: string, env: NodeJS.ProcessEnv = process.env, execPath?: string): boolean {
   if (signingTestHooks.eligible) return signingTestHooks.eligible(path)
-  const p = resolve(path).toLowerCase()
-  const known: string[] = []
-  for (const root of gitRoots(execPath)) known.push(join(root, 'usr', 'bin', 'gpg.exe'), join(root, 'usr', 'bin', 'ssh-keygen.exe'))
-  for (const k of ['ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432']) if (env[k]) known.push(join(env[k]!, 'GnuPG', 'bin', 'gpg.exe'))
-  if (env.SystemRoot) known.push(join(env.SystemRoot, 'System32', 'OpenSSH', 'ssh-keygen.exe'))
-  return known.some((k) => resolve(k).toLowerCase() === p)
+  return isKnownSigner(path, gitRoots(execPath), env)
 }
-
-/** A signer's words that say it needs someone (a passphrase, a pinentry, an agent with the key unlocked). */
-const NEEDS = /passphrase|pinentry|no gpg-agent|agent.*not running|can't connect to the agent|agent refused|inappropriate ioctl|no tty|cannot open \/dev\/tty|operation cancelled|could not open a connection to your authentication agent/i
 
 /** What a signer's run says (exported for its tests): signed, needs someone, didn't finish, or failed with its words. */
 export function signerSaid(format: 'openpgp' | 'ssh', r: QueueGitResult): SigningStatus {

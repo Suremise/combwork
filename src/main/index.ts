@@ -1098,6 +1098,15 @@ app.whenReady().then(async () => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
+  // Agents' signer (HI-2867): cw-sign.exe, built with Combwork (resources\bin installed, out\bin in development), and
+  // cw-sign.js beside cw-progress.js. Without the launcher, sessions sign with git's own signer, as before.
+  const signLauncher = app.isPackaged ? join(process.resourcesPath, 'bin', 'cw-sign.exe') : join(__dirname, '..', 'bin', 'cw-sign.exe')
+  void stat(signLauncher).then(
+    (s) => {
+      if (s.isFile()) sessions.signer = { launcher: signLauncher, exec: process.execPath, script: unpackedScript('cw-sign.js') }
+    },
+    () => log.warn(`No signer launcher at ${userText(signLauncher)}: agents' signed commits use git's own signer`)
+  )
   /** Tests only (development builds): where the combwork MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
   sessions.combworkMcp = (projectPath, agentId): McpServerDef | null => {

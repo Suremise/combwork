@@ -257,6 +257,8 @@ describe('the signing check (HI-1185)', () => {
     expect(signerSaid('openpgp', r({ err: 'gpg: no gpg-agent running in this session' }))).toMatchObject({ kind: 'needsSomeone' })
     expect(signerSaid('openpgp', r({ err: 'gpg: skipped "X": No secret key' }))).toMatchObject({ kind: 'cantSign' })
     expect(signerSaid('ssh', r({ err: 'Load key "k": incorrect passphrase supplied to decrypt private key' }))).toMatchObject({ kind: 'needsSomeone' })
+    // HI-2867: a .pub key whose private half only an agent holds, none holding it: someone has to load it.
+    expect(signerSaid('ssh', r({ err: 'No private key found for public key "C:/k/id.pub"' }))).toMatchObject({ kind: 'needsSomeone' })
     expect(signerSaid('ssh', r({ timedOut: true }))).toEqual({ kind: 'couldNotComplete', format: 'ssh' })
     expect(signerSaid('ssh', r({ ok: true, code: 0 }))).toEqual({ kind: 'unattended' })
   })
