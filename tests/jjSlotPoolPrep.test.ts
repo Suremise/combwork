@@ -5,7 +5,9 @@
 // - released after the card's submitted work is in the target: the pool's look settles it (detached at the target's
 //   head, no binding) and it is ready; released with the work not yet integrated: kept, never detached, and not retried;
 // - released while its builder's session still leaves the slot (HI-2906): the detach refused, then retried by itself
-//   until it is quiet: detached, ready and lent again with no refresh;
+//   until it is quiet: detached, ready and lent again with no refresh; quiet lost only during the detach, retried by its
+//   latch; known dirty, not retried; an operation taking the slot meanwhile, its wait ended; a close during a retry,
+//   nothing left running; an older attempt's continuation never changing a newer wait (HR1's rounds);
 // - a stale slot recovered through the pool's explicit action (J2's recoverStale), its local edit kept;
 // - a queued publication (HR1's round 2): the slot's operation replaced after the last guard while the publication's
 //   write waits for the database: published in the pool's fenced transaction, so nothing is; the journal stays `written`.
@@ -24,9 +26,11 @@ import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 
-const closers: (() => void)[] = []
-afterEach(() => {
-  for (const c of closers.splice(0)) c()
+// Each world's teardown, in reverse order of what it made (HR1 on HI-2906): its pool closed and awaited (its retries and
+// any running settle ended) before its database and admission go.
+const closers: (() => void | Promise<void>)[] = []
+afterEach(async () => {
+  for (const c of closers.splice(0).reverse()) await c()
 })
 
 function world(colocated: boolean, o: { queued?: boolean } = {}) {
@@ -94,7 +98,7 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
     return sessions.has(f.toLowerCase()) || hooks.detaching ? 'a builder leaving' : null
   }
   const pool = new SlotPool({ store, workspaces: port, project: repo, root, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 4, runner, settle: async () => true, holder, sessionIn })
-  closers.push(() => void pool.close())
+  closers.push(() => pool.close())
   const git: GitRun = async (cwd, args) => {
     try {
       const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -125,6 +129,15 @@ async function integrated(w: ReturnType<typeof world>, card: number) {
   w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', R)
   return { lent, row, key }
 }
+
+/** The pool's retry state and operations (tests reach them, HI-2906: an older attempt's continuation, simulated). */
+type PoolInternals = {
+  settleWaits: Map<string, { gen: number; tries: number; timer: ReturnType<typeof setTimeout> | null }>
+  running: Set<Promise<unknown>>
+  settleLater(name: string, expected: number): boolean
+  forgetSettleLater(name: string, gen?: number): void
+}
+const internals = (pool: SlotPool): PoolInternals => pool as unknown as PoolInternals
 
 /** Waits for a condition (the pool's retries run on their own timers): its answer, within a bound for a hung run. */
 async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
@@ -246,6 +259,40 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.pool.settleWaitOf(row.name)).toBeNull()
         expect(w.store.slot(row.name)?.op).toBeNull()
         expect(w.store.slot(row.name)?.state).toBe('lent')
+        // Nothing left that could touch the database after its teardown: no wait, no timer, no running operation.
+        expect(internals(w.pool).settleWaits.size).toBe(0)
+        expect(internals(w.pool).running.size).toBe(0)
+      })
+
+      it("an older attempt's continuation after a newer wait is armed, and after it has fired (HR1's round 1): never re-arms, drops or changes it", { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated)
+        const { lent, row } = await integrated(w, 10)
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.release(lent.lease.id, 'done')
+        const p = internals(w.pool)
+        const entry = p.settleWaits.get(row.name)!
+        expect(entry.timer).not.toBeNull()
+        const at = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
+        // An attempt started with no wait (generation 0), and one under an older generation, finishing now: nothing changes.
+        expect(p.settleLater(row.name, 0)).toBe(false)
+        expect(p.settleLater(row.name, at.gen - 1)).toBe(false)
+        p.forgetSettleLater(row.name, at.gen - 1)
+        expect(p.settleWaits.get(row.name)).toBe(entry)
+        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(at)
+        // Its timer fires (the retry under way: its timer spent) and the folder is still busy, so the retry arms the next
+        // generation; an older continuation then still changes nothing.
+        expect(await until(() => p.settleWaits.get(row.name) === entry && entry.gen > at.gen && entry.timer !== null)).toBe(true)
+        const next = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
+        expect(next.tries).toBe(at.tries + 1)
+        expect(p.settleLater(row.name, at.gen)).toBe(false)
+        expect(p.settleLater(row.name, 0)).toBe(false)
+        p.forgetSettleLater(row.name, at.gen)
+        expect(p.settleWaits.get(row.name)).toBe(entry)
+        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(next)
+        // Its own (current) generation's clean-up does drop it.
+        w.sessions.delete(row.folder.toLowerCase())
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(p.settleWaits.size).toBe(0)
       })
 
       it("released with the card's work not in the target yet: kept on the card, never detached", async () => {

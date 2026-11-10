@@ -1814,8 +1814,7 @@ export class SlotPool {
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
       // Armed only after this settle's fenced end (its row written above, its operation over).
-      if (busyDetach) {
-        this.settleLater(name)
+      if (busyDetach && this.settleLater(name, genAtStart)) {
         const w = this.settleWaits.get(name)
         if (w) log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): looked at again (try ${w.tries})`)
       }
@@ -1834,8 +1833,13 @@ export class SlotPool {
    * already waits (HI-2906). An ordinary settle: it does nothing to a slot that has since been taken (an operation, a
    * writer, a lease) or set aside, and nothing after the pool closes.
    */
-  private settleLater(name: string): void {
-    if (this.closed) return
+  private settleLater(name: string, expected: number): boolean {
+    if (this.closed) return false
+    // Only the wait this attempt was started under (HR1's round 1): with none (0), only while there still is none; with
+    // one, only that generation's, its timer spent (the retry that is this attempt). An older attempt's continuation finds
+    // a newer wait and leaves it as it is: no tries, generation or timer of it changed.
+    const now = this.settleWaits.get(name)
+    if (expected === 0 ? !!now : !now || now.gen !== expected || !!now.timer) return false
     if (!this.waitsOwned) {
       // One listener for the pool: its close drops every wait (no listener per slot or retry).
       this.waitsOwned = true
@@ -1849,7 +1853,6 @@ export class SlotPool {
       this.settleWaits.set(name, made)
       w = made
     }
-    if (w.timer) return
     w.tries++
     const gen = ++this.settleGen
     w.gen = gen
@@ -1868,6 +1871,7 @@ export class SlotPool {
         .catch((e) => log.warn(`looking at ${userText(name)} again`, e))
     }, Math.min(SETTLE_RETRY_MAX_MS, 1000 * 2 ** (w.tries - 1)))
     w.timer.unref?.()
+    return true
   }
 
   /** A slot's wait dropped; with `gen`, only while it is still that generation's (a stale attempt drops nothing newer). */
