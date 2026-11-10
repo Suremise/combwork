@@ -102,7 +102,7 @@ function jjRepo(dir, o = {}) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
-    const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
+    const until = (fn, ms) => lib.until(fn, ms, 200)
     await lib.openWorkspace(inv, page, ws)
     const vcTab = page.locator('.tabs .tab', { hasText: 'Version Control' })
     const head = page.locator('[data-vc-head]')
@@ -121,7 +121,7 @@ function jjRepo(dir, o = {}) {
     const toTab = async (name) => {
       await page.getByText(name, { exact: true }).first().click()
       await vcTab.first().click()
-      await until(async () => (await head.count()) === 1)
+      await until(async () => (await head.count()) === 1, HUNG_MS)
     }
     const section = async (id) => {
       await page.locator(`.git-sections [data-section="${id}"]`).click()
@@ -130,9 +130,9 @@ function jjRepo(dir, o = {}) {
 
     // --- shop as Git: Git's UI kept, jj found and offered.
     await toTab('shop')
-    check('shop: Git chosen, jj offered beside None', !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="jj"]').count()) === 1)), await text(head))
+    check('shop: Git chosen, jj offered beside None', !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="jj"]').count()) === 1, HUNG_MS)), await text(head))
     check("Git's own sections, unchanged", JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), JSON.stringify(await sections()))
-    check('the jjFound offer: jj found at the root, Switch to jj…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'jjFound' && /jj found at/.test(await text(offer)))), await text(offer))
+    check('the jjFound offer: jj found at the root, Switch to jj…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'jjFound' && /jj found at/.test(await text(offer)), HUNG_MS)), await text(offer))
     await shoot(page.locator('.vc-view'), 'offer')
 
     // --- The drain: a card in flight refuses the switch, listed; Check Again reads it again.
@@ -141,28 +141,28 @@ function jjRepo(dir, o = {}) {
     check('a card started in shop', !!moved && (await inv('tasks:list')).find((t) => t.number === card.number)?.column === 'doing', JSON.stringify(moved))
     await head.locator('[data-platform="jj"]').click()
     const drained = dialog.filter({ has: page.locator('[data-vc-store-drain]') })
-    check('refused while the card is in flight: the drain lists it', !!(await until(async () => (await drained.count()) === 1 && (await text(drained)).includes('In flight'))), await text(dialog))
+    check('refused while the card is in flight: the drain lists it', !!(await until(async () => (await drained.count()) === 1 && (await text(drained)).includes('In flight'), HUNG_MS)), await text(dialog))
     await shoot(drained, 'drain')
     await inv('tasks:move', card.number, 'done', { confirm: true, reason: 'jjview: done' })
     await drained.getByRole('button', { name: 'Check Again' }).click()
 
     // --- The switch: the group, the gates, jj's limits.
     const warn = dialog.filter({ has: page.locator('[data-vc-store="jj"]') })
-    check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 5)), await text(dialog))
+    check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 5, HUNG_MS)), await text(dialog))
     await shoot(warn, 'switch-to-jj')
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
-    check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
-    check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']))), JSON.stringify(await sections()))
+    check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
+    check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']), HUNG_MS)), JSON.stringify(await sections()))
 
     // --- Repository.
     const repo = await section('jjRepo')
-    check('Repository: the root, colocated, the unsupported list (every gate)', !!(await until(async () => (await text(repo)).includes(shop) && /Colocated with Git/.test(await text(repo)) && (await repo.locator('[data-jj-unsupported] li').count()) === 10)), await text(repo))
+    check('Repository: the root, colocated, the unsupported list (every gate)', !!(await until(async () => (await text(repo)).includes(shop) && /Colocated with Git/.test(await text(repo)) && (await repo.locator('[data-jj-unsupported] li').count()) === 10, HUNG_MS)), await text(repo))
     check('…and Waiting for you to integrate, no merge offered', (await repo.locator('[data-jj-integrate]').count()) === 1 && (await page.locator('[data-action*="merge" i]').count()) === 0)
     await shoot(page.locator('.vc-view'), 'repository')
 
     // --- History: change id beside commit id, divergent, conflicted, working copy.
     const hist = await section('jjHistory')
-    check('History: the feature’s two variants divergent, each with the change id and its own commit id', !!(await until(async () => (await hist.locator(`[data-change="${featureChange}"]`).count()) >= 2 && (await hist.locator('[data-jj-badge="divergent"]').count()) >= 2)), await text(hist))
+    check('History: the feature’s two variants divergent, each with the change id and its own commit id', !!(await until(async () => (await hist.locator(`[data-change="${featureChange}"]`).count()) >= 2 && (await hist.locator('[data-jj-badge="divergent"]').count()) >= 2, HUNG_MS)), await text(hist))
     check('…a conflicted commit and the working copy', (await hist.locator('[data-jj-badge="conflict"]').count()) >= 1 && /working copy/.test(await text(hist)))
     await shoot(page.locator('.vc-view'), 'history')
 
@@ -172,19 +172,19 @@ function jjRepo(dir, o = {}) {
     await cmp.locator('[data-jj-to]').fill(featureChange)
     await cmp.locator('[data-action="jj-compare"]').click()
     const amb = cmp.locator('[data-jj-resolve="to"][data-jj-resolve-state="ambiguous"]')
-    check('Compare: the divergent change id names 2 commits, none picked', !!(await until(async () => (await amb.count()) === 1 && (await amb.locator('[data-action="jj-pick"]').count()) === 2)), await text(cmp))
+    check('Compare: the divergent change id names 2 commits, none picked', !!(await until(async () => (await amb.count()) === 1 && (await amb.locator('[data-action="jj-pick"]').count()) === 2, HUNG_MS)), await text(cmp))
     await shoot(page.locator('.vc-view'), 'compare-ambiguous')
     await amb.locator('[data-action="jj-pick"]').first().click()
     await cmp.locator('[data-action="jj-compare"]').click()
-    check('…one picked by its commit id: what changed', !!(await until(async () => (await cmp.locator('[data-jj-compare-result]').count()) === 1 && /f\.txt/.test(await text(cmp.locator('[data-jj-files]'))))), await text(cmp))
+    check('…one picked by its commit id: what changed', !!(await until(async () => (await cmp.locator('[data-jj-compare-result]').count()) === 1 && /f\.txt/.test(await text(cmp.locator('[data-jj-files]'))), HUNG_MS)), await text(cmp))
     await shoot(page.locator('.vc-view'), 'compare')
 
     // --- Bookmarks and Conflicts.
     const bm = await section('jjBookmarks')
-    check('Bookmarks: main, merged, read only', !!(await until(async () => (await bm.locator('[data-jj-bookmark="main"]').count()) >= 1 && (await bm.locator('[data-jj-bookmark="merged"]').count()) >= 1)), await text(bm))
+    check('Bookmarks: main, merged, read only', !!(await until(async () => (await bm.locator('[data-jj-bookmark="main"]').count()) >= 1 && (await bm.locator('[data-jj-bookmark="merged"]').count()) >= 1, HUNG_MS)), await text(bm))
     await shoot(page.locator('.vc-view'), 'bookmarks')
     const cf = await section('jjConflicts')
-    check('Conflicts: the merge, with a.txt', !!(await until(async () => (await cf.locator('[data-jj-conflicts] > li').count()) >= 1 && /a\.txt/.test(await text(cf)))), await text(cf))
+    check('Conflicts: the merge, with a.txt', !!(await until(async () => (await cf.locator('[data-jj-conflicts] > li').count()) >= 1 && /a\.txt/.test(await text(cf)), HUNG_MS)), await text(cf))
     await shoot(page.locator('.vc-view'), 'conflicts')
 
     // --- A card can't start in a jj project.
@@ -196,7 +196,7 @@ function jjRepo(dir, o = {}) {
     await toTab('notes')
     await head.locator('[data-platform="jj"]').click()
     const gated = dialog.filter({ has: page.locator('[data-vc-store-gates]') })
-    check('notes: refused, attributes used (.gitattributes eol)', !!(await until(async () => (await gated.locator('[data-gate="attributes"][data-gate-state="uses"]').count()) === 1 && /eol=lf/.test(await text(gated)))), await text(dialog))
+    check('notes: refused, attributes used (.gitattributes eol)', !!(await until(async () => (await gated.locator('[data-gate="attributes"][data-gate-state="uses"]').count()) === 1 && /eol=lf/.test(await text(gated)), HUNG_MS)), await text(dialog))
     await shoot(gated, 'gates')
     await gated.getByRole('button', { name: 'Close', exact: true }).click()
     check('…and notes stays Git', JSON.parse(fs.readFileSync(path.join(notes, '.combwork', 'project.json'), 'utf8')).platform === 'git')
@@ -213,7 +213,7 @@ function jjRepo(dir, o = {}) {
     await toTab('shop')
     await head.locator('[data-platform="git"]').click()
     const fb = dialog.filter({ has: page.locator('[data-vc-store-fallback]') })
-    check('back to Git refused: a commit storing conflicts listed', !!(await until(async () => (await fb.locator('[data-fallback="conflictedCommit"]').count()) >= 1)), await text(dialog))
+    check('back to Git refused: a commit storing conflicts listed', !!(await until(async () => (await fb.locator('[data-fallback="conflictedCommit"]').count()) >= 1, HUNG_MS)), await text(dialog))
     await shoot(fb, 'fallback-refused')
     // The user fixes it with jj: the conflicted merge abandoned, everything exported.
     jj(shop, 'abandon', 'merged')
@@ -221,17 +221,17 @@ function jjRepo(dir, o = {}) {
     jj(shop, 'git', 'export')
     await fb.getByRole('button', { name: 'Check Again' }).click()
     const back = dialog.filter({ has: page.locator('[data-vc-store="git"]') })
-    check('…then the warning to go back to Git', !!(await until(async () => (await back.count()) === 1 && (await back.locator('[data-vc-store-fallback]').count()) === 0)), await text(dialog))
+    check('…then the warning to go back to Git', !!(await until(async () => (await back.count()) === 1 && (await back.locator('[data-vc-store-fallback]').count()) === 0, HUNG_MS)), await text(dialog))
     await shoot(back, 'switch-to-git')
     await back.getByRole('button', { name: 'Switch', exact: true }).click()
-    check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']))) && fs.existsSync(path.join(shop, '.jj')))
+    check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), HUNG_MS)) && fs.existsSync(path.join(shop, '.jj')))
 
     // --- All seven locales: jj's Repository section of notes after a switch would need clear gates; shop's offer and
     // the jj option's tooltip in each language, and a jj project's sections (shop again) in each.
     await head.locator('[data-platform="jj"]').click()
-    await until(async () => (await warn.count()) === 1)
+    await until(async () => (await warn.count()) === 1, HUNG_MS)
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
-    await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1)
+    await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)
     await section('jjRepo')
     // The window's language, as a change of it reaches the window (vcswitch's way).
     const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
@@ -242,7 +242,7 @@ function jjRepo(dir, o = {}) {
       const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
       // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
       const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
-      check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]))), await text(page.locator('.git-sections')))
+      check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]), HUNG_MS)), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
     }
     await speak(english)
