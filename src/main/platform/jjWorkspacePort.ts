@@ -710,11 +710,16 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const prep = ctx ? (deps.prep?.(ctx.store) ?? null) : null
       if (!ctx || !prep || !identity || !samePath(ctx.store, identity.store)) return false
       return deps.lock(ctx.store, async () => {
+        // The live folder is still the workspace the submission was made in (HR2's round 2): its generation, its
+        // checkout's workspace and store, checked here and again right before the publication; a replaced folder whose
+        // old pointer still names that generation gets nothing.
+        if (!(await owns(folder, identity))) return false
         const now = prep.pointer(ctx.store, identity.workspace)
         if (now === 'unreadable' || !now || now.key !== line || now.generation !== identity.generation) return false
         // A later submission's record already there: an older action's never replaces it (HI-2868).
         if ((now.submittedSeq ?? 0) >= seq) return (now.submittedSeq ?? 0) === seq && now.submitted.length === commits.length && now.submitted.every((c, i) => c === commits[i])
         const next = { ...now, submitted: [...commits], submittedSeq: seq }
+        if (!(await owns(folder, identity))) return false
         return prep.publish(ctx.store, identity.workspace, now, next, { kind: 'prepare', prep: now.prep, next, prev: now, phase: 'done' })
       })
     },

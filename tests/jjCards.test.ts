@@ -14,7 +14,7 @@
 // - without the seam, a jj start is refused `start.platformReady`.
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
-import { rmSync, writeFileSync } from 'fs'
+import { cpSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -65,7 +65,11 @@ async function world(colocated: boolean) {
     closeBoard(home)
     dismiss()
   })
-  const port = h.portWith({ prep: () => boardPrepStore(conn), contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
+  // The bindings' store, with a seam: `onPointer` runs once at the next pointer read (the late pin's, between its checks).
+  const bindings = boardPrepStore(conn)
+  let onPointer: (() => void) | null = null
+  const prepWithSeam = { ...bindings, pointer: (s: string, ws: string) => { const f = onPointer; onPointer = null; f?.(); return bindings.pointer(s, ws) } }
+  const port = h.portWith({ prep: () => prepWithSeam, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
   const main = (): string => h.id(repo, 'main')
   const slots: Record<string, { folder: string; identity: WorkspaceIdentity; lease: string }> = {}
   for (const [name, lease] of [['slot-a', 'L1'], ['slot-b', 'L2']] as const) {
@@ -138,7 +142,13 @@ async function world(colocated: boolean) {
       return null
     }
   }
-  return { h, repo, root, home, store, conn, port, wf, slots, slotOf, holds, pins, deps, main, prepare, commitIn, runPins, refAt, ctx: ctx.jj, another: () => make(FactStore.open(boardFile(home), { project: 'project', key: 'AM', projectId: () => 'p-jj' })) }
+  /** A slot's `.jj` replaced by a byte-for-byte copy at the same path: the same names and store, another generation. */
+  const replaceJj = (folder: string): void => {
+    renameSync(join(folder, '.jj'), join(folder, '.jj-old'))
+    cpSync(join(folder, '.jj-old'), join(folder, '.jj'), { recursive: true })
+    rmSync(join(folder, '.jj-old'), { recursive: true, force: true })
+  }
+  return { h, repo, root, home, store, conn, port, wf, replaceJj, atPointer: (f: () => void) => void (onPointer = f), slots, slotOf, holds, pins, deps, main, prepare, commitIn, runPins, refAt, ctx: ctx.jj, another: () => make(FactStore.open(boardFile(home), { project: 'project', key: 'AM', projectId: () => 'p-jj' })) }
 }
 type World = Awaited<ReturnType<typeof world>>
 
@@ -364,6 +374,37 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
       expect(w.refAt(`refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(P)
       expect(w.port.pointerSync(b.identity.store, b.identity.workspace)).toEqual(newB)
+    })
+
+    it("a late pin into a slot whose .jj was replaced (another generation, the same bytes) before it runs retains only", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'replaced')
+      const P = w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: '1' }))
+      const late = w.store.pendingActions().find((x) => x.kind === 'pin' && x.card === card.id)!
+      const before = w.port.pointerSync(a.identity.store, a.identity.workspace)
+      // Replaced before the action runs.
+      w.replaceJj(a.folder)
+      expect((await w.port.identity!(a.folder))?.generation).not.toBe(a.identity.generation)
+      expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
+      expect(w.refAt(`refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(P)
+      expect(w.port.pointerSync(a.identity.store, a.identity.workspace)).toEqual(before)
+    })
+
+    it('a late pin whose slot is replaced while it waits to publish retains only', async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'replaced late')
+      const P = w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: '1' }))
+      const late = w.store.pendingActions().find((x) => x.kind === 'pin' && x.card === card.id)!
+      const before = w.port.pointerSync(a.identity.store, a.identity.workspace)
+      // Its first identity check passes; the folder is replaced at its pointer read, before the publication.
+      w.atPointer(() => w.replaceJj(a.folder))
+      expect(await w.wf.platformOf(card).perform('pin', late.payload)).toBe(true)
+      expect(w.refAt(`refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(P)
+      expect(w.port.pointerSync(a.identity.store, a.identity.workspace)).toEqual(before)
     })
 
     it('a late pin after a restart in the same slot (a new key, carried) fills nothing', async () => {

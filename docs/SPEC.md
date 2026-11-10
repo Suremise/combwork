@@ -3086,8 +3086,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   is overwritten), and only then the slot's binding's submitted commits advanced, seq-ordered (`submittedSeq`: an older
   submission's record never replaces a newer one's). The action is bound to its own submission (HR2's round 1): the
   Submitted fact records the slot it was made from (`platform.jjSlot`: folder, line key, store, workspace, generation),
-  the pin is made in that store, and only that binding is advanced, while still bound to that key at that generation:
-  a restart in another slot or under a new key, or a removed folder, is never filled from a late action. No ref is ever deleted here; reclaiming only `owned` ones is later.
+  the pin is made in that store, and only that binding is advanced, while still bound to that key at that generation and
+  while the live folder is still that workspace (its generation, its checkout's workspace and store: the port's ownership
+  check, under the store's lock and again right before the publication; HR2's round 2): a restart in another slot or
+  under a new key, a removed folder, or a folder replaced at the same path is never filled from a late action. No ref is ever deleted here; reclaiming only `owned` ones is later.
 - **Checks:** J3's bracket in one adapter call: B1 (the snapshot) and the revision read at its head, the run, then
   always the end (its write record, J3's stat fallback, B2) whatever the run did, and the credit. **No check copies**:
   the new capability `checkCopies` (Git's) is what a check copy needs, apart from `isolation` (slots); the check API,
