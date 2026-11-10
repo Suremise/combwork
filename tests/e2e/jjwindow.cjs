@@ -259,7 +259,9 @@ const onDb = (fn) => {
     if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')
-    jj(shop, 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
+    // The slot's working-copy commit rewritten from the project folder, its own working copy untouched (a write of its
+    // checkout state can race Combwork's reads there on Windows: Access is denied).
+    jj(shop, '--ignore-working-copy', 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
     check('the slot is stale', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
     await toProject()
     await section('workflow')
