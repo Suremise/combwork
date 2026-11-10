@@ -1,7 +1,8 @@
 // The window for jj cards (HI-2869, J9c; SPEC "The window for jj cards"): the real app, the pinned jj (npm run jj:fetch)
 // on its PATH, a fake Claude Code builder (B1), a throwaway profile and workspace. jj cards start here before J9e through
-// the unpackaged seam alone (CW_TEST_JJ_CARDS=1, HI-2870's jjCardsTestSwitch); a packaged build never takes it. Colocated only: a
-// non-colocated jj project can't be switched to before J9f (HI-2896, which checks these views in that mode).
+// the unpackaged seam alone (CW_TEST_JJ_CARDS=1, HI-2870's jjCardsTestSwitch); a packaged build never takes it. Colocated
+// here; the suite `jjwindownc` runs the same steps on a repository not colocated with Git (J9f, HI-2896:
+// CW_JJWINDOW_NONCOLOCATED=1), its screenshots `jjwindownc-…`.
 // - shop (jj, you review, target main): the user starts a card for B1, in a slot (a jj workspace); B1 commits there with
 //   jj and submits through the Agent API; the user passes it. Repository's Waiting for you to integrate shows it with its change id and
 //   "not in main yet" (J5's observation for exactly that approval, shown when written), and the same panel, still mounted,
@@ -31,8 +32,11 @@ if (!exe) {
   process.exit(process.env.CW_JJ_REAL === '1' ? 1 : 0)
 }
 
-const PORT = Number(lib.port(47797))
-const work = path.join(lib.WORK, 'jjwindow')
+// Not colocated (HI-2896): Git's data inside .jj, no .git in the project folder; its own port and folders.
+const NC = process.env.CW_JJWINDOW_NONCOLOCATED === '1'
+const SUITE = NC ? 'jjwindownc' : 'jjwindow'
+const PORT = Number(lib.port(NC ? 47798 : 47797))
+const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')
 const shop = path.join(ws, 'shop')
@@ -75,7 +79,7 @@ const onDb = (fn) => {
   fs.writeFileSync(gitConfig, `[user]\n\tname = ${lib.TEST_GIT_IDENTITY.name}\n\temail = ${lib.TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`)
   fs.mkdirSync(shop, { recursive: true })
   fs.writeFileSync(path.join(shop, '.gitignore'), '.combwork/\n')
-  jj(shop, 'git', 'init', '--colocate')
+  jj(shop, 'git', 'init', NC ? '--no-colocate' : '--colocate')
   fs.writeFileSync(path.join(shop, 'base.txt'), 'base\n')
   jj(shop, 'commit', '-m', 'base')
   jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
@@ -165,7 +169,7 @@ const onDb = (fn) => {
       await page.mouse.move(5, 5)
       for (const theme of ['dark', 'light']) {
         await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-        await loc.screenshot({ path: path.join(shots, `jjwindow-${name}-${theme}.png`) })
+        await loc.screenshot({ path: path.join(shots, `${SUITE}-${name}-${theme}.png`) })
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
@@ -269,6 +273,7 @@ const onDb = (fn) => {
     const kept2 = fs.existsSync(aside) ? fs.readdirSync(aside, { recursive: true }).some((f) => String(f).endsWith('draft.txt')) || fs.existsSync(path.join(w1.folder, 'draft.txt')) : false
     check('…its unrecorded edit is kept', kept2, fs.existsSync(aside) ? JSON.stringify(fs.readdirSync(aside, { recursive: true })) : 'no aside folder')
     check('…and Recover… is gone from its row', !!(await until(async () => (await row.locator('[data-action="recover"]').count()) === 0, HUNG_MS)), await text(row))
+    if (NC) check('not colocated throughout: no .git in the project folder or its slot', !fs.existsSync(path.join(shop, '.git')) && !fs.existsSync(path.join(w1.folder, '.git')))
 
   } finally {
     await app.close().catch(() => undefined)
