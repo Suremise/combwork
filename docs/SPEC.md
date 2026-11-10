@@ -2862,7 +2862,10 @@ start), and the skills' jj-slot workflow.
   carries; main only relays it and reads nothing after. That is enough here because the preview writes nothing and the
   user acts later, if at all: no write follows the check, as one did J5's compare-and-set (the Assistant's note). The
   Operations print is bounded (`OPERATIONS_PRINT_BOUNDS`: 20,000 files and 2,000 folders in its trees, 16 MB read in
-  all): past any, no command (`bounds`). Measured on 4,000 loose tags (`tests/jjOperationsReal.test.ts`): the longest
+  all): past any, no command (`bounds`). The byte bound limits what is read, not only what is accepted (HR2's round 4):
+  each file's size is checked on its opened handle against what is left of the budget, one past it refused unread, and
+  read up to one byte past that size, its bytes taken only when exactly that size was read (grown or shrunk meanwhile:
+  unknown). J5's few small sources are read whole as before. Measured on 4,000 loose tags (`tests/jjOperationsReal.test.ts`): the longest
   stall of the event loop during a preview, 221.6 ms with the prints and answer on that thread, 20.2 ms with them on jj's
   worker. **Copy** asks main again with that moment
   (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the

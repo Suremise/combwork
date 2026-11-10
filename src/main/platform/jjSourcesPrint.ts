@@ -4,7 +4,7 @@
 // the answers belong to those bytes), and checks it once more synchronously in the continuation that answers. Each
 // caller names its own sources; jj's operation heads are always among them.
 
-import { opendirSync, readFileSync } from 'original-fs'
+import { closeSync, fstatSync, opendirSync, openSync, readFileSync, readSync } from 'original-fs'
 import { createHash } from 'crypto'
 import { join } from 'path'
 import { readOpHeads } from './jjView'
@@ -53,15 +53,49 @@ interface Spent {
   over: boolean
 }
 
-/** A file's bytes within the budget: null when absent, undefined when unreadable, 'over' past the bytes. */
+/**
+ * A file's bytes, reading at most `cap` of them (HR2's HI-2800 round 4): its opened handle's size checked first, a file
+ * already larger refused unread, then read in chunks up to one byte past that size (never past the cap and one byte),
+ * never loaded whole. Its bytes only when exactly that size was read: a file grown past the cap meanwhile is 'over', one
+ * that grew or shrank otherwise is changing, so unknown, never a partial read's hash. Null when absent, undefined when it
+ * can't be read.
+ */
+function bytesCapped(f: string, cap: number): Buffer | null | undefined | 'over' {
+  let fd: number
+  try {
+    fd = openSync(f, 'r')
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
+  }
+  try {
+    const size = fstatSync(fd).size
+    if (size > cap) return 'over'
+    const buf = Buffer.alloc(Math.min(cap, size) + 1)
+    let n = 0
+    while (n < buf.length) {
+      const got = readSync(fd, buf, n, buf.length - n, null)
+      if (!got) break
+      n += got
+    }
+    if (n > cap) return 'over'
+    return n === size ? buf.subarray(0, n) : undefined
+  } catch {
+    return undefined
+  } finally {
+    closeSync(fd)
+  }
+}
+
+/** A file's bytes within the budget: null when absent, undefined when unreadable, 'over' past the bytes. Unbounded (J5's few small sources): read whole. */
 function bytesWithin(f: string, spent: Spent, b: PrintBounds): Buffer | null | undefined | 'over' {
-  const got = bytesOf(f)
-  if (got === null || got === undefined) return got
-  spent.bytes += got.length
-  if (spent.bytes > b.bytes) {
+  const got = Number.isFinite(b.bytes) ? bytesCapped(f, b.bytes - spent.bytes) : bytesOf(f)
+  if (got === 'over') {
     spent.over = true
     return 'over'
   }
+  if (got === null || got === undefined) return got
+  spent.bytes += got.length
   return got
 }
 
