@@ -137,6 +137,20 @@ const TARGET = 'integration'
     await h.inv('settings:update', { appearance: { theme: 'dark' } })
     const noReason = await api(assistant, 'POST', '/v1/queue/retry', { card: `#${three.n}` })
     check("its Retry merge needs a reason (400)", noReason.status === 400, JSON.stringify(noReason.body))
+    // --- HI-2892: a forward merge against the release path's direction (into main, the default branch): refused with its
+    // reason; the user's override only as the JSON boolean true, recorded in the Assistant's action.
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { otherTargets: ['main'] }) })
+    const backward = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main' })
+    check('HI-2892: a forward into main is refused (400), saying why', backward.status === 400 && /main isn’t brought up to date with integration: main is the repository’s default branch, which a release reaches through its pull request/.test(JSON.stringify(backward.body)), JSON.stringify(backward.body))
+    const loose = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: 'true' })
+    check('…an override that isn’t the boolean true is refused (400)', loose.status === 400 && /override is true or left out/.test(JSON.stringify(loose.body)), JSON.stringify(loose.body))
+    const overridden = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: true })
+    const fwdCard = overridden.body?.card
+    check('…with override true it is queued, the override on its card', overridden.status === 200 && overridden.body?.queued === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
+    const fwdActions = await h.inv('assistant:actions')
+    check('…its action says it overrode the direction', fwdActions.some((x) => x.ok && x.kind === 'queue-forward' && /with the user’s override of the release path’s direction/.test(x.text)), JSON.stringify(fwdActions.map((x) => [x.kind, x.text])))
+    // Taken out again, unless merged already: only the override was checked.
+    if (fwdCard) await h.inv('queue:remove', fwdCard, 'only the override was checked').catch(() => null)
     await h.inv('session:stop', home, 'assistant')
 
     // --- G18 (#1179): Push the target branch after merging, on, in a repository with no remote: the card merges, then

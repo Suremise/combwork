@@ -137,6 +137,7 @@ const T = {
   'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
   'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date, one of the project\'s targets; from is another of them or the repository\'s default branch (main, after a release).' }),
   'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
+  'queue.arg.override': agentMsg({ id: 'tool.queue.arg.override', text: 'forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.', note: 'HI-2892.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
   'releaseSlot.arg.slot': agentMsg({ id: 'tool.releaseSlot.arg.slot', text: 'release: the slot, by name (slot-b, hb2).' }),
   'releaseSlot.arg.kind': agentMsg({ id: 'tool.releaseSlot.arg.kind', text: 'release: which, when the slot is both.' }),
@@ -997,7 +998,7 @@ const tools: Tool[] = [
         action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward', 'retarget'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
-        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) }, items: { type: 'array', items: { type: 'string' }, description: say(T['queue.arg.items']) }, preview: { type: 'string', description: say(T['queue.arg.preview']) } } : {})
+        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) }, override: { type: 'boolean', description: say(T['queue.arg.override']) }, items: { type: 'array', items: { type: 'string' }, description: say(T['queue.arg.items']) }, preview: { type: 'string', description: say(T['queue.arg.preview']) } } : {})
       },
       required: ['action']
     },
@@ -1013,7 +1014,7 @@ const tools: Tool[] = [
       if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
       // HI-2679: bring `target` up to date with `from` (a forward merge through target's queue).
       if (a.action === 'forward') {
-        const r = (await api('POST', '/v1/queue/forward', { project, from: a.from, to: a.target })) as { upToDate: boolean; key: string | null; card: number | null; queued: boolean; from: string; to: string }
+        const r = (await api('POST', '/v1/queue/forward', { project, from: a.from, to: a.target, ...(a.override !== undefined ? { override: a.override } : {}) })) as { upToDate: boolean; key: string | null; card: number | null; queued: boolean; from: string; to: string }
         return say(T['queue.reply.forward'], { upToDate: r.upToDate ? 'yes' : 'no', queued: r.queued ? 'yes' : 'no', card: r.key ?? (r.card !== null ? `#${r.card}` : ''), from: r.from, to: r.to })
       }
       // HI-2680: after a project's target moved on, move the named cards and slots from `from` to `target`.

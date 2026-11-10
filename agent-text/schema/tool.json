@@ -520,6 +520,9 @@
   "tool.queue.arg.items": {
     "placeholders": {}
   },
+  "tool.queue.arg.override": {
+    "placeholders": {}
+  },
   "tool.queue.arg.preview": {
     "placeholders": {}
   },

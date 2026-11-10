@@ -25,6 +25,7 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { forwardDirection, forwardPermitted } from '../../shared/workflow/forwardOrder'
 import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -1243,6 +1244,9 @@ export class MergeQueue {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
+      // HI-2892: a forward merge against the release path's direction, its request with no override, is never merged: it
+      // comes back with why, whatever let it be queued (one from before, or the default branch changed since).
+      if (s.forward && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
       // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
       const blockers = this.wf.queueWaitingOn(card.id)
       if (blockers.length) return this.waiting(card, entry, blockers)
@@ -1488,6 +1492,21 @@ export class MergeQueue {
   }
 
   /** The history port of the card's platform (port 3, HI-2792): the queue's step reads ask it. */
+  /**
+   * HI-2892: whether a forward merge may go, as its direction reads now (the default branch as the card's own port names
+   * it; one it can't name or that is gone counts as none, so it makes no direction) or with its request's override.
+   */
+  private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean> {
+    const f = s.forward
+    if (!f) return true
+    const H = this.history(card, s)
+    const d = await H.defaultTarget(this.project).catch(() => null)
+    const named = d && !isUnknown(d) ? d : null
+    const there = named ? await H.lineHead(this.project, named).catch(() => null) : null
+    const main = named && there && !isUnknown(there) ? named : null
+    return forwardPermitted(forwardDirection(f.from, f.to, main), f.override)
+  }
+
   private history(card: CardRecord, s?: CardState): HistoryPort {
     return historyFor(this.wf.rulesetOf(card, s).options.platform)
   }

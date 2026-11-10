@@ -39,6 +39,10 @@
     "text": "a conflict with {target}",
     "note": "What came back: a conflict merging into {target} (its files follow, queue.failure.in)."
   },
+  "queue.failure.direction": {
+    "text": "a forward merge into {target} against the release path’s direction (into an older version or the default branch, or two branches Combwork can’t order), its request with no override; nothing merged",
+    "note": "What came back (HI-2892): a forward merge card the queue refused to merge, against the release path’s direction."
+  },
   "queue.failure.focused.newProof": {
     "text": "the merge needs real-CLI or packaged focused tests its review never ran: {tests}",
     "note": "G20 (HI-1367): the merge needs focused tests the queue doesn't run and the review didn't either. {tests}: the tests, as many as fit."
@@ -150,6 +154,10 @@
   "queue.next.conflict": {
     "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).",
     "note": "The next step after a conflict with {target}, the branch."
+  },
+  "queue.next.direction": {
+    "text": "Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.",
+    "note": "The next step after a forward merge came back against the release path’s direction (HI-2892)."
   },
   "queue.next.fix": {
     "text": "Fix it in your worktree, commit and submit again (cw_submit).",

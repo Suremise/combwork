@@ -739,7 +739,7 @@
   "board.queue.removeTitle": "{card}をマージキューから外しますか？",
   "board.queue.resume": "キューを再開",
   "board.queue.resumeFailed": "マージキューを再開できませんでした",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {競合} other {{files}で競合}}} checks {{check, select, none {チェック失敗} other {チェック失敗：{check}}}} hook {フックが失敗} folderBusy {{target}がチェックアウトされているフォルダーが使用中} notUpToDate {{target}の最新の状態ではない} focused {対象テストを選べなかったか、証明できなかった} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {競合} other {{files}で競合}}} checks {{check, select, none {チェック失敗} other {チェック失敗：{check}}}} hook {フックが失敗} folderBusy {{target}がチェックアウトされているフォルダーが使用中} notUpToDate {{target}の最新の状態ではない} focused {対象テストを選べなかったか、証明できなかった} direction {リリースの流れと逆向き、例外なし} other {{why}}}",
   "board.queue.returned": "{card}は差し戻し：{why}",
   "board.queue.returnedTo": "{card}をビルダー{builder}に差し戻し：{why}",
   "board.queue.runBy": "プロファイル{profile}が実行中",

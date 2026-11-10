@@ -284,6 +284,22 @@
       "file": "plain"
     }
   },
+  "service.forward.direction": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "why": "select",
+      "dir": "select"
+    }
+  },
+  "service.forward.directionRetry": {
+    "placeholders": {
+      "card": "plain",
+      "why": "select",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "service.forward.missing": {
     "placeholders": {
       "unknown": "select",
@@ -302,6 +318,13 @@
       "to": "plain",
       "targets": "plain",
       "sources": "plain"
+    }
+  },
+  "service.forward.openNoOverride": {
+    "placeholders": {
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
     }
   },
   "service.forward.raced": {

@@ -2683,12 +2683,15 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
   const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
   const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
   if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
-  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
-    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+  // HI-2892: the user's explicit override of the release path's direction, only as the JSON boolean true.
+  if (body?.override !== undefined && body.override !== true && body.override !== false) throw new HttpError(400, say(API.queue.overrideArg))
+  const override = body?.override === true
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to, override: override ? 'yes' : 'no' }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard, { override }).catch((e: unknown) => {
       throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
     })
     const made = 'upToDate' in r ? null : r
-    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
   })
 })

@@ -739,7 +739,7 @@
   "board.queue.removeTitle": "Remove {card} from the merge queue?",
   "board.queue.resume": "Resume queue",
   "board.queue.resumeFailed": "Couldn't resume the merge queue",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} other {{why}}}",
   "board.queue.returned": "{card} returned: {why}",
   "board.queue.returnedTo": "{card} returned to builder {builder}: {why}",
   "board.queue.runBy": "Run by profile {profile}",

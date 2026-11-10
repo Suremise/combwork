@@ -5241,6 +5241,32 @@ brought up to date with the release branch, and only the pull request's merge co
 merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
 refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
 
+**Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
+next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the
+default branch as the project's own platform port names it and only while it exists (none named or readable: nothing
+counts as `main`): two versions (`X.Y.Z[-pre]` or `X.Y`, an optional `v`, read on the whole name or its last `/`
+segment, compared by semver) give `forward` older into newer and `backward` (`older`) newer into older, and `unknown`
+(`sameVersion`) for one version under two names, decided first, whichever is the default (HR1's round 1: with no
+`main` or `master`, git's default is the checked-out branch, which may be a version); then the default branch, unless
+its name is a version, into any other is `forward`, any other into it `backward` (`default`: a release reaches it
+through its pull request); any other pair is `unknown` (`unordered`).
+Ancestry decides nothing: no graph test tells which branch was made from which (one containing the other is equally a
+release behind its next version and a next version built on it), so a pair the names don't order is unknown, never
+permitted. Only `forward` is permitted by default:
+- **The window** offers Bring Up to Date… and counts *behind* only for sources `forward` into the target; a target with
+  none has no `forward` in its view. It has no override.
+- **A request** (`forwardMerge`: the window's IPC, `POST /v1/queue/forward`, `cw_queue forward`) for a `backward` or
+  `unknown` pair is refused, saying which and why (`invalid`, 400), after the membership, actor and Control checks, which
+  an override never bypasses. `override: true` (the Agent API alone, only the JSON boolean: anything else is 400) is the
+  user's explicit choice: the card's `ForwardRequested` records it (`override: { by, dir, why }`), bound to that card and
+  so to its pair, and the Assistant's `queue-forward` action says so. An open card for the pair made without one is
+  never given it: the request is refused (`conflict`), naming the card to remove first.
+- **Retry merge** on a forward card and **the queue, before each forward entry's test merge**, read the direction again:
+  one not `forward` whose request recorded no override is refused (Retry, the card staying Active), or returned
+  (`IntegrationFailed` `direction`, never merged, both branches as they were): a card from before, or one whose default
+  branch changed since, inherits nothing from having been queued. Remove from queue ends it. A recorded override holds
+  through Retry, the source frozen again.
+
 #### 16.9.2 Advancing the target
 
 [P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected

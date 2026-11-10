@@ -54,6 +54,8 @@ const FAILURES: Failed[] = [
   // HI-1183's follow mode: the push of the merge refused, and an unknown publication the user said didn't happen.
   { ...base, reason: 'pushRefused' },
   { ...base, reason: 'notPublished' },
+  // HI-2892: a forward merge against the release path's direction, never merged.
+  { ...base, reason: 'direction' },
   { ...base, reason: 'folderBusy' },
   { ...base, reason: 'notUpToDate' },
   { ...base, reason: 'notUpToDate', files: ['src/a.ts'] },
