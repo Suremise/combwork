@@ -619,7 +619,10 @@ function OperationPreview({ project, p, note, onReplace }: { project: ProjectInf
         <div data-jj-op-command="">
           <p className="hint">{tr(M.command)}</p>
           <div className="jj-op-command-row">
-            <code className="mono jj-command">{p.command}</code>{' '}
+            {/* An operation id is 128 characters: it wraps rather than run past the page. */}
+            <code className="mono jj-command" style={{ wordBreak: 'break-all' }}>
+              {p.command}
+            </code>{' '}
             <button type="button" className="btn small" data-action="jj-op-copy" onClick={copy} disabled={busy}>
               <Icon name="copy" /> {tr(M.copy)}
             </button>

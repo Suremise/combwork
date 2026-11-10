@@ -21,6 +21,7 @@ export const OP_ROW_TEMPLATE = [
   'parents.map(|p| p.id()).join(",")',
   'time.start().utc().format("%Y-%m-%dT%H:%M:%SZ")',
   'user.escape_json()',
+  // jj 0.47.1 writes a workspace as `name@` here; the row keeps the name.
   'workspace_name.escape_json()',
   'description.first_line().escape_json()',
   'snapshot'
@@ -44,7 +45,7 @@ export function parseOpRow(line: string): JjOperationRow | null {
   const d = json(desc)
   const ps = parents ? parents.split(',') : []
   if (!isOpId(id) || !ps.every(isOpId) || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time) || typeof u !== 'string' || typeof w !== 'string' || typeof d !== 'string' || !/^(true|false)$/.test(snapshot)) return null
-  return { id, parents: ps, time, user: u.slice(0, 200), workspace: w.slice(0, 200), description: d.slice(0, 500), snapshot: snapshot === 'true' }
+  return { id, parents: ps, time, user: u.slice(0, 200), workspace: w.replace(/@$/, '').slice(0, 200), description: d.slice(0, 500), snapshot: snapshot === 'true' }
 }
 
 /** A page of operations, newest first: from the head, or from `from` (a page's `next`) back. */
