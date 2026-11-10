@@ -596,5 +596,7 @@
   "tips.opencodeHistory.text": "Die Unterhaltung eines OpenCode-Agenten erscheint im Tab „Sitzungen“, seine Tokens und Kosten in der Übersicht und der Fußzeile seines Bereichs, wie OpenCode sie meldet. $0 Kosten sind kein Maß für das Kontingent deines Plans; Limits gibt es nur für OpenCode Go oder Console.",
   "tips.opencodeHistory.title": "Verlauf, Tokens und Kosten eines OpenCode-Agenten",
   "tips.versionControlJj.text": "Wähle in einem jj-Repository, das mit Git colocated ist, oben im Tab Versionsverwaltung jj: Der Verlauf zeigt jede Change-ID neben ihrer Commit-ID, und Vergleichen, Bookmarks und Konflikte lesen das Repository, ohne es zu ändern. Reviewte Arbeit integrierst du selbst.",
-  "tips.versionControlJj.title": "Ein jj-Repository ansehen"
+  "tips.versionControlJj.title": "Ein jj-Repository ansehen",
+  "tips.activityMap.text": "„Aktivität“ zeigt seine Agenten als Wabe: Jeder Tool-Aufruf geht zu seiner Station (Lesen, Ändern, Shell, Agenten, Tools, Du), mit einem Kontextring pro Agent. Wähle einen Agenten unter „Agenten ▾“ für seine eigene Karte; „Zeigen“ blendet die Karte, ihren Verlauf und die Ringe aus.",
+  "tips.activityMap.title": "Eine Karte dessen, was deine Agenten tun"
 }

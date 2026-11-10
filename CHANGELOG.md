@@ -9,6 +9,10 @@
   - **Refused in place, with why**, nothing changed: a card that's Done, not in Todo, of another project, keeping earlier work or placed before a card it depends on, or a lane that changed meanwhile. A card on another lane offers **Move Here**, which moves it in one step.
   - **Undo** in the notification, or **Ctrl+Z** in the tab, puts the last change back exactly, or not at all once something changed since.
 - **Today's ended lanes** (HI-2898). **Ended today**, at the top of Progress → Lanes, lists the lanes that ended or were abandoned since midnight, with their builder and reviewer, cards, merge commit and how long they ran, each opening to its cards.
+- **The Activity map** (HI-2903). Activity, a project's tab and the workspace's view, draws what its agents are doing as a honeycomb above the list (beside it when wide): the agent in the centre, and six stations its tool calls go to (You, Read, Edit, Shell, Agents, Tools), each counting its turn's calls and naming the last. Live, each call sends a dot out to its station and back; a failed call turns its station red, and the busiest spokes thicken. **Last actions** lists the newest calls.
+  - **One agent** shows its own map, with its context as a ring (amber from 70 %, red from 90 %); **several, or All**, one shared map with each agent in its own colour and a context ring each.
+  - **Names, never content**: a file by its last two folders, a web page by its host, a command only as its tool.
+  - **Show** turns the map, its feed and the rings on and off. It is frozen when Activity is, draws nothing while hidden, and follows Windows' **Show animations** (Settings → Advanced → **The Activity map's moving pulses** to choose).
 
 ### Fixed
 

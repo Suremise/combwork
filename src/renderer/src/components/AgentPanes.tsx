@@ -10,7 +10,7 @@ import { signInHostLine } from '../signInHost'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { launchedName } from '@shared/connectionLabel'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
-import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, footerChoices, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
+import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, contextShown, agentModelShown, effortLabel, footerChoices, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
 import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
@@ -42,7 +42,7 @@ import { chooseFocus } from '../deferredFocus'
 import { onStripMenu, takeStripMenu, type StripMenu } from '../stripMenus'
 import { ModeBadge } from './PermissionMode'
 import { contextLines, providerDescriptor, providerName } from '@shared/providers'
-import { declaredFor, launchedWindow, localLimitsLines } from '@shared/localModelLimits'
+import { declaredFor, localLimitsLines } from '@shared/localModelLimits'
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText, zeroCostNote } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
@@ -1596,10 +1596,12 @@ export function PaneFooter({
   const waited = live ? retryWaitsView(live) : undefined
   const effort = onServer ? null : effortLabel(provider, live?.effort, chose.effort, chose.effortGlobal, modelCaps(provider, runModel, pinfo, settings).defaultEffort, settings)
   const threshold = compactThreshold(project.config, settings?.sessions.compactSuggestTokens ?? 0)
-  const ctx = usage?.contextTokens ?? 0
   // A local model's context as its launch applied it (HI-2682), until Claude Code reports its window: launch-global.
+  // The Activity map shows the same (contextShown, HI-2903).
+  const context = contextShown(usage, live)
+  const ctx = context.tokens ?? 0
   const running = live?.modelId || usage?.model || null
-  const windowShown = usage?.contextWindow ?? launchedWindow(live?.localLimits, usage?.contextWindow, running)
+  const windowShown = context.window
   const pct = contextPercent(ctx, windowShown)
   const over = threshold > 0 && ctx >= threshold
   const cost = live?.costUsd ?? usage?.costUsd ?? null

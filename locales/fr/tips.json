@@ -596,5 +596,7 @@
   "tips.opencodeHistory.text": "La conversation d’un agent OpenCode s’affiche dans l’onglet Sessions, et ses tokens et son coût dans la Vue d’ensemble et le pied de son volet, tels qu’OpenCode les indique. Un coût de $0 ne mesure pas le quota de votre forfait ; les limites ne s’affichent que pour OpenCode Go ou Console.",
   "tips.opencodeHistory.title": "L’historique, les tokens et le coût d’un agent OpenCode",
   "tips.versionControlJj.text": "Dans un dépôt jj colocalisé avec Git, choisis jj en haut de l’onglet Gestion de versions : son Historique montre chaque identifiant de changement à côté de son identifiant de commit, et Comparer, Signets et Conflits lisent le dépôt sans le modifier. Tu intègres toi-même le travail relu.",
-  "tips.versionControlJj.title": "Voir un dépôt jj"
+  "tips.versionControlJj.title": "Voir un dépôt jj",
+  "tips.activityMap.text": "Activité dessine ses agents en nid d’abeilles : chaque appel d’outil part vers sa station (Lire, Modifier, Shell, Agents, Outils, Toi), avec un anneau de contexte par agent. Choisis un agent dans Agents ▾ pour sa propre carte ; Afficher masque la carte, son fil et les anneaux.",
+  "tips.activityMap.title": "Une carte de ce que font tes agents"
 }

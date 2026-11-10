@@ -347,6 +347,9 @@ export const ALL_KEYS_TO_CLI = 'cw.terminal.allKeysToCli'
 /** What Combwork does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
 export const OSC52_POLICY = 'cw.terminal.osc52'
 
+/** The Activity map's pulses travel (HI-2903): system (Windows' animation setting), on or off. */
+export const ACTIVITY_MAP_MOTION = 'cw.activity.mapMotion'
+
 /** A card started on an agent is typed as its own words, without Combwork's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 
@@ -1365,6 +1368,25 @@ const SOURCES: readonly AdvancedSource[] = [
       { value: 'block', label: msg({ id: 'settings.advanced.cw.terminal.osc52.block', defaultMessage: 'Block', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": take none.' }) }
     ],
     default: 'allow',
+    applies: 'now'
+  },
+  // HI-2903: the Activity map's pulses travel along its spokes; reduced motion (Windows' setting) flashes the station instead.
+  {
+    id: ACTIVITY_MAP_MOTION,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.activity.mapMotion.title', defaultMessage: "The Activity map's moving pulses", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: whether the Activity tab's map shows a dot travelling to a station for each tool call." }),
+    desc: msg({
+      id: 'settings.advanced.cw.activity.mapMotion.desc',
+      defaultMessage: "The Activity map sends a dot along a spoke to its station for each tool call an agent makes, and back when it ends. As Windows says follows Windows' Show animations setting; On always moves them; Off only lights the station.",
+      description: 'What the advanced setting "The Activity map\'s moving pulses" does (Settings → Advanced, under Combwork). As Windows says, On and Off are the setting\'s choices: use the words its list shows. Show animations is the name of a Windows setting: use the name Windows gives it in your language.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'system', label: msg({ id: 'settings.advanced.cw.activity.mapMotion.system', defaultMessage: 'As Windows says', description: 'A choice of the advanced setting "The Activity map\'s moving pulses": follow Windows\' animation setting.' }) },
+      { value: 'on', label: msg({ id: 'settings.advanced.cw.activity.mapMotion.on', defaultMessage: 'On', description: 'A choice of the advanced setting "The Activity map\'s moving pulses": always move them.' }) },
+      { value: 'off', label: msg({ id: 'settings.advanced.cw.activity.mapMotion.off', defaultMessage: 'Off', description: 'A choice of the advanced setting "The Activity map\'s moving pulses": never move them; the station lights instead.' }) }
+    ],
+    default: 'system',
     applies: 'now'
   },
   {

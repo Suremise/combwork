@@ -1634,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Quanto tempo o servidor privado de um agente do OpenCode tem para responder antes de a inicialização desistir e encerrá-lo. Curto demais, um agente num PC lento não inicia.",
   "settings.advanced.opencode.server.readySeconds.title": "Servidor: tempo para iniciar",
   "settings.advanced.opencode.version.desc": "O que o opencode --version imprime: a versão é o primeiro grupo. O Combwork usa só o OpenCode 2 ou posterior. Errado, o OpenCode não é encontrado.",
-  "settings.advanced.opencode.version.title": "A versão em opencode --version"
+  "settings.advanced.opencode.version.title": "A versão em opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "O mapa de atividade envia um ponto por um raio até a estação a cada chamada de ferramenta de um agente, e de volta quando ela termina. Como o Windows diz segue a configuração Mostrar animações do Windows; Ligado sempre os move; Desligado só acende a estação.",
+  "settings.advanced.cw.activity.mapMotion.off": "Desligado",
+  "settings.advanced.cw.activity.mapMotion.on": "Ligado",
+  "settings.advanced.cw.activity.mapMotion.system": "Como o Windows diz",
+  "settings.advanced.cw.activity.mapMotion.title": "Pulsos em movimento do mapa de atividade"
 }
