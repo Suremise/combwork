@@ -14,6 +14,7 @@
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
 // both themes.
+// Dev build only (#1578): jj cards start through CW_TEST_JJ_CARDS, which a packaged build ignores (until J9e).
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
