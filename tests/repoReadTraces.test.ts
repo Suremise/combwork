@@ -80,7 +80,7 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
   } finally {
     // A command still running when the call ended (one of two read together, after the other's refusal) is this step's:
     // waited for, so it never lands in the next step's trace.
-    await until(() => running.size === 0)
+    await until(() => running.size === 0, HUNG_MS)
     gitTestHooks.started = undefined
     gitTestHooks.ended = undefined
   }
@@ -90,8 +90,11 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
   return [...ran.sort(), end]
 }
 
+/** The bound for a hung run, never how long a step should take. */
+const HUNG_MS = 15_000
+
 /** Waits for `ok` (a bound for a hung run, never how long it should take). */
-async function until(ok: () => boolean, ms = 15_000): Promise<void> {
+async function until(ok: () => boolean, ms = HUNG_MS): Promise<void> {
   const by = Date.now() + ms
   while (!ok()) {
     if (Date.now() > by) throw new Error('git commands still running after the read ended') // i18n-ignore: a test's own failure
