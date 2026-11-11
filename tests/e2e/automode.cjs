@@ -54,7 +54,14 @@ const check = (name, ok, extra = '') => {
     check(`${says}: the CLI shows the mode it says (${m.expected.join(' or ')})`, m.expected.includes(m.observed), m.observed ?? 'none shown')
     // Not merely the mode asked for: where the CLI said nothing or Auto, it still showed it itself.
     check(`${says}: Combwork shows the mode the CLI showed`, !!m.observed && m.shown === m.observed, `${m.shown} / ${m.observed}`)
-    const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m.autoOffered)
+    // The dialog's account is asked in its own folder (HI-2852): the same answer set up there, and waited for (HI-2901).
+    const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, {
+      prepare: (folder) => fs.writeFileSync(path.join(folder, 'fake-models.json'), JSON.stringify({ haikuAuto })),
+      read: (catalog) => {
+        const haiku = catalog?.source === 'cli' ? catalog.models.find((x) => x.value === 'haiku') : undefined
+        return !!haiku && haiku.supportsAuto === wanted
+      }
+    })
     check(`${says}: the connection dialog warns exactly as the CLI says`, caveatRight, caveat)
     await page.keyboard.press('Control+Shift+E').catch(() => undefined)
     await inv('session:stop', home, 'assistant')

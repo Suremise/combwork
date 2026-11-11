@@ -7,7 +7,7 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { RESTART_READY_SECONDS, RESUME_AFTER_UPDATE } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
-import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, restartingLine, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
+import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, restartingLine, resumeNote, STALL_HOLD_MS, ackFile, takenFile, unreported, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
 import type { LaneInfo, LiveSessionState, TaskCard, ToastAction } from '../shared/types'
 import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
@@ -24,6 +24,8 @@ import { allTasks } from './tasks'
 import { onGateSettled } from './openGate'
 import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 import { pausedFor } from './teamPause'
+import { projectAgents } from '../shared/defaults'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { dataFolder } from './combworkFolder'
 
 /**
@@ -197,12 +199,15 @@ export function baseEntries(): RestartEntry[] {
 }
 
 /**
- * The base entries narrowed to those that were working, watching or in a running lane, each with its card, round and
- * lane (each workspace's lanes and board read once).
+ * The base entries narrowed to those that were working, watching, in a running lane, reviewing for a running pool lane's
+ * project (HI-2909) or reviewing a card in Review, each with its card, round and lane (each workspace's lanes and board read once,
+ * each project's agents once). The others, idle with nothing a running lane needs, are kept as skipped (`idle`), so the
+ * next start's notice names every agent that was running.
  */
 export async function enrich(base: readonly RestartEntry[]): Promise<RestartEntry[]> {
   const lanes = new Map<string, Promise<LaneInfo[]>>()
   const boards = new Map<string, Promise<TaskCard[]>>()
+  const reviewers = new Map<string, Promise<Set<string>>>()
   const once = <T>(m: Map<string, Promise<T>>, key: string, read: () => Promise<T>, empty: T): Promise<T> => {
     if (!m.has(key)) m.set(key, read().catch(() => empty))
     return m.get(key)!
@@ -213,8 +218,17 @@ export async function enrich(base: readonly RestartEntry[]): Promise<RestartEntr
     const key = e.workspace.toLowerCase()
     const running = (await once(lanes, key, () => inWorkspace(ws, () => listLanes(ws)), [] as LaneInfo[])).filter((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === e.project.toLowerCase())
     const lane = running.find((l) => l.builder.id === e.agentId) ?? running.find((l) => l.reviewer?.id === e.agentId)
-    if (!BUSY.has(e.status) && !lane) continue
-    const card = cardFor(await once(boards, key, () => allTasks(ws, { archived: false }), [] as TaskCard[]), e.project, e.agentId, lane?.current ?? null)
+    // A running pool lane's project (HI-2909): every agent whose role reviews is its pool, needed even with no review in
+    // hand (an idle one parked by a team pause is "finished", and the pool never restarts one it told already).
+    const pooled = running.some((l) => l.pool) && (await once(reviewers, e.projectPath.toLowerCase(), async () => new Set(projectAgents(await ws.projectConfig(e.projectPath)).filter((a) => reviewsWork(agentWorkflowRole(a))).map((a) => a.id)), new Set<string>())).has(e.agentId)
+    const board = await once(boards, key, () => allTasks(ws, { archived: false }), [] as TaskCard[])
+    const card = cardFor(board, e.project, e.agentId, lane?.current ?? null)
+    // A review in hand (a loose card's, HI-2046, given to whoever was free): its card waits for this agent.
+    const reviewing = board.some((c) => c.project === e.project && c.column === 'review' && c.review?.agent === e.agentId)
+    if (!BUSY.has(e.status) && !lane && !pooled && !reviewing) {
+      out.push({ ...e, state: 'skipped', why: 'idle' }) // i18n-ignore: the record's codes, not text
+      continue
+    }
     out.push({ ...e, ...(card ? { card } : {}), ...(lane ? { lane: { id: lane.id, name: lane.name, role: lane.builder.id === e.agentId ? 'builder' : 'reviewer' } } : {}) })
   }
   return out
@@ -249,9 +263,13 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   let snapshot = base
   if (enriched) {
     const narrowed = new Set(base.map(agentKey))
-    record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched, reason)
-    snapshot = enriched
+    // The idle ones are in the record only to be named as not resumed (HI-2909): not told they will be, nor counted. A
+    // quit's start offers what it resumes, and names no idle one: not kept.
+    const idle = enriched.filter((e) => e.state === 'skipped')
+    record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, reason === 'quit' ? enriched.filter((e) => e.state !== 'skipped') : enriched, reason)
+    snapshot = enriched.filter((e) => e.state !== 'skipped')
     await save()
+    if (idle.length) log.info(`Not recording ${idle.length} idle agent(s) to resume as Combwork closes (${reason}): ${idle.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
   } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Combwork closed: every running conversation is kept to resume`)
   if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
   if (reason !== 'quit' && snapshot.length) {
@@ -301,6 +319,9 @@ export async function startRestartRecovery(): Promise<void> {
   for (const e of record.entries) {
     if (e.state === 'held') setState(e, 'offered')
     if (e.state === 'offered') offer.push(e)
+    // Skipped already, as Combwork closed (idle, HI-2909) or at this start (a day old): the report names them too, so
+    // it accounts for every agent that was running.
+    if (unreported(e)) skippedBefore.push(e)
   }
   // Told before the write is awaited, as pump does (HI-2356): an offer the queue told already is replaced at once.
   if (offer.length) tellOffer()
@@ -314,6 +335,8 @@ export async function startRestartRecovery(): Promise<void> {
 
 /** Once a start: the window's load can come more than once (a reload). */
 let recoveryStarted = false
+/** Entries skipped before this run's queue (idle as Combwork closed, or expired): listed in its first report, once. */
+const skippedBefore: RestartEntry[] = []
 
 /** The offer's buttons' commands (the renderer's commands.ts). */
 const RESUME_COMMAND = 'session.resumeRestart'
@@ -670,6 +693,8 @@ function whyText(e: RestartEntry): string {
       return tr(msg({ id: 'main.restart.why.stopped', defaultMessage: 'it was stopped while it started', description: 'Why an agent was not resumed after Combwork restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready.' }))
     case 'expired':
       return tr(msg({ id: 'main.restart.why.expired', defaultMessage: 'it waited more than a day', description: 'Why an agent was not resumed after Combwork restarted: the restart was over a day ago.' }))
+    case 'idle':
+      return tr(msg({ id: 'main.restart.why.idle', defaultMessage: 'it was idle, with no card or lane waiting for it', description: 'HI-2909: why an agent was not resumed after Combwork restarted: as Combwork closed it was idle (not working or watching), and no running card loop (lane), reviewer pool or review in progress needed it.' }))
     default:
       return e.state === 'held' ? tr(msg({ id: 'main.restart.why.held', defaultMessage: 'its working folder is held for other work (resume it by hand)', description: "Why an agent was not resumed after Combwork restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it." })) : (e.why ?? '')
   }
@@ -677,8 +702,18 @@ function whyText(e: RestartEntry): string {
 
 /** The one notice of what this run's queue did, and each workspace's Assistant told; then the counts start again. */
 function report(): void {
-  const { resumed, failed, held, skipped } = done
-  if (!resumed.length && !failed.length && !held.length && !skipped.length) return
+  const { resumed, failed, held } = done
+  // Those skipped before the queue (HI-2909: idle as Combwork closed, or expired), once their workspace is ready and has
+  // nothing left to decide or start: named once, alone too (an update whose agents were all idle), then kept no more.
+  const settled = (e: RestartEntry): boolean => !!readyWorkspaceOf(e) && !record?.entries.some((x) => samePlace(x.workspace, e.workspace) && (x.state === 'pending' || x.state === 'queued' || x.state === 'starting'))
+  const before = skippedBefore.filter(settled)
+  if (!resumed.length && !failed.length && !held.length && !done.skipped.length && !before.length) return
+  for (const e of before) {
+    skippedBefore.splice(skippedBefore.indexOf(e), 1)
+    e.reported = true
+  }
+  if (before.length) void save()
+  const skipped = [...before, ...done.skipped]
   const update = policy() !== 'quit'
   const lines: string[] = []
   if (resumed.length) lines.push(tr(msg({ id: 'main.restart.resumedLine', defaultMessage: 'Resumed: {names}.', description: 'A line of the notice after Combwork resumed agents when it started again. {names} lists them, each with its project.' }), { names: fmt.list(resumed.map((e) => `${e.agentName} (${e.project})`)) }))

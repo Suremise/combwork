@@ -33,7 +33,9 @@ const h = vi.hoisted(() => ({
   dropped: [] as [string, string[], string][],
   /** The record's writes held here while set, and how many are held (HI-2356, HR1's round 1). */
   saveHold: null as Promise<void> | null,
-  savesHeld: 0
+  savesHeld: 0,
+  /** The workspace's lanes as listLanes reads them (HI-2909: a pool lane). */
+  lanes: [] as unknown[]
 }))
 
 // The record's writes, held while a test says (a slow disk): what an await on save() lets happen meanwhile.
@@ -80,7 +82,7 @@ vi.mock('../src/main/workspace', () => ({
   workspaceFor: (p: string) => (h.workspaces as { path: string }[]).find((w) => p.toLowerCase().startsWith(w.path.toLowerCase())) ?? null,
   inWorkspace: (_w: unknown, fn: () => unknown) => fn()
 }))
-vi.mock('../src/main/lanes', () => ({ listLanes: async () => [] }))
+vi.mock('../src/main/lanes', () => ({ listLanes: async () => h.lanes }))
 // The team's pause (HI-2081): restart recovery waits for a paused team.
 vi.mock('../src/main/teamPause', () => ({ pausedFor: () => (h.paused ? { pauseId: 'p1', since: '', by: 'user' } : null) }))
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
@@ -100,14 +102,16 @@ vi.mock('../src/main/notify', () => ({
 vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string, ws?: Record<string, unknown> | null) => (ws && id in ws ? ws[id] : h.advanced[id]) } }))
 
 /** A workspace as the queue reads it: its path, whether it has been read (info), its own Advanced values. */
-function workspace(path: string, agents: string[], o: { read?: boolean; advanced?: Record<string, unknown> } = {}) {
+function workspace(path: string, agents: string[], o: { read?: boolean; advanced?: Record<string, unknown>; reviewers?: string[] } = {}) {
   const project = join(path, 'alpha')
   const w = {
     path,
     read: o.read ?? true,
     config: { advanced: o.advanced ?? {} },
     isAssistantHome: () => false,
-    info: () => (w.read ? { projects: [{ path: project, agents: agents.map((id) => ({ id, name: id, lastSessionId: `s-${id}` })) }] } : null)
+    info: () => (w.read ? { projects: [{ path: project, agents: agents.map((id) => ({ id, name: id, lastSessionId: `s-${id}` })) }] } : null),
+    // Its project's agents, with their workflow roles (HI-2909: the reviewer pool is those whose role reviews).
+    projectConfig: async () => ({ agents: agents.map((id) => ({ id, name: id, workflowRole: o.reviewers?.includes(id) ? 'reviewer' : 'builder' })) })
   }
   return w
 }
@@ -180,7 +184,7 @@ function takesNote(agentId: string): void {
 
 beforeEach(() => {
   dir = tempDir('cw-restart-recovery-')
-  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0 })
+  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0, lanes: [] })
 })
 afterEach(() => {
   m?.stopRestartRecovery()
@@ -441,6 +445,102 @@ describe('the restart queue (HI-1707)', () => {
       expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.state ?? 'gone').toMatch(/resumed|gone/)
       expect(h.resolved).toEqual([[first, expect.stringContaining('Resumed: a1 (alpha).')], [second.offer, 'Not resumed']])
     })
+  })
+
+  // HI-2909: rc.1's install after a team pause resumed the builders but not the reviewer pool HR1–HR3, parked idle ("finished")
+  // with no lane naming them, and its notice named neither. A pool lane's reviewers resume with it, and an agent left
+  // idle is named as not resumed, with why.
+  it('a pause, an update and the restart with a pool lane: its reviewers resume, and the notice names every agent that ran', async () => {
+    const ws = workspace(join(dir, 'ws'), ['b1', 'r1', 'r2', 'i1'], { reviewers: ['r1', 'r2'] })
+    h.workspaces = [ws]
+    h.lanes = [{ id: 'l1', name: 'Pool lane', project: 'alpha', state: 'active', builder: { id: 'b1', name: 'b1' }, reviewer: null, pool: true, current: null }]
+    await startWith([])
+    // The team paused before the install: every agent parked, at its prompt with its turn done.
+    h.paused = true
+    const live = (agentId: string, i: number): Live => ({ projectPath: join(ws.path, 'alpha'), agentId, runId: `r${i}`, status: 'finished', sessionId: `s-${agentId}`, provider: 'claude-code' })
+    h.lives = ['b1', 'r1', 'r2', 'i1'].map(live)
+    expect(await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })).toBe(3)
+    await m.restartRecordSaved()
+    expect(saved()?.entries.map((e) => [e.agentId, e.state, e.why ?? null])).toEqual([
+      ['b1', 'pending', null],
+      ['r1', 'pending', null],
+      ['r2', 'pending', null],
+      ['i1', 'skipped', 'idle']
+    ])
+    // The update's restart lifted the pause: the builder and both pooled reviewers resume, one at a time.
+    h.paused = false
+    await relaunch(ws, { readyMs: HUNG_MS })
+    for (const [i, id] of ['b1', 'r1', 'r2'].entries()) {
+      await vi.waitFor(() => expect(h.starts).toHaveLength(i + 1), { timeout: HUNG_MS })
+      expect(h.starts[i]).toBe(id)
+      takesNote(id)
+    }
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    const notice = h.toasts[0].message ?? ''
+    for (const id of ['b1', 'r1', 'r2']) expect(notice).toContain(`${id} (alpha)`)
+    expect(notice).toContain('Not resumed: i1 (alpha): it was idle, with no card or lane waiting for it.')
+    expect(h.starts).toEqual(['b1', 'r1', 'r2'])
+  })
+
+  // HR2's round 1: with every agent idle the record was removed at once and nothing told; skips from before the queue
+  // are kept until a start's notice names them, once, and then the record goes.
+  it('an update with every agent idle: the next start names them, once (a reload adds no second notice), and the record goes', async () => {
+    const ws = workspace(join(dir, 'ws'), ['i1', 'i2'])
+    h.workspaces = [ws]
+    await startWith([])
+    h.lives = ['i1', 'i2'].map((agentId, i) => ({ projectPath: join(ws.path, 'alpha'), agentId, runId: `r${i}`, status: 'finished', sessionId: `s-${agentId}`, provider: 'claude-code' }))
+    expect(await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })).toBe(0)
+    await m.restartRecordSaved()
+    expect(saved()?.entries.map((e) => [e.agentId, e.state, e.why])).toEqual([
+      ['i1', 'skipped', 'idle'],
+      ['i2', 'skipped', 'idle']
+    ])
+    await relaunch(ws)
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    for (const id of ['i1', 'i2']) expect(h.toasts[0].message).toContain(`Not resumed: ${id} (alpha): it was idle, with no card or lane waiting for it.`)
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+    // The window loads again: nothing more is said.
+    await queueSettles(async () => {
+      await m.startRestartRecovery()
+      events.emit({ type: 'workspace-changed', workspace: null })
+    })
+    expect(h.toasts).toHaveLength(1)
+    expect(h.starts).toEqual([])
+  })
+
+  it('a record whose entries are all over a day old: the start names them as expired, starts none, and the record goes', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    await startWith([entry(ws.path, 'a1', { at: new Date(Date.now() - 2 * 24 * 3600_000).toISOString() })], { reason: 'update' })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    expect(h.toasts[0].message).toContain('Not resumed: a1 (alpha): it waited more than a day.')
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+    expect(h.starts).toEqual([])
+  })
+
+  it('a quit with every agent idle keeps no record: its start offers what it resumes, and names no idle one', async () => {
+    const ws = workspace(join(dir, 'ws'), ['i1'])
+    h.workspaces = [ws]
+    await startWith([])
+    h.lives = [{ projectPath: join(ws.path, 'alpha'), agentId: 'i1', runId: 'r1', status: 'finished', sessionId: 's-i1', provider: 'claude-code' }]
+    await m.recordClosing('quit', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+  })
+
+  it("an idle reviewer with a review in hand outside a lane (a loose card, HI-2046): it resumes, so the card isn't left waiting", async () => {
+    const ws = workspace(join(dir, 'ws'), ['r1'], { reviewers: ['r1'] })
+    h.workspaces = [ws]
+    h.tasks = Promise.resolve([{ number: 7, key: 'HI-7', project: 'alpha', column: 'review', agent: 'b9', review: { agent: 'r1', agentName: 'r1', since: '' } }])
+    await startWith([])
+    h.lives = [{ projectPath: join(ws.path, 'alpha'), agentId: 'r1', runId: 'r1', status: 'finished', sessionId: 's-r1', provider: 'claude-code' }]
+    await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()?.entries).toEqual([expect.objectContaining({ agentId: 'r1', state: 'pending', card: { label: 'HI-7', round: 1 } })])
   })
 
   it("Combwork closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {

@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "再開済み：{names}。",
   "main.restart.why.expired": "1日以上待機していました",
   "main.restart.why.held": "作業フォルダーが別の作業のために確保されています（手動で再開してください）",
+  "main.restart.why.idle": "アイドル状態で、待っているカードもレーンもありませんでした",
   "main.restart.why.movedOn": "より新しい会話があります",
   "main.restart.why.notReady": "時間内に準備ができなかったため停止しました",
   "main.restart.why.notStopped": "時間内に準備ができず、まだ停止していません。停止すると、ほかのエージェントを再開します",
