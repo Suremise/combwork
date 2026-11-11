@@ -854,7 +854,9 @@ function OperationLine({ row, selected, onPreview }: { row: JjOperationRow; sele
 export function JjOperationsSection({ project }: { project: ProjectInfo }) {
   const r = useJjRead<JjOperationsView>(() => call('jj:operations', project.path, null), project.path)
   const [older, setOlder] = useState<{ for: string; first: string; rows: JjOperationRow[]; next: string | null } | null>(null)
-  const [preview, setPreview] = useState<{ for: string; op: string; v: JjView<JjOperationPreview> | null; note: string | null } | null>(null)
+  // `ask`: which request it answers (HI-2971). Copy's re-read replaces only the preview it was started from, so it never
+  // overwrites a later request's answer, of the same operation or another.
+  const [preview, setPreview] = useState<{ for: string; op: string; ask: number; v: JjView<JjOperationPreview> | null; note: string | null } | null>(null)
   const first = r.data && !isJjViewUnknown(r.data) ? r.data : null
   // Older pages belong to the first page they were read after: a refreshed list starts again.
   const extra = older && first && older.for === project.path && older.first === first.op ? older : null
@@ -873,10 +875,10 @@ export function JjOperationsSection({ project }: { project: ProjectInfo }) {
   const ask = (op: string): void => {
     const g = ++asked.current
     const latest = (): boolean => asked.current === g
-    setPreview({ for: project.path, op, v: null, note: null })
+    setPreview({ for: project.path, op, ask: g, v: null, note: null })
     call('jj:operationPreview', project.path, op, null).then(
-      (v) => latest() && setPreview({ for: project.path, op, v, note: null }),
-      (e: unknown) => latest() && setPreview({ for: project.path, op, v: { jjUnknown: 'failed', detail: errorMessage(e) }, note: null })
+      (v) => latest() && setPreview({ for: project.path, op, ask: g, v, note: null }),
+      (e: unknown) => latest() && setPreview({ for: project.path, op, ask: g, v: { jjUnknown: 'failed', detail: errorMessage(e) }, note: null })
     )
   }
   return (
@@ -884,7 +886,7 @@ export function JjOperationsSection({ project }: { project: ProjectInfo }) {
       {() => (
         <>
           <p className="hint">{tr(M.opsIntro)}</p>
-          {shown && (shown.v === null ? <p className="faint">{tr(M.reading)}</p> : isJjViewUnknown(shown.v) ? <Unknown u={shown.v} /> : <OperationPreview project={project} p={shown.v} note={shown.note} onReplace={(v, note) => setPreview((p) => (p && p.for === project.path && p.op === shown.op && p.v !== null ? { for: project.path, op: shown.op, v, note } : p))} />)}
+          {shown && (shown.v === null ? <p className="faint">{tr(M.reading)}</p> : isJjViewUnknown(shown.v) ? <Unknown u={shown.v} /> : <OperationPreview project={project} p={shown.v} note={shown.note} onReplace={(v, note) => asked.current === shown.ask && setPreview((p) => (p?.ask === shown.ask ? { ...p, v, note } : p))} />)}
           {rows.length === 0 ? (
             <p className="faint">{tr(M.opNone)}</p>
           ) : (

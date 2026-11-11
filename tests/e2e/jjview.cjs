@@ -300,6 +300,22 @@ function jjRepo(dir, o = {}) {
     check('…the earlier one answers late', !!(await until(async () => (await settled('jj:operationPreview')) >= prev0 + 2, HUNG_MS)))
     await answered()
     check('…and the later one still shows', (await overlapPreview.count()) === 1 && (await ops.locator(`[data-jj-op-preview="${clean}"]`).count()) === 0, await text(ops))
+    // Nor does Copy's re-read (HR1's round 1): Copy, its check slowed, finds the head moved and reads the preview again;
+    // a Preview Undo of the same operation asked meanwhile answers first, and the re-read's late answer leaves it shown.
+    const anyClean = ops.locator(`[data-jj-op-preview="${clean}"]`)
+    const movedNote = ops.locator('[data-jj-moved-at-copy]')
+    await slowNext('')
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    check('the clean one previewed again', !!(await until(async () => (await anyClean.locator('[data-action="jj-op-copy"]').count()) === 1 && (await movedNote.count()) === 0, HUNG_MS)), await text(ops))
+    jj(shop, 'bookmark', 'create', 'meanwhile2', '-r', base)
+    const copy0 = await settled('jj:operationPreview')
+    await slowNext('jj:operationPreview=5000*1')
+    await anyClean.locator('[data-action="jj-op-copy"]').click()
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    check('…Copy with the head moved, then Preview Undo of it again: the new preview shows', !!(await until(async () => (await settled('jj:operationPreview')) >= copy0 + 1 && (await anyClean.locator('[data-action="jj-op-copy"]').count()) === 1, HUNG_MS)), await text(ops))
+    check("…Copy's check and re-read answer after it", !!(await until(async () => (await settled('jj:operationPreview')) >= copy0 + 3, HUNG_MS)))
+    await answered()
+    check("…and the new preview still shows, not Copy's re-read (no moved-at-copy note)", (await anyClean.count()) === 1 && (await movedNote.count()) === 0, await text(ops))
     await slowNext('')
 
     // --- Unsupported features: notes' .gitattributes refuses the switch, listed; its own core.autocrlf too, with the hint
