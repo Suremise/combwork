@@ -197,8 +197,10 @@ describe('the canary dialect over the session contract (card 1)', () => {
     for (const level of ['look', 'agents', 'projects'] as const) for (const cs of [true, false]) out.push({ name: `control ${level} ${cs}`, text: controlRules(level, cs), values: [] })
     out.push({ name: 'journal', text: journalRule([]), values: [] })
     out.push({ name: 'handover', text: withLatestHandover('', 'handovers/2026-10-03-web.md'), values: ['handovers/2026-10-03-web.md'] })
-    // A jj project's rule (HI-2800), after the contract.
+    // A jj project's rule (HI-2800), after the contract; a jj repository not colocated with Git has its own (HI-2896,
+    // HI-2952: walked here too, so the canary sees it).
     out.push({ name: 'jj', text: withPlatformRule('', 'jj'), values: [] })
+    out.push({ name: 'jj separate', text: withPlatformRule('', 'jj-separate'), values: [] })
     out.push({ name: 'notes', text: deliveredNotes('MACHINE NOTE').text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'notes cut', text: deliveredNotes('MACHINE NOTE\n'.repeat(500), 600).text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'starter', text: instructionsStarter('webapp', 'Codex'), values: ['webapp', 'Codex'] })
