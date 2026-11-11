@@ -3,11 +3,14 @@
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { tempDir } from './tempDir'
 import { destinationOf, displayUrl, fetchHeadOf, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
 import { gitTree } from '../src/main/workflow/mergeQueue'
 import type { CandidateHost } from '../src/main/platform/integration'
+
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 import { memoryTransportStore, snapshotDigest } from '../src/main/workflow/transportSnapshots'
 import type { TransportSnapshot } from '../src/main/platform/integration'
 
@@ -91,7 +94,9 @@ describe('follow mode’s transport helpers (HI-1183)', () => {
 })
 
 describe('the sealed fetch offers the project’s commits as haves (HI-2987)', () => {
-  const sh = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  // Every git of the fixture with the run's allowlisted environment and test git config, no system config (tests/README.md, Isolation).
+  const env = gitEnv()
+  const sh = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', env }).trim()
   const slash = (p: string): string => p.replace(/\\/g, '/')
   /** The project's objects, loose and packed. */
   const objects = (repo: string): number => {
@@ -103,8 +108,8 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     const root = tempDir('sealed-haves-')
     const bare = slash(join(root, 'origin.git'))
     const project = join(root, 'project')
-    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
-    execFileSync('git', ['init', '-q', '-b', 'main', project])
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { env })
+    execFileSync('git', ['init', '-q', '-b', 'main', project], { env })
     for (const [k, v] of [['user.email', 't@example.com'], ['user.name', 'T'], ['core.autocrlf', 'false']]) sh(project, 'config', k, v)
     // 120 commits, three objects each (commit, tree, blob), made with fast-import (HG1's probe).
     let stream = ''
@@ -112,20 +117,20 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
       const data = `content ${i}\n`
       stream += `commit refs/heads/main\nmark :${i}\ncommitter T <t@example.com> ${1700000000 + i} +0000\ndata 3\nc${String(i).padStart(2, '0').slice(-2)}\n${i > 1 ? `from :${i - 1}\n` : ''}M 100644 inline f${i}.txt\ndata ${data.length}\n${data}\n`
     }
-    execFileSync('git', ['fast-import', '--quiet'], { cwd: project, input: stream })
+    execFileSync('git', ['fast-import', '--quiet'], { cwd: project, input: stream, env })
     sh(project, 'reset', '-q', '--hard', 'main')
     sh(project, 'remote', 'add', 'origin', bare)
     sh(project, 'push', '-q', '-u', 'origin', 'main')
     sh(project, 'gc', '-q')
     const other = join(root, 'other')
-    execFileSync('git', ['clone', '-q', bare, other])
+    execFileSync('git', ['clone', '-q', bare, other], { env })
     for (const [k, v] of [['user.email', 'o@example.com'], ['user.name', 'O'], ['core.autocrlf', 'false']]) sh(other, 'config', k, v)
     writeFileSync(join(other, 'theirs.txt'), 'theirs\n')
     sh(other, 'add', 'theirs.txt')
     sh(other, 'commit', '-q', '-m', 'theirs')
     sh(other, 'push', '-q', 'origin', 'main')
     const theirs = sh(other, 'rev-parse', 'HEAD')
-    const host: CandidateHost = { project, folder: project, signTimeoutMs: 0, identity: async () => null, reads: {}, run: (cwd, args, opts) => gitTree(cwd, args, opts ?? {}) }
+    const host: CandidateHost = { project, folder: project, signTimeoutMs: 0, identity: async () => null, reads: {}, run: (cwd, args, opts) => gitTree(cwd, args, { env, ...opts }) }
     const d = await destinationOf(host, 'main')
     if (!('snapshot' in d)) throw new Error(JSON.stringify(d))
     const before = objects(project)
