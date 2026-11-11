@@ -115,7 +115,8 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     // --- Staged: the user's staged change pauses the next card's merge; Set Aside in the card's Work section, and it goes on.
     fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'kept, and the user staged this\n')
     git('add', 'keep.txt')
-    Object.assign(builder, await q.renewed(fx, h, builder))
+    // No renewed() here (HI-2955): B1's run ended with the first card's Done (with its slot's lease) and nothing restarts
+    // it, so a wait for a new run only runs out; startCard starts B1 again (rejoin) as it finds it not live.
     const b = await q.approveBy(fx, h, builder, reviewer, 'Keep more', { 'keep.txt': 'kept\nby the card\n' })
     check('a second card is approved', Object.values(b.steps).every((s) => s.status === 200), JSON.stringify(b.steps))
     const ps = await waitHung(async () => ((await queue())?.paused?.reason === 'staged' ? (await queue()).paused : null))
