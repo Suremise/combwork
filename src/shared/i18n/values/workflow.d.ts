@@ -291,6 +291,8 @@ interface CombworkMessageValues {
   'workflow.refused.evidence.changed.next': undefined
   'workflow.refused.forward.notAgents.message': { card: string | number }
   'workflow.refused.forward.notAgents.next': undefined
+  'workflow.refused.forward.resolutionSource.message': { card: string | number; from: string | number; to: string | number; revision: string | number; source: string | number }
+  'workflow.refused.forward.resolutionSource.next': { source: string | number }
   'workflow.refused.forward.resolutionTarget.message': { card: string | number; from: string | number; to: string | number; target: string | number }
   'workflow.refused.forward.resolutionTarget.next': { to: string | number }
   'workflow.refused.integrate.approved.message': { card: string | number; revision: string | number; why: string | number }

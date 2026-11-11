@@ -709,6 +709,16 @@
     "note": "HI-2679: the next step after an agent was refused acting on a forward-merge card.",
     "audience": "both"
   },
+  "workflow.refused.forward.resolutionSource.message": {
+    "text": "{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.",
+    "note": "HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "text": "In its branch, run git merge {source}, resolve the conflict, commit, and submit again.",
+    "note": "HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; \"git merge\" is a command, never translated) into the card’s branch.",
+    "audience": "both"
+  },
   "workflow.refused.forward.resolutionTarget.message": {
     "text": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
     "note": "HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12.",

@@ -5807,6 +5807,12 @@ the default branch or the branches changed since Resolve so that it no longer re
 builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
 only a new forward request with the user's override merges that pair.
 
+Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
+`source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
+next forward conflict again) is refused (`forward.resolutionSource`, its next step `git merge <source>`). Read with the
+project's history port (`resolutionMissing`); what can't be read doesn't refuse, and the queue reads it again at each
+attempt, returning one without it to its builder (`resolution`, nothing merged), however it reached the queue.
+
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
 merge commit or squashed counts once, a rebased one per commit), kept by both heads (at most 64 pairs), null when a head

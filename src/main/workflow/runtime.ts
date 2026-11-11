@@ -29,6 +29,7 @@ import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
+import { historyOf } from '../platform/historyPorts'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
@@ -1764,6 +1765,9 @@ export class Workflow {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
         s = this.state(card)
       }
+      // HI-2999: a forward's resolution carries the commit it resolves, merged, never cherry-picked or copied.
+      const missing = await this.resolutionMissing(o, s, revision)
+      if (missing) return { rule: 'forward.resolutionSource', values: { card: card.key, from: missing.from, to: missing.to, source: missing.source, revision: (revision ?? '').slice(0, 7) } }
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') {
@@ -2828,6 +2832,19 @@ export class Workflow {
     })
     if (out) return this.refuse(card, by, 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2999: a forward's resolution (`s.resolves`) whose `revision` doesn't have the commit it resolves in its history
+   * (cherry-picked or copied, not merged: the next forward would conflict again): what it resolves; null for any other
+   * card, one that has it, or what can't be read (no history, no revision, unknown), the queue's check reading it again.
+   */
+  async resolutionMissing(o: WorkflowOptions, s: CardState, revision: string | null): Promise<FactData['ForwardResolution'] | null> {
+    const res = s.resolves
+    const h = historyOf(o.platform)
+    if (!res || !revision || !h) return null
+    const has = await h.isAncestor(this.cfg.project, res.source, revision).catch(() => null)
+    return has === false ? res : null
   }
 
   /**

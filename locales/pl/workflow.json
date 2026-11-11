@@ -287,6 +287,8 @@
   "workflow.refused.forward.notAgents.next": "Zostaw to użytkownikowi lub Asystentowi.",
   "workflow.refused.forward.resolutionTarget.message": "Karta {card} rozwiązuje scalenie {from} do {to}, ale zaczęłaby od {target} i tam zostałaby scalona.",
   "workflow.refused.forward.resolutionTarget.next": "Użytkownik lub Assistant może ustawić jej „Scalanie do” na {to}, a potem uruchomić ją ponownie.",
+  "workflow.refused.forward.resolutionSource.message": "Karta {card} rozwiązuje scalenie {from} do {to}, ale {revision} nie zawiera {source}, commita, który wrócił: cherry-pick lub kopia jego zmian pozostawia go poza historią {to}, więc następne „Zaktualizuj” znów skończyłoby się konfliktem.",
+  "workflow.refused.forward.resolutionSource.next": "W jej gałęzi uruchom git merge {source}, rozwiąż konflikt, zrób commit i prześlij ją ponownie.",
   "workflow.refused.integrate.approved.message": "Karta {card} w rewizji {revision} nie jest zatwierdzona: {why}",
   "workflow.refused.integrate.approved.next": "Przekaż ją do recenzji.",
   "workflow.refused.integrate.checksPassed.change": "Tę regułę ustawisz w Kontrola wersji → Sprawdzenia przechodzą na scalonym wyniku.",

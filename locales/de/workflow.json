@@ -287,6 +287,8 @@
   "workflow.refused.forward.notAgents.next": "Überlass das dem Benutzer oder dem Assistenten.",
   "workflow.refused.forward.resolutionTarget.message": "{card} löst den Merge von {from} in {to} auf, würde aber von {target} aus starten und dorthin gemergt werden.",
   "workflow.refused.forward.resolutionTarget.next": "Du oder der Assistant könnt ihr „Wird gemergt in“ auf {to} setzen und sie dann erneut starten.",
+  "workflow.refused.forward.resolutionSource.message": "{card} löst den Merge von {from} in {to} auf, aber {revision} enthält {source} nicht, den zurückgekommenen Commit: Ein Cherry-Pick oder eine Kopie seiner Änderungen lässt ihn aus der Historie von {to} heraus, sodass das nächste „Auf den neuesten Stand bringen“ wieder einen Konflikt hätte.",
+  "workflow.refused.forward.resolutionSource.next": "Führe in ihrem Branch git merge {source} aus, löse den Konflikt, committe und reiche sie erneut ein.",
   "workflow.refused.integrate.approved.message": "{card} (Revision {revision}) ist nicht genehmigt: {why}",
   "workflow.refused.integrate.approved.next": "Reiche die Karte zum Review ein.",
   "workflow.refused.integrate.checksPassed.change": "Diese Regel wird hier festgelegt: Versionsverwaltung → Checks bestehen auf dem gemergten Ergebnis.",
