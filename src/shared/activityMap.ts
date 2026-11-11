@@ -4,6 +4,7 @@
 // tool name), the agents' live state, their processes and background tasks, and the pane footer's context number.
 // Names only, never content (mapLabel): a summary is shown only where it is recognised as a path or a URL's host.
 import type { ActivityState, ActivityTurns } from './activity'
+import { msg, tr } from './i18n'
 import type { BackgroundTaskType, LaunchedLimits } from './types'
 
 export type MapStation = 'you' | 'read' | 'edit' | 'shell' | 'agents' | 'tools'
@@ -222,6 +223,20 @@ export interface MapStationView {
   partial: boolean
   /** Tools: its calls this turn by group. */
   groups?: Partial<Record<ToolGroup, number>>
+}
+
+const TIP = {
+  stationTip: msg({ id: 'activity.map.stationTip', defaultMessage: '{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {hasLast, select, yes {{last}} other {none}}', description: "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool); {hasLast} is yes when there is one, else no (then translate \"none\"). Keep the select keys." }),
+  stationTipPending: msg({ id: 'activity.map.stationTipPending', defaultMessage: '{station}: {status, select, notReported {not reported} other {loading…}}', description: "Hover of a station on the Activity map before it has counts. {station} is its name; {status} is notReported when the agent's CLI doesn't report that kind of call (not an observed zero), else its calls are still being read. Keep the select keys." })
+}
+
+/**
+ * A station's hover (HI-2930): whole messages, so each locale places its own punctuation; no last call is a case of the
+ * message, never a word passed in (a call whose label is "none" stays its label). `last` as shown (a prompt's word).
+ */
+export function stationTitle(st: Pick<MapStationView, 'status' | 'count' | 'heat'>, name: string, last: string): string {
+  if (st.status !== 'ok') return tr(TIP.stationTipPending, { station: name, status: st.status })
+  return tr(TIP.stationTip, { station: name, n: st.count, heat: st.heat, hasLast: last ? 'yes' : 'no', last })
 }
 
 export interface MapAgentView {

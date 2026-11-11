@@ -2,11 +2,12 @@
 // heat, partial and unknown states, the pulses' baseline, and the context number the pane footer shows.
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, stationTitle, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
+import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
 import { ConversationParser } from '../src/main/providers/claude/conversation'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
@@ -420,5 +421,34 @@ describe('the context reads follow the live state under the same session (HI-292
     expect(mapContextEntries(stale, (e) => liveIn(modelNow, e.path, e.agentId)).key).not.toBe(then.key)
     // Gone from the hosts: no live state, nothing to read.
     expect(mapContextEntries(stale, (e) => liveIn<HostLive>([], e.path, e.agentId)).entries[0].live).toBeNull()
+  })
+})
+
+describe("a station's hover: whole messages in every language (HI-2930)", () => {
+  const catalogue = (code: string): Record<string, string> => JSON.parse(readFileSync(join(__dirname, '..', 'locales', code, 'activity.json'), 'utf8'))
+  afterEach(() => setLanguage('en', {}))
+
+  it('says none as a case of the message, and a call named "none" stays its name', () => {
+    expect(stationTitle({ status: 'ok', count: 2, heat: 3 }, 'Read', '')).toBe('Read: 2 calls this turn, 3 calls in the last ten minutes of the turns read. Last: none')
+    setLanguage('fr', catalogue('fr'))
+    expect(stationTitle({ status: 'ok', count: 1, heat: 1 }, 'Lecture', '')).toMatch(/Dernier : aucun$/)
+    expect(stationTitle({ status: 'ok', count: 1, heat: 1 }, 'Lecture', 'none')).toMatch(/Dernier : none$/)
+  })
+
+  it('a station not counted yet: its status in the message, with the language\'s own punctuation', () => {
+    expect(stationTitle({ status: 'notReported', count: 0, heat: 0 }, 'Read', '')).toBe('Read: not reported')
+    expect(stationTitle({ status: 'loading', count: 0, heat: 0 }, 'Read', '')).toBe('Read: loading…')
+    setLanguage('fr', catalogue('fr'))
+    expect(stationTitle({ status: 'notReported', count: 0, heat: 0 }, 'Lecture', '')).toBe('Lecture : non signalé')
+    setLanguage('ja', catalogue('ja'))
+    expect(stationTitle({ status: 'loading', count: 0, heat: 0 }, '読み取り', '')).toBe('読み取り：読み込み中…')
+  })
+
+  it('every locale has both messages, with the select keys kept', () => {
+    for (const code of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
+      const c = catalogue(code)
+      expect(c['activity.map.stationTip'], code).toMatch(/\{hasLast, select, yes \{\{last\}\} other \{[^{}]+\}\}$/)
+      expect(c['activity.map.stationTipPending'], code).toMatch(/\{status, select, notReported \{[^{}]+\} other \{[^{}]+\}\}$/)
+    }
   })
 })
