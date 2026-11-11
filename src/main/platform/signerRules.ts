@@ -5,21 +5,35 @@
 import { delimiter, isAbsolute, join, resolve } from 'path'
 
 /**
- * Where a program name resolves for a commit: a path as given (against its folder), else on its PATH with PATHEXT.
+ * Where a program name resolves for a commit, as git for Windows looks it up (compat/mingw.c path_lookup and lookup_prog,
+ * HI-2934): a path as given (against the commit's folder), never with an extension added; else in each PATH folder in
+ * turn, `<name>.exe` then `<name>` itself (only `<name>` when it ends in .exe). PATHEXT plays no part: a folder with only
+ * `gpg.cmd` is passed over for a later one with `gpg.exe`, as git does.
  * `isFile` is the caller's (main's never blocks its thread; cw-sign's, a process of its own, may).
  */
 export async function resolveProgramWith(isFile: (p: string) => Promise<boolean>, name: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string | null> {
-  const exts = process.platform === 'win32' ? [...(envGet(env, 'PATHEXT') ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean), ''] : ['']
-  const tryAll = async (base: string): Promise<string | null> => {
-    for (const ext of exts) if (await isFile(base + ext)) return base + ext
-    return null
+  if (/[\\/]/.test(name)) {
+    const p = isAbsolute(name) ? name : resolve(cwd, name)
+    return (await isFile(p)) ? p : null
   }
-  if (/[\\/]/.test(name)) return tryAll(isAbsolute(name) ? name : resolve(cwd, name))
+  const names = process.platform !== 'win32' || /\.exe$/i.test(name) ? [name] : [`${name}.exe`, name]
   for (const dir of (envGet(env, 'PATH') ?? '').split(delimiter).filter(Boolean)) {
-    const found = await tryAll(join(dir, name))
-    if (found) return found
+    for (const n of names) if (await isFile(join(dir, n))) return join(dir, n)
   }
   return null
+}
+
+/**
+ * GIT_CONFIG_COUNT as git reads it (config.c, strtoul in base 10 with nothing after the digits, at most INT_MAX): the
+ * count, 0 for an empty value, or null for one git refuses ("bogus count").
+ */
+export function gitConfigCount(v: string): number | null {
+  if (v === '') return 0
+  const m = /^[ \t\n\v\f\r]*([+-]?)(\d+)$/.exec(v)
+  if (!m) return null
+  const n = Number(m[2])
+  // strtoul negates a '-' count: any but 0 wraps past INT_MAX.
+  return n <= 2 ** 31 - 1 && (m[1] !== '-' || n === 0) ? n : null
 }
 
 /**
@@ -164,17 +178,17 @@ export function withSessionSigner(env: Record<string, string>, signer: SessionSi
   const configKey = /^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+)$/i
   for (const [k, v] of Object.entries(env)) if (!configKey.test(k)) out[k] = v
   const theirs: [string, string][] = []
-  const n = Number(envGet(env, 'GIT_CONFIG_COUNT'))
-  if (Number.isInteger(n) && n > 0) {
-    for (let i = 0; i < n; i++) {
-      const k = envGet(env, `GIT_CONFIG_KEY_${i}`) ?? ''
-      const v = envGet(env, `GIT_CONFIG_VALUE_${i}`) ?? ''
-      // A broken entry is git's to refuse, as it would have: kept as it is.
-      if (!((SIGN_KEYS as readonly string[]).includes(k.toLowerCase()) && isSignLauncher(v))) theirs.push([k, v])
-    }
-  } else if (envGet(env, 'GIT_CONFIG_COUNT') !== undefined) {
-    // Not a count git takes: left for git to refuse, as before.
-    return env
+  const given = envGet(env, 'GIT_CONFIG_COUNT')
+  // A count git takes, 0 included (HI-2934), else left for git to refuse, as before.
+  const n = given === undefined ? 0 : gitConfigCount(given)
+  if (n === null) return env
+  for (let i = 0; i < n; i++) {
+    const k = envGet(env, `GIT_CONFIG_KEY_${i}`)
+    const v = envGet(env, `GIT_CONFIG_VALUE_${i}`)
+    // An entry missing is git's to refuse ("missing config key/value"), as it would have: the environment as it is
+    // (which also bounds this loop by the entries there, whatever the count).
+    if (k === undefined || v === undefined) return env
+    if (!((SIGN_KEYS as readonly string[]).includes(k.toLowerCase()) && isSignLauncher(v))) theirs.push([k, v])
   }
   const all: [string, string][] = [...(signer ? SIGN_KEYS.map((k): [string, string] => [k, signer.launcher]) : []), ...theirs]
   if (all.length) out.GIT_CONFIG_COUNT = String(all.length)
@@ -195,6 +209,9 @@ export function withSessionSigner(env: Record<string, string>, signer: SessionSi
 // ---- Running a signer as git for Windows runs it (HR2's HI-2867 round 1): cw-sign passes on every signer it doesn't
 // change, and git runs .cmd and .bat files, and #! scripts through their interpreter, where Node's spawn can't (EINVAL).
 
+/** git's isspace (git-compat-util.h's sane_ctype): space, tab, newline and carriage return only. */
+const GIT_SPACE = /[ \t\n\r]/
+
 /**
  * An argument quoted as git for Windows quotes one on a command line (compat/mingw.c quote_arg_msvc): as it is unless
  * empty, holding whitespace, *, ?, { or ', a double quote, or backslashes before a quote or the end; then in double
@@ -205,7 +222,7 @@ export function quoteArgMsvc(arg: string): string {
   let n = 0
   for (let i = 0; i < arg.length; ) {
     const c = arg[i]
-    if (/\s/.test(c) || c === '*' || c === '?' || c === '{' || c === "'") force = true
+    if (GIT_SPACE.test(c) || c === '*' || c === '?' || c === '{' || c === "'") force = true
     else if (c === '"') n++
     else if (c === '\\') {
       let count = 0
@@ -243,6 +260,23 @@ export function quoteArgMsvc(arg: string): string {
 }
 
 /**
+ * An argument quoted as git for Windows quotes one for MSYS2's sh (compat/mingw.c quote_arg_msys2): as it is unless empty
+ * or holding whitespace, \, ", {, ', ?, * or ~; then in double quotes, each \ and " escaped with a backslash.
+ */
+export function quoteArgMsys2(arg: string): string {
+  if (arg === '') return '""'
+  if (!/[ \t\n\r\\"{'?*~]/.test(arg)) return arg
+  return `"${arg.replace(/[\\"]/g, '\\$&')}"`
+}
+
+/** Whether git would quote for MSYS2 (compat/mingw.c is_msys2_sh): the program is the `sh.exe` git finds first on PATH. */
+export function isMsys2Sh(file: string, findExe: (name: string) => string | null): boolean {
+  if (!/[\\/]sh\.exe$/i.test(file)) return false
+  const sh = findExe('sh')
+  return !!sh && resolve(sh).toLowerCase() === resolve(file).toLowerCase()
+}
+
+/**
  * A #! script's interpreter as git for Windows reads it (compat/mingw.c parse_interpreter): never for a .exe; the first
  * line of at most 99 bytes, `#!` then a path, the name after its last / (else \), up to a space. Null for anything else.
  */
@@ -258,30 +292,42 @@ export function interpreterOf(program: string, head: string | null): string | nu
   return body.slice(at + 1).split(' ')[0]
 }
 
-/** How to start a signer git would start: the file and its arguments, and whether they are a command line as written. */
+/**
+ * How to start a signer git would start: the file, and its command line as git writes it, already quoted, in two parts
+ * (Node's `argv0` and arguments, spawned with windowsVerbatimArguments so nothing is quoted again).
+ */
 export interface SignerRun {
   file: string
+  /** The command line's first word, quoted. */
+  argv0: string
+  /** The rest of the command line, each word quoted. */
   args: string[]
-  /** The arguments are one command line, already quoted (cmd's): Node's windowsVerbatimArguments. */
-  verbatim: boolean
 }
 
 /**
- * How git for Windows would start `program` (resolved; `argv0` the name it was given as) with `args`: a #! script
- * through its interpreter found on PATH (`findExe`: the name with .exe, as git looks it up), the script and the
- * arguments after it; a .cmd or .bat file through `cmd /c` with the command line git builds (each part quoted as git
- * quotes it), as Windows runs a batch file CreateProcess is given, so cmd reads it exactly as before; anything else as
- * it is.
+ * How git for Windows would start `program` (resolved; `argv0` the name it was given as) with `args` (compat/mingw.c
+ * mingw_spawnvpe, HI-2934): a #! script through its interpreter found on PATH (`findExe`: the name with .exe, as git
+ * looks it up), its command line the interpreter, the script's path and the arguments; a .cmd or .bat file through
+ * `cmd /c` with the command line git builds, as Windows runs a batch file CreateProcess is given, so cmd reads it
+ * exactly as before; anything else, an .exe included, with git's command line. Each word quoted as git quotes it:
+ * quote_arg_msys2 for MSYS2's sh, quote_arg_msvc for the rest (so MSYS2 programs, Git's own gpg and ssh-keygen among
+ * them, never glob a `*`, `?` or `{`, or read a `'` as a quote).
  */
 export function signerRun(program: string, argv0: string, args: readonly string[], head: string | null, findExe: (name: string) => string | null, comspec: string): SignerRun {
+  const line = (file: string, words: readonly string[]): SignerRun => {
+    const quote = isMsys2Sh(file, findExe) ? quoteArgMsys2 : quoteArgMsvc
+    const [first, ...rest] = words.map(quote)
+    return { file, argv0: first, args: rest }
+  }
   const interp = interpreterOf(program, head)
   if (interp) {
     const found = findExe(interp)
-    if (found) return { file: found, args: [argv0, ...args], verbatim: false }
+    // git prepends the interpreter and gives the script by the path it found.
+    if (found) return line(found, [found, program, ...args])
   }
   // Windows runs a batch file it is given as `cmd /c "<the command line>"`: cmd takes the outer quotes off again.
-  if (/\.(cmd|bat)$/i.test(program)) return { file: comspec, args: ['/c', `"${[argv0, ...args].map(quoteArgMsvc).join(' ')}"`], verbatim: true }
-  return { file: program, args: [...args], verbatim: false }
+  if (/\.(cmd|bat)$/i.test(program)) return { file: comspec, argv0: quoteArgMsvc(comspec), args: ['/c', `"${[argv0, ...args].map(quoteArgMsvc).join(' ')}"`] }
+  return line(program, [argv0, ...args])
 }
 
 /** Which signer git is calling, by its arguments: ssh-keygen's are `-Y <op>`, gpg's the rest. */

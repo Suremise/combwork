@@ -5988,7 +5988,8 @@ under two names, read together with the last line git reads winning. Each value'
 
 **The check** signs a throwaway payload, in a temp folder removed after, in the commit's folder and environment, bounded
 at 5 s with its tree ended there. It runs only what Combwork can vouch for: the program a commit would run is resolved to
-a full path first (the configured one, or git's default on the commit's PATH with PATHEXT), and is run only when that
+a full path first, as git for Windows finds it (HI-2934: a path as given, with no extension added; a name in each folder
+of the commit's PATH in turn, `<name>.exe` then `<name>`, never by PATHEXT), and is run only when that
 path is a known installation: Git for Windows' own `usr\bin\gpg.exe` or `usr\bin\ssh-keygen.exe` (beside the git
 Combwork runs, or its `--exec-path`), GnuPG's `…\GnuPG\bin\gpg.exe` under Program Files, or Windows' own
 `System32\OpenSSH\ssh-keygen.exe`. Anything else, an unrecognised default found on PATH included, is `notChecked` and is
@@ -6042,7 +6043,9 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **Only the session's environment, never config.** A session with Combwork's tools (none "as from a terminal") gets two
   `GIT_CONFIG_*` entries, first so the user's own entries after them still win: `gpg.program` and `gpg.ssh.program` set
   to `cw-sign.exe`, and the variables it reads (`CW_SIGN_*`). Entries naming another Combwork's `cw-sign.exe` (a dev
-  build started from a session) are dropped. Combwork writes no git, ssh or gpg configuration.
+  build started from a session) are dropped. A `GIT_CONFIG_COUNT` git takes, 0 or empty included (HI-2934), gets them;
+  one git refuses, or an entry missing, is left as it is for git to refuse. Combwork writes no git, ssh or gpg
+  configuration.
 - **The launcher, `cw-sign.exe`** (`resources/cw-sign/cw-sign.cs`, compiled at each build by Windows' own .NET Framework
   `csc.exe` into `out/bin`, shipped as `resources\bin`; none built, sessions get no entries and sign as before). Git
   names one program with no arguments of its own, a `.cmd` loses arguments to cmd's parsing and a `#!/bin/sh` script
@@ -6062,10 +6065,14 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
   sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
   no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
   default: long enough for a hardware key's touch). Verification and every other signer run as before, the protection
-  being for known installations only: started as git for Windows starts them (HR2's round 1), a `.cmd` or `.bat` through
-  `cmd /c` with git's own command line (each part quoted as git's `quote_arg_msvc` quotes it, so cmd reads it as it
-  did), a `#!` script through its interpreter looked up on PATH as git looks it up, anything else as it is, with git's
-  arguments, stdio and exit; sharing the launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
+  being for known installations only. Every signer, known or not, is started as git for Windows starts it (HR2's round
+  1, HI-2934): a `.cmd` or `.bat` through `cmd /c` with git's own command line (so cmd reads it as it did), a `#!`
+  script through its interpreter looked up on PATH as git looks it up (the interpreter, the script's path, then git's
+  arguments), anything else, an `.exe` included, with git's command line, written out as is; each word quoted as git
+  quotes it, `quote_arg_msys2` for MSYS2's `sh` and `quote_arg_msvc` for the rest, so an MSYS2 program (Git's own gpg
+  and ssh-keygen among them) neither globs a `*`, `?` or `{` nor reads a `'` as a quote (a profile such as
+  `C:\Users\O'Brien`), where Node's own quoting would let it. Git's stdio and exit are kept; an unknown signer shares the
+  launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
