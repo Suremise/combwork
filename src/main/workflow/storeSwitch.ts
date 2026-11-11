@@ -202,7 +202,9 @@ export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Pro
   // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
   const d = await pinnedContextOf(path, runner)
   if ('jjUnknown' in d && d.jjUnknown === 'heads') return [{ code: 'heads', n: Number(d.detail) || 0 }]
-  if (!('ctx' in d)) return [{ code: 'unknown', detail: 'jjUnknown' in d ? d.jjUnknown : 'noRepo' }] // i18n-ignore: a code, never shown as text
+  // No jj repository (its .jj gone, HI-2975): nothing to export and nothing that can conflict, so Git is ready as it is.
+  if ('none' in d) return []
+  if (!('ctx' in d)) return [{ code: 'unknown', detail: d.jjUnknown }]
   const c = d.ctx
   const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
   const r = await reads.pinned(async (op) => {
@@ -245,6 +247,9 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
     if (!refused && store.gates.some((x) => !('clear' in x))) refused = { why: 'gates' } // i18n-ignore: a code or SQL, never shown as text
   } else {
     store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(path)
+    // jj missing or not the tested version (HI-2975): the repository's readiness can't be checked, so the switch is
+    // refused saying the way out (install the tested jj, or remove .jj once done with it), not as a list's `unknown`.
+    if (!refused && store.fallback.some((f) => f.code === 'unknown' && /^tool(:|$)/.test(f.detail))) refused = { why: 'jjToolBack', state: jjRunner.readinessNow().state } // i18n-ignore: a code or SQL, never shown as text
     if (!refused && store.fallback.length) refused = { why: 'fallback' } // i18n-ignore: a code or SQL, never shown as text
   }
   if (!refused && !drainEmpty(store.drain)) refused = { why: 'drain' } // i18n-ignore: a code or SQL, never shown as text

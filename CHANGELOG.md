@@ -35,6 +35,7 @@
 
 ### Fixed
 
+- **A jj project whose `.jj` folder is gone can switch back to Git** (HI-2975). The offered switch was always refused with an unexplained "see the list"; now it goes through. While jj itself is missing or isn't the version Combwork is tested with, the switch back to Git says why and what to do (install that jj, or remove `.jj` once you're done with jj).
 - **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:
   - The paused merge (Merges, Version Control → Merge queue, the card's Work section) has **Commit** and **Set Aside** for the files it names, and the merge goes on.
   - When a card or lane starts and that folder has uncommitted changes, Combwork says so before work begins, with the same buttons.

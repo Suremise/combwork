@@ -501,6 +501,7 @@
   "git.vc.switch.gates": "Este repositório usa o que o jj não suporta: veja a lista.",
   "git.vc.switch.groupChanged": "Os projetos deste repositório mudaram nesse meio-tempo: confira de novo antes de mudar.",
   "git.vc.switch.jjTool": "{state, select, missing {O jj não está instalado (ou não está no PATH)} old {Este jj é mais antigo que o testado com o Combwork} untested {Este jj é mais novo que o testado com o Combwork} other {Não foi possível verificar o jj}}, então este projeto não pode usar o jj.",
+  "git.vc.switch.jjToolBack": "{state, select, missing {O jj não está instalado (ou não está no PATH)} old {Este jj é mais antigo que o testado com o Combwork} untested {Este jj é mais novo que o testado com o Combwork} other {Não foi possível verificar o jj}}, então o Combwork não consegue verificar se este repositório está pronto para voltar ao Git. Instale o jj testado com o Combwork e depois troque. Ou, se você não vai mais usar o jj, remova a pasta .jj: o projeto poderá então voltar ao Git sem ela.",
   "git.vc.switch.jjUnknown": "O jj não conseguiu confirmar este repositório ({code}), então este projeto não pode mudar.",
   "git.vc.switch.noJj": "Não há repositório jj aqui. O Combwork nunca cria um: crie-o com o jj.",
   "git.vc.switch.otherWorkspace": "Este repositório também é um projeto do espaço de trabalho aberto {workspace}: feche-o lá primeiro.",

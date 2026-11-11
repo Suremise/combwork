@@ -473,6 +473,7 @@ interface CombworkMessageValues {
   'git.vc.switch.jjInGit': { root: string | number }
   'git.vc.switch.jjNoGitCopy': undefined
   'git.vc.switch.jjTool': { state: string }
+  'git.vc.switch.jjToolBack': { state: string }
   'git.vc.switch.jjUnknown': { code: string | number }
   'git.vc.switch.lane': { name: string | number; builder: string | number }
   'git.vc.switch.laneUnnamed': { builder: string | number }

@@ -6,7 +6,7 @@
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
-import { mkdirSync, realpathSync, writeFileSync } from 'fs'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
@@ -159,6 +159,16 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     const f = await fallbackOf(r.root, runner)
     expect(f).toEqual(expect.arrayContaining([{ code: 'conflictedBookmark', name: 'main' }]))
     expect(f.some((x) => x.code === 'conflictedCommit')).toBe(true)
+  })
+
+  it('back to Git (HI-2975): jj missing is the fallback’s unknown tool; the .jj gone leaves nothing to check', async () => {
+    const r = await repo('fallback-gone')
+    const { fallbackOf } = await import('../src/main/workflow/storeSwitch')
+    const missing = createJjRunner({ exe: join(tempDir('jjv-nojj-'), 'jj.exe'), env })
+    expect(await fallbackOf(r.root, missing)).toEqual([{ code: 'unknown', detail: 'tool' }])
+    rmSync(join(r.root, '.jj'), { recursive: true })
+    expect(await fallbackOf(r.root, runner)).toEqual([])
+    expect(await fallbackOf(r.root, missing)).toEqual([])
   })
 
   it('back to Git: ready when every bookmark is exported and nothing is conflicted; not when Git moved one', async () => {
