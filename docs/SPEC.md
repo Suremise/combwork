@@ -3472,10 +3472,13 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   in Todo, or Done with no Integrated fact (the user's own Done). A reopen or a restart is a new cycle, so an ended cycle
   never becomes live again; an Approved, Review or Active card's current cycle never has ended.
 - **The sweep** (JjPlatform `sweepEnded`, from `afterRun`, whatever the cards' stages, so after every start too): at most
-  `SWEEP_SCAN` (32) of the project's attempt journals read a run, by the key's index after the cursor (wrapping), each
+  `SWEEP_SCAN` (32) of the project's attempt journals read a run, by the key's index after the cursor, each
   card looked up by its key (never the whole board: HR1's round 1); each card and cycle with something left (an attempt not dropped or
   kept, a checks journal, the window's record) whose cycle has ended, a fair page of 8 after a durable cursor
-x The `moved` hook asks for a run on a move into Todo or Done too.
+  (`jj_sweep_cursor:<project>`, past every row scanned). A pass runs from the start to the last key and ends there, its
+  cursor back at the start (HR1's round 2): `more` asks for a continuation run only mid-pass or for a page cut short, and
+  the minute's tick asks for a new pass while anything was left unresolved. The `moved` hook asks for a run on a move
+  into Todo or Done too.
 - **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
   run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleEnded` the
   owner (read before every J4 write, pin delete and abandon); an interrupted drop is left as it was (found again next
