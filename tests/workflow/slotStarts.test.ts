@@ -184,6 +184,28 @@ describe('cards on slots (#1438)', () => {
     expect(e.wf.state(card).started).toMatchObject({ line, base: left })
   })
 
+  it("HI-3010: a submission from a slot off the card's line is refused, naming where it is; on its line, it goes", async () => {
+    const folder = tempDir('slot-')
+    const { e } = world(() => ({ slot: 'slot-a', folder, lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'Off its line' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    const line = s.started!.line!
+    // Its slot never switched onto its line (its preparation waited): its builder committed on the detached head.
+    sh(e.project, 'worktree', 'add', '-q', '--detach', folder, s.started!.base!)
+    const work = commit(folder, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    const detached = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine')
+    expect(detached.message).toMatch(new RegExp(`isn't on its branch ${line}: its head is detached at ${work.slice(0, 7)}`))
+    expect(detached.next).toMatch(new RegExp(`git switch -c ${line}`))
+    // On another branch.
+    sh(folder, 'switch', '-q', '-c', 'elsewhere')
+    expect(refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine').message).toMatch(/: it is on elsewhere,/)
+    expect(e.wf.state(card).stage).toBe('active')
+    // On its line, made where its work is: submitted.
+    sh(folder, 'switch', '-q', '-c', line)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
   it("names a card's line: lower case ASCII letters, digits and hyphens, at most 40, accents folded", () => {
     expect(lineName('AM', { key: 'AM-12', title: 'Fix the Login!' })).toBe('cw/AM/AM-12-fix-the-login')
     expect(slugOf('Café déjà vu — naïve')).toBe('cafe-deja-vu-naive')

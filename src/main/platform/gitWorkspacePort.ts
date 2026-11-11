@@ -63,6 +63,13 @@ export const gitWorkspacePort: WorkspacePort = {
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
   prepare: (folder, line, base, o) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o))),
+  // HI-3010: the head past `base` first (git's own exit, no words, when it isn't), then the line made where HEAD is now
+  // (no start point: a commit meanwhile is on it, and no file changes).
+  branchHere: async (folder, line, base) => {
+    const past = await git(folder, ['merge-base', '--is-ancestor', base, 'HEAD'])
+    if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // agent-protocol: a log line's detail, never sent to an agent
+    return step(git(folder, ['switch', '--no-guess', '-c', line]))
+  },
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
   resetTo: async (folder, revision, o) => {
     const co = await git(folder, ['checkout', '--detach', '--force', revision], undefined, undefined, smudge(o))

@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
@@ -1430,6 +1430,61 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     sh(r.slot.folder, 'switch', '-q', '--detach', 'main')
     expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-first', base: head, install: false })).toMatchObject({ ok: true })
     expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(work)
+  })
+
+  it("HI-3010: in place, a detached slot gets its new line where its head is, its builder's work kept, without asking whether it is quiet", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const base = sh(w.project, 'rev-parse', 'main')
+    sh(r.slot.folder, 'switch', '-q', '--detach', base)
+    // Its builder already at work on the card (a commit on the detached head, and an edit not committed yet).
+    commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work')
+    const work = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
+    const busy = vi.fn(async () => 'its builder is busy')
+    const inPlace = vi.fn(async () => null)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-1-one')
+    expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(work)
+    expect(readFileSync(join(r.slot.folder, 'wip.txt'), 'utf8')).toBe('wip\n')
+    expect(busy).not.toHaveBeenCalled()
+    expect(inPlace).toHaveBeenCalledTimes(1)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    // Already on its line: prepared as it is.
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
+  })
+
+  it('HI-3010: in place, anything that would change files waits for its builder (retry), nothing changed', async () => {
+    const w = world({ builders: 1, setup: WRITE_ENV })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const inPlace = async (): Promise<null> => null
+    const old = sh(w.project, 'rev-parse', 'main')
+    commit(w.project, { 'b.txt': 'b\n' }, 'newer')
+    const base = sh(w.project, 'rev-parse', 'main')
+    // Detached at a commit before the card's base: switching would change files.
+    sh(r.slot.folder, 'switch', '-q', '--detach', old)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('')
+    expect(sh(w.project, 'branch', '--list', 'cw/AM/AM-1-one')).toBe('')
+    // On another line (the last card's).
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/AM/AM-0-zero', base)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-0-zero')
+    // The line made before (a card started again): switching to it can change files.
+    sh(r.slot.folder, 'switch', '-q', '--detach', base)
+    sh(w.project, 'branch', 'cw/AM/AM-1-one', old)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('')
+    // An install due: the line is made in place, the install waits for the preparation that waits for its builder.
+    commit(w.project, { 'package-lock.json': '{"v":9}\n' }, 'lock')
+    const locked = sh(w.project, 'rev-parse', 'main')
+    sh(r.slot.folder, 'switch', '-q', '--detach', locked)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-2-two', base: locked, install: true, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-2-two')
+    expect(w.runs.map((x) => x.what)).toEqual(['setup'])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-2-two', base: locked, install: true })).toMatchObject({ ok: true })
+    expect(w.runs.map((x) => x.what)).toEqual(['setup', 'install'])
   })
 
   it("a lane's next card in the same slot: G15 on installs again when the lock files changed; off, nothing is installed", async () => {

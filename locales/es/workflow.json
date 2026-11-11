@@ -360,6 +360,8 @@
   "workflow.refused.platform.unknown.next": "Revisa Configuración de proveedores o la carpeta y vuelve a intentarlo.",
   "workflow.refused.platform.targetGone.message": "{card} se empezó en {target}, que ya no existe en este repositorio.",
   "workflow.refused.platform.targetGone.next": "Tú o el Assistant podéis moverla a otra rama con su trabajo: cambia su «Se fusiona en» o redirige El trabajo se fusiona en.",
+  "workflow.refused.platform.offLine.message": "La carpeta de {card} no está en su rama {line}: {where, select, detached {su HEAD está separado en {head}} other {está en {on}}}, así que el trabajo allí no es lo que la tarjeta fusionaría.",
+  "workflow.refused.platform.offLine.next": "{where, select, detached {Pon los commits en la rama de la tarjeta: git switch -c {line} si aún no existe; si no, git switch {line} y git cherry-pick de los commits hechos fuera de ella. Luego envíala de nuevo.} other {Vuelve con git switch {line} y haz allí git cherry-pick de los commits de la tarjeta hechos en {on}. Luego envíala de nuevo.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {El repositorio Git del proyecto ya no está: restáuralo o cambia el proyecto a Ninguno en su pestaña Control de versiones (a partir de la próxima tarjeta).} other {El repositorio Git del proyecto ya no está: pide al usuario que lo restaure o que cambie el proyecto a Ninguno en su pestaña Control de versiones (a partir de la próxima tarjeta).}}",
   "workflow.refused.queue.advancing.message": "La tarjeta {card} se está fusionando ahora en {target}: ya no se puede quitar de la cola de fusión.",
   "workflow.refused.queue.advancing.next": "Espera a que termine la fusión. Si el cambio no se quiere, reviértelo en {target}.",

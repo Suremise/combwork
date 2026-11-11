@@ -820,6 +820,22 @@
       "why": "select"
     }
   },
+  "workflow.refused.platform.offLine.message": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "where": "select",
+      "head": "plain",
+      "on": "plain"
+    }
+  },
+  "workflow.refused.platform.offLine.next": {
+    "placeholders": {
+      "where": "select",
+      "line": "plain",
+      "on": "plain"
+    }
+  },
   "workflow.refused.platform.switching.message": {
     "placeholders": {
       "card": "plain"
