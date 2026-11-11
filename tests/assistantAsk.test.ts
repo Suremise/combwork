@@ -22,7 +22,7 @@ const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
 const { askAssistant, askLine, AskRefused, reconcileAskWaits, setAskRetryMsForTests, askRetryPending } = await import('../src/main/assistantAsk')
 const { nothingWaitsOn, idleWatchReason, IDLE_WATCH_STALL_MS } = await import('../src/shared/idleWatch')
-const { readDelivery } = await import('../src/shared/deliveries')
+const { readDelivery, isLive, needsAck } = await import('../src/shared/deliveries')
 
 type WS = ReturnType<typeof createWorkspaceService>
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
@@ -84,7 +84,8 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     expect(r.id).toBe(got[0].id)
     // As the Assistant reads it: from B1, on the card.
     const items = (await deliveries.readInbox(w.assistantHome, 'assistant')).items
-    expect(items).toMatchObject([{ from: 'B1 (alpha)', card, kind: 'control' }])
+    // A message the Assistant acks once it has dealt with it (HI-2931), never a control notice, which needs no ack.
+    expect(items).toMatchObject([{ from: 'B1 (alpha)', card, kind: 'rebrief' }])
   })
 
   it('refused before anything is written: another project, archived, in Done, the Assistant unable to act, no agent, too long', async () => {
@@ -265,6 +266,51 @@ describe("a request's waiting mark (HI-2915)", () => {
     expect((await waitingOf(w, card))?.ask).toBe(deliveries.deliveryNow(w.assistantHome, live.id)?.ref)
     // And again with nothing to do.
     expect(await reconcileAskWaits(w)).toBe(0)
+  })
+
+  // HI-2931: the request was a control notice, done once received: its doorbell asked for no ack, and a received one wasn't
+  // live, so the delivery service dropped it with neither of its source's hooks run, and the mark stood for good.
+  it('read but not acked yet (HI-2931): still live, so its mark stands and nothing drops it; the ack takes the mark off', async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toMatchObject([{ ids: [r.id], kind: 'rebrief' }])
+    const rec = deliveries.deliveryNow(w.assistantHome, r.id)!
+    expect(rec.state).toBe('received')
+    expect(needsAck(rec.kind)).toBe(true)
+    expect(isLive(rec)).toBe(true)
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBe(rec.ref)
+    await ack(w, r.id)
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+
+  it('a request given as a control notice before HI-2931, read: done once received, so its mark goes as the workspace opens', async () => {
+    const { w, card } = await open()
+    const ref = `#${card}/0ldc0ntr`
+    const was = await read(w, card)
+    await store.boardWrite(w, async () => store.putCard(w, card, { ...was, waitingFor: { reason: 'The Sandbox', by: 'B1 (alpha)', at: new Date().toISOString(), ask: ref } } as unknown as Record<string, unknown>))
+    await deliveries.createDelivery(w.assistantHome, { agentId: 'assistant', kind: 'control', from: { kind: 'agent', name: 'B1 (alpha)', project: 'alpha', agentId: 'b1' }, card, body: 'An old request', source: 'assistant-ask', ref, meta: { card, project: 'alpha', askerName: 'B1 (alpha)' } })
+    // On its way: its mark stands.
+    expect(await reconcileAskWaits(w)).toBe(0)
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    expect(await reconcileAskWaits(w)).toBe(1)
+    expect(await waitingOf(w, card)).toBeUndefined()
+  })
+
+  it('read and never acked for a week (HI-2931): expired, its mark goes, and the user is not told the Assistant never got it', async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    const notes = (await read(w, card)).history.length
+    // Eight days on, the next save of the Assistant's deliveries expires it.
+    const later = Date.now() + 8 * 24 * 60 * 60_000
+    vi.spyOn(Date, 'now').mockReturnValue(later)
+    await deliveries.createDelivery(w.assistantHome, { agentId: 'assistant', kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: 'A notice' })
+    // Expired (and, ended long ago by the clock moved on, dropped from what is kept in the same save).
+    await vi.waitFor(() => expect(deliveries.deliveryNow(w.assistantHome, r.id)?.state ?? 'gone').toMatch(/^(expired|gone)$/), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+    const lines = (await read(w, card)).history.slice(notes).map((h) => h.what)
+    expect(lines).toEqual(['No longer waiting'])
   })
 
   it('the stall: none while the request stands; flagged after its answer once only watching for 5 min, as with no request', async () => {

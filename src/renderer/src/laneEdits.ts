@@ -1,7 +1,8 @@
 import { msg, tr } from '@shared/i18n'
+import { newerLanes, ownRunAfter, revisionToName, type OwnRun } from '@shared/laneQueueEdit'
 import type { LaneEdit, LaneEditResult, LaneEditUndo } from '@shared/types'
 import { call, errorMessage } from './api'
-import { cardLabelOf, get, notify, pushToast, setLoaded } from './store'
+import { cardLabelOf, get, notify, pushToast, set } from './store'
 
 /**
  * The window's edits of a running lane's list (HI-2898, Progress → Lanes): each asked of main (`lanes:edit`), which
@@ -32,8 +33,11 @@ export interface EditNames {
   to?: string
 }
 
-/** Asks main for an edit; null when it was made (and said so, with Undo), else main's reason, in the window's language. */
-export async function editLane(e: LaneEdit, names: EditNames): Promise<string | null> {
+/**
+ * Asks main for an edit; null when it was made (and said so, with Undo), else main's reason, in the window's language.
+ * The Lanes tab asks through editLaneInTurn, so an edit names the revision the last one left.
+ */
+async function editLane(e: LaneEdit, names: EditNames): Promise<LaneEditResult | string> {
   let r: LaneEditResult
   try {
     r = await call('lanes:edit', e)
@@ -42,15 +46,69 @@ export async function editLane(e: LaneEdit, names: EditNames): Promise<string | 
   }
   said(r, names)
   await reload()
-  return null
+  return r
+}
+
+/** How an edit asked in turn ended: made, refused (main's reason), or not asked (nothing to do by the time its turn came). */
+export type EditOutcome = 'made' | 'skipped' | { refused: string }
+
+/**
+ * The last lane edit or undo asked here (HI-2932): the next one, of any lane, waits for it and the lanes read again after
+ * it, so this window's reads of the lanes after its edits land in the order they were asked (HR1's round 1: two lanes'
+ * edits each reading the whole list, the slower answer set last, put a lane back to an older revision).
+ */
+let tail: Promise<unknown> = Promise.resolve()
+
+/** Runs `fn` after the last edit asked here, as the next one in turn. */
+function inTurn<T>(fn: () => Promise<T>): Promise<T> {
+  const mine = tail.then(fn)
+  tail = mine.then(
+    () => undefined,
+    () => undefined
+  )
+  return mine
+}
+
+/** Each lane's revisions this window's own edits went through, nothing else between (ownRunAfter). */
+const own = new Map<string, OwnRun>()
+
+/**
+ * An edit of these lanes' lists in turn (HI-2932): asked once the last one asked here has been answered and the lanes
+ * read again, and only then made, from the lanes as they are now (`make`: a card's place). `shown`: each lane's revision
+ * as the user saw it when they asked; `rev(lane)` the one to name (revisionToName): the lane's now when only this
+ * window's own edits came between, so two quick moves are two moves, else the one shown, which main refuses as changed
+ * meanwhile. `make` returns null when there is nothing left to do (the lane ended, the card is at the end).
+ */
+export function editLaneInTurn(shown: Readonly<Record<string, number>>, make: (rev: (lane: string) => number) => { edit: LaneEdit; names: EditNames } | null): Promise<EditOutcome> {
+  return inTurn(async (): Promise<EditOutcome> => {
+    const sent = new Map<string, number>()
+    const rev = (lane: string): number => {
+      const current = get().lanes.find((x) => x.id === lane)?.listRev ?? 0
+      const r = revisionToName(shown[lane] ?? current, current, own.get(lane))
+      sent.set(lane, r)
+      return r
+    }
+    const asked = make(rev)
+    if (!asked) return 'skipped'
+    const r = await editLane(asked.edit, asked.names)
+    if (typeof r === 'string') return { refused: r }
+    for (const s of r.lanes) {
+      const from = sent.get(s.lane)
+      if (from !== undefined) own.set(s.lane, ownRunAfter(own.get(s.lane), from, s.rev))
+    }
+    return 'made'
+  })
 }
 
 /**
  * The lanes read again at once after a change made here: the next edit names the revision its lane has now, not the
- * one the settled lanes-changed event (300 ms later) would bring.
+ * one the settled lanes-changed event (300 ms later) would bring. Set directly, never batched (setLoaded can wait up to
+ * a live batch's 250 ms, HI-2932): the next edit in turn is made from the store as soon as this returns. A direct set
+ * shows what waits first; and each lane is kept as the store has it when that is at a later revision than this read
+ * (newerLanes), so an older read, wherever it came from, never takes a lane back.
  */
 async function reload(): Promise<void> {
-  await call('lanes:list').then((lanes) => setLoaded({ lanes }), () => undefined)
+  await call('lanes:list').then((lanes) => set((s) => ({ lanes: newerLanes(s.lanes ?? [], lanes) })), () => undefined)
 }
 
 /** The notification of a change made, with its Undo (kept as the last change made here). */
@@ -87,8 +145,12 @@ export async function undoLaneEdit(id?: string, workspace?: string): Promise<voi
   if ((workspace ?? l.workspace).toLowerCase() !== here.toLowerCase() || l.workspace.toLowerCase() !== here.toLowerCase()) return notify('error', tr(M.undoFailed), tr(M.otherWorkspace))
   last = null
   try {
-    const r = await call('lanes:edit', { op: 'undo', undo: l.undo })
-    await reload()
+    // In turn with the edits (HI-2932), so its read of the lanes lands in order too.
+    const r = await inTurn(async () => {
+      const done = await call('lanes:edit', { op: 'undo', undo: l.undo })
+      await reload()
+      return done
+    })
     pushToast({ id: `lane-edit-${++seq}`, level: 'success', title: tr(M.done, { op: r.op, card: '', lane: '' }), timestamp: new Date().toISOString() })
   } catch (err) {
     notify('error', tr(M.undoFailed), errorMessage(err))

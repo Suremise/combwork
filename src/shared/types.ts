@@ -4517,8 +4517,11 @@ export interface LaneEditUndo {
 export interface LaneEditResult {
   op: LaneEdit['op']
   card: number | null
-  /** Each lane it changed, with the card in flight its change was queued after (null: applied now). */
-  lanes: { lane: string; queuedAfter: number | null }[]
+  /**
+   * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
+   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   */
+  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
   undo: LaneEditUndo | null
 }
 

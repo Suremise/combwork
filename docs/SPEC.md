@@ -2275,7 +2275,7 @@ works.
 | Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
-| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`), built for an approved card by J9b2's reconciliation since HI-2871 | J4, HI-2871 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
@@ -2507,7 +2507,12 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
   name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
   child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
-  repository or workspace, is refused.
+  repository or workspace, is refused. A prune forgets only this project's workspaces whose folders are gone, each
+  proved again under the store's lock (HI-2946): still registered under that name at that root, read afresh at an
+  operation; then, with the control's proof at the forget's admission right before jj starts, that operation still the
+  single head (any registration changed since, such as the name forgotten and added again at another root, waits for
+  the next prune) and its folder still absent. A folder back by then (restored or replaced while the prune waited)
+  keeps its registration and everything in it.
 - **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
   operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
   jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
@@ -2684,7 +2689,7 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   then a fresh child of the target given the merge's tree (`jj restore --from <scratch> --into <it>`), the scratch
   abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
   later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
-  never moves. Strict's update (G8) isn't built for jj.
+  never moves. Strict's update (G8) came with HI-2853 (`prepareJjUpdate`); HI-2871 runs both for approved cards.
 - **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
   under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
   operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
@@ -3293,7 +3298,7 @@ Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). 
 Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
 - **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
   the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
-  journalled bundles, every bundle an Integrated fact already names as consumed, no J4 candidates: the user's own merge,
+  journalled bundles, every bundle an Integrated fact already names as consumed, and since HI-2871 the cycle's J4 attempt records, so a move onto J4's candidate is proved `via: 'candidate'`; the user's own merge,
   fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
   result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
   proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
@@ -3334,6 +3339,60 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### jj's pre-integration candidate (1.5.0, HI-2871)
+
+Darren's decision (11 Nov): J4's candidates run for jj cards as a pre-integration check, as strict's update and the test
+merge do for Git, in J9b2's runtime; the user still integrates (decision A: Combwork never moves a bookmark or pushes).
+Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its design is HI-2871/s13 and s21 (HR3's OK).
+- **When** (`reconcileJj`, workflow/reconcile.ts): a card in Approved that J5's proof finds not yet contained, its pass
+  holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
+  (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
+  `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
+  (J5's `jjTargetHead`); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
+  keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
+  Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
+  lock, Git's replay on the store for sameness (a replay that can't be read: unknown, never "not the same").
+- **The fingerprint** (`JjCandidateFingerprint`): the approval (`approvalOf`: cycle, approved submission, revision, base,
+  key, recorded jj commit, target; the stage Approved, its pass holding: no Stale recorded and the slot's observed head
+  the approved revision, HR3's round 1), the effective ruleset's id (its options' hash: an Override that
+  applies other options changes it) and the style and strict used. Each attempt is journalled with it (board_meta
+  `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
+  owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
+  options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
+- **Withdrawn first** (HR3's rounds 1 and 2): a ready offer that isn't current any more (its head not the target's, or
+  its candidate superseded or gone by `jjCandidateNow`, the target unmoved; or either unreadable: `offerCurrent`) is
+  deleted (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never
+  leaves it.
+- **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
+  the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
+  `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
+  containment record), shown only while its fingerprint is the card's now and, a ready one, while the target's head as
+  the window just read it (`jjWaiting`'s `targetHeads`) is the head it was built on (`candidateShown`): a moved target
+  hides it at once, before any reconciliation and across restarts. A conflict, or not up to
+  date (a merge in a rebase's suffix, not on top, or strict's update not the same change): `IntegrationFailed` (entry
+  `jj:<attempt>`; jj has no merge queue) with its files, hunks and log, the card to Active, its builder woken in jj's words
+  (`jjReturnedWake`) and the card's comment (`tasks.history.jjCandidateReturned`). A repository that signs
+  (`signing.behavior` own or force): a record saying so, nothing built. Unknown: nothing offered or returned; counted in
+  the record, shown from the third in a row.
+- **The credit:** J5's proof gets the cycle's attempt records (`candidates`): the user's `jj bookmark set` onto the
+  candidate is Integrated `via: 'candidate'`, its update validated again as J5 already does.
+- **Descriptions on one line:** J4 reads its writes back from jj's operation log a line each, and a newline in `-m`'s
+  argument makes that read malformed (0.47.1), so a candidate's and an update's descriptions are the first line of
+  Combwork's (`mergeMessage`, `updateMessage`): the card's key and title.
+- **Options:** jj's Merging group shows `style` (*Candidate style*) and `strict` (*The candidate brings work up to date
+  first*), each with its own words where the user integrates (`OptionText.integrates`, `optionTitle`, `optionDesc`: by the
+  descriptor, never the platform's id).
+- **The window:** Waiting for you to integrate shows *Candidate ready* (commit, change id, style, the head built on; no
+  conflicts, no merge checks) with `jj bookmark set <target> -r <candidate>` in place of the duplicate's commands; *No
+  candidate* for a signing repository and *couldn't build a candidate* (after three tries) keep the manual commands.
+- **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
+  Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
+  options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
+  rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
+  `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
@@ -4277,10 +4336,10 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Combwork merges (queue) · The agent merges, Combwork checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Combwork merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G7b | **Other branches work can merge into** (`otherTargets`, HI-2556) | Branch names, none by default | The branches besides G7 a lane's or card's **Merges into** may name. Not a rule: left out of every ruleset (`ruleOptions`), never set by a preset, never Custom, so a change applies at once. A pick is checked against it as it is made. |
-| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
+| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate`. In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Combwork merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
@@ -5139,7 +5198,8 @@ and a comment reaches no inbox: it sat an hour unseen):** `cw_ask_assistant` (`P
 in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
 Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
 the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
-("Asked the Assistant: …"), and a `control` delivery to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
+("Asked the Assistant: …"), and a message (`rebrief`, which the Assistant acks once it has dealt with it; a `control`
+notice before HI-2931, which needed no ack) to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
 the agent: sender kind `agent` with its project and id) quoting it whole as an agent's request, not the user's
 decision, with the card's key, offered at once: an idle or watching Assistant (its lane watch, which carries on) is
 woken by the doorbell, a busy one told at its next tool call. The Assistant acts on it only within its Control and what
@@ -5155,11 +5215,15 @@ by the card's own agent on its card in Doing with no waiting mark, the card is m
 mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
 `waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
 acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
-unread (`ended`), or never given. A take-off that fails is retried after 30 s, and each workspace's open
-(`reconcileAskWaits`) takes off every request mark whose delivery is no longer live (queued, offered, received or
-uncertain), so none stays for ever. A wait past the answer is the Assistant's own mark, set before it acks; its go is
-clearing it with the go as that change's comment, which wakes the builder's card watch. `ask` is Combwork's alone:
-never from the Agent API, and undo puts a mark back without it. A lane's row in the Progress panel says **waiting**
+without an ack (`ended`: unread, said as above; read and never acked for a week, expired with nothing said, HI-2931),
+or never given. A take-off that fails is retried after 30 s, and each workspace's open (`reconcileAskWaits`) takes off
+every request mark whose delivery is no longer live as the delivery service has it (`isLive`: queued, offered,
+uncertain, or received and not acked; an old `control` request once read is done), so none stays for ever. A wait past
+the answer is the Assistant's own mark, set before it acks; its go is clearing it with the go as that change's comment,
+which wakes the builder's card watch. `ask` is Combwork's alone: never from the Agent API (it takes a string), and kept
+only by undo (HI-2931): the Assistant's change snapshots the mark whole, `ask` with it, and undo puts it back so (a whole
+mark keeps its `ask`), so the request's end still takes it off; one whose request ended meanwhile goes as the undo
+ends (`reconcileAskWaits`). A lane's row in the Progress panel says **waiting**
 (what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
 for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
@@ -8123,11 +8187,21 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     on hold, another agent's) keeps its places in every edit; the card in flight shows a lock.
     - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
       `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a
-      queued list edits that list. **Cancel Change** drops the queued list only. The builders of the lanes it changed are
-      started on them if they aren't running, as an update by the user or the Assistant does.
+      queued list edits that list. **Cancel Change** drops the queued list only, as an edit whose list is the applied
+      one (HI-2943), checked as every edit is: a card the queued change took off that another running lane holds now
+      (Move here after a queued reorder) stays there, left out; each other card it brings back is checked as any card
+      brought in (To do, the project's, its target, no work kept from a start since: with no record from before its
+      removal, any kept work refuses it), and given to nobody or the lane's builder, else refused with nothing changed. The builders of the lanes it
+      changed are started on them if they aren't running, as an update by the user or the Assistant does.
     - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
       one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
-      a lane gone, ended or at another revision is refused, nothing saved. Every check is made again at the write, under
+      a lane gone, ended or at another revision is refused, nothing saved. **Quick edits in turn** (HI-2932): the window
+      asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
+      from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
+      board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
+      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
+      Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
       facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
       before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:

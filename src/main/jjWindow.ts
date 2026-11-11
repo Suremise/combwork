@@ -6,10 +6,10 @@
 
 import { reconcileCard } from './workflow/reconciler'
 import { basename, resolve as resolvePath } from 'path'
-import type { JjLeftover, JjToCheckRow, JjWaitingCard } from '../shared/jjViews'
+import type { JjLeftover, JjToCheckRow, JjWaitingCandidate, JjWaitingCard } from '../shared/jjViews'
 import { boardRead } from './boardStore'
 import { boardConn, jjPort } from './slotsApp'
-import { containedKey, type JjContained } from './workflow/reconcile'
+import { CANDIDATE_MISSES, candidateShown, containedKey, type JjContained } from './workflow/reconcile'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -37,7 +37,7 @@ const commitOf = (platform: unknown, field: 'commitId' | 'changeId'): string | n
  */
 export async function jjWaiting(ws: WorkspaceService, projectPath: string): Promise<JjWaitingCard[]> {
   const wf = await workflowFor(ws, projectPath)
-  const rows = wf ? waitingOf(wf, projectIdOf(ws, projectPath)) : []
+  const rows = wf ? waitingOf(wf, projectIdOf(ws, projectPath), await targetHeads(wf)) : []
   // A card listed with no observation yet is reconciled soon, as a card's Work section read asks (HI-2896): an approval
   // changes no jj operation or ref, so in a repository not colocated with Git nothing else would run one until the next
   // jj command; what it records reaches the panel as a board change.
@@ -48,8 +48,33 @@ export async function jjWaiting(ws: WorkspaceService, projectPath: string): Prom
   return rows
 }
 
-/** jjWaiting's reading of one workflow, by the project's canonical id (the records' scope). */
-export function waitingOf(wf: Workflow, project: string): JjWaitingCard[] {
+/**
+ * The heads of the targets the project's approved cards wait on, each read once (HR3's round 1: a candidate is shown only
+ * while its target is still at the head it was built on); a head that can't be read is null, so no candidate on it shows.
+ */
+async function targetHeads(wf: Workflow): Promise<Map<string, string | null>> {
+  const heads = new Map<string, string | null>()
+  for (const card of wf.store.cards()) {
+    if (card.stage !== 'approved') continue
+    const s = wf.state(card)
+    const target = s.started?.target
+    if (!target || heads.has(target)) continue
+    let h: unknown = null
+    try {
+      h = await wf.platformOf(card, s).targetHead(target)
+    } catch {
+      h = null
+    }
+    heads.set(target, typeof h === 'string' ? h : null)
+  }
+  return heads
+}
+
+/**
+ * jjWaiting's reading of one workflow, by the project's canonical id (the records' scope). `heads`: the targets' heads as
+ * just read (targetHeads): without them, no candidate ready is shown.
+ */
+export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<string, string | null>): JjWaitingCard[] {
   const out: JjWaitingCard[] = []
   for (const card of wf.store.cards()) {
     if (card.stage !== 'approved') continue
@@ -65,7 +90,18 @@ export function waitingOf(wf: Workflow, project: string): JjWaitingCard[] {
       rec = null
     }
     const matches = !!rec && rec.submission === s.latest.id && rec.revision === s.approved.revision && rec.base === s.approved.base && rec.key === (s.latest.key ?? null) && rec.commit === commit && rec.target === target
-    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null })
+    // HI-2871: its candidate, only as recorded for exactly its approval and rules now; an unknown only once repeated.
+    const c = candidateShown(wf, card, s, project, heads?.get(target))
+    const candidate: JjWaitingCandidate | null = !c
+      ? null
+      : c.state === 'ready' && c.offer
+        ? { state: 'ready', result: c.offer.result, change: c.offer.change, expected: c.offer.expected, style: c.offer.style, ...(c.offer.updated ? { updated: c.offer.updated } : {}), at: c.at }
+        : c.state === 'signing'
+          ? { state: 'signing', at: c.at }
+          : c.state === 'unknown' && (c.misses ?? 1) >= CANDIDATE_MISSES
+            ? { state: 'unknown', why: c.why ?? '', at: c.at }
+            : null
+    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null, candidate })
   }
   return out
 }

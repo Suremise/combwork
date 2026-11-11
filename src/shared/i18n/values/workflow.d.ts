@@ -254,8 +254,12 @@ interface CombworkMessageValues {
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
   'workflow.option.strict.desc': undefined
+  'workflow.option.strict.jjDesc': undefined
+  'workflow.option.strict.jjTitle': undefined
   'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
+  'workflow.option.style.jjDesc': undefined
+  'workflow.option.style.jjTitle': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined

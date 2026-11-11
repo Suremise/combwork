@@ -280,6 +280,8 @@
   "tips.inboxNotices.title": "Les messages joignent un agent occupé entre deux étapes",
   "tips.isolatedChecks.text": "Dans un dossier partagé, une vérification ne compte pas si un autre agent modifie quelque chose pendant qu’elle tourne. cw-progress --check typecheck --isolated la lance dans une copie à elle, à la révision de la carte, où rien d’autre n’écrit. Arrêter, dans le panneau Progression, l’arrête avec tout ce qu’elle a lancé.",
   "tips.isolatedChecks.title": "Une vérification que personne ne peut gâcher",
+  "tips.jjCandidates.text": "Dès qu’une carte jj est validée, Combwork en construit un candidat sur le signet cible et vérifie qu’il n’a pas de conflit. Gestion de versions → Dépôt l’affiche avec la commande jj bookmark set qui l’intègre : c’est toi qui la lances, Combwork ne déplace jamais le signet.",
+  "tips.jjCandidates.title": "Intégrer le candidat d’une carte jj",
   "tips.jjCards.text": "Dans un projet jj, chaque carte travaille dans son propre emplacement. Une fois qu’une carte a passé la revue, c’est vous qui l’intégrez : Contrôle de version → Dépôt liste ce qui vous attend, et Combwork passe la carte à Terminé dès que son travail est dans la cible.",
   "tips.jjCards.title": "Les cartes dans un projet jj",
   "tips.jjOperations.text": "Dans un projet jj, Gestion de versions → Opérations liste les opérations de jj par leur nom. Aperçu de l’annulation montre ce que l’annulation de l’une d’elles changerait, et te donne la commande à exécuter quand rien d’autre ne changerait. Combwork ne l’exécute jamais.",
