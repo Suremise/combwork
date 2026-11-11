@@ -25,6 +25,7 @@ import { isUnknown, unknown, withDetail, type Containment, type Maybe, type Unkn
 import { isAgain } from './again'
 import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
+import type { TargetChanges } from '../../shared/types'
 
 /** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
 const SLOT_FETCH_MS = 60_000
@@ -639,6 +640,17 @@ export class GitPlatform implements PlatformAdapter {
 
   targetHead(target: string): Promise<Maybe<string | null>> {
     return G.lineHead(this.project, target)
+  }
+
+  /** HI-2944: the folder `target` is checked out in and its uncommitted files (null: checked out nowhere, or clean; never a refusal). */
+  async targetChanges(target: string): Promise<TargetChanges | null> {
+    const where = await G.checkouts(this.project)
+    const folder = isUnknown(where) ? null : where[target]
+    if (!folder) return null
+    const now = await G.worktreeNow(folder)
+    // A git operation's marker (`(MERGE_HEAD)`) isn't a file to commit: the files only.
+    const files = isUnknown(now) ? [] : now.dirty.filter((f) => !f.startsWith('('))
+    return files.length ? { target, folder, files } : null
   }
 
   async lineNow(folder: string, target: string): Promise<Maybe<LineNow>> {

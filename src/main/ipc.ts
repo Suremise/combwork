@@ -10,7 +10,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { CombworkChannel, CombworkRequests } from '../shared/api'
 import * as updater from './updater'
-import type { LaneStartRequest, MergeResult, ProviderId, QuitChoice } from '../shared/types'
+import type { LaneStartRequest, MergeResult, ProviderId, QueuePauseRef, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
 import { extraArgsProblem, isKnownProvider, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
@@ -154,7 +154,7 @@ import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
-import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -1088,6 +1088,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return 'upToDate' in r ? { upToDate: true, card: null, queued: false } : { upToDate: false, card: r.card.number, queued: r.queued }
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
+    // HI-2944: the port refuses it first where the project's version control doesn't offer it.
+    'queue:settleChanges': (p, target, action, shown, pause) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), opsAt('queue:settleChanges')),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     'project:excludeCombwork': async (p) => {
@@ -1995,6 +1997,14 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       }
     })
   }
+}
+
+/** HI-2944: the pause a Commit or Set aside acts on, as the window showed it (null: from a start's warning). */
+function pauseRef(p: unknown): QueuePauseRef | null {
+  if (p === null || p === undefined) return null
+  const { card, reason, at } = (typeof p === 'object' ? p : {}) as Record<string, unknown>
+  if (typeof card === 'string' && typeof reason === 'string' && typeof at === 'string') return { card, reason, at }
+  throw new CombworkError({ lines: ["A paused merge is named by its card, reason and time"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
 }
 
 /** A merge queue's target as the window names it (a branch): refused when it isn't one. */

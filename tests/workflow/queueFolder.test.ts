@@ -3,7 +3,7 @@
 // rollback; HEAD seen naming the target after the swap; every row of the recovery table after a crash at each point of
 // the journal, never merging twice; the terminal state's record (branch, ref, each file's side, the commands, For you);
 // Ask each time (OP-40): the Approve bound to the entry and its test merge.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { execFileSync } from 'child_process'
 import { tempDir } from '../tempDir'
 import { shellLine } from '../../src/shared/workflow/queue'
@@ -11,7 +11,7 @@ import { createRequire } from 'module'
 
 const { baseEnv } = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MergeQueue, type QueueConfig, type QueueHook } from '../../src/main/workflow/mergeQueue'
@@ -119,6 +119,27 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     expect(e.wf.state(card).stage).toBe('done')
     expect(readFileSync(join(e.project, 'new.txt'), 'utf8')).toBe('A\n')
     expect(readFileSync(join(e.project, 'README.md'), 'utf8')).toBe('the user is editing this\n')
+  })
+
+  it("HI-2944's repro: Files' shared exclude left uncommitted, and a card that also changes .gitignore, pauses naming .gitignore", async () => {
+    const e = pair()
+    writeFileSync(join(e.project, '.gitignore'), 'node_modules/\n')
+    sh(e.project, 'add', '.gitignore')
+    sh(e.project, 'commit', '-q', '-m', 'ignore')
+    const card = await queued(e, 'A', '.gitignore', 'node_modules/\nout/\n')
+    // Files' own Exclude from git, in a workspace holding the project.
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../../src/main/workspace')
+    const { gitExclude } = await import('../../src/main/filesGit')
+    const w = createWorkspaceService()
+    w.path = dirname(e.project)
+    onTestFinished(() => disposeWorkspaceService(w))
+    expect(await gitExclude(e.project, [{ rel: 'reference', isDir: true }], 'shared', false)).toMatchObject({ file: '.gitignore', lines: ['/reference/'] })
+    const before = head(e)
+    const [o] = await e.queue().drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'unstagedChanges', files: ['.gitignore'] })
+    expect(head(e)).toBe(before)
+    expect(readFileSync(join(e.project, '.gitignore'), 'utf8')).toBe('node_modules/\n/reference/\n')
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
   })
 
   it('the conditions are checked inside the lock and the fence, and the fence names the folder', async () => {

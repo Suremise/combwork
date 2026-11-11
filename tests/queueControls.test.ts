@@ -18,7 +18,9 @@ vi.mock('../src/main/workflow/queueHost', () => ({
   queueChanged: (_ws: unknown, _p: string, target: string) => void host.changed.push(target),
   queueLive: () => ({ running: false, now: null, run: null }),
   queueHostsStamp: () => host.stamp,
-  profileName: () => 'test'
+  profileName: () => 'test',
+  // HI-2944: nothing builds in a folder here.
+  folderBuilders: () => null
 }))
 
 const base = tempDir('cw-queuecontrols-')
@@ -32,7 +34,8 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
-const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
+const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue, settleQueueChanges } = await import('../src/main/workflow/queueControls')
+const { gitRepoOps } = await import('../src/main/platform/gitRepoOps')
 const { forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
 const { keptLive, nextFold, queueKey, shownReturns, unseenReturns, withKept, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
 const { runCardIntent } = await import('../src/main/cardIntents')
@@ -288,6 +291,88 @@ describe('Pause queue and Resume (#1353)', () => {
     await pause({ reason: 'needsYou', card: '', pid: 2 ** 30 })
     expect((await resume()).resumed).toBe(true)
     expect(host.kicked).toEqual(['main', 'main', 'main', 'main', 'main'])
+  })
+})
+
+describe('Commit and Set aside on a paused merge (HI-2944)', () => {
+  /** A workspace whose main (checked out in the project folder) is paused on a.txt's uncommitted change, as the queue pauses. */
+  async function paused(files = ['a.txt']) {
+    const { w, repo, wt } = await workspace()
+    const wf = (await service.workflowFor(w, repo))!
+    for (const f of files) writeFileSync(join(repo, f), `the user's ${f}\n`)
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files }))
+    const p = wf.store.queuePause('main')!
+    const ref = { card: p.card, reason: p.reason, at: p.at! }
+    const head = () => git(repo, 'rev-parse', 'HEAD')
+    const settle = (action: 'commit' | 'setAside', shown: string[], r: typeof ref | null = ref, ops = gitRepoOps) => inWorkspace(w, () => settleQueueChanges(w, repo, 'main', action, shown, r, ops))
+    return { w, repo, wt, wf, ref, head, settle }
+  }
+
+  it("Commit: the files shown committed, the same pause found clean by Resume's own check, the queue run", async () => {
+    const { repo, wf, settle } = await paused()
+    const r = await settle('commit', ['a.txt'])
+    expect(r).toMatchObject({ resumed: true, done: { action: 'commit', files: ['a.txt'], branch: 'main' } })
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe('Commit changes before merging p-1')
+    expect(wf.store.queuePause('main')).toBeNull()
+    expect(host.kicked).toEqual(['main'])
+  })
+
+  it('Set aside: stashed, resumed; from a start (no pause) only done, the queue untouched', async () => {
+    const { repo, wf, settle } = await paused()
+    expect(await settle('setAside', ['a.txt'])).toMatchObject({ resumed: true, done: { action: 'setAside' } })
+    expect(git(repo, 'stash', 'list', '--format=%s')).toMatch(/Combwork: set aside before merging p-1/)
+    writeFileSync(join(repo, 'a.txt'), 'again\n')
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' }))
+    host.kicked.length = 0
+    expect(await settle('commit', ['a.txt'], null)).toMatchObject({ resumed: false, done: { action: 'commit' } })
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe('Commit changes before starting work on main')
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(host.kicked).toEqual([])
+  })
+
+  it('a pause no longer the one shown: refused before anything is touched', async () => {
+    const { repo, wf, ref, head, settle } = await paused()
+    const before = head()
+    await expect(settle('commit', ['a.txt'], { ...ref, at: '2000-01-01T00:00:00.000Z' })).rejects.toThrow(/pause changed meanwhile/)
+    await wf.locked(() => wf.store.setQueuePause('main', null))
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/pause changed meanwhile/)
+    expect(head()).toBe(before)
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+  })
+
+  it('the pause replaced while the commit ran: committed, but the new pause stays, shown; nothing resumed', async () => {
+    const { wf, settle } = await paused()
+    const ops = {
+      ...gitRepoOps,
+      settleChanges: async (...a: Parameters<typeof gitRepoOps.settleChanges>) => {
+        const done = await gitRepoOps.settleChanges(...a)
+        await wf.locked(() => wf.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' }))
+        return done
+      }
+    }
+    const r = await settle('commit', ['a.txt'], undefined, ops)
+    expect(r.resumed).toBe(false)
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(host.kicked).toEqual([])
+  })
+
+  it('a paused file left changed: the merge stays paused, naming it', async () => {
+    const { wf, settle } = await paused(['a.txt', 'c.txt'])
+    const r = await settle('commit', ['a.txt'])
+    expect(r.resumed).toBe(false)
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', files: ['c.txt'] })
+  })
+
+  it('main checked out in another folder since: acted on there or refused, never in the old folder; not resumed unless clean', async () => {
+    const { repo, ref, head, settle } = await paused()
+    const before = head()
+    git(repo, 'checkout', '-q', '--detach')
+    const elsewhere = join(repo, '..', 'p-main')
+    git(repo, 'worktree', 'add', '-q', elsewhere, 'main')
+    // a.txt is changed only in the old folder: not the changes shown, in main's folder now.
+    await expect(settle('commit', ['a.txt'], ref)).rejects.toThrow(/aren't the ones shown/)
+    expect(git(repo, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
   })
 })
 

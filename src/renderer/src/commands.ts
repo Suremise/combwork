@@ -21,6 +21,7 @@ import { focusTileAfter } from './components/AgentTiles'
 import type { VcSection } from '@shared/gitRepo'
 import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
+import { commitIgnore, settleFolderChanges, showFolderChanges } from './folderChanges'
 import { workspacePaused } from './teamPause'
 import { pauseTheTeam, resumeTheTeam } from './components/TeamPause'
 
@@ -568,6 +569,29 @@ const COMMAND_DEFS: CommandDef[] = [
     // The Undo of a change of a lane's cards (HI-2898): the last one made in this window, while it still can be.
     internal: true,
     run: (id?: unknown, workspacePath?: unknown) => undoLaneEdit(typeof id === 'string' ? id : undefined, typeof workspacePath === 'string' ? workspacePath : undefined)
+  },
+  {
+    id: 'folderChanges.settle',
+    name: msg({ id: 'shell.command.folderChanges.settle', defaultMessage: 'Commit or Set Aside Changes', description: "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes (when a card or lane starts) runs it by its name from its Commit and Set Aside buttons." }),
+    category: 'project',
+    // A start's warning (HI-2944): exactly the files it named, in the folder the target is checked out in (main finds it).
+    internal: true,
+    run: (projectPath?: unknown, target?: unknown, action?: unknown, files?: unknown) =>
+      typeof projectPath === 'string' && typeof target === 'string' && Array.isArray(files) ? settleFolderChanges(projectPath, target, action === 'setAside' ? 'setAside' : 'commit', files.filter((f): f is string => typeof f === 'string')).then(() => undefined) : undefined
+  },
+  {
+    id: 'folderChanges.show',
+    name: msg({ id: 'shell.command.folderChanges.show', defaultMessage: 'Show Uncommitted Changes', description: "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes runs it from its Show Changes button (the project's Version Control tab)." }),
+    category: 'project',
+    internal: true,
+    run: (projectPath?: unknown) => (typeof projectPath === 'string' ? showFolderChanges(projectPath) : undefined)
+  },
+  {
+    id: 'files.commitIgnore',
+    name: msg({ id: 'shell.command.files.commitIgnore', defaultMessage: 'Commit .gitignore', description: "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the notification after Exclude from Git (shared, in .gitignore) runs it from its Commit It button. Keep .gitignore: a file name." }),
+    category: 'project',
+    internal: true,
+    run: (projectPath?: unknown) => (typeof projectPath === 'string' ? commitIgnore(projectPath) : undefined)
   },
   {
     id: 'agent.show',
