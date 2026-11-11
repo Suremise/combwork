@@ -218,7 +218,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'loop.noStep': r(
     msg({ id: 'workflow.refused.loop.noStep.message', defaultMessage: '{card} has no design or follow-up waiting for its check.', description: "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key." }),
-    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.' })
+    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.' })
   ),
   'loop.noReviewer': r(
     msg({ id: 'workflow.refused.loop.noReviewer.message', defaultMessage: '{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.', description: "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer." }),

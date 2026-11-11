@@ -308,7 +308,7 @@
   "workflow.refused.loop.noReviewer.message": "{card} hat keinen Reviewer, der die Karte prüfen könnte: Sie ist in keiner Lane mit Reviewer, und niemand hat sie bisher geprüft.",
   "workflow.refused.loop.noReviewer.next": "Starte für die Karte eine Lane mit Reviewer, oder schreib es stattdessen in einen Kommentar.",
   "workflow.refused.loop.noStep.message": "Auf {card} wartet kein Entwurf und kein Follow-up auf eine Prüfung.",
-  "workflow.refused.loop.noStep.next": "Lies die Karte: Es wurde vielleicht schon beantwortet, oder die Karte ist weitergezogen.",
+  "workflow.refused.loop.noStep.next": "Lies die Karte: Es wurde vielleicht schon beantwortet, oder die Karte ist weitergezogen. Feedback, das noch etwas bringt, kommt als Kommentar auf die Karte.",
   "workflow.refused.loop.roundLimit.message": "{card} hat seine Rundengrenze erreicht: Es geht weiter, sobald die Frage zur Rundengrenze beantwortet ist.",
   "workflow.refused.loop.roundLimit.next": "Die Frage steht auf der Karte (Für dich): Sobald sie beantwortet ist, weckt Combwork die Agenten, die auf die Karte warten.",
   "workflow.refused.loop.staleStep.message": "{card}: Das betrifft {design}, aber jetzt wartet {waiting} auf seine Prüfung.",

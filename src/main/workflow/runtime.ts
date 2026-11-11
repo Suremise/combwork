@@ -2411,6 +2411,12 @@ export class Workflow {
         const at = opts.now ?? Date.now()
         if (this.enforced()) {
           const builder = now.started?.builder ?? null
+          // An answer or going ahead names a step waiting: none waiting, or an earlier one, is said first (HI-3011), so a
+          // reviewer the pool gave a design that has since closed (the card put back) hears that, not that it isn't its.
+          if (step !== 'design' && step !== 'followUp') {
+            if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
+            if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+          }
           // Each side its own (an agent; the user and the Assistant take either): the builder's steps by the card's
           // builder, an answer by its reviewer, never its builder.
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
@@ -2422,9 +2428,7 @@ export class Workflow {
             if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
             // A pool lane's design (HI-2310) needs no reviewer yet: the pool gives it to the next free one.
             if (!(step === 'design' && w.card.reviewerPool) && (!reviewer || reviewer === builder)) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
-          } else {
-            if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
-            if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+          } else if (now.step) {
             // A follow-up was asked for: it waits for its check, with no going ahead unchecked.
             if (step === 'proceed' && now.step.step === 'followUp') return { rule: 'loop.followUpChecked', values: { card: card.key } } as GuardRefusal
             const due = now.step.until ? Date.parse(now.step.until) : NaN

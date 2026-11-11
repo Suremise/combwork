@@ -825,8 +825,8 @@
     "audience": "both"
   },
   "workflow.refused.loop.noStep.next": {
-    "text": "Read the card: it may have been answered, or the card moved on.",
-    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.",
+    "text": "Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.",
+    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.",
     "audience": "both"
   },
   "workflow.refused.loop.roundLimit.message": {

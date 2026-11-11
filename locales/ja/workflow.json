@@ -308,7 +308,7 @@
   "workflow.refused.loop.noReviewer.message": "{card}には確認するレビュアーがいません。レビュアーのいるレーンに入っておらず、まだ誰もレビューしていません。",
   "workflow.refused.loop.noReviewer.next": "レビュアーのいるレーンをこのカードで開始するか、代わりにコメントに書いてください。",
   "workflow.refused.loop.noStep.message": "{card}には確認待ちの設計もフォローアップもありません。",
-  "workflow.refused.loop.noStep.next": "カードを読んでください。すでに回答があるか、カードが先に進んでいる可能性があります。",
+  "workflow.refused.loop.noStep.next": "カードを読んでください。すでに回答があるか、カードが先に進んでいる可能性があります。まだ伝える価値のあるフィードバックは、カードにコメントとして書いてください。",
   "workflow.refused.loop.roundLimit.message": "{card}はラウンド上限に達しました。ラウンド上限の質問に回答があると先に進みます。",
   "workflow.refused.loop.roundLimit.next": "質問はカードにあります（要対応）。回答されると、Combworkはこのカードを待っているエージェントを起こします。",
   "workflow.refused.loop.staleStep.message": "{card}：これは{design}についてですが、いま確認待ちなのは{waiting}です。",

@@ -66,6 +66,7 @@
 
 ### Fixed
 
+- **A late answer to a design says the design no longer waits** (HI-3011). A reviewer the pool gave a design to, answering after its builder had put the card back, was refused as if the design weren't its to check. It's now told that nothing waits for its check, and that its feedback can go on the card as a comment.
 - **A jj card started right after another card's integration is no longer refused for nothing** (HI-2972). Starting a card while Combwork's own jj operations ran (the finished card's slot put back) could still say "What Combwork read … changed while it decided" under load. Combwork now reads it again instead, and its log says which check refused a start when one is.
 - **The switch to jj notices Git's older `crlf` attribute** (HI-2978). A `.gitattributes` line such as `*.txt crlf` (or `-crlf`, `crlf=input`) still makes Git convert line endings, which jj doesn't do, so switching would have changed every such file. It now refuses the switch and lists the line, as it does for `text` and `eol`. A `.gitattributes` you haven't committed yet counts too.
 - **A jj card put back and started again in its slot keeps its uncommitted edits** (HI-2981). A card in a jj lane put back with an edit not committed yet was refused when started again in the same slot, and stalled after three tries. It now carries on with the edit, as in Git; another card is still refused over edits that aren't its own.
