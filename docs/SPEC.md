@@ -3097,6 +3097,11 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   card's commit moved it off), besides exactly the binding's submitted commits (`chainIsBinding`, unchanged). An empty
   range alone never authorizes it (a working copy on unrelated history has none); the previous card's work must still
   be in its target (§16.3.2).
+- **A lane's later card whose slot couldn't be prepared** (HI-2923): its builder (stopped before a jj preparation) is
+  not started with the lane's brief, which only the lane's first card's start carries (`briefAfterFailedPrepare`); the
+  card waits, not started in that slot, with the failure in its Work section and its builder's wake. Work committed in
+  the slot before its preparation (on the last card's original commit, its copy in the target) is that slot's own
+  unintegrated work: refused and kept, never moved.
 - **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
   again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
   matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
