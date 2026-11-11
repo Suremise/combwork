@@ -29,9 +29,10 @@ import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
+import { historyOf } from '../platform/historyPorts'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
-import { isUnknown, unknown, type Maybe } from '../platform/types'
+import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
@@ -1826,6 +1827,11 @@ export class Workflow {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
         s = this.state(card)
       }
+      // HI-2999: a forward's resolution carries the commit it resolves, merged, never cherry-picked or copied; what can't
+      // be read refuses too (Unknown never satisfies a rule), saying what: submitted again once it reads.
+      const has = s.resolves ? await this.resolutionHasSource(o, s, revision) : null
+      if (isUnknown(has)) return { rule: 'platform.unknown', values: { card: card.key, what: has.whatText ?? has.what, rule: 'forward.resolutionSource' } }
+      if (has === false && s.resolves) return { rule: 'forward.resolutionSource', values: { card: card.key, from: s.resolves.from, to: s.resolves.to, source: s.resolves.source, revision: (revision ?? '').slice(0, 7) } }
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') {
@@ -2895,6 +2901,21 @@ export class Workflow {
     })
     if (out) return this.refuse(card, by, 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2999: whether a forward's resolution (`s.resolves`) has the commit it resolves in `revision`'s history: false when
+   * it doesn't (cherry-picked or copied, not merged: the next forward would conflict again), unknown when that can't be
+   * read (git failed or threw, no revision, a platform with no history): never taken as either. Null for any other card.
+   */
+  async resolutionHasSource(o: WorkflowOptions, s: CardState, revision: string | null): Promise<Maybe<boolean> | null> {
+    const res = s.resolves
+    if (!res) return null
+    const what = unknown(UNREADABLE.contains, { revision: res.source.slice(0, 7), target: (revision ?? '').slice(0, 7) || '?' })
+    const h = historyOf(o.platform)
+    if (!revision || !h) return what
+    const has = await h.isAncestor(this.cfg.project, res.source, revision).catch((e: unknown) => withDetail(what, e instanceof Error ? e.message : String(e)))
+    return isUnknown(has) ? { ...what, ...(has.detail ? { detail: has.detail } : {}) } : has
   }
 
   /**

@@ -57,6 +57,8 @@ const Q = {
   nextDirection: agentMsg({ id: 'queue.next.direction', text: 'Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.', note: 'The next step after a forward merge came back against the release path’s direction (HI-2892).' }),
   directionResolution: agentMsg({ id: 'queue.failure.directionResolution', text: 'the resolution of {forward}, bringing {to} up to date with {from}, is against the release path’s direction now (the default branch or the branches changed since Resolve), and {forward}’s request recorded no override; nothing merged', note: 'What came back (HI-2998): a card made by Resolve on a builder to merge branch {from} into branch {to} by hand, refused at its merge: that direction no longer reads forward. {forward}: the forward merge card it resolves (a key like HI-12).' }),
   nextDirectionResolution: agentMsg({ id: 'queue.next.directionResolution', text: 'Don’t submit it again: it comes back the same way. Say so on the card and leave it to the user; only a new forward request with their explicit override merges {from} into {to}.', note: 'The next step, for its builder, after a resolution of a forward merge came back against the release path’s direction (HI-2998).' }),
+  resolution: agentMsg({ id: 'queue.failure.resolution', text: 'the resolution of {forward} doesn’t contain {source}, the commit it resolves (cherry-picked or copied, not merged); nothing merged', note: 'What came back (HI-2999): a card made by Resolve on a builder whose revision lacks the commit it resolves. {forward}: the forward merge card (a key like HI-12); {source}: a commit id.' }),
+  nextResolution: agentMsg({ id: 'queue.next.resolution', text: 'In its branch, run git merge {source}, resolve the conflict, commit, and submit again.', note: 'The next step after a resolution came back without the commit it resolves (HI-2999). {source}: a full commit id.' }),
   notPublished: agentMsg({ id: 'queue.failure.notPublished', text: 'the user said its publication to {target}’s remote didn’t happen; it is tested again', note: 'What came back (HI-1183, follow mode): an unknown publication the user said wasn’t published.' }),
   folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
   notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
@@ -355,6 +357,8 @@ function failureText(f: FactData['IntegrationFailed'], room: number, about?: Ret
     case 'direction':
       if (about?.resolution) return say(Q.directionResolution, { forward: clip(about.resolution, NAME_MAX), from: clip(about.from, NAME_MAX), to: clip(about.to, NAME_MAX) })
       return say(Q.direction, { target: f.target })
+    case 'resolution':
+      return say(Q.resolution, { forward: clip(about?.resolution ?? '?', NAME_MAX), source: about?.source ?? '?' })
     case 'folderBusy':
       return say(Q.folderBusy, { target: f.target })
     case 'notUpToDate': {
@@ -384,12 +388,14 @@ export interface ReturnedForward {
   from: string
   to: string
   resolution?: string
+  /** HI-2999: with `resolution`, the commit it resolves. */
+  source?: string
 }
 
 /** What a card's return is about (HI-2959, HI-2998): its forward merge, or the forward it resolves; else none. */
 export function returnedAbout(s: CardState): ReturnedForward | undefined {
   if (s.forward) return { from: s.forward.from, to: s.forward.to }
-  if (s.resolves) return { from: s.resolves.from, to: s.resolves.to, resolution: s.resolves.forward }
+  if (s.resolves) return { from: s.resolves.from, to: s.resolves.to, resolution: s.resolves.forward, source: s.resolves.source }
   return undefined
 }
 
@@ -398,6 +404,7 @@ function nextStep(f: FactData['IntegrationFailed'], forward?: ReturnedForward): 
   // HI-2998: a resolution returned for its direction: its builder can't change that, the user decides.
   if (forward?.resolution) {
     if (f.reason === 'direction') return say(Q.nextDirectionResolution, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
+    if (f.reason === 'resolution') return say(Q.nextResolution, { source: forward.source ?? '?' })
     forward = undefined
   }
   // HI-2959: a forward merge's choices are the user's or the Assistant's, never a builder's (it has none).
@@ -494,7 +501,7 @@ export function returnedComment(key: string, f: FactData['IntegrationFailed'], f
   // when it is read (storedForAgents, HI-2440).
   // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
   const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
-  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}) } } : {}) } }
+  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}), ...(forward.source ? { source: forward.source } : {}) } } : {}) } }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
 }
 
@@ -505,8 +512,8 @@ export const RETURNED_COMMENT = 'queue.returned'
 export function returnedCommentFrom(data: unknown): string | null {
   const d = data as { key?: unknown; failure?: unknown; forward?: unknown } | null
   if (!d || typeof d.key !== 'string' || !d.failure || typeof d.failure !== 'object') return null
-  const fw = d.forward as { from?: unknown; to?: unknown; resolution?: unknown } | null | undefined
-  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to, ...(typeof fw.resolution === 'string' ? { resolution: fw.resolution } : {}) } : undefined
+  const fw = d.forward as { from?: unknown; to?: unknown; resolution?: unknown; source?: unknown } | null | undefined
+  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to, ...(typeof fw.resolution === 'string' ? { resolution: fw.resolution } : {}), ...(typeof fw.source === 'string' ? { source: fw.source } : {}) } : undefined
   try {
     return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES, forward)
   } catch {
