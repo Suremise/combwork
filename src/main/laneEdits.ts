@@ -336,8 +336,10 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, from
         // the lane it leaves in this undo; its earlier work, assignment and history are checked against the token below.
         // Cancel Change's cards back from its queued change the same (HI-2943), from no other lane: one another running
-        // lane holds is refused here, on the board as it is now, if it got there after the plan left it out.
-        if (p.op === 'undo' || p.op === 'cancel') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.op === 'undo' ? (p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null) : null, fresh: true, work: false, def: defOf(x.lane) })
+        // lane holds is refused here, on the board as it is now, if it got there after the plan left it out. With no
+        // record from before their removal, any work one keeps refuses it (HR1's round 1: started since and back in To do
+        // never comes back), as Add and Move here do; its assignment is checked below.
+        if (p.op === 'undo' || p.op === 'cancel') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.op === 'undo' ? (p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null) : null, fresh: true, work: p.op === 'cancel', def: defOf(x.lane) })
       }
       if (p.brings) bringable(ws, lanes, p.brings.into, p.brings.card, { leaving: p.brings.leaving, fresh: true, work: true, def: defOf(p.brings.into) })
       // The card's assignment, through the card-change owner, in this change (HR1's s17): a card brought in that is given
@@ -355,6 +357,17 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
               const c = await getTask(n, ws)
               if (!b || headOf(c) !== b.head || (c.agent && c.agent !== x.lane.builder.id && c.agent !== p.undoCard?.after)) refuse(ws, 409, M.cardChanged, { card: cardRef(n) })
               if (!b.work && keepsWork(ws, x.lane, n)) refuse(ws, 409, M.kept, { card: cardRef(n) })
+            }
+          }
+        }
+        // Cancel Change's cards back (HI-2943, HR1's round 1): given to nobody or to the lane's builder, never taken from
+        // an agent it was given to since it left. Checked before anything is written.
+        if (p.op === 'cancel') {
+          for (const x of p.lanes) {
+            const was = working(x.lane)
+            for (const n of x.next.filter((c) => !was.includes(c))) {
+              const c = await getTask(n, ws)
+              if (c.agent && c.agent !== x.lane.builder.id) refuse(ws, 409, M.cardChanged, { card: cardRef(n) })
             }
           }
         }

@@ -182,11 +182,27 @@ describe('editLanes (HI-2898)', () => {
     await edit({ op: 'add', lane: l.id, rev: await revOf(), card: f2, at: 1 })
     const queued = (await raw(l.id)).pending!
     await edit({ op: 'remove', lane: l.id, rev: await revOf(), card: e })
-    expect((await raw(l.id)).pending).toEqual(queued.filter((n) => n !== e))
+    const left = queued.filter((n) => n !== e)
+    expect((await raw(l.id)).pending).toEqual(left)
+    /** Cancel refused with `why`, and nothing changed: the lane's lists and E as they were. */
+    const refused = async (why: RegExp): Promise<void> => {
+      const [laneBefore, cardBefore] = [await raw(l.id), await card(e)]
+      await expect(edit({ op: 'cancel', lane: l.id, rev: await revOf() })).rejects.toThrow(why)
+      const [laneAfter, cardAfter] = [await raw(l.id), await card(e)]
+      expect([laneAfter.cards, laneAfter.pending, laneAfter.listRev]).toEqual([laneBefore.cards, laneBefore.pending, laneBefore.listRev])
+      expect([cardAfter.column, cardAfter.agent ?? null, cardAfter.history.length]).toEqual([cardBefore.column, cardBefore.agent ?? null, cardBefore.history.length])
+    }
+    // Given to another agent since it left (still in To do, never started): never taken from them (HR1's round 1).
+    await run(() => tasks.updateTask(e, { agent: 'b2' }, user))
+    await refused(/changed since/)
+    await run(() => tasks.updateTask(e, { agent: null }, user))
+    // Started outside the lane: not in To do.
     await doing(e, 'b1')
-    const rev = await revOf()
-    await expect(edit({ op: 'cancel', lane: l.id, rev })).rejects.toThrow(/isn’t in To do/)
-    expect((await raw(l.id)).pending).toEqual(queued.filter((n) => n !== e))
+    await refused(/isn’t in To do/)
+    // Then back in To do, given to nobody: its start stays in its facts, and that work keeps it off (HR1's round 1).
+    await run(() => tasks.updateTask(e, { column: 'todo', agent: null }, user))
+    await refused(/keeps work/)
+    expect((await raw(l.id)).pending).toEqual(left)
   })
 
   it('removes a queued card back to the board, and undoes it', async () => {
