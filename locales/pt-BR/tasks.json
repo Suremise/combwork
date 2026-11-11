@@ -87,6 +87,7 @@
   "tasks.error.targetMoved": "O branch antigo de {card} mudou enquanto seu “Mescla em” era alterado, então ele continua igual. Veja primeiro o que chegou lá.",
   "tasks.error.targetNotAgents": "Só você ou o Assistente definem em qual branch um cartão é mesclado.",
   "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} não é um branch em que o trabalho possa ser mesclado aqui: indique {default}{hasOthers, select, yes { ou um de {others}} other {}}, ou adicione-o em “Outros branches em que o trabalho pode ser mesclado” (Controle de versão → Fluxo de trabalho).} other {Este projeto não mescla o trabalho em nenhum branch que o Combwork possa escolher: o “Mescla em” de um cartão é para projetos Git.}}",
+  "tasks.error.targetResolution": "O cartão {card} resolve a mesclagem de {from} em {to}, então ele é mesclado só em {to}. Para levar {from} a outro branch, use “Atualizar” nele.",
   "tasks.error.tooLong": "{what, select, title {O título é longo demais (no máximo {max, number} caracteres).} description {A descrição é longa demais (no máximo {max, number} caracteres).} comment {O comentário é longo demais (no máximo {max, number} caracteres).} decision {A decisão é longa demais (no máximo {max, number} caracteres).} other {O motivo do bloqueio é longo demais (no máximo {max, number} caracteres).}}",
   "tasks.error.tooManyContext": "Um cartão pode ter até {max} seções de documentos para ler primeiro.",
   "tasks.error.tooManyDecisions": "Um cartão pode ter até {max} decisões.",

@@ -285,6 +285,8 @@
   "workflow.refused.evidence.changed.next": "请重试：Combwork 会重新读取。",
   "workflow.refused.forward.notAgents.message": "{card} 用于将一个分支更新到另一个分支的最新状态：只有用户或助手可以操作它。",
   "workflow.refused.forward.notAgents.next": "请交给用户或助手处理。",
+  "workflow.refused.forward.resolutionTarget.message": "{card} 解决的是把 {from} 合并到 {to}，但它会从 {target} 开始并合并到那里。",
+  "workflow.refused.forward.resolutionTarget.next": "用户或 Assistant 可以把它的“合并到”设为 {to}，然后重新开始它。",
   "workflow.refused.integrate.approved.message": "{card} 的修订版本 {revision} 未获批准：{why}",
   "workflow.refused.integrate.approved.next": "将它提交评审。",
   "workflow.refused.integrate.checksPassed.change": "此规则在“版本控制”→“合并结果的检查通过”中设置。",

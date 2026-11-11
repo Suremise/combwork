@@ -285,6 +285,8 @@
   "workflow.refused.evidence.changed.next": "Tente de novo: o Combwork lê tudo outra vez.",
   "workflow.refused.forward.notAgents.message": "{card} atualiza um branch com outro: só o usuário ou o Assistente age nele.",
   "workflow.refused.forward.notAgents.next": "Deixe isso para o usuário ou o Assistente.",
+  "workflow.refused.forward.resolutionTarget.message": "O cartão {card} resolve a mesclagem de {from} em {to}, mas começaria de {target} e seria mesclado lá.",
+  "workflow.refused.forward.resolutionTarget.next": "Você ou o Assistant podem definir o “Mescla em” dele como {to} e depois iniciá-lo de novo.",
   "workflow.refused.integrate.approved.message": "O cartão {card} na versão {revision} não está aprovado: {why}",
   "workflow.refused.integrate.approved.next": "Envie-o para revisão.",
   "workflow.refused.integrate.checksPassed.change": "Esta regra é definida em Controle de versão → As verificações passam no resultado mesclado.",

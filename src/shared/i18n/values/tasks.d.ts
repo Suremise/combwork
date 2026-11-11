@@ -90,6 +90,7 @@ interface CombworkMessageValues {
   'tasks.error.targetMoved': { card: string | number }
   'tasks.error.targetNotAgents': undefined
   'tasks.error.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
+  'tasks.error.targetResolution': { card: string | number; from: string | number; to: string | number }
   'tasks.error.tooLong': { what: string; max: number }
   'tasks.error.tooManyContext': { max: string | number }
   'tasks.error.tooManyDecisions': { max: string | number }

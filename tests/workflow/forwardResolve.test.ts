@@ -149,3 +149,53 @@ describe('a forward merge resolved on a builder (HI-2959)', () => {
     expect(forwardWaitOf({ forward: null, stage: 'active', queue: q('failed', 'conflict') })).toBeNull()
   })
 })
+
+describe('a resolution whose destination is Work merges into (HI-2985)', () => {
+  /** HI-2967's probe: main into 1.2.0, the project's own; then Start the next version (1.3.0, 1.2.0 listed) before a builder takes it. */
+  async function movedOn(pin: boolean) {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    const { card: fwd, source } = await returned(e)
+    const back = e.wf.returnedForward(e.wf.store.card(fwd.id))!
+    // Pinned (queueControls' pinTarget), its own target the default named; unpinned, a card made before HI-2985 stored none.
+    const made = e.wf.createCard({ title: 'Resolve: bring 1.2.0 up to date with main', ...(pin ? { target: back.to } : {}) })
+    moved(await e.wf.markForwardResolution(made.key, { forward: fwd.key, from: back.from, to: back.to, source: back.source }, 'user'))
+    moved(await e.wf.resolveForward(fwd.key, { entry: back.entry, resolver: made.key }, 'by hand', 'user'))
+    sh(e.project, 'branch', '1.3.0', '1.2.0')
+    e.options.target = '1.3.0'
+    e.options.otherTargets = ['1.2.0']
+    return { e, made, source }
+  }
+
+  it('pinned, it starts from and merges into the branch it resolves, not the one work merges into now', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, made, source } = await movedOn(true)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    expect(e.wf.state(made).started?.target).toBe('1.2.0')
+    const folder = started.data!.folder as string
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict
+    }
+    commit(folder, { 'fix.txt': 'resolved\n' }, 'Merge main, resolved')
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged' }))
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    expect(await e.queue().drain('1.3.0')).toEqual([])
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    expect(sh(e.project, 'merge-base', '--is-ancestor', source, '1.2.0')).toBe('')
+    expect(() => sh(e.project, 'merge-base', '--is-ancestor', source, '1.3.0')).toThrow()
+  })
+
+  it("unpinned, its start on another branch is refused with what to do, and nothing is started", { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, made } = await movedOn(false)
+    const r = await e.wf.start(made.key, B1)
+    expect(isRefusal(r) && r.rule).toBe('forward.resolutionTarget')
+    expect(JSON.stringify(r)).toContain('it would start from 1.3.0')
+    expect(e.wf.state(made)).toMatchObject({ stage: 'todo', started: null })
+    // Set to the branch it resolves (tasks.setTarget, by the user), it starts there.
+    e.wf.store.updateCard(made.id, { target: '1.2.0' })
+    moved(await e.wf.start(made.key, B1))
+    expect(e.wf.state(made).started?.target).toBe('1.2.0')
+  })
+})

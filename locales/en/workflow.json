@@ -1159,6 +1159,14 @@
     "defaultMessage": "Leave it to the user or the Assistant.",
     "description": "HI-2679: the next step after an agent was refused acting on a forward-merge card."
   },
+  "workflow.refused.forward.resolutionTarget.message": {
+    "defaultMessage": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
+    "description": "HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12."
+  },
+  "workflow.refused.forward.resolutionTarget.next": {
+    "defaultMessage": "The user or the Assistant can set its Merges into to {to}, then start it again.",
+    "description": "HI-2985: the next step after a refused start of a Resolve on a builder card: set its Merges into (a name in the window: as translated there) to branch {to}."
+  },
   "workflow.refused.integrate.approved.message": {
     "defaultMessage": "{card} at {revision} isn't approved: {why}",
     "description": "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing."
