@@ -192,6 +192,29 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       cards.mockRestore()
     })
 
+    it("work left unresolved on a pass's first page keeps the tick asking after the pass ends; once resolved and a pass drained, it stops (HR2's round 3)", async () => {
+      const w = await world(true, { candidates: true })
+      const jjp = new JjPlatform(w.wf)
+      const Z = (c: string) => c.repeat(40)
+      // First by key: a gone card's live candidate whose drop can't be made (its commit unknown to jj): unresolved.
+      const held = [{ fp: { cycle: 1, submission: 1, revision: Z('a'), base: Z('b'), key: null, commit: Z('a'), target: 'main', ruleset: 'r', style: 'merge', strict: false, generation: 0, approval: 1 }, record: { attempt: 'aaaaaa01', card: 'AA-00', kind: 'candidate', style: 'merge', revision: Z('a'), base: Z('b'), expected: Z('b'), phase: 'done', baseOp: 'x', ops: [], commits: [Z('1')], pins: [], result: Z('1'), outcome: 'candidate' } }]
+      await w.deps.records!.write((db) => {
+        const put = db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)')
+        put.run(attemptsKey('p-jj', 'AA-00', 1), JSON.stringify(held))
+        for (let i = 0; i < 39; i++) put.run(attemptsKey('p-jj', `ZZ-${String(i).padStart(2, '0')}`, 1), '[]')
+      })
+      // Page 1 (the held one among its 32): unresolved; page 2 (settled only): the pass ends; the tick still asks.
+      expect(await jjp.sweepEnded()).toEqual({ more: true })
+      expect(await jjp.sweepEnded()).toEqual({ more: false })
+      expect(await jjp.invalidated('tick')).toBe(true)
+      // Resolved meanwhile (its journal settled): the next pass drains and the tick stops asking.
+      await w.deps.records!.write((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run('[]', attemptsKey('p-jj', 'AA-00', 1)))
+      expect(await jjp.sweepEnded()).toEqual({ more: true })
+      expect(await jjp.invalidated('tick')).toBe(true)
+      expect(await jjp.sweepEnded()).toEqual({ more: false })
+      expect(await jjp.invalidated('tick')).toBe(false)
+    })
+
     it("a step run just after the user moved the target onto the candidate (it read the target before): the candidate left for the proof, credited via it", async () => {
       const w = await world(true, { candidates: true })
       const { card } = await approved(w)

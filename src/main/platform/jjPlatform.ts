@@ -199,7 +199,11 @@ export interface JjChecksHost {
 
 /** HI-2950: each workflow's per-card locks (the candidate step and an ended cycle's clean-up), and its sweep's state. */
 const cardLocks = new WeakMap<Workflow, Map<number, Promise<unknown>>>()
-const sweeps = new WeakMap<Workflow, { unresolved: boolean }>()
+/**
+ * Each workflow's sweep (HI-2950, HR2's round 3): `pass`, whether the pass under way has left anything unresolved so far
+ * (all its pages, reset as a new pass begins); `last`, what the last finished pass left (kept for the tick's retries).
+ */
+const sweeps = new WeakMap<Workflow, { pass: boolean; last: boolean }>()
 /** Ended cycles cleaned up per sweep, at most. */
 export const SWEEP_PAGE = 8
 /** Journals read per sweep, at most (HR1's round 1, finding 2): the selection bounded, not only the clean-up. */
@@ -915,7 +919,9 @@ export class JjPlatform implements PlatformAdapter {
     const rec = this.deps?.records
     if (!rec) return false
     const project = rec.projectId()
-    if (what === 'tick') return (!!this.wf && sweeps.get(this.wf)?.unresolved === true) || rec.read((db) => anyRetainedDue(db, project, Date.now(), RETAIN_EVERY_MS))
+    // A new pass while the pass under way or the last finished one left work unresolved (HR2's round 3: across its pages).
+    const sw = this.wf ? sweeps.get(this.wf) : undefined
+    if (what === 'tick') return !!sw?.pass || !!sw?.last || rec.read((db) => anyRetainedDue(db, project, Date.now(), RETAIN_EVERY_MS))
     if (what === 'retained:*') {
       await rec.write((db) => markRetainedDue(db, project, null))
       return true
@@ -1086,7 +1092,10 @@ export class JjPlatform implements PlatformAdapter {
     // The cursor past what this run took on (its page's last row when cut short), or back to the start once a pass ends.
     const next = cut ? page.at(-1)!.key : passEnds ? '' : (all.at(-1)?.key ?? '')
     await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, next)) // i18n-ignore: SQL
-    sweeps.set(wf, { unresolved })
+    // Unresolved accumulated over the whole pass (from its first page: a pass begins at the start), and kept once it ends.
+    const was = sweeps.get(wf) ?? { pass: false, last: false }
+    const pass = (after === prefix ? false : was.pass) || unresolved
+    sweeps.set(wf, passEnds && !cut ? { pass: false, last: pass } : { pass, last: was.last })
     return { more: cut || !passEnds }
   }
 
