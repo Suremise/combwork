@@ -228,6 +228,63 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(existsSync(join(ws2, '.jj'))).toBe(true)
     })
 
+    it('a slot whose folder is back by the time prune forgets it (HI-2946): kept registered, its unrecorded file kept; still gone, forgotten', async () => {
+      const h = harness()
+      const { repo, root, base } = h.repo(`prn${colocated ? 'c' : 'n'}`, colocated)
+      let onLock: (() => void) | null = null
+      let onProved: (() => void) | null = null
+      const once = (f: (() => void) | null): void => f?.()
+      const port = h.portWith({
+        remakeAllowed: () => true,
+        lock: (_s, fn) => {
+          const f = onLock
+          onLock = null
+          once(f)
+          return fn()
+        },
+        controlProved: () => {
+          const f = onProved
+          onProved = null
+          once(f)
+        }
+      })
+      const list = (): string => h.jj(repo, '--ignore-working-copy', 'workspace', 'list')
+      const slot = join(root, 'slot-p')
+      expect((await port.create(repo, slot, base)).ok).toBe(true)
+      const name = /^(\S+): /m.exec(list().split('\n').find((l) => l.includes('slot-p')) ?? '')?.[1]
+      const parked = `${slot}-parked`
+      const back = (): void => {
+        renameSync(parked, slot)
+        writeFileSync(join(slot, 'valuable.txt'), 'unrecorded work\n')
+      }
+      // Restored as prune takes the store's lock (the card's repro), and again between the control's proof and the
+      // forget's admission (after the fresh listing): kept registered each time, the file in place.
+      for (const at of ['lock', 'proof'] as const) {
+        renameSync(slot, parked)
+        expect(await port.prunable(repo)).toHaveLength(1)
+        const before = list()
+        // The proof's seam armed only once the lock is held: the forget's own proof, after the fresh listing.
+        if (at === 'lock') onLock = back
+        else onLock = () => void (onProved = back)
+        await port.prune(repo)
+        expect(list(), at).toBe(before)
+        expect(readFileSync(join(slot, 'valuable.txt'), 'utf8')).toBe('unrecorded work\n')
+        rmSync(join(slot, 'valuable.txt'))
+      }
+      // Forgotten by someone else meanwhile: nothing to do, no failure.
+      renameSync(slot, parked)
+      onLock = () => void h.jj(repo, 'workspace', 'forget', '--', name!)
+      await port.prune(repo)
+      expect(list()).not.toContain('slot-p')
+      // Still gone (the ordinary case): forgotten, as before.
+      renameSync(parked, slot)
+      const slot2 = join(root, 'slot-q')
+      expect((await port.create(repo, slot2, base)).ok).toBe(true)
+      rmSync(slot2, { recursive: true, force: true })
+      await port.prune(repo)
+      expect(list()).not.toContain('slot-q')
+    })
+
     it("the window's leftovers (HI-2869): only proved absences pruned, in rotating batches; present, registered, unreadable or changed meanwhile, kept", async () => {
       const w = setup('ctll')
       expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)

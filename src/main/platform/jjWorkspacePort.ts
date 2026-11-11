@@ -942,11 +942,21 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       await lockCtx(ctx, async () => {
         for (const w of l) {
           if (!gone.some((g) => samePath(g, w.root))) continue
+          // Proved again under the lock (HI-2946): what was found gone before the waits may have been restored or
+          // replaced since. Still registered under that name at that root, read afresh…
+          const now = await pinned(repo)
+          if (isUnknown(now)) return
+          const fresh = await listAt(repo, now)
+          if (isUnknown(fresh)) return
+          const cur = fresh.find((x) => x.name === w.name)
+          if (!cur || !samePath(cur.root, w.root)) continue
           // The control proved for each forget; its synchronous check right before the forget starts (HI-2887).
           const proof = await controlProof(repo, ctx)
           if (!proof || proof.path !== from || !proof.check()) return
-          // The check again under the file gate's admission, right before jj starts (HI-2918).
-          const f = await jj(from, ['workspace', 'forget', '--', w.name], { write: true, recheck: () => (proof.check() ? null : JJ_REFUSED.control) })
+          // …and its folder still absent, checked with the control's proof under the file gate's admission, right before
+          // jj starts (HI-2918): a folder back by then is a live workspace, kept registered with everything in it.
+          const f = await jj(from, ['workspace', 'forget', '--', w.name], { write: true, recheck: () => (!proof.check() ? JJ_REFUSED.control : existsSync(cur.root) ? JJ_REFUSED.exists : null) })
+          if (f.refused === JJ_REFUSED.exists) continue
           if (f.refused) return
         }
       })
