@@ -21,6 +21,10 @@ export interface BoundedOptions {
   owner?: string
   /** Ends it (its tree) when aborted; aborted already, nothing starts. */
   signal?: AbortSignal
+  /** HI-2947: its first word on Windows' command line (quoted by the caller when `verbatim`). */
+  argv0?: string
+  /** HI-2947: `args` are Windows' command line as given (quoted by the caller, as git quotes them). */
+  verbatim?: boolean
 }
 
 export function boundedSpawn(file: string, args: string[], o: BoundedOptions): Promise<QueueGitResult> {
@@ -29,7 +33,7 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
   return new Promise((res) => {
     let child: ChildProcess
     try {
-      child = spawn(file, args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: [o.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] })
+      child = spawn(file, args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: [o.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}) })
     } catch (e) {
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }
