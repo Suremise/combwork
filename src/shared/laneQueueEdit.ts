@@ -50,6 +50,30 @@ export function revisionToName(shown: number, current: number, run: OwnRun | und
   return run && run.now === current && shown >= run.base && shown < run.now ? current : shown
 }
 
+/**
+ * Where a card added before another (`before`: its number; null: last) goes in the rows as they are now (HI-2932, HR1's
+ * round 1: worked out when the edit's turn comes, as a move's is, so two quick drops keep their order); none given, or
+ * not a place there: last (no `at`).
+ */
+export function addedPlace(rows: readonly QueueRow[], before: number | null | undefined): { at?: number } {
+  if (before === undefined) return {}
+  const at = droppedPlace(rows, null, before)
+  return at === null ? {} : { at }
+}
+
+/**
+ * The lanes a read of them brings (`fresh`: which lanes there are, in its order), each kept as `held` has it when that
+ * is at a later list revision (HI-2932, HR1's round 1): a lane's revision only goes up, so the one at the higher
+ * revision was read later, and an older read landing last never takes a lane back.
+ */
+export function newerLanes<L extends { id: string; listRev?: number }>(held: readonly L[], fresh: readonly L[]): L[] {
+  const had = new Map(held.map((l) => [l.id, l]))
+  return fresh.map((l) => {
+    const h = had.get(l.id)
+    return h && (h.listRev ?? 0) > (l.listRev ?? 0) ? h : l
+  })
+}
+
 /** Whether a lane's card waits its turn: in To do, and not another agent's (only such cards move, HI-2898). */
 export const queuedCard = (c: Pick<LaneCard, 'column' | 'elsewhere'>): boolean => c.column === 'todo' && !c.elsewhere
 

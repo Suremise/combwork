@@ -5,7 +5,7 @@ import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shar
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages, TaskCard } from '@shared/types'
-import { droppedPlace, nudgedPlace, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
+import { addedPlace, droppedPlace, nudgedPlace, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
 import { dayBounds, dayKey } from '@shared/laneDay'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
@@ -866,7 +866,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           )}
         </div>
       )}
-      {refusal && editing && <RefusalLine refusal={refusal} onMoveHere={(m) => void editing.run((now, _rows, rev) => ({ op: 'transfer', card: m.card, from: { lane: m.from.id, rev: rev(m.from.id) }, to: { lane: now.id, rev: rev(now.id) }, ...(m.at !== undefined ? { at: m.at } : {}) }), { [m.from.id]: m.from.listRev })} onDismiss={dismiss} />}
+      {refusal && editing && <RefusalLine refusal={refusal} onMoveHere={(m) => void editing.run((now, rows, rev) => ({ op: 'transfer', card: m.card, from: { lane: m.from.id, rev: rev(m.from.id) }, to: { lane: now.id, rev: rev(now.id) }, ...addedPlace(rows, m.before) }), { [m.from.id]: m.from.listRev })} onDismiss={dismiss} />}
       {expanded && <LaneQueue lane={l} badges={badges} {...(editing ? { edit: editing } : {})} />}
     </div>
   )
@@ -892,7 +892,8 @@ const QUEUE_DRAG = 'application/x-combwork-lane-card'
  */
 interface QueueEditing {
   run: (make: QueueEditMaker, also?: Readonly<Record<string, number>>) => Promise<EditOutcome>
-  add: (card: number, at?: number) => void
+  /** A card added before another (its number), or last (null or none): placed when its turn comes. */
+  add: (card: number, before?: number | null) => void
   all: Lane[]
 }
 type QueueEditMaker = (now: Lane, rows: QueueRow[], rev: (lane: string) => number) => LaneEdit | null
@@ -1007,7 +1008,8 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
       })
       return
     }
-    edit.add(n, droppedPlace(rows, null, before) ?? undefined)
+    // Placed by the card it goes before, when its turn comes (HR1's round 1: two quick drops keep their order).
+    edit.add(n, before)
   }
   const nudge = (n: number, by: -1 | 1): void => {
     const label = cardLabelOf({ tasks }, n)
@@ -1212,7 +1214,7 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
 /** A refused edit, shown under its lane (HI-2898): main's reason, and Move here for a card another lane has. */
 interface Refusal {
   text: string
-  moveHere: { card: number; from: Lane; at?: number } | null
+  moveHere: { card: number; from: Lane; before?: number | null } | null
 }
 
 /**
@@ -1224,7 +1226,7 @@ function useQueueEditing(l: Lane, all: Lane[] | undefined): { editing: QueueEdit
   if (!all || !laneRunning(l.state) || l.frozen) return { editing: null, refusal: null, dismiss: () => undefined }
   // The revision as shown now, when the user asks (HI-2932): the edit, made in its turn, names the lane's then only when
   // nothing but this window's own edits came between.
-  const run = (make: QueueEditMaker, also: Readonly<Record<string, number>> = {}, add?: { card: number; at?: number }): Promise<EditOutcome> => {
+  const run = (make: QueueEditMaker, also: Readonly<Record<string, number>> = {}, add?: { card: number; before?: number | null }): Promise<EditOutcome> => {
     setRefusal(null)
     return editLaneInTurn({ ...also, [l.id]: l.listRev }, (rev) => {
       const now = laneNow(l.id)
@@ -1235,7 +1237,7 @@ function useQueueEditing(l: Lane, all: Lane[] | undefined): { editing: QueueEdit
       if (typeof o === 'object') {
         const others = lanesOf(get().lanes ?? [], get().workspace?.projects ?? [])
         const from = add ? others.find((x) => x.id !== l.id && laneRunning(x.state) && (x.cards.includes(add.card) || !!x.queued?.includes(add.card))) : undefined
-        setRefusal({ text: o.refused, moveHere: from && add ? { card: add.card, from, ...(add.at !== undefined ? { at: add.at } : {}) } : null })
+        setRefusal({ text: o.refused, moveHere: from && add ? { card: add.card, from, ...(add.before !== undefined ? { before: add.before } : {}) } : null })
       }
       return o
     })
@@ -1243,7 +1245,7 @@ function useQueueEditing(l: Lane, all: Lane[] | undefined): { editing: QueueEdit
   return {
     editing: {
       run: (make, also) => run(make, also),
-      add: (card, at) => void run((now, _rows, rev) => ({ op: 'add', lane: now.id, rev: rev(now.id), card, ...(at !== undefined ? { at } : {}) }), {}, { card, ...(at !== undefined ? { at } : {}) }),
+      add: (card, before) => void run((now, rows, rev) => ({ op: 'add', lane: now.id, rev: rev(now.id), card, ...addedPlace(rows, before) }), {}, { card, ...(before !== undefined ? { before } : {}) }),
       all
     },
     refusal,
