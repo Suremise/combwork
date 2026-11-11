@@ -68,12 +68,6 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
   jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
   fs.mkdirSync(path.join(shop, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(shop, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: 'jj', workflow: { platform: 'jj', preset: 'solo', options: { target: 'main' }, presetAsked: 'chosen' } }))
-  // The suite's folder trusted in the test home (the runner resets the home before each run; real suites run one at a
-  // time): Claude Code trusts the folders under it, the slot's too, so no trust question waits on a key press.
-  const homeJson = path.join(CLAUDE_TEST_HOME, '.claude.json')
-  const homeCfg = fs.existsSync(homeJson) ? JSON.parse(fs.readFileSync(homeJson, 'utf8')) : {}
-  homeCfg.projects = { ...homeCfg.projects, [work.replace(/\\/g, '/')]: { ...homeCfg.projects?.[work.replace(/\\/g, '/')], hasTrustDialogAccepted: true } }
-  fs.writeFileSync(homeJson, JSON.stringify(homeCfg, null, 2))
   lib.enableProviders(userData, ['claude-code'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -104,6 +98,14 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     const launchMark = lib.combworkLogLines(userData).length
     // What B1 does is its card's (a builder started on a card works on it first): run jj once in its folder, nothing more.
     const description = 'Use the Bash tool once, in your working folder, to run: jj --ignore-working-copy log --no-graph -r @ > jj-ran.txt   Do nothing else: no commit, no submit, no other card or board change. Then reply with the single word DONE.'
+    // The slot's folder (the pool's first, slot-a) trusted in the test home, right before Claude Code starts there: Claude
+    // Code trusts a folder by its exact path, and writes the file back itself, so a Claude Code another lane starts in
+    // the shared home meanwhile can drop the entry (the trust question is then answered below).
+    const slotPath = path.join(`${ws}.worktrees`, 'shop', 'slot-a').replace(/\\/g, '/')
+    const homeJson = path.join(CLAUDE_TEST_HOME, '.claude.json')
+    const homeCfg = fs.existsSync(homeJson) ? JSON.parse(fs.readFileSync(homeJson, 'utf8')) : {}
+    homeCfg.projects = { ...homeCfg.projects, [slotPath]: { ...homeCfg.projects?.[slotPath], hasTrustDialogAccepted: true } }
+    fs.writeFileSync(homeJson, JSON.stringify(homeCfg, null, 2))
     const n = (await inv('tasks:create', { title: 'Run jj once', description, project: 'shop', agent: b1.id })).number
     const cardKey = (await card(n)).key
     const started = await inv('tasks:move', n, 'doing', { confirm: true, reason: 'jjslot-claude: start' }).catch((e) => ({ error: String(e) }))
