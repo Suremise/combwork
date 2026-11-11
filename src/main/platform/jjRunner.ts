@@ -101,20 +101,24 @@ export async function storeGitGated(cwd: string, args: readonly string[], run: (
 }
 
 /**
- * The gate key of the Git store a path names (HR2's HI-2918 round 1): a Git dir (its `HEAD` a file: a store, or a
- * worktree's folder naming its common store) is keyed by its common store, wherever it is (a store outside every jj
- * workspace included); any other folder by the store of the jj workspace it is in. null: neither (nothing of jj's can
- * write there, so no gate); 'refuse': a Git dir whose common store can't be read.
+ * The gate key of the Git store a path names (HR2's HI-2918 rounds 1 and 2), in this order:
+ * - a path in a jj workspace: that workspace's store. This covers the workspace's folders (a tracked file named `HEAD`
+ *   in one is only content) and a store or worktree folder inside the project (`.git`, `.jj/repo/store/git`, a
+ *   store's `worktrees/<name>`), which are that same store;
+ * - else a Git dir, by its common store wherever it is (a store outside every jj workspace): a store (`HEAD` a file and
+ *   `objects` a folder) or a worktree's folder (`HEAD` and `commondir` files).
+ * null: neither (nothing of jj's can write there, so no gate); 'refuse': a Git dir whose common store can't be read.
  */
 export async function storeKeyOf(p: string): Promise<string | null | 'refuse'> {
   const at = resolve(p)
-  const head = await stat(join(at, 'HEAD')).then((s) => s.isFile(), () => false)
-  if (head) {
-    const common = await commonOf(at)
-    const k = common ? await pathKey(common) : null
-    return k ? storeKey(k) : 'refuse'
-  }
-  return (await workspaceGateKeys(at))?.store ?? null
+  const ws = await workspaceGateKeys(at)
+  if (ws) return ws.store
+  const isFile = (f: string): Promise<boolean> => stat(join(at, f)).then((s) => s.isFile(), () => false)
+  const isFolder = (f: string): Promise<boolean> => stat(join(at, f)).then((s) => s.isDirectory(), () => false)
+  if (!(await isFile('HEAD')) || !((await isFolder('objects')) || (await isFile('commondir')))) return null
+  const common = await commonOf(at)
+  const k = common ? await pathKey(common) : null
+  return k ? storeKey(k) : 'refuse'
 }
 
 /**
