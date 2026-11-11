@@ -42,8 +42,8 @@ import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordInt
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
 import { reconcileJj } from '../workflow/reconcile'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
-import type { JjCandidateDeps } from './jjCandidates'
-import { dropCandidates, jjCandidateStep, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
+import { dropCandidates, jjCandidateStep, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -606,7 +606,7 @@ export class JjPlatform implements PlatformAdapter {
       },
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
       projectId: () => rec.projectId(),
-      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle) } : {})
+      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle) } : {})
     })
   }
 
@@ -622,6 +622,15 @@ export class JjPlatform implements PlatformAdapter {
    * folder, the store's lock, git on the store) and Git's replay on the store, its attempts journalled in the workspace
    * database under the card's cycle. A replay that can't be read stops the attempt (never "not the same").
    */
+  /** HI-2871 (HR3's round 2): an offer still current: its target at its head, its candidate the visible commit recorded. */
+  private async offerCurrent(target: string, offer: JjCandidateOffer): Promise<boolean> {
+    if (!(await this.headIs(target, offer.expected))) return false
+    const integ = await this.deps?.integration()
+    if (!integ) return false
+    const now = await jjCandidateNow({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder }, { result: offer.result, change: offer.change }).catch(() => null)
+    return now === 'current'
+  }
+
   /** HI-2871: an integrated cycle's candidates dropped (jjCandidateStep's `dropCandidates`); a failure only logged. */
   private async candidatesDone(card: CardRecord, cycle: number): Promise<void> {
     const rec = this.deps?.records

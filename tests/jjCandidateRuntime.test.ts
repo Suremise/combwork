@@ -161,6 +161,32 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(waiting(w, card.id, other)?.candidate).toMatchObject({ state: 'ready', expected: w.main() })
     })
 
+    it('a ready candidate rewritten (superseded, main unmoved) and its rebuild interrupted: withdrawn (round 2)', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const old = shown(w, card, cycle)!.offer!
+      const head = w.main()
+      // Someone rewrites the candidate itself: main and the approved slot don't move, the recorded commit is superseded.
+      w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', old.result, '-m', 'revised candidate')
+      expect(w.main()).toBe(head)
+      w.deps.candidateHook = async (point) => {
+        if (point === 'written') throw new Error('crash')
+      }
+      await expect(jjp.reconcile(w.wf.store.card(card.id), {})).rejects.toThrow('crash')
+      expect(shown(w, card, cycle)).toBeNull()
+      expect(waiting(w, card.id)?.candidate).toBeNull()
+      expect(waiting(w, card.id, w.another())?.candidate).toBeNull()
+      // The next run builds a fresh one, never the superseded commit.
+      w.deps.candidateHook = undefined
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const now = shown(w, card, cycle)?.offer
+      expect(now?.expected).toBe(head)
+      expect(now?.result).not.toBe(old.result)
+    })
+
     it('a stale pass after a ready offer: no longer offered', async () => {
       const w = await world(true, { candidates: true })
       const a = w.slots['slot-a']

@@ -3349,8 +3349,10 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
   owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
   options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
-- **Withdrawn first** (HR3's round 1): a ready offer whose head isn't the target's any more (or can't be read) is deleted
-  (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never leaves it.
+- **Withdrawn first** (HR3's rounds 1 and 2): a ready offer that isn't current any more (its head not the target's, or
+  its candidate superseded or gone by `jjCandidateNow`, the target unmoved; or either unreadable: `offerCurrent`) is
+  deleted (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never
+  leaves it.
 - **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
   the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
   `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
@@ -3377,7 +3379,7 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
   options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
   rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
-  rebuild is interrupted, after a restart too; a stale pass after the offer and during the build), and the e2e suites
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
   `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)

@@ -499,6 +499,11 @@ export interface JjReconcilePorts {
   candidate?(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep>
   /** HI-2871: whether the target's head is still `expected`, read just before a candidate's answer is published. */
   headIs?(target: string, expected: string): Promise<boolean>
+  /**
+   * HI-2871 (HR3's round 2): whether a published offer is still current: the target still at its head, and its candidate
+   * still the visible commit J4 recorded (`jjCandidateNow`: not superseded or gone). False when either can't be read.
+   */
+  offerCurrent?(target: string, offer: JjCandidateOffer): Promise<boolean>
   /** HI-2871: the cycle integrated: its candidates dropped (the one the target reaches kept). */
   candidatesDone?(card: CardRecord, cycle: number): Promise<void>
 }
@@ -580,8 +585,9 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
       return null
     }
   }
-  // HR3's round 1: a ready offer whose head isn't the target's any more (or can't be read) is withdrawn before anything
-  // is recovered, dropped or rebuilt, so an interrupted or failed rebuild never leaves it offered. Only that exact row.
+  // HR3's rounds 1 and 2: a ready offer that isn't current any more (its head not the target's, its candidate superseded
+  // or gone, or either unreadable) is withdrawn before anything is recovered, dropped or rebuilt, so an interrupted or
+  // failed rebuild never leaves it offered. Only that exact row.
   const raw = wf.store.boardMeta(key)
   let had: JjCandidateShown | null = null
   try {
@@ -589,7 +595,7 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   } catch {
     had = null
   }
-  if (had?.state === 'ready' && had.offer && !(ports.headIs && (await ports.headIs(fp.target, had.offer.expected)))) {
+  if (had?.state === 'ready' && had.offer && !(ports.offerCurrent && (await ports.offerCurrent(fp.target, had.offer)))) {
     const seen = had
     await wf.write(card, null, 'outside', (w) => {
       w.tx.sql((db) => {
