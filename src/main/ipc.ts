@@ -1962,6 +1962,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   const holding = (channel: string): boolean => !app.isPackaged && (process.env.CW_TEST_HOLD_IPC ?? '').split(',').some((x) => x.trim() === channel)
   const heldIpc: Record<string, number> = {}
   if (!app.isPackaged) (globalThis as { __cwHeldIpc?: Record<string, number> }).__cwHeldIpc = heldIpc
+  // And globalThis.__cwSettledIpc counts the calls answered (or failed), by channel, so a suite knows a slowed call's
+  // late answer has gone to the window (HI-2971) without waiting a time.
+  const settledIpc: Record<string, number> = {}
+  if (!app.isPackaged) (globalThis as { __cwSettledIpc?: Record<string, number> }).__cwSettledIpc = settledIpc
   const hold = async (channel: string): Promise<void> => {
     heldIpc[channel] = (heldIpc[channel] ?? 0) + 1
     try {
@@ -1997,6 +2001,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         throw windowError(err)
       } finally {
         done()
+        if (!app.isPackaged) settledIpc[channel] = (settledIpc[channel] ?? 0) + 1
       }
     })
   }

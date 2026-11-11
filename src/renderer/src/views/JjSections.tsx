@@ -165,16 +165,20 @@ const commitShort = (id: string): string => revisionShort('jj', id)
 /** One jj read for a project, again on Refresh and on coming back to the window. */
 function useJjRead<T>(read: () => Promise<JjView<T>>, key: string): { data: JjView<T> | null; error: string | null; loading: boolean; reload: () => void; stamp: number } {
   const [s, setS] = useState<{ key: string; data: JjView<T> | null; error: string | null; loading: boolean; stamp: number }>({ key, data: null, error: null, loading: true, stamp: 0 })
+  // Each read supersedes the one before, whoever started it (HI-2971): a Refresh or a focus read still out when the
+  // project changes answered for the old project, after the new one's, and left the section on Reading… for good.
+  const gen = useRef(0)
   const reload = useCallback(() => {
-    let live = true
+    const g = ++gen.current
+    const live = (): boolean => gen.current === g
     setS((p) => ({ ...p, key, loading: true }))
     // Each finished read counts (HI-2869): what reads beside the section (Repository's panels) reads again with it.
     read().then(
-      (data) => live && setS((p) => ({ key, data, error: null, loading: false, stamp: p.stamp + 1 })),
-      (e: unknown) => live && setS((p) => ({ key, data: null, error: errorMessage(e), loading: false, stamp: p.stamp + 1 }))
+      (data) => live() && setS((p) => ({ key, data, error: null, loading: false, stamp: p.stamp + 1 })),
+      (e: unknown) => live() && setS((p) => ({ key, data: null, error: errorMessage(e), loading: false, stamp: p.stamp + 1 }))
     )
     return () => {
-      live = false
+      if (live()) gen.current++
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
@@ -864,11 +868,15 @@ export function JjOperationsSection({ project }: { project: ProjectInfo }) {
       setOlder({ for: project.path, first: first.op, rows: [...(extra?.rows ?? []), ...v.rows], next: v.next })
     })
   }
+  // Only the latest preview asked answers (HI-2971): an earlier one's late reply never replaces it.
+  const asked = useRef(0)
   const ask = (op: string): void => {
+    const g = ++asked.current
+    const latest = (): boolean => asked.current === g
     setPreview({ for: project.path, op, v: null, note: null })
     call('jj:operationPreview', project.path, op, null).then(
-      (v) => setPreview({ for: project.path, op, v, note: null }),
-      (e: unknown) => setPreview({ for: project.path, op, v: { jjUnknown: 'failed', detail: errorMessage(e) }, note: null })
+      (v) => latest() && setPreview({ for: project.path, op, v, note: null }),
+      (e: unknown) => latest() && setPreview({ for: project.path, op, v: { jjUnknown: 'failed', detail: errorMessage(e) }, note: null })
     )
   }
   return (
@@ -876,7 +884,7 @@ export function JjOperationsSection({ project }: { project: ProjectInfo }) {
       {() => (
         <>
           <p className="hint">{tr(M.opsIntro)}</p>
-          {shown && (shown.v === null ? <p className="faint">{tr(M.reading)}</p> : isJjViewUnknown(shown.v) ? <Unknown u={shown.v} /> : <OperationPreview project={project} p={shown.v} note={shown.note} onReplace={(v, note) => setPreview({ for: project.path, op: shown.op, v, note })} />)}
+          {shown && (shown.v === null ? <p className="faint">{tr(M.reading)}</p> : isJjViewUnknown(shown.v) ? <Unknown u={shown.v} /> : <OperationPreview project={project} p={shown.v} note={shown.note} onReplace={(v, note) => setPreview((p) => (p && p.for === project.path && p.op === shown.op && p.v !== null ? { for: project.path, op: shown.op, v, note } : p))} />)}
           {rows.length === 0 ? (
             <p className="faint">{tr(M.opNone)}</p>
           ) : (
