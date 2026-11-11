@@ -4,16 +4,23 @@
 // replies are stood in for: each read of the lanes answers only when the test lets it, in any order.
 import { describe, expect, it, vi } from 'vitest'
 
-interface FakeLane {
-  id: string
-  listRev: number
-}
-const state = vi.hoisted(() => ({
-  store: { workspace: { path: 'W' }, lanes: [] as FakeLane[] },
-  main: new Map<string, number>(),
-  edits: [] as { lane: string; rev: number }[],
-  reads: [] as { snapshot: FakeLane[]; answer: () => void }[]
-}))
+const state = vi.hoisted(() => {
+  const s = {
+    store: { workspace: { path: 'W' }, lanes: [] as { id: string; listRev: number }[] },
+    main: new Map<string, number>(),
+    edits: [] as { lane: string; rev: number }[],
+    reads: [] as { snapshot: { id: string; listRev: number }[]; answer: () => void }[],
+    /** Waiting for the nth edit or read to reach main: resolved by the stand-in as it arrives (a condition, never a time). */
+    waiting: [] as { what: 'edits' | 'reads'; n: number; go: () => void }[],
+    /** Wakes those waiting for as many edits or reads as have arrived. */
+    arrived: (): void => {
+      s.waiting = s.waiting.filter((w) => (s[w.what].length >= w.n ? (w.go(), false) : true))
+    }
+  }
+  return s
+})
+/** Until main has had `n` edits, or `n` reads of the lanes. */
+const until = (what: 'edits' | 'reads', n: number): Promise<void> => new Promise((go) => (state[what].length >= n ? go() : state.waiting.push({ what, n, go })))
 
 vi.mock('../src/renderer/src/store', () => ({
   get: () => state.store,
@@ -30,6 +37,7 @@ vi.mock('../src/renderer/src/api', () => ({
   call: (channel: string, arg: { lane: string; rev: number }) => {
     if (channel === 'lanes:edit') {
       state.edits.push({ lane: arg.lane, rev: arg.rev })
+      state.arrived()
       // Main: refused unless it names the lane's revision now; made, its revision up by one.
       if (state.main.get(arg.lane) !== arg.rev) return Promise.reject(new Error('changed meanwhile'))
       const rev = arg.rev + 1
@@ -38,7 +46,10 @@ vi.mock('../src/renderer/src/api', () => ({
     }
     // lanes:list: the lanes as main has them when asked, answered when the test says.
     const snapshot = [...state.main].map(([id, listRev]) => ({ id, listRev }))
-    return new Promise((resolve) => state.reads.push({ snapshot, answer: () => resolve(snapshot) }))
+    return new Promise((resolve) => {
+      state.reads.push({ snapshot, answer: () => resolve(snapshot) })
+      state.arrived()
+    })
   }
 }))
 
@@ -48,7 +59,6 @@ type Outcome = 'made' | 'skipped' | { refused: string }
 const { editLaneInTurn } = (await import(/* @vite-ignore */ laneEditsModule)) as {
   editLaneInTurn: (shown: Record<string, number>, make: (rev: (lane: string) => number) => { edit: unknown; names: { lane: string } } | null) => Promise<Outcome>
 }
-const settle = () => new Promise((r) => setTimeout(r, 0))
 const move = (lane: string, shown: number) => editLaneInTurn({ [lane]: shown }, (rev) => ({ edit: { op: 'move', lane, rev: rev(lane), card: 1, to: 0 }, names: { lane } }))
 
 describe("quick edits of two lanes, in turn (HI-2932, HR1's round 1)", () => {
@@ -59,16 +69,17 @@ describe("quick edits of two lanes, in turn (HI-2932, HR1's round 1)", () => {
     const a = move('A', 0)
     const b = move('B', 0)
     const b2 = move('B', 0)
-    await settle()
-    // A's edit made; its read of the lanes (A1, B0) waits. B's edit isn't asked yet.
+    // A's edit made, and its read of the lanes (A1, B0) has reached main, held. B's edit waits for that read's answer, so
+    // main hasn't had it (round 1's per-lane turns sent it before this read was even asked).
+    await until('reads', 1)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }])
-    expect(state.reads).toHaveLength(1)
     state.reads[0].answer()
-    await settle()
-    // Then B's, on B0, and its read (A1, B1); then B's second, on what B's first left.
+    // Then B's, on B0, and its read (A1, B1), held; B's second waits for it.
+    await until('reads', 2)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }, { lane: 'B', rev: 0 }])
     state.reads[1].answer()
-    await settle()
+    // Then B's second, on what B's first left.
+    await until('reads', 3)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }, { lane: 'B', rev: 0 }, { lane: 'B', rev: 1 }])
     state.reads[2].answer()
     expect(await Promise.all([a, b, b2])).toEqual(['made', 'made', 'made'])
