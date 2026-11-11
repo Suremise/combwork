@@ -18,7 +18,7 @@
 import { execFileSync } from 'child_process'
 import { readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
 import type { Workflow } from '../src/main/workflow/runtime'
@@ -275,6 +275,65 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       } else {
         moved(out)
         expect(w.wf.state(card).started).toMatchObject({ base: Y, target: 'main' })
+      }
+    })
+
+    it("start: the fingerprint unreadable at the write and the read after it (jj's operation heads while an operation lands): gathered again and started (HI-2972)", async () => {
+      const w = await world(colocated)
+      // The first read after beforeWrite (revalidate's) as it is; the next two (the write's, and the decision after it)
+      // unreadable, as `singleHead` is while any jj operation, Combwork's own included, writes its new head before
+      // removing the old one.
+      const real = JjPlatform.prototype.evidence
+      let skip = -1
+      let nulls = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...a: Parameters<JjPlatform['evidence']>) {
+        if (skip > 0) skip--
+        else if (skip === 0 && nulls > 0) {
+          nulls--
+          return null
+        }
+        return real.apply(this, a)
+      })
+      let once = true
+      w.wf.cfg.hooks = {
+        beforeWrite: () => {
+          if (!once) return
+          once = false
+          skip = 1
+          nulls = 2
+        }
+      }
+      try {
+        const card = w.wf.createCard({ title: 'heads mid-update' })
+        moved(await w.wf.start(card.key, B1))
+        expect(nulls).toBe(0)
+        expect(w.wf.state(card).started).toMatchObject({ target: 'main', slot: 'slot-a' })
+      } finally {
+        w.wf.cfg.hooks = undefined
+        spy.mockRestore()
+      }
+    })
+
+    it("start: the fingerprint unreadable when it is gathered (a jj operation landing then: Combwork's own slot made beside it): gathered again and started (HI-2972)", async () => {
+      const w = await world(colocated)
+      // The gather's own reads (its fingerprint, then its answer by content) unreadable; every read after as it is.
+      const real = JjPlatform.prototype.evidence
+      let nulls = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...a: Parameters<JjPlatform['evidence']>) {
+        if (nulls > 0) {
+          nulls--
+          return null
+        }
+        return real.apply(this, a)
+      })
+      try {
+        const card = w.wf.createCard({ title: 'heads mid-update at the gather' })
+        nulls = 2
+        moved(await w.wf.start(card.key, B1))
+        expect(nulls).toBe(0)
+        expect(w.wf.state(card).started).toMatchObject({ target: 'main', slot: 'slot-a' })
+      } finally {
+        spy.mockRestore()
       }
     })
 
