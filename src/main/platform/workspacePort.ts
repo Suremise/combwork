@@ -40,7 +40,7 @@ export interface WorkspaceIdentity {
 
 /** A database a fence's transaction hands its callback (the pool's workspace database, as board_meta's store reads it). */
 export interface FenceDb {
-  prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown }
+  prepare(sql: string): { get(...a: unknown[]): unknown; all(...a: unknown[]): unknown[]; run(...a: unknown[]): unknown }
 }
 
 /** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
@@ -266,6 +266,12 @@ export interface WorkspacePort {
    * compared before every change; null when it can't be read (then nothing is changed).
    */
   identity?(folder: string): Promise<WorkspaceIdentity | null>
+  /**
+   * Forgets, inside the pool's own write (`db`), what the platform keeps about a workspace by its name (HI-2979: jj's
+   * binding pointer and preparation journals): called as a slot's row is deleted, and as a workspace is made under a
+   * name, so a slot removed and made again under the same name never inherits its predecessor's records.
+   */
+  forgetIn?(db: FenceDb, identity: Pick<WorkspaceIdentity, 'store' | 'workspace'>): void
   /**
    * An explicit record of the folder's files (jj: a snapshot, a write), allowed only to the holder of the folder's
    * operation (`fence`), after its writers are proved ended: its changed files then, or unknown (stale, not the
