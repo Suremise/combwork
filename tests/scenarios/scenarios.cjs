@@ -4039,9 +4039,10 @@ module.exports.SCENARIOS = [
       if (!card?.waitingFor || card.waitingFor.ask) throw new Error(`setup: the Assistant's own mark on #${c.cards.a} expected: ${JSON.stringify(card?.waitingFor)}`)
       await c.api('POST', `/v1/tasks/${c.cards.c}/comments`, { text: 'Sandbox run finished: the installer passed. The Windows Sandbox is free.' })
     },
-    // One line, as every prompt here: Codex holds a pasted multi-line prompt as "[Pasted Content]" and never takes it.
+    // One short line, as every prompt here: Codex holds a long or multi-line paste as "[Pasted Content]" and never takes
+    // it. So of the request's line (Combwork's own words, as the Assistant read it) only its waiting part is quoted.
     prompt: (c) =>
-      `Earlier you read this in your inbox: ${c.line.replace(/\s+/g, ' ').trim()} You had Coder wait: you marked ${c.ask.key} waiting ("The Windows Sandbox: after Implementer's run on #${c.cards.c} ends") and acked the request. [CW] #${c.cards.c} (Implementer's card): latest comment by Implementer: "Sandbox run finished: the installer passed. The Windows Sandbox is free." Carry on.`,
+      `Earlier Coder asked you on ${c.ask.key} for the Windows Sandbox, and the request's line in your inbox said: "${(c.line.replace(/\s+/g, ' ').match(/\S+ shows as waiting for your answer.*?comment\./) ?? [''])[0]}" You had Coder wait: you marked ${c.ask.key} waiting ("The Windows Sandbox: after Implementer's run on #${c.cards.c} ends") and acked the request. [CW] #${c.cards.c} (Implementer's card): latest comment by Implementer: "Sandbox run finished: the installer passed. The Windows Sandbox is free." Carry on.`,
     fake: (c) => `cw cw_update_task ${JSON.stringify({ number: c.ask.key, waitingFor: '', comment: 'Go: the Windows Sandbox is yours now.' })}`,
     expect: (o, c) => {
       const clears = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && (argsOf(x).waitingFor === '' || argsOf(x).waitingFor === null))
