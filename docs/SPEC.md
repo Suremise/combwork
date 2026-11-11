@@ -2535,7 +2535,11 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
 - **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
   released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
-  with no port there is kept (`cantCheck`).
+  with no port there is kept (`cantCheck`), its refresh, settle and owed pass leaving it as it is. HI-2936: after a
+  switch, the old platform's slots and copies are never lent again: they don't count toward the pool's size, and the
+  idle tidy removes each once unused for a day (its own port, the removal's guards: unmerged or uncommitted work keeps
+  it); the app registers jj's port while a project's board still holds a jj slot or copy, so a project switched back
+  to Git settles, keeps or removes them by jj.
 - **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
   forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
   worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
