@@ -26,6 +26,30 @@ export interface QueueRow {
   queued: boolean
 }
 
+/**
+ * A lane's revisions this window's own edits took it through, one after another with nothing else between (HI-2932):
+ * from `base` (the revision its first such edit named) to `now` (what its last one left).
+ */
+export interface OwnRun {
+  base: number
+  now: number
+}
+
+/** The run after an edit made here took a lane from `sent` to `after`: the same run when it went on from its end, else a new one. */
+export function ownRunAfter(run: OwnRun | undefined, sent: number, after: number): OwnRun {
+  return run && run.now === sent ? { base: run.base, now: after } : { base: sent, now: after }
+}
+
+/**
+ * The revision an edit asked in turn names (HI-2932): the lane's now (`current`) when that is what the user saw, or when
+ * only this window's own edits came between (`shown` in the run that ends at `current`); else the one shown, which main
+ * refuses as changed meanwhile, as it should: someone else changed the list after the user looked.
+ */
+export function revisionToName(shown: number, current: number, run: OwnRun | undefined): number {
+  if (shown === current) return current
+  return run && run.now === current && shown >= run.base && shown < run.now ? current : shown
+}
+
 /** Whether a lane's card waits its turn: in To do, and not another agent's (only such cards move, HI-2898). */
 export const queuedCard = (c: Pick<LaneCard, 'column' | 'elsewhere'>): boolean => c.column === 'todo' && !c.elsewhere
 

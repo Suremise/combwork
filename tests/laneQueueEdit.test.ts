@@ -1,7 +1,7 @@
 // Progress → Lanes' editable queue (HI-2898): the window's working list, which rows keep their places, and where a
 // nudge or a drop puts a card. Main checks each edit again; this only decides what the window offers.
 import { describe, expect, it } from 'vitest'
-import { droppedPlace, fixedRows, nudgedPlace, queueRows, type QueueLane } from '../src/shared/laneQueueEdit'
+import { droppedPlace, fixedRows, nudgedPlace, ownRunAfter, queueRows, revisionToName, type QueueLane } from '../src/shared/laneQueueEdit'
 import type { LaneCard } from '../src/shared/types'
 
 const lc = (number: number, column: LaneCard['column'], over: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...over })
@@ -47,5 +47,38 @@ describe('fixedRows, nudgedPlace, droppedPlace', () => {
     expect(droppedPlace(free, null, 2)).toBe(1)
     expect(droppedPlace(free, null, null)).toBe(4)
     expect(droppedPlace(free, 99, 2)).toBe(1)
+  })
+})
+
+describe('the revision an edit asked in turn names (HI-2932)', () => {
+  it('two quick edits on the list shown: the second names what the first left', () => {
+    // Both asked on revision 5; the first made here took it to 6.
+    const run = ownRunAfter(undefined, 5, 6)
+    expect(run).toEqual({ base: 5, now: 6 })
+    expect(revisionToName(5, 6, run)).toBe(6)
+    // A third, still on 5: the run goes on unbroken (6 → 7), so it names 7.
+    const on = ownRunAfter(run, 6, 7)
+    expect(on).toEqual({ base: 5, now: 7 })
+    expect(revisionToName(5, 7, on)).toBe(7)
+    expect(revisionToName(6, 7, on)).toBe(7)
+  })
+
+  it("someone else's change between: the one shown, which main refuses as changed meanwhile", () => {
+    const run = ownRunAfter(undefined, 5, 6)
+    // Another window or an agent moved it on to 7 after this window's edit.
+    expect(revisionToName(5, 7, run)).toBe(5)
+    expect(revisionToName(6, 7, run)).toBe(6)
+    // Changed before the user looked at revision 4: never taken for ours.
+    expect(revisionToName(4, 6, run)).toBe(4)
+    // No edit made here: the one shown.
+    expect(revisionToName(5, 6, undefined)).toBe(5)
+    expect(revisionToName(6, 6, undefined)).toBe(6)
+  })
+
+  it('a run broken by another change starts again from the edit that followed it', () => {
+    const run = ownRunAfter({ base: 5, now: 6 }, 8, 9)
+    expect(run).toEqual({ base: 8, now: 9 })
+    expect(revisionToName(6, 9, run)).toBe(6)
+    expect(revisionToName(8, 9, run)).toBe(9)
   })
 })

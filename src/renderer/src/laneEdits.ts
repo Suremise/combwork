@@ -1,7 +1,8 @@
 import { msg, tr } from '@shared/i18n'
+import { ownRunAfter, revisionToName, type OwnRun } from '@shared/laneQueueEdit'
 import type { LaneEdit, LaneEditResult, LaneEditUndo } from '@shared/types'
 import { call, errorMessage } from './api'
-import { cardLabelOf, get, notify, pushToast, setLoaded } from './store'
+import { cardLabelOf, get, notify, pushToast, set } from './store'
 
 /**
  * The window's edits of a running lane's list (HI-2898, Progress → Lanes): each asked of main (`lanes:edit`), which
@@ -32,8 +33,11 @@ export interface EditNames {
   to?: string
 }
 
-/** Asks main for an edit; null when it was made (and said so, with Undo), else main's reason, in the window's language. */
-export async function editLane(e: LaneEdit, names: EditNames): Promise<string | null> {
+/**
+ * Asks main for an edit; null when it was made (and said so, with Undo), else main's reason, in the window's language.
+ * The Lanes tab asks through editLaneInTurn, so an edit names the revision the last one left.
+ */
+async function editLane(e: LaneEdit, names: EditNames): Promise<LaneEditResult | string> {
   let r: LaneEditResult
   try {
     r = await call('lanes:edit', e)
@@ -42,15 +46,64 @@ export async function editLane(e: LaneEdit, names: EditNames): Promise<string | 
   }
   said(r, names)
   await reload()
-  return null
+  return r
+}
+
+/** How an edit asked in turn ended: made, refused (main's reason), or not asked (nothing to do by the time its turn came). */
+export type EditOutcome = 'made' | 'skipped' | { refused: string }
+
+/** Each lane's last edit asked here, in turn (HI-2932): the next one for that lane waits for it. */
+const turns = new Map<string, Promise<unknown>>()
+/** Each lane's revisions this window's own edits went through, nothing else between (ownRunAfter). */
+const own = new Map<string, OwnRun>()
+
+/**
+ * An edit of these lanes' lists in turn (HI-2932): asked once the last one asked here for any of them has been answered
+ * and the lanes read again, and only then made, from the lanes as they are now (`make`: a card's place). `shown`: each
+ * lane's revision as the user saw it when they asked; `rev(lane)` the one to name (revisionToName): the lane's now when
+ * only this window's own edits came between, so two quick moves are two moves, else the one shown, which main refuses
+ * as changed meanwhile. `make` returns null when there is nothing left to do (the lane ended, the card is at the end).
+ */
+export function editLaneInTurn(shown: Readonly<Record<string, number>>, make: (rev: (lane: string) => number) => { edit: LaneEdit; names: EditNames } | null): Promise<EditOutcome> {
+  const lanes = Object.keys(shown)
+  const before = Promise.all(lanes.map((id) => turns.get(id)))
+  const mine = before.then(async (): Promise<EditOutcome> => {
+    const sent = new Map<string, number>()
+    const rev = (lane: string): number => {
+      const current = get().lanes.find((x) => x.id === lane)?.listRev ?? 0
+      const r = revisionToName(shown[lane] ?? current, current, own.get(lane))
+      sent.set(lane, r)
+      return r
+    }
+    const asked = make(rev)
+    if (!asked) return 'skipped'
+    const r = await editLane(asked.edit, asked.names)
+    if (typeof r === 'string') return { refused: r }
+    for (const s of r.lanes) {
+      const from = sent.get(s.lane)
+      if (from !== undefined) own.set(s.lane, ownRunAfter(own.get(s.lane), from, s.rev))
+    }
+    return 'made'
+  })
+  const done = mine.then(
+    () => undefined,
+    () => undefined
+  )
+  for (const id of lanes) turns.set(id, done)
+  void done.then(() => {
+    for (const id of lanes) if (turns.get(id) === done) turns.delete(id)
+  })
+  return mine
 }
 
 /**
  * The lanes read again at once after a change made here: the next edit names the revision its lane has now, not the
- * one the settled lanes-changed event (300 ms later) would bring.
+ * one the settled lanes-changed event (300 ms later) would bring. Set directly, never batched (setLoaded can wait up to
+ * a live batch's 250 ms, HI-2932): the next edit in turn is made from the store as soon as this returns. A direct set
+ * shows what waits first, so an older answer never replaces this one.
  */
 async function reload(): Promise<void> {
-  await call('lanes:list').then((lanes) => setLoaded({ lanes }), () => undefined)
+  await call('lanes:list').then((lanes) => set({ lanes }), () => undefined)
 }
 
 /** The notification of a change made, with its Undo (kept as the last change made here). */
