@@ -19,13 +19,14 @@
 // runner that no longer holds stops at once, writing nothing. A target's worktree is kept while the queue needs it
 // (queueFolderNeeded): a released runner leaves it for the next.
 
+import { queueIntegration } from '../platform/integrationPorts'
 import { type ChildProcess, type SpawnOptions } from 'child_process'
 import { createHash, randomBytes } from 'crypto'
 import { existsSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { access } from 'original-fs/promises'
-import { git, GIT_PREFIX, withoutGitRoute } from '../git'
+import { GIT_PREFIX, withoutGitRoute } from '../git'
 import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
 import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
@@ -809,9 +810,11 @@ export class QueueRunner {
       log.warn(`Not removing ${userText(folder)}: it isn't one of the merge queue's folders`)
       return false
     }
-    const r = await git(this.project, ['worktree', 'remove', '--force', folder])
-    if (!r.ok && existsSync(folder)) await removePath(folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(folder)}`, e))
-    await git(this.project, ['worktree', 'prune'])
+    // The platform's own removal (HI-2791: the port's), then what is left of it, then its record of workspaces tidied.
+    const I = queueIntegration()
+    const removed = await I.removeWorkspace(this.project, folder)
+    if (!removed && existsSync(folder)) await removePath(folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(folder)}`, e))
+    await I.pruneWorkspaces(this.project)
     if (existsSync(folder)) return false
     await locked(this.cfg, () => this.cfg.store.dropQueueFolder(folder))
     return true
@@ -911,17 +914,18 @@ export async function forgetProjectQueues(cfg: Pick<RunnerConfig, 'store' | 'pro
   await releaseQueueRunners((r) => samePlace(r.project, cfg.project))
   const probe = cfg.probe ?? defaultProbe()
   const store = cfg.store
+  const I = queueIntegration()
   for (const f of store.queueFolders()) {
     const holder = store.queueLease(f.target)
     if (holder && f.lease === holder.lease && (await probe.alive(holder.pid, holder.started)) !== false) continue
     if ((f.lease && store.queueProcs(f.lease).length) || !isQueueFolder(cfg.root, f.folder)) continue
     if (existsSync(f.folder)) {
-      const r = await git(cfg.project, ['worktree', 'remove', '--force', f.folder])
-      if (!r.ok && existsSync(f.folder)) await removePath(f.folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(f.folder)}`, e))
+      const removed = await I.removeWorkspace(cfg.project, f.folder)
+      if (!removed && existsSync(f.folder)) await removePath(f.folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(f.folder)}`, e))
     }
     if (!existsSync(f.folder)) await locked(cfg, () => store.dropQueueFolder(f.folder))
   }
-  await git(cfg.project, ['worktree', 'prune'])
+  await I.pruneWorkspaces(cfg.project)
 }
 
 /** Every runner this Combwork holds (the panel's "run by", a workspace closing). */

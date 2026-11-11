@@ -1,5 +1,29 @@
 # Release Notes
 
+## 1.4.0 — 2026-11-11
+
+### Added
+
+- **Start the next version, and branches from anywhere** (HI-2807). Setting up 1.4.0 took a `git branch` in a terminal; now Combwork does it.
+  - **New branch…** (Version Control → Branches & remotes) has **Starts at**: the folder's branch by default, or any branch, tag or commit, with what it points at shown. A branch made elsewhere than the folder's commit doesn't switch the project folder unless you tick **Switch to it now**. Its name is checked as you type, a branch or tag of that name included.
+  - **Start the next version…** (Version Control → Workflow, under **Work merges into**, while that is a version branch such as `1.3.0`): proposes `1.4.0` (editable), then makes it from `1.3.0` as shown, adds `1.3.0` to **Other branches work can merge into** and moves **Work merges into** to `1.4.0`, offering to move the Todo cards and free slots that can follow. Started cards and running lanes stay on `1.3.0`.
+  - **A branch that doesn't exist** can no longer be saved as **Work merges into** or one of the other branches: the field offers to create it from a branch you pick.
+  - **The Assistant** does both with `cw_branch` (`create`, `nextVersion`), once you agree, and can undo them.
+
+### Fixed
+
+- **A card loop's pool reviewers resume after an update** (HI-2909). Combwork resumed the agents that were working or in a card loop after an update, but not the reviewers of a pool, which sit idle between reviews, as a team pause leaves them. So a loop reviewed by the pool waited for a reviewer until someone started one by hand, and the notice didn't name them at all. Now a project's pool reviewers resume with its running pool loops, and so does any agent with a review in hand. The notice names every agent that was running, an idle one as not resumed, with why.
+- **`main` into the next version after a release** (HI-2885). **Bring Up to Date…** on a merge queue's card now offers the repository's default branch (`main`) too, even when it isn't one of the branches the project merges work into, and even when the project merges into only one. It lands as a merge commit through the merge checks even when the next version already has every file of `main`'s, where before it was taken as merged already and nothing was merged.
+- **A connection's model list is its own account's** (HI-2852). Claude Code offers each account its own models, but Combwork asked only the CLI's own home, so every connection listed those: one account's dialog showed Fable 5.1 while its sessions offered Fable 5.2. Now each account is asked in its own folder, and its connections' model and effort lists, their checks and their agents' launches use what that account offers. If an account can't be asked, its last answer is used, else the fallback list, never another account's.
+- **The Assistant sees each connection's own models** (HI-2856). Listing the providers (`cw_list_providers`, `GET /v1/providers`) still gave the CLI's own home's models for every connection, so an agent choosing a connection's model could see Fable 5.1 where that account offers Fable 5.2. Now each connection carries its account's default, and its model list where it differs.
+- **The card dialog's Merges into follows the project's branches** (HI-2830). After **Work merges into** or **Other branches work can merge into** changed (in Version Control → Workflow, or by the Assistant), a card's Merges into still offered the old branches until you switched project or reloaded the window, so a branch just added couldn't be picked. Now the dialog reads them again each time it opens. In 1.2 and 1.3.
+- **The card dialog's Skip review follows the project's rules** (HI-2851). After a project's rules gained or lost a review (in Version Control → Workflow, or by the Assistant), the card dialog still offered Skip review, or didn't, by the old rules until you switched project or reloaded the window. Now it follows them as they change, the dialog open or not, and so does Merges into. In 1.0 to 1.3.
+- **A `/rename` just before Stop survives a quick resume** (HI-2839). A Claude Code session renamed with `/rename` and resumed within seconds of stopping (sooner under load) went back to its older name for good: Combwork read the name from its usage history before that had the end of the transcript, and resumed the session with the older name. Now a resume reads the transcript itself when the history is behind it, and the name you gave in the CLI is kept. In 1.0 to 1.3.
+- **Merges into on a card never started** (HI-2825). Changing the branch a card On Hold merges into, from the card dialog or by the Assistant, was refused as if the card had work, with a message naming an empty branch ("made from ,"), and the rest of the Assistant's change was refused with it. A card On Hold now changes its Merges into as a Todo card does, while its branch has no work of its own, and a refusal always names a branch.
+- **A slot or copy is kept when git can't list worktrees for a moment** (HI-2810). When `git worktree list` failed (an index lock, a busy machine), a free slot or review copy was taken for gone and set up again at its next use, a slot in use was marked gone, and a recreation cut short was given up. Now an unreadable list leaves it as it is, and Combwork looks again next time.
+- **A reviewer told of a design or follow-up to check sees how to answer it** (HI-2808). When a reviewer from the pool was given a card and its builder's follow-up at once, its inbox showed only "2 changes, read the card", and the reviewer often started a review or asked what to do instead of checking the follow-up. The check now leads that inbox line, with how to answer it.
+
+
 ## 1.3.0 — 2026-11-10
 
 ### Added

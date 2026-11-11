@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
-import type { PlatformId } from '@shared/platform/descriptors'
+import { hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
 import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
@@ -24,6 +24,8 @@ import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
 import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
+import { isVersionBranch } from '@shared/nextVersion'
+import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -147,6 +149,9 @@ const T = {
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
+/** What each platform's defaults are for, beside the level's None · Git choice: a platform's own words (HI-2822). */
+const LEVEL_FOR: Record<PlatformId, ReturnType<typeof msg>> = { none: T.levelForNone, git: T.levelForGit }
+
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
 const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
 
@@ -241,7 +246,7 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
             </button>
           ))}
         </div>
-        <span className="s-desc">{tr(platform === 'git' ? T.levelForGit : T.levelForNone)}</span>
+        <span className="s-desc">{tr(LEVEL_FOR[platform])}</span>
       </div>
       <WorkflowEditor source={source} project={null} onDirty={onDirty} />
     </div>
@@ -353,6 +358,28 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   }, [prefill, loaded, source, show, project])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
+  // HI-2807: a Git project's branches newly named as targets that don't exist yet (each offered to be created), and the
+  // branches one can be created from, read again once one is.
+  const gitProject = project && form && merges(form.platform) ? project.path : null
+  const named = useMemo(() => (gitProject && form && effective ? newlyNamed(effective, form.options) : []), [gitProject, form, effective])
+  const namedKey = named.join(' ')
+  const [branchesRead, setBranchesRead] = useState(0)
+  const [missing, setMissing] = useState<{ for: string; names: string[]; branches: string[] } | null>(null)
+  useEffect(() => {
+    if (!gitProject || !namedKey) return setMissing(null)
+    let live = true
+    const t = setTimeout(() => {
+      void Promise.all([call('git:missingBranches', gitProject, namedKey.split(' ')), call('git:startPoints', gitProject)]).then(
+        ([names, points]) => live && setMissing({ for: `${gitProject} ${namedKey}`, names, branches: points.branches }),
+        () => live && setMissing(null)
+      )
+    }, 250)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [gitProject, namedKey, branchesRead])
+  const missingNow = missing && missing.for === `${gitProject} ${namedKey}` ? missing : null
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
   dirtyRef.current = dirty
   useEffect(() => onDirty?.(dirty), [onDirty, dirty])
@@ -519,6 +546,17 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   )
   const controlNote = (key: OptionKey): React.ReactNode => {
     if (key === 'identity') return <div className="s-desc">{form.identity ? tr(T.identity, { name: form.identity.name, email: form.identity.email }) : tr(T.noIdentity)}</div>
+    // HI-2807: a named branch that doesn't exist offers to create itself; a version branch, to start the next version.
+    if ((key === 'target' || key === 'otherTargets') && gitProject) {
+      const here = (missingNow?.names ?? []).filter((b) => (key === 'target' ? b === effective.target : b !== effective.target))
+      const release = form.options.target
+      return (
+        <>
+          <MissingBranches projectPath={gitProject} missing={here} branches={missingNow?.branches ?? []} from={release || ''} created={() => setBranchesRead((n) => n + 1)} />
+          {key === 'target' && isVersionBranch(release) && !source.level && <NextVersionButton from={release} disabled={dirty} onStart={() => void startNextVersion(gitProject, (f) => show(source.key, f))} />}
+        </>
+      )
+    }
     // Agents still on their worktrees from before 1.0 (#1441) finish their current work there first.
     const carried = project?.agents.filter((a) => a.carriedSlot) ?? []
     if (key === 'folder' && effective.folder === 'slots' && carried.length) return <div className="s-desc" data-note="carried">{tr(T.carried, { agents: fmt.list(carried.map((a) => a.name)) })}</div>
@@ -547,7 +585,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     switch (key) {
       case 'review':
         return select('review', [
-          ['none', tr(platform === 'none' ? V.review.noneNone : V.review.none)],
+          ['none', tr(merges(platform) ? V.review.none : V.review.noneNone)],
           ['agent', tr(V.review.agent)],
           ['agentThenYou', tr(V.review.agentThenYou)],
           ['you', tr(V.review.you)]
@@ -645,7 +683,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   // A template's options filled in (HI-1910), while unsaved: its name, and the checks this project can't run yet, from the
   // draft as it is (never the dialog's list: a command added here clears it).
   const filled = fromTemplate?.for === source.key && dirty ? fromTemplate : null
-  const noCommand = filled ? [...new Set([...effective.preChecks, ...(platform === 'git' ? effective.mergeChecks : [])])].filter((n) => !effective.commands[n]?.trim()) : []
+  const noCommand = filled ? [...new Set([...effective.preChecks, ...(merges(platform) ? effective.mergeChecks : [])])].filter((n) => !effective.commands[n]?.trim()) : []
   const choices: Choice[] = [...form.presets.map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
@@ -692,8 +730,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             </button>
           ))}
         </div>
-        {/* Git's presets only: None has no merged result. */}
-        {platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
+        {/* Only where work merges (Git): None has no merged result. */}
+        {merges(platform) && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
         {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
       </section>
       {FORM_GROUPS[platform].map((g) => {
@@ -707,10 +745,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             </section>
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
-            {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
+            {g.id === 'where' && !project && source.level && hasCapability(platform, 'isolation') && <SlotCopyLevel level={source.level} />}
             {/* The GitHub hosts (HI-2779): a Git project's own, and the workspace's default (Combwork's level has none). */}
             {g.id === 'where' && project && <GithubHosts projectPath={project.path} />}
-            {g.id === 'where' && !project && source.level === 'workspace' && platform === 'git' && <GithubHosts projectPath={null} />}
+            {g.id === 'where' && !project && source.level === 'workspace' && hasOperation(platform, 'push') && <GithubHosts projectPath={null} />}
           </Fragment>
         )
       })}
@@ -724,8 +762,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
           saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
-        <Tooltip content={blocked ? tr(T.saveBlocked) : null}>
-          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
+        <Tooltip content={blocked ? tr(T.saveBlocked) : missingNow?.names.length ? missingSaveText(missingNow.names) : null}>
+          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked || !!missingNow?.names.length} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>
@@ -789,7 +827,7 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
 /** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
 export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
   if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-  if (key === 'review') return tr(platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+  if (key === 'review') return tr(!merges(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
   const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
   if (values && typeof v === 'string' && values[v]) return tr(values[v])
   // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
@@ -912,7 +950,7 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
  * which keep their rules until their next card.
  */
 /** HI-2680: what a retarget left where it was, a line each (the toast's text). */
-function retargetSkippedText(r: RetargetResult): string {
+export function retargetSkippedText(r: RetargetResult): string {
   return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? s.lane ?? '', why: s.why })).join('\n')
 }
 
@@ -1022,7 +1060,7 @@ function SaveDetails({ changes, check, picked, retarget, title }: { changes: str
 const LANE_KEEPS = 'lane' // i18n-ignore: a select key
 
 /** HI-2680: the Save… dialog's Retarget: what can follow the new target, what stays and why, and its tick box. */
-function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
+export function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
   const lanes = p.laneMoves ?? []
   const movable = p.cards.move.length + p.slots.move.length + lanes.length
   const laneName = (l: { name: string | null; builder: string }): string => (l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }))

@@ -20,7 +20,7 @@ import { boardWaits } from '../boardStore'
 import { onCombworkEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { coalesced } from '../coalesce'
-import { gitStep } from '../platform/git'
+import { readStep } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { LINE_GATE } from '../../shared/workflow/facts'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -102,7 +102,7 @@ export async function updateLines(ws: WorkspaceService): Promise<void> {
       seen.add(id)
       try {
         // Each lane's look one git step (#1376).
-        const r = await gitStep(() => laneLine(wf, project, id, () => alive() && workflowEnforced(), done))
+        const r = await readStep(() => laneLine(wf, project, id, () => alive() && workflowEnforced(), done))
         if (r === null) {
           if (mine.delete(id)) moved = true
         } else if (mine.get(id) !== r) {

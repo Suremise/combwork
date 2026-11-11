@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
+import { needsRepository } from '@shared/platform/descriptors'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
 import { get, notify, set, showVersionControl, useStore } from '../store'
@@ -114,14 +115,14 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   // The project's workflow form, read once: the header's preset, and "How do you work?" while it asks (#1423).
   const form = useWorkflowForm(project)
   // A None folder with no repository of its own (none, or one around it): Git's page can be shown before it has one.
-  const noRepo = platform === 'none' && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
+  const noRepo = !needsRepository(platform) && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
   // Git's page shown before the repository (HI-1905): this component's alone, never saved, gone with the project or the
   // tab. It stays through an init that stopped part way (a repository with no commit yet) until the project is Git, and
   // ends once the folder has a repository of its own with a commit (made here, the switch then cancelled, or elsewhere):
   // None's page then, with Combwork's offer to switch.
   const [previewFor, setPreviewFor] = useState<string | null>(null)
   const [initError, setInitError] = useState<{ path: string; error: string } | null>(null)
-  const preview = platform === 'none' && previewFor === project.path && (noRepo || (!!s?.isRepo && !s.head))
+  const preview = !needsRepository(platform) && previewFor === project.path && (noRepo || (!!s?.isRepo && !s.head))
   useEffect(() => {
     setPreviewFor(null)
     setInitError(null)
@@ -152,7 +153,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
     if (switched) void loadTemplate(p.path, waiting.entry, waiting.from)
     else notify('warning', tr(M.templateNotApplied, { project: p.name, template: waiting.entry.name }))
   }
-  const status = platform === 'git' && !!s?.isRepo
+  const status = needsRepository(platform) && !!s?.isRepo
   useDetectionCatchUp(project, s)
   const sectionsShown = VC_SECTIONS.filter((x) => shown.includes(x.id))
   const tabsId = useId()

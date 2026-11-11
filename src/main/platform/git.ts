@@ -14,14 +14,10 @@ import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
+import type { CommitInfo, WorktreeNow } from './history'
 
-/** A commit as attribution reads it: its id, author email and `Combwork-Card` trailers. */
-export interface CommitInfo {
-  commit: string
-  email: string
-  cards: string[]
-  subject: string
-}
+// A commit as attribution reads it, and a worktree as worktreeNow reads it: port 3's types (history.ts, HI-2787).
+export type { CommitInfo, WorktreeNow } from './history'
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
 
@@ -381,18 +377,6 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
 
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
-
-/** A worktree as it is now (worktreeNow): its branch (null: detached), head and uncommitted state (dirty's list). */
-export interface WorktreeNow {
-  line: string | null
-  /** Null: no commit yet. */
-  head: string | null
-  dirty: string[]
-  /** The line asked for's head (null: no such line), when one was. */
-  target?: string | null
-  /** The git paths asked for, absolute, in their order. */
-  gitPaths: string[]
-}
 
 /**
  * A worktree's branch, head and uncommitted state, and optionally a line's head and some git paths, in two gits run at

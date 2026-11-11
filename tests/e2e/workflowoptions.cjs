@@ -96,6 +96,8 @@ async function theForm(page, app, inv) {
   lib.gitProject(project, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'web', scripts: { typecheck: 'tsc', lint: 'oxlint', test: 'vitest' } }) })
   // Its own commit identity: G12 shows it (never the machine's global one).
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.invalid']]) lib.git(project, ['config', k, v])
+  // The branch the suite's saves name as Work merges into (HI-2807: a target must exist to be saved).
+  lib.git(project, ['branch', 'release'])
   // As the upgrade leaves a project: today's way of working (Not checked, a reviewer agent: it has one), no preset.
   fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
   const upgraded = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'notChecked', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: false, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }

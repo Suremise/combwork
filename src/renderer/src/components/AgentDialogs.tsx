@@ -16,6 +16,7 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
+import { offered as opOffered, repoOp } from '../repoOps'
 import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -987,6 +988,8 @@ export function MergeDialog() {
 
   if (!target || !project || !agent?.tree) return null
   const close = (): void => set({ mergeFor: null })
+  // Which merge this is (HR3's HI-2788 round 1): an unused worktree's or an agent's, each offered by the one map.
+  const mergeChannel = unused ? 'worktrees:mergeUnused' : 'agents:merge'
   const running = !!agent.live
   // The agent started a task while the dialog was open.
   const blocked = mergeBlocked(agent.name, agent.live?.status, tr)
@@ -1011,8 +1014,8 @@ export function MergeDialog() {
       const removing = cleanup && !running
       const confirmed = lineCard && !queueCard ? { card: lineCard.number } : {}
       const r = unused
-        ? await call('worktrees:mergeUnused', project.path, unused.path, { squash, message, cleanup: removing, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
-        : await call('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+        ? await repoOp('worktrees:mergeUnused', project.path, unused.path, { squash, message, cleanup: removing, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+        : await repoOp('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
       setResult(r)
       if (r.ok) {
         // Where it went: the branch the project folder is on, or the folder itself when git didn't say.
@@ -1060,12 +1063,12 @@ export function MergeDialog() {
           <button className="btn subtle" onClick={close}>
             {result?.conflicts ? tr(msg({ id: 'agents.mergeDialog.close', defaultMessage: 'Close', description: 'Button: closes the Merge dialog after a merge that would conflict.' })) : tr(CANCEL)}
           </button>
-          {!result?.conflicts && queueCard && (
+          {!result?.conflicts && queueCard && opOffered(mergeChannel) && (
             <button className="btn subtle" data-action="merge-anyway" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge(true)}>
               {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
             </button>
           )}
-          {!result?.conflicts && (
+          {!result?.conflicts && opOffered(mergeChannel) && (
             <Tooltip content={queueCard ? tr(QUEUE_MERGES, { card: queueCard.key }) : lookup.state === 'pending' ? tr(QUEUE_LOOKUP) : lookup.state === 'failed' ? tr(QUEUE_LOOKUP_FAILED, { why: lookup.error ?? '' }) : null}>
               {/* While Combwork merges the card (or that isn't known yet), Merge is plainly off, Merge anyway the action (the Assistant's #1357 review); its reason on hover. */}
               <button className={cx('btn', queueCard || lookup.state !== 'done' ? 'merge-held' : 'primary')} data-action="merge" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken || !!queueCard || lookup.state !== 'done'} onClick={() => void merge()}>

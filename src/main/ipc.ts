@@ -34,15 +34,11 @@ import { emit, emitTo, onCombworkEvent } from './events'
 import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
-import { gitDiff, gitStatus } from './git'
-import { compareBranches, compareDiff, compareLines } from './gitCompare'
-import { initCheck, initRepo } from './gitInit'
-import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, leftoverInfo, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
 import { combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
-import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
+import { lineCard, lineConfirmed } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
 import { cleanCombwork, cleanWorkspace } from '../shared/commands'
@@ -148,6 +144,11 @@ import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from '
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
+import { lineRepoReads } from './platform/repoReadsPorts'
+import { checkRepoTools } from './platform/repoPorts'
+import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
+import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -507,6 +508,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   }
 
   const impl: Impl = {
+    // The repository mutations (HI-2788): each through the operations port, gated by its operation.
+    ...repoOpHandlers,
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
@@ -1026,6 +1029,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
+    'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
+    'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    'workflow:startNextVersion': (p, a) => startNextVersion(workspace, workspace.assertProject(p), { name: String(a?.name ?? ''), ...(branchStartArg(a?.from) ? { from: branchStartArg(a?.from)! } : {}), ...(a?.base ? { base: a.base } : {}) }),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
@@ -1302,6 +1308,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'agents:branchStatuses': () => branchWatch.statuses(),
     'agents:merge': async (p, id, opts) => {
       const path = workspace.assertProject(p)
+      refuseUnoffered('agents:merge')
       const branch = legacyWorktree(agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id))?.branch
       return authorizedMerge(path, branch, opts, () => projectAgents.merge(p, id, opts))
     },
@@ -1309,20 +1316,22 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'worktrees:unusedBranchStatus': (p, path) => unusedBranchStatus(p, path),
     'worktrees:mergeUnused': async (p, path, opts) => {
       const project = workspace.assertProject(p)
+      refuseUnoffered('worktrees:mergeUnused')
       const r = await authorizedMerge(project, await unusedBranchOf(project, path), opts, () => mergeUnused(p, path, opts))
       if (r.cleanedUp) storage.forgetStorage(p)
       return r
     },
     'worktrees:removalPreview': (p, path) => removalPreview(p, path),
-    'worktrees:mergeBranches': (p) => mergeBranches(p),
-    'worktrees:branchMergeStatus': (p, branch, target) => branchMergeStatus(p, branch, target),
+    // The Merge dialog's reads, through the repository reads port (HI-2785).
+    'worktrees:mergeBranches': (p) => lineRepoReads().mergeLines(p),
+    'worktrees:branchMergeStatus': (p, branch, target) => lineRepoReads().lineMergeStatus(p, branch, target),
     'worktrees:branchCards': async (p, branch) => {
       const path = workspace.assertProject(p)
       return { queue: await branchQueueCard(workspace, path, branch), line: await lineCard(path, branch) }
     },
     'worktrees:mergeBranch': async (p, branch, opts) => {
       const path = workspace.assertProject(p)
-      return authorizedMerge(path, branch, opts, () => mergeBranch(path, branch, { target: opts.target, squash: opts.squash, message: opts.message }))
+      return authorizedMerge(path, branch, opts, () => opsAt('worktrees:mergeBranch').mergeLine(path, branch, { target: opts.target, squash: opts.squash, message: opts.message }))
     },
     'worktrees:removeUnused': async (p, path, opts) => {
       const r = await removeUnusedWorktree(p, path, opts ?? {})
@@ -1353,9 +1362,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
     'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
-    'files:gitExclude': (p, items, target, ext) => filesGit.gitExclude(p, items, target, ext === true),
-    'files:gitUntrack': (p, items) => filesGit.gitUntrack(p, items),
-    'files:gitInclude': (p, items) => filesGit.gitInclude(p, items),
     'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),
@@ -1755,20 +1761,22 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
 
     // An unused worktree too (#400): read only, as the Changes tab opens it.
-    'git:status': (root, base) => gitStatus(workspace.assertChangesRoot(root), base),
-    'git:diff': (root, f, base) => gitDiff(workspace.assertChangesRoot(root), f, base),
+    'git:status': (root, base) => lineRepoReads().changes(workspace.assertChangesRoot(root), base),
+    'git:diff': (root, f, base) => lineRepoReads().changeDiff(workspace.assertChangesRoot(root), f, base),
     'git:compareLines': async (p) => {
       p = workspace.assertProject(p)
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
       const slots = (await boardSlots(p)).map((s) => ({ name: s.name, folder: s.folder, card: s.open?.card ?? null, agent: s.open?.agent ?? null, target: s.target ?? null }))
-      return compareLines(p, await workTargetOf(p), slots)
+      const reads = lineRepoReads()
+      return reads.compareLines(p, await reads.workTarget(p), slots)
     },
     'git:leftovers': async (p) => {
       p = workspace.assertProject(p)
-      return leftoverInfo(p, await workTargetOf(p))
+      const reads = lineRepoReads()
+      return reads.leftovers(p, await reads.workTarget(p))
     },
-    'git:compare': (p, base, head, page, pinBase, pinHead) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
-    'git:compareDiff': (p, base, head, f, pinned) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
+    'git:compare': (p, base, head, page, pinBase, pinHead) => lineRepoReads().compare(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
+    'git:compareDiff': (p, base, head, f, pinned) => lineRepoReads().compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
     // The file of the diff shown (#495): in the folder the Changes tab shows, which may be an unused worktree outside the
     // workspace that file IPC (guardFile) doesn't reach; inside it by its real location too, so a link can't lead out.
     'changes:openFile': (root, f) => {
@@ -1779,48 +1787,37 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'git:tool': (recheck) => (recheck ? checkGit() : gitTool()),
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
-    'git:summary': (p) => repoSummary(workspace.assertProject(p)),
+    // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
+    'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
-      const info = await repoInfo(p, await workTargetOf(p))
+      const reads = lineRepoReads()
+      const info = await reads.info(p, await reads.workTarget(p))
       // Combwork's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
       return { ...info, worktrees: info.worktrees.map((w) => {
         const combwork = combworkWorktreeOf(p, w.path)
         return combwork ? { ...w, combwork } : w
       }) }
     },
-    'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
-    'git:deleteRemoteBranches': (p, remote, items) => deleteRemoteBranches(p, String(remote ?? ''), Array.isArray(items) ? items : []),
-    'git:branchDrops': (p, name) => branchDrops(p, String(name ?? '')),
+    'git:branchDrops': (p, name) => lineRepoReads().lineDrops(p, String(name ?? '')),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
-      return repoHistory(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await workTargetOf(p) })
+      const reads = lineRepoReads()
+      return reads.history(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await reads.workTarget(p) })
     },
-    'git:switch': (p, branch) => switchBranch(p, String(branch ?? '')),
-    // Update from <target> (HI-1180): what it would do, for its dialog, and the update itself.
-    'git:updatePlan': (p, branch) => branchUpdatePlan(p, String(branch ?? '')),
-    'git:updateBranch': (p, branch, how) => updateBranch(p, String(branch ?? ''), how === 'rebase' ? 'rebase' : 'merge'),
-    'git:createBranch': (p, name, stay) => createBranch(p, String(name ?? ''), !!stay),
-    'git:addRemote': (p, name, url) => addRemote(p, String(name ?? ''), String(url ?? '')),
-    'git:setRemoteUrl': (p, name, url) => setRemoteUrl(p, String(name ?? ''), String(url ?? '')),
-    'git:fetch': (p) => fetchAll(p),
-    'git:pull': (p) => pull(p),
-    'git:push': (p, remote) => push(p, remote ? String(remote) : undefined),
-    'git:pushTo': (p, remote, scope, branch) => pushToRemote(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
-    'git:remoteTracking': (p, remote) => remoteTracking(p, String(remote ?? '')),
-    'git:removeRemote': (p, name, expected) => removeRemote(p, String(name ?? ''), Array.isArray(expected) ? expected.map(String) : undefined),
-    'git:renameRemote': (p, from, to) => renameRemote(p, String(from ?? ''), String(to ?? '')),
-    'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
-    'git:createTag': (p, name, message, pushTo) => createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),
-    'git:setIdentity': (p, name, email) => setIdentity(p, String(name ?? ''), String(email ?? '')),
-    'git:initCheck': (p) => initCheck(p),
-    'git:init': (p, opts) => initRepo(p, opts && typeof opts === 'object' ? opts : { gitignore: 'none' }),
+    // Update from <target> (HI-1180): what it would do, for its dialog (the update itself is repoOpsIpc.ts').
+    'git:updatePlan': (p, branch) => lineRepoReads().updatePlan(p, String(branch ?? '')),
+    'git:checkBranchName': (p, name) => lineRepoReads().checkLineName(p, String(name ?? '')),
+    'git:resolveStart': (p, ref) => lineRepoReads().resolveStart(p, String(ref ?? '')),
+    'git:startPoints': (p) => lineRepoReads().startPoints(p),
+    'git:missingBranches': (p, names) => lineRepoReads().missingLines(p, names),
+    'git:remoteTracking': (p, remote) => lineRepoReads().remoteTracking(p, String(remote ?? '')),
 
     'provider:info': () => providerService.shown(),
     'provider:refresh': async (id) => {
       // Provider Setup's Check again looks at git too (#346), on the PATH a new process would get (#472).
       await refreshPath()
-      await Promise.all([providerService.refresh(id, true), checkGit()])
+      await Promise.all([providerService.refresh(id, true), checkRepoTools()])
       return providerService.shown()
     },
     'provider:task': async (id, task, host) => {

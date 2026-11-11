@@ -30,13 +30,15 @@ import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
-import { git, gitErrorLine } from './git'
 import { agentMsg, inDefaultDialect, say, sayWithId, type AgentMsg, type AgentValues, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
-import { copyIgnored, listWorktrees } from './worktrees'
+import { slotWorkspaces } from './platform/workspacePorts'
 
 const log = createLogger('copies')
+
+/** The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5). */
+const port = slotWorkspaces
 
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
@@ -574,7 +576,16 @@ export class CopyPool {
       }
       const opts = await this.deps.options()
       let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
-      if (!made && !(await this.listed(copy.folder))) {
+      const listed = made ? true : await this.listed(copy.folder)
+      // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
+      if (listed === null) {
+        await this.store.fenced(name, token, (db) => {
+          this.store.dropIn(db, lease.id, 'cantList')
+          this.store.setIn(db, name, copy.state, {}, { op: null })
+        })
+        return 'skip'
+      }
+      if (!listed) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
           this.store.setIn(db, name, 'creating', { warmError: sayStored(T.notListed) }, { op: null })
@@ -594,16 +605,14 @@ export class CopyPool {
       await this.store.fenced(name, token, () => undefined)
       if (made) {
         await mkdir(this.deps.dir, { recursive: true })
-        await git(this.deps.project, ['worktree', 'prune'])
-        const r = await git(this.deps.project, ['worktree', 'add', '--detach', copy.folder, lease.revision])
-        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: gitErrorLine(r.err) || 'failed' }))
-        if (opts.copy.trim()) await copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
+        await port().prune(this.deps.project)
+        const r = await port().create(this.deps.project, copy.folder, lease.revision)
+        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: port().errorLine(r.err) || 'failed' }))
+        if (opts.copy.trim()) await port().copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
       } else {
         // The exact revision, and nothing else: tracked changes dropped, what isn't ignored removed (dependencies stay).
-        const co = await git(copy.folder, ['checkout', '--detach', '--force', lease.revision])
-        if (!co.ok) return await fail(sayStored(T.checkout, { error: gitErrorLine(co.err) || 'failed' }))
-        const cl = await git(copy.folder, ['clean', '-fd'])
-        if (!cl.ok) return await fail(sayStored(T.clean, { error: gitErrorLine(cl.err) || 'failed' }))
+        const at = await port().resetTo(copy.folder, lease.revision)
+        if (!at.ok) return await fail(sayStored(at.failed === 'checkout' ? T.checkout : T.clean, { error: port().errorLine(at.err) || 'failed' }))
       }
       const hash = await lockHash(copy.folder)
       const needed = made || (hash !== null && hash !== copy.installHash)
@@ -630,9 +639,10 @@ export class CopyPool {
     }
   }
 
-  private async listed(folder: string): Promise<boolean> {
-    const l = await listWorktrees(this.deps.project).catch(() => null)
-    return !l || l.some((w) => samePlace(w.path, folder))
+  /** Whether git lists a worktree at `folder`; null when its listing fails (HI-2810, #734: unknown, never an empty one). */
+  private async listed(folder: string): Promise<boolean | null> {
+    const l = await port().list(this.deps.project).catch(() => null)
+    return l ? l.some((w) => samePlace(w.path, folder)) : null
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */
@@ -811,9 +821,9 @@ export class CopyPool {
           if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: sayStored(T.heldProcess) })
           await this.store.fenced(name, token, () => undefined)
           // A copy holds nobody's work (detached at a revision): its build outputs go with it.
-          const r = await git(this.deps.project, ['worktree', 'remove', '--force', c.folder])
+          const r = await port().remove(this.deps.project, c.folder, { force: true })
           if (!r.ok) return await keep({ why: 'busy' as const })
-        } else await git(this.deps.project, ['worktree', 'prune'])
+        } else await port().prune(this.deps.project)
         await this.store.fenced(name, token, (db) => db.prepare('DELETE FROM copies WHERE project = ? AND name = ?').run(this.store.project, name))
         log.info(`Removed copy ${userText(name)} (${userText(c.folder)})`)
         return null

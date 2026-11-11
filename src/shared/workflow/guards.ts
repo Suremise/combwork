@@ -11,6 +11,7 @@ import { choiceStands, type FocusedChoice } from './focused'
 import type { GuardId } from './pieces'
 import type { RefusalValues, RuleId } from './refusals'
 import type { StoredText } from '../types'
+import { PLATFORMS, type PlatformId, type Remedies } from '../platform/descriptors'
 
 export interface UnknownAnswer {
   unknown: true
@@ -74,8 +75,15 @@ const short = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 'â€
  * submit.trailer's refusal (HI-2562: also the submit's with nothing of its own): card `key`'s commit names no card. The
  * amend that fixes it only when it is the folder's head: one other commits follow isn't amended, as that rewrites them.
  */
-export function trailerRefusal(key: string, u: { commit: string; head: boolean }): GuardRefusal {
-  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: `git commit --amend --no-edit --trailer "Combwork-Card: ${key}"` } } // i18n-ignore: a git command and select keys, as typed
+export function trailerRefusal(platform: PlatformId, key: string, u: { commit: string; head: boolean }): GuardRefusal {
+  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: remedies(platform).trailer(key) } } // i18n-ignore: select keys, as typed
+}
+
+/** The platform's remedies (HI-2792): a guard that gives one is only in the rulesets of a platform with commits to fix. */
+function remedies(platform: PlatformId): Remedies {
+  const r = PLATFORMS[platform].remedies
+  if (!r) throw new Error(`No remedies for ${platform}`) // i18n-ignore: an internal error, for the log
+  return r
 }
 
 export function okBeforeApplies(r: Ruleset, labels: string[]): boolean {
@@ -150,7 +158,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     const u = i.untrailered
     if (u === undefined || u === null) return null
     if (isUnknownAnswer(u)) return unknownRefusal(i, 'submit.trailer', u)
-    return trailerRefusal(i.card.key, u)
+    return trailerRefusal(i.ruleset.options.platform, i.card.key, u)
   },
   // G20 (HI-1367): a pick that failed or said "every test" stands only with the builder's own list (`tests`).
   'submit.focusedChosen': (i) => (!i.focused || choiceStands(i.focused) ? null : { rule: 'submit.focusedChosen', values: { card: i.card.key, revision: short(i.revision), state: i.focused.state, why: i.focused.why ?? 'none' } }), // i18n-ignore: codes (a why, a check name), never shown as text
@@ -166,8 +174,9 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     const b = i.badIdentity
     if (b === undefined || b === null) return null
     if (isUnknownAnswer(b)) return unknownRefusal(i, 'submit.identity', b)
-    if (b === 'missing') return { rule: 'submit.identity', values: { card: i.card.key, missing: 'yes', commit: '', email: '', command: 'git config user.email' } } // i18n-ignore: a select key and a git command, as typed
-    return { rule: 'submit.identity', values: { card: i.card.key, missing: 'no', commit: short(b.commit), email: b.email, command: 'git commit --amend --no-edit --reset-author' } } // i18n-ignore: a select key and a git command, as typed
+    const fix = remedies(i.ruleset.options.platform)
+    if (b === 'missing') return { rule: 'submit.identity', values: { card: i.card.key, missing: 'yes', commit: '', email: '', command: fix.setIdentity } } // i18n-ignore: a select key, as typed
+    return { rule: 'submit.identity', values: { card: i.card.key, missing: 'no', commit: short(b.commit), email: b.email, command: fix.resetAuthor } } // i18n-ignore: a select key, as typed
   },
   'submit.ownRunsStopped': (i) => (i.runsGoing?.length ? { rule: 'submit.ownRunsStopped', values: { card: i.card.key, runs: i.runsGoing.join(', ') } } : null),
   'submit.decisionsReceived': (i) => (i.agent !== null && (i.state.received[i.agent] ?? 0) < i.state.generation ? { rule: 'submit.decisionsReceived', values: { card: i.card.key } } : null),

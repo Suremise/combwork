@@ -10,23 +10,24 @@
 // whose cause Combwork can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
 // first, and paused again, saying so, when it still holds.
 
+import { queueIntegration } from '../platform/integrationPorts'
 import { app } from 'electron'
 import { CombworkError } from '../combworkError'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
-import { branchExists, projectTargets } from './targets'
+import { merges } from '../../shared/platform/descriptors'
+import { branchExists, forwardSources, projectTargets } from './targets'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
 import { onCombworkEvent } from '../events'
-import { git } from '../git'
 import type { TaskActor } from '../tasks'
 import type { TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
-import * as G from '../platform/git'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
@@ -127,7 +128,9 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
-  if (window && targets.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, targets)
+  // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
+  const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
+  if (sources.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, sources)
   return views
 }
 
@@ -140,9 +143,9 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
   return out
 }
 
-/** A target's forward merges (HI-2679): the project's other targets, and how far behind each it is. */
-async function forwardOfTarget(projectPath: string, to: string, targets: readonly string[]): Promise<QueueForward> {
-  const others = targets.filter((b) => b !== to)
+/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources), and how far behind each it is. */
+async function forwardOfTarget(projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
+  const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
   for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
   return { others, behind }
@@ -157,14 +160,13 @@ const BEHIND_KEPT = 64
  * kept by both heads (a git process only when either moved); null when a head can't be read.
  */
 export async function commitsBehind(projectPath: string, from: string, to: string): Promise<number | null> {
-  const [a, b] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  const [a, b] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   if (!a || !b || isUnknown(a) || isUnknown(b)) return null
   const key = [projectPath.toLowerCase(), a, b].join('\n') // i18n-ignore: a key, never shown
   const had = behindKept.get(key)
   if (had !== undefined) return had
-  const r = await git(projectPath, ['rev-list', '--count', '--first-parent', `${b}..${a}`])
-  const n = r.ok ? Number(r.out.trim()) : NaN
-  if (!Number.isInteger(n)) return null
+  const n = await lineHistory().countFirstParents(projectPath, b, a)
+  if (n === null) return null
   behindKept.set(key, n)
   while (behindKept.size > BEHIND_KEPT) behindKept.delete(behindKept.keys().next().value!)
   return n
@@ -183,13 +185,13 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
     if (!s.started || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
     const t = s.started.target
-    if (o.platform !== 'git' || o.finish !== 'combworkMerges' || !t) continue
+    if (!merges(o.platform) || o.finish !== 'combworkMerges' || !t) continue
     inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
   }
   const o = wf.currentRuleset(false).options
   let current: string | null = null
-  if (o.platform === 'git' && o.finish === 'combworkMerges') {
-    const def = o.target ? o.target : await G.defaultBranch(projectPath).catch(() => null)
+  if (merges(o.platform) && o.finish === 'combworkMerges') {
+    const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
   return { inFlight, current }
@@ -237,7 +239,7 @@ export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): 
   const pending = new Set(pushPendingOf(wf.store.meta(pushPendingKey(target))).map((p) => p.entry))
   const settled = new Map(pushLogOf(wf.store.meta(pushLogKey(target))).map((p) => [p.entry, p.state]))
   const o = wf.cfg.options()
-  const pushesNow = o.platform === 'git' && o.finish === 'combworkMerges' && o.pushTarget === true
+  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
   return recent.map((r) => {
     const took = r.entry ? entryTook(of(r.card), r.entry) : null
     const push: QueueRecent['push'] = r.outcome !== 'merged' || r.by !== 'combwork' || !r.entry ? undefined : pending.has(r.entry) ? 'pending' : (settled.get(r.entry) ?? (pushesNow ? 'unknown' : undefined))
@@ -392,7 +394,7 @@ export async function branchQueueCard(ws: WorkspaceService, projectPath: string,
     const s = wf.state(card)
     if (!s.started || s.started.line !== branch || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
-    if (o.platform !== 'git' || o.finish !== 'combworkMerges') continue
+    if (!merges(o.platform) || o.finish !== 'combworkMerges') continue
     const target = s.entries.at(-1)?.target ?? s.started.target ?? ''
     const v = target ? queueView(ws, wf, projectPath, target) : null
     const at = v?.queued.findIndex((q) => q.card === card.id) ?? -1
@@ -433,7 +435,7 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
     const rec = wf?.store.cards().find((c) => c.id === n)
     const f = rec ? wf!.state(rec).forward : null
     if (!f) continue
-    const head = await G.lineHead(p.path, f.from)
+    const head = await lineHistory().lineHead(p.path, f.from)
     return head && !isUnknown(head) ? { source: head } : null
   }
   return null
@@ -450,7 +452,7 @@ const FORWARD_TEXT = {
   description: msg({ id: 'service.forward.description', defaultMessage: 'Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.', description: 'HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there.' }),
   byUser: msg({ id: 'service.forward.byUser', defaultMessage: 'you', description: 'HI-2679: who asked for a forward merge, in its card’s description: the user.' }),
   byAssistant: msg({ id: 'service.forward.byAssistant', defaultMessage: 'the Assistant', description: 'HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant.' }),
-  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} and {to} must be two different branches this project merges work into: {targets}.', description: 'HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.' }),
+  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.', description: 'HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.' }),
   missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
   raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
@@ -458,7 +460,8 @@ const FORWARD_TEXT = {
 
 /**
  * Brings `to` up to date with `from` (HI-2679, SPEC §16.9): a forward merge, the user's or the Assistant's alone (`actor`;
- * the Assistant's guard checked again inside each write). Both must be the project's existing targets, and different.
+ * the Assistant's guard checked again inside each write). `to` must be one of the project's existing targets, `from` another
+ * of them or the repository's default branch (HI-2885: main into the next version, after a release).
  * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
  * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
  */
@@ -468,13 +471,15 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   const wf = await workflowFor(ws, projectPath)
   if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
   const all = [t.default, ...t.others]
-  if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
+  // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
+  const sources = await forwardSources(ws, projectPath, all)
+  if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
-  const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
-  const contained = await G.isAncestor(projectPath, source as string, dest as string)
+  const contained = await lineHistory().isAncestor(projectPath, source as string, dest as string)
   if (contained === true) return { upToDate: true, from, to }
-  const base = await G.mergeBase(projectPath, source as string, dest as string)
+  const base = await lineHistory().mergeBase(projectPath, source as string, dest as string)
   const { cardBatch, readTask, createTask, runIntent } = await import('../tasks')
   const by = actor.kind === 'assistant' ? 'assistant' : 'user'
   // One board change (HR3's round 1): the open card for the pair looked for, the caller's authority checked, the card made
@@ -529,18 +534,9 @@ async function stillPaused(ws: WorkspaceService, wf: Workflow, projectPath: stri
       return (await ws.projectConfig(projectPath).catch(() => null))?.workflow?.mergeAsk && !wf.store.meta(MERGE_CHOICE_KEY) ? {} : null
     case 'wrongBranch':
     case 'staged':
-    case 'unstagedChanges': {
-      const where = await G.checkouts(projectPath)
-      if (isUnknown(where)) return {}
-      const folder = where[target]
-      if (!folder) return null
-      if (p.reason === 'wrongBranch') return (await G.branch(folder)) === target ? null : {}
-      if (p.reason === 'staged') return (await git(folder, ['diff', '--cached', '--quiet'])).code === 0 ? null : {}
-      if (!p.files?.length) return null
-      const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...p.files])
-      const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-      return !st.ok || busy.length ? { files: busy.length ? busy : p.files } : null
-    }
+    case 'unstagedChanges':
+      // The checked-out target's condition read again (HI-2791: the port's).
+      return queueIntegration().pausedCondition(projectPath, target, p.reason, p.files)
     case 'needsYou': {
       // An earlier runner's process or folder (#1360): the next runner settles it again, and pauses again if it can't.
       if (!p.card) return (p.pid && processAlive(p.pid)) || (p.files?.[0] && existsSync(p.files[0])) ? {} : null

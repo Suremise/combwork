@@ -45,10 +45,11 @@ import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
 import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
-import { git } from './git'
 import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
-import * as G from './platform/git'
+import { lineHistory } from './platform/historyPorts'
+import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
@@ -66,13 +67,15 @@ import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
-import { listWorktreesOrNull } from './worktrees'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
 import { briefOf } from './laneBriefs'
 
 const log = createLogger('slots')
+
+/** The workspace lifecycle port slots are inspected and changed with (SPEC §16.3.6 Port 2, HI-2786's R4). */
+const port = (): WorkspacePort => slotWorkspaces()
 
 /** What a placement's delivery is made from: its identity is the card's cycle and lease, so it is made once. */
 const PLACEMENT = 'slot-placement'
@@ -322,8 +325,8 @@ async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: S
   let checkout: Checkout | null
   if (resumed) checkout = await leavable(projectPath, slot.folder, slot.target)
   else {
-    const d = await G.dirty(slot.folder)
-    checkout = isUnknown(d) || d.length ? null : G.headSync(slot.folder)
+    const d = await port().dirty(slot.folder)
+    checkout = isUnknown(d) || d.length ? null : port().checkout(slot.folder)
   }
   if (!checkout) return 'kept'
   const was = checkout
@@ -573,7 +576,7 @@ async function endLeftCarriedNow(ws: WorkspaceService, projectPath: string, pool
 }
 
 /** A slot's checkout as a handover or a retirement decided on it (headSync's): its line (null: detached) and commit. */
-type Checkout = NonNullable<ReturnType<typeof G.headSync>>
+type Checkout = WorkspaceCheckout
 
 /**
  * A builder's own slot a start or a lane can take over (#1441): its carried lease (its adopted worktree, or a slot its
@@ -592,7 +595,7 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
     return checkout ? { carried, slot, checkout } : null
   }
   if (!(await cleanAndContained(projectPath, slot.folder, target))) return null
-  return { carried, slot, checkout: G.headSync(slot.folder) }
+  return { carried, slot, checkout: port().checkout(slot.folder) }
 }
 
 /**
@@ -602,9 +605,9 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
  * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
  */
 async function leavable(projectPath: string, folder: string, target: string | null): Promise<Checkout | null> {
-  const d = await G.dirty(folder)
+  const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return null
-  const checkout = G.headSync(folder)
+  const checkout = port().checkout(folder)
   if (!checkout) return null
   if (checkout.line) return checkout
   return (await cleanAndContained(projectPath, folder, target)) ? checkout : null
@@ -612,7 +615,7 @@ async function leavable(projectPath: string, folder: string, target: string | nu
 
 /** Whether a slot's checkout is still the one decided on (read again from its ref files; unknown: no). */
 function sameCheckout(folder: string, was: Checkout): boolean {
-  const now = G.headSync(folder)
+  const now = port().checkout(folder)
   return !!now && now.line === was.line && now.head === was.head
 }
 
@@ -696,15 +699,15 @@ async function takeWritten(ws: WorkspaceService, projectPath: string, pool: Slot
 
 /** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
 async function cleanAndContained(projectPath: string, folder: string, target: string | null): Promise<boolean> {
-  const d = await G.dirty(folder)
+  const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return false
-  const head = await G.head(folder)
-  const t = target ?? (await G.defaultBranch(projectPath))
+  const head = await port().head(folder)
+  const t = target ?? (await port().defaultLine(projectPath))
   if (isUnknown(head) || isUnknown(t) || !t) return false
-  const th = await G.lineHead(projectPath, t)
+  const th = await port().lineHead(projectPath, t)
   if (isUnknown(th) || !th) return false
   if (head === th) return true
-  const inIt = await G.isAncestor(projectPath, head, th)
+  const inIt = await lineHistory().isAncestor(projectPath, head, th)
   return !isUnknown(inIt) && inIt
 }
 
@@ -1049,7 +1052,7 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
         if (asked() && own()) await wf.closeSlotDirty(card, finish)
         return
       }
-      const h = await G.heads(now.folder, target)
+      const h = await port().heads(now.folder, target)
       if (isUnknown(h.line)) return
       offLine.delete(key)
       if (refs) {
@@ -1061,7 +1064,7 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
         if (asked()) await wf.closeSlotDirty(card, finish)
         return
       }
-      const d = await G.dirty(now.folder)
+      const d = await port().dirty(now.folder)
       if (isUnknown(d) || !own()) return
       if (d.length) {
         // Asked only of the slot as it was read, after git's reads too (HI-2170): still the lease's, free, in the pool's
@@ -1075,7 +1078,7 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
       if (now.open && !isUnknown(h.target) && h.target) {
         const at = slotNow()
         if (!own() || !at || at.busy) return
-        const r = await git(now.folder, ['switch', '--detach', h.target])
+        const r = await port().detach(now.folder, h.target)
         if (!r.ok) return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
         log.info(`${userText(now.name)} detached at ${userText(target)} after #${n}${lane ? ` (lane ${userText(lane)})` : ''}`)
         detached = true
@@ -1682,12 +1685,12 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
     projectPath,
     async () => {
       if (!allowed()) return false
-      const head = await G.lineHead(projectPath, line)
+      const head = await port().lineHead(projectPath, line)
       if (isUnknown(head) || !head) return false
       const inTarget = await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null })
       if (isUnknown(inTarget) || !inTarget) return false
-      const before = await listWorktreesOrNull(projectPath).catch(() => null)
-      if (!before || before.some((w) => w.branch === line) || !allowed()) return false
+      const before = await port().list(projectPath).catch(() => null)
+      if (!before || before.some((w) => w.line === line) || !allowed()) return false
       // The intent, durably, before anything is removed: from here a crash is settled by the next pass.
       const intent: FactData['LineDeleting'] = { line, revision: head }
       const meant = await wf.write(card, null, 'combwork', (w) => {
@@ -1697,7 +1700,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
         return true
       })
       if (!meant) return false
-      const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${line}`, head])
+      const r = await port().dropLine(projectPath, line, head)
       if (r.ok) await crashAt('inDeletion')
       return settleDeletion(projectPath, wf, card, n, intent)
     },
@@ -1713,7 +1716,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
  * be read, leave the intent for the next pass: nothing is claimed kept that isn't.
  */
 async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecord, n: number, d: FactData['LineDeleting']): Promise<boolean> {
-  const head = await G.lineHead(projectPath, d.line)
+  const head = await port().lineHead(projectPath, d.line)
   if (isUnknown(head)) return false
   if (head) {
     await wf.write(card, null, 'combwork', (w) => {
@@ -1721,12 +1724,12 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
     })
     return false
   }
-  const trees = await listWorktreesOrNull(projectPath).catch(() => null)
+  const trees = await port().list(projectPath).catch(() => null)
   if (!trees) return false
-  if (trees.some((w) => w.branch === d.line)) {
+  if (trees.some((w) => w.line === d.line)) {
     // Checked out as it went (another Combwork, a terminal): put back at the head the intent recorded, and checked.
-    const r = await git(projectPath, ['update-ref', `refs/heads/${d.line}`, d.revision, ''])
-    const back = await G.lineHead(projectPath, d.line)
+    const r = await port().restoreLine(projectPath, d.line, d.revision)
+    const back = await port().lineHead(projectPath, d.line)
     if (!r.ok || isUnknown(back) || back !== d.revision) {
       log.warn(`${userText(d.line)} is checked out but its branch couldn't be put back at ${d.revision.slice(0, 7)}: tried again at the next pass`)
       return false

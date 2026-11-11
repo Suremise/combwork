@@ -5,7 +5,7 @@ import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as 
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
-import { infoAt, modelCaps, modelIdName, serverModelLabel } from '@shared/models'
+import { accountInfo, infoAt, modelCaps, modelIdName, serverModelLabel } from '@shared/models'
 import { signInHostLine } from '../signInHost'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { launchedName } from '@shared/connectionLabel'
@@ -26,6 +26,7 @@ import * as actions from '../actions'
 import { freshShort, freshTip } from '../freshResume'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call } from '../api'
+import { offered } from '../repoOps'
 import { templateList, templatesStillHere } from '../templateList'
 import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
@@ -500,7 +501,7 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
       ? // Its branch under Review Changes (the pane's header showed it as a mark before #977).
         [
           { label: tr(msg({ id: 'panes.menu.reviewChanges', defaultMessage: 'Review Changes', description: "Menu item (a worktree agent's menu): shows its changes in the Git tab." })), icon: 'git-compare', detail: own.branch, onClick: () => reviewChanges(project, a) },
-          { label: tr(MERGE), icon: 'git-merge', disabled: !!blocked, detail: blocked ?? (unmerged?.badge ? unmerged.text : undefined), onClick: () => set({ mergeFor: { project: project.path, agentId: a.id } }) },
+          ...(offered('agents:merge') ? [{ label: tr(MERGE), icon: 'git-merge', disabled: !!blocked, detail: blocked ?? (unmerged?.badge ? unmerged.text : undefined), onClick: () => set({ mergeFor: { project: project.path, agentId: a.id } }) }] : []),
           { separator: true },
           { label: tr(REMOVE_AGENT), icon: 'close', action: 'remove' as const, onClick: () => void actions.removeAgent(project.path, a.id) },
           { label: tr(msg({ id: 'panes.menu.discard', defaultMessage: 'Discard Worktree and Branch…', description: "Menu item (a worktree agent's menu): removes the agent and deletes its worktree and branch (asks first)." })), icon: 'trash', danger: true, onClick: () => void actions.discardAgent(project.path, a.id) }
@@ -1575,7 +1576,10 @@ export function PaneFooter({
   const chose = footerChoices(a, live)
   // The models of the GitHub host its project resolves to (HI-2779), for a CLI signing in on one; else the CLI's catalogue.
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const pinfo = infoAt(providers[provider], { projectPath: project.path, workspacePath })
+  // A running session's on its launch's sign-in account: that account's own models and default (HI-2852).
+  const launchedOn = live?.launchedConnection
+  const hostInfo = infoAt(providers[provider], { projectPath: project.path, workspacePath })
+  const pinfo = launchedOn ? accountInfo(hostInfo, { id: launchedOn.id, kind: launchedOn.server ? 'server' : 'signIn' }) : hostInfo
   const shown = agentModelShown(provider, chose.model, chose.modelGlobal, pinfo, live ? live.modelId || usage?.model || null : null)
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server

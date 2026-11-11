@@ -3677,6 +3677,18 @@ p.hint {
   display: block;
   margin-block-end: 4px;
 }
+/* HI-2807: New branch… and Start the next version: a field's label set apart from the field above it, the boxes wide enough for a branch name. */
+.new-branch-form .dialog-field-label + .input,
+.next-version-form .dialog-field-label + .input {
+  width: min(100%, 320px);
+}
+.new-branch-form .s-desc + .dialog-field-label,
+.new-branch-form .input + .dialog-field-label {
+  margin-block-start: 10px;
+}
+.next-version-steps {
+  margin: 10px 0 6px;
+}
 .dialog-footer {
   display: flex;
   justify-content: flex-end;

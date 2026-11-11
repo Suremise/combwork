@@ -10,7 +10,7 @@
 
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'original-fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'original-fs'
 import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
@@ -25,28 +25,28 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
-import * as G from '../platform/git'
+import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
+import type { HistoryPort } from '../platform/history'
 import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedComment, returnedWake } from './queueState'
-import { readConflicts } from './conflictRead'
 import { mergeMessage, updateMessage } from './mergeMessage'
-
-/**
- * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
- * lines, as git C-quotes a name with other than ASCII (café.txt) in its line form, and the reader would look for that.
- */
-const namesOf = (out: string | undefined): string[] => (out ?? '').split('\0').filter(Boolean)
+import { again, isAgain } from '../platform/again'
+import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, QueueGitResult } from '../platform/integration'
+import { integrationFor, queueIntegration } from '../platform/integrationPorts'
+// Git's commit reading (HI-2790: moved to the platform with the candidate steps), named here for its tests.
+export { commitFailed, readCommitStream, type CommitChild, type CommitStream } from '../platform/gitCommits'
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { CW_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
 import type { RunCheck } from '../../shared/types'
-import { shellLine, type QueueCommand, type QueueFileSide, type QueueStep, type QueueStuck } from '../../shared/workflow/queue'
+import type { QueueStep, QueueStuck } from '../../shared/workflow/queue'
 import { agentMsg, say } from '../../shared/agentText'
 
 /** A focused-test run's results Combwork couldn't read, as its check's output (HI-2463: Combwork's name). */
@@ -181,30 +181,8 @@ export interface QueueConfig {
 export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback' | 'beforeRetry'
 export type QueueHooks = Partial<Record<QueueHook, (entry: string) => void | Promise<void>>>
 
-/** How the queue runs a git command that may run the repository's hooks or sign (#1350): its environment and bound. */
-export interface QueueGitOptions {
-  env?: NodeJS.ProcessEnv
-  /** Ends the command's whole tree (git, its hooks, its signer) once it has run this long. */
-  timeoutMs?: number
-}
-
-export interface QueueGitResult {
-  ok: boolean
-  out: string
-  err: string
-  code: number
-  /** Ended at its bound (QueueGitOptions.timeoutMs). */
-  timedOut?: boolean
-  /** Its stderr as far as it had come when the bound ended it: what was running then. */
-  errAtTimeout?: string
-  /** HI-2020: git never started (Node's code for why): nothing ran, so nothing to classify; the entry goes round again. */
-  notRun?: string
-  /**
-   * HI-2042: git was ended by a signal (its name), code -1: what it did is unknown, so nothing to classify (no conflict,
-   * no hook); put back, and the entry goes round again, as for notRun.
-   */
-  signal?: string
-}
+// How the queue runs a command, and what it answered: the integration port's types (platform/integration.ts, HI-2790).
+export type { QueueGitOptions, QueueGitResult } from '../platform/integration'
 
 export type QueueOutcome =
   | { card: string; entry: string; outcome: 'integrated'; result: string; retests: number }
@@ -289,21 +267,13 @@ export function pushOwedOf(value: string | null): PushOwed | null {
  * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
  * fast-forward moves the target forward (#1184); a squash into the card's own target is a squash; else a merge commit.
  */
+/** An entry's begun advance into a checked-out target, as the port's recovery reads it (its journal's last phase). */
+const begun = (e: QueueEntry): BegunAdvance => ({ target: e.target, expected: e.started!.expected, result: e.started!.result, files: e.started!.files ?? [], folder: e.started!.checkedOut!, phase: e.phases.at(-1) ?? 'started' })
+
 function methodOf(style: FactData['IntegrationRequested']['style'], cardTarget: string | null | undefined, target: string): 'merge' | 'squash' | 'fastForward' {
   if (style === 'rebase') return 'fastForward'
   return cardTarget === target && style === 'squash' ? 'squash' : 'merge'
 }
-
-/** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
-const PUSH_MS = 5 * 60_000
-
-/** A push never waits on a prompt nobody sees: no terminal prompt, no askpass, a credential manager kept non-interactive. */
-function pushEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
-}
-
-/** git's words when a remote refuses a push that isn't a fast-forward (the Git view's test). */
-const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 
 /** What an entry's steps read of the repository's config once (#1386): the identity Combwork commits as, and signing. */
 /** What a pass of an entry reads once (HI-2019: made afresh for each pass, so a pass that goes round again reads again). */
@@ -314,24 +284,6 @@ interface EntryReads {
 
 /** What an advance came to (advanceRef, advanceCheckedOut); `again` only before anything was touched. */
 type Advance = 'done' | 'moved' | 'denied' | 'held' | 'waiting' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
-
-/** The state a checked-out target's begun advance is found in (§16.9.2's recovery table), and what it calls for. */
-type Found = 'integrated' | 'residue' | 'rerun' | 'swap' | 'rollback' | 'requeue' | 'stuck'
-
-/** git's status in porcelain v1 with -z: the paths with a change in the working copy or index, both sides of a rename. */
-function statusPaths(out: string): string[] {
-  const t = out.split('\0')
-  const paths: string[] = []
-  for (let i = 0; i < t.length; i++) {
-    if (t[i].length < 4) continue
-    paths.push(t[i].slice(3))
-    // A rename or copy: its source follows as a token of its own.
-    if (t[i][0] === 'R' || t[i][0] === 'C') paths.push(t[++i] ?? '')
-  }
-  return paths.filter(Boolean)
-}
-
-const nulList = (out: string): string[] => out.split('\0').filter(Boolean)
 
 /** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
 /**
@@ -372,171 +324,6 @@ function advanceApprovedIn(s: CardState, entry: string, expected: string, result
 
 /** The longest a signed merge commit runs when the config gives none (Advanced `cw.queue.signSeconds`'s default). */
 const SIGN_TIMEOUT_MS = 60_000
-
-/**
- * A signer's messages that say it would wait for someone (a passphrase, a pinentry, a terminal): read only once git's
- * trace says the signer is what failed, never to tell a signer from a hook.
- */
-const SIGN_WAITS = /passphrase|pinentry|inappropriate ioctl|cannot open \/dev\/tty|no tty|tty.*not available/i
-
-/** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit (used only with no trace to read). */
-const MERGE_HOOK_STOPPED = /^Not committing merge;/m
-
-/** A child git ran for a commit, as its trace names it, with the text it wrote: a hook, the signer, or another (git's own). */
-export interface CommitChild {
-  kind: 'hook' | 'signer' | 'other'
-  /** A hook's name (`commit-msg`). */
-  name?: string
-  /** Its exit code; none while it ran (the stream ended, or was cut, first). */
-  code?: number
-  text: string
-  /**
-   * git's own text once it had exited, until the next child starts (HI-2399): where a newer git (Git for Windows 2.56) reprints the signer's
-   * text, which it captured (`error: gpg failed to sign the data:` and gpg's lines; ssh-keygen's as `error: …`).
-   */
-  after: string
-}
-
-/**
- * A commit's stderr read with git's own trace in it (#1350: `GIT_TRACE2_EVENT=2`, trace2's events on git's stderr, in
- * the order things happened): each piece of text given to the source that wrote it. A child's text comes after its
- * `child_start` and before its `child_exit` (a hook writes before it exits; git writes `child_exit` once it has waited
- * for it); text while no child of the top git runs is git's own. `traced`: the top git's events were there (an old
- * git writes none). `open`: the child running where the stream ends.
- */
-export interface CommitStream {
-  traced: boolean
-  children: CommitChild[]
-  open: CommitChild | null
-  git: string
-  /** All the text, every source's, in order, without the events: what a message shows. */
-  text: string
-}
-
-/** A trace2 event: a complete JSON record with the fields its kind needs; anything else is text, whatever it looks like. */
-type TraceEvent = { event: string; sid: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
-
-function traceEvent(s: string): TraceEvent | null {
-  let v: unknown
-  try {
-    v = JSON.parse(s)
-  } catch {
-    return null
-  }
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
-  const e = v as Record<string, unknown>
-  if (typeof e.event !== 'string' || typeof e.sid !== 'string' || typeof e.time !== 'string') return null
-  if (e.event === 'child_start' && (typeof e.child_id !== 'number' || !Array.isArray(e.argv) || !e.argv.every((a) => typeof a === 'string'))) return null
-  if (e.event === 'child_exit' && (typeof e.child_id !== 'number' || typeof e.code !== 'number')) return null
-  return e as TraceEvent
-}
-
-/**
- * A line split into its text and the trace event ending it: an event begins at a `{"event":"` and runs to the line's
- * end, so text with no newline before it (a hook's last line) stays text. The first place a valid record starts wins;
- * an event-looking fragment that isn't one is text.
- */
-function splitTraceLine(line: string): { text: string; ev: TraceEvent | null } {
-  const body = line.endsWith('\r') ? line.slice(0, -1) : line
-  for (let i = body.indexOf('{"event":"'); i >= 0; i = body.indexOf('{"event":"', i + 1)) {
-    const ev = traceEvent(body.slice(i))
-    if (ev) return { text: body.slice(0, i), ev }
-  }
-  return { text: line, ev: null }
-}
-
-/** Reads a commit's stderr (git's trace in it) into who wrote what (CommitStream). */
-export function readCommitStream(err: string): CommitStream {
-  const children: CommitChild[] = []
-  const byId = new Map<number, CommitChild>()
-  let open: CommitChild | null = null
-  // The child that exited last, while no other has started since: git's text then is also its `after`.
-  let last: CommitChild | null = null
-  let top: string | null = null
-  let own = ''
-  let text = ''
-  const add = (t: string): void => {
-    if (!t) return
-    text += t
-    if (open) open.text += t
-    else {
-      own += t
-      if (last) last.after += t
-    }
-  }
-  // The top git's session starts with its `version` event (trace2's first) and has no parent's prefix; a git a hook runs
-  // is `<parent>/<own>`. Only their records are events: any other record (a hook's own structured log, #1397) is text.
-  const ours = (ev: TraceEvent): boolean => (top === null ? ev.event === 'version' && !ev.sid.includes('/') : ev.sid === top || ev.sid.startsWith(`${top}/`))
-  const lines = err.split('\n')
-  lines.forEach((line, i) => {
-    const nl = i < lines.length - 1 ? '\n' : ''
-    const { text: t, ev } = splitTraceLine(line)
-    if (!ev || !ours(ev)) return add(line + nl)
-    // Text cut by an event (no newline of its own) keeps a line of its own.
-    add(t ? `${t}\n` : '')
-    // A descendant's events are only dropped from the text, never a source.
-    top ??= ev.sid
-    if (ev.sid !== top || ev.child_id === undefined) return
-    if (ev.event === 'child_start') {
-      const argv = ev.argv ?? []
-      const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
-      const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '', after: '' }
-      children.push(c)
-      byId.set(ev.child_id, c)
-      open = c
-      last = null
-    } else if (ev.event === 'child_exit') {
-      const c = byId.get(ev.child_id)
-      if (c) c.code = ev.code
-      if (open === c) {
-        open = null
-        last = c ?? null
-      }
-    }
-  })
-  return { traced: top !== null, children, open, git: own, text }
-}
-
-const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?.trim()).filter(Boolean).join('\n')
-
-/**
- * Why Combwork's merge, or a squash's commit, failed (#1350), from the source of each piece of what it said (its stream,
- * readCommitStream), never from words in another's (a hook that passed saying "passphrase" changes nothing):
- * - ended at the bound: always a pause, decided by what was running when it was ended (`cut`, its stream until then;
- *   ending it may make a hook exit non-zero, which is never its rejection): a hook → `hookTimedOut`; the signer, or
- *   nothing known in a repository that signs → `signingWaits`; else `needsYou`;
- * - a hook that exited non-zero → returned (`hook`) with its own text, then git's;
- * - the signer exiting non-zero → `signingWaits` when its own text says it needs a passphrase, a pinentry or a
- *   terminal, else `signing`, with its text and git's. Its own text is what it wrote while it ran (Git for Windows
- *   2.45 lets it write to stderr) and git's text right after it exited, before any other child (HI-2399: 2.56 captures it and
- *   reprints it then, `error: gpg failed to sign the data:` and gpg's lines); a hook's text is never either;
- * - anything else (an index lock, a broken repository) → `needsYou` with git's own lines, never a return.
- * With no trace (an old git), only git's own "Not committing merge" is a hook. A message never has an event in it.
- */
-export function commitFailed(r: QueueGitResult, signs: boolean): { fail: 'hook'; log: string } | { pause: PauseReason; message?: string } {
-  const s = readCommitStream(r.err)
-  const all = joined(r.out, s.text)
-  if (r.timedOut) {
-    const running = readCommitStream(r.errAtTimeout ?? r.err).open
-    if (running?.kind === 'hook') return { pause: 'hookTimedOut', message: all }
-    return { pause: running?.kind === 'signer' || signs ? 'signingWaits' : 'needsYou', message: all }
-  }
-  if (!s.traced) return MERGE_HOOK_STOPPED.test(all) ? { fail: 'hook', log: all } : { pause: 'needsYou', message: all }
-  const hook = s.children.find((c) => c.kind === 'hook' && c.code !== undefined && c.code !== 0)
-  if (hook) return { fail: 'hook', log: joined(hook.text, s.git, r.out) }
-  const signer = s.children.find((c) => c.kind === 'signer' && c.code !== undefined && c.code !== 0)
-  if (signer) return { pause: SIGN_WAITS.test(signer.text) || SIGN_WAITS.test(signer.after) ? 'signingWaits' : 'signing', message: joined(signer.text, s.git) }
-  return { pause: 'needsYou', message: joined(r.out, s.git) }
-}
-
-/**
- * The environment of Combwork's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
- * asks for a passphrase, and a credential manager stays non-interactive; a pinentry window is ended by the bound.
- */
-function commitEnv(): NodeJS.ProcessEnv {
-  // GIT_TRACE2_EVENT=2: git's trace2 events on its own stderr, in order with what its hooks and signer write there.
-  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never', GIT_TRACE2_EVENT: '2' }
-}
 
 /**
  * git as Combwork runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
@@ -603,31 +390,10 @@ const READ_RETRY_MS = 250
 const CONFIRM_TRIES = 3
 const CONFIRM_RETRY_MS = 100
 
-/**
- * HI-2019: a git read that failed before anything was touched (no `IntegrationStarted`, no pause written): the entry
- * goes round again, a fresh pass. `message` is what git said, for the pause once the budget is spent.
- */
-interface Again {
-  again: { message?: string }
-}
-const again = (message?: string): Again => ({ again: message?.trim() ? { message: message.trim() } : {} })
-const isAgain = (v: unknown): v is Again => !!v && typeof v === 'object' && 'again' in v
 /** An unknown's own words for the pause: what git said, else what couldn't be read. */
 const gitSaid = (u: Unknown): string => u.detail ?? u.what
-/**
- * HI-2054: a `git config --get` as git answered it: its value, '' when git says the key isn't set (its own exit 1), or
- * `{ failed }` with git's words for a read git couldn't make (as src/main/platform/git's identity, HI-2019). A git that
- * never started, was ended by a signal or by its bound is never an answer, whatever its code or partial output.
- */
-const configRead = (r: QueueGitResult): string | { failed: string } => {
-  const answered = !r.timedOut && !r.notRun && !r.signal
-  if (answered && r.ok) return r.out.trim()
-  if (answered && r.code === 1) return ''
-  return { failed: r.err.trim() || `git exited with code ${r.code}` } // i18n-ignore: git's side of a pause's message, in English as git's are
-}
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
 
 /** A runner that lost its lease stops at once: no outcome (another Combwork's runner carries on). */
 const lostIsNull = (e: unknown): null => {
@@ -759,7 +525,7 @@ export class MergeQueue {
   /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
   private pushes(): boolean {
     const o = this.wf.cfg.options()
-    return o.platform === 'git' && o.finish === 'combworkMerges' && o.pushTarget === true
+    return merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
   }
 
   /** The message of Combwork's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
@@ -802,7 +568,7 @@ export class MergeQueue {
     const at = new Date().toISOString()
     const out: PushSettled[] = []
     for (const p of pending) {
-      const has = p.result === head ? true : await G.isAncestor(this.project, p.result, head)
+      const has = p.result === head ? true : await queueIntegration().contains(this.project, p.result, head)
       if (!isUnknown(has)) out.push({ entry: p.entry, state: has ? 'pushed' : 'reset', at })
     }
     return out
@@ -833,19 +599,21 @@ export class MergeQueue {
     // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
     // own words (`pushUnreadable`, a message the window translates: HR2's round 2), so no later merge goes ahead of it;
     // Resume reads again.
-    const head = await G.lineHead(this.project, target)
+    const I = queueIntegration()
+    const h = this.host({})
+    const head = await I.targetHead(this.project, target)
     if (isUnknown(head)) return this.pausePush(target, owed, 'pushUnreadable')
-    const has = head ? await G.isAncestor(this.project, owed.result, head) : false
+    const has = head ? await I.contains(this.project, owed.result, head) : false
     if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
     if (!has) {
       // Nothing is pushed: the merges the target no longer has are settled as reset; one it still has stays pending,
       // for the next push to settle (never taken for pushed on the local target alone).
       const gone: PushPending[] = []
-      for (const p of pending) if (!head || (await G.isAncestor(this.project, p.result, head)) === false) gone.push(p)
+      for (const p of pending) if (!head || (await I.contains(this.project, p.result, head)) === false) gone.push(p)
       await this.clearOwed(target, owed.result, this.notPushed(gone, 'reset'))
       return null
     }
-    const dest = await this.pushDest(target)
+    const dest = await I.pushDest(h, target)
     // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
     if (!this.pushes()) {
       await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
@@ -856,33 +624,12 @@ export class MergeQueue {
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
     // The head read above, by its commit (HI-1924): what was pushed is exactly what the settled merges are checked against.
     const pushed = head as string
-    const r = await this.git(this.project, ['push', '--', dest.remote, `${pushed}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
-    if (r.ok) {
+    const r = await I.push(h, dest, pushed)
+    if (r === 'pushed') {
       await this.clearOwed(target, owed.result, await this.pushedBy(pending, pushed))
       return null
     }
-    const said = `${r.err}\n${r.out}`.trim()
-    return this.pausePush(target, owed, !r.timedOut && PUSH_REJECTED.test(said) ? 'pushRejected' : 'pushFailed', said)
-  }
-
-  /**
-   * Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin.
-   * HI-2054: a read git couldn't make is 'unreadable', never "nowhere to push" (nor a guessed ref).
-   */
-  private async pushDest(target: string): Promise<{ remote: string; ref: string } | null | 'unreadable'> {
-    const get = async (key: string) => configRead(await this.git(this.project, ['config', '--get', key]))
-    const remote = await get(`branch.${target}.remote`)
-    if (typeof remote !== 'string') return 'unreadable'
-    if (remote && remote !== '.') {
-      const merge = await get(`branch.${target}.merge`)
-      if (typeof merge !== 'string') return 'unreadable'
-      return { remote, ref: merge.startsWith('refs/heads/') ? merge : `refs/heads/${target}` }
-    }
-    const list = await this.git(this.project, ['remote'])
-    if (!list.ok) return 'unreadable'
-    const remotes = list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
-    const only = remotes.length === 1 ? remotes[0] : remotes.includes('origin') ? 'origin' : null
-    return only ? { remote: only, ref: `refs/heads/${target}` } : null
+    return 'rejected' in r ? this.pausePush(target, owed, 'pushRejected', r.rejected) : this.pausePush(target, owed, 'pushFailed', r.failed)
   }
 
   /** Pauses the target's queue for its owed push (never in place of a pause saved meanwhile), naming the merged card. */
@@ -981,7 +728,7 @@ export class MergeQueue {
    */
   private async process(card: CardRecord, entry: QueueEntry, ready?: { expected: string; result: string }): Promise<QueueOutcome> {
     try {
-      return await G.gitStep(() => this.steps(card, entry, ready))
+      return await readStep(() => this.steps(card, entry, ready))
     } finally {
       this.cfg.onStep?.(null)
     }
@@ -1033,15 +780,18 @@ export class MergeQueue {
       } else {
         step('testMerge', null)
         const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
-        const head = await G.lineHeadAndTree(this.project, target)
+        const head = await this.history(card, s).lineHeadAndTree(this.project, target)
         if (isUnknown(head)) {
           const o = await readFailed(again(gitSaid(head)))
           if (o) return o
           continue
         }
         if (!head) return this.pause(target, card, entry, 'needsYou')
-        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
-        const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read. A forward
+        // merge (HI-2885) only when its source is in the target's history: one whose files the target already has (main
+        // after a release, into the next version) still lands as a merge commit.
+        const there = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        const found = s.forward && !isUnknown(there) && there && there.method !== 'merge' && there.method !== 'fastForward' ? null : there
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
@@ -1060,7 +810,7 @@ export class MergeQueue {
         let updated: string | undefined
         // Rebase and fast-forward (#1184) puts the change on top of the target in the test merge itself: no update first.
         if (this.wf.rulesetOf(card, s).options.strict && this.wf.rulesetOf(card, s).options.style !== 'rebase') {
-          const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected, reads)
+          const up = await this.upToDate(card, s, entry, revision, base || (await this.integration(card, s).mergeBase(this.host(reads), revision, expected)), expected, reads)
           if (isAgain(up)) {
             const o = await readFailed(up)
             if (o) return o
@@ -1111,7 +861,7 @@ export class MergeQueue {
       const blocked = this.wf.queueWaitingOn(card.id)
       if (blocked.length) return this.waiting(card, entry, blocked)
       step('advance', expected)
-      const now = await G.lineHead(this.project, target)
+      const now = await this.integration(card, s).targetHead(this.project, target)
       if (isUnknown(now) || now !== expected) {
         // The target moved since the test: tested again against the new head; never an untested advance.
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
@@ -1120,7 +870,7 @@ export class MergeQueue {
       // Workflow rules turned off meanwhile: no advance begins (an entry already begun finishes: recover). Decided again
       // in the write of `IntegrationStarted` (startAdvance), after the wait for the lock.
       if (this.cfg.enforced && !this.cfg.enforced()) return this.pause(target, card, entry, 'rulesOff')
-      const where = await G.checkouts(this.project)
+      const where = await this.integration(card, s).checkouts(this.host(reads))
       if (isUnknown(where)) {
         const o = await readFailed(again(gitSaid(where)))
         if (o) return o
@@ -1217,249 +967,61 @@ export class MergeQueue {
    * copy that goes stale): null when git says it isn't set, unknown when git couldn't read it (HI-2019).
    */
   private async identity(reads: EntryReads): Promise<Maybe<{ name: string; email: string } | null>> {
-    return reads.identity ??= G.identity(this.project)
+    return reads.identity ??= lineHistory().identity(this.project)
+  }
+
+  /** The history port of the card's platform (port 3, HI-2792): the queue's step reads ask it. */
+  private history(card: CardRecord, s?: CardState): HistoryPort {
+    return historyFor(this.wf.rulesetOf(card, s).options.platform)
+  }
+
+  /** The integration port of the card's platform (port 4's candidate half, HI-2790): the queue's steps call it. */
+  private integration(card: CardRecord, s: CardState): IntegrationPort {
+    return integrationFor(this.wf.rulesetOf(card, s).options.platform)
+  }
+
+  /** What a candidate's step is given of the queue: the repository, its own worktree, its runner and this round's reads. */
+  private host(reads: EntryReads): CandidateHost {
+    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads }
   }
 
   /**
-   * Whether the repository signs commits, as git reads it in the queue's folder. HI-2054: a read git couldn't make is
-   * `again` with git's words (the round's reads are new each time round, so it is read again), never "unsigned".
+   * Strict, G8 (§16.9.1 step 3, #1352): the reviewed revision brought up to date with the target in the queue's own
+   * worktree (the port's `update`: the target merged in, or with merge style Squash rebased onto it), the same change or
+   * the card goes back. The same: recorded (`Updated`, carried), and the entry's test merge merges it.
    */
-  private signs(reads: EntryReads, f: string): Promise<boolean | Again> {
-    return (reads.signs ??= this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
-      const v = configRead(r)
-      return typeof v === 'string' ? v === 'true' : again(v.failed)
-    }))
-  }
-
-  /**
-   * The test merge (§16.9.1 step 4), committed as Combwork's commits are (#1350): with the project's identity (else paused
-   * `identity`, naming the folder), the repository's hooks run (one that fails returns the card), signed as the
-   * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
-   * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
-   */
-  /** Where two revisions' histories meet ('' when git can't say: an update then fails as git refuses it). */
-  private async mergeBaseOf(a: string, b: string): Promise<string> {
-    const r = await this.git(this.project, ['merge-base', a, b])
-    return r.ok ? r.out.trim() : ''
-  }
-
-  /**
-   * The queue's own worktree, made or reused, detached and clean at `at`. Reused (forced to `at`, cleaned) only when this
-   * repository's worktree list names it (HI-2019: never because a folder is there); made when it is neither there nor
-   * listed, or there and empty. A git that failed (the listing, the add, the checkout, which may have done part of its
-   * work) is `again`: the next pass looks afresh. Nothing is ever removed or pruned: a folder there but not listed with
-   * something in it, or listed but gone, is left as it is and pauses, named.
-   */
-  private async folderAt(at: string): Promise<Again | { pause: PauseReason; files?: string[]; message?: string } | null> {
-    const f = this.cfg.folder
-    const list = await this.git(this.project, ['worktree', 'list', '--porcelain'])
-    if (!list.ok) return again(list.err)
-    const key = (p: string): string => resolve(p).toLowerCase()
-    const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
-    const there = existsSync(f)
-    if (listed && there) {
-      const co = await this.git(f, ['checkout', '--detach', '-f', at])
-      if (!co.ok) return again(co.err)
-      await this.git(f, ['clean', '-fdq'])
-      return null
-    }
-    if (listed) return { pause: 'needsYou', files: [f], message: `The queue's worktree ${f} is registered with git but isn't there: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
-    const empty = (): boolean => {
-      try {
-        return readdirSync(f).length === 0
-      } catch {
-        return false // a file, or unreadable: never taken for an empty folder
-      }
-    }
-    if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
-    const add = await this.git(this.project, ['worktree', 'add', '--detach', f, at])
-    return add.ok ? null : again(add.err)
-  }
-
-  /**
-   * Strict, G8 (§16.9.1 step 3, #1352): a reviewed revision that doesn't contain the target's head is brought up to date
-   * in the queue's own worktree only, never on the card's line (the builder's branch, in its worktree): the target merged
-   * into it, or, with merge style Squash, it rebased onto the target, as Combwork's commits are made (#1350: the project's
-   * identity, the repository's hooks and signing, never a prompt). The result is the same change (§16.3.2's replay:
-   * `sameChange`) or the card goes back to its builder: a conflict with the files, or a different change, both
-   * `notUpToDate`. The same: kept on `refs/cw/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
-   * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
-   * after the target moved updates afresh, never on an earlier update.
-   */
-  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<Again | { updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
-    const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
-    if (anc.code === 0) return { updated: null }
-    if (anc.code !== 1) return again(anc.err)
-    const id = await this.identity(reads)
-    if (isUnknown(id)) return again(gitSaid(id))
-    if (!id) return { pause: 'identity', files: [this.project] }
-    const at = await this.folderAt(revision)
-    if (at) return at
-    const f = this.cfg.folder
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<Again | { updated: string | null } | CandidateFail | CandidatePause> {
     const rebase = this.wf.rulesetOf(card, s).options.style === 'squash'
-    const signs = await this.signs(reads, f)
-    // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
-    if (isAgain(signs)) return signs
-    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
-    const target = entry.target
-    const message = updateMessage(this.commitMessage(), target, card.key, revision)
-    // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
-    // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
-    // Overridden for this command only; the repository's config is left as it is.
-    const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
-    // HI-2020: git never started (nothing ran), or HI-2042 a signal ended it (what it did unknown): the worktree put back as
-    // after any failure, and the entry goes round again.
-    if (u.notRun || u.signal) {
-      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
-      await this.folderAt(expected)
-      return again(u.err)
-    }
-    if (!u.ok) {
-      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
-      const files = namesOf(c?.out)
-      // Its hunks read before the abort (HI-1181): a merge of the target into the card's revision writes the card first.
-      const conflicts = files.length ? await readConflicts(f, files, rebase ? 'target' : 'card') : undefined
-      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
-      await this.folderAt(expected)
-      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
-      return commitFailed(u, signs)
-    }
-    const h = await G.head(f)
-    if (isUnknown(h)) return again(gitSaid(h))
-    // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
-    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: h }))) {
-      return { fail: 'notSame', log: `${card.key}: ${revision.slice(0, 7)} brought up to date with ${target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
-    }
-    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(entry.id)}`, h])
+    // Read by the port just before its command, as the options are then (G19), never when the step began.
+    const message = (): string => updateMessage(this.commitMessage(), entry.target, card.key, revision)
+    const up = await this.integration(card, s).update(this.host(reads), { card: card.key, revision, base, key: s.latest?.key, target: entry.target, expected, entry: entry.id, how: rebase ? 'rebase' : 'merge', message })
+    if (isAgain(up) || !('updated' in up) || up.updated === null) return up
+    const h = up.updated
     await this.write(card, (w) => {
       if (this.isOpen(w, entry)) w.fact('Updated', { entry: entry.id, from: revision, to: h, how: rebase ? 'rebased' : 'mergedTarget', carried: true }) // i18n-ignore: a fact's kind and codes, not text
     })
-    return { updated: h }
-  }
-
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<Again | { result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
-    const id = await this.identity(reads)
-    if (isUnknown(id)) return again(gitSaid(id))
-    if (!id) return { pause: 'identity', files: [this.project] }
-    const r = this.wf.rulesetOf(card, s)
-    if (r.options.style === 'rebase') return this.rebaseOnto(card, s, revision, base || (await this.mergeBaseOf(revision, expected)), expected, id, reads)
-    const f = this.cfg.folder
-    const at = await this.folderAt(expected)
-    if (at) return at
-    // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
-    const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
-    // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
-    // G19 (HI-1697): Combwork's, or the branch's own (its commits since it left the target, merges left out).
-    const how = this.commitMessage()
-    const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
-    if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
-    const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
-    revision = updated ?? revision
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
-    const squash = r.options.style === 'squash'
-    // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
-    // is ended with the rest of the commit's tree.
-    const signs = await this.signs(reads, f)
-    // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
-    if (isAgain(signs)) return signs
-    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
-    const clean = async (): Promise<void> => {
-      await this.git(f, ['merge', '--abort'])
-      await this.git(f, ['reset', '--hard', '-q', expected])
-      await this.git(f, ['clean', '-fdq'])
-    }
-    // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
-    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
-    // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from), or HI-2042 a signal ended it
-    // (no answer of git's to tell them from): put back, and again.
-    if (m.notRun || m.signal) {
-      await clean()
-      return again(m.err)
-    }
-    if (!m.ok) {
-      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
-      const files = namesOf(u?.out)
-      // Its hunks read before the clean (HI-1181): the target is checked out, so its side comes first.
-      const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
-      await clean()
-      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text), conflicts }
-      return commitFailed(m, signs)
-    }
-    if (squash) {
-      const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
-      if (!c.ok) {
-        await clean()
-        return c.notRun || c.signal ? again(c.err) : commitFailed(c, signs)
-      }
-    }
-    const h = await G.head(f)
-    if (isUnknown(h)) return again(gitSaid(h))
-    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(card.key)}`, h])
-    return { result: h }
+    return up
   }
 
   /**
-   * Rebase and fast-forward's test merge (G6, #1184), under its "linear landing" policy: every commit the advance adds
-   * to the target (`expected..result`) has exactly one parent, and `expected` is an ancestor of `result`. The reviewed
-   * suffix (`base..revision`) is rebased onto the target's head in the queue's worktree, with merge preservation always
-   * off (`rebase.rebaseMerges` overridden for this command, `--no-rebase-merges`; `--force-rebase` when the suffix holds
-   * a merge, which git would otherwise take as up to date) and no other ref moved (`rebase.updateRefs`, as strict's
-   * update). A linear suffix already on the target lands as it is. Then, before the merge checks: on top of the target,
-   * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
-   * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
+   * The test merge (§16.9.1 step 4), the port's `candidate` in the queue's own worktree: its message the queue's (G19,
+   * HI-1697: Combwork's, or the branch's own, its commits since it left the target with merges left out), read once the
+   * worktree is ready, naming the reviewers whose passes count for what is merged (the latest submission, at the current
+   * generation) and the queue's update when strict brought it up to date (#1352).
    */
-  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<Again | { result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
-    const f = this.cfg.folder
-    const merges = await this.git(this.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
-    if (!merges.ok) return again(merges.err)
-    const linear = !merges.out.trim()
-    const onTop = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
-    if (onTop.code !== 0 && onTop.code !== 1) return again(onTop.err)
-    // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
-    // lands as it is, and its merge checks still run there, on exactly that revision.
-    const at = await this.folderAt(revision)
-    if (at) return at
-    let result = revision
-    if (!linear || onTop.code !== 0) {
-      const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
-      const signs = await this.signs(reads, f)
-      // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
-      if (isAgain(signs)) return signs
-      const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
-      const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
-      // HI-2020: git never started, or HI-2042 a signal ended it: put back, and again.
-      if (u.notRun || u.signal) {
-        await this.git(f, ['rebase', '--abort'])
-        await this.folderAt(expected)
-        return again(u.err)
-      }
-      if (!u.ok) {
-        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
-        const files = namesOf(c?.out)
-        // Its hunks read before the abort (HI-1181): rebased onto the target, whose side comes first.
-        const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
-        await this.git(f, ['rebase', '--abort'])
-        await this.folderAt(expected)
-        if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
-        return commitFailed(u, signs)
-      }
-      const h = await G.head(f)
-      if (isUnknown(h)) return again(gitSaid(h))
-      result = h
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
+    const r = this.wf.rulesetOf(card, s)
+    const port = this.integration(card, s)
+    const h = this.host(reads)
+    const message = async (): Promise<string | Again> => {
+      const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
+      const how = this.commitMessage()
+      const own = how === 'branch' ? await this.history(card, s).messages(this.project, `${base || (await port.mergeBase(h, revision, expected))}..${revision}`) : []
+      if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+      return mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     }
-    const notUp = (why: string): { fail: 'notUpToDate'; log: string } => ({ fail: 'notUpToDate', log: `${card.key}: ${revision.slice(0, 7)} rebased onto ${expected.slice(0, 7)} ${why}: rebase it onto the target yourself and submit it again.` }) // i18n-ignore: the card's log, agent-facing
-    const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, result])
-    if (anc.code === 1) return notUp("isn't on top of the target") // i18n-ignore: the card's log, agent-facing
-    if (anc.code !== 0) return again(anc.err)
-    const twoParents = await this.git(this.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
-    if (!twoParents.ok) return again(twoParents.err)
-    if (twoParents.out.trim()) return notUp('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
-    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: result }))) return notUp("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
-    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(card.key)}`, result])
-    return { result }
+    return port.candidate(h, { card: card.key, revision, base, key: s.latest?.key, expected, style: r.options.style === 'rebase' ? 'rebase' : r.options.style === 'squash' ? 'squash' : 'merge', ...(updated ? { updated } : {}), message })
   }
-
 
   /**
    * Runs the merge checks (G9) on the test merge's result, one after another, stopping at the first that isn't green.
@@ -1604,8 +1166,8 @@ export class MergeQueue {
       }
       if (!b.counted) return { kind: 'uncounted' }
       if (!('bad' in read) && read.skipped.length) {
-        const tree = await git(f, ['rev-parse', `${result}^{tree}`])
-        const bound = { expected, tree: tree.ok ? tree.out.trim() : `unread:${result}` }
+        const tree = await this.history(card).treeOf(f, result)
+        const bound = { expected, tree: tree ?? `unread:${result}` }
         const decided = this.skipDecided(card, entry, read.skipped, bound)
         if (decided === 'declined') return { kind: 'red', transient: false, output: `Skipped and not accepted: ${read.skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')}.`, check: FOCUSED_CHECK } // i18n-ignore: a check's output, agent-facing
         if (decided !== 'approved') return { kind: 'skip', skipped: read.skipped, ...bound }
@@ -1726,8 +1288,10 @@ export class MergeQueue {
     // checked it out while the queue waited: a swap then would leave that folder's files behind), `IntegrationStarted`
     // (its write checks the lease, the fence, and the rules) and the ref's compare-and-swap, the lease checked once more
     // just before the swap.
+    const I = this.integration(card, this.wf.state(card))
+    const h = this.host({})
     const r = await lock(async (): Promise<Advance> => {
-      const where = await G.checkouts(this.project)
+      const where = await I.checkouts(h)
       // HI-2019: nothing touched yet, nothing written: out of the lock, and the entry goes round again.
       if (isUnknown(where)) return again(gitSaid(where))
       if (where[target]) return 'retest'
@@ -1736,7 +1300,7 @@ export class MergeQueue {
       if (started === 'denied' || started === 'held' || started === 'waiting' || started === 'ask' || started === 'proofGone') return started === 'ask' || started === 'proofGone' ? 'retest' : started
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
-      if ((await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok) return 'done'
+      if (await I.swap(h, target, expected, result)) return 'done'
       await this.moved(card, entry, target)
       return 'moved'
     })
@@ -1794,9 +1358,10 @@ export class MergeQueue {
    * git runs: a runner that lost its lease writes nothing more and touches nothing.
    */
   private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, seen: string, integrate: () => Promise<void>): Promise<Advance> {
+    const I = this.integration(card, this.wf.state(card))
     const r = await this.guarded(seen, async (): Promise<Advance> => {
       // Where the target is checked out now, under the lock: switched meanwhile, looked at again the right way.
-      const now = await G.checkouts(this.project)
+      const now = await I.checkouts(this.host({}))
       // HI-2019: a read before anything is touched (and before IntegrationStarted) is never settled into a pause here: it
       // leaves the lock and the fence as `again`, for the entry to go round once admitted afresh.
       if (isUnknown(now)) return again(gitSaid(now))
@@ -1809,27 +1374,19 @@ export class MergeQueue {
   }
 
   private async journal(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<Advance> {
+    const I = this.integration(card, this.wf.state(card))
+    const h = this.host({})
     // Conditions, before anything is touched: no agent builds there (an idle one, or one reviewing in a review copy,
     // doesn't count); HEAD names the target, at the expected revision; nothing staged; no unstaged or untracked change in
     // a file the merge changes (the user's other edits are left as they are).
     const busy = this.cfg.folderBusy?.(folder)
     if (busy) return { pause: 'folderBusy', files: busy.length ? busy : [folder] }
-    // The folder's branch and the target's head, in one git (#1386). A branch git couldn't read is a read that failed
-    // (HI-2019), never taken for the wrong branch; one it read, and isn't the target, is.
-    const h = await G.heads(folder, target)
-    if (isUnknown(h.line)) return again(gitSaid(h.line))
-    if (h.line !== target) return { pause: 'wrongBranch', files: [folder] }
-    if (h.target !== expected) return 'retest'
-    // HI-2019: until IntegrationStarted below, a read git couldn't make is `again` (nothing touched, nothing written).
-    const staged = await this.git(folder, ['diff', '--cached', '--name-only', '-z', expected])
-    if (!staged.ok) return again(staged.err)
-    if (nulList(staged.out).length) return { pause: 'staged', files: nulList(staged.out) }
-    const changed = await this.git(this.project, ['diff', '--name-only', '-z', '--no-renames', expected, result])
-    if (!changed.ok) return again(changed.err)
-    const files = nulList(changed.out)
-    const edited = await this.editedOf(folder, files)
-    if (!Array.isArray(edited)) return again(edited.err || `Combwork couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
-    if (edited.length) return { pause: 'unstagedChanges', files: edited }
+    // Then the platform's (the port's `conditions`, before anything is touched): the folder on the target at the expected
+    // revision, nothing staged, no change in a file the merge changes. HI-2019: until IntegrationStarted below, a read
+    // the platform couldn't make is `again` (nothing touched, nothing written).
+    const cond = await I.conditions(h, folder, target, expected, result)
+    if (isAgain(cond) || cond === 'retest' || 'pause' in cond) return cond
+    const { files } = cond
 
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
     if (started === 'rulesOff') return { pause: 'rulesOff' }
@@ -1844,17 +1401,17 @@ export class MergeQueue {
     await this.phase(card, entry, 'files')
     await this.cfg.hooks?.beforeFiles?.(entry.id)
     this.stillHolds(target)
-    const rt = await this.git(folder, ['read-tree', '-m', '-u', expected, result])
+    const rt = await I.moveFiles(h, folder, expected, result)
     if (!rt.ok) {
-      const sides = await this.sidesOf(folder, files, expected, result)
+      const sides = await I.sides(h, folder, files, expected, result)
       // Nothing written (every listed file still at the expected revision in the index): back to the test merge, and a
       // file the user edited since the check pauses, named. Anything else is the terminal state.
       if (sides && sides.every((f) => f.side === 'expected' || (f.side === 'other' && f.staged === 'expected'))) {
-        const now = await this.editedOf(folder, files)
+        const now = await I.edited(h, folder, files)
         await this.moved(card, entry, target)
         return Array.isArray(now) && now.length ? { pause: 'unstagedChanges', files: now } : 'moved'
       }
-      return { pause: 'needsYou', message: rt.err, stuck: await this.stuckOf(target, folder, expected, result, files, 'files') }
+      return { pause: 'needsYou', message: rt.err, stuck: await I.stuck(h, target, folder, expected, result, files, 'files') }
     }
     await this.cfg.hooks?.afterFiles?.(entry.id)
 
@@ -1862,100 +1419,34 @@ export class MergeQueue {
     await this.phase(card, entry, 'ref')
     await this.cfg.hooks?.beforeRef?.(entry.id)
     this.stillHolds(target)
-    const u = await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])
-    if (!u.ok) return this.rollback(card, entry, target, expected, result, folder, files)
+    if (!(await I.swap(h, target, expected, result))) return this.rollback(card, entry, target, expected, result, folder, files)
 
     // HEAD no longer names the target (another client switched the folder in that instant: §16.9.2's "does not
     // guarantee"): merged, with the merged files in the other branch's working copy, listed to restore.
     // HI-2019: only a branch git couldn't read is read again (the advance is never redone), still in the lock and the
     // fence, the lease checked again before what follows is acted on.
-    let after = await G.branch(folder)
+    let after = await I.folderLine(folder)
     for (let i = 0; isUnknown(after) && i < CONFIRM_TRIES; i++) {
       await wait(CONFIRM_RETRY_MS)
-      after = await G.branch(folder)
+      after = await I.folderLine(folder)
     }
     this.stillHolds(target)
-    if (isUnknown(after) || after !== target) return { residue: await this.stuckOf(target, folder, expected, result, files, 'done') }
+    if (isUnknown(after) || after !== target) return { residue: await I.stuck(h, target, folder, expected, result, files, 'done') }
     return 'done'
   }
 
   /** The swap found the ref moved: the files rolled back (phase rollback), and the entry tested again; refused, terminal. */
   private async rollback(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string, files: string[]): Promise<Advance> {
+    const I = this.integration(card, this.wf.state(card))
+    const h = this.host({})
     await this.phase(card, entry, 'rollback')
     await this.cfg.hooks?.inRollback?.(entry.id)
     this.stillHolds(target)
-    const back = await this.git(folder, ['read-tree', '-m', '-u', result, expected])
-    if (!back.ok) return { pause: 'needsYou', message: back.err, stuck: await this.stuckOf(target, folder, expected, result, files, 'rollback') }
+    const back = await I.moveFiles(h, folder, result, expected)
+    if (!back.ok) return { pause: 'needsYou', message: back.err, stuck: await I.stuck(h, target, folder, expected, result, files, 'rollback') }
     await this.cfg.hooks?.afterRollback?.(entry.id)
     await this.moved(card, entry, target)
     return 'moved'
-  }
-
-  /**
-   * Of the files a merge changes, those with a change in the folder (unstaged, staged or untracked), both sides of a
-   * rename; null when git can't say. The whole folder's status, then the listed files: a long list never makes a
-   * command line too long.
-   */
-  /** The listed files with a change in the folder's working copy or index; git's words when it couldn't say (HI-2019). */
-  private async editedOf(folder: string, files: string[]): Promise<string[] | { err: string }> {
-    if (!files.length) return []
-    const st = await this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
-    if (!st.ok) return { err: st.err }
-    const listed = new Set(files)
-    return [...new Set(statusPaths(st.out).filter((p) => listed.has(p)))]
-  }
-
-  /**
-   * Where each listed file stands in the folder: its index entry and working copy both at the expected revision, both at
-   * the result, or neither (`other`, with the side its index entry is at, when one). Null when git can't say.
-   */
-  private async sidesOf(folder: string, files: string[], expected: string, result: string): Promise<{ path: string; side: QueueFileSide; staged: QueueFileSide }[] | null> {
-    const [ix, rx, st] = await Promise.all([
-      this.git(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', expected]),
-      this.git(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', result]),
-      this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
-    ])
-    if (!ix.ok || !rx.ok || !st.ok) return null
-    const notExpected = new Set(nulList(ix.out))
-    const notResult = new Set(nulList(rx.out))
-    // A working copy that differs from its index entry (unstaged or untracked: the status's second column, or `??`).
-    const dirty = new Set(
-      st.out
-        .split('\0')
-        .filter((t) => t.length > 3 && (t[1] !== ' ' || t.startsWith('??')))
-        .map((t) => t.slice(3))
-    )
-    return files.map((path) => {
-      const staged: QueueFileSide = !notExpected.has(path) ? 'expected' : !notResult.has(path) ? 'result' : 'other'
-      return { path, side: dirty.has(path) ? 'other' : staged, staged }
-    })
-  }
-
-  /**
-   * §16.9.2's terminal state as Combwork finds it: the branch, the ref, each listed file's side, and the commands that finish
-   * or undo it, as far as the state allows (none when a file is at neither side: git would refuse them).
-   */
-  private async stuckOf(target: string, folder: string, expected: string, result: string, files: string[], phase: QueueStuck['phase']): Promise<QueueStuck> {
-    const b = await G.branch(folder)
-    const r = await G.lineHead(this.project, target)
-    const branch = isUnknown(b) ? null : b
-    const ref = isUnknown(r) ? null : r
-    const sides = (await this.sidesOf(folder, files, expected, result)) ?? files.map((path) => ({ path, side: 'other' as const, staged: 'other' as const }))
-    const all = (side: QueueFileSide): boolean => sides.every((f) => f.side === side)
-    // Each command as its arguments, the ref as it is (a ref may hold `$` or `&`): shown for PowerShell by shellLine.
-    const cmd = (purpose: QueueCommand['purpose'], place: QueueCommand['place'], args: string[]): QueueCommand => ({ purpose, place, args, command: shellLine(args) })
-    const swap = ['git', 'update-ref', `refs/heads/${target}`, result, expected]
-    const back = ['git', 'read-tree', '-m', '-u', result, expected]
-    const forth = ['git', 'read-tree', '-m', '-u', expected, result]
-    const commands: QueueCommand[] = []
-    // A ref with `"` in it (git allows one) can't be handed to git by Windows PowerShell as written (it splits native
-    // arguments at quotes): no command names it then; the state says where things are.
-    if (branch === target && ref === expected && all('result')) commands.push(...(target.includes('"') ? [] : [cmd('finish', 'project', swap)]), cmd('undo', 'folder', back))
-    else if (branch === target && ref === result && all('expected')) commands.push(cmd('finish', 'folder', forth))
-    else if (branch === target && ref !== expected && ref !== result && all('result')) commands.push(cmd('undo', 'folder', back))
-    // The merged files in another branch's working copy: put back as that branch had them.
-    else if (phase === 'done' && all('result')) commands.push(cmd('undo', 'folder', back))
-    return { folder, branch, ref, expected, result, phase, files: sides.map(({ path, side }) => ({ path, side })), commands }
   }
 
   /**
@@ -2023,6 +1514,8 @@ export class MergeQueue {
       const e = openEntry(s)
       if (!e || e.state !== 'started' || !e.started || (target !== undefined && e.target !== target)) continue
       const { expected, result, checkedOut } = e.started
+      const I = this.integration(card, s)
+      const h = this.host({})
       const done = async () => {
         await this.write(card, (w) => {
           // A begun advance recovered (HI-2709: a record after an advance, closeWaitsFor's `afterAdvance`: its blockers were
@@ -2051,7 +1544,7 @@ export class MergeQueue {
         const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
         const outcome = await lock(async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
           if (frozen()) return 'needsYou'
-          const ref = await G.lineHead(this.project, e.target)
+          const ref = await I.targetHead(this.project, e.target)
           if (ref === result) {
             await done()
             return 'integrated'
@@ -2078,7 +1571,7 @@ export class MergeQueue {
       // Combwork's other work nor the Git view acts in the folder in between.
       const outcome = await this.guarded(checkedOut, async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
         if (frozen()) return 'needsYou'
-        const f = await this.found(e)
+        const f = await I.recoveryState(h, begun(e))
         const stuck = async (st: QueueStuck, merged = false): Promise<'integrated' | 'needsYou'> => {
           if (merged) await done()
           await this.pause(e.target, card, e, 'needsYou', undefined, undefined, st)
@@ -2105,13 +1598,12 @@ export class MergeQueue {
           // The journaled commit, never a new merge: hooks or time can't make it differ.
           if (e.phases.at(-1) !== 'ref') await this.phase(card, e, 'ref')
           this.stillHolds(e.target)
-          const u = await this.git(this.project, ['update-ref', `refs/heads/${e.target}`, result, expected])
-          if (!u.ok) {
+          if (!(await I.swap(h, e.target, expected, result))) {
             const r = await this.rollback(card, e, e.target, expected, result, checkedOut, e.started!.files ?? [])
             return r === 'moved' ? 'failed' : stuck((r as { stuck: QueueStuck }).stuck)
           }
-          const after = await G.branch(checkedOut)
-          if (isUnknown(after) || after !== e.target) return stuck(await this.stuckOf(e.target, checkedOut, expected, result, e.started!.files ?? [], 'done'), true)
+          const after = await I.folderLine(checkedOut)
+          if (isUnknown(after) || after !== e.target) return stuck(await I.stuck(h, e.target, checkedOut, expected, result, e.started!.files ?? [], 'done'), true)
           await done()
           return 'integrated'
         }
@@ -2123,44 +1615,6 @@ export class MergeQueue {
   }
 
   /**
-   * §16.9.2's recovery table for an advance begun into a checked-out target, from its journal (the last phase), the
-   * folder's branch, the ref and each listed file's side: run it again from the test merge (`rerun`; `requeue` when the
-   * ref moved before anything was touched, or after a rollback finished: failed and queued again), finish its swap
-   * (`swap`), roll the files back (`rollback`: the ref moved meanwhile), merged (`integrated`; `residue` when the folder
-   * is on another branch with the merged files in its working copy), or the terminal state (`stuck`). Reads only.
-   */
-  private async found(e: QueueEntry): Promise<{ found: Found; stuck?: QueueStuck }> {
-    const { expected, result, files = [] } = e.started!
-    const folder = e.started!.checkedOut!
-    const phase = e.phases.at(-1) ?? 'started'
-    const b = await G.branch(folder)
-    const r = await G.lineHead(this.project, e.target)
-    const branch = isUnknown(b) ? null : b
-    const ref = isUnknown(r) ? null : r
-    const sides = await this.sidesOf(folder, files, expected, result)
-    const all = (side: QueueFileSide): boolean => !!sides && sides.every((f) => f.side === side)
-    const stuck = async (p: QueueStuck['phase'] = phase): Promise<{ found: Found; stuck: QueueStuck }> => ({ found: 'stuck', stuck: await this.stuckOf(e.target, folder, expected, result, files, p) })
-    if (ref === result) {
-      if (branch === e.target || !sides) return { found: 'integrated' }
-      // Merged, and the folder is on another branch now: the merged files left in its working copy (changed from its
-      // HEAD, at the result), if any, are listed to restore.
-      const vsHead = await this.git(folder, ['diff', '--name-only', '-z', '--no-renames', 'HEAD'])
-      const changed = new Set(vsHead.ok ? nulList(vsHead.out) : files)
-      return sides.some((f) => (f.side === 'result' || f.staged === 'result') && changed.has(f.path)) ? { found: 'residue', stuck: await this.stuckOf(e.target, folder, expected, result, files, 'done') } : { found: 'integrated' }
-    }
-    if (branch !== e.target || !sides) return stuck()
-    if (ref === expected) {
-      if ((phase === 'started' || phase === 'files' || phase === 'rollback') && all('expected')) return { found: 'rerun' }
-      if ((phase === 'files' || phase === 'ref') && all('result')) return { found: 'swap' }
-      return stuck()
-    }
-    // The ref moved meanwhile (another client), not to the result.
-    if (ref !== null && phase !== 'started' && all('result')) return { found: 'rollback' }
-    if (ref !== null && phase !== 'ref' && all('expected')) return { found: 'requeue' }
-    return stuck()
-  }
-
-  /**
    * Resume of a needs-you pause (#1353, §16.9.3): whether the target's begun advance is still in §16.9.2's terminal state,
    * as recovery would find it now (the files it names, or [] for none), or null when recovery can carry on. Reads only.
    */
@@ -2168,7 +1622,7 @@ export class MergeQueue {
     for (const card of this.wf.store.cards()) {
       const e = openEntry(this.wf.state(card))
       if (!e || e.state !== 'started' || !e.started || e.target !== target || !e.started.checkedOut) continue
-      const f = await this.found(e)
+      const f = await this.integration(card, this.wf.state(card)).recoveryState(this.host({}), begun(e))
       return f.found === 'stuck' || f.found === 'residue' ? (f.stuck?.files.map((x) => x.path) ?? []) : null
     }
     return null

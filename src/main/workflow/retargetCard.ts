@@ -20,14 +20,16 @@
 // lock, the board's, and a prepared `git update-ref --stdin` verifying the line at H and `to` at T (an agent's commit or
 // reset meanwhile fails on git's lock, or makes the prepare fail); under them the card (and its lane) checked again as
 // it was seen; then one board write. The transaction is closed after the write commits (or is undone), always.
+//
+// HI-2821: the proof is the card's platform's (its history port's `ownWork`: Git's is gitOwnWork.ts), and the hold port
+// 1's `holdRefs`; this module keeps the workflow's parts. A platform without the proof doesn't offer the move.
 
-import { readFile } from 'original-fs/promises'
-import { join } from 'path'
-import { git } from '../git'
-import * as G from '../platform/git'
-import { holdRefs, type RefHold, type RefHoldRefused } from '../platform/refHold'
+import { historyOf } from '../platform/historyPorts'
+import type { OwnWorkAsk, OwnWorkRule } from '../platform/history'
+import { portsOf, repoContext } from '../platform/repoPorts'
+import type { RefHold, RefHoldRefused } from '../platform/repoContext'
 import { isUnknown } from '../platform/types'
-import { samePlace } from '../places'
+import type { PlatformId } from '../../shared/platform/descriptors'
 import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
 import type { CardState, StageId } from '../../shared/workflow/facts'
 import type { CardRecord } from './factStore'
@@ -49,7 +51,7 @@ export const IN_FLIGHT_STAGES: readonly StageId[] = ['active', 'review', 'approv
 export type MoveWhy = 'notStarted' | 'noLine' | 'queued' | 'targetMissing' | 'notInTarget' | 'reviewed' | 'cantCheck' | 'lane' | 'changed' | 'locked'
 
 /** Which rule of the proof failed (MoveWhy `notInTarget`). */
-export type ProofRule = 'firstParent' | 'otherRef' | 'reflog' | 'anchor'
+export type ProofRule = OwnWorkRule
 
 export interface MoveRefusal {
   why: MoveWhy
@@ -65,6 +67,8 @@ export interface MoveRefusal {
 export interface CardMoveCheck {
   card: number
   key: string
+  /** The platform it was proved on (its ruleset's): the one whose locks hold its refs. */
+  platform: PlatformId
   from: string
   to: string
   line: string
@@ -83,7 +87,6 @@ export interface CardMoveCheck {
 
 export type CheckResult = { ok: true; check: CardMoveCheck } | ({ ok: false } & MoveRefusal)
 
-const ZERO = /^0+$/
 const FULL = /^[0-9a-f]{40}([0-9a-f]{24})?$/
 
 /** The lane a card is in, while it runs, with its target (the one its ruleset marks, else the ruleset's G7). */
@@ -126,50 +129,47 @@ export async function checkCardMove(wf: Workflow, projectPath: string, card: Car
   if (first) return { ok: false, ...first }
   const from = s.started!.target!
   const line = s.started!.line!
-  const H = await G.lineHead(projectPath, line)
+  // The card's platform's proof (its ruleset's); none: the move isn't offered (§16.3.6's rule 6), as one it can't check.
+  const platform = wf.rulesetOf(card, s).options.platform
+  const hist = historyOf(platform)
+  const proof = hist?.ownWork
+  if (!hist || !proof) return { ok: false, why: 'cantCheck', detail: noProof(platform) } // i18n-ignore: a reason's code, said in words where it is shown
+  const H = await hist.lineHead(projectPath, line)
   if (isUnknown(H)) return { ok: false, why: 'cantCheck', detail: H.what } // i18n-ignore: a reason's code, said in words where it is shown
   if (!H) return { ok: false, why: 'cantCheck', detail: `the branch ${line} is gone` } // i18n-ignore: a reason's detail (English)
-  const T = await G.lineHead(projectPath, to)
+  const T = await hist.lineHead(projectPath, to)
   if (isUnknown(T)) return { ok: false, why: 'cantCheck', detail: T.what } // i18n-ignore: a reason's code, said in words where it is shown
   if (!T) return { ok: false, why: 'targetMissing', ref: to } // i18n-ignore: a reason's code, said in words where it is shown
   const facts = wf.store.facts(card.id)
   const anchors = [...new Set(facts.filter((f) => (f.kind === 'Started' || f.kind === 'Adopted') && (f.data as { line?: string | null }).line === line).map((f) => (f.data as { base?: string | null }).base).filter((b): b is string => !!b && FULL.test(b)))]
   const own = ownRefs(card.key, s.lines.length ? s.lines : [line])
   const folder = wf.folderOf(s)
-  const proof = await proveOwn(projectPath, { line, head: H, target: T, anchors, own, folder, reflog: true })
-  if (proof) return { ok: false, ...proof }
+  const refused = await proof.prove(projectPath, { line, head: H, target: T, anchors, own, folder, reflog: true })
+  if (refused) return { ok: false, ...refused }
   // A reviewed card: its reviewed revision brings into `to` what it was reviewed with.
   const sub = s.latest
   let base: string | undefined
   const reviewed = s.stage !== 'active'
   if (sub?.revision && sub.base && FULL.test(sub.revision)) {
-    const same = await sameCommits(projectPath, sub.revision, sub.base, T)
+    const same = await proof.sameCommits(projectPath, sub.revision, sub.base, T)
     if (isUnknown(same)) return { ok: false, why: 'cantCheck', detail: same.what } // i18n-ignore: a reason's code, said in words where it is shown
     if (same && sub.revision !== H) {
-      const r = await proveOwn(projectPath, { line, head: sub.revision, target: T, anchors, own, folder, reflog: false })
+      const r = await proof.prove(projectPath, { line, head: sub.revision, target: T, anchors, own, folder, reflog: false })
       if (r) return reviewed ? { ok: false, ...r, why: r.why === 'notInTarget' ? 'reviewed' : r.why } : { ok: false, ...r } // i18n-ignore: a reason's code, said in words where it is shown
     }
     if (!same && reviewed) return { ok: false, why: 'reviewed' } // i18n-ignore: a reason's code, said in words where it is shown
     if (same) {
-      const mb = await G.mergeBase(projectPath, sub.revision, T)
+      const mb = await hist.mergeBase(projectPath, sub.revision, T)
       if (isUnknown(mb) || !mb) return { ok: false, why: 'cantCheck', detail: isUnknown(mb) ? mb.what : `no merge base of ${sub.revision.slice(0, 7)} and ${to}` } // i18n-ignore: a reason's detail (English)
       base = mb
     }
   } else if (reviewed) return { ok: false, why: 'reviewed' } // i18n-ignore: a reason's code, said in words where it is shown
   const lane = laneOf(wf, card)
-  return { ok: true, check: { card: card.id, key: card.key, from, to, line, head: H, toHead: T, seq: s.lastSeq, ...(base ? { base } : {}), ...(lane ? { lane } : {}) } }
+  return { ok: true, check: { card: card.id, key: card.key, platform, from, to, line, head: H, toHead: T, seq: s.lastSeq, ...(base ? { base } : {}), ...(lane ? { lane } : {}) } }
 }
 
-/** Whether `R ^target` and `R ^base` are the same commits (the reviewed change brings the same into the new target). */
-async function sameCommits(repo: string, R: string, base: string, target: string): Promise<boolean | { what: string }> {
-  const a = await count(repo, [R, `^${target}`])
-  const b = await count(repo, [R, `^${base}`])
-  const both = await count(repo, [R, `^${target}`, `^${base}`])
-  if (typeof a !== 'number') return a
-  if (typeof b !== 'number') return b
-  if (typeof both !== 'number') return both
-  return a === b && b === both
-}
+/** A platform's missing own-work proof, as a refusal's detail (English, for the log and the reply's detail). */
+const noProof = (platform: PlatformId): string => `${platform} has no proof that a line's work is its own` // i18n-ignore: a reason's detail (English)
 
 /** The card's own refs (rule b): its lines (and remote copies of them), its submissions' pins, its queue refs, a stash. */
 export function ownRefs(key: string, lines: readonly string[]): (ref: string) => boolean {
@@ -184,98 +184,16 @@ export function ownRefs(key: string, lines: readonly string[]): (ref: string) =>
   }
 }
 
-/** `git rev-list --count` of the revisions given (on stdin: any number of negatives). */
-async function count(repo: string, revs: readonly string[], firstParent = false): Promise<number | { what: string }> {
-  const r = await git(repo, ['rev-list', '--count', ...(firstParent ? ['--first-parent'] : []), '--stdin'], 1024 * 1024, revs.join('\n') + '\n')
-  const n = r.ok ? Number(r.out.trim()) : NaN
-  return Number.isInteger(n) ? n : { what: r.err || 'git rev-list failed' } // i18n-ignore: a reason's detail (English, as git's)
-}
-
 /**
- * Rules (a) to (d) for `head` against `target` (both full ids): null when every commit `head` would bring into `target`
- * is provably the line's own; else the rule that failed, or why it couldn't be read. `reflog`: rule (c) too (the line's
- * head; a reviewed revision behind it needs only the others).
+ * Rules (a) to (d) for `head` against `target` (both full ids), by the own-work proof of the platform whose repository
+ * holds `repo` (HI-2821; Git's is gitOwnWork.ts): null when every commit `head` would bring into `target` is provably the
+ * line's own; else the rule that failed, or why it couldn't be read. `reflog`: rule (c) too.
  */
-export async function proveOwn(repo: string, p: { line: string; head: string; target: string; anchors: readonly string[]; own: (ref: string) => boolean; folder: string; reflog: boolean }): Promise<MoveRefusal | null> {
-  const n = await count(repo, [p.head, `^${p.target}`])
-  if (typeof n !== 'number') return { why: 'cantCheck', detail: n.what } // i18n-ignore: a reason's code, said in words where it is shown
-  // Nothing to bring: every commit of it is in the target already.
-  if (n === 0) return null
-  // (a) on the first-parent chain.
-  const fp = await count(repo, [p.head, `^${p.target}`], true)
-  if (typeof fp !== 'number') return { why: 'cantCheck', detail: fp.what } // i18n-ignore: a reason's code, said in words where it is shown
-  if (fp !== n) return { why: 'notInTarget', rule: 'firstParent', detail: `${n - fp} of its commits came in by a merge of history ${p.target} doesn't have` } // i18n-ignore: a reason's detail (English)
-  // (b) reachable from no other ref, nor another worktree's detached HEAD.
-  const refs = await git(repo, ['for-each-ref', '--format=%(objectname) %(refname)'])
-  if (!refs.ok) return { why: 'cantCheck', detail: refs.err } // i18n-ignore: a reason's code, said in words where it is shown
-  const others = new Set<string>()
-  for (const l of refs.out.split(/\r?\n/)) {
-    const at = l.indexOf(' ')
-    if (at < 0) continue
-    const oid = l.slice(0, at)
-    if (!p.own(l.slice(at + 1)) && FULL.test(oid)) others.add(oid)
-  }
-  const wts = await git(repo, ['worktree', 'list', '--porcelain'])
-  if (!wts.ok) return { why: 'cantCheck', detail: wts.err } // i18n-ignore: a reason's code, said in words where it is shown
-  for (const block of wts.out.split(/\r?\n\r?\n/)) {
-    const path = /^worktree (.+)$/m.exec(block)?.[1]
-    const head = /^HEAD ([0-9a-f]+)$/m.exec(block)?.[1]
-    if (path && head && /^detached$/m.test(block) && !samePlace(path, p.folder) && FULL.test(head)) others.add(head)
-  }
-  const alone = await count(repo, [p.head, `^${p.target}`, ...[...others].map((o) => `^${o}`)])
-  if (typeof alone !== 'number') return { why: 'cantCheck', detail: alone.what } // i18n-ignore: a reason's code, said in words where it is shown
-  if (alone !== n) return { why: 'notInTarget', rule: 'otherRef', detail: `${n - alone} of its commits are on another branch, tag or worktree` } // i18n-ignore: a reason's detail (English)
-  // (c) the line's reflog, from its creation.
-  const anchors = [...p.anchors]
-  if (p.reflog) {
-    const log = await reflogOf(repo, p.line)
-    if ('what' in log) return { why: 'cantCheck', rule: 'reflog', detail: log.what } // i18n-ignore: a reason's code, said in words where it is shown
-    const seen = new Set<string>([log.created])
-    anchors.push(log.created)
-    for (const e of log.entries) {
-      if (!OWN_ENTRY.test(e.msg) && !seen.has(e.new)) {
-        if (/^rebase/i.test(e.msg)) return { why: 'notInTarget', rule: 'reflog', detail: `its branch was rebased (${e.msg})` } // i18n-ignore: a reason's detail (English)
-        const inT = await G.isAncestor(repo, e.new, p.target)
-        if (isUnknown(inT)) return { why: 'cantCheck', rule: 'reflog', detail: inT.what } // i18n-ignore: a reason's code, said in words where it is shown
-        if (!inT) return { why: 'notInTarget', rule: 'reflog', detail: `its branch was moved to ${e.new.slice(0, 7)} (${e.msg || 'update-ref'}), which ${p.target} doesn't have` } // i18n-ignore: a reason's detail (English)
-      }
-      seen.add(e.new)
-    }
-  }
-  // (d) every point it was created or started from is in the target.
-  for (const a of new Set(anchors)) {
-    const inT = await G.isAncestor(repo, a, p.target)
-    if (isUnknown(inT)) return { why: 'cantCheck', rule: 'anchor', detail: inT.what } // i18n-ignore: a reason's code, said in words where it is shown
-    if (!inT) return { why: 'notInTarget', rule: 'anchor', detail: `it was started from ${a.slice(0, 7)}, which ${p.target} doesn't have` } // i18n-ignore: a reason's detail (English)
-  }
-  return null
-}
-
-/** A reflog entry that is the line's own work (rule c): a commit of any kind, a cherry-pick, a revert, a real merge. */
-const OWN_ENTRY = /^(commit( \((amend|merge|initial)\))?|cherry-pick|revert): |^merge [^:]+: Merge made by /
-
-/**
- * A line's reflog (its file in the repository's common git dir), oldest first: its creation's commit and every later
- * entry. Read only when its first entry is the creation (an old id of zeros): one cut short (expired, or the line older
- * than its log) can't prove where it began, nor can a repository whose refs aren't files.
- */
-export async function reflogOf(repo: string, line: string): Promise<{ created: string; entries: { old: string; new: string; msg: string }[] } | { what: string }> {
-  const common = await G.commonDirFast(repo)
-  if (isUnknown(common)) return { what: common.what }
-  let text: string
-  try {
-    text = await readFile(join(common, 'logs', 'refs', 'heads', ...line.split('/')), 'utf8')
-  } catch {
-    return { what: `no reflog for ${line}` } // i18n-ignore: a reason's detail (English)
-  }
-  const entries: { old: string; new: string; msg: string }[] = []
-  for (const l of text.split(/\r?\n/)) {
-    const m = /^([0-9a-f]+) ([0-9a-f]+) [^\t]*\t?(.*)$/.exec(l)
-    if (m) entries.push({ old: m[1], new: m[2], msg: m[3] })
-  }
-  const first = entries.shift()
-  if (!first || !ZERO.test(first.old) || !FULL.test(first.new)) return { what: `the reflog of ${line} doesn't start where it was created` } // i18n-ignore: a reason's detail (English)
-  return { created: first.new, entries }
+export async function proveOwn(repo: string, p: OwnWorkAsk): Promise<MoveRefusal | null> {
+  const ctx = await repoContext(repo)
+  const proof = ctx ? historyOf(ctx.platform)?.ownWork : undefined
+  if (!ctx || !proof) return { why: 'cantCheck', detail: ctx ? noProof(ctx.platform) : `no repository at ${repo}` } // i18n-ignore: a reason's detail (English)
+  return proof.prove(repo, p)
 }
 
 /** A move refused at the apply: what was found then. */
@@ -297,9 +215,12 @@ export function heldRefusal(r: RefHoldRefused): MoveRefusal {
  * caller's board lock and closed by the caller once its write has committed or been undone (`close()` in a finally
  * outside the board's write, which is after either). Refused (MoveRefused) when they can't be held as checked.
  */
-export async function holdChecked(projectPath: string, c: Pick<CardMoveCheck, 'line' | 'head' | 'to' | 'toHead'>): Promise<RefHold> {
-  const got = await holdRefs(
-    projectPath,
+export async function holdChecked(projectPath: string, c: Pick<CardMoveCheck, 'platform' | 'line' | 'head' | 'to' | 'toHead'>): Promise<RefHold> {
+  // Port 1's holds, of the platform it was proved on (HI-2821): Git's are refHold.ts's, through its context's folder.
+  const ctx = await repoContext(projectPath, c.platform)
+  if (!ctx) throw new MoveRefused({ why: 'cantCheck', detail: `no repository at ${projectPath}` }) // i18n-ignore: a reason's detail (English)
+  const got = await portsOf(ctx).locks.holdRefs(
+    ctx,
     [
       { ref: `refs/heads/${c.line}`, oid: c.head },
       { ref: `refs/heads/${c.to}`, oid: c.toHead }

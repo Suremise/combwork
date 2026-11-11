@@ -370,6 +370,8 @@ interface CombworkMessageValues {
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
   'tips.newCard.title': undefined
+  'tips.nextVersion.text': undefined
+  'tips.nextVersion.title': undefined
   'tips.noCodeCards.text': undefined
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined

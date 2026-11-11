@@ -20,10 +20,11 @@ import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { git, readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
+import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
 const log = createLogger('observe')
 
@@ -51,15 +52,8 @@ const ARM_MS = 250
 /** At most this many working folders per repository are watched (its worktrees): beyond, the rest are unknown. */
 const MAX_FOLDERS = 64
 
-/** What the watcher tells its subscribers (platform-neutral: a line is a Git branch). */
-export type ObserveEvent =
-  | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
-  | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
-  | { kind: 'written'; project: string; folder: string; paths: string[] }
-
-export interface Disposable {
-  dispose(): void
-}
+// What the watcher tells its subscribers, and how a subscription ends: port 3's types (history.ts, HI-2787).
+export type { Disposable, FolderChanges, ObserveEvent } from './history'
 
 /** A watch that survives its folder going and coming back (#964), and an error: it ends, and is tried again. */
 class DirWatch {
@@ -454,18 +448,11 @@ export interface ObservedProject {
   root?: string
 }
 
-/** The question checks ask of the write log, answered: the folder's writes that count, or unknown. */
-export interface FolderChanges {
-  changed: boolean
-  /** What counted: folder-relative paths, ':reflog', ':edit'. */
-  paths: string[]
-}
-
 /**
  * The watcher for a set of projects: `follow` says which (the workspaces' projects); each repository and folder is
  * watched once, however many projects share it, and closed when none needs it.
  */
-export class Observer {
+export class Observer implements ObservePort {
   /** Common git dir (lower-cased) → its watch. */
   private repos = new Map<string, RepoWatch>()
   /** None project folders (lower-cased) → their write logs. */
@@ -481,12 +468,14 @@ export class Observer {
     for (const p of list) {
       const path = resolve(p.path)
       // Never a repository found above a Git project whose own is gone: only the one detection named.
-      const repo = p.platform === 'git' && p.root ? commonDirOf(p.root) : null
+      // A platform whose deliverables are commits has its refs watched (Git's: ObservePort's Git half); one whose are
+      // declared paths, its folder's write record (None's). By the descriptor's deliverables (HI-2822), never the id.
+      const repo = deliversCommits(p.platform) && p.root ? commonDirOf(p.root) : null
       want.set(path.toLowerCase(), { path, platform: p.platform, repo: repo && resolve(repo) })
     }
     this.projects = want
     const repos = new Set([...want.values()].flatMap((p) => (p.repo ? [p.repo.toLowerCase()] : [])))
-    const folders = new Set([...want.values()].flatMap((p) => (p.platform === 'none' ? [p.path.toLowerCase()] : [])))
+    const folders = new Set([...want.values()].flatMap((p) => (declaresPaths(p.platform) ? [p.path.toLowerCase()] : [])))
     for (const [k, r] of this.repos) {
       if (repos.has(k) && !this.held(r.common)) continue
       r.close()
@@ -504,7 +493,7 @@ export class Observer {
         const repo = p.repo
         this.repos.set(repo.toLowerCase(), new RepoWatch(repo, (e) => this.fan(repo, e), (f) => this.held(f)))
       }
-      if (p.platform === 'none' && !this.folders.has(p.path.toLowerCase()) && !this.held(p.path)) {
+      if (declaresPaths(p.platform) && !this.folders.has(p.path.toLowerCase()) && !this.held(p.path)) {
         const path = p.path
         this.folders.set(path.toLowerCase(), new FolderLog(path, (paths) => this.fanProject(path, { kind: 'written', project: path, folder: path, paths })))
       }

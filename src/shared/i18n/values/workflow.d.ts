@@ -151,6 +151,11 @@ interface CombworkMessageValues {
   'workflow.group.where': undefined
   'workflow.group.work': undefined
   'workflow.mergeChoice.answer': { styleTitle: string | number; style: string | number; messageTitle: string | number; message: string | number }
+  'workflow.missing.create': undefined
+  'workflow.missing.failed': { branch: string | number }
+  'workflow.missing.from': { branch: string | number }
+  'workflow.missing.line': { branch: string | number }
+  'workflow.missing.save': { branches: string | number; n: number }
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
   'workflow.move.loopStep': undefined
@@ -163,6 +168,23 @@ interface CombworkMessageValues {
   'workflow.move.startReview': undefined
   'workflow.move.submit': undefined
   'workflow.move.verdict': undefined
+  'workflow.nextVersion.button': undefined
+  'workflow.nextVersion.done': { name: string | number; from: string | number; added: string }
+  'workflow.nextVersion.doneMoved': { name: string | number; from: string | number; cards: number; slots: number; skipped: number }
+  'workflow.nextVersion.enterName': undefined
+  'workflow.nextVersion.message': { from: string | number }
+  'workflow.nextVersion.name': undefined
+  'workflow.nextVersion.noStart': { from: string | number }
+  'workflow.nextVersion.planFailed': undefined
+  'workflow.nextVersion.start': undefined
+  'workflow.nextVersion.starting': undefined
+  'workflow.nextVersion.stays': { from: string | number }
+  'workflow.nextVersion.stepAdd': { from: string | number }
+  'workflow.nextVersion.stepCreate': { name: string | number; from: string | number; commit: string | number }
+  'workflow.nextVersion.stepListed': { from: string | number }
+  'workflow.nextVersion.stepTarget': { from: string | number; name: string | number }
+  'workflow.nextVersion.tip': { from: string | number }
+  'workflow.nextVersion.title': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
   'workflow.option.commitMessage.desc': undefined

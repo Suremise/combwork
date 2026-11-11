@@ -40,6 +40,8 @@ vi.mock('../src/main/git', async (original) => {
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
+// Git's check-ignore tries, with Git's Files reads (HI-2792).
+const { IGNORE_TRIES } = await import('../src/main/platform/gitFiles')
 const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }
@@ -80,20 +82,20 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
   it('still failing: the folder keeps its last known state and is listed again shortly, a few times at most', async () => {
     const r = relists()
     expect(await dimmed()).toEqual(['dist'])
-    for (let i = 0; i < files.IGNORE_TRIES; i++) failNext.push(BUSY)
+    for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
     expect(await dimmed()).toEqual(['dist'])
-    expect(checkIgnoreCalls).toBe(1 + files.IGNORE_TRIES)
+    expect(checkIgnoreCalls).toBe(1 + IGNORE_TRIES)
     await vi.waitFor(() => expect(r.seen).toEqual([['']]), { timeout: HUNG_MS })
     // Failing on every re-list: at most RELIST_MAX of them in a row.
     for (let k = 0; k < files.RELIST_MAX + 2; k++) {
-      for (let i = 0; i < files.IGNORE_TRIES; i++) failNext.push(BUSY)
+      for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
       await dimmed()
       await new Promise((res) => setTimeout(res, 700))
     }
     expect(r.seen.length).toBe(files.RELIST_MAX)
     // Working again: back to normal, and a later failure is listed again once more.
     expect(await dimmed()).toEqual(['dist'])
-    for (let i = 0; i < files.IGNORE_TRIES; i++) failNext.push(BUSY)
+    for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
     await dimmed()
     await vi.waitFor(() => expect(r.seen.length).toBe(files.RELIST_MAX + 1), { timeout: HUNG_MS })
     r.off()

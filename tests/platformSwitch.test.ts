@@ -272,7 +272,11 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       const card = await inWorkspace(w, () => tasks.createTask({ title: 'Lane card', project: 'p' }, user))
       await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [card.number], name: 'git lane', by: 'B1 (p)' })
       if (after === 'switch') await sw.setPlatform(w, repo, 'none', { expected: 'git' })
-      else await form.setWorkflowOptions(w, repo, { preset: null, options: { ...own, target: 'dev' } })
+      else {
+        // HI-2807: a target named anew must exist.
+        execFileSync('git', ['branch', 'dev'], { cwd: repo, stdio: 'pipe' })
+        await form.setWorkflowOptions(w, repo, { preset: null, options: { ...own, target: 'dev' } })
+      }
       const wf = (await workflowFor(w, repo))!
       expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
       expect(wf.rulesetOf(wf.store.card(card.number)).options).toMatchObject({ platform: 'git', target: 'main', targetOwn: true })

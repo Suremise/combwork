@@ -1,0 +1,45 @@
+{
+  "lease a new copy": [
+    "<base>/ws/project :: worktree prune",
+    "<base>/ws/project :: worktree add --detach <base>/ws.worktrees/project/copies/copy-1 <id>"
+  ],
+  "return it": [],
+  "lease it again at another revision": [
+    "<base>/ws/project :: worktree list --porcelain",
+    "<base>/ws.worktrees/project/copies/copy-1 :: checkout --detach --force <id>",
+    "<base>/ws.worktrees/project/copies/copy-1 :: clean -fd"
+  ],
+  "remove it": [
+    "<base>/ws/project :: worktree remove --force <base>/ws.worktrees/project/copies/copy-1"
+  ],
+  "trust root: main": [
+    "<base>/main :: rev-parse --path-format=absolute --git-dir --git-common-dir --show-toplevel",
+    "=> [{\"project\":\"main\",\"root\":\"<base>/main\",\"git\":true,\"short\":false,\"folder\":\"<base>/main\"}]"
+  ],
+  "memory base: main": [
+    "<base>/main :: rev-parse --path-format=absolute --git-common-dir --show-toplevel",
+    "=> \"<base>/main\""
+  ],
+  "trust root: tree": [
+    "<base>/tree :: rev-parse --path-format=absolute --git-dir --git-common-dir --show-toplevel",
+    "<base>/tree :: worktree list --porcelain",
+    "<base>/main :: rev-parse --path-format=absolute --git-common-dir --show-toplevel",
+    "=> [{\"project\":\"tree\",\"root\":\"<base>/main\",\"git\":true,\"short\":false,\"folder\":\"<base>/tree\"}]"
+  ],
+  "memory base: tree": [
+    "<base>/tree :: rev-parse --path-format=absolute --git-common-dir --show-toplevel",
+    "=> \"<base>/main\""
+  ],
+  "trust root: none": [
+    "<base>/none :: rev-parse --path-format=absolute --git-dir --git-common-dir --show-toplevel",
+    "=> [{\"project\":\"none\",\"root\":\"<base>/none\",\"git\":false,\"short\":false,\"folder\":\"<base>/none\"}]"
+  ],
+  "memory base: none": [
+    "<base>/none :: rev-parse --path-format=absolute --git-common-dir --show-toplevel",
+    "=> \"<base>/none\""
+  ],
+  "exclude copies: tree": [
+    "<base>/tree :: rev-parse --git-common-dir",
+    "=> \"# git ls-files --others --exclude-from=.git/info/exclude/n# lines that start with '#' are comments./n# for a project mostly in c, the following would be a good set of/n# exclude patterns (uncomment them if you want to use them):/n# *.[oa]/n# *~/n# combwork's copies of workspace skills for codex and copilot (added by combwork)/n/.agents/skills/cw-*//n/.agents/skills/.cw-*//n\""
+  ]
+}

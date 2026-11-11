@@ -14,12 +14,12 @@
 import { boardReadOnly } from '../boardStore'
 import { onCombworkEvent } from '../events'
 import { createLogger } from '../logger'
-import { observer, type Disposable, type ObserveEvent } from '../platform/observe'
+import type { Disposable, ObserveEvent } from '../platform/history'
+import { historyOf, observePort } from '../platform/historyPorts'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { reconcile } from './reconcile'
 import { workflowFor } from './service'
-import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 
 const log = createLogger('workflow')
@@ -79,7 +79,7 @@ function follow(): void {
       running: null,
       again: false
     }
-    f.watch = observer.subscribe(n.path, (e) => onObserved(f, e))
+    f.watch = observePort.subscribe(n.path, (e) => onObserved(f, e))
     followed.set(k, f)
   }
 }
@@ -152,9 +152,10 @@ async function reconcileProject(f: Followed): Promise<void> {
   // next open or focus). One read per target, however many Done cards it has.
   const moved = new Set(lines)
   const checked = new Map<string, string>()
-  if (f.platform === 'git') {
+  const H = historyOf(f.platform)
+  if (H) {
     for (const t of new Set(cards.flatMap(({ card, s }) => (card.stage === 'done' && s.started?.target ? [s.started.target] : [])))) {
-      const th = await G.lineHead(f.path, t)
+      const th = await H.lineHead(f.path, t)
       // Unreadable: neither checked nor moved on (its Done cards are looked at once it reads again). A target that
       // doesn't exist is a head of its own ('': deleted), so a deletion is a move too.
       if (isUnknown(th)) continue

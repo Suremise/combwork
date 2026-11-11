@@ -80,6 +80,9 @@ beforeAll(async () => {
   }
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
+  // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
+  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('codex'), 'listModels').mockResolvedValue(null)
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
     const s = [...status].find(([k]) => k.toLowerCase() === env.CLAUDE_CONFIG_DIR!.toLowerCase())?.[1]
     return s ? s() : { ok: true, loggedIn: false }

@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "已恢复：{names}。",
   "main.restart.why.expired": "它已等待超过一天",
   "main.restart.why.held": "它的工作文件夹被其他工作占用（请手动恢复）",
+  "main.restart.why.idle": "它处于空闲状态，没有卡片或通道在等它",
   "main.restart.why.movedOn": "它有更新的对话",
   "main.restart.why.notReady": "它未能及时就绪，因此已被停止",
   "main.restart.why.notStopped": "它未能及时就绪且尚未停止；它停止后，其余智能体才会恢复",

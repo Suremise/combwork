@@ -9,10 +9,12 @@
  *
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--repo <Combwork repo>]
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc|profile-move] [--short <installer>] [--wait-min N]
- *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a 1.1 release candidate's installer>]
+ *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a release candidate's installer>]
  *
- * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
- * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
+ * --previous-rc (HI-2587): a release candidate, for scenario 10: the upgrade from it, run beside scenario 4's whenever it is
+ * given. Its version decides what scenario 10 seeds and checks, as --previous's does scenario 4's (HI-2834, previousEra):
+ * a 1.1.0 prerelease (RC2) is partly converted to Combwork's names, so the names upgrade is checked from it; one from 1.1.0
+ * on (1.3.0-rc.1) has Combwork's names, so the upgrade is checked keeping them and carrying its workspace over, with Git.
  *
  * --previous's version decides what scenario 4 seeds and checks (HI-2727, previousEra): from 1.0, its names moved; from
  * 1.1 on, a real workspace (a git project, cards, a lane and its slot, a connection, advanced overrides) carried over as
@@ -195,8 +197,8 @@ function plan(argv) {
   // edge cases (edges) run when asked for (--only).
   // A release candidate given (HI-2587): its upgrade too, by default.
   const previousRc = opt('--previous-rc') && path.resolve(opt('--previous-rc'))
-  if (previousRc && (!fs.existsSync(previousRc) || !versionOf(previousRc))) throw new Error('--previous-rc must name an existing Combwork-Setup-<version>.exe of a 1.1 release candidate')
-  if (only === 'upgrade-rc' && !previousRc) throw new Error("--only upgrade-rc needs --previous-rc <a 1.1 release candidate's installer>")
+  if (previousRc && (!fs.existsSync(previousRc) || !versionOf(previousRc))) throw new Error('--previous-rc must name an existing Combwork-Setup-<version>.exe of a release candidate')
+  if (only === 'upgrade-rc' && !previousRc) throw new Error("--only upgrade-rc needs --previous-rc <a release candidate's installer>")
   const ran = only ? [only] : ['fresh', 'upgrade', 'clean', 'profile-move', ...(previousRc ? ['upgrade-rc'] : [])]
   let previous = opt('--previous') && path.resolve(opt('--previous'))
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges') || ran.includes('profile-move')
@@ -219,6 +221,8 @@ function plan(argv) {
   if (era && era !== '1.0' && ran.includes('edges')) throw new Error(`--only edges needs a 1.0 previous release (${OLD_SETUP}-1.0.0.exe): its cases are over the 1.0 app, and ${path.basename(previous)} is ${versionOf(previous)}`)
   const upgrade = overOld
   const fromRc = ran.includes('upgrade-rc')
+  // Scenario 10's era, from the release candidate's version as scenario 4's is from --previous's (HI-2834).
+  const rcEra = fromRc ? previousEra(versionOf(previousRc)) : null
   const root = buildRoot(installer, upgrade ? previous : null, fromRc ? previousRc : null)
   const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(installer), 'build-info.json'), 'utf8')) } catch { return null } })()
   const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')
@@ -240,12 +244,13 @@ function plan(argv) {
     guestPrevious: upgrade ? guest(previous) : null,
     previousRc: fromRc ? previousRc : null,
     guestPreviousRc: fromRc ? guest(previousRc) : null,
+    previousRcEra: rcEra,
     guestShort: short ? guest(short) : null,
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'combwork-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off',
     // Git for the clean install's project, and for the git project (and its slot) an upgrade from 1.1 on seeds.
-    git: ran.includes('clean') || (upgrade && era === 'combwork' && (ran.includes('upgrade') || ran.includes('manual'))) ? gitRoot(opt('--git')) : null
+    git: ran.includes('clean') || (upgrade && era === 'combwork' && (ran.includes('upgrade') || ran.includes('manual'))) || rcEra === 'combwork' ? gitRoot(opt('--git')) : null
   }
 }
 
@@ -364,7 +369,7 @@ async function main(argv) {
   const problem = hostProblem()
   if (problem) { log('NOT RUN:', problem); return 2 }
   for (const [kind, why] of Object.entries(p.skipped)) log(`${kind}: ${why}`)
-  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous ? `${p.previous} (${p.previousEra})` : '-'}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}`)
+  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous ? `${p.previous} (${p.previousEra})` : '-'}${p.previousRc ? `; release candidate ${p.previousRc} (${p.previousRcEra})` : ''}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}`)
   for (const t0w = Date.now(); ;) {
     let ids
     try { ids = await list() } catch (e) { log('NOT RUN:', e.message); return 2 }
@@ -430,8 +435,9 @@ async function main(argv) {
     // runs the new installer (scenario 4) and as a user installs it by hand (7).
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
     manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
-    // Over a 1.1 release candidate (HI-2587), installed as Combwork already: the names upgrade from a partly converted install.
-    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, era: 'rc' }),
+    // Over a release candidate, installed as Combwork already: from a 1.1 RC the names upgrade from a partly converted install
+    // (HI-2587); from a later one, its workspace carried over as it was (HI-2834), by its era.
+    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, era: p.previousRcEra }),
     // The installer's edge cases over the 1.0 app (edges.ps1), then a notification under the new app ID (HI-2460).
     // HI-2592, the rename's acceptance test: a Windows that never had Combwork or the app before it, the build installed, used as a new
     // user would (drive.cjs clean), quit, then every place it wrote or shows searched for the old name (inside/clean-scan.cjs).
@@ -477,7 +483,7 @@ async function main(argv) {
       continue
     }
     try {
-      const withGit = !!p.git && (kind === 'clean' || ((kind === 'upgrade' || kind === 'manual') && p.previousEra === 'combwork'))
+      const withGit = !!p.git && (kind === 'clean' || ((kind === 'upgrade' || kind === 'manual') && p.previousEra === 'combwork') || (kind === 'upgrade-rc' && p.previousRcEra === 'combwork'))
       await inSandbox(srvOpts, kind, withGit ? { ...start, tools: [...start.tools, 'git'] } : start, bodies[kind], [p.root])
     } catch (e) {
       if (e instanceof NotRun) {
@@ -508,6 +514,7 @@ async function main(argv) {
     skipped: p.skipped,
     previousRc: p.previousRc && path.relative(p.root, p.previousRc),
     previousRcVersion: p.previousRc && versionOf(p.previousRc),
+    previousRcEra: p.previousRcEra,
     sameInstaller: p.sameInstaller,
     hostBuild: os.release(),
     ran: p.ran,

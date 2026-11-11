@@ -13,33 +13,14 @@ import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import type { RunResult } from './platform/repoContext'
 
 const log = createLogger('git')
 
 export const MAX_DIFF_BYTES = 2 * 1024 * 1024
 
-export interface GitResult {
-  out: string
-  ok: boolean
-  buf: Buffer
-  /** Standard error, for messages to show when a command fails. */
-  err: string
-  /**
-   * The exit code; -1 when git didn't run to an exit code of its own (not started: `missing`, or `notRun`), so no caller
-   * takes it for git's own "no" (exit 1: a config key not set, HEAD detached, not an ancestor).
-   */
-  code: number
-  /** Git couldn't be started: not installed, or not on Combwork's PATH (#346). Never an answer about the repository. */
-  missing?: boolean
-  /**
-   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Combwork's worker said it (`EAGAIN`, a
-   * busy machine; `ERR_GIT_WORKER`, the worker ended; the output bound; ended by a signal): a failure to try again, never
-   * git's answer, and never git missing.
-   */
-  notRun?: string
-  /** Stopped at its `timeout` (GitRunOptions). */
-  timedOut?: boolean
-}
+/** What a git command answered: the repository context port's RunResult (SPEC §16.3.6), as git() gives it. */
+export type GitResult = RunResult
 
 /**
  * What every git command Combwork runs starts with. Combwork's git calls run in the background, beside the user's and agents'

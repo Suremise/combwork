@@ -19,7 +19,7 @@ import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes, withLanesLock } from '../lanes'
 import { createLogger, userText } from '../logger'
-import * as G from '../platform/git'
+import { historyOf, lineHistory } from '../platform/historyPorts'
 import { agentText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
@@ -27,7 +27,7 @@ import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/opt
 import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { merges, type PlatformId } from '../../shared/platform/descriptors'
 import type { KeptTargets, RetargetPreview, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
@@ -38,9 +38,9 @@ import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
 import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
-import { projectTargets } from './targets'
+import { newlyMissing, projectTargets, refuseMissingTargets } from './targets'
 import { workflowWrite } from './writes'
-import { withRepoLocks } from '../repoLock'
+import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 
@@ -96,11 +96,13 @@ export async function presetInputs(projectPath: string, platform: PlatformId): P
   const quick = ['typecheck', 'lint'].filter(has)
   const tests = has('test') ? ['test'] : []
   const commands = Object.fromEntries([...quick.map((n) => [n, `npm run ${n}`]), ...tests.map((n) => [n, 'npm test'])]) // i18n-ignore: commands, run as written
-  if (platform !== 'git') return { quick, tests, commands, identity: null }
-  const target = await G.defaultBranch(projectPath).catch(() => null)
+  // A platform with no history (None) has no target or identity to read (HI-2792: asked of the port, never by its id).
+  const hist = historyOf(platform)
+  if (!hist) return { quick, tests, commands, identity: null }
+  const target = await hist.defaultTarget(projectPath).catch(() => null)
   // HI-2019: a read git couldn't make is asked once more; still unread, the form shows no identity (it has no state for
   // "couldn't read", and the queue reads it again itself before a merge).
-  const read = () => G.identity(projectPath).catch(() => null)
+  const read = () => hist.identity(projectPath).catch(() => null)
   const first = await read()
   const id = isUnknown(first) ? await read() : first
   return { quick, tests, commands, identity: isUnknown(id) ? null : id, ...(typeof target === 'string' ? { target } : {}) }
@@ -258,7 +260,9 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const targets = c.changed.includes('target') ? await keptTargets(ws, project, c.options.target ?? '') : null
   // HI-2680: what can follow the new target (Retarget), read while the old one is the project's.
   const retarget = targets ? await retargetOf(ws, project, targets.to) : null
-  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
+  // HI-2807: branches newly named as targets that don't exist (the save refuses them; the section offers to create each).
+  const missing = merges(project.platform) && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, project.platform, cfg).options, c.options) : []
+  return { problems: c.problems, ...(missing.length ? { missing } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 
 /**
@@ -272,7 +276,7 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
   // The new target, empty: the default branch, as a start in a slot resolves it.
   let fallback: Promise<string> | null = null
   const resolved = (t: string | null | undefined): Promise<string> =>
-    t ? Promise.resolve(t) : (fallback ??= G.defaultBranch(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
+    t ? Promise.resolve(t) : (fallback ??= lineHistory().defaultTarget(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
   const now = await resolved(to)
   const out: KeptTargets = { to: now, cards: [], lanes: [] }
   const wf = await workflowFor(ws, project.path)
@@ -337,7 +341,7 @@ export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Combwork or another.
-  return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
+  return withFolderRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
 /** HI-1697: the user's answer to the merge queue's question before an upgraded project's first merge. */
@@ -357,7 +361,7 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
   const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
   if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new CombworkError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const answer: MergeAnswer = { card: a.card as number, request: a.request, style: a.style as WorkflowOptions['style'], commitMessage: a.commitMessage as CommitMessage }
-  await withRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
+  await withFolderRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
 }
 
 /**
@@ -371,9 +375,10 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * request answered as the user, or the question closed. project.json follows once that has committed, and the record
  * is marked written. A save stopped between the two leaves the board's record pending: `settleMergeChoice` writes the
  * file from it (at the workspace's open, before the queue goes on, before the next save). The board decides; the file
- * follows.
+ * follows. The caller holds the repository's lock and this Combwork's turn of workflow writes (`setWorkflowOptions`;
+ * HI-2807: Start the next version, in its own hold of both): never called inside another turn, which would wait on itself.
  */
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
+export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   await settleLocked(ws, project)
   const cfg = await ws.projectConfig(project.path)
@@ -384,6 +389,11 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   // the turn of workflow writes, which every other write of a project's options takes too).
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
+  const was = resolvedOf(ws, project.path, project.platform, cfg).options
+  const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
+  // HI-2807: a branch newly named as a target must exist, checked here at the save (one deleted since the window's check
+  // too), for both ways a save goes: the plain write and the one recording the merge choice (HR1's round 1, finding 3).
+  if (merges(project.platform)) await refuseMissingTargets(project.path, was, will)
   if (!plan.chosen) {
     const write = () =>
       ws.mutateProjectConfig(project.path, (c) => {
@@ -393,8 +403,6 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
       })
     // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
     // the board's write (serial with every writer of those), the file written in it.
-    const was = resolvedOf(ws, project.path, project.platform, cfg).options
-    const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
     if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
       const slots = await slotTargets(ws, project.path)
       await withLanesLock(ws, () =>
@@ -439,7 +447,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   // Whether Combwork merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
   // question (paused `mergeChoice`) carries on.
-  const t = target || (await G.defaultBranch(project.path).catch(() => null))
+  const t = target || (await lineHistory().defaultTarget(project.path).catch(() => null))
   if (t && !isUnknown(t)) {
     queueChanged(ws, project.path, t)
     if (plan.chosen) void kickQueue(ws, project.path, t)
@@ -475,7 +483,7 @@ export function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeC
 export async function settleMergeChoice(ws: WorkspaceService, projectPath: string): Promise<void> {
   const project = projectOf(ws, projectPath)
   if (!mergeChoiceOf(ws, project.name)?.pending) return
-  await withRepoLocks([project.path], () => workflowWrite(() => settleLocked(ws, project)), { quiet: true, project: project.path })
+  await withFolderRepoLocks([project.path], () => workflowWrite(() => settleLocked(ws, project)), { quiet: true, project: project.path })
 }
 
 /** Every project of the workspace settled (its open), each on its own: one that fails is logged and tried again later. */

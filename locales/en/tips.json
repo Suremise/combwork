@@ -1475,6 +1475,14 @@
     "defaultMessage": "Jot down a card",
     "description": "A tip's title."
   },
+  "tips.nextVersion.text": {
+    "defaultMessage": "With Work merges into on 1.3.0, Start the next version… makes 1.4.0 from it, keeps 1.3.0 in Other branches work can merge into and moves Work merges into to 1.4.0. Started cards and running lanes stay on 1.3.0.",
+    "description": "A tip (HI-2807). Work merges into, Start the next version… and Other branches work can merge into are names in Combwork's window: keep them as Combwork shows them. Keep 1.3.0 and 1.4.0 as they are."
+  },
+  "tips.nextVersion.title": {
+    "defaultMessage": "Start the next version in one go",
+    "description": "A tip's title (HI-2807): making the next version's branch from the release branch and moving the project's work onto it."
+  },
   "tips.noCodeCards.text": {
     "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: no-code card."

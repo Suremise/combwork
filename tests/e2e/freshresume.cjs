@@ -55,6 +55,18 @@ function backup(id, at) {
 
   const agentInfo = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')?.agents.find((a) => a.id === worker.id)
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === worker.id)
+  // A question answered "no" starts nothing (HI-2818). Resume stays busy (aria-busy) from the click until the click's work
+  // has run, a start included (actions.ts, whileStarting), and the dialog goes before that ends: so wait for it not busy,
+  // then no session may be live. `settled` is the last read, both values, for the check's detail.
+  let settled = null
+  const startedNothing = async () => {
+    const busy = () => page.evaluate(() => document.querySelector('.transcript-toolbar button.act-resume')?.getAttribute('aria-busy') ?? null)
+    const done = await lib.until(async () => {
+      settled = { busy: await busy(), live: (await live()) ?? null }
+      return settled.busy ? null : settled
+    }, HUNG_MS)
+    return !!done && !done.live
+  }
 
   // 1. The window knows beforehand, by the rule the start reads.
   const resume = await lib.until(async () => ((await agentInfo())?.resume?.id === OLD ? (await agentInfo()).resume : null), HUNG_MS)
@@ -92,11 +104,7 @@ function backup(id, at) {
   await shot(page, '2-question')
   await dialog.locator('.dialog-footer button', { hasText: /^Cancel$/ }).click()
   check('Cancel closes it', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
-  // Its Resume stops showing busy once the start it began is over: the store clears that with the agents' states, at the
-  // end of their batch if some came lately (setWithLive, HI-1862), so waited for, never read at the dialog's close (HI-2819).
-  const busy = () => page.evaluate(() => document.querySelector('.transcript-toolbar button.act-resume')?.getAttribute('aria-busy') ?? null)
-  const settled = await lib.until(async () => !(await busy()), HUNG_MS)
-  check('…and starts nothing', !!settled && !(await live()), JSON.stringify({ busy: await busy(), live: (await live())?.status ?? null }))
+  check('…and starts nothing', await startedNothing(), JSON.stringify(settled))
 
   // 4. Start New Conversation: a new conversation for the agent; the old one stays.
   await resumeBtn.click()
@@ -122,7 +130,7 @@ function backup(id, at) {
   check('…not the fresh-start question', !/Start a new conversation\?/.test(await dialog.innerText().catch(() => '')))
   await shot(page, '3-recache')
   await page.keyboard.press('Escape')
-  check('closed, nothing started', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)) && !(await live()))
+  check('closed, nothing started', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)) && (await startedNothing()), JSON.stringify(settled))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

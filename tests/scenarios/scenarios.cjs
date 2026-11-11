@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 127
+const FIXTURES_VERSION = 128
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2785,7 +2785,8 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      // Left running (HI-2891): since HI-2815 a builder stopped with Stop isn't started for its lane's first card.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
     },
@@ -3407,7 +3408,7 @@ module.exports.SCENARIOS = [
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
       await c.inv('tasks:update', n, { decision: 'Have a design checked by the reviewer before you build anything.' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
     },
     prompt: (c) =>
       `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
@@ -3585,7 +3586,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
       await c.inv('tasks:update', a, { decision: 'Part 2 tests the name the user picks, "Ann" or "Bo": the Assistant brings their pick in a message once part 1 is committed. Do part 1, then wait for that message; don\'t ask the user yourself.' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       await c.startAssistant()
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
@@ -4297,6 +4298,77 @@ module.exports.SCENARIOS = [
     fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
   },
   {
+    id: 'assistant-next-version-ask',
+    title: "The Assistant told the user is about ready for the next version (HI-2811): puts starting it to the user first, changing nothing (no cw_branch, no retarget)",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    // An intent the user hasn't confirmed (HI-2811's design, HR1): a question about what it would do alone was answered,
+    // rightly, with nothing to decide (Codex, 0 of 3), so the prompt leaves the step to be agreed.
+    prompt: "I think alpha's 1.3.0 is feature-complete, so we're about ready for 1.4.0.",
+    // A fake has nothing to decide: it reads the board, as a model may, and its run checks only that nothing changed.
+    fake: 'cw cw_list_tasks {"project":"alpha"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      return [
+        ['put the decision to the user (a reply naming 1.4.0 that asks)', s.asks('1.4.0'), (o.replies ?? []).filter((r) => String(r).includes('1.4.0')).map((r) => String(r).slice(-250)).join(' | ') || s.said.slice(-300)],
+        ['started no version and moved nothing (no cw_branch, no cw_queue retarget, no card target)', !called(o, 'cw_branch').length && !s.retargets.length && !s.byCard.length, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['no 1.4.0 branch, and alpha still merges into 1.3.0', !s.branches.includes('1.4.0') && s.targets?.target === '1.3.0' && !(s.targets?.otherTargets ?? []).length, JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ["the Todo card still has its own 1.3.0, and the lane's card is still in Doing on it", s.todoTarget === '1.3.0' && s.laneOn13 && s.laneCardDoing, JSON.stringify({ todo: s.todoTarget, lane: s.lane })]
+      ]
+    },
+    fakeSkips: ['put the decision to the user (a reply naming 1.4.0 that asks)']
+  },
+  {
+    id: 'assistant-next-version',
+    title: "The Assistant told to start the next version (HI-2811): starts it with cw_branch nextVersion, then offers the move its reply previewed and asks, moving nothing itself",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    prompt: "We're done adding features to 1.3.0 in alpha. Start 1.4.0.",
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      return [
+        ['started it with cw_branch nextVersion, which worked', s.started.length > 0, o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['1.4.0 exists, alpha merges into it, and 1.3.0 is another branch work can merge into', s.branches.includes('1.4.0') && s.targets?.target === '1.4.0' && (s.targets?.otherTargets ?? []).includes('1.3.0'), JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ["offered the Todo card's move (its key) and put it to the user", s.asks(c.todoKey), s.said.slice(-600)],
+        ['moved no card itself (no cw_queue retarget, no card target)', !s.retargets.length && !s.byCard.length && s.todoTarget === '1.3.0', JSON.stringify({ calls: o.combworkCalls.map((x) => x.tool), todo: s.todoTarget })],
+        ["the running lane stays on 1.3.0, its card in Doing", s.laneOn13 && s.laneCardDoing, JSON.stringify(s.lane)]
+      ]
+    },
+    fakeSkips: ["offered the Todo card's move (its key) and put it to the user"]
+  },
+  {
+    id: 'assistant-next-version-retarget',
+    title: "The Assistant told to start the next version and move what can follow (HI-2811): cw_branch nextVersion, then cw_queue retarget with the preview its reply gave; the Todo card moves, the running lane stays on the release",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    setup: nextVersionSetup,
+    after: nextVersionAfter,
+    prompt: "Start 1.4.0 for alpha, and move whatever can follow it over to 1.4.0: I've checked them, go ahead.",
+    // A fake's script is fixed: it can't name the preview its cw_branch reply gives, so it asks cw_queue retarget by
+    // branch, which only previews and moves nothing; the checks of the move are a model's (fakeSkips), never a fake run's.
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.3.0","target":"1.4.0"}',
+    expect: (o, c) => {
+      const s = nextVersionState(o, c)
+      const offered = callsWithReplies(o, 'cw_branch').map((x) => /\bpreview (rt-[\w-]+)/.exec(x.reply)?.[1]).filter(Boolean)
+      return [
+        ['started it with cw_branch nextVersion, which worked', s.started.length > 0, o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['1.4.0 exists, alpha merges into it, and 1.3.0 is another branch work can merge into', s.branches.includes('1.4.0') && s.targets?.target === '1.4.0' && (s.targets?.otherTargets ?? []).includes('1.3.0'), JSON.stringify({ branches: s.branches, targets: s.targets })],
+        ['moved it with cw_queue retarget naming the preview cw_branch gave, the Todo card among its items', s.retargets.some((x) => offered.includes(String(argsOf(x).preview)) && (argsOf(x).items ?? []).map(String).includes(c.todoKey)), JSON.stringify({ offered, retargets: s.retargets.map((x) => argsOf(x)) })],
+        ['the Todo card follows 1.4.0 now (no target of its own)', (s.todoTarget ?? null) === null, JSON.stringify(s.todoTarget)],
+        ["the running lane stays on 1.3.0, its card in Doing and not moved", s.laneOn13 && s.laneCardDoing && !(o.facts?.l ?? []).some((f) => f.kind === 'Retargeted'), JSON.stringify({ lane: s.lane, facts: (o.facts?.l ?? []).map((f) => f.kind) })]
+      ]
+    },
+    fakeSkips: ['moved it with cw_queue retarget naming the preview cw_branch gave, the Todo card among its items', 'the Todo card follows 1.4.0 now (no target of its own)']
+  },
+  {
     id: 'assistant-add-agent-connection',
     title: "The Assistant adds an agent on another agent's connection (HI-2108): names the connection, never a provider, model, effort, mode or context",
     role: 'assistant',
@@ -4450,6 +4522,66 @@ async function builderLane(c, key, body, { keepRunning = false } = {}) {
   const lib = require('../e2e/lib.cjs')
   if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
+}
+/**
+ * The Start the next version scenarios' alpha (HI-2811): Work merges into 1.3.0 (a branch; 1.4.0 not yet), a Todo card
+ * `a` with its own Merges into 1.3.0, and Implementer's lane running on 1.3.0 with its card `l` in Doing. A card that
+ * follows Work merges into moves with it by itself, so only one with its own target is offered (retarget.ts); and a
+ * target the same as the project's is no target of the card's (targets.ts pickTarget), so `a`'s is set while alpha
+ * merges into 1.2.0, 1.3.0 listed. Checked as the preview Start the next version makes, so no check passes on nothing.
+ */
+async function nextVersionSetup(c) {
+  c.git('branch', '1.2.0')
+  c.git('branch', '1.3.0')
+  await pairInProject(c, { target: '1.2.0', otherTargets: ['1.3.0'] })
+  await c.card('a', { title: 'Add a dark mode toggle', description: 'A toggle in the settings page that switches the theme.' })
+  await c.inv('tasks:setTarget', c.cards.a, '1.3.0')
+  await pairInProject(c, { target: '1.3.0', otherTargets: [] })
+  const a = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
+  if (a?.target !== '1.3.0') throw new Error(`setup: #${c.cards.a} has no Merges into 1.3.0 of its own: ${JSON.stringify(a?.target)}`)
+  c.todoKey = a.key
+  await swapRoles(c)
+  // Built in alpha's own folder (pairInProject), on the branch it has checked out: the release's, as a lane on it is.
+  c.git('checkout', '-q', '1.3.0')
+  const l = await c.card('l', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+  await userMove(c, l, 'doing')
+  await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [l] })
+  const p = await c.inv('workflow:nextVersionPreview', c.alpha, '1.3.0', '1.4.0')
+  const moves = (p?.cards?.move ?? []).map((x) => x.number)
+  const kept = (p?.cards?.keep ?? []).filter((x) => x.why === 'started').map((x) => x.number)
+  if (!(moves.length === 1 && moves[0] === c.cards.a && kept.includes(l) && (p?.lanes ?? []).length === 1 && !(p?.laneMoves ?? []).length)) throw new Error(`setup: Start the next version wouldn't offer #${c.cards.a} alone and keep the lane: ${JSON.stringify(p)}`)
+}
+/**
+ * After the run (HI-2811): the running lanes still on 1.3.0, as Start the next version's own preview reads each lane's
+ * Merges into (retarget.ts: its recorded ruleset's target), by id.
+ */
+async function nextVersionAfter(c) {
+  const p = await c.inv('workflow:nextVersionPreview', c.alpha, '1.3.0', '1.4.0')
+  return { lanesOn13: (p?.lanes ?? []).map((x) => x.id), laneMoves: (p?.laneMoves ?? []).map((x) => x.id) }
+}
+/** What the next version scenarios check (HI-2811), from what the run left. */
+function nextVersionState(o, c) {
+  const lane = (o.lanes ?? []).find((x) => (x.cards ?? []).some((y) => (y?.number ?? y) === c.cards.l)) ?? null
+  const started = (o.facts?.l ?? []).find((f) => f.kind === 'Started')?.data?.target ?? null
+  return {
+    started: ran(o, 'cw_branch').filter((x) => argsOf(x).action === 'nextVersion'),
+    // A retarget that moves (named a preview): one asking only for a preview moves nothing.
+    retargets: ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget' && argsOf(x).preview),
+    byCard: retargetWays(o).byCard,
+    branches: o.branches ?? [],
+    targets: o.targets ?? null,
+    todoTarget: o.cards.a?.target ?? null,
+    lane: lane && { state: lane.state, target: lane.target ?? null, cards: (lane.cards ?? []).map((y) => y?.number ?? y), started },
+    // On 1.3.0 as Combwork reads a running lane's Merges into (its ruleset's, which the lane list shows only when the
+    // lane named one: nextVersionAfter), its card started on it.
+    laneOn13: !!lane && ['active', 'paused'].includes(lane.state) && (o.after?.lanesOn13 ?? []).includes(lane.id) && started === '1.3.0',
+    laneCardDoing: o.cards.l?.column === 'doing',
+    // Everything it said in its turn: its answer can come before what it says of the lane it then watches (its lane's
+    // builder is stopped, so the lane stalls), and its last words be about that watch.
+    said: (o.replies ?? []).join('\n\n'),
+    // A reply that puts a decision to the user and names `what` (not one about the stalled lane only).
+    asks: (what) => (o.replies ?? []).some((r) => asksTheUser(r) && String(r).includes(what))
+  }
 }
 /** The states of a delivery that has reached its agent's current launch, or been read: never uncertain or ended. */
 const DELIVERY_REACHED = ['offered', 'received', 'acked']

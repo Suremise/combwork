@@ -571,6 +571,8 @@
   "tips.localModelPicker.title": "Claude Codeの/modelでローカルモデルを切り替える",
   "tips.localModelPicker.text": "サーバーアカウントのエージェントは、Claude Codeの/modelでそのアカウントのモデルを正確なIDで選べます。サーバーを編集…で各モデルにラベルを付けると、その名前で表示されます。",
   "tips.localModelLimits.title": "ローカルモデルの実際のコンテキストをClaude Codeに伝える",
+  "tips.nextVersion.text": "マージ先が 1.3.0 のとき、「次のバージョンを開始…」で 1.3.0 から 1.4.0 を作り、1.3.0 をその他のマージ先ブランチに残してマージ先を 1.4.0 に移せます。開始済みのカードと実行中のレーンは 1.3.0 に残ります。",
+  "tips.nextVersion.title": "次のバージョンを一度に開始",
   "tips.opencode.text": "エージェントはOpenCode 2を使えます。「プロバイダーのセットアップ」でインストールします。OpenCodeの各アカウントは独自のプロバイダーへのサインインとセッションを持ち、各エージェントは自分と一緒に終了するプライベートなOpenCodeサーバーを実行します。",
   "tips.opencodeOwnProvider.title": "OpenCodeは接続のプロバイダーだけを使う",
   "tips.opencodeOwnProvider.text": "OpenCodeのエージェントは接続のモデルにあるプロバイダーだけを使うため、その作業がほかのプロバイダーやOpenCodeの無料クラウドモデルに送られることはありません。接続のモデル（ollama/qwen3:8bなど）を指定してください。「設定」→「詳細」→「OpenCode」でオフにできます。",

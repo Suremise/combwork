@@ -336,4 +336,10 @@ describe('cw_list_providers: a line per provider, one in full on request (HI-281
     // Five CLIs with long model lists still fit well inside the reply's budget (tests/e2e/replysize.cjs).
     expect(providerListText(Array.from({ length: 5 }, () => claude)).length).toBeLessThan(2000)
   })
+
+  // HI-2856: a connection on an account offering other models than the provider's says its own count and default.
+  it("says a connection's own models where its account's aren't the provider's", () => {
+    const two: ProviderPublic = { ...claude, connections: [{ id: 'c-1', name: 'Max', defaultModel: 'claude-opus-5-5' }, { id: 'c-2', name: 'Team', defaultModel: 'sonnet', models: [{ value: 'sonnet', label: 'Sonnet' }, { value: 'fable', label: 'Fable 5.2' }] }, { id: 'c-3', name: 'New', defaultModel: null, models: [{ value: 'opus', label: 'Opus' }] }] }
+    expect(providerListText([two]).split('\n')[0]).toMatch(/; connections Max \(id c-1\), Team \(id c-2; its account's 2 models, default model sonnet\), New \(id c-3; its account's 1 model, default model its CLI's own\)$/)
+  })
 })

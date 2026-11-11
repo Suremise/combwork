@@ -21,6 +21,7 @@ import {
 import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
+import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
@@ -36,6 +37,7 @@ import { BusyButton, Icon, IconButton, Tooltip, useBusy } from '../components/ui
 import { INIT_TEXT, InitRepoButton } from '../components/InitRepo'
 import { at, GIT_TEXT, GitForm, gitAction, Loading, rich, useFolderBusy, useGitRead, type FormSpec, type OpenForm } from './GitTab'
 import { awayFromProject } from '../agentPlace'
+import { NewBranchForm, type NewBranchDraft } from '../components/NewBranchForm'
 
 /**
  * Version Control → Branches & remotes (#607, #1385; its own file since #1416): the project folder's branch or detached
@@ -63,7 +65,7 @@ const M = {
   create: msg({ id: 'git.newBranch.create', defaultMessage: 'Create', description: "The New branch form's button." }),
   branchNoSpaces: msg({ id: 'git.newBranch.noSpaces', defaultMessage: 'Branch names have no spaces', description: "Under the New branch form's box." }),
   switchNow: msg({ id: 'git.newBranch.switchNow', defaultMessage: 'Switch to it now', description: 'Check box in the New branch form.' }),
-  createFailed: msg({ id: 'git.newBranch.failed', defaultMessage: "Couldn't create {branch}", description: 'Title of an error notification.' }),
+  noStartAt: msg({ id: 'git.newBranch.noStartAt', defaultMessage: 'There’s no branch, tag or commit {ref}.', description: 'HI-2807: an error in the New branch form: nothing in the repository is called {ref} (as typed in Starts at).' }),
   pushFailed: msg({ id: 'git.push.failed', defaultMessage: "Couldn't push {branch}", description: 'Title of an error notification.' }),
   pushTitle: msg({ id: 'git.push.title', defaultMessage: 'Push {branch}', description: 'Title of the dialog that pushes a branch that tracks no remote branch yet.' }),
   pushMessage: msg({ id: 'git.push.message', defaultMessage: '{branch} tracks no remote branch yet. Push it, and track it from now on:', description: 'The Push dialog, above the drop-down of remotes.' }),
@@ -250,25 +252,36 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
       ...(idle.length ? { detail: tr(M.switchIdle, { agents: fmt.list(idle, 'unit'), count: idle.length, branch: target }) } : {}),
       confirmLabel: tr(M.switch)
     })
-    if (ok) act(`switch:${target}`, tr(M.switchFailed, { branch: target }), () => call('git:switch', project.path, target))
+    if (ok) act(`switch:${target}`, tr(M.switchFailed, { branch: target }), () => repoOp('git:switch', project.path, target))
   }
 
+  /**
+   * HI-2807: New branch… with where it starts (the folder's commit by default, or any branch, tag or commit), created
+   * from the commit the form showed; switched to only when asked and the folder may move. A failure stays in the dialog.
+   */
   const newBranch = async (s: GitRepoSummary): Promise<void> => {
     const blocked = busyFor('create')
-    let switchNow = !blocked
-    const name = await prompt({
+    let draft: NewBranchDraft = { name: '', start: '', resolved: null, switchNow: false }
+    let done = ''
+    await confirm({
       title: tr(M.newBranchTitle),
       message: [tr(M.newBranchAt, { commit: s.head ?? '', onBranch: s.branch ? 'yes' : 'no', current: s.branch ?? '' }), blocked ? tr(M.newBranchBlocked, { why: blocked }) : ''].filter(Boolean).join(' '),
-      placeholder: tr(M.branchPlaceholder),
+      content: <NewBranchForm projectPath={project.path} onChange={(d) => (draft = d)} initialStart={s.branch ?? s.head ?? ''} blocked={blocked} switchLabel={tr(M.switchNow)} placeholder={tr(M.branchPlaceholder)} />,
       confirmLabel: tr(M.create),
-      validate: (v) => (!v.trim() ? tr(M.enterName) : /\s/.test(v.trim()) ? tr(M.branchNoSpaces) : null),
-      check: blocked ? undefined : { label: tr(M.switchNow), initial: true, set: (v) => (switchNow = v) }
+      run: async () => {
+        if (!draft.name) throw new Error(tr(M.enterName))
+        if (/\s/.test(draft.name)) throw new Error(tr(M.branchNoSpaces))
+        const start = draft.resolved ?? (await call('git:resolveStart', project.path, draft.start))
+        if (!start) throw new Error(tr(M.noStartAt, { ref: draft.start }))
+        done = await repoOp('git:createBranch', project.path, draft.name, !draft.switchNow, { ref: draft.start, commit: start.commit })
+      }
     })
-    if (name) act('create', tr(M.createFailed, { branch: name.trim() }), () => call('git:createBranch', project.path, name.trim(), !switchNow))
+    bumpGit(project.path)
+    if (done) notify('success', done)
   }
 
   const pushNow = async (s: GitRepoSummary): Promise<void> => {
-    if (s.upstream?.remote && !s.upstream.gone) return act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => call('git:push', project.path))
+    if (s.upstream?.remote && !s.upstream.gone) return act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => repoOp('git:push', project.path))
     let remote = s.remotes.includes('origin') ? 'origin' : s.remotes[0]
     const go = await choose({
       title: tr(M.pushTitle, { branch: s.branch ?? '' }),
@@ -279,7 +292,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         { label: tr(M.push), value: 'push' }
       ]
     })
-    if (go === 'push') act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => call('git:push', project.path, remote))
+    if (go === 'push') act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => repoOp('git:push', project.path, remote))
   }
 
   const renameRemote = async (name: string, remotes: string[]): Promise<void> => {
@@ -290,7 +303,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
       confirmLabel: tr(M.rename),
       validate: (v) => remoteNameProblem(v) ?? (remotes.some((x) => x !== name && x.toLowerCase() === v.trim().toLowerCase()) ? tr(M.remoteTaken, { remote: v.trim() }) : null)
     })
-    if (next && next.trim() !== name) act(`remote:${name}`, tr(M.renameRemoteFailed, { remote: name }), () => call('git:renameRemote', project.path, name, next.trim()))
+    if (next && next.trim() !== name) act(`remote:${name}`, tr(M.renameRemoteFailed, { remote: name }), () => repoOp('git:renameRemote', project.path, name, next.trim()))
   }
 
   /**
@@ -310,7 +323,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
       danger: true,
       run: async () => {
         try {
-          notify('success', await call('git:removeRemote', project.path, name, tracking))
+          notify('success', await repoOp('git:removeRemote', project.path, name, tracking))
         } finally {
           bumpGit(project.path)
         }
@@ -320,7 +333,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
 
   const untrack = async (branch: string, upstream: string): Promise<void> => {
     const ok = await confirm({ title: tr(M.untrackTitle, { branch, upstream }), message: tr(M.untrackMessage, { branch }), confirmLabel: tr(M.untrack) })
-    if (ok) act(`track:${branch}`, tr(M.untrackFailed, { branch, upstream }), () => call('git:setUpstream', project.path, branch, null))
+    if (ok) act(`track:${branch}`, tr(M.untrackFailed, { branch, upstream }), () => repoOp('git:setUpstream', project.path, branch, null))
   }
 
   /**
@@ -347,12 +360,12 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const remote = picked.remote.filter((r) => !done.has(`remote:${r.name}`))
         try {
           if (local.length) {
-            notify('success', await call('git:deleteBranches', project.path, local.map(asked)))
+            notify('success', await repoOp('git:deleteBranches', project.path, local.map(asked)))
             for (const b of local) done.add(`local:${b.name}`)
           }
           for (const name of [...new Set(remote.map((r) => r.remote))]) {
             const mine = remote.filter((r) => r.remote === name)
-            notify('success', await call('git:deleteRemoteBranches', project.path, name, mine.map(asked)))
+            notify('success', await repoOp('git:deleteRemoteBranches', project.path, name, mine.map(asked)))
             for (const r of mine) done.add(`remote:${r.name}`)
           }
         } finally {
@@ -365,7 +378,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   const editRemote = async (name: string, url: string): Promise<void> => {
     const next = await prompt({ title: tr(M.changeUrlTitle, { remote: name }), initial: url, confirmLabel: tr(M.change), validate: remoteUrlProblem })
     // An https URL shows with its password hidden: unchanged, nothing to save.
-    if (next && next.trim() !== url) act(`remote:${name}`, tr(M.changeUrlFailed, { remote: name }), () => call('git:setRemoteUrl', project.path, name, next.trim()))
+    if (next && next.trim() !== url) act(`remote:${name}`, tr(M.changeUrlFailed, { remote: name }), () => repoOp('git:setRemoteUrl', project.path, name, next.trim()))
   }
 
   return (
@@ -384,7 +397,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const remoteOnly = remoteRows.filter((r) => !info.branches.some((b) => b.name === r.name.slice(r.name.indexOf('/') + 1)))
         // Grouped by state against the project's target (#1642); with none known, the list as it was.
         const target = info.target ?? null
-        const offer = cleanupOffer(info, busyBranches)
+        // Each part by its own operation (HR3's HI-2788 round 1): local lines by deleting lines, remote ones by deleting remote lines.
+        const offer = offeredCleanup(cleanupOffer(info, busyBranches))
         // Update from <target> (HI-1180): a branch that lacks some of the target's commits (never the target), with work of
         // its own, or in use (HR4's round 1: a card's new line behind its target, fast-forwarded); a merged branch nothing
         // uses is Clean Up's, not to update.
@@ -461,29 +475,35 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
               {s.remotes.length > 0 && (
                 <div className="git-fetched faint" data-git-fetched="">
                   {fetched ? tr(M.fetchedAt, { when: fetched }) : tr(M.neverFetched)}
-                  <Tooltip content={tr(M.fetchTip)}>
-                    <button className="btn small subtle" disabled={off} aria-label={tr(M.fetch)} data-action="fetch" onClick={() => act('fetch', tr(M.fetchFailed), () => call('git:fetch', project.path))}>
-                      <Icon name={busy === 'fetch' ? 'loading' : 'refresh'} spin={busy === 'fetch'} /> {tr(M.fetch)}
-                    </button>
-                  </Tooltip>
+                  {offered('git:fetch') && (
+                    <Tooltip content={tr(M.fetchTip)}>
+                      <button className="btn small subtle" disabled={off} aria-label={tr(M.fetch)} data-action="fetch" onClick={() => act('fetch', tr(M.fetchFailed), () => repoOp('git:fetch', project.path))}>
+                        <Icon name={busy === 'fetch' ? 'loading' : 'refresh'} spin={busy === 'fetch'} /> {tr(M.fetch)}
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
               )}
               <div className="git-actions">
-                <Tooltip content={pullBlocked ?? tr(M.pullTip, { upstream: s.upstream?.name ?? '', branch: s.branch ?? '' })}>
-                  <span>
-                    <BusyButton className="small" busy={busy === 'pull'} busyLabel={tr(M.pulling)} disabled={!!pullBlocked || off} onClick={() => act('pull', tr(M.pullFailed), () => call('git:pull', project.path))}>
-                      <Icon name="repo-pull" /> {tr(M.pull)}
-                    </BusyButton>
-                  </span>
-                </Tooltip>
-                <Tooltip content={pushBlocked ?? (s.upstream?.remote && !s.upstream.gone ? tr(M.pushTo, { branch: s.branch ?? '', upstream: s.upstream.name }) : tr(M.pushTrack, { branch: s.branch ?? '' }))}>
-                  <span>
-                    <BusyButton className="small" busy={busy === 'push'} busyLabel={tr(M.pushing)} disabled={!!pushBlocked || off} onClick={() => void pushNow(s)}>
-                      <Icon name="repo-push" /> {tr(M.push)}
-                    </BusyButton>
-                  </span>
-                </Tooltip>
-                {s.remotes.length > 0 && (
+                {offered('git:pull') && (
+                  <Tooltip content={pullBlocked ?? tr(M.pullTip, { upstream: s.upstream?.name ?? '', branch: s.branch ?? '' })}>
+                    <span>
+                      <BusyButton className="small" busy={busy === 'pull'} busyLabel={tr(M.pulling)} disabled={!!pullBlocked || off} onClick={() => act('pull', tr(M.pullFailed), () => repoOp('git:pull', project.path))}>
+                        <Icon name="repo-pull" /> {tr(M.pull)}
+                      </BusyButton>
+                    </span>
+                  </Tooltip>
+                )}
+                {offered('git:push') && (
+                  <Tooltip content={pushBlocked ?? (s.upstream?.remote && !s.upstream.gone ? tr(M.pushTo, { branch: s.branch ?? '', upstream: s.upstream.name }) : tr(M.pushTrack, { branch: s.branch ?? '' }))}>
+                    <span>
+                      <BusyButton className="small" busy={busy === 'push'} busyLabel={tr(M.pushing)} disabled={!!pushBlocked || off} onClick={() => void pushNow(s)}>
+                        <Icon name="repo-push" /> {tr(M.push)}
+                      </BusyButton>
+                    </span>
+                  </Tooltip>
+                )}
+                {s.remotes.length > 0 && offered('git:pushTo') && (
                   <Tooltip content={ro ?? (!s.head ? tr(M.pushNoCommits) : tr(M.pushToTip, { branch: s.branch ?? '' }))}>
                     <span>
                       <button className="btn small" data-action="push-to" disabled={!s.head || off} onClick={() => setForm({ make: () => pushToForm(project, s) })}>
@@ -492,19 +512,21 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     </span>
                   </Tooltip>
                 )}
-                <Tooltip content={!s.head ? tr(M.commitFirst) : tr(M.branchAt, { commit: s.head })}>
-                  <span>
-                    <button className="btn small" data-action="new-branch" disabled={!s.head || off} onClick={() => void newBranch(s)}>
-                      <Icon name="git-branch-create" /> {tr(M.newBranch)}
-                    </button>
-                  </span>
-                </Tooltip>
+                {offered('git:createBranch') && (
+                  <Tooltip content={!s.head ? tr(M.commitFirst) : tr(M.branchAt, { commit: s.head })}>
+                    <span>
+                      <button className="btn small" data-action="new-branch" disabled={!s.head || off} onClick={() => void newBranch(s)}>
+                        <Icon name="git-branch-create" /> {tr(M.newBranch)}
+                      </button>
+                    </span>
+                  </Tooltip>
+                )}
               </div>
             </div>
 
             <h2 className="section git-section-head">
               {tr(M.branches)} <span className="badge">{info.branches.length}</span>
-              {target && (
+              {target && (offered('git:deleteBranches') || offered('git:deleteRemoteBranches')) && (
                 <span className="git-section-actions">
                   <Tooltip content={ro ?? tr(C.cleanUpTip, { n: offer.local.length + offer.remote.length, target })}>
                     <span>
@@ -567,14 +589,14 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     <span className="git-meta faint">{at(b.date)}</span>
                     {info.remotes.length > 0 && (
                       <span className="git-row-actions">
-                        <IconButton icon={busy === `track:${b.name}` ? 'loading' : 'link'} spin={busy === `track:${b.name}`} title={tr(M.trackTip, { branch: b.name })} action="track" disabled={off} onClick={() => setForm({ make: () => trackForm(project, latest.current ?? info, b) })} />
-                        {b.upstream ? <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} /> : <span className="git-act-slot" />}
+                        {offered('git:setUpstream') ? <IconButton icon={busy === `track:${b.name}` ? 'loading' : 'link'} spin={busy === `track:${b.name}`} title={tr(M.trackTip, { branch: b.name })} action="track" disabled={off} onClick={() => setForm({ make: () => trackForm(project, latest.current ?? info, b) })} /> : <span className="git-act-slot" />}
+                        {b.upstream && offered('git:setUpstream') ? <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} /> : <span className="git-act-slot" />}
                       </span>
                     )}
-                    {updatable(b) ? <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} /> : <span className="git-act-slot" />}
-                    {!b.current ? <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} /> : <span className="git-act-slot" />}
-                    {free ? <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} /> : <span className="git-act-slot" />}
-                    {!b.current ? (
+                    {updatable(b) && offered('git:updateBranch') ? <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} /> : <span className="git-act-slot" />}
+                    {!b.current && offered('worktrees:mergeBranch') ? <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} /> : <span className="git-act-slot" />}
+                    {free && offered('git:deleteBranches') ? <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} /> : <span className="git-act-slot" />}
+                    {!b.current && offered('git:switch') ? (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
                           <button className="btn small subtle" disabled={!!why || off} onClick={() => void switchTo(b.name, s.branch)}>
@@ -617,13 +639,15 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       )}
                     </span>
                     <span className="git-row-tail">
-                      <Tooltip content={switchBlocked ?? tr(M.trackLocal, { branch: r.slice(r.indexOf('/') + 1), remote: r })}>
-                        <span>
-                          <button className="btn small subtle" disabled={!!switchBlocked || off} onClick={() => void switchTo(r, s.branch)}>
-                            {tr(M.switch)}
-                          </button>
-                        </span>
-                      </Tooltip>
+                      {offered('git:switch') && (
+                        <Tooltip content={switchBlocked ?? tr(M.trackLocal, { branch: r.slice(r.indexOf('/') + 1), remote: r })}>
+                          <span>
+                            <button className="btn small subtle" disabled={!!switchBlocked || off} onClick={() => void switchTo(r, s.branch)}>
+                              {tr(M.switch)}
+                            </button>
+                          </span>
+                        </Tooltip>
+                      )}
                     </span>
                   </div>
                   )
@@ -632,11 +656,13 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
 
             <h2 className="section git-section-head">
               {tr(M.remotes)} <span className="badge">{info.remotes.length}</span>
-              <span className="git-section-actions">
-                <button className="btn small" data-action="add-remote" disabled={off} onClick={() => setForm({ make: () => remoteForm(project) })}>
-                  <Icon name="add" /> {tr(M.addRemote)}
-                </button>
-              </span>
+              {offered('git:addRemote') && (
+                <span className="git-section-actions">
+                  <button className="btn small" data-action="add-remote" disabled={off} onClick={() => setForm({ make: () => remoteForm(project) })}>
+                    <Icon name="add" /> {tr(M.addRemote)}
+                  </button>
+                </span>
+              )}
             </h2>
             {info.remotes.length === 0 ? (
               <p className="hint">{tr(M.noRemotes)}</p>
@@ -650,9 +676,9 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       {r.fetchUrl}
                       {r.pushUrl && r.pushUrl !== r.fetchUrl && <span className="faint"> {tr(M.pushesTo, { url: r.pushUrl })}</span>}
                     </span>
-                    <IconButton icon="edit" title={tr(M.changeUrlTitle, { remote: r.name })} disabled={off} onClick={() => void editRemote(r.name, r.fetchUrl)} />
-                    <IconButton icon="whole-word" title={tr(M.renameRemoteTip, { remote: r.name })} action="rename-remote" disabled={off} onClick={() => void renameRemote(r.name, info.remotes.map((x) => x.name))} />
-                    <IconButton icon="trash" title={tr(M.removeRemoteTip, { remote: r.name })} action="remove-remote" disabled={off} onClick={() => void removeRemote(r.name)} />
+                    {offered('git:setRemoteUrl') && <IconButton icon="edit" title={tr(M.changeUrlTitle, { remote: r.name })} disabled={off} onClick={() => void editRemote(r.name, r.fetchUrl)} />}
+                    {offered('git:renameRemote') && <IconButton icon="whole-word" title={tr(M.renameRemoteTip, { remote: r.name })} action="rename-remote" disabled={off} onClick={() => void renameRemote(r.name, info.remotes.map((x) => x.name))} />}
+                    {offered('git:removeRemote') && <IconButton icon="trash" title={tr(M.removeRemoteTip, { remote: r.name })} action="remove-remote" disabled={off} onClick={() => void removeRemote(r.name)} />}
                   </div>
                 ))}
               </div>
@@ -740,11 +766,13 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
 
             <h2 className="section git-section-head">
               {tr(M.identity)}
-              <span className="git-section-actions">
-                <button className="btn small" data-action="set-identity" disabled={off} onClick={() => setForm({ make: () => identityForm(project, info) })}>
-                  <Icon name="person" /> {tr(M.setIdentity)}
-                </button>
-              </span>
+              {offered('git:setIdentity') && (
+                <span className="git-section-actions">
+                  <button className="btn small" data-action="set-identity" disabled={off} onClick={() => setForm({ make: () => identityForm(project, info) })}>
+                    <Icon name="person" /> {tr(M.setIdentity)}
+                  </button>
+                </span>
+              )}
             </h2>
             {warnings.map((w) => (
               <div key={w} className="banner warn" data-identity-warning="">
@@ -909,7 +937,7 @@ function updateForm(project: ProjectInfo, p: BranchUpdatePlan): FormSpec {
     // Why it can't run now (an agent in a turn there, uncommitted changes…): shown, and Update off.
     validate: () => p.blocked,
     note: (v) => (!p.ahead ? tr(U.forwardNote, { branch: p.branch, target: p.target }) : v.how === 'rebase' ? tr(U.rebaseNote, { branch: p.branch, n: p.ahead, target: p.target, pushed: p.pushed ? 'yes' : 'no' }) : tr(U.mergeNote, { target: p.target, branch: p.branch })),
-    submit: (v) => call('git:updateBranch', project.path, p.branch, v.how === 'rebase' ? 'rebase' : 'merge')
+    submit: (v) => repoOp('git:updateBranch', project.path, p.branch, v.how === 'rebase' ? 'rebase' : 'merge')
   }
 }
 
@@ -928,7 +956,7 @@ function remoteForm(project: ProjectInfo): FormSpec {
     confirm: tr(M.add),
     busyLabel: tr(M.adding),
     validate: (v) => remoteNameProblem(v.name) ?? remoteUrlProblem(v.url),
-    submit: (v) => call('git:addRemote', project.path, v.name.trim(), v.url.trim())
+    submit: (v) => repoOp('git:addRemote', project.path, v.name.trim(), v.url.trim())
   }
 }
 
@@ -948,7 +976,7 @@ function pushToForm(project: ProjectInfo, s: GitRepoSummary): FormSpec {
     busyLabel: tr(M.pushing),
     validate: (v) => (v.remote ? null : tr(M.pushNoRemote)),
     // The branch the form names, as it named it when opened: never whichever is checked out when Push runs.
-    submit: (v) => call('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined))
+    submit: (v) => repoOp('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined))
   }
 }
 
@@ -971,7 +999,7 @@ function trackForm(project: ProjectInfo, info: GitRepoInfo, b: GitBranchRow): Fo
     busyLabel: tr(M.saving),
     validate: (v) => (!v.branch.trim() ? tr(M.enterName) : /\s/.test(v.branch.trim()) ? tr(M.branchNoSpaces) : null),
     note: (v) => (known(v) ? null : tr(M.trackPushFirst, { remote: v.remote, branch: v.branch.trim(), local: b.name })),
-    submit: (v) => call('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v))
+    submit: (v) => repoOp('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v))
   }
 }
 
@@ -989,7 +1017,7 @@ function identityForm(project: ProjectInfo, info: GitRepoInfo): FormSpec {
     confirm: tr(M.save),
     busyLabel: tr(M.saving),
     validate: (v) => identityProblem(v.name, v.email),
-    submit: (v) => call('git:setIdentity', project.path, v.name.trim(), v.email.trim())
+    submit: (v) => repoOp('git:setIdentity', project.path, v.name.trim(), v.email.trim())
   }
 }
 
@@ -1081,7 +1109,7 @@ export async function deleteBranch(project: Pick<ProjectInfo, 'path'>, b: Pick<G
   const one = { name: b.name, sha: b.sha }
   const remove = async (unmerged: boolean): Promise<void> => {
     try {
-      notify('success', await call('git:deleteBranches', project.path, [one], unmerged))
+      notify('success', await repoOp('git:deleteBranches', project.path, [one], unmerged))
     } finally {
       bumpGit(project.path)
     }

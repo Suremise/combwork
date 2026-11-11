@@ -32,6 +32,8 @@ export const ACTIVITY_KINDS = [
   'queue-resume',
   'queue-forward',
   'retarget',
+  'create-branch',
+  'next-version',
   'team-pause',
   'team-resume',
   'release-slot',

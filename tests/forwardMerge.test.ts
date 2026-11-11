@@ -61,8 +61,8 @@ describe('the forward request (HI-2679)', () => {
     const { w, repo } = await project()
     const ask = (from: string, to: string, actor: Parameters<typeof controls.forwardMerge>[4] = user) => inWorkspace(w, () => controls.forwardMerge(w, repo, from, to, actor))
     await expect(ask('main', '1.2.0', agent)).rejects.toThrow(/Only the user or the Assistant/)
-    await expect(ask('main', 'main')).rejects.toThrow(/must be two different branches this project merges work into/)
-    await expect(ask('elsewhere', '1.2.0')).rejects.toThrow(/must be two different branches/)
+    await expect(ask('main', 'main')).rejects.toThrow(/main can’t be brought into main/)
+    await expect(ask('elsewhere', '1.2.0')).rejects.toThrow(/elsewhere can’t be brought into 1\.2\.0: 1\.2\.0 must be a branch this project merges work into \(main and 1\.2\.0\)/)
     const made = await ask('main', '1.2.0', assistant)
     expect(made).toMatchObject({ queued: true, from: 'main', to: '1.2.0' })
     const card = 'card' in made ? made.card : null
@@ -108,6 +108,57 @@ describe('the forward request (HI-2679)', () => {
     const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', assistant))
     expect(made).toMatchObject({ queued: true })
     expect(wf.store.cards().length).toBe(before + 1)
+  })
+})
+
+/**
+ * HI-2885: after a release, a project whose only target is the next version (1.5.0, made from main), main then a commit
+ * ahead (the release's merge commit, no change: `empty`). `trunk`: the repository's branch is trunk, the folder detached,
+ * so git names no default branch.
+ */
+async function released(o: { trunk?: boolean } = {}): Promise<{ w: WS; repo: string; main: string }> {
+  const ws = join(base, `ws-${++n}`)
+  const repo = join(ws, 'p')
+  const main = o.trunk ? 'trunk' : 'main'
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
+  git(repo, 'init', '-q', '-b', main)
+  for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
+  git(repo, 'add', '-A')
+  git(repo, 'commit', '-qm', 'initial')
+  git(repo, 'branch', '1.5.0')
+  git(repo, 'commit', '-q', '--allow-empty', '-m', 'Merge pull request: 1.4.0')
+  if (o.trunk) git(repo, 'checkout', '-q', '--detach')
+  const { platform: _p, ...pair } = preset('git', 'pair')
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, target: '1.5.0' } } }))
+  const w = createWorkspaceService()
+  await w.open(ws)
+  opened.push(w)
+  return { w, repo, main }
+}
+
+describe('HI-2885: main into the next version after a release', () => {
+  it("one target and main: Bring Up to Date… offers main, which can be brought in but never brought up to date", async () => {
+    const { w, repo } = await released()
+    const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    expect(views.find((v) => v.target === '1.5.0')?.forward).toEqual({ others: ['main'], behind: [{ from: 'main', commits: 1 }] })
+    expect(views.find((v) => v.target === 'main')).toBeUndefined()
+    const ask = (from: string, to: string) => inWorkspace(w, () => controls.forwardMerge(w, repo, from, to, user))
+    await expect(ask('1.5.0', 'main')).rejects.toThrow(/1\.5\.0 can’t be brought into main: main must be a branch this project merges work into \(1\.5\.0\), and 1\.5\.0 another branch of 1\.5\.0 and main/)
+    // An empty merge (1.5.0 has every file of main's): still queued, main's head frozen.
+    const made = await ask('main', '1.5.0')
+    expect(made).toMatchObject({ queued: true, from: 'main', to: '1.5.0' })
+    const wf = (await workflowFor(w, repo))!
+    const card = 'card' in made ? made.card : null
+    expect(wf.state(wf.store.card(card!.number)).forward).toMatchObject({ from: 'main', to: '1.5.0', source: git(repo, 'rev-parse', 'main') })
+  })
+
+  it('no default branch git can name: nothing offered, and none taken', async () => {
+    const { w, repo } = await released({ trunk: true })
+    const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    expect(views.find((v) => v.target === '1.5.0')?.forward).toBeUndefined()
+    await expect(inWorkspace(w, () => controls.forwardMerge(w, repo, 'trunk', '1.5.0', user))).rejects.toThrow(/trunk can’t be brought into 1\.5\.0/)
   })
 })
 

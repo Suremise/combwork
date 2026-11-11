@@ -4,7 +4,7 @@ import type { TaskCard } from '@shared/types'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { cardLabel } from '@shared/projectKeys'
 import { call, errorMessage } from '../api'
-import { loadTasks, notify, prompt, useLanguage } from '../store'
+import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
 import { BusyButton, Icon, Tooltip, useBusy } from './ui'
 import { reviewSkipTip } from './reviewSkipTip'
 
@@ -32,21 +32,26 @@ const M = {
   failed: msg({ id: 'board.reviewSkip.failed', defaultMessage: "Whether the card skips review wasn't changed", description: "An error toast's title (#1625): setting whether a card skips its review failed. Its text says why." })
 }
 
-/** Whether a project's rules review its cards (its stages have Review), read from main; null while unknown or none. */
-export function useProjectReviews(projectPath: string | null): boolean | null {
-  const [reviews, setReviews] = useState<boolean | null>(null)
+/**
+ * Whether a project's rules review its cards (its stages have Review), read from main; null while unknown or none.
+ * Read again whenever `opened` changes (HI-2851: the card dialog stays mounted, so each opening counts) and on each
+ * `workflow-changed`, as the project's rules gain or lose Review meanwhile; the last answer stays while the same
+ * project's is re-read.
+ */
+export function useProjectReviews(projectPath: string | null, opened: number): boolean | null {
+  const [read, setRead] = useState<{ path: string; reviews: boolean | null } | null>(null)
+  const version = useStore((s) => s.workflowVersion)
   useEffect(() => {
     let live = true
-    setReviews(null)
     if (!projectPath) return
     call('workflow:stages', projectPath)
-      .then((p) => live && setReviews(!!p?.stages.some((s) => s.id === 'review')))
-      .catch(() => live && setReviews(null))
+      .then((p) => live && setRead({ path: projectPath, reviews: !!p?.stages.some((s) => s.id === 'review') }))
+      .catch(() => live && setRead({ path: projectPath, reviews: null }))
     return () => {
       live = false
     }
-  }, [projectPath])
-  return reviews
+  }, [projectPath, opened, version])
+  return read && read.path === projectPath ? read.reviews : null
 }
 
 /** The Review skipped mark on a card's tile, or Skip review? for an agent's proposal not answered yet. */

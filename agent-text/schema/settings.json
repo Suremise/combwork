@@ -2264,6 +2264,12 @@
       "problems": "plain"
     }
   },
+  "settings.agent.tool.missingTarget": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain"
+    }
+  },
   "settings.agent.tool.more.advancedDesc": {
     "placeholders": {}
   },

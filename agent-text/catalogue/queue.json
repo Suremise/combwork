@@ -1,4 +1,20 @@
 {
+  "queue.candidate.mergeCommit": {
+    "text": "{card}: {revision} rebased onto {expected} would land a merge commit (Rebase and fast-forward lands a linear history): rebase it onto the target yourself and submit it again.",
+    "note": "A card's log from the merge queue (Rebase and fast-forward): the rebased revision would add a merge commit to the target, so the card goes back. card: its key; revision and expected: short commit ids."
+  },
+  "queue.candidate.notOnTop": {
+    "text": "{card}: {revision} rebased onto {expected} isn't on top of the target: rebase it onto the target yourself and submit it again.",
+    "note": "A card's log from the merge queue (Rebase and fast-forward): the rebased revision doesn't sit on the target's head, so the card goes back. card: its key; revision and expected: short commit ids."
+  },
+  "queue.candidate.notSame": {
+    "text": "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.",
+    "note": "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch."
+  },
+  "queue.candidate.rebasedNotSame": {
+    "text": "{card}: {revision} rebased onto {expected} isn't the same change as reviewed: rebase it onto the target yourself and submit it again.",
+    "note": "A card's log from the merge queue (Rebase and fast-forward): the rebased revision isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids."
+  },
   "queue.failure.check.environment": {
     "text": "{what} failed for the environment, not the work ({cause}{code})",
     "note": "{what}: the check (queue.failure.check.*). {cause}: why, as recorded (queue.failure.temporary when none). {code}: \": \" and its code, or nothing."

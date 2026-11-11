@@ -15,11 +15,11 @@ import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDesc
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
-import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
+import { branchChange, changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
-import { fallbackEfforts, infoAt, modelGroups } from '../shared/models'
+import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
@@ -94,6 +94,13 @@ import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
 import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
+import { NextVersionPartial, startNextVersion } from './workflow/nextVersion'
+import { projectTargets } from './workflow/targets'
+import { withRepoLock } from './repoLock'
+import type { NextVersionResult } from '../shared/types'
+import { lineRepoOps } from './platform/repoOpsPorts'
+import { branchStartArg } from '../shared/nextVersion'
+import type { Value } from './assistantChanges'
 import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
@@ -113,7 +120,7 @@ import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, platformIdOf } from './platform/registry'
-import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
+import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
@@ -1100,6 +1107,10 @@ route('GET', '/v1/providers', async () => {
   const here = contextWorkspace()
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
+    // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
+    const at = infoAt(info, { workspacePath: here?.path ?? null })
+    // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
+    const models = offeredModels(p.id, at, s)
     return {
       id: p.id,
       name: p.name,
@@ -1109,16 +1120,16 @@ route('GET', '/v1/providers', async () => {
       // The version this Combwork release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
       problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
-      defaultModel: infoAt(info, { workspacePath: here?.path ?? null })?.defaultModel ?? null,
-      // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
-      // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
-      models: modelGroups(p.id, infoAt(info, { workspacePath: here?.path ?? null }), s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
+      // The CLI's own home's; each connection says its own account's (HI-2856).
+      defaultModel: at?.defaultModel ?? null,
+      models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names.
-      ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
+      // with its own account's default and, where they aren't the provider's, its models (HI-2856).
+      ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
     }
   })
 })
@@ -2679,6 +2690,67 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
     const made = 'upToDate' in r ? null : r
     const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+  })
+})
+/** A git refusal as the Agent API answers it (HI-2807): its own status where it has a kind, else 409. */
+const gitRefused = (e: unknown): unknown => (e instanceof CombworkError ? httpFrom(ownStatus(e) ?? 409, e) : e)
+
+// HI-2807: a branch made from a branch, tag or commit, never switched to: the Assistant's (within Control agents) and the
+// user's (in the window), never a project agent's or a script's. `commit` pins the start (refused if `from` moved);
+// recorded for undo, which removes it only while it is still there, unused.
+route('POST', '/v1/git/branch', async ({ body }) => {
+  notAgents([API.change.createBranchAny])
+  const p = queueProject(body?.project)
+  const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 250) : ''
+  const from = branchStartArg({ ref: body?.from, commit: body?.commit })
+  if (!name || !from) throw new HttpError(400, say(API.queue.branchArgs))
+  return assistantChange('agents', [API.change.createBranch, { name, from: from.ref, project: basename(p) }], { kind: 'create-branch', project: basename(p) }, async (guard) => {
+    const start = await withRepoLock(
+      p,
+      // The guard at once, and again right before git creates it (after its reads).
+      async () => {
+        guard()
+        return lineRepoOps('createLine').makeLine(p, name, from, guard)
+      },
+      { project: p }
+    ).catch((e: unknown) => {
+      throw gitRefused(e)
+    })
+    await noteChange(requireWorkspace(), branchChange(basename(p), name, start.commit))
+    return { done: [API.done.branchCreated, { name, from: from.ref, commit: start.short, project: basename(p) }], result: { name, from: from.ref, commit: start.short } }
+  })
+})
+// HI-2807: Start the next version, as the window's dialog does it, in one hold: the branch made at the project's target's
+// head (pinned by `commit` when given), the target added to Other branches, Work merges into moved to the new branch.
+// What can follow is offered as a retarget preview made before the branch existed, both going on (started cards and
+// running lanes stay), applied with /v1/workflow/retarget. Recorded for undo: the branch and the two options.
+route('POST', '/v1/workflow/next-version', async ({ body }) => {
+  notAgents([API.change.createBranchAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 250) : ''
+  const commit = typeof body?.commit === 'string' ? body.commit.trim().slice(0, 64) : ''
+  return assistantChange('agents', [API.change.nextVersion, { project: basename(p) }], { kind: 'next-version', project: basename(p) }, async (guard) => {
+    const from = commit ? { from: { ref: (await projectTargets(ws, p))?.default ?? '', commit } } : {}
+    let r: NextVersionResult
+    try {
+      r = await startNextVersion(ws, p, { name, ...from, check: guard, preview: true })
+    } catch (e) {
+      // The branch kept after a refused save: recorded, so undo can still take it back.
+      if (e instanceof NextVersionPartial) await noteChange(ws, branchChange(basename(p), e.branch.name, e.branch.commit))
+      throw gitRefused(e)
+    }
+    // For undo, newest first: the options, then the branch. As the settings tool records them (their own value or inherit).
+    await noteChange(ws, branchChange(basename(p), r.name, r.commit))
+    const own = (v: unknown): unknown => v ?? 'inherit'
+    if (JSON.stringify(own(r.was.otherTargets)) !== JSON.stringify(r.now.otherTargets)) await noteChange(ws, { kind: 'setting', project: basename(p), target: 'project.workflow.otherTargets', fields: [{ field: 'value', old: own(r.was.otherTargets) as Value, new: r.now.otherTargets }] })
+    await noteChange(ws, { kind: 'setting', project: basename(p), target: 'project.workflow.target', fields: [{ field: 'value', old: own(r.was.target) as Value, new: r.now.target }] })
+    const items = r.preview ? [...r.preview.cards.move.map((c) => c.key), ...r.preview.slots.move.map((s) => s.name)] : []
+    const offer = r.preview && items.length ? offerRetarget(p, r.preview) : null
+    return {
+      done: [API.done.nextVersionStarted, { name: r.name, from: r.from, commit: r.short, project: basename(p), added: r.added ? 'yes' : 'no' }],
+      result: { name: r.name, from: r.from, commit: r.short, added: r.added, ...(offer ? { retarget: { preview: offer, move: items, stay: [...r.preview!.cards.keep.map((c) => ({ key: c.key, why: c.why })), ...r.preview!.slots.keep.map((s) => ({ slot: s.name, why: s.why })), ...r.preview!.lanes.map((l) => ({ lane: l.name ?? l.builder, why: l.why ?? 'running' }))] } } : {}) }
+    }
   })
 })
 route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge'))
@@ -4507,7 +4579,7 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, apiSaid(API.check.noVcs))
+  if (!hasCapability(platformIdOf(caller.projectPath, cfg?.platform), 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

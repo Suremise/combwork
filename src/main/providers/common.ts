@@ -1,7 +1,7 @@
 import { execFile } from 'child_process'
 import { existsSync, readFileSync, statSync } from 'original-fs'
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'original-fs/promises'
-import { basename, delimiter, dirname, isAbsolute, join, resolve as resolvePath } from 'path'
+import { basename, delimiter, dirname, join } from 'path'
 import { agentField, englishText, shownText, type TextPart } from '../../shared/advanced'
 import { msg, tr } from '../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } from '../../shared/types'
@@ -9,7 +9,7 @@ import { readFirstLineOf } from '../transcriptFiles'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
 import { combworkError } from '../combworkError'
-import { git } from '../git'
+import { excludeFile } from '../platform/repoPorts'
 import type { HookIds, LaunchContext, SkillCopyBook, SkillCopyRecord, SkillDelivery } from './types'
 
 const log = createLogger('providers')
@@ -522,10 +522,9 @@ const COPIES_COMMENT_HEAD = "# Combwork's copies of workspace skills" // i18n-ig
 
 /** Keeps Combwork's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
-  const common = await git(cwd, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: 5000 })
-  const gitDir = common.ok ? common.out.trim() : ''
-  if (!gitDir) return
-  const exclude = join(isAbsolute(gitDir) ? gitDir : resolvePath(cwd, gitDir), 'info', 'exclude')
+  // The repository's own exclude file, from the context port (HI-2789: Git's info/exclude, as this named it before).
+  const exclude = await excludeFile(cwd, { timeout: 5000 })
+  if (!exclude) return
   const text = await readFile(exclude, 'utf8').catch(() => '')
   const lines = text.split(/\r?\n/)
   // Combwork's copies, and the dot-folders a swap uses for a moment (left behind only by a crash, until the next launch).

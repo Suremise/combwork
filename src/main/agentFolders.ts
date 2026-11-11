@@ -12,7 +12,7 @@ import { basename } from 'path'
 import { boardRead, boardWrite, boardWriteOp } from './boardStore'
 import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
-import * as G from './platform/git'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { isUnknown } from './platform/types'
 import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperObservation, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setCombworkIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { combworkError } from './combworkError'
@@ -265,7 +265,7 @@ export class ClaimRefused extends Error {
 /** What the user's Resume taking a free slot compares in its write: the folder's head now, clean (null: dirty or unknown). */
 async function headNow(folder: string): Promise<string | null> {
   if (!existsSync(folder)) return null
-  const [head, dirty] = await Promise.all([G.head(folder), G.dirty(folder)])
+  const [head, dirty] = await Promise.all([slotWorkspaces().head(folder), slotWorkspaces().dirty(folder)])
   return isUnknown(head) || isUnknown(dirty) || dirty.length ? null : head
 }
 

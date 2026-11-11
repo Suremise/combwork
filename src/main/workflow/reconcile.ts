@@ -16,7 +16,8 @@ import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { notApproved } from '../../shared/workflow/guards'
-import * as G from '../platform/git'
+import type { HistoryPort } from '../platform/history'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown, type Maybe } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
@@ -51,19 +52,19 @@ function sharedFolderCards(wf: Workflow): CardRecord[] {
  * commits this way, and one that gave up there was refused as having nothing committed while the lane started its next
  * card in the folder.
  */
-export async function attributeFolder(wf: Workflow, hooks: ReconcileHooks = {}): Promise<void> {
-  for (let tries = 0; tries < 5; tries++) if ((await attributeOnce(wf, hooks)) !== 'raced') return
+export async function attributeFolder(wf: Workflow, hooks: ReconcileHooks = {}, H: HistoryPort = lineHistory()): Promise<void> {
+  for (let tries = 0; tries < 5; tries++) if ((await attributeOnce(wf, hooks, H)) !== 'raced') return
 }
 
 /** One attribution run: `raced` when the folder's cards changed between its read and its write (nothing written then). */
-async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done' | 'raced'> {
+async function attributeOnce(wf: Workflow, hooks: ReconcileHooks, H: HistoryPort): Promise<'done' | 'raced'> {
   const project = wf.cfg.project
   const cards = sharedFolderCards(wf)
   // Each card's cycle as read: attribution decided on these is written only while they are still the folder's cards.
   const cycles = new Map(cards.map((c) => [c.id, wf.state(c).cycle]))
-  const line = await G.branch(project)
+  const line = await H.line(project)
   if (isUnknown(line) || !line) return 'done'
-  const head = await G.lineHead(project, line)
+  const head = await H.lineHead(project, line)
   if (isUnknown(head) || !head) return 'done'
   const seenKey = `seen:${line}`
   let from = wf.store.meta(seenKey)
@@ -75,12 +76,12 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done
       return 'done'
     }
     from = bases[0]
-    for (const b of bases.slice(1)) if ((await G.isAncestor(project, b, from)) === true) from = b
+    for (const b of bases.slice(1)) if ((await H.isAncestor(project, b, from)) === true) from = b
   }
   if (from === head) return 'done'
   // The line's own commits (HI-2382, Darren): a branch merged in keeps its commits on their own cards; the merge is
   // attributed like any commit of the line.
-  const list = await G.commits(project, `${from}..${head}`, { firstParent: true })
+  const list = await H.commits(project, `${from}..${head}`, { firstParent: true })
   if (isUnknown(list)) return 'done'
   await hooks.afterRead?.()
   const decided = list.map((c) => {
@@ -145,15 +146,15 @@ type Followed = 'renamed' | 'unchanged' | 'unknown'
  * old name is gone and the new one is there (git's step done), the card follows it (LineRenamed, as Repair writes it),
  * once: the write checks, under its lock, that the card is still in the cycle and on the line this observer read.
  */
-async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promise<Followed> {
+async function followRename(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState): Promise<Followed> {
   const line = s.started?.line
   if (!line || !wf.cfg.pendingRename) return 'unchanged'
   const to = await wf.cfg.pendingRename(line)
   if (!to) return 'unchanged'
-  const old = await G.lineHead(wf.cfg.project, line)
+  const old = await H.lineHead(wf.cfg.project, line)
   if (isUnknown(old)) return 'unknown'
   if (old !== null) return 'unchanged'
-  const head = await G.lineHead(wf.cfg.project, to)
+  const head = await H.lineHead(wf.cfg.project, to)
   if (head === null || isUnknown(head)) return 'unknown'
   await wf.write(card, null, 'combwork', (w) => {
     if (!sameCycle(w, s) || w.state().started?.line !== line) return
@@ -171,13 +172,13 @@ async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promi
  * covers the project, so Repair moves it (or its new place's branch can't be read now: the next run looks again);
  * `gone`, neither.
  */
-async function followFolder(wf: Workflow, card: CardRecord, s: CardState): Promise<'moved' | 'pending' | 'gone'> {
+async function followFolder(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState): Promise<'moved' | 'pending' | 'gone'> {
   const folder = s.started!.folder
   const line = s.started!.line
   const now = await wf.cfg.agentFolder?.(s.started!.builder)
   if (now && !samePath(now.path, folder)) {
     const there = line ? presence(now.path) : 'gone'
-    const on = there === 'there' ? await G.branch(now.path) : null
+    const on = there === 'there' ? await H.line(now.path) : null
     // Unreadable (the folder, or its branch): undecided, so not taken for gone this time either.
     if (there === 'unknown' || isUnknown(on)) return 'pending'
     // Its line may be the old name of a rename Repair began (#1305): the worktree is on the new name then, and the card
@@ -256,8 +257,11 @@ export async function reconcile(wf: Workflow, card: CardRecord, hooks: Reconcile
   return wf.platformOf(c, s).reconcile(c, hooks)
 }
 
-/** The Git adapter's reconciliation: observed heads, attribution in a shared folder, containment, carry-over and stale. */
-export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
+/**
+ * A platform with history's reconciliation (its adapter's: Git's), read through its history port: observed heads,
+ * attribution in a shared folder, containment, carry-over and stale.
+ */
+export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
   let card = wf.store.card(card0.id)
   let s = wf.state(card)
   if (!s.started) return
@@ -268,28 +272,28 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   // Gone (§16.4.4), only for what doesn't exist (an unreadable folder is unknown, not gone): the repository, then the
   // card's own folder. Recorded once per cycle.
   const s0 = s
-  if (presence(project) === 'gone' || (presence(join(project, '.git')) === 'gone' && isUnknown(await G.commonDir(project)))) {
+  if (presence(project) === 'gone' || (presence(join(project, '.git')) === 'gone' && isUnknown(await H.store(project)))) {
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
-  if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone' && (await followFolder(wf, card, s)) === 'gone') {
+  if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone' && (await followFolder(wf, H, card, s)) === 'gone') {
     const folder = s.started.folder
     // Not if the card's folder moved meanwhile (Repair's FolderMoved, another observer's).
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.state().started?.folder === folder && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
   }
   s = wf.state(card)
   // The target's head as observed (#1462: the partial-merge check below reads it from here, not from git again).
-  const seenTarget = await observeTarget(wf, card, s, hooks)
+  const seenTarget = await observeTarget(wf, H, card, s, hooks)
 
   if (!wf.ownLine(s)) {
     // A shared folder: attribution; its commits are working revisions, never an integration (§16.4.4).
-    await attributeFolder(wf)
+    await attributeFolder(wf, {}, H)
     if (card.stage !== 'done') return
   } else if (card.stage !== 'done') {
     // A rename Repair began and was cut short after git's step (#1305: a crash, a file it couldn't write): the card
     // follows it now, before its line is read, rather than take it for gone. Read again whatever it found: another
     // observer may have followed it first.
-    const followed = await followRename(wf, card, s)
+    const followed = await followRename(wf, H, card, s)
     s = wf.state(card)
     const line = s.started?.line
     // A slot card's line is made by its slot's preparation (#1438): until then it doesn't exist and isn't gone, nor has
@@ -301,7 +305,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       // The cycle the line was read in, which passed the check above: what it read is that cycle's only (HR6's #1551
       // round 1: started again meanwhile, an old null read would mark the new cycle, its preparation still owed).
       const read = s
-      const lh = await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
+      const lh = await observeHead(wf, card, () => H.lineHead(project, line), line, hooks)
       s = wf.state(card)
       // Never gone while a rename points away from it: the next run follows it once git's names can be read.
       if (lh === null && !(await wf.cfg.pendingRename?.(line))) await wf.write(card, null, 'outside', (w) => sameCycle(w, read) && w.state().started?.line === line && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${read.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
@@ -323,10 +327,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     const approved = { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key }
     // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
-      const c = await G.contains(project, target, approved)
+      const c = await H.contains(project, target, approved)
       if (!isUnknown(c) && c) {
         await hooks.afterRead?.()
-        return integratedOutside(wf, card, s, approved.revision, c.method, [])
+        return integratedOutside(wf, H, card, s, approved.revision, c.method, [])
       }
     }
     // The pass follows the newest observed head (#1623, the Assistant's call after HR2's round 2): at exactly the approved
@@ -358,9 +362,9 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
     if (wf.ownLine(s) && s.head && s.head !== approved.revision && !s.stale) {
-      const th = await G.lineHead(project, target)
-      const b2 = !isUnknown(th) && th ? await G.mergeBase(project, th, s.head) : null
-      const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await G.sameChange(project, approved, { base: b2, revision: s.head }))
+      const th = await H.lineHead(project, target)
+      const b2 = !isUnknown(th) && th ? await H.mergeBase(project, th, s.head) : null
+      const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await H.sameChange(project, approved, { base: b2, revision: s.head }))
       const head = s.head
       await wf.write(card, r, 'combwork', (w) => {
         // Only while the head observation it follows is still the newest (a newer one is read by the next run).
@@ -386,7 +390,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // submission, for the submission it was read for.
     if (inTargetNow(s)) return
     const sub = s.latest
-    const c = await G.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
+    const c = await H.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
     if (isUnknown(c) || !c) return
     await hooks.afterRead?.()
     await wf.write(card, null, 'outside', (w) => {
@@ -401,12 +405,12 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   if (card.stage === 'active' && wf.ownLine(s) && s.head && base && s.head !== base) {
     // Some of its own work in the target (a partial hand merge): a mark; the card stays where it is. Its own commits
     // are its line's first-parent history since its base: the target merged into the card (an update) isn't its work.
-    const th = seenTarget?.target === target ? seenTarget.head : await G.lineHead(project, target)
+    const th = seenTarget?.target === target ? seenTarget.head : await H.lineHead(project, target)
     if (isUnknown(th) || !th) return
-    const own = await G.firstParents(project, base, s.head)
+    const own = await H.firstParents(project, base, s.head)
     if (isUnknown(own)) return
     let found: string | null = null
-    for (const c of own) if ((await G.isAncestor(project, c, th)) === true) found = found ?? c
+    for (const c of own) if ((await H.isAncestor(project, c, th)) === true) found = found ?? c
     if (!found) return
     const part = found
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'MergedInPart', actor: 'outside', source: 'observed', dedupe: `part:${s.cycle}:${part}`, data: { revision: part, target } }))
@@ -420,15 +424,15 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // A submitted revision is the card's record (history: it keeps the names it had); an unsubmitted one is read from
     // the line as it is now, so its write checks the card is still on that line (#1305: renamed since, it's dropped).
     const read = s.latest?.revision ? null : s.started!.line!
-    const lineNow = read ? await G.lineHead(project, read) : null
+    const lineNow = read ? await H.lineHead(project, read) : null
     if (isUnknown(lineNow)) hooks.unknown?.(lineNow.what)
     const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
     const from = s.latest?.base ?? base
     if (!revision || !from || revision === from) return
-    const c = await G.contains(project, target, { base: from, revision, key: s.latest?.key })
+    const c = await H.contains(project, target, { base: from, revision, key: s.latest?.key })
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
-    const th = await G.lineHead(project, target)
+    const th = await H.lineHead(project, target)
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && (!read || w.state().started?.line === read) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
@@ -436,24 +440,24 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   if (card.stage === 'done' && s.integrated && s.integrated.method !== 'committed') {
     // A Done card's revision no longer in the target (the target was reset): a warning mark; it stays Done.
     const i = s.integrated
-    const th = await G.lineHead(project, i.target)
+    const th = await H.lineHead(project, i.target)
     if (isUnknown(th)) return hooks.unknown?.(th.what)
     if (!th) return
     // The result still in the target settles it with the history alone (kept between passes: HI-2182); only once it
     // isn't is the change looked for, in the same head.
-    const resultIn = await G.isAncestor(project, i.result, th)
+    const resultIn = await H.isAncestor(project, i.result, th)
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
     if (resultIn) return
     const sub = s.latest
-    const c = await G.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
+    const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
   }
 }
 
-async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
+async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
   const target = s.started!.target ?? ''
-  const th = await G.lineHead(wf.cfg.project, target)
+  const th = await H.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
     // HI-2709: never while a card it depends on isn't Done, read in this write (a dependency added while containment was
@@ -596,17 +600,17 @@ function presence(path: string): 'there' | 'gone' | 'unknown' {
  * no move writes nothing, and one after a time closed records what changed meanwhile. Replies with the head git read
  * (none when it couldn't be read, or there's no target).
  */
-async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hooks: ReconcileHooks): Promise<{ target: string; head: string | null } | undefined> {
+async function observeTarget(wf: Workflow, H: HistoryPort, card: CardRecord, s0: CardState, hooks: ReconcileHooks): Promise<{ target: string; head: string | null } | undefined> {
   const target = s0.started?.target
   if (!target) return
-  const common = await G.commonDirFast(wf.cfg.project)
+  const common = await H.storeFast(wf.cfg.project)
   if (isUnknown(common)) {
     hooks.unknown?.(common.what)
     return
   }
   // Read by git first: an unreadable target is unknown (nothing recorded), where a target that doesn't exist is a value
   // of its own, null (HR4's round 2: a deleted target is recorded, X→null, and its return, null→Y).
-  const seen = await G.lineHead(wf.cfg.project, target)
+  const seen = await H.lineHead(wf.cfg.project, target)
   if (isUnknown(seen)) {
     hooks.unknown?.(seen.what)
     return
@@ -618,7 +622,7 @@ async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hook
       if (s.cycle !== s0.cycle) return
       // As it is now, under the lock, from the ref files (null: the ref isn't there). Null where git read it just before:
       // gone meanwhile, or a file this read couldn't open; the next run reads again rather than record a deletion.
-      const to = G.refSync(common, `refs/heads/${target}`)
+      const to = H.refSync(common, `refs/heads/${target}`)
       if (to === null && seen !== null) return
       const last = facts.filter((f) => f.kind === 'TargetMoved' && f.seq > s.cycle && (f.data as FactData['TargetMoved']).target === target).at(-1)
       const from = last ? (last.data as FactData['TargetMoved']).to : null

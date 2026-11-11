@@ -144,10 +144,16 @@ interface CombworkMessageValues {
   'git.newBranch.button': undefined
   'git.newBranch.commitFirst': undefined
   'git.newBranch.create': undefined
-  'git.newBranch.failed': { branch: string | number }
   'git.newBranch.message': { onBranch: string; commit: string | number; current: string | number }
+  'git.newBranch.name': undefined
   'git.newBranch.noSpaces': undefined
+  'git.newBranch.noStart': { ref: string | number }
+  'git.newBranch.noStartAt': { ref: string | number }
   'git.newBranch.placeholder': undefined
+  'git.newBranch.resolved': { kind: string; commit: string | number; subject: string | number }
+  'git.newBranch.startsAt': undefined
+  'git.newBranch.startsAtHint': undefined
+  'git.newBranch.switchElsewhere': undefined
   'git.newBranch.switchNow': undefined
   'git.newBranch.tip': { commit: string | number }
   'git.newBranch.title': undefined
@@ -228,6 +234,7 @@ interface CombworkMessageValues {
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
+  'git.repoOp.notOffered': undefined
   'git.retry': undefined
   'git.section.branches': undefined
   'git.section.changes': undefined

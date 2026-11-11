@@ -27,7 +27,9 @@ vi.mock('../src/main/git', async (importOriginal) => {
     gitReading: ((cwd, args) => (failing?.(args) ? failed() : real.gitReading(cwd, args))) as typeof real.gitReading
   }
 })
-const { ensureCombworkExcluded, excludeLine, hasExcludeLine, combworkVcs, literalPattern, syncServiceOf, trackedCombworkFiles, untrackCombwork, vcsOf } = await import('../src/main/combworkVcs')
+const { ensureCombworkExcluded, combworkVcs, syncServiceOf, trackedCombworkFiles, untrackCombwork, vcsOf } = await import('../src/main/combworkVcs')
+// Git's exclude syntax moved with Git's keep-out (HI-2792).
+const { excludeLine, hasExcludeLine, literalPattern } = await import('../src/main/platform/gitKeepOut')
 afterEach(() => {
   failing = null
 })

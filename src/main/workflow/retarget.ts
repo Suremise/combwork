@@ -10,7 +10,7 @@
 import { existsSync } from 'original-fs'
 import { randomBytes } from 'crypto'
 import { samePlace } from '../places'
-import * as G from '../platform/git'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import type { TaskActor } from '../tasks'
@@ -40,8 +40,8 @@ const keepOf = (why: MoveWhy): KeepWhy => (why === 'queued' || why === 'notInTar
  * What a change of Work merges into from `from` to `to` would move, and what stays with why (HI-2680), read-only. Slots
  * recording none count as `from`'s when it is the project's target they fell back to (the preview is made while it is).
  */
-export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string): Promise<RetargetPreview> {
-  const out: RetargetPreview = { from, to, cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [] }
+export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string, o: { ongoing?: boolean } = {}): Promise<RetargetPreview> {
+  const out: RetargetPreview = { from, to, cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [], ...(o.ongoing ? { ongoing: true } : {}) }
   const wf = await workflowFor(ws, projectPath)
   if (!wf || from === to) return out
   const store = wf.store
@@ -57,9 +57,12 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
   // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
   // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
-  const fromNow = await G.lineHead(projectPath, from)
-  const toNow = await G.lineHead(projectPath, to)
-  const ended = !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await G.isAncestor(projectPath, fromNow, toNow)) === true)
+  // HI-2807: `ongoing` (Start the next version): both go on by the user's word, whatever their heads say (a new branch is
+  // at the release's head), so started cards and running lanes stay, and `to` need not exist yet: nothing reads it.
+  const H = lineHistory()
+  const fromNow = o.ongoing ? null : await H.lineHead(projectPath, from)
+  const toNow = o.ongoing ? null : await H.lineHead(projectPath, to)
+  const ended = !o.ongoing && !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await H.isAncestor(projectPath, fromNow, toNow)) === true)
   const inFlight = (c: (typeof cards)[number], s: ReturnType<typeof wf.state>): boolean => IN_FLIGHT_STAGES.includes(s.stage) && s.started?.target === from
   const grouped = new Set<number>()
   out.laneMoves = []
@@ -106,7 +109,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   }
   const { poolFor } = await import('../slotsApp')
   const pool = await poolFor(ws, projectPath).catch(() => null)
-  const fromHead = await G.lineHead(projectPath, from)
+  const fromHead = await H.lineHead(projectPath, from)
   for (const s of pool ? pool.deps.store.slots() : []) {
     if ((s.target ?? from) !== from) continue
     const keep = (why: RetargetPreview['slots']['keep'][number]['why']) => out.slots.keep.push({ name: s.name, why })
@@ -122,8 +125,8 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       keep('cantCheck')
       continue
     }
-    const d = await G.dirty(s.folder)
-    const h = await G.head(s.folder)
+    const d = await H.dirty(s.folder)
+    const h = await H.head(s.folder)
     if (isUnknown(d) || isUnknown(h) || !h) {
       keep('cantCheck')
       continue
@@ -132,7 +135,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       keep('dirty')
       continue
     }
-    const inIt = h === fromHead || (await G.isAncestor(projectPath, h, fromHead))
+    const inIt = h === fromHead || (await H.isAncestor(projectPath, h, fromHead))
     if (inIt !== true) {
       keep(isUnknown(inIt) ? 'cantCheck' : 'unmerged')
       continue

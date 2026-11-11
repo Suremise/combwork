@@ -17,12 +17,12 @@ import { agentWorkflowRole, reviewsWork } from '../../shared/workflow/roles'
 import { legacyWorktree } from '../../shared/agentFolders'
 import type { StageId } from '../../shared/workflow/facts'
 import type { ProjectConfig } from '../../shared/types'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { merges, type PlatformId } from '../../shared/platform/descriptors'
 import { ADOPTION_UPTO, adoptionCardNow, adoptionCards, boardValue, boardWrite, markPreWorkflow, setBoardValue, upgradeWaiting, type AdoptionCard } from '../boardStore'
 import { coalesced } from '../coalesce'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
-import * as G from '../platform/git'
+import { historyOf } from '../platform/historyPorts'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
@@ -183,7 +183,7 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
     const agents = c.agents ?? []
     const options = upgradeOptions(platform, { reviewers: hasLane || agents.some((a) => reviewsWork(agentWorkflowRole(a))), worktrees: agents.some((a) => !!legacyWorktree(a)) })
     // HI-1697: the merge style and commit message are asked when the queue first merges, never set silently.
-    return { platform: c.platform ?? platform, workflow: { platform, preset: null, options, ...(platform === 'git' ? { mergeAsk: true as const } : {}) } }
+    return { platform: c.platform ?? platform, workflow: { platform, preset: null, options, ...(merges(platform) ? { mergeAsk: true as const } : {}) } }
   })
   if (made || !cfg.workflow) return MADE_BY_1_0
   return { cfg, platform: cfg.workflow.platform, configured }
@@ -210,6 +210,6 @@ async function whereItWorks(folder: string, cfg: ProjectConfig, c: AdoptionCard,
   const agent = c.agent ? (cfg.agents ?? []).find((a) => a.id === c.agent) : undefined
   const tree = legacyWorktree(agent)
   if (agent && tree) return { agent: agent.id, worktree: tree.path, target: tree.base }
-  const line = platform === 'git' ? await G.branch(folder) : null
+  const line = (await historyOf(platform)?.line(folder)) ?? null
   return { agent: c.agent ?? 'user', target: line && !isUnknown(line) ? line : null }
 }

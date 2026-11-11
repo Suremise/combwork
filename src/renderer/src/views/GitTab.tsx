@@ -5,6 +5,7 @@ import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTi
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import type { CombworkRequests } from '@shared/api'
 import { call, errorMessage } from '../api'
+import { offered, repoOp } from '../repoOps'
 import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
 import { bumpGit, notify, set, showVersionControl, showView, useStore } from '../store'
@@ -249,11 +250,13 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
           {h.pages > 1 && <Pager page={h.page} pages={h.pages} from={(h.page - 1) * HISTORY_COMMITS + 1} to={Math.min(h.page * HISTORY_COMMITS, h.total)} total={h.total} onPage={(page) => setPick({ ...mine, page })} />}
           <h2 className="section git-section-head">
             {tr(M.tags)} <span className="badge">{h.tags.length + h.moreTags}</span>
-            <span className="git-section-actions">
-              <button className="btn small" data-action="create-tag" disabled={!summary?.head || !!summary.parentRepo} onClick={() => setForm({ make: () => tagForm(project, summary) })}>
-                <Icon name="tag" /> {tr(M.createTag)}
-              </button>
-            </span>
+            {offered('git:createTag') && (
+              <span className="git-section-actions">
+                <button className="btn small" data-action="create-tag" disabled={!summary?.head || !!summary.parentRepo} onClick={() => setForm({ make: () => tagForm(project, summary) })}>
+                  <Icon name="tag" /> {tr(M.createTag)}
+                </button>
+              </span>
+            )}
           </h2>
           {h.tags.length === 0 ? (
             <p className="hint">{tr(M.noTags)}</p>
@@ -406,7 +409,7 @@ function tagForm(project: ProjectInfo, s: GitRepoSummary | null): FormSpec {
     confirm: tr(M.createTagButton),
     busyLabel: tr(M.tagging),
     validate: (v) => (!v.name.trim() ? tr(M.enterName) : /\s/.test(v.name.trim()) ? tr(M.tagNoSpaces) : null),
-    submit: (v) => call('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined)
+    submit: (v) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined)
   }
 }
 

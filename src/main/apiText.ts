@@ -140,6 +140,9 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
     pauseAQueue: agentMsg({ id: 'api.change.pauseAQueue', text: 'pause a merge queue' }),
     forwardAny: agentMsg({ id: 'api.change.forwardAny', text: 'bring a branch up to date with another' }),
+    createBranchAny: agentMsg({ id: 'api.change.createBranchAny', text: 'create a branch' }),
+    createBranch: agentMsg({ id: 'api.change.createBranch', text: 'create the branch {name} from {from} in {project}', note: 'HI-2807: cw_branch create. {from}: a branch, tag or commit as named.' }),
+    nextVersion: agentMsg({ id: 'api.change.nextVersion', text: 'start the next version of {project}', note: 'HI-2807: cw_branch nextVersion.' }),
     retargetAny: agentMsg({ id: 'api.change.retargetAny', text: "move cards and slots to a project's new target" }),
     retarget: agentMsg({ id: 'api.change.retarget', text: 'move cards and slots from {from} to {to} in {project}' }),
     forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
@@ -246,6 +249,8 @@ export const API = {
     prompted: agentMsg({ id: 'api.done.prompted', text: 'Gave {agent} in {project} a task{given, select, yes { ({id})} other {}}' }),
     promptedFresh: agentMsg({ id: 'api.done.promptedFresh', text: 'Gave {agent} in {project} a task in a new conversation' }),
     queuePaused: agentMsg({ id: 'api.done.queuePaused', text: 'Paused the merge queue for {target} in {project}' }),
+    branchCreated: agentMsg({ id: 'api.done.branchCreated', text: 'Created {name} from {from} ({commit}) in {project}', note: 'HI-2807: {commit} is a short hash.' }),
+    nextVersionStarted: agentMsg({ id: 'api.done.nextVersionStarted', text: 'Started {name} from {from} ({commit}) in {project}: {added, select, yes {{from} added to the other branches work can merge into, } other {}}work merges into {name} now', note: 'HI-2807: Start the next version. {commit} is a short hash.' }),
     retargeted: agentMsg({ id: 'api.done.retargeted', text: 'Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why' }),
     forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: '{to} has everything of {from} already: nothing queued' }),
     forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}" }),
@@ -396,7 +401,8 @@ export const API = {
     targetArg: agentMsg({ id: 'api.queue.targetArg', text: 'target is a branch name' }),
     retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
     retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
-    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets" }),
+    branchArgs: agentMsg({ id: 'api.queue.branchArgs', text: 'name and from are required: the new branch and where it starts (a branch, a tag or a commit)', note: 'HI-2807: cw_branch create without them.' }),
+    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },
   settings: {

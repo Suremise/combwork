@@ -25,6 +25,8 @@ import { agentChangeCheck, agentImpact, impactBusy, ImpactMoved } from './connec
 import { boardWrite } from './boardStore'
 import type { LaunchImpact } from '../shared/launchPolicy'
 import * as wt from './worktrees'
+import { lineRepoOps } from './platform/repoOpsPorts'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { listOf, shownText, withValues, type Text } from '../shared/advanced'
@@ -81,6 +83,12 @@ function connectionFor(projectPath: string, cli: ProviderId, named: string | nul
   return account ? baseConnection(account.id, allConnections())?.id : undefined
 }
 
+/** The workspace lifecycle port agents' worktrees are listed and made with (SPEC §16.3.6 Port 2, HI-2789's R5). */
+const port = slotWorkspaces
+
+/** The project's worktrees, the project folder included, by path and branch: none when they can't be listed (as listWorktrees answered). */
+const worktreesOf = async (projectPath: string): Promise<{ path: string; branch: string | null }[]> => ((await port().list(projectPath)) ?? []).map((w) => ({ path: w.path, branch: w.line }))
+
 /**
  * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
  * CombworkError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
@@ -95,8 +103,8 @@ export async function gitInfo(projectPath: string): Promise<ProjectGitInfo> {
   const cfg = await workspace.projectConfig(projectPath)
   // By real paths (#389): git lists the long names, while an agent's may be saved short (8.3), or through a junction.
   const used = new Set(projectAgents(cfg).flatMap((a) => (legacyWorktree(a) ? [placeKey(legacyWorktree(a)!.path)] : [])))
-  const current = await wt.currentBranch(projectPath)
-  const all = await wt.listWorktrees(projectPath)
+  const current = await port().currentLine(projectPath)
+  const all = await worktreesOf(projectPath)
   // No worktrees listed because git can't run is not "not a repository" (#346).
   const problem = all.length ? null : gitProblem()
   return {
@@ -270,7 +278,7 @@ export async function matchingWorktree(projectPath: string, branch: string, base
 async function matchingTree(projectPath: string, branch: string, base: string, others: readonly AgentDef[], name?: string): Promise<(Omit<WorktreeMatch, 'why'> & { whyText?: Text }) | null> {
   const root = placeKey(join(workspaceOf(projectPath).worktreesRoot, basename(projectPath)))
   const used = new Set(others.flatMap((a) => (legacyWorktree(a) ? [placeKey(legacyWorktree(a)!.path)] : [])))
-  const listed = (await wt.listWorktrees(projectPath)).filter((x) => !samePlace(x.path, projectPath) && placeKey(dirname(x.path)) === root && !used.has(placeKey(x.path)) && existsSync(x.path))
+  const listed = (await worktreesOf(projectPath)).filter((x) => !samePlace(x.path, projectPath) && placeKey(dirname(x.path)) === root && !used.has(placeKey(x.path)) && existsSync(x.path))
   const w = reusableBranches(branch, await branchPlace(projectPath), name)
     .map((b) => listed.find((x) => x.branch === b))
     .find((x) => !!x)
@@ -328,16 +336,16 @@ export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions)
   const cfg = await workspace.projectConfig(projectPath)
   let tree: wt.WorktreeRef
   if (opts.location === 'existing-worktree') {
-    const found = (await wt.listWorktrees(projectPath)).find((w) => !!opts.worktreePath && placeKey(w.path) === placeKey(opts.worktreePath))
+    const found = (await worktreesOf(projectPath)).find((w) => !!opts.worktreePath && placeKey(w.path) === placeKey(opts.worktreePath))
     if (!found?.branch) throw new Error(`not a worktree of this project on a branch: ${opts.worktreePath}`) // i18n-ignore: a test channel, never shown
-    tree = { path: found.path, branch: found.branch, base: (await wt.currentBranch(projectPath)) ?? found.branch }
+    tree = { path: found.path, branch: found.branch, base: (await port().currentLine(projectPath)) ?? found.branch }
   } else {
-    const base = opts.base || (await wt.currentBranch(projectPath)) || 'main'
+    const base = opts.base || (await port().currentLine(projectPath)) || 'main'
     const name = opts.name?.trim() || 'Agent' // i18n-ignore: a test channel's fallback for a worktree's folder name
     const { branch, path: dest, newSpace } = await newWorktreePlace(projectPath, name, opts.branch)
-    await wt.createWorktree(projectPath, dest, branch, base)
+    await port().createOnNewLine(projectPath, dest, branch, base)
     if (newSpace) await recordSpace(projectPath, newSpace)
-    await wt.copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value)
+    await port().copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value)
     tree = { path: dest, branch, base }
   }
   const def = await addAgent(projectPath, { ...opts, location: 'project', branch: undefined, base: undefined, worktreePath: undefined, reuseWorktree: undefined })
@@ -722,7 +730,7 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
 export async function mergeInProject(projectPath: string, worktree: wt.WorktreeRef, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
   // The merge slot of the branch merged into: the target named (#1450's branch merges), else the project folder's.
   const into = opts.target ?? (await workspace.branch(projectPath))
-  const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => wt.mergeWorktree(projectPath, worktree, opts), { project: projectPath })
+  const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => lineRepoOps('mergeLine').mergeWorkspace(projectPath, worktree, opts), { project: projectPath })
   return into ? await userMergeSlot(projectPath, into, run) : await run()
 }
 

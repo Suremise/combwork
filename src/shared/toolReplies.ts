@@ -244,7 +244,7 @@ const R = {
   unknownCli: agentMsg({ id: 'reply.connection.unknownCli', text: 'unknown CLI', note: "A connection whose CLI isn't known." }),
   accountBare: agentMsg({ id: 'reply.connection.accountBare', text: 'Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}', note: 'cw_connection list: an account with no connections.' }),
   providerRow: agentMsg({ id: 'reply.provider.row', text: "{name} ({id}): {on, select, yes {on} other {off}}, {installed, select, yes {installed{hasVersion, select, yes { {version}} other {}}{hasTested, select, yes { (tested with {tested}: {compared})} other {}}} other {not installed}}; default model {hasModel, select, yes {{model}} other {its CLI's own}}; {models, plural, one {# model} other {# models}}{hasEfforts, select, yes {; efforts {efforts}} other {}}; modes {modes}{hasConnections, select, yes {; connections {connections}} other {}}{hasProblem, select, yes {. Problem: {problem}} other {}}", note: "cw_list_providers (HI-2814): a provider in a line. The has… flags (yes/no) say whether {version}, {tested}, {model}, {efforts}, {connections} and {problem} have a value. {compared}: same, newer, older or unknown." }),
-  providerConnection: agentMsg({ id: 'reply.provider.connection', text: '{name} (id {id})', note: "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names." }),
+  providerConnection: agentMsg({ id: 'reply.provider.connection', text: "{name} (id {id}{own, select, yes {; its account's {models, plural, one {# model} other {# models}}, default model {hasModel, select, yes {{model}} other {its CLI's own}}} other {}})", note: "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names. own (yes/no): its account's models or default aren't the provider's (HI-2856), so they are said; hasModel (yes/no): whether {model} has a value." }),
   providersMore: agentMsg({ id: 'reply.provider.more', text: 'cw_list_providers with provider (its id) gives one in full: its models with their labels, its efforts and its modes with what each does.', note: 'cw_list_providers (HI-2814): the listing ends with how to get one provider in full.' }),
   connectionsNone: agentMsg({ id: 'reply.connection.none', text: 'No connections: the user adds an account in Settings → Accounts & Connections.', note: 'cw_connection list with none.' }),
   usageLimit: agentMsg({ id: 'reply.usage.limit', text: '{label} {percent}%{hasReset, select, yes { (resets {at}Z)} other {}}', note: "An account's limit (HI-2195): its share used and when it resets (UTC)." }),
@@ -1438,7 +1438,8 @@ export interface ProviderPublic {
   efforts: { value: string; label: string }[]
   context200k: boolean
   modes: { value: string; label: string; description: string }[]
-  connections?: { id: string; name: string }[]
+  /** Each with its account's default, and its models where they aren't the provider's (HI-2856). */
+  connections?: { id: string; name: string; defaultModel?: string | null; models?: { value: string; label: string }[] }[]
 }
 
 /**
@@ -1449,7 +1450,14 @@ export interface ProviderPublic {
 export function providerListText(ps: ProviderPublic[]): string {
   const rows = ps.map((p) => {
     const efforts = p.efforts.map((e) => e.value).join(', ')
-    const connections = (p.connections ?? []).map((c) => say(R.providerConnection, { name: c.name, id: c.id })).join(', ')
+    // A connection on an account offering other models than the provider's (HI-2856): its count and default.
+    const connections = (p.connections ?? [])
+      .map((c) => {
+        const own = !!c.models || (c.defaultModel !== undefined && c.defaultModel !== p.defaultModel)
+        const model = c.defaultModel === undefined ? p.defaultModel : c.defaultModel
+        return say(R.providerConnection, { name: c.name, id: c.id, own: yn(own), models: (c.models ?? p.models).length, hasModel: yn(model), model: model ?? '' })
+      })
+      .join(', ')
     const tested = p.installed && p.tested ? p.tested : null
     return say(R.providerRow, {
       name: p.name,

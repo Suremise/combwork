@@ -33,7 +33,7 @@ import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
-import { dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
+import { accountInfo, dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
   AgentDef,
@@ -47,6 +47,7 @@ import type {
   ModelSwitch,
   RuntimeFacts,
   McpServerDef,
+  AgentInstallInfo,
   McpServerInfo,
   PermissionMode,
   ProjectConfig,
@@ -2367,17 +2368,24 @@ class SessionManager {
     // A /rename in the CLI since the session was last named in Combwork is the newer name: Combwork takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
+    // The CLI's title not known now (HI-2839 review round 1): no --name, so the CLI keeps its own title, whatever it is.
+    let titleUnknown = false
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
-      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      // As its transcript has it now (HI-2839): a /rename just before Stop is in no history yet, and missing it here passes
+      // the older name with --name, which Claude Code keeps as the title over the user's.
+      const read = await this.resumeUsage(projectPath, opts.resumeId).catch(() => null)
       times.mark('usage')
-      adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
+      titleUnknown = !read?.known
+      if (titleUnknown) log.info(`Session ${existing.id} is resumed without --name: its CLI's title couldn't be read in time`)
+      else adopted = cliRename({ ...existing, usage: read!.usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
         log.info(`Session ${existing.id} takes the name ${userText(adopted)} it was given in the CLI`)
       }
     }
     const sessionName = adopted || opts.name?.trim() || existing?.name || (assistant ? `${ASSISTANT_NAME}${mode ? ` · ${mode}` : ''} · ${formatDateTime(new Date())}` : autoName(projectPath, agent, count))
+    // What the launch passes as --name: none while the CLI's title isn't known (above).
+    const launchName = titleUnknown ? '' : sessionName
     const key = this.key(projectPath, agentId)
     const runId = run
     const state: LiveSessionState = {
@@ -2422,7 +2430,7 @@ class SessionManager {
           quietExit: true,
           // What the setup command starts is the launch's too (an `npm install` left running).
           ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
-          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
+          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: launchName, resume: !!opts.resumeId })
         })
         // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
         this.writerSpawned(runId)
@@ -2435,7 +2443,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
+      await this.launch(projectPath, agent, { sessionId, name: launchName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -2870,7 +2878,10 @@ class SessionManager {
     // Performance metrics for this launch go to the workspace it started in (none, if that closes meanwhile).
     const metrics = metricsHandle(workspaceOf(projectPath))
     const { sessionId } = opts
-    const info = providerService.info(adapter.id)
+    // The account it launches on (HI-2852): a sign-in account's own models and default, as its folder says; a server's
+    // connection and a launch on the CLI's own home, the CLI's catalogue.
+    const modelAccount = conn ? ({ id: conn.id, kind: conn.server ? 'server' : 'signIn' } as const) : null
+    const info = accountInfo(providerService.info(adapter.id), modelAccount) ?? providerService.info(adapter.id)
     if (!info.path) throw combworkError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
 
     let resume = opts.resume
@@ -2987,7 +2998,7 @@ class SessionManager {
       mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
-      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
+      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, modelAccount, eff.effort) ? null : eff.effort,
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
@@ -4569,26 +4580,32 @@ class SessionManager {
         writePty(key, '\r')
       }
     } catch (e) {
+      const who = userText(l ? this.label(l.state) : agentId)
       if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
         // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
         // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it. A CLI whose Ctrl+U
         // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
-        if (l?.adapter.descriptor.capabilities.ctrlUClearsRow) {
-          const n = backspaceKeys(lines ?? typedOut)
+        // Each take-back is logged as its keys are written (HI-2875: a put-off line's take-back had no time in the log).
+        let pressed = 0
+        const rows = !!l?.adapter.descriptor.capabilities.ctrlUClearsRow
+        const n = rows ? backspaceKeys(lines ?? typedOut) : lines ? rollbackKeys(lines) : 1
+        if (rows) {
           for (let i = 0; i < n; i += 8) {
             if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
             writePty(key, '\x7f'.repeat(Math.min(8, n - i)))
+            pressed += Math.min(8, n - i)
             if (i + 8 < n) await new Promise((r) => setTimeout(r, 10))
           }
         } else {
-          const n = lines ? rollbackKeys(lines) : 1
           for (let i = 0; i < n; i++) {
             if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
             writePty(key, '\x15')
+            pressed++
             if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
           }
         }
-      }
+        log.info(`${who}: the line Combwork typed is taken back: ${pressed} of ${n} ${rows ? 'Backspace' : 'Ctrl+U'} written`)
+      } else if (typed) log.info(`${who}: the line Combwork typed is left as it is: ${!clearDraft ? 'clearing drafts is off' : !same() ? 'its run changed' : 'the user typed there'}`)
       throw e
     } finally {
       if (sent && l) l.typed = sent
@@ -6387,6 +6404,13 @@ class SessionManager {
     if (windowChanged && st.sessionId) emit({ type: 'usage-changed', projectPath: st.projectPath, sessionId: st.sessionId })
   }
 
+  /** Its CLI's models as its launch's account offers them (HI-2852: a sign-in account's own; a server's, the CLI's). */
+  private launchedInfo(st: LiveSessionState): AgentInstallInfo {
+    const info = providerService.info(st.provider)
+    const c = st.launchedConnection
+    return (c ? accountInfo(info, { id: c.id, kind: c.server ? 'server' : 'signIn' }) : info) ?? info
+  }
+
   /**
    * Whether the session runs another model than its launch gave it, after a report (HI-2609, modelSwitched): the same
    * object while that stands unchanged (so nothing is sent again), a new one when it starts or the model changes again,
@@ -6397,7 +6421,7 @@ class SessionManager {
     const st = l.state
     if (!d.modelId || st.launchedConnection?.server) return st.modelSwitch
     if (d.modelAt && Date.parse(d.modelAt) < Date.parse(st.startedAt)) return st.modelSwitch
-    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, providerService.info(st.provider))
+    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, this.launchedInfo(st))
     if (!s) return undefined
     const was = st.modelSwitch
     return was && was.launched === s.launched && was.running === s.running ? was : { ...s, since: new Date().toISOString() }
@@ -6413,7 +6437,7 @@ class SessionManager {
     log.warn(`${userText(label)}: its CLI reports model ${s.running}, not ${s.launched} as launched`)
     if (l.modelSwitchTold) return
     l.modelSwitchTold = true
-    const info = providerService.info(st.provider)
+    const info = this.launchedInfo(st)
     const values = { agent: label, cli: l.adapter.descriptor.name, launched: modelIdName(st.provider, s.launched, info), running: modelIdName(st.provider, s.running, info) }
     toast('warning', tr(M.modelSwitchTitle, values), tr(M.modelSwitch, values), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }
@@ -8271,6 +8295,41 @@ class SessionManager {
       if (window) return { ...usage, contextWindow: window }
     }
     return usage
+  }
+
+  /** How long a resume waits for the worker's turn on its transcript (HI-2839): past it, the history's usage, or none. */
+  resumeReadWaitMs = 3000
+
+  /**
+   * A stopped session's usage as its resume adopts a CLI /rename from it (HI-2839): the history's only while it has the
+   * whole transcript (its size and time as read); behind it (the import queued as the launch ended hasn't run yet), the
+   * transcript's, read by the worker from where it stopped. When the worker has the file's turn (that import under way),
+   * waited for up to `resumeReadWaitMs` rather than never (#1177: a start never waits long on it). `known` false: neither
+   * (that wait ran out, the read failed, the transcript couldn't be looked at), so the CLI's title now isn't known and the
+   * usage given is none: the resume passes no --name rather than a name that may be older than the CLI's (review round 1).
+   * No transcript: what the history or the record keeps, as `usage()` gives it (the CLI has nothing newer to resume from).
+   */
+  private async resumeUsage(projectPath: string, sessionId: string): Promise<{ usage: SessionUsage | null; known: boolean }> {
+    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+    const p = await this.anyTranscript(projectPath, sessionId)
+    if (!p) return { usage: await this.usage(projectPath, sessionId, undefined, { noWait: true }), known: true }
+    const st = await stat(p).catch(() => null)
+    if (!st) return { usage: null, known: false }
+    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    if (stored && stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs) return { usage: withScreenStopsIn(this.titled(stored.usage), rec?.screenStops), known: true }
+    const provider = await this.sessionProvider(projectPath, sessionId)
+    const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
+    let usage = await this.usageFor(projectPath, p, sessionId, provider, { ...o, noWait: true })
+    if (!usage) {
+      let timer: NodeJS.Timeout | undefined
+      const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), this.resumeReadWaitMs)))
+      try {
+        usage = await Promise.race([this.usageFor(projectPath, p, sessionId, provider, o), late])
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    return usage ? { usage: withScreenStopsIn(usage, rec?.screenStops), known: true } : { usage: null, known: false }
   }
 
   /** A usage from the history with the title its CLI gives the session now (Codex's and Copilot's own index), when it has none. */

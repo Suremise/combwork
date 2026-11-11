@@ -420,8 +420,8 @@
     "note": "cw_list_projects's last line."
   },
   "reply.provider.connection": {
-    "text": "{name} (id {id})",
-    "note": "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names."
+    "text": "{name} (id {id}{own, select, yes {; its account's {models, plural, one {# model} other {# models}}, default model {hasModel, select, yes {{model}} other {its CLI's own}}} other {}})",
+    "note": "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names. own (yes/no): its account's models or default aren't the provider's (HI-2856), so they are said; hasModel (yes/no): whether {model} has a value."
   },
   "reply.provider.more": {
     "text": "cw_list_providers with provider (its id) gives one in full: its models with their labels, its efforts and its modes with what each does.",

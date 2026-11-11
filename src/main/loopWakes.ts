@@ -237,7 +237,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
     const answer = w.kind === 'answer'
-    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}) }
+    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}), ...(w.kind === 'step' ? { awaitsCheck: true } : {}) }
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Combwork's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`

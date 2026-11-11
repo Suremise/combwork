@@ -86,6 +86,24 @@
   "tool.askUser.description": {
     "text": "Ask the user something about a card, under For you; the answer comes to your inbox. When the answer is something only the user can do (Done, no code, unblock, skip review), offer it in actions."
   },
+  "tool.branch.arg.commit": {
+    "text": "The commit you showed the user for from (or the release): refused if it moved since."
+  },
+  "tool.branch.arg.from": {
+    "text": "create: where it starts: a branch, tag or commit."
+  },
+  "tool.branch.description": {
+    "text": "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.",
+    "note": "HI-2807. Work merges into and Other branches (work can merge into) are option names."
+  },
+  "tool.branch.reply.created": {
+    "text": "Created {name} from {from} ({commit}).",
+    "note": "HI-2807: cw_branch create. {commit} is a short hash."
+  },
+  "tool.branch.reply.nextVersion": {
+    "text": "Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}",
+    "note": "HI-2807: cw_branch nextVersion. {move} and {stay} are lists (\"-\" for none); {preview} an id."
+  },
   "tool.call.error": {
     "text": "Combwork error: {message}",
     "note": "{message}: the call's error (the Agent API's refusal, or one below). What the call takes follows on its own line when it gave the wrong arguments (HI-2229)."
@@ -333,7 +351,7 @@
     "text": "Its id (\"claude-code\")."
   },
   "tool.listProviders.description": {
-    "text": "The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents. provider: one as JSON, its models and what each mode does."
+    "text": "The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents (a connection on an account with other models: its own count and default). provider: one as JSON, its models, each connection's own, and what each mode does."
   },
   "tool.listProviders.error.unknown": {
     "text": "No provider {provider}: one of {ids}.",
@@ -430,7 +448,7 @@
     "text": "Put a card in Doing back in Todo, unstarted. why is written as a comment."
   },
   "tool.queue.arg.from": {
-    "text": "forward: the branch to bring in; target is the one brought up to date. Both the project's targets."
+    "text": "forward: the branch to bring into target: another project target, or the default branch (main, after a release)."
   },
   "tool.queue.arg.items": {
     "text": "retarget: the card keys, lane names and slot names to move, from the preview named."

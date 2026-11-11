@@ -20,13 +20,14 @@ export interface UiState {
   boardFold?: AppConfig['ui']['boardFold']
   projectViews?: AppConfig['ui']['projectViews']
   modelCatalogs?: AppConfig['modelCatalogs']
+  accountModelCatalogs?: AppConfig['accountModelCatalogs']
 }
 
 /** The config as config.json keeps it, and the UI state kept beside it. */
 export function splitUiState<C extends AppConfig>(c: C): { saved: C; state: UiState } {
-  const { modelCatalogs, ...rest } = c
+  const { modelCatalogs, accountModelCatalogs, ...rest } = c
   const { boardFold, projectViews, ...ui } = c.ui
-  return { saved: { ...rest, ui } as C, state: { ...(boardFold ? { boardFold } : {}), ...(projectViews ? { projectViews } : {}), ...(modelCatalogs ? { modelCatalogs } : {}) } }
+  return { saved: { ...rest, ui } as C, state: { ...(boardFold ? { boardFold } : {}), ...(projectViews ? { projectViews } : {}), ...(modelCatalogs ? { modelCatalogs } : {}), ...(accountModelCatalogs ? { accountModelCatalogs } : {}) } }
 }
 
 /** ui-state.json's text as a UiState: anything else (missing, damaged, not an object) is none, a cache lost. */
@@ -35,8 +36,8 @@ export function parseUiState(text: string | null): UiState {
     const j: unknown = text === null ? null : JSON.parse(text)
     if (!j || typeof j !== 'object' || Array.isArray(j)) return {}
     const obj = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v)
-    const { boardFold, projectViews, modelCatalogs } = j as Record<string, unknown>
-    return { ...(obj(boardFold) ? { boardFold: boardFold as UiState['boardFold'] } : {}), ...(obj(projectViews) ? { projectViews: projectViews as UiState['projectViews'] } : {}), ...(obj(modelCatalogs) ? { modelCatalogs: modelCatalogs as UiState['modelCatalogs'] } : {}) }
+    const { boardFold, projectViews, modelCatalogs, accountModelCatalogs } = j as Record<string, unknown>
+    return { ...(obj(boardFold) ? { boardFold: boardFold as UiState['boardFold'] } : {}), ...(obj(projectViews) ? { projectViews: projectViews as UiState['projectViews'] } : {}), ...(obj(modelCatalogs) ? { modelCatalogs: modelCatalogs as UiState['modelCatalogs'] } : {}), ...(obj(accountModelCatalogs) ? { accountModelCatalogs: accountModelCatalogs as UiState['accountModelCatalogs'] } : {}) }
   } catch {
     return {}
   }
@@ -102,7 +103,8 @@ class ConfigStore {
     if (state.boardFold) this.data.ui.boardFold = state.boardFold
     if (state.projectViews) this.data.ui.projectViews = state.projectViews
     if (state.modelCatalogs) this.data.modelCatalogs = state.modelCatalogs
-    if (state.boardFold || state.projectViews || state.modelCatalogs) this.stateWritten = text
+    if (state.accountModelCatalogs) this.data.accountModelCatalogs = state.accountModelCatalogs
+    if (state.boardFold || state.projectViews || state.modelCatalogs || state.accountModelCatalogs) this.stateWritten = text
     // Tests: no tip card over what a suite clicks, unless its profile turns tips on.
     if (testTipsOff() && raw?.settings?.general?.showTips === undefined) this.data.settings.general.showTips = false
   }

@@ -10,7 +10,7 @@ import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
 import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
 import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, laneStill, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type LaneSeen, type MoveRefusal } from './workflow/retargetCard'
-import type { RefHold } from './platform/refHold'
+import type { RefHold } from './platform/repoContext'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
@@ -26,7 +26,7 @@ import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageEr
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import { loopReviewerOf } from './loopReviewer'
-import { gitStep } from './platform/git'
+import { readStep } from './platform/historyPorts'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
@@ -1757,8 +1757,8 @@ export async function runIntent<R>(
           saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}) }), moved)
         }
       },
-      // One git step (#1376): what it asks git about fixed commits is asked once in it.
-      () => gitStep(() => call(wf))
+      // One read step (#1376): what it asks git about fixed commits is asked once in it.
+      () => readStep(() => call(wf))
     )
   )
   return { reply, saved }
@@ -2051,6 +2051,9 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
   )
 }
 
+/** The stages a card waits in, not yet started or put back (On Hold, Todo): its Merges into changes while it has no work of its own. */
+const WAITING_STAGES: readonly StageId[] = ['hold', 'todo']
+
 const TARGET = {
   agents: msg({ id: 'tasks.error.targetNotAgents', defaultMessage: 'Only the user or the Assistant sets which branch a card merges into.', description: 'HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can.' }),
   notListed: msg({ id: 'tasks.error.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}', description: 'HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
@@ -2223,9 +2226,11 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
       const s = wf ? wf.state(wf.store.card(n)) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
       // a start or a put back of it would be written.
-      const own = s && s.stage === 'todo' ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
-      const work = !s ? false : s.stage !== 'todo' ? true : own!.work
-      if (work !== false) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target ?? '' })) // i18n-ignore: select keys
+      // HI-2825: On Hold as well as Todo (a card never started, or put back there); a card past them has work.
+      const own = s && WAITING_STAGES.includes(s.stage) ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
+      const work = !s ? false : own ? own.work : true
+      // The branch its work was made from, else the one it merges into now: never an empty name (HI-2825).
+      if (work !== false) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
       if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
       // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
       // carrying the old target's history; refused while one is checked out somewhere.

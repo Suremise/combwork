@@ -12,12 +12,13 @@ import type { CardState, FileChange } from '../../shared/workflow/facts'
 import { trailerRefusal, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
-import { attributeFolder, reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
+import { attributeFolder, reconcileHistory, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
 import * as G from './git'
-import { observer, type Disposable, type ObserveEvent } from './observe'
+import type { Disposable, ObserveEvent } from './history'
+import { historyFor, observePort } from './historyPorts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
 import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
@@ -90,6 +91,8 @@ function othersFiles(others: Locked[], files: string[]): string[] {
 
 export class GitPlatform implements PlatformAdapter {
   readonly id = 'git' as const
+  /** Its history and evidence reads (port 3, HI-2787): reconciliation and attribution go through them. */
+  private readonly history = historyFor(this.id)
 
   constructor(private wf: Workflow) {}
 
@@ -371,7 +374,7 @@ export class GitPlatform implements PlatformAdapter {
       // A shared folder: the card's change is its own attributed commits (§16.3.2), attributed by reconciling first; a
       // start not written yet (a drag planning, #1265) has none yet, and nothing is written for it.
       if (!args.predicted) {
-        await reconcileGit(this.wf, card, {})
+        await reconcileHistory(this.wf, this.history, card, {})
         s = this.wf.state(card)
       }
       commits = s.attributed
@@ -397,7 +400,7 @@ export class GitPlatform implements PlatformAdapter {
       if (commits) {
         const u = await this.untrailered(card, s)
         if (isUnknown(u)) return { ok: false, refusal: unknownRefusal(card, u, 'submit') }
-        if (u) return { ok: false, refusal: trailerRefusal(card.key, u) }
+        if (u) return { ok: false, refusal: trailerRefusal(this.id, card.key, u) }
       }
       const all = dirty ?? (await G.dirty(folder))
       const notMine = this.wf.ownLine(s) || isUnknown(all) ? [] : await this.inRepo(this.notMine(card, s))
@@ -562,7 +565,7 @@ export class GitPlatform implements PlatformAdapter {
       return b !== line || !lh || h !== lh ? null : h
     }
     // The shared folder's attribution brought up to date first: a commit just made is the card's once attributed.
-    if (shared && !(await attributeFolder(this.wf).then(() => true, () => false))) return null
+    if (shared && !(await attributeFolder(this.wf, {}, this.history).then(() => true, () => false))) return null
     const head = await at()
     if (!head || head === submitted || (await G.isAncestor(folder, submitted, head)) !== true) return null
     const ids = await G.commitIds(folder, `${submitted}..${head}`, UNSUBMITTED_MAX + 1)
@@ -614,7 +617,7 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   reconcile(card: CardRecord, hooks: ReconcileHooks): Promise<void> {
-    return reconcileGit(this.wf, card, hooks)
+    return reconcileHistory(this.wf, this.history, card, hooks)
   }
 
   /**
@@ -639,7 +642,7 @@ export class GitPlatform implements PlatformAdapter {
     const snapA = await snapshot(folder, files, gitDir)
     const t0 = Date.now()
     const ok = run.command ? (await run.exec(run.command, folder)).ok : false
-    const seen = await observer.changedBetween(folder, t0, Date.now())
+    const seen = await observePort.changedBetween(folder, t0, Date.now())
     const snapB = await snapshot(folder, files, gitDir)
     const after = await G.worktreeNow(folder)
     const dirtyB = isUnknown(after) ? after : after.dirty
@@ -655,7 +658,7 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   observe(onChange: (e: ObserveEvent) => void): Disposable {
-    return observer.subscribe(this.project, onChange)
+    return observePort.subscribe(this.project, onChange)
   }
 
   async checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null> {

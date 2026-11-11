@@ -273,6 +273,63 @@ wired the rest into the app.
 moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Combwork merges needs Git).
+Many modules still call Git directly past it (the runner, locks, slots, copies, the queue's mechanics, the Git view):
+1.4.0's refactor (HI-2783's R0 to R9) puts them behind five ports, repository context, workspace lifecycle, evidence
+and history, integration and repository operations, with the invariants each keeps and a type map from today's modules
+in SPEC §16.3.6. Until a module has moved, the code above is how it works. Port 1, repository context (HI-2784's R1):
+`platform/repoContext.ts` holds the contracts (`RepoContext`, `RepoRunner`, `RepoLocks`, importing no platform's code),
+`platform/gitRepoPorts.ts` is Git's, delegating to `git.ts`, `gitTool.ts`, `repoLock.ts`, `folderFence.ts` and
+`refHold.ts` unchanged, and `platform/repoPorts.ts` finds a folder's or a platform's (`repoContext`,
+`withFolderRepoLocks`). A caller moved to it imports only those two (`tests/repoPortsImports.test.ts`, check:repo).
+Port 2, workspace lifecycle (HI-2786's R4): `platform/workspacePort.ts` is the contract (a workspace's reads, its
+creation, preparation, detach, recreation and removal, a merged card line's deletion), `platform/gitWorkspacePort.ts`
+Git's over worktrees (the same git commands as before; `worktrees.ts` stays its helpers), and
+`platform/workspacePorts.ts` finds it (`slotWorkspaces()`, by the isolation capability). The slot pool (`slots.ts`,
+which takes it as `PoolDeps.workspaces`), its card hooks (`slotCards.ts`) and a 0.9 worktree's recreation
+(`agentWorktree.ts`) keep the leases, operations, jobs and refusals and act on folders only through it;
+`tests/slotTraces.test.ts` holds the pool's git commands to their recorded traces. R5 (HI-2789): copies (`copies.ts`),
+a Resume's claim (`agentFolders.ts`), a lane's start (`lanes.ts`) and agents' worktrees (`projectAgents.ts`'s listing and
+making) use the workspace port too, and the providers' context reads (Claude Code's memory base, the trust check's roots
+in `accounts.ts`, the skill copies' exclude) are port 1's `mainTree`, `trustRoot` and `excludeFile` (`repoPorts.ts`);
+`tests/contextTraces.test.ts` holds their commands and answers.
+Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
+`platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
+`platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
+platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
+pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
+`reconcileHistory` and `attributeFolder`. A card's move to another target (`workflow/retargetCard.ts`, HI-2821) asks its
+platform's optional `ownWork` proof (Git's in `platform/gitOwnWork.ts`; absent, the move isn't offered) and holds the refs
+through port 1's `holdRefs`; `tests/retargetTraces.test.ts` holds its git commands.
+Port 4's candidate half (HI-2790's R7): `platform/integration.ts` holds the contract (`IntegrationPort`'s `update`,
+`candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/gitIntegration.ts` is Git's (the queue's
+worktree made or reused, strict's update, the test merge in each style and its cleanup, moved from `mergeQueue.ts`), with
+`platform/gitCommits.ts` reading a commit's stream (hook, signer or git), and `platform/integrationPorts.ts` finds it by
+the card's platform. `mergeQueue.ts` keeps the state machine, the facts and the messages, and calls the port for each
+candidate (`tests/integrationPortsImports.test.ts`, check:repo; `tests/workflow/queueTraces.test.ts` holds the commands to
+their recorded traces). Its advance, recovery and publish half (HI-2791's R8) is granular steps of the same port (the
+swap, a checked-out target's conditions, the files moved forth and back, each file's side and the terminal state,
+recovery's table, the push's destination and the push of a captured head, the host's pins, the runner's workspace
+removal, Resume's condition reads), called between the journal's phases: the journal, lock, fence, lease checks, crash
+hooks and pauses stay in `mergeQueue.ts` (`tests/workflow/queueAdvanceTraces.test.ts` holds those commands to theirs).
+R9 (HI-2792) finished the routing and audited what's left. The runtime builds its adapters from
+`platform/adapters.ts`, and the Git tool's readiness is each repository platform's runner (`repoTools()`,
+`checkRepoTools()`). Port 1 also owns keeping `.combwork` out (`RepoPorts.keepOut`, Git's in `platform/gitKeepOut.ts`;
+`combworkVcs.ts` routes to it), the Files tab's ignore rules and search list (`RepoPorts.files`, Git's in
+`platform/gitFiles.ts`), the project's current line, and the metadata folders the Files tab hides. Detection's folder
+markers are `vcsDetect.ts`. Port 2 has the relocation capability (`Relocation`, Git's in `platform/gitRelocation.ts`),
+which Repair (`workspaceMove.ts`) and the 1.1 folder move's worktree repair (`combworkMove.ts`) use. Port 3 gained the
+reads its last direct callers made (a step, identity, messages, the queue's step reads, a run's checked-out revision),
+and the queue reads them by the card's platform (`historyFor`). Port 5 gained the Changes tab's status and diff. The
+refusals' git commands are the descriptor's `remedies`. **The audit** is `tests/gitAudit.mjs`: every import of a Git
+module from outside Git's implementation is a classified edge (Git implementation, a port's registry, Git-facing UI,
+historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
+"platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
+`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and 1.5.0's J0 routes each
+by the project's platform. Its `SWITCHES` justify, per file, the switches on a platform's id (`platform === 'git'`)
+left outside the descriptors, adapters and registry (HI-2822): everything else reads the descriptor's workflow facts
+(`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in `shared/platform/descriptors.ts`), a
+capability or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, a
+changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

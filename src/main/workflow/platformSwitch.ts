@@ -12,7 +12,7 @@ import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
-import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
+import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { withValues } from '../../shared/advanced'
@@ -23,7 +23,7 @@ import { workflowFor } from './service'
 import { queueChanged } from './queueHost'
 import { workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
-import { withRepoLocks } from '../repoLock'
+import { withFolderRepoLocks } from '../platform/repoPorts'
 import { cardRef } from '../../shared/projectKeys'
 
 const log = createLogger('workflow')
@@ -69,7 +69,8 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
     refused: same ? null : switchRefused(to, now.detected),
     lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })),
     inFlight: same ? [] : await cardsInFlight(ws, project),
-    gitFolder: to === 'none' && now.detected.platform === 'git',
+    // Its repository stays in the folder (Git's), unused, when switched to a platform that needs none.
+    gitFolder: !needsRepository(to) && needsRepository(now.detected.platform),
     queue: !same && (await queueInFlight(ws, project.path))
   }
 }
@@ -83,7 +84,7 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
 export function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
   // In its turn among workflow writes (#1422): an options save or a level's check never interleaves with it.
   // Its repository's lock first (#1642 round 5): a switch moves what the project's branches are measured against.
-  return withRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
+  return withFolderRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
 async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {

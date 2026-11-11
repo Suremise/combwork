@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelCatalog, ModelSwitch, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Account, Connection, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelCatalog, ModelSwitch, ProviderId } from './types'
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
@@ -52,21 +52,75 @@ export function infoAt<T extends Pick<AgentInstallInfo, 'catalog' | 'defaultMode
   return { ...info, catalog, defaultModel: same ? info.defaultModel : (catalog?.defaultModel ?? null) }
 }
 
+/** The account fields that say whose models apply (HI-2852): its id, its kind, and whether it is on the CLI's own home. */
+export type ModelAccount = Pick<Account, 'id' | 'kind' | 'home'>
+
+/**
+ * A provider's install info as one sign-in account sees it (HI-2852): the CLI offers each account its own models, so
+ * the catalogue and default are that account's alone (`accountCatalogs`, read in its own folder), never the CLI's own
+ * home's or another account's; an account with nothing read nor kept has none (the fallback list, which says so). An
+ * account on the CLI's own home, a server account, or a CLI whose accounts aren't read: the info as it is.
+ */
+export function accountInfo<T extends Pick<AgentInstallInfo, 'catalog' | 'defaultModel' | 'accountCatalogs'>>(info: T | null | undefined, account: ModelAccount | null | undefined): T | null | undefined {
+  if (!info?.accountCatalogs || !account || account.home || (account.kind ?? 'signIn') !== 'signIn') return info
+  // One not read yet (added since the CLI's check): none, until its read lands.
+  const own = Object.hasOwn(info.accountCatalogs, account.id) ? info.accountCatalogs[account.id] : undefined
+  return { ...info, catalog: own?.catalog ?? null, defaultModel: own?.defaultModel ?? null }
+}
+
 /**
  * What Combwork knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
- * (its catalogue, as without connections); a server connection's its own list (HI-1772), each with the aliases it
- * stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
+ * in its account's own folder (HI-2852: accountInfo); a server connection's its own list (HI-1772), each with the aliases
+ * it stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
  */
-export function connectionModels(conn: Pick<Account, 'kind' | 'server'>, info: Info, tr?: Tr): Info {
+export function connectionModels(conn: Pick<Account, 'id' | 'kind' | 'server' | 'home'>, info: (NonNullable<Info> & Pick<AgentInstallInfo, 'accountCatalogs'>) | null | undefined, tr?: Tr): Info {
   switch (conn.kind ?? 'signIn') {
     case 'signIn':
-      return info
+      return accountInfo(info, conn)
     case 'server': {
       const models = conn.server?.models ?? []
       const def = serverDefaultModel(models)
       return { catalog: { source: 'cli', version: null, at: '', models: models.map((m) => ({ value: m.id, label: serverModelLabel(m.id, m.as ?? [], tr, m.remote), efforts: [] })), ...(def ? { defaultModel: def } : {}) }, ...(def ? { defaultModel: def } : {}) }
     }
   }
+}
+
+/** A listed model: its value and label (GET /v1/providers). */
+export interface ListedModel {
+  value: string
+  label: string
+}
+
+/** The models the pickers offer for this info (the CLI's, else the fallback list in Settings), those unavailable left out. */
+export function offeredModels(provider: ProviderId, info: Info, settings: Settings): ListedModel[] {
+  return modelGroups(provider, info, settings)
+    .filter((g) => !g.unavailable)
+    .flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label })))
+}
+
+/** A connection as GET /v1/providers lists it (HI-2856): its account's default, and its models where they aren't the provider's. */
+export interface ListedConnection {
+  id: string
+  name: string
+  defaultModel: string | null
+  models?: ListedModel[]
+}
+
+const sameModels = (a: readonly ListedModel[], b: readonly ListedModel[]): boolean => a.length === b.length && a.every((m, i) => m.value === b[i].value && m.label === b[i].label)
+
+/**
+ * A provider's connections as GET /v1/providers lists them (HI-2856): each its own account's models (connectionModels: a
+ * sign-in account's read in its own folder, a server's its own list), its default always, its list only where it isn't
+ * the provider's (`models`, the CLI's own home's), so the reply stays lean. A connection whose account is gone: the provider's.
+ */
+export function listedConnections(provider: ProviderId, conns: readonly Pick<Connection, 'id' | 'name' | 'account'>[], accountOf: (id: string) => Pick<Account, 'id' | 'kind' | 'server' | 'home'> | null | undefined, info: (NonNullable<Info> & Pick<AgentInstallInfo, 'accountCatalogs'>) | null | undefined, settings: Settings, models: readonly ListedModel[]): ListedConnection[] {
+  return conns.map((c) => {
+    const account = accountOf(c.account)
+    if (!account) return { id: c.id, name: c.name, defaultModel: info?.defaultModel ?? null }
+    const own = connectionModels(account, info)
+    const list = offeredModels(provider, own, settings)
+    return { id: c.id, name: c.name, defaultModel: own?.defaultModel ?? null, ...(sameModels(list, models) ? {} : { models: list }) }
+  })
 }
 
 /**

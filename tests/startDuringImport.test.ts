@@ -66,6 +66,8 @@ describe('a start during the usage history import', () => {
     for (const id of ids) writeFileSync(backup(id), JSON.stringify({ type: 'user', sessionId: id, timestamp: at, message: { role: 'user', content: 'Task' } }) + '\n')
     vi.spyOn(sessions, 'providerTranscript').mockImplementation(async () => null)
     providerService.info = ((id: string) => ({ provider: id, found: true, path: join(base, 'no-cli.exe') })) as never
+    // A resume waits for the import's turn on its transcript only this long (HI-2839): bounded, so the start goes on.
+    ;(sessions as unknown as { resumeReadWaitMs: number }).resumeReadWaitMs = 100
     enabled = config.settings.providers['claude-code'].enabled
     config.settings.providers['claude-code'].enabled = true
     w = createWorkspaceService()

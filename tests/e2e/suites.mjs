@@ -9,6 +9,7 @@
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
 // noCombwork (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
 // selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
+// A real suite has it exactly when its files call no launch( (HI-2833: runner.mjs noCombworkProblems, tests/e2esuites.test.ts).
 // everything (with what): a suite whose code under test is all in affected.mjs's EVERYTHING, so it is in no area: any
 // change to that code runs every suite already (HI-2689; tests/e2esuites.test.ts fails an area that selects nothing).
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
