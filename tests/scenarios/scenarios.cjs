@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 132
+const FIXTURES_VERSION = 133
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1601,7 +1601,8 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
-        ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')), `${between.length} call(s) between`],
+        // HI-2854: or its submit was refused for it, the refusal giving the decision in full (and moving the flag's baseline).
+        ['a board reply before it read the card again flagged the new decision (or a submit refused for it)', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')) || o.combworkCalls.some((x) => x.tool === 'cw_submit' && !x.ok && Date.parse(x.at) > decided && Date.parse(x.at) < reread), `${between.length} call(s) between`],
         // HI-2854: or its submit was refused for the decision it hadn't seen, which gives the decision in full.
         ['saw the decision before handing it on (read the card again, or a submit refused for it)', decided > 0 && review > 0 && (cardReads(o, c.cards.a).some((t) => t > decided && t < review) || o.combworkCalls.some((x) => x.tool === 'cw_submit' && !x.ok && Date.parse(x.at) > decided && Date.parse(x.at) < review)), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}, refused submits ${o.combworkCalls.filter((x) => x.tool === 'cw_submit' && !x.ok).map((x) => Date.parse(x.at)).join(',')}`],
         handedOnCheck(o, c, 'a'),

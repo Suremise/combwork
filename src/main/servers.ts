@@ -3989,8 +3989,9 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
     })
     // HI-2854: the task Combwork started the card with is acked by its builder's start or submit of it (still recorded).
     const me = agentCaller()
-    if (me && self && (intent.kind === 'start' || intent.kind === 'submit')) await ackCardTask(me.projectPath, me.agentId, card).catch((err) => log.warn('acking a card\'s task by its start or submit', err))
-    const done = await withLaneOrder(intent, card, ran)
+    const acked = me && self && (intent.kind === 'start' || intent.kind === 'submit') ? await ackCardTask(me.projectPath, me.agentId, card).catch((err) => (log.warn('acking a card\'s task by its start or submit', err), [] as string[])) : []
+    // Said in the reply ("acked: m1"), so the agent doesn't call cw_inbox to ack it again.
+    const done = await withLaneOrder(intent, card, acked.length ? { ...ran, data: { ...ran.data, acked } } : ran)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
     // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
     const watch = self ? await armIntentWatch(requireWorkspace(), self.agentId, card, { submit: intent.kind === 'submit', failed: intent.kind === 'verdict' && !intent.pass }) : null
