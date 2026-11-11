@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "最初に読むドキュメントのセクションは設定されたままです。",
   "assistant.undo.why.decision": "記録した決定事項は残ります。決定事項を変更・削除できるのは、エージェントやアシスタントではなく自分だけです。",
   "assistant.undo.why.declarePaths": "宣言したパスはカードに残ります。",
+  "assistant.undo.why.forwardResolved": "ビルダーに渡した最新化のマージは終了したままで、ビルダー用に作ったカードも残ります。不要なら、そのカードを保留にするか削除してください。",
   "assistant.undo.why.freshRetried": "再試行したレーンのエージェントの新しい会話は、元に戻しても停止しません。不要ならレーンを終了してください。",
   "assistant.undo.why.handOver": "引き継ぎは元に戻せません。作業は別のエージェントに移りました。",
   "assistant.undo.why.laneEnded": "終了したレーンは終了したままです。続ける場合は再開してください。",

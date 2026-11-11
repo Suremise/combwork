@@ -5584,7 +5584,23 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
 - a conflict or a red check returns the card to Active (no builder is woken: it says so on itself), both branches as
   they were, and so does its advance declined (Ask each time on a checked-out destination); **Retry merge** freezes the source again at its head then (a new entry, its own checks); **Remove from
   queue** ends it in Done with `IntegrationCancelled`, never an `Integrated` (refused while it advances);
-- a project agent's every intent on it is refused (`forward.notAgents`).
+- a project agent's every intent on it is refused (`forward.notAgents`). Its return says so: its comment's next step is
+  the user's or the Assistant's three choices (Retry merge, Resolve on a builder, Remove from queue), never a builder's
+  `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it" (HI-2959).
+
+**Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
+to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
+`resolve`, `POST /v1/queue/resolve`, its reason required; never a project agent or a script). One board change
+(`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
+the forward's destination (its Merges into), linked to it, its description the files in conflict, the returned attempt's
+frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by}, written before its start
+and kept over every cycle; and the forward ended as Remove from queue ends it (Done, an override, never an `Integrated`),
+its comment naming the new card. The forward's intent is refused unless its last entry is still the one read, so a Retry,
+a Remove or another Resolve meanwhile leaves no card. `source` is that attempt's entry `revision`, not the source's head
+now. The new card is an ordinary card: agents start it (it has no `ForwardRequested`), its review, checks and merge
+queue are its rules', except that a card with a `ForwardResolution` merges as a merge commit always
+(`mergeCommitOf`: G6 merge, its id the base's marked `~mergeCommit`, `rulesBaseId` reading through it), so a squash or
+rebase project never drops the source's history from the destination.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a

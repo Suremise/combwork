@@ -162,6 +162,7 @@
   "workflow.move.putBack": "Remettre en À faire",
   "workflow.move.removeFromQueue": "Retirer de la file",
   "workflow.move.reportMerge": "Signaler la fusion",
+  "workflow.move.resolveOnBuilder": "Faire résoudre par un auteur",
   "workflow.move.retryMerge": "Réessayer la fusion",
   "workflow.move.start": "Démarrer",
   "workflow.move.startReview": "Commencer la relecture",

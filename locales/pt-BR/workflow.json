@@ -162,6 +162,7 @@
   "workflow.move.putBack": "Devolver",
   "workflow.move.removeFromQueue": "Remover da fila",
   "workflow.move.reportMerge": "Informar o merge",
+  "workflow.move.resolveOnBuilder": "Resolver com um executor",
   "workflow.move.retryMerge": "Tentar o merge de novo",
   "workflow.move.start": "Iniciar",
   "workflow.move.startReview": "Iniciar revisão",

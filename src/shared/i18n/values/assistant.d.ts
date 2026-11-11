@@ -728,6 +728,7 @@ interface CombworkMessageValues {
   'assistant.undo.why.context': undefined
   'assistant.undo.why.decision': undefined
   'assistant.undo.why.declarePaths': undefined
+  'assistant.undo.why.forwardResolved': undefined
   'assistant.undo.why.freshRetried': undefined
   'assistant.undo.why.handOver': undefined
   'assistant.undo.why.laneEnded': undefined

@@ -23,7 +23,7 @@ export function returnIn(wf: Workflow, n: number): QueueReturn | null {
     const q = queueStateOf(wf, card, s)
     if (q?.state !== 'returned') return null
     const failed = wf.store.facts(n).filter((f) => f.kind === 'IntegrationFailed').at(-1)
-    return { at: failed?.at ?? '', text: returnedWake(card.key, q.failure), builder: s.started?.builder ?? null }
+    return { at: failed?.at ?? '', text: returnedWake(card.key, q.failure, s.forward ?? undefined), builder: s.started?.builder ?? null }
   } catch {
     // A card not on this board (gone, another project's) or a board from before 1.0.
     return null
@@ -77,6 +77,20 @@ export function staleIn(wf: Workflow, n: number): StaleApproval | null {
 export async function staleApprovalOf(ws: WorkspaceService, projectPath: string, n: number): Promise<StaleApproval | null> {
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   return wf ? staleIn(wf, n) : null
+}
+
+/**
+ * HI-2959: a forward merge the queue returned, waiting for the user or the Assistant (Retry merge, Resolve on a builder,
+ * Remove from queue): its branches; null for any other card, or unreadable.
+ */
+export async function forwardWaitOf(ws: WorkspaceService, projectPath: string, n: number): Promise<{ from: string; to: string } | null> {
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  try {
+    const back = wf ? wf.returnedForward(wf.store.card(n)) : null
+    return back ? { from: back.from, to: back.to } : null
+  } catch {
+    return null
+  }
 }
 
 /** returnIn for a card of a project in a workspace (its workflow, null when it has none). */

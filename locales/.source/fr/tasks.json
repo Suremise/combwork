@@ -127,6 +127,7 @@
   "tasks.history.dependsOn": "Depends on {cards}",
   "tasks.history.description": "Changed the description",
   "tasks.history.followUpSubmitted": "Follow-up submitted for review at {revision}",
+  "tasks.history.forwardResolving": "Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.",
   "tasks.history.fromOlder": "Added from an older Combwork, where it was made as #{was}",
   "tasks.history.given": "Given to {agent}",
   "tasks.history.imported": "Brought back with {project} (it was #{was})",

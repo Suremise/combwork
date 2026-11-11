@@ -125,6 +125,7 @@
   "tasks.history.dependsOn": "依赖 {cards}",
   "tasks.history.description": "更改了描述",
   "tasks.history.followUpSubmitted": "已在 {revision} 提交后续修改供评审",
+  "tasks.history.forwardResolving": "已在此结束，未合并任何内容：“交给构建者解决”创建了 {card}，由构建者将 {from}（{source}）合并到 {to} 并在那里解决冲突。请关注 {card}。",
   "tasks.history.fromOlder": "从旧版 Combwork 添加，在那里创建时编号为 #{was}",
   "tasks.history.given": "交给了 {agent}",
   "tasks.history.imported": "随 {project} 一起恢复（原为 #{was}）",

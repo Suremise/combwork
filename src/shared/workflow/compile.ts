@@ -199,8 +199,11 @@ export const baseRulesetId = (id: string): string => (id.endsWith(REVIEW_SKIPPED
  */
 export const TARGETED = '~target:'
 
-/** An id with a forward merge's mark (HI-2679) taken off: its base's. */
-const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id)
+/** What marks a forward resolution's rules (HI-2959): its id is its base's with this after it (`mergeCommitOf`). */
+export const MERGE_COMMIT = '~mergeCommit'
+
+/** An id with a forward merge's mark (HI-2679) or a forward resolution's (HI-2959) taken off: its base's. */
+const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id.endsWith(MERGE_COMMIT) ? id.slice(0, -MERGE_COMMIT.length) : id)
 
 /**
  * A ruleset's rules for old rules (§16.5.4, HI-2556): its id with neither a review skip nor another target marked, so a
@@ -209,7 +212,8 @@ const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(
 export const rulesBaseId = (id: string): string => {
   const base = unforwarded(baseRulesetId(id))
   const at = base.indexOf(TARGETED)
-  return at < 0 ? base : base.slice(0, at)
+  // A forward resolution retargeted (HI-2959): its mark is before the target's.
+  return at < 0 ? base : unforwarded(base.slice(0, at))
 }
 
 /** The other target a ruleset's id marks (HI-2556), or null: the one its options name (G7) is its own. */
@@ -248,6 +252,18 @@ export function forwardOf(r: Ruleset, to: string): Ruleset {
   const base = targetedOf(r, to)
   const c = mustCompile({ ...base.options, target: to, review: 'none', reviewers: 1, reviewerMode: 'lane', style: 'merge', strict: false, focusedTests: false })
   return { ...c, id: base.id + FORWARD }
+}
+
+/**
+ * The rules a forward resolution (HI-2959: a card made by Resolve on a builder) runs under: its base's with a merge
+ * commit always (G6), so a squash or a rebase never drops the source's history from the destination (the next forward
+ * merge would conflict again); review, checks and everything else as its base's. The base itself when it merges with a
+ * merge commit already. Its id is the base's marked (`MERGE_COMMIT`), found again by `rulesBaseId`.
+ */
+export function mergeCommitOf(r: Ruleset): Ruleset {
+  if (r.options.style === 'merge') return r
+  const c = mustCompile({ ...r.options, style: 'merge' })
+  return { ...c, id: r.id + MERGE_COMMIT }
 }
 
 /**

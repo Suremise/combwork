@@ -31,6 +31,10 @@
     "text": "the user takes it over",
     "note": "The user's choice at a lane's round limit, as its answer's wake says it."
   },
+  "runtime.forward.resolving": {
+    "text": "Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.",
+    "note": "HI-2959: the comment on a forward merge card (Combwork merging branch {from} into {to}) ended by Resolve on a builder. {card}: the new card’s key; {source}: a short commit id."
+  },
   "runtime.move.doneByOverride": {
     "text": "{cards} can start without {card}'s work in the target: it is Done by an override, not merged.",
     "note": "A move's warning: cards waiting on this one can start, but its work isn't in their target. {cards}: their keys."

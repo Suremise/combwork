@@ -168,6 +168,7 @@ interface CombworkMessageValues {
   'workflow.move.putBack': undefined
   'workflow.move.removeFromQueue': undefined
   'workflow.move.reportMerge': undefined
+  'workflow.move.resolveOnBuilder': undefined
   'workflow.move.retryMerge': undefined
   'workflow.move.start': undefined
   'workflow.move.startReview': undefined

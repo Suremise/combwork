@@ -125,6 +125,7 @@
   "tasks.history.dependsOn": "Zależy od: {cards}",
   "tasks.history.description": "Zmieniono opis",
   "tasks.history.followUpSubmitted": "Poprawka przekazana do recenzji w {revision}",
+  "tasks.history.forwardResolving": "Zakończone tutaj, nic nie scalono: Rozwiąż przez wykonawcę utworzyło {card}, aby wykonawca scalił {from} ({source}) z {to} i tam rozwiązał konflikt. Śledź {card}.",
   "tasks.history.fromOlder": "Dodana ze starszego Combwork, gdzie utworzono ją jako #{was}",
   "tasks.history.given": "Przekazano agentowi {agent}",
   "tasks.history.imported": "Przywrócono z projektem {project} (wcześniej #{was})",

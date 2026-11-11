@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "Sekcje dokumentów do przeczytania najpierw zostają takie, jak ustawiono.",
   "assistant.undo.why.decision": "Zapisana decyzja zostaje: tylko Ty zmieniasz lub usuwasz decyzje.",
   "assistant.undo.why.declarePaths": "Zadeklarowane ścieżki zostają przy karcie.",
+  "assistant.undo.why.forwardResolved": "Scalenie aktualizujące przekazane przez niego wykonawcy pozostaje zakończone, a karta utworzona dla wykonawcy zostaje: wstrzymaj ją lub usuń, jeśli nie jest potrzebna.",
   "assistant.undo.why.freshRetried": "Cofnięcie nie zatrzymuje ponowionej nowej rozmowy agenta toru: zakończ tor, jeśli nie jest potrzebny.",
   "assistant.undo.why.handOver": "Przekazania nie da się cofnąć: praca trafiła do innego agenta.",
   "assistant.undo.why.laneEnded": "Zakończony tor pozostaje zakończony: uruchom go ponownie, jeśli ma trwać dalej.",

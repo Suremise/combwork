@@ -137,6 +137,7 @@ const T = {
   'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
   'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
   'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date, one of the project\'s targets; from is another of them or the repository\'s default branch (main, after a release).' }),
+  'queue.reply.resolve': agentMsg({ id: 'tool.queue.reply.resolve', text: 'Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged.', note: "HI-2959: cw_queue resolve's reply." }),
   'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
   'queue.arg.override': agentMsg({ id: 'tool.queue.arg.override', text: 'forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.', note: 'HI-2892.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
@@ -252,7 +253,7 @@ const T = {
   'waitForTasks.arg.timeoutSeconds': agentMsg({ id: 'tool.waitForTasks.arg.timeoutSeconds', text: 'Without wake: how long it waits here (default 300, at most {max}).' }),
   'lane.description.assistant': agentMsg({ id: 'tool.lane.description.assistant', text: "Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'lane.description': agentMsg({ id: 'tool.lane.description', text: "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-cw-api, tools.md)" }),
-  'queue.description.assistant': agentMsg({ id: 'tool.queue.description.assistant', text: "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
+  'queue.description.assistant': agentMsg({ id: 'tool.queue.description.assistant', text: "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved), retry (a returned card) and resolve (a returned forward merge: ends it and makes a card for a builder to merge it by hand). remove, retry and resolve take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'queue.description': agentMsg({ id: 'tool.queue.description', text: "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused." }),
   'team.description': agentMsg({ id: 'tool.team.description', text: 'Pause the team before an update: Combwork starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only status works.} other {}}' }),
   'branch.description': agentMsg({ id: 'tool.branch.description', text: "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.", note: 'HI-2807. Work merges into and Other branches (work can merge into) are option names.' }),
@@ -309,7 +310,7 @@ const T = {
   'lane.error.action': agentMsg({ id: 'tool.lane.error.action', text: 'action must be start, join, next, end or list' }),
   'lane.error.laneRequired': agentMsg({ id: 'tool.lane.error.laneRequired', text: 'lane is required: the id cw_lane list gives' }),
   'queue.error.action': agentMsg({ id: 'tool.queue.error.action', text: 'action must be list' }),
-  'queue.error.action.assistant': agentMsg({ id: 'tool.queue.error.action.assistant', text: 'action must be list, pause, resume, remove or retry' }),
+  'queue.error.action.assistant': agentMsg({ id: 'tool.queue.error.action.assistant', text: 'action must be list, pause, resume, remove, retry or resolve' }),
   'team.error.action': agentMsg({ id: 'tool.team.error.action', text: 'action must be status, pause or resume' }),
   'releaseSlot.error.action': agentMsg({ id: 'tool.releaseSlot.error.action', text: 'action must be list or release' }),
   'releaseSlot.error.slotRequired': agentMsg({ id: 'tool.releaseSlot.error.slotRequired', text: 'slot is required: the name list gives' }),
@@ -996,7 +997,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward', 'retarget'] : ['list'] },
+        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'resolve', 'forward', 'retarget'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
         past: { type: 'boolean', description: say(T['queue.arg.past']) },
@@ -1027,6 +1028,11 @@ const tools: Tool[] = [
         }
         const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[]; lanes?: string[] }; skipped: { key?: string; slot?: string; lane?: string; why: string }[]; to: string }
         return say(T['queue.reply.retarget'], { moved: [...(r.moved.lanes ?? []), ...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+      }
+      // HI-2959: Resolve on a builder, on a forward merge the queue returned.
+      if (a.action === 'resolve') {
+        const r = (await api('POST', '/v1/queue/resolve', { card: a.card, reason: a.reason })) as { key: string | null; card: number; forward: string; from: string; to: string; source: string }
+        return say(T['queue.reply.resolve'], { card: r.key ?? `#${r.card}`, forward: r.forward, from: r.from, to: r.to, source: r.source.slice(0, 12) })
       }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)

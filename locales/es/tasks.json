@@ -125,6 +125,7 @@
   "tasks.history.dependsOn": "Depende de {cards}",
   "tasks.history.description": "Cambió la descripción",
   "tasks.history.followUpSubmitted": "Seguimiento enviado a revisión en {revision}",
+  "tasks.history.forwardResolving": "Terminada aquí, sin fusionar nada: Resolver con un autor creó {card} para que un autor fusione {from} ({source}) en {to} y resuelva allí el conflicto. Sigue {card}.",
   "tasks.history.fromOlder": "Agregada desde una versión anterior de Combwork, donde se creó como #{was}",
   "tasks.history.given": "Dada al agente {agent}",
   "tasks.history.imported": "Devuelta con el proyecto {project} (era la #{was})",

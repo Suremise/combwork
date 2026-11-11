@@ -450,6 +450,8 @@
   "tips.recentWorkspaces.title": "Ordena tus espacios de trabajo recientes",
   "tips.removeAll.text": "Quitar todos, en el encabezado del proyecto, quita todos los agentes de un proyecto tras una pregunta. Los worktrees se conservan salvo que marques la casilla, que elimina solo los fusionados y limpios.",
   "tips.removeAll.title": "Quita todos los agentes a la vez",
+  "tips.resolveOnBuilder.text": "¿Poner al día… volvió con un conflicto? Resolver con un autor… en su tarjeta crea una tarjeta normal para que un autor fusione a mano y resuelva el conflicto; se revisa y se fusiona como un commit de fusión, como cualquier tarjeta.",
+  "tips.resolveOnBuilder.title": "Una fusión de actualización con conflicto",
   "tips.resumeAfterUpdate.text": "Al instalar una versión nueva se avisa a los agentes que estaban trabajando o en un ciclo de tarjetas, y cuando Combwork se inicia de nuevo los reanuda en sus conversaciones, uno por uno, y a cada uno se le dice su tarjeta, ronda y carril. Después de salir, el siguiente inicio ofrece reanudarlos.",
   "tips.resumeAfterUpdate.title": "Las actualizaciones dejan tus agentes donde estaban",
   "tips.resumeAll.text": "Tras un reinicio, Reanudar todos los agentes, en el encabezado del proyecto, reanuda de una vez la última sesión de cada agente detenido.",

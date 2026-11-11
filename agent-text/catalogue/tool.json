@@ -474,17 +474,21 @@
     "text": "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
   },
   "tool.queue.description.assistant": {
-    "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved), retry (a returned card) and resolve (a returned forward merge: ends it and makes a card for a builder to merge it by hand). remove, retry and resolve take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
   },
   "tool.queue.error.action": {
     "text": "action must be list"
   },
   "tool.queue.error.action.assistant": {
-    "text": "action must be list, pause, resume, remove or retry"
+    "text": "action must be list, pause, resume, remove, retry or resolve"
   },
   "tool.queue.reply.forward": {
     "text": "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}",
     "note": "HI-2679: cw_queue forward's reply."
+  },
+  "tool.queue.reply.resolve": {
+    "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged.",
+    "note": "HI-2959: cw_queue resolve's reply."
   },
   "tool.queue.reply.retarget": {
     "text": "Moved to {to}: {moved}. Left where they were: {skipped}.",

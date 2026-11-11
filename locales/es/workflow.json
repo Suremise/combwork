@@ -162,6 +162,7 @@
   "workflow.move.putBack": "Devolver",
   "workflow.move.removeFromQueue": "Quitar de la cola",
   "workflow.move.reportMerge": "Notificar la fusión",
+  "workflow.move.resolveOnBuilder": "Resolver con un autor",
   "workflow.move.retryMerge": "Reintentar la fusión",
   "workflow.move.start": "Iniciar",
   "workflow.move.startReview": "Iniciar la revisión",

@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "Les sections de documents à lire d’abord restent telles qu’elles ont été définies.",
   "assistant.undo.why.decision": "Une décision qu’il a enregistrée reste : toi seul modifies ou retires les décisions.",
   "assistant.undo.why.declarePaths": "Les chemins qu’il a déclarés restent avec la carte.",
+  "assistant.undo.why.forwardResolved": "Une fusion de mise à jour qu’il a confiée à un auteur reste terminée, et la carte créée pour l’auteur reste : mets cette carte en attente ou supprime-la si elle n’est pas voulue.",
   "assistant.undo.why.freshRetried": "Annuler n’arrête pas la nouvelle conversation d’un agent du couloir qui a été réessayée : termine le couloir s’il n’est pas voulu.",
   "assistant.undo.why.handOver": "Une passation ne peut pas être annulée : le travail est passé à l’autre agent.",
   "assistant.undo.why.laneEnded": "Un couloir terminé reste terminé : redémarre-le s’il doit continuer.",

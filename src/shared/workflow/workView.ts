@@ -325,6 +325,10 @@ export interface WorkView {
   loopStep: LoopAsk | null
   /** Retry merge was used since its latest submission: after a return, it isn't allowed again for it (HI-1667). */
   retried: boolean
+  /** HI-2679: a forward merge's branches (no agent works on it: Retry merge, Resolve on a builder, Remove); null for any other card. */
+  forward: { from: string; to: string } | null
+  /** HI-2959: the forward merge this card resolves (made by Resolve on a builder); null for any other card. */
+  resolves: { forward: string; from: string; to: string; source: string } | null
   /** The newest fact's seq: a view is newer than another when this is higher. */
   lastSeq: number
   /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
@@ -541,6 +545,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
       .slice(0, RESOLVED_SHOWN),
     loopStep: s.step?.step ?? null,
     retried: s.entries.some((x) => x.seq > (latest ?? 0) && x.requeue === 'retry'),
+    forward: s.forward ? { from: s.forward.from, to: s.forward.to } : null,
+    resolves: s.resolves ? { forward: s.resolves.forward, from: s.resolves.from, to: s.resolves.to, source: s.resolves.source } : null,
     lastSeq: s.lastSeq,
     ruleset: ownRuleset(facts, s),
     startedAt: s.cycle ? (at.get(s.cycle) ?? null) : null

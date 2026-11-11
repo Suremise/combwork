@@ -154,7 +154,7 @@ import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
-import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue, settleQueueChanges } from './workflow/queueControls'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -1092,6 +1092,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
+    // HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder.
+    'queue:resolve': async (n, reason) => (await resolveForward(currentWorkspace(), n, { kind: 'user' }, typeof reason === 'string' ? reason : '')).card,
     'project:excludeCombwork': async (p) => {
       p = workspace.assertProject(p)
       const r = await ensureCombworkExcluded(p)

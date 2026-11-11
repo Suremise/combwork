@@ -4227,6 +4227,10 @@
     "defaultMessage": "{n, plural, one {# file, and where it is} other {# files, and where each is}}",
     "description": "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither."
   },
+  "board.workQueue.forwardNext": {
+    "defaultMessage": "No agent works on a forward merge: it waits for you. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} by hand; Remove from queue ends it, nothing merged.",
+    "description": "HI-2959: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned with a conflict or a red check: no agent may act on it, so the user (or the Assistant) chooses. Retry merge, Resolve on a builder and Remove from queue are commands: as translated there."
+  },
   "board.workQueue.heading": {
     "defaultMessage": "Merge queue",
     "description": "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue."
@@ -4258,6 +4262,30 @@
   "board.workQueue.queuedNoPlace": {
     "defaultMessage": "Queued for {target}",
     "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)."
+  },
+  "board.workQueue.resolve": {
+    "defaultMessage": "Resolve on a Builder…",
+    "description": "HI-2959: a button in the card dialog's Work section on a forward merge card the merge queue returned: ends it and makes an ordinary card for an agent (a builder) to do the merge by hand and resolve its conflict (asks first). Title case, as the window's buttons."
+  },
+  "board.workQueue.resolveConfirm": {
+    "defaultMessage": "Resolve on a Builder",
+    "description": "HI-2959: the button confirming Resolve on a builder. Keep it short."
+  },
+  "board.workQueue.resolveFailed": {
+    "defaultMessage": "Couldn't hand the forward merge to a builder",
+    "description": "HI-2959: an error's title: Resolve on a builder failed (the card dialog); its message says why."
+  },
+  "board.workQueue.resolveMessage": {
+    "defaultMessage": "{card} ends, nothing merged, and a new card is made on {to} for a builder: it merges {from} at {revision} into its branch, resolves the conflict and goes through review and the merge queue like any card, as a merge commit. Give the new card to a builder or a lane.",
+    "description": "HI-2959: the confirmation before Resolve on a builder. {card}: the forward merge card's key; {from}, {to}: branch names; {revision}: a short commit id (the attempt that came back)."
+  },
+  "board.workQueue.resolveTitle": {
+    "defaultMessage": "Resolve {card} on a builder?",
+    "description": "HI-2959: title of the confirmation before Resolve on a builder ({card}: the forward merge card's key)."
+  },
+  "board.workQueue.resolved": {
+    "defaultMessage": "Made {card} for a builder to resolve it.",
+    "description": "HI-2959: a notification after Resolve on a builder: the new card ({card}: its key) was made; give it to a builder."
   },
   "board.workQueue.result": {
     "defaultMessage": "The merge",

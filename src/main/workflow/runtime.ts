@@ -11,7 +11,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -39,6 +39,7 @@ import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
+import { HISTORY, storedText } from '../../shared/taskHistory'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 import { admit } from '../platform/platformFence'
@@ -313,6 +314,7 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
 const filesNamed = (files: readonly string[]): string => (files.length <= 5 ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, 5).join(', '), more: files.length - 5 }))
 
 const W = {
+  forwardResolving: agentMsg({ id: 'runtime.forward.resolving', text: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.', note: 'HI-2959: the comment on a forward merge card (Combwork merging branch {from} into {to}) ended by Resolve on a builder. {card}: the new card’s key; {source}: a short commit id.' }),
   choiceCarryOn: agentMsg({ id: 'runtime.choice.carryOn', text: 'carry on', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceAccept: agentMsg({ id: 'runtime.choice.accept', text: 'accept it with follow-ups', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
@@ -568,7 +570,8 @@ export class Workflow {
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
     const facts = this.store.facts(card.id)
-    const base = this.baseRulesetOf(card, s, facts)
+    // A forward resolution (HI-2959) merges as a merge commit, whatever its base's style.
+    const base = s.resolves ? mergeCommitOf(this.baseRulesetOf(card, s, facts)) : this.baseRulesetOf(card, s, facts)
     // A card that skips review (#1625) runs under its rules with no review, whenever the skip was set.
     if (!reviewSkipOf(facts).skip) return base
     const skipped = skipReviewOf(base)
@@ -2803,6 +2806,63 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, by, 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2959: the attempt Resolve on a builder would hand over, on a forward merge the queue returned (Active, its last
+   * entry failed, or its advance declined): that entry, its frozen source and what came back; null for any other card.
+   */
+  returnedForward(card: CardRecord, s: CardState = this.state(card)): { entry: string; from: string; to: string; source: string; failed: FactData['IntegrationFailed'] | null } | null {
+    const last = s.entries.at(-1)
+    if (!s.forward || s.stage !== 'active' || !last || (last.state !== 'failed' && last.state !== 'cancelled')) return null
+    const failed = this.store.facts(card.id).findLast((f) => f.kind === 'IntegrationFailed' && (f.data as FactData['IntegrationFailed']).entry === last.id)
+    return { entry: last.id, from: s.forward.from, to: s.forward.to, source: last.revision, failed: failed ? (failed.data as FactData['IntegrationFailed']) : null }
+  }
+
+  /**
+   * HI-2959: Resolve on a builder, on a forward merge the queue returned (the user's, or the Assistant's with a reason):
+   * it ends in Done, nothing merged (as Remove from queue: an override, never an `Integrated`), its comment naming
+   * `resolver`, the card made for a builder in the same board change. Refused unless its last attempt is still `entry`
+   * (read by the caller, which froze that attempt's source for the new card): a Retry, a Remove or another Resolve since
+   * leaves it as it is.
+   */
+  async resolveForward(ref: unknown, d: { entry: string; resolver: string }, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = this.rulesetOf(card, s)
+    const out = await this.write(card, r, by, (w) => {
+      guard?.()
+      const now = w.state()
+      const back = this.returnedForward(card, now)
+      if (!back || back.entry !== d.entry) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: this.movesFrom(now.stage, r, now).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      w.fact('Override', { rules: ['integrate'], move: 'resolve on a builder', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+      w.move('done', 'user')
+      const values = { card: d.resolver, from: back.from, to: back.to, source: back.source.slice(0, 12) }
+      w.action('comment', { text: stored(W.forwardResolving, values), shown: storedText(HISTORY.forwardResolving, values) })
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2959: marks a card made a moment ago by Resolve on a builder (in Todo, never started) as the forward resolution
+   * of `d.forward`: its `ForwardResolution`, kept over every cycle, which makes its rules merge it as a merge commit.
+   */
+  async markForwardResolution(ref: unknown, d: Omit<FactData['ForwardResolution'], 'by'>, by: 'user' | 'assistant', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, null, by, (w) => {
+      guard?.()
+      const now = w.state()
+      if (now.started || now.stage !== 'todo' || now.resolves) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('ForwardResolution', { ...d, by }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 

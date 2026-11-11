@@ -1058,6 +1058,7 @@ interface CombworkMessageValues {
   'board.workQueue.declineWhy': undefined
   'board.workQueue.expected': undefined
   'board.workQueue.files': { n: number }
+  'board.workQueue.forwardNext': { from: string | number; to: string | number }
   'board.workQueue.heading': undefined
   'board.workQueue.hideLog': undefined
   'board.workQueue.noBranch': undefined
@@ -1066,6 +1067,12 @@ interface CombworkMessageValues {
   'board.workQueue.paused': { target: string | number }
   'board.workQueue.queued': { target: string | number; position: number }
   'board.workQueue.queuedNoPlace': { target: string | number }
+  'board.workQueue.resolve': undefined
+  'board.workQueue.resolveConfirm': undefined
+  'board.workQueue.resolveFailed': undefined
+  'board.workQueue.resolveMessage': { card: string | number; to: string | number; from: string | number; revision: string | number }
+  'board.workQueue.resolveTitle': { card: string | number }
+  'board.workQueue.resolved': { card: string | number }
   'board.workQueue.result': undefined
   'board.workQueue.retried': undefined
   'board.workQueue.retry': undefined

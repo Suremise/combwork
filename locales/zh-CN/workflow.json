@@ -162,6 +162,7 @@
   "workflow.move.putBack": "放回",
   "workflow.move.removeFromQueue": "移出队列",
   "workflow.move.reportMerge": "报告合并",
+  "workflow.move.resolveOnBuilder": "交给构建者解决",
   "workflow.move.retryMerge": "重试合并",
   "workflow.move.start": "开始",
   "workflow.move.startReview": "开始评审",

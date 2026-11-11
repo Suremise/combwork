@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "设置的先读文档章节保持不变。",
   "assistant.undo.why.decision": "它记录的决定会保留：只有你能更改或删除决定。",
   "assistant.undo.why.declarePaths": "它声明的路径保留在卡片上。",
+  "assistant.undo.why.forwardResolved": "它交给构建者的更新合并仍保持结束，为构建者创建的卡片也会保留：如果不需要，请将那张卡片暂停或删除。",
   "assistant.undo.why.freshRetried": "撤销不会停止已重试的通道智能体新对话：如不需要，请结束该通道。",
   "assistant.undo.why.handOver": "交接无法撤销：工作已交给另一个智能体。",
   "assistant.undo.why.laneEnded": "已结束的通道保持结束：如需继续，请重新启动它。",

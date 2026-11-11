@@ -85,6 +85,7 @@ import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from '
 import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type StallAgent } from './cardStall'
+import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { giveUnseen } from './cardFreshness'
 import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
@@ -102,7 +103,7 @@ import type { NextVersionResult } from '../shared/types'
 import { lineRepoOps } from './platform/repoOpsPorts'
 import { branchStartArg } from '../shared/nextVersion'
 import type { Value } from './assistantChanges'
-import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resolveForward, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
@@ -2699,6 +2700,21 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
   })
 })
+// HI-2959: Resolve on a builder, on a forward merge the queue returned: the Assistant's (within Control agents, its
+// reason required) and the user's, never a project agent's or a script's.
+route('POST', '/v1/queue/resolve', async ({ body }) => {
+  notAgents([API.change.resolveForwardAny])
+  const ws = requireWorkspace()
+  const ref = intentRef(String(body?.card ?? ''))
+  const reason = textField(body, 'reason', true)
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', [API.change.resolveForward, { card: was?.key ?? `#${ref.n}` }], { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const r = await resolveForward(ws, ref.n, await taskActor(), reason, guard).catch((e: unknown) => {
+      throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
+    })
+    return { done: [API.done.forwardResolved, { card: cardName(r.card), forward: r.forward, from: r.from, to: r.to, source: r.source.slice(0, 12) }], act: { card: r.card.number, column: r.card.column, ...(was?.project ? { project: was.project } : {}) }, stays: UNDO_FINAL.forwardResolved, result: { card: r.card.number, key: r.card.key ?? null, forward: r.forward, from: r.from, to: r.to, source: r.source } }
+  })
+})
 /** A git refusal as the Agent API answers it (HI-2807): its own status where it has a kind, else 409. */
 const gitRefused = (e: unknown): unknown => (e instanceof CombworkError ? httpFrom(ownStatus(e) ?? 409, e) : e)
 
@@ -3044,7 +3060,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c))
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c), c.column === 'doing' && !c.agent && c.project && workspace.path ? await forwardWaitOf(workspace, join(workspace.path, c.project), c.number) : null)
   }
   // A review whose reviewer has gone or isn't running (Combwork ends those, but one can show while that happens).
   if (c.review && c.project) {

@@ -575,6 +575,69 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   return done
 }
 
+const RESOLVE_TEXT = {
+  title: msg({ id: 'service.forward.resolveTitle', defaultMessage: 'Resolve: bring {to} up to date with {from}', description: 'HI-2959: the title of the card Resolve on a builder makes from a forward merge that came back with a conflict: an agent merges branch {from} into branch {to} by hand and resolves the conflict. Branch names.' }),
+  description: msg({
+    id: 'service.forward.resolveDescription',
+    defaultMessage:
+      '{forward} tried to merge {from} ({source}) into {to} and came back{files, select, none {.} other {: a conflict in {files}.}} Resolve on a builder ended it and made this card, so a builder does that merge.\n\nIn this card’s branch (made from {to}): `git merge {source}`, resolve the conflict, commit the merge and submit it for review. It merges into {to} as a merge commit, whatever the project’s merge style, so {to} keeps {from}’s history.',
+    description: 'HI-2959: the description of the card Resolve on a builder makes. {forward}: the forward merge card’s key (HI-12); {from}, {to}: branch names; {source}: the commit id to merge (keep it); {files}: the files in conflict, a list (none: leave that part out; keep the select keys). Keep the git command in backticks as it is.'
+  }),
+  notReturned: msg({ id: 'service.forward.notReturned', defaultMessage: '{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.', description: 'HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card).' }),
+  raced: msg({ id: 'service.forward.resolveRaced', defaultMessage: '{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.', description: 'HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.' })
+}
+
+/** What Resolve on a builder did (HI-2959): the card made for a builder, and the forward merge it ended. */
+export interface ForwardResolved {
+  card: TaskCard
+  forward: string
+  from: string
+  to: string
+  source: string
+}
+
+/**
+ * HI-2959 (SPEC §16.9): Resolve on a builder, on a forward merge the queue returned, the user's or the Assistant's alone
+ * (`actor`; the Assistant's guard checked again inside each write). One board change: an ordinary code card made on the
+ * forward's destination, linked to it, saying what came back and how to resolve it; marked its forward resolution
+ * (`ForwardResolution`: its rules merge it as a merge commit); and the forward ended (Done, nothing merged). The returned
+ * attempt's frozen source is what the card merges, not the source's head now. Refused or stopped part way, none of it is
+ * kept: a Retry, a Remove or another Resolve meanwhile leaves no card.
+ */
+export async function resolveForward(ws: WorkspaceService, n: number, actor: TaskActor, reason: string, guard?: () => void): Promise<ForwardResolved> {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
+  const found = await forwardCard(ws, n)
+  if (!found) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: `#${n}` }), { kind: 'invalid' })
+  const { wf, rec, projectPath } = found
+  const back = wf.returnedForward(rec)
+  if (!back) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: rec.key }), { kind: 'conflict' })
+  const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+  const files = back.failed?.files?.length ? fmt.list(back.failed.files.slice(0, 20)) : ''
+  const { cardBatch, createTask, runIntent } = await import('../tasks')
+  const done = await cardBatch(ws, async (): Promise<ForwardResolved> => {
+    guard?.()
+    const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
+    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source }, by, guard), undefined, guard)
+    if (isRefusal(marked.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
+    // Refused (a Retry, a Remove or another Resolve since it was read): thrown, so the card made just now goes too.
+    const ended = await runIntent(wf, rec.id, actor, (x) => x.resolveForward(rec.id, { entry: back.entry, resolver: wf.store.card(made.number).key }, reason, by, guard), undefined, guard)
+    if (isRefusal(ended.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
+    return { card: marked.saved ?? made, forward: rec.key, from: back.from, to: back.to, source: back.source }
+  })
+  queueChanged(ws, projectPath, back.to)
+  return done
+}
+
+/** The forward merge card `n` (HI-2679) with its project's workflow; null for any other card. */
+async function forwardCard(ws: WorkspaceService, n: number): Promise<{ wf: Workflow; rec: CardRecord; projectPath: string } | null> {
+  for (const p of ws.info()?.projects ?? []) {
+    const wf = await workflowFor(ws, p.path).catch(() => null)
+    const rec = wf?.store.cards().find((c) => c.id === n)
+    if (wf && rec && wf.state(rec).forward) return { wf, rec, projectPath: p.path }
+  }
+  return null
+}
+
 /** A direction's values for its refusals (HI-2892): why, and whether the reverse is the release path's way. */
 const directionValues = (d: ForwardDirection): { why: string; dir: string } => (d.dir === 'forward' ? { why: 'other', dir: 'other' } : { why: d.why, dir: d.dir === 'backward' ? 'backward' : 'other' }) // i18n-ignore: select keys
 

@@ -634,6 +634,14 @@
       "column": "plain"
     }
   },
+  "api.change.resolveForward": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.change.resolveForwardAny": {
+    "placeholders": {}
+  },
   "api.change.resumeAQueue": {
     "placeholders": {}
   },
@@ -1005,6 +1013,15 @@
       "to": "plain",
       "from": "plain",
       "override": "select"
+    }
+  },
+  "api.done.forwardResolved": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
     }
   },
   "api.done.forwardUpToDate": {

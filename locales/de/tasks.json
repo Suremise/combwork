@@ -125,6 +125,7 @@
   "tasks.history.dependsOn": "Hängt ab von {cards}",
   "tasks.history.description": "Beschreibung geändert",
   "tasks.history.followUpSubmitted": "Follow-up zum Review eingereicht bei {revision}",
+  "tasks.history.forwardResolving": "Hier beendet, nichts gemergt: „Von einem Bearbeiter lösen lassen“ hat {card} erstellt, damit ein Bearbeiter {from} ({source}) in {to} mergt und den Konflikt dort löst. Verfolge {card}.",
   "tasks.history.fromOlder": "Aus einer älteren Version von Combwork hinzugefügt, wo sie als #{was} erstellt wurde",
   "tasks.history.given": "Agent {agent} zugewiesen",
   "tasks.history.imported": "Mit {project} zurückgeholt (war #{was})",

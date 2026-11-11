@@ -558,6 +558,15 @@
       "card": "plain"
     }
   },
+  "tool.queue.reply.resolve": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
+    }
+  },
   "tool.queue.reply.retarget": {
     "placeholders": {
       "to": "plain",

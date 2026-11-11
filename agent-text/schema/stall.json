@@ -43,6 +43,12 @@
       "minutes": "plain"
     }
   },
+  "stall.forward.waits": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "stall.lane.orderWait": {
     "placeholders": {
       "reviewer": "plain",
