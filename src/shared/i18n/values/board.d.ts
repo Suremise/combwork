@@ -1000,6 +1000,7 @@ interface CombworkMessageValues {
   'board.work.carriedOver': { from: string | number; to: string | number }
   'board.work.change': { commits: number; change: string | number }
   'board.work.check': { name: string | number; result: string; counted: string }
+  'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
   'board.work.filesNotRead': { note: string; why: string | number }

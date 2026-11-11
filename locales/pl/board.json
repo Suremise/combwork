@@ -998,6 +998,7 @@
   "board.work.carriedOver": "Zaliczenie dla {from} pozostaje ważne dla {to}: ta sama zmiana.",
   "board.work.change": "{commits, plural, one {zmiana {change}} few {zmiana {change}, # commity} many {zmiana {change}, # commitów} other {zmiana {change}, # commita}}",
   "board.work.check": "{name}: {result, select, passed {udane} failed {nieudane} other {zatrzymane}}{counted, select, no { (nie liczy się)} other {}}",
+  "board.work.doneUnproved": "Ukończona przez Ciebie, integracja niepotwierdzona ({when}).",
   "board.work.failed": "Nie udało się odczytać pracy karty: {error}",
   "board.work.files": "{n, plural, =0 {Brak zmienionych plików} one {# zmieniony plik} few {# zmienione pliki} many {# zmienionych plików} other {# zmienionego pliku}}",
   "board.work.filesNotRead": "{note, select, beforeChange {Nie odczytano plików} noBaseOrHead {Nie odczytano plików: nie było bazy ani rewizji do porównania} other {Nie odczytano plików: Combwork nie mógł odczytać {why}}}",
