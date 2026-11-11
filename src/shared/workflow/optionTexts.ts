@@ -63,7 +63,11 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   mergeChecks: {
     title: msg({ id: 'workflow.option.mergeChecks.title', defaultMessage: 'Checks pass on the merged result', description: 'A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch.' }),
-    desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' })
+    desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' }),
+    integrates: {
+      title: msg({ id: 'workflow.option.mergeChecks.jjTitle', defaultMessage: 'Checks pass on the candidate', description: 'The workflow option “Checks pass on the merged result” (G9) for a project using jj (HI-2938): named commands Combwork runs on the candidate it builds for the user to integrate. Candidate: the commit Combwork builds.' }),
+      desc: msg({ id: 'workflow.option.mergeChecks.jjDesc', defaultMessage: 'Combwork runs these named commands on the candidate, in a check copy of its own, and offers the candidate for you to integrate only once each one has passed. One that fails sends the card back to its builder.', description: 'What the workflow option “Checks pass on the candidate” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks (glossary).' })
+    }
   },
   focusedTests: {
     title: msg({ id: 'workflow.option.focusedTests.title', defaultMessage: 'Each card’s focused tests pass on the merged result', description: 'A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Combwork’s merge queue runs them on its work merged with the target branch.' }),
@@ -91,7 +95,11 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
-    desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' })
+    desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' }),
+    integrates: {
+      title: msg({ id: 'workflow.option.mergeInstall.jjTitle', defaultMessage: 'Install dependencies from scratch', description: 'The workflow option “Install dependencies from scratch” for a project using jj (HI-2938): before the checks on the candidate.' }),
+      desc: msg({ id: 'workflow.option.mergeInstall.jjDesc', defaultMessage: 'Before the checks on a candidate, its check copy installs the dependencies afresh: always, or when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks. Lock file: as in the glossary.' })
+    }
   },
   okBefore: {
     title: msg({ id: 'workflow.option.okBefore.title', defaultMessage: 'Your OK before merging', description: 'A workflow option (glossary 2.6, G10).' }),
@@ -195,7 +203,8 @@ export const VALUE_TEXT = {
   },
   mergeInstall: {
     onManifestChange: msg({ id: 'workflow.value.mergeInstall.onManifestChange', defaultMessage: 'When the lock file or manifests change', description: 'A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value).' }),
-    always: msg({ id: 'workflow.value.mergeInstall.always', defaultMessage: 'Before every merge', description: 'A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.' })
+    always: msg({ id: 'workflow.value.mergeInstall.always', defaultMessage: 'Before every merge', description: 'A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.' }),
+    alwaysCandidate: msg({ id: 'workflow.value.mergeInstall.alwaysCandidate', defaultMessage: 'Before every candidate’s checks', description: 'The value “always” of the workflow option “Install dependencies from scratch” in a project using jj (HI-2938): before the merge checks on each candidate (the commit Combwork builds for the user to integrate).' })
   },
   okBefore: {
     never: msg({ id: 'workflow.value.okBefore.never', defaultMessage: 'Never', description: 'A value of the workflow option “Your OK before merging” (glossary 2.6, G10).' }),

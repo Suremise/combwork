@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "Retomados: {names}.",
   "main.restart.why.expired": "ele esperou mais de um dia",
   "main.restart.why.held": "a pasta de trabalho dele está reservada para outro trabalho (retome-o manualmente)",
+  "main.restart.why.idle": "ele estava ocioso, sem nenhum cartão ou raia esperando por ele",
   "main.restart.why.movedOn": "ele tem uma conversa mais recente",
   "main.restart.why.notReady": "ele não ficou pronto a tempo, então foi parado",
   "main.restart.why.notStopped": "ele não ficou pronto a tempo e ainda não parou; os outros são retomados quando ele parar",

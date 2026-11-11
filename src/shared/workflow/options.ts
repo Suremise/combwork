@@ -544,7 +544,8 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   jj: [
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
-    { id: 'checks', options: ['preChecks'] },
+    // HI-2938: the merge checks (and their install) run on the candidate before it is offered.
+    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
     // HI-2871: style and strict shape the candidate Combwork builds before the user integrates.
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'identity', 'stopOwnRuns'] },
@@ -605,9 +606,11 @@ export function previewRows(options: WorkflowOptions, effective: WorkflowOptions
  * with everyone in the project folder (the only place a commit can take in another agent's files).
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
-  if (key === 'mergeChecks' || key === 'focusedTests') return o.finish === 'combworkMerges'
+  // HI-2938: G9 also where the user integrates (jj's candidate); G20 stays the merge queue's.
+  if (key === 'mergeChecks') return o.finish === 'combworkMerges' || o.finish === 'userIntegrates'
+  if (key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
-  if (key === 'mergeInstall') return o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
+  if (key === 'mergeInstall') return (o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)) || (o.finish === 'userIntegrates' && o.mergeChecks.length > 0)
   // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges; or (HI-2871) jj's candidate,
   // where the user integrates.
   if (key === 'strict') return o.finish === 'combworkMerges' || o.finish === 'userIntegrates'

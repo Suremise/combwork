@@ -223,8 +223,12 @@ interface CombworkMessageValues {
   'workflow.option.maxAgents.desc': undefined
   'workflow.option.maxAgents.title': undefined
   'workflow.option.mergeChecks.desc': undefined
+  'workflow.option.mergeChecks.jjDesc': undefined
+  'workflow.option.mergeChecks.jjTitle': undefined
   'workflow.option.mergeChecks.title': undefined
   'workflow.option.mergeInstall.desc': undefined
+  'workflow.option.mergeInstall.jjDesc': undefined
+  'workflow.option.mergeInstall.jjTitle': undefined
   'workflow.option.mergeInstall.title': undefined
   'workflow.option.noSelfReview.desc': undefined
   'workflow.option.noSelfReview.title': undefined
@@ -582,6 +586,7 @@ interface CombworkMessageValues {
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
   'workflow.value.mergeInstall.always': undefined
+  'workflow.value.mergeInstall.alwaysCandidate': undefined
   'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined
   'workflow.value.okBefore.labels': undefined

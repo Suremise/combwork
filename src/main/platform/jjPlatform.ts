@@ -40,10 +40,18 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { reconcileJj } from '../workflow/reconcile'
+import { candidateFingerprint, candidateShown, checksAgain, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
+import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps } from '../workflow/jjCandidateChecks'
+import { jjCandidateEntry } from '../workflow/jjCandidateReturn'
+import type { Spawn } from '../workflow/queueChecks'
+import type { CheckContext, CheckResult } from '../workflow/mergeQueue'
+import type { CheckWhyNot } from '../../shared/types'
+import type { FactData } from '../../shared/workflow/facts'
+import { CW_RUNS } from '../progress'
+import { createLogger } from '../logger'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
 import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
-import { dropCandidates, jjCandidateStep, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { dropCandidates, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -126,6 +134,12 @@ export interface JjCardDeps {
   /** HI-2871, tests only: where a candidate attempt pauses (J4's points), so a race can be placed exactly there. */
   candidateHook?: JjCandidateDeps['hook']
   /**
+   * HI-2938: the app's side of the merge checks on a candidate: the project's setup command, a check copy leased at a
+   * revision with its job's spawn (and whether a lease is freed through the pool's barrier), the queue's runner and
+   * install, and whether Stop ended a run. Absent: no checks run (a candidate is offered after its conflict check).
+   */
+  candidateChecks?: JjChecksHost
+  /**
    * J9b2's (HI-2882): the project's canonical id (its rows' scope), the workspace database's file, a synchronous read and
    * an async write on it (the board's connections), a card and cycle's journalled bundles, and a publish commit sent to
    * the publish worker with its own cancel fence. Absent: nothing reconciled to Integrated, nothing observed.
@@ -153,6 +167,38 @@ const oneLine = (m: string): string => m.split(/\r?\n/)[0].trim()
 
 /** A replay on the store that couldn't be read, mid-attempt (HI-2871): the step's answer is unknown, never "not the same". */
 class SamenessUnread extends Error {}
+
+const checksLog = createLogger('jj')
+
+/** HI-2938: what the app gives the candidate checks (jjCards.ts). */
+export interface JjChecksHost {
+  /**
+   * The project's setup command, and a stamp of where it was read from (project.json's identity: its id, size and time),
+   * which `setupStamp` reads again synchronously in a publishing transaction (HR1's round 1 finding 3).
+   */
+  setup(): Promise<{ setup: string; stamp: string }>
+  setupStamp(): string
+  lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
+  leaseFreed(id: string): Promise<boolean>
+  runCheck(name: string, command: string, folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult>
+  install(folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult & { skipped?: boolean }>
+  stopped(run: string): boolean
+  hook?: CandidateChecksDeps['hook']
+  /** How often a running command's validity is read again (tests: shorter than the default). */
+  watchMs?: number
+  /** How long the runner waits before looking again: a copy wait (0), the nth transient failure in a row. */
+  againMs?: (misses: number) => number
+  /** The workspace's life (s11 §3): closing it ends a running check's job and gives its lease back; nothing more runs. */
+  signal?: AbortSignal
+}
+
+/** HI-2938: each workflow's checks runner: one look at a time, another asked for mid-look runs after it. */
+interface ChecksRunner {
+  busy: boolean
+  again: boolean
+  timer: NodeJS.Timeout | null
+}
+const runners = new WeakMap<Workflow, ChecksRunner>()
 
 /** The retention pass's page and how often each retained bundle is verified again (HI-2882/s13 §2). */
 export const RETAIN_PAGE = 8
@@ -606,7 +652,7 @@ export class JjPlatform implements PlatformAdapter {
       },
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
       projectId: () => rec.projectId(),
-      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle) } : {})
+      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle), checksNow: (_c: CardRecord, s: CardState) => this.checksNow(card, s), checksWanted: () => this.checksWanted() } : {})
     })
   }
 
@@ -622,6 +668,160 @@ export class JjPlatform implements PlatformAdapter {
    * folder, the store's lock, git on the store) and Git's replay on the store, its attempts journalled in the workspace
    * database under the card's cycle. A replay that can't be read stops the attempt (never "not the same").
    */
+  /** HI-2938: the project's merge checks for a card now: names and key; none when not configured or not composed. */
+  private async checksNow(card: CardRecord, s: CardState): Promise<{ key: string; names: string[] }> {
+    const host = this.deps?.candidateChecks
+    if (!this.wf || !host) return { key: '', names: [] }
+    const o = this.wf.rulesetOf(card, s).options
+    return o.mergeChecks.length ? { key: checksKeyOf(o, (await host.setup()).setup), names: [...o.mergeChecks] } : { key: '', names: [] }
+  }
+
+  /** HI-2938: asks the project's checks runner to look (one per workflow; a look asked for mid-look runs after it). */
+  checksWanted(): void {
+    if (!this.wf || !this.deps?.candidateChecks) return
+    const r = runners.get(this.wf) ?? { busy: false, again: false, timer: null }
+    runners.set(this.wf, r)
+    if (r.busy) {
+      r.again = true
+      return
+    }
+    r.busy = true
+    void (async () => {
+      try {
+        do {
+          r.again = false
+          await this.checksPass(r)
+        } while (r.again)
+      } catch (e) {
+        checksLog.warn("a jj candidate's checks", e) // i18n-ignore: a log line, English
+      } finally {
+        r.busy = false
+      }
+    })()
+  }
+
+  /**
+   * HI-2938's Run Checks Again (s11 §1): a candidate whose checks were stopped or keep failing runs them again, under
+   * the same validity as any publication (its fingerprint, checks key, head and recorded commit). Whether it did.
+   */
+  async checksAgain(card: CardRecord): Promise<boolean> {
+    const host = this.deps?.candidateChecks
+    const rec = this.deps?.records
+    if (!this.wf || !host || !rec) return false
+    const project = rec.projectId()
+    const s = this.wf.state(card)
+    const shown = candidateShown(this.wf, card, s, project, undefined, true)
+    const fp = candidateFingerprint(this.wf, card, s)
+    if (!shown?.offer || !fp) return false
+    const ok = await checksAgain(this.wf, card, project, (await host.setup()).setup, await this.offerCurrent(fp.target, shown.offer))
+    if (ok) this.checksWanted()
+    return ok
+  }
+
+  /** Whether the project's checks runner is looking now (tests wait for it to finish). */
+  checksBusy(): boolean {
+    return !!this.wf && !!runners.get(this.wf)?.busy
+  }
+
+  /** One look: each card waiting for its candidate's checks, in turn (s11). */
+  private async checksPass(r: ChecksRunner): Promise<void> {
+    const wf = this.wf!
+    const d = this.deps!
+    const host = d.candidateChecks!
+    const rec = d.records
+    if (!rec) return
+    const project = rec.projectId()
+    let later: number | null = null
+    for (const card0 of wf.store.cards()) {
+      if (host.signal?.aborted) return
+      if (card0.stage !== 'approved') continue
+      const s = wf.state(card0)
+      const shown = candidateShown(wf, card0, s, project, undefined, true)
+      const fp = candidateFingerprint(wf, card0, s)
+      if (!shown?.offer || !shown.checks || !fp || (shown.checks.state !== 'running' && shown.checks.state !== 'waiting' && shown.checks.state !== 'failing')) continue
+      const offer = shown.offer
+      const read = await host.setup()
+      const setup = read.setup
+      const o = wf.rulesetOf(card0, s).options
+      const key = checksKeyOf(o, setup)
+      const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
+      if (key !== shown.checks.key) {
+        if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer)))) continue
+      }
+      const publish = async (u: JjChecksUpdate): Promise<boolean> => publishCandidateChecks(wf, wf.store.card(card0.id), project, at, u, await this.offerCurrent(fp.target, offer))
+      const jkey = checksJournalKey(project, card0.key, fp.cycle, offer.attempt)
+      const valid = async (): Promise<boolean> => {
+        const c = wf.store.card(card0.id)
+        const st = wf.state(c)
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerCurrent(fp.target, offer))
+      }
+      let done = 0
+      const out = await runCandidateChecks(
+        {
+          journal: {
+            read: () => rec.read((db) => readChecksJournal(db, jkey)),
+            write: (j) => rec.write((db) => writeChecksJournal(db, jkey, j))
+          },
+          leaseFreed: (id) => host.leaseFreed(id),
+          lease: (revision) => host.lease(card0.id, revision),
+          runCheck: (name, command, folder, ctx, spawn) => host.runCheck(name, command, folder, ctx, spawn),
+          install: (folder, ctx, spawn) => host.install(folder, ctx, spawn),
+          bracket: (folder, revision) => this.copyBracket(folder, revision),
+          valid,
+          checkRan: async (c) => {
+            const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt) }
+            await wf.write(wf.store.card(card0.id), null, 'combwork', (w) => void w.fact('CheckRan', data))
+            if (c.ok && c.counted) await publish({ progress: { done: ++done } })
+          },
+          stopped: (run) => host.stopped(run),
+          ...(host.signal ? { signal: host.signal } : {}),
+          ...(host.watchMs ? { watchMs: host.watchMs } : {}),
+          hook: async (p) => {
+            if (p.startsWith('beforeCheck:')) await publish({ progress: { done, current: p.slice('beforeCheck:'.length) } })
+            await host.hook?.(p)
+          }
+        },
+        { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
+      )
+      const misses = shown.checks.state === 'failing' ? (shown.checks.misses ?? 1) : 0
+      if ('green' in out) await publish({ passed: out.checks })
+      else if ('red' in out) await publish({ red: { ...out.red, expected: offer.expected } })
+      else if ('stopped' in out) await publish({ stopped: out.stopped.check })
+      else if ('wait' in out) {
+        await publish({ waiting: out.wait })
+        later = Math.min(later ?? Infinity, host.againMs?.(0) ?? 30_000)
+      } else if ('transient' in out) {
+        await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500) })
+        later = Math.min(later ?? Infinity, host.againMs?.(misses + 1) ?? Math.min(15 * 60_000, 30_000 * 2 ** misses))
+      }
+    }
+    if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
+      if (r.timer) clearTimeout(r.timer)
+      r.timer = setTimeout(() => {
+        r.timer = null
+        this.checksWanted()
+      }, later)
+      r.timer.unref?.()
+    }
+  }
+
+  /** J3's check bracket at a check copy, for exactly `revision` (HI-2938/s11): counted only when its credit is that commit. */
+  private async copyBracket(folder: string, revision: string): Promise<{ end(): Promise<{ counted: boolean; tested: string; whyNot?: CheckWhyNot }> }> {
+    const ctx = await this.ctxOf(folder)
+    const d = this.deps!
+    if (!ctx) return { end: async () => ({ counted: false, tested: '', whyNot: 'changed' as const }) }
+    const r = { view: ctx, folder, revision, owner: { still: () => true }, lock: d.lock(ctx.store) }
+    const start = await jjCheckStart(r, observePort, { runner: this.runner() })
+    return {
+      end: async () => {
+        const credit = jjCredit(await jjCheckEnd(r, start, observePort, { runner: this.runner() }))
+        const counted = !credit.whyNot && credit.tested === revision
+        return { counted, tested: credit.tested ?? '', ...(counted ? {} : { whyNot: credit.whyNot ?? ('notContained' as const) }) }
+      }
+    }
+  }
+
   /** HI-2871 (HR3's round 2): an offer still current: its target at its head, its candidate the visible commit recorded. */
   private async offerCurrent(target: string, offer: JjCandidateOffer): Promise<boolean> {
     if (!(await this.headIs(target, offer.expected))) return false
@@ -716,6 +916,8 @@ export class JjPlatform implements PlatformAdapter {
    * `ensureRetained`), every visit recorded whatever its outcome. `more`: due bundles remain after the page.
    */
   async afterRun(signal?: AbortSignal): Promise<{ more: boolean }> {
+    // HI-2938: candidates waiting for their checks (after a restart too) looked at by the project's checks runner.
+    this.checksWanted()
     const d = this.deps
     const rec = d?.records
     if (!this.wf || !d || !rec) return { more: false }

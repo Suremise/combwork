@@ -618,6 +618,7 @@
     "placeholders": {
       "target": "plain",
       "reason": "select",
+      "check": "plain",
       "files": "select"
     }
   },

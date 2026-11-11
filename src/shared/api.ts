@@ -1125,6 +1125,8 @@ export interface CombworkRequests {
   'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
   /** HI-2869: the passed jj cards with their last containment observation for exactly their approval. */
   'jj:waiting': (projectPath: string) => JjWaitingCard[]
+  /** HI-2938: Run Checks Again for a jj card's candidate whose checks were stopped or keep failing; whether it did. */
+  'jj:candidateChecksAgain': (projectPath: string, card: number) => boolean
   /** HI-2869: a page of the publish records to check (J9b2's checkThis), after a cursor. */
   'jj:toCheck': (projectPath: string, after?: { target: string; checkAt: number; card: string; cycle: number; bundle: string } | null) => { rows: JjToCheckRow[]; more: boolean }
   /** HI-2869: Mark as checked, the user's acknowledgement (false: the record changed meanwhile). */

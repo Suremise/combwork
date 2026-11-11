@@ -34,6 +34,8 @@ const FAKE_CLAUDE_ONLY = [
   'start-target-changes',
   // A stuck lane's wake waiting in the inbox, read with cw_inbox; the board, facts and slot after the server (HI-2913).
   'jj-slot-stale',
+  // A returned jj card's wake waiting in the inbox (HI-2938), read with cw_inbox; the board, facts and slot after the server.
+  'jj-checks-back',
   // Overrides, intents, old moves, presets.
   'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'solo-ab-card', 'preset-pair-lane',
   // The Assistant's board work.

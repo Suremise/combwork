@@ -2537,6 +2537,55 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'jj-checks-back',
+    title: "A builder whose approved jj card came back from its candidate's merge check (HI-2938): it fixes the work in its slot with jj, commits and submits again; no git command that moves HEAD, the index or a ref, and no bookmark moved",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    jj: true,
+    jjCards: true,
+    // Its setup leaves Coder's inbox with the card's start and the return: the prompt comes first, not a wake for those.
+    promptAtLaunch: true,
+    async setup(c) {
+      await jjCardProject(c)
+      // The project's merge check, run by Combwork on the candidate before it is offered: fails while greet.js says Helo.
+      const lint = `"${process.execPath}" -e "if(require('fs').readFileSync('greet.js','utf8').includes('Helo')){console.log('greet.js: Helo is misspelt (Hello)');process.exit(1)}"`
+      await setWorkflow(c, { ...JJ_PAIR, target: c.target, mergeChecks: ['lint'], commands: { lint } }, 'pair')
+      c.sub = await jjSlotSubmission(c, 'p', 'coder', { title: 'Greeting says Hi', description: 'greet.js says "Hello, <name>" and a second line, the comment "// Hi".' }, { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n// Hi\n" })
+      await c.startAgent('implementer')
+      const started = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.p}/start-review`)
+      if (started.status !== 200) throw new Error(`setup: start review: ${JSON.stringify(started.body)}`)
+      const passed = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.p}/verdict`, { pass: true, comment: 'Round 1: PASSED. greet.js has its comment.' })
+      if (passed.status !== 200) throw new Error(`setup: the verdict: ${JSON.stringify(passed.body)}`)
+      await c.inv('session:stop', c.alpha, c.agents.implementer.id).catch(() => undefined)
+      // Combwork builds the candidate and runs lint on it: it fails, the card goes back to Coder with the wake.
+      const lib = require('../e2e/lib.cjs')
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), 240000)
+      const column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
+      if (!told || column !== 'doing') throw new Error(`setup: #${c.cards.p} didn't come back from its candidate's lint: ${JSON.stringify({ column, deliveries: (await c.deliveries('coder')).map((d) => String(d.body ?? d.text ?? '').slice(0, 120)) })}`)
+      const id = c.agents.coder.id
+      await c.inv('session:stop', c.alpha, id).catch(() => undefined)
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      c.told = String(told.body ?? told.text ?? '')
+      c.bookmarks = jjBookmarks(c)
+      c.bookmarksBefore = c.bookmarks
+    },
+    prompt: () => 'Carry on: read your Combwork inbox and act on what is there.',
+    fake: (c) => `skill work-on-card then cw cw_inbox {} then shell: node -e "const f=require('fs');f.writeFileSync('greet.js',f.readFileSync('greet.js','utf8').replace('Helo','Hello'))" then shell: jj commit -m "Greeting says Hello" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.p}`, summary: 'Fixed what came back from the candidate: greet.js says Hello, so lint passes.\n\nWhat changed: the misspelt greeting. Checks: the merge check runs on the next candidate.' })}`,
+    expect: (o, c) => {
+      const subs = factsOf(o, 'p', 'Submitted').map((f) => f.data)
+      const s = jjSubmitted(o, 'p')
+      const work = s?.revision ? jjIn(c, '--ignore-working-copy', 'file', 'show', '-r', s.revision, 'greet.js', { allowFail: true }) : ''
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['read its inbox (the wake that the candidate\'s lint failed)', ran(o, 'cw_inbox').length > 0, calls],
+        ['submitted it again (a new submission; the card in Review)', !!s && s.revision !== c.sub.revision && o.cards.p?.column === 'review', `${o.cards.p?.column}; ${calls}; ${subs.length}`],
+        ['the fix is in the submitted commit', /Hello/.test(work) && !/Helo,/.test(work), JSON.stringify({ revision: s?.revision, work })],
+        ...jjSafetyChecks(o, c),
+        ['never moved it on itself (no move to Passed or Done, no verdict)', !finishedItself(o, c.cards.p), calls]
+      ]
+    },
+    fakeSkips: ['the fix is in the submitted commit']
+  },
+  {
     id: 'jj-slot-stale',
     title: "A builder whose lane's next jj card couldn't be prepared, its slot stale since the user rebased the last card's commit (HI-2913): it doesn't update or recover the slot with jj itself, moves no bookmark, doesn't work on or submit the card there, and asks the user to recover it",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
@@ -3330,7 +3379,8 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      // Left running (HI-2891): since HI-2815 a builder stopped with Stop isn't started for its lane's first card.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
     },
@@ -3979,7 +4029,7 @@ module.exports.SCENARIOS = [
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
       await c.inv('tasks:update', n, { decision: 'Have a design checked by the reviewer before you build anything.' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
     },
     prompt: (c) =>
       `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
@@ -4220,7 +4270,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
       await c.inv('tasks:update', a, { decision: 'Part 2 tests the name the user picks, "Ann" or "Bo": the Assistant brings their pick in a message once part 1 is committed. Do part 1, then wait for that message; don\'t ask the user yourself.' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       await c.startAssistant()
       c.head = c.git('rev-parse', 'HEAD').trim()
     },

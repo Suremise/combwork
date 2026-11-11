@@ -36,9 +36,13 @@ export interface JjCandidateFingerprint {
   ruleset: string
   style: JjCandidateStyle
   strict: boolean
+  /** HI-2938/s11: the card's decision generation (a new decision makes it another approval). */
+  generation: number
+  /** HI-2938/s11: the seq of the move into Approved the current approval came from (a re-approval is another). */
+  approval: number
 }
 
-const FP_KEYS = ['cycle', 'submission', 'revision', 'base', 'key', 'commit', 'target', 'ruleset', 'style', 'strict'] as const
+const FP_KEYS = ['cycle', 'submission', 'revision', 'base', 'key', 'commit', 'target', 'ruleset', 'style', 'strict', 'generation', 'approval'] as const
 
 export const sameFingerprint = (a: JjCandidateFingerprint | null | undefined, b: JjCandidateFingerprint | null | undefined): boolean => !!a && !!b && FP_KEYS.every((k) => a[k] === b[k])
 

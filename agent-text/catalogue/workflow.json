@@ -414,6 +414,16 @@
     "note": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).",
     "audience": "both"
   },
+  "workflow.option.mergeChecks.jjDesc": {
+    "text": "Combwork runs these named commands on the candidate, in a check copy of its own, and offers the candidate for you to integrate only once each one has passed. One that fails sends the card back to its builder.",
+    "note": "What the workflow option “Checks pass on the candidate” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks (glossary).",
+    "audience": "both"
+  },
+  "workflow.option.mergeChecks.jjTitle": {
+    "text": "Checks pass on the candidate",
+    "note": "The workflow option “Checks pass on the merged result” (G9) for a project using jj (HI-2938): named commands Combwork runs on the candidate it builds for the user to integrate. Candidate: the commit Combwork builds.",
+    "audience": "both"
+  },
   "workflow.option.mergeChecks.title": {
     "text": "Checks pass on the merged result",
     "note": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch.",
@@ -422,6 +432,16 @@
   "workflow.option.mergeInstall.desc": {
     "text": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
     "note": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).",
+    "audience": "both"
+  },
+  "workflow.option.mergeInstall.jjDesc": {
+    "text": "Before the checks on a candidate, its check copy installs the dependencies afresh: always, or when the lock file or manifests changed.",
+    "note": "What the workflow option “Install dependencies from scratch” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks. Lock file: as in the glossary.",
+    "audience": "both"
+  },
+  "workflow.option.mergeInstall.jjTitle": {
+    "text": "Install dependencies from scratch",
+    "note": "The workflow option “Install dependencies from scratch” for a project using jj (HI-2938): before the checks on the candidate.",
     "audience": "both"
   },
   "workflow.option.mergeInstall.title": {
@@ -1737,6 +1757,11 @@
   "workflow.value.mergeInstall.always": {
     "text": "Before every merge",
     "note": "A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.",
+    "audience": "both"
+  },
+  "workflow.value.mergeInstall.alwaysCandidate": {
+    "text": "Before every candidate’s checks",
+    "note": "The value “always” of the workflow option “Install dependencies from scratch” in a project using jj (HI-2938): before the merge checks on each candidate (the commit Combwork builds for the user to integrate).",
     "audience": "both"
   },
   "workflow.value.mergeInstall.onManifestChange": {

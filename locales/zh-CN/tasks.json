@@ -129,7 +129,7 @@
   "tasks.history.fromOlder": "从旧版 Combwork 添加，在那里创建时编号为 #{was}",
   "tasks.history.given": "交给了 {agent}",
   "tasks.history.imported": "随 {project} 一起恢复（原为 #{was}）",
-  "tasks.history.jjCandidateReturned": "从其在 {target} 上的候选退回：{reason, select, conflict {它与 {target} 冲突} other {它与 {target} 不同步}}{files, select, none {} other {（在 {files} 中）}}。其构建者用 jj 引入 {target} 后再次提交。",
+  "tasks.history.jjCandidateReturned": "从其在 {target} 上的候选退回：{reason, select, conflict {它与 {target} 冲突} checks {其合并检查 {check} 在候选上失败} other {它与 {target} 不同步}}{files, select, none {} other {（在 {files} 中）}}。其构建者{reason, select, checks {修复后} other {用 jj 引入 {target} 后}}再次提交。",
   "tasks.history.kind": "{how, select, made {创建为无代码} proposed {提议为无代码} confirmed {确认为无代码} kept {保持有代码} other {类型改为{kind, select, code {有代码} other {无代码}}}}",
   "tasks.history.labels": "设置标签：{labels}",
   "tasks.history.labelsAdded": "添加了标签：{labels}",
