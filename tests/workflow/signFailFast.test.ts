@@ -5,7 +5,7 @@
 // keys, agents or settings. Every git run is bounded (HUNG_MS): a hang is a failure, never a wait.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { spawn, spawnSync, type SpawnSyncReturns } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
 import { tempDir } from '../tempDir'
@@ -212,6 +212,51 @@ describe.skipIf(!ready)('ssh signing through cw-sign', () => {
       expect(plain.err).toContain('SH_SIGNER_REACHED')
       expect(wrapped).toEqual(plain)
     })
+
+    // HI-2934: git quotes a ', *, ?, { (and for sh, ~ and \) where Node's spawn doesn't (it quotes only for a space, a
+    // tab or a "), so MSYS2's runtime neither globs nor unquotes them: a profile such as C:\Users\O'Brien. No spaces
+    // here, or Node would quote them too.
+    it("a #! script, with a key path holding ', *, {, ~ and \\ (quote_arg_msys2)", () => {
+      const d = tempDir('sh-')
+      const signerFile = join(d, 'signer')
+      writeFileSync(signerFile, '#!/bin/sh\nfor a in "$@"; do echo "SH_ARG [$a]" >&2; done\nexit 5\n')
+      const r = repo('ssh', `${d}\\O'Brien{a,b}*~\\k`)
+      git(r, ['config', 'gpg.ssh.program', slash(signerFile)])
+      const { plain, wrapped } = both(r, shPath())
+      expect(plain.err).toContain("O'Brien{a,b}*~")
+      expect(wrapped).toEqual(plain)
+    })
+
+    it("Git's own ssh-keygen, with a key path holding ', * and { (quote_arg_msvc)", () => {
+      const r = repo('ssh', `${slash(tempDir('q-'))}/O'Brien{a}*/id`)
+      git(r, ['config', 'gpg.ssh.program', slash(join(GB, 'ssh-keygen.exe'))])
+      const { plain, wrapped } = both(r)
+      expect(plain.err).toContain("O'Brien{a}*/id")
+      expect(wrapped).toEqual(plain)
+    })
+
+    it('a signer by its name found as git finds it: <name>.exe in a later PATH folder over <name>.cmd in an earlier one', () => {
+      const first = tempDir('path-a-')
+      const later = tempDir('path-b-')
+      writeFileSync(join(first, 'cwsigner.cmd'), '@echo off\r\necho CMD_SIGNER_REACHED 1>&2\r\nexit /b 9\r\n')
+      // Any .exe will do as the one git runs (it refuses git's arguments): Windows' own find.exe, copied.
+      copyFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'find.exe'), join(later, 'cwsigner.exe'))
+      const r = repo('ssh', `${slash(first)}/k`)
+      git(r, ['config', 'gpg.ssh.program', 'cwsigner'])
+      const { plain, wrapped } = both(r, { PATH: `${first};${later};${base.PATH ?? ''}` })
+      expect(plain.status).not.toBe(0)
+      expect(plain.err).not.toContain('CMD_SIGNER_REACHED')
+      expect(wrapped).toEqual(plain)
+    })
+  })
+
+  it('a session whose GIT_CONFIG_COUNT is 0 still gets the signer, and fails at once when the key needs a passphrase (HI-2934)', () => {
+    const r = repo('ssh', slash(sshKey(join(GB, 'ssh-keygen.exe'), 'secret')))
+    const c = commit(r, session(signer, { GIT_CONFIG_COUNT: '0' }))
+    expect(c.status).not.toBe(0)
+    expect(c.ms).toBeLessThan(FAST_MS)
+    expect(c.err).toContain(NEEDS_LINE)
+    expect(heads(r)).toBe(0)
   })
 
   it("refuses, signing nothing, when the session's entries aren't exactly Combwork's (never a guess, never unsigned)", () => {

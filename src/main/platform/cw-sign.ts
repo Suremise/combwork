@@ -15,7 +15,7 @@ import { spawn } from 'child_process'
 import { closeSync, openSync, readSync, statSync } from 'fs'
 import { delimiter, join, resolve } from 'path'
 import { agentMsg, say } from '../../shared/agentText'
-import { GPG_NO_PROMPT, NEEDS, SIGN_ENV, decodeArgv, envGet, gitRootOfExecPath, isKnownSigner, isSignLauncher, isSigningCall, resolveProgramWith, signerKind, signerRun, withoutOurEntries } from './signerRules'
+import { GPG_NO_PROMPT, NEEDS, SIGN_ENV, decodeArgv, envGet, gitRootOfExecPath, isKnownSigner, isSignLauncher, isSigningCall, resolveProgramWith, signerKind, signerRun, withoutOurEntries, type SignerRun } from './signerRules'
 import { configuredSigner, gitOf } from './signerPick'
 
 const T = {
@@ -128,13 +128,15 @@ async function main(): Promise<void> {
   if (!program) return fail(say(T.notFound, { name }))
   const exec = envGet(process.env, 'GIT_EXEC_PATH')
   const known = isSigningCall(args) && isKnownSigner(program, exec ? [gitRootOfExecPath(exec)] : [], clean)
+  // Started as git starts it (a .cmd or .bat through cmd, a #! script through its interpreter), its command line quoted
+  // as git quotes it (HI-2934): Node's own quoting differs (no quotes around *, ?, { or ', which MSYS2 programs glob).
+  const runOf = (a: readonly string[]): SignerRun => signerRun(program, /[\\/]/.test(name) ? name : program, a, head(program), (n) => findExe(n, clean), envGet(clean, 'ComSpec') ?? 'cmd.exe')
   if (!known) {
-    // As before: started as git starts it (a .cmd or .bat through cmd, a #! script through its interpreter), git's
-    // arguments, the console it has (cw-sign.exe's, shared), nothing added.
-    const run = signerRun(program, /[\\/]/.test(name) ? name : program, args, head(program), (n) => findExe(n, clean), envGet(clean, 'ComSpec') ?? 'cmd.exe')
+    // As before: git's arguments, the console it has (cw-sign.exe's, shared), nothing added.
+    const run = runOf(args)
     let c: ReturnType<typeof spawn>
     try {
-      c = spawn(run.file, run.args, { stdio: 'inherit', env: clean, windowsVerbatimArguments: run.verbatim })
+      c = spawn(run.file, run.args, { stdio: 'inherit', env: clean, argv0: run.argv0, windowsVerbatimArguments: true })
     } catch (e) {
       return fail(say(T.notStarted, { program, detail: e instanceof Error ? e.message : String(e) }))
     }
@@ -144,7 +146,8 @@ async function main(): Promise<void> {
   }
   const env: NodeJS.ProcessEnv = kind === 'ssh' ? { ...clean, SSH_ASKPASS_REQUIRE: 'never' } : clean
   const timeoutMs = Number(process.env[SIGN_ENV.timeout]) > 0 ? Number(process.env[SIGN_ENV.timeout]) : DEFAULT_TIMEOUT_MS
-  const c = spawn(program, kind === 'openpgp' ? [...GPG_NO_PROMPT, ...args] : args, { stdio: ['pipe', 'pipe', 'pipe'], env, windowsHide: true, detached: true })
+  const run = runOf(kind === 'openpgp' ? [...GPG_NO_PROMPT, ...args] : args)
+  const c = spawn(run.file, run.args, { stdio: ['pipe', 'pipe', 'pipe'], env, argv0: run.argv0, windowsVerbatimArguments: true, windowsHide: true, detached: true })
   process.stdin.pipe(c.stdin!)
   c.stdin?.on('error', () => undefined)
   c.stdout?.on('data', (d: Buffer) => process.stdout.write(d))
