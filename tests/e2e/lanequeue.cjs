@@ -158,6 +158,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   // --- Dropped on the locked row (HI-2969): its top half is no place, so no line shows and the drop does nothing, never
   // "after the last row" (the list's own handler took it so, and the card went last).
   const box = async (n) => (await row(la, n).boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 }
+  await clearToasts()
   const from = await box(a2)
   const onto = await box(a1)
   await page.mouse.move(from.x + 60, from.y + from.height / 2)
