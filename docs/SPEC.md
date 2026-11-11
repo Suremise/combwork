@@ -5847,26 +5847,16 @@ touched:
   and a staged pause's files as staged then, which the pause's text names), and, under the repository
   lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
   operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
-  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: those paths alone, by
-  git itself wherever it can: `add --intent-to-add` for untracked ones, then `commit --only -- <paths>` (their
-  working-tree content; every other index entry kept; a rename's both sides); a failure (a hook, signing) undoes only
-  the intent-to-add entries it made and loses nothing. Except when a path whose index entry is gone (a staged deletion,
-  Files' Stop Tracking, or a rename's old side) still has its file in the folder: `commit --only` would add it back
-  (HI-2982: a secret just taken out of Git went back in), so that commit commits it as the deletion, the file left
-  untracked, built by Combwork as `commit --only` builds one. The folder's `index.lock` is taken first and held to the
-  end, as git's own commit holds it (another git holding it: refused, nothing done); both copies of the index are made
-  before the commit, and only a missing index counts as none. HEAD must be read for certain (a failed read refuses,
-  never taken for an unborn branch: a staged deletion is of a file HEAD has), and the tree is that commit's, by its id.
-  After the commit, HEAD must be provably this commit (its parent the HEAD read, its tree the one committed): another
-  that moved the branch around it leaves it refused, saying to look at git log, with the branch never moved back. The commit is built in an index of its own (HEAD's
-  tree over a copy of the folder's index, each path from the folder by `update-index --add --remove`, each deletion
-  `--force-remove`) and committed from it (hooks and signing as any commit); the folder's new index (those paths
-  brought to the commit, `reset -- <paths>` in a copy) is written into the lock and renamed over the index, as git
-  publishes one. Message *Commit changes before merging HI-12*; a failure (a hook, signing) leaves the folder's index
-  and files untouched, and one after the commit puts the branch back (only if still at that commit) and refuses, never a
-  success with HEAD and the index apart. Set aside refuses, naming it, a path whose deletion is staged while its file is still in the
-  folder: a stash would put the committed copy over it (git refuses that, after making the stash, for an ignored one),
-  so Commit is the way on. Set aside: `stash push --include-untracked -- <paths>`, named
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Git does all the index work;
+  Combwork never writes the index. **Refused by name first** (HI-2982; Darren, 11 Nov 2026), before Commit or Set
+  aside runs, nothing committed or changed: a path whose removal from Git is staged (Files' Stop Tracking, `git rm
+  --cached`, or a rename's old side) while its file is still in the folder, *"<file> is staged for removal from Git:
+  commit it yourself in Git; Combwork won't add it back."* `commit --only` takes each path from the folder, so it put
+  the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
+  over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
+  untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
+  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
+  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked -- <paths>`, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
   after it made one is said with that stash, kept. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its

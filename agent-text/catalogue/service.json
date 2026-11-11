@@ -360,8 +360,8 @@
     "audience": "both"
   },
   "service.folderChanges.deletedKept": {
-    "text": "{file} is taken out of Git but still in the folder: setting it aside would replace it with the copy last committed. Commit it instead, which keeps it out of Git and leaves the file as it is.",
-    "note": "HI-2982: an error from Set aside (a paused merge, a start's warning): the file ({file}, a path) had its deletion staged (Files' Stop Tracking) and is still on disk, so a stash would overwrite it with the committed copy; nothing was done. Commit is the button beside Set aside.",
+    "text": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
+    "note": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves.",
     "audience": "both"
   },
   "service.folderChanges.detached": {

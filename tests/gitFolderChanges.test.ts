@@ -4,7 +4,7 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -13,31 +13,6 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
-/** HI-2982: the reset that makes the folder's new index after a commit answered as failed. */
-let failIndexSync = false
-/** HI-2982 (HR2's round 3): the next `rev-parse … HEAD^{commit}` answered as failed. */
-let failHeadRead = false
-/** HI-2982 (HR2's round 3): the branch moved by another just before the next commit's git starts, or just after it. */
-let moveBranch: 'before' | 'after' | null = null
-/** Another's commit of HEAD's own tree on top of HEAD, the branch moved to it (no index lock needed), its id kept. */
-function moveBranchNow(cwd: string): void {
-  moveBranch = null
-  const c = sh(cwd, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'other')
-  sh(cwd, 'update-ref', 'refs/heads/main', c)
-  writeFileSync(join(cwd, '.git', 'other'), c)
-}
-/** HI-2982 (HR1's round 2): a copy of the index to a file matching this refused (EPERM), as Windows can. */
-let failCopyTo: RegExp | null = null
-vi.mock('original-fs/promises', async (original) => {
-  const real = await original<typeof import('fs/promises')>()
-  return {
-    ...real,
-    copyFile: (async (from: string, to: string, mode?: number) => {
-      if (failCopyTo?.test(String(to))) throw Object.assign(new Error(`EPERM: operation not permitted, copyfile '${from}'`), { code: 'EPERM' })
-      return real.copyFile(from, to, mode)
-    }) as typeof real.copyFile
-  }
-})
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -47,16 +22,7 @@ vi.mock('../src/main/git', async (original) => {
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
-      if (moveBranch === 'before' && args[0] === 'commit') moveBranchNow(cwd)
       const r = await real.git(cwd, args, max, input, opts)
-      if (moveBranch === 'after' && args[0] === 'commit') moveBranchNow(cwd)
-      // HI-2982 (HR2's round 3): the next read of HEAD answered as failed.
-      if (failHeadRead && args[0] === 'rev-parse' && args.includes('HEAD^{commit}')) {
-        failHeadRead = false
-        return { ok: false, code: 128, out: '', err: 'fatal: injected read error', buf: Buffer.alloc(0) }
-      }
-      // HI-2982: the folder's new index not made, after the commit (its reset into a side index).
-      if (failIndexSync && args[0] === 'reset' && opts?.env?.GIT_INDEX_FILE) return { ok: false, code: 128, out: '', err: 'fatal: could not write the new index', buf: Buffer.alloc(0) }
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
         return { ...r, ok: false, code: 1, err: 'error: could not write index' }
@@ -124,10 +90,6 @@ beforeEach(() => {
   fencedProbe = null
   failTopIn = null
   failStashAfter = false
-  failIndexSync = false
-  failCopyTo = null
-  failHeadRead = false
-  moveBranch = null
 })
 
 describe('Commit', () => {
@@ -174,7 +136,7 @@ describe('Commit', () => {
     expect(status()).toBe('M a.txt')
   })
 
-  it('a refusing pre-commit hook loses nothing: the files and the index as they were, an untracked file still untracked', async () => {
+  it('a refusing pre-commit hook loses nothing: the files and the index as they were, the intent-to-add undone', async () => {
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\necho "no commits today" >&2\nexit 1\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
@@ -241,9 +203,10 @@ describe('Set aside', () => {
   })
 })
 
-// HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the deletion staged and the file in the folder. Commit took
-// each path from the folder (`commit --only`), so the file went back into Git with its local content.
-describe('a file the user stopped tracking (its deletion staged, the file kept)', () => {
+// HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the file's removal staged and the file in the folder. Commit
+// took each path from the folder (`commit --only`), so the file went back into Git with its local content. Darren's
+// decision (11 Nov 2026): git does all the index work; such a path is refused by name, nothing committed or changed.
+describe('a file the user stopped tracking (its removal staged, the file kept)', () => {
   const stopTracking = (file: string, content: string, ignore: boolean): void => {
     commit(proj, { [file]: '{}\n' }, 'tracked')
     sh(proj, 'rm', '-q', '--cached', file)
@@ -251,191 +214,60 @@ describe('a file the user stopped tracking (its deletion staged, the file kept)'
     writeFileSync(join(proj, file), content)
   }
   const inHead = (file: string): boolean => sh(proj, 'ls-tree', '--name-only', 'HEAD').split('\n').includes(file)
-  const stashes = (): string => sh(proj, 'stash', 'list')
+  /** HEAD, every index entry (mode, object, stage), the status and the stashes: compared before and after a refusal. */
+  const state = (): string[] => [head(), sh(proj, 'ls-files', '--stage'), status(), sh(proj, 'stash', 'list')]
+  const refused = /is staged for removal from Git: commit it yourself in Git; Combwork won't add it back/
 
-  it("Commit with .gitignore commits the deletion: the file stays out of Git, its content in no commit, kept as it is", async () => {
+  it('Commit with .gitignore (the start warning, H2): refused by name, nothing committed or changed, the secret in no commit', async () => {
     stopTracking('settings.local.json', '{"token":"REAL-SECRET"}\n', true)
     expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['D  settings.local.json', 'M .gitignore'])
-    const done = await settle('commit', ['.gitignore', 'settings.local.json'])
-    expect(done.files.sort()).toEqual(['.gitignore', 'settings.local.json'])
-    expect(committed()).toEqual(['.gitignore', 'settings.local.json'])
-    expect(inHead('settings.local.json')).toBe(false)
+    const before = state()
+    await expect(settle('commit', ['.gitignore', 'settings.local.json'])).rejects.toThrow(/^settings\.local\.json is staged for removal from Git/)
+    expect(state()).toEqual(before)
     expect(sh(proj, 'log', '--all', '-p', '--format=')).not.toContain('REAL-SECRET')
     expect(read('settings.local.json')).toBe('{"token":"REAL-SECRET"}\n')
-    expect(status()).toBe('')
-    expect(sh(proj, 'ls-files', '--', 'settings.local.json')).toBe('')
+    // The rest commits as before, the removal left staged for the user.
+    await settle('commit', ['.gitignore'])
+    expect(committed()).toEqual(['.gitignore'])
+    expect(status()).toBe('D  settings.local.json')
+    expect(inHead('settings.local.json')).toBe(true)
   })
 
-  it('the deletion alone (.gitignore committed before): Commit commits it; Set Aside refuses it by name, no stash made', async () => {
+  it('the removal alone (.gitignore committed before): Commit and Set Aside refused by name, neither looping nor leaving a stash', async () => {
     stopTracking('secret.env', 'SECRET=1\n', true)
     sh(proj, 'commit', '-q', '-m', 'ignore', '--only', '--', '.gitignore')
     expect(status()).toBe('D  secret.env')
-    const err = await settle('setAside', ['secret.env']).catch((e: Error) => e)
-    expect(String(err)).toMatch(/secret\.env is taken out of Git but still in the folder/)
-    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
-    expect(status()).toBe('D  secret.env')
-    await settle('commit', ['secret.env'])
-    expect(committed()).toEqual(['secret.env'])
-    expect(inHead('secret.env')).toBe(false)
+    const before = state()
+    for (const action of ['commit', 'setAside', 'commit', 'setAside'] as const) {
+      await expect(settle(action, ['secret.env'])).rejects.toThrow(refused)
+      expect(state()).toEqual(before)
+    }
     expect(read('secret.env')).toBe('SECRET=1\n')
-    expect(status()).toBe('')
   })
 
-  it('no ignore line (listed deleted and untracked): Commit commits the deletion, the file left untracked with its content', async () => {
+  it("no ignore line (listed removed and untracked): Commit and Set Aside refused, the staged removal never lost, the file's content kept", async () => {
     stopTracking('a.txt', 'local only\n', false)
     expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
-    await settle('commit', ['a.txt'])
-    expect(committed()).toEqual(['a.txt'])
-    expect(inHead('a.txt')).toBe(false)
-    expect(status()).toBe('?? a.txt')
+    const before = state()
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(refused)
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(refused)
+    expect(state()).toEqual(before)
     expect(read('a.txt')).toBe('local only\n')
   })
 
-  it('a refused commit keeps the staged deletion (never put back from HEAD); Set Aside refuses it too, no stash made', async () => {
-    stopTracking('a.txt', 'local only\n', false)
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
-    const before = head()
-    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Git did not commit/)
-    expect(head()).toBe(before)
-    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
-    expect(read('a.txt')).toBe('local only\n')
-    // A stash would put the committed copy over the user's file (kept only in a stash that can't pop over it): refused.
-    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/a\.txt is taken out of Git but still in the folder/)
-    expect(stashes()).toBe('')
-    expect(read('a.txt')).toBe('local only\n')
-    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
-  })
-
-  // HR1's rounds 1 and 2: a stopped-tracking file selected, the commit is built in an index of Combwork's, so the folder's
-  // index is held as git's own commit holds it, and copied whole or not at all.
-  /** The whole index, each entry's mode, object and stage: compared before and after. */
-  const indexEntries = (): string => sh(proj, 'ls-files', '--stage')
-  const withStopped = (): void => {
-    stopTracking('secret.env', 'SECRET=1\n', true)
-    writeFileSync(join(proj, 'a.txt'), 'new\n')
-  }
-
-  it('Git does the commit itself (commit --only) when no deletion kept on disk is selected', async () => {
-    writeFileSync(join(proj, 'a.txt'), 'new\n')
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    // Git's own commit --only hands a hook its next-index lock as GIT_INDEX_FILE; an index of Combwork's has no .lock.
-    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nbasename "$GIT_INDEX_FILE" > .git/hook-index\nexit 0\n')
-    await settle('commit', ['a.txt'])
-    expect(readFileSync(join(proj, '.git', 'hook-index'), 'utf8').trim()).toMatch(/^next-index-.*\.lock$/)
-    expect(committed()).toEqual(['a.txt'])
-  })
-
-  it('another git holding the index lock: refused, nothing done (HEAD, the index and the files as they were)', async () => {
-    withStopped()
-    const before = head()
-    const entries = indexEntries()
-    writeFileSync(join(proj, '.git', 'index.lock'), '')
-    try {
-      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Another git command is using the repository/)
-      expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(true)
-    } finally {
-      rmSync(join(proj, '.git', 'index.lock'))
-    }
-    expect(head()).toBe(before)
-    expect(indexEntries()).toBe(entries)
-    expect(read('a.txt')).toBe('new\n')
-    expect(read('secret.env')).toBe('SECRET=1\n')
-  })
-
-  it('another git writing the index while the commit runs (a hook staging into the real index) is refused, its file left as it was', async () => {
-    withStopped()
-    writeFileSync(join(proj, 'b.txt'), 'b, edited\n')
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    // Git hands the hook the commit's own index (GIT_INDEX_FILE): unset, its add writes the folder's index, which is held.
-    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nunset GIT_INDEX_FILE\ngit add b.txt 2>/dev/null\necho $? > .git/hook-add\nexit 0\n')
-    await settle('commit', ['a.txt', 'secret.env'])
-    expect(readFileSync(join(proj, '.git', 'hook-add'), 'utf8').trim()).not.toBe('0')
-    expect(committed()).toEqual(['a.txt', 'secret.env'])
-    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['M .gitignore', 'M b.txt'])
-    expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
-  })
-
-  it("the folder's index not written after the commit: the commit taken back and refused, never a success with them apart", async () => {
-    withStopped()
-    const before = head()
-    const entries = indexEntries()
-    failIndexSync = true
-    await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: fatal: could not write the new index/)
-    expect(head()).toBe(before)
-    expect(indexEntries()).toBe(entries)
-    expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
-    expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
-  })
-
-  it("the index not copied (EPERM, not a missing index): refused before any commit; an unrelated file's staged version, the whole index and the files as they were", async () => {
-    withStopped()
-    writeFileSync(join(proj, 'b.txt'), 'STAGED VERSION\n')
-    sh(proj, 'add', 'b.txt')
-    writeFileSync(join(proj, 'b.txt'), 'UNSTAGED VERSION\n')
-    const before = head()
-    const entries = indexEntries()
-    for (const copy of [/\.cw-next-/, /\.cw-commit-/]) {
-      failCopyTo = copy
-      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: could not copy the index/)
-      expect(head()).toBe(before)
-      expect(indexEntries()).toBe(entries)
-      expect(sh(proj, 'show', ':b.txt')).toBe('STAGED VERSION')
-      expect(read('b.txt')).toBe('UNSTAGED VERSION\n')
-      expect(read('a.txt')).toBe('new\n')
-      expect(read('secret.env')).toBe('SECRET=1\n')
-      expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
-    }
-  })
-
-  it('HEAD unreadable: refused, never taken for an unborn branch (no commit of every other file deleted); HEAD, the index and the files as they were', async () => {
-    withStopped()
-    writeFileSync(join(proj, 'b.txt'), 'STAGED VERSION\n')
-    sh(proj, 'add', 'b.txt')
-    writeFileSync(join(proj, 'b.txt'), 'UNSTAGED VERSION\n')
-    const before = head()
-    const entries = indexEntries()
-    failHeadRead = true
-    await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: fatal: injected read error/)
-    expect(failHeadRead).toBe(false)
-    expect(head()).toBe(before)
-    expect(indexEntries()).toBe(entries)
-    expect(sh(proj, 'show', ':b.txt')).toBe('STAGED VERSION')
-    expect(read('b.txt')).toBe('UNSTAGED VERSION\n')
-    expect(read('a.txt')).toBe('new\n')
-    expect(read('secret.env')).toBe('SECRET=1\n')
-    expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
-  })
-
-  // Another moves the branch (no index lock needed): a commit of HEAD's own tree on top of it. During git's commit (a
-  // hook), git's own compare-and-swap refuses it. Before git's commit starts or just after it ends, HEAD isn't provably
-  // this commit: refused, the branch never moved back (a take-back could drop the other's commit).
-  for (const when of ['during the commit (a hook)', 'after HEAD was read, before the commit starts', 'just after the commit']) {
-    it(`the branch moved by another ${when}: refused, the other's commit kept, nothing taken back, the index as it was`, async () => {
-      withStopped()
-      const entries = indexEntries()
-      if (when.startsWith('during')) {
-        mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-        writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nunset GIT_INDEX_FILE\nC=$(git commit-tree "HEAD^{tree}" -p HEAD -m other)\ngit update-ref refs/heads/main "$C"\necho "$C" > .git/other\nexit 0\n')
-      } else moveBranch = when.startsWith('after') ? 'before' : 'after'
-      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(when.startsWith('during') ? /Git did not commit: fatal: cannot lock ref 'HEAD'/ : /Git did not commit: the branch moved while the commit was made: look at git log/)
-      const other = readFileSync(join(proj, '.git', 'other'), 'utf8').trim()
-      expect(() => sh(proj, 'merge-base', '--is-ancestor', other, 'HEAD')).not.toThrow()
-      expect(sh(proj, 'reflog', '-1', '--format=%gs')).not.toMatch(/Combwork: put back/)
-      expect(indexEntries()).toBe(entries)
-      expect(read('a.txt')).toBe('new\n')
-      expect(read('secret.env')).toBe('SECRET=1\n')
-      expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
-    })
-  }
-
-  it('a staged rename whose old name is back on disk: the rename committed, the old file left untracked', async () => {
+  it('a staged rename whose old name is back on disk: refused by the old name, nothing done', async () => {
     sh(proj, 'mv', 'b.txt', 'c.txt')
     writeFileSync(join(proj, 'b.txt'), 'a new b\n')
-    await settle('commit', ['c.txt'])
-    expect(committed()).toEqual(['b.txt', 'c.txt'])
-    expect(inHead('b.txt')).toBe(false)
-    expect(status()).toBe('?? b.txt')
+    const before = state()
+    await expect(settle('commit', ['c.txt'])).rejects.toThrow(/^b\.txt is staged for removal from Git/)
+    expect(state()).toEqual(before)
+  })
+
+  it("Files' Commit it with .gitignore itself staged for removal and still there: refused by name", async () => {
+    sh(proj, 'rm', '-q', '--cached', '.gitignore')
+    const before = state()
+    await expect(inWorkspace(w, () => changes.commitIgnore(proj))).rejects.toThrow(/^\.gitignore is staged for removal from Git/)
+    expect(state()).toEqual(before)
   })
 })
 

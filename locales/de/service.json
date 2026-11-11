@@ -72,7 +72,7 @@
   "service.folderChanges.busy": "Ein Agent oder ein Lauf arbeitet in {folder} ({what}). Versuche es erneut, sobald die Arbeit dort fertig ist.",
   "service.folderChanges.changed": "Die Änderungen in {folder} sind nicht mehr die angezeigten. Sieh noch einmal nach.",
   "service.folderChanges.commitFailed": "Git hat nicht committet: {why}",
-  "service.folderChanges.deletedKept": "{file} ist aus Git genommen, liegt aber noch im Ordner: Beiseitelegen würde die Datei durch die zuletzt committete Fassung ersetzen. Committe sie stattdessen: So bleibt sie aus Git heraus, und die Datei bleibt, wie sie ist.",
+  "service.folderChanges.deletedKept": "{file} ist zum Entfernen aus Git vorgemerkt: Committe das selbst in Git; Combwork fügt die Datei nicht wieder hinzu.",
   "service.folderChanges.detached": "{folder} ist auf keinem Branch, daher committet Combwork dort nicht.",
   "service.folderChanges.indexBusy": "Ein anderer Git-Befehl verwendet gerade das Repository. Versuche es gleich noch einmal.",
   "service.folderChanges.midOperation": "Git ist in {folder} mitten in {state, select, merge {einem Merge} rebase {einem Rebase} cherryPick {einem Cherry-Pick} other {einem Revert}}. Schließe den Vorgang zuerst ab oder brich ihn ab.",
