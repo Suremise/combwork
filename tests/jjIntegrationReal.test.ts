@@ -38,7 +38,12 @@ if (!jjExe) console.warn(`jjIntegrationReal.test.ts skipped: jj ${TESTED_JJ.vers
 let tokens = 0
 const token = (): string => `t${Date.now().toString(36)}${(++tokens).toString(36)}`
 
-describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.version})`, () => {
+// A hung test's bound (HI-2921), not a time budget: each test runs tens of real jj and Git processes, up to 15.8 s alone on
+// jj 0.47.1, and Vitest's 20 s default for unit tests timed out the candidate-credit and strict-update tests beside the
+// other real-jj files and 2 spinner workers (20 s cut off). About twice the worst seen under that load.
+const REAL_JJ_MS = 60_000
+
+describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
   const env = { ...h.env, GIT_TERMINAL_PROMPT: '0' }
 

@@ -49,7 +49,12 @@ afterEach(() => {
 let attempts = 0
 const token = (): string => `t${Date.now().toString(36)}${(++attempts).toString(36)}`
 
-describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.version})`, () => {
+// A hung test's bound (HI-2921), not a time budget: each test runs real jj and Git processes, and Vitest's 20 s default for
+// unit tests timed out the drop test beside the other real-jj files and 2 spinner workers (its neighbours 17.3 and 19.5 s
+// there). About twice the worst seen under that load.
+const REAL_JJ_MS = 60_000
+
+describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
 
   /** `git --git-dir <store>`, as the candidate's deps run it. */
