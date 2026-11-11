@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 130
+const FIXTURES_VERSION = 131
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -370,6 +370,24 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
  * can't load: its imports name no extension), Pair's target being the repository's branch, set by the scenario.
  */
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
+/** HI-2854's A/B task (the card's own: a CSV line parser and 8 node:test cases, run until green). */
+const AB_TASK =
+  'Write csv.js exporting parseLine(line), which splits one CSV line into its fields: commas separate fields; a field in double quotes may hold commas, and two double quotes inside it stand for one; an empty line is one empty field. ' +
+  'Add csv.test.js with 8 node:test cases covering these, and run `node --test` until it passes.'
+/** The fakes' work on it: a parser and 8 passing tests, written by shell steps. */
+const AB_FAKE_WORK =
+  `shell: node -e "require('fs').writeFileSync('csv.js', 'module.exports.parseLine = (l) => l.split(String.fromCharCode(44))' + String.fromCharCode(10))" then ` +
+  `shell: node -e "const t = []; for (let i = 0; i < 8; i++) t.push('test(' + JSON.stringify('case ' + i) + ', () => {})'); require('fs').writeFileSync('csv.test.js', 'const test = require(' + JSON.stringify('node:test') + ')' + String.fromCharCode(10) + t.join(String.fromCharCode(10)) + String.fromCharCode(10))"`
+/** node --test in alpha: its output's pass and fail counts. */
+const abTests = (c) => {
+  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
+  return { status: r.status, pass: Number(/^# pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^# fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
+}
+/** Green with at least 8 tests. */
+const abGreen = (c) => {
+  const t = abTests(c)
+  return t.status === 0 && t.pass >= 8 && t.fail === 0
+}
 const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'combworkMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
 /**
  * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Combwork gives it to its builder (`key`) in its
@@ -4281,6 +4299,44 @@ module.exports.SCENARIOS = [
         ['submitted it with cw_submit (a Submitted fact)', ran(o, 'cw_submit').length > 0 && factsOf(o, 's', 'Submitted').length > 0, calls],
         ['the card is Done: committed is done, with no review', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
         ['skipped no rule (no Override fact)', !overridesOf(o, 's').length, JSON.stringify(overridesOf(o, 's').map((f) => f.data))]
+      ]
+    }
+  },
+  // HI-2854's A/B: the same small task done plainly (an Independent agent, no Combwork tools, typed as from a terminal) and
+  // as a Solo card Combwork starts (its start task carrying the whole card), for their requests and cost side by side
+  // (summary.md's Combwork's cost column). Alpha is a Git project, so the card commits where tokentest (no version
+  // control) only accepted: one step more than the card's own measurement had.
+  {
+    id: 'solo-ab-plain',
+    title: "HI-2854's A: a small task typed into an Independent agent (no Combwork tools, skills or guidance), as from a terminal: the parser and its tests, green",
+    async setup(c) {
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'independent' })
+    },
+    prompt: AB_TASK,
+    fake: AB_FAKE_WORK,
+    expect: (o, c) => [['the parser and its 8 tests, passing (node --test)', abGreen(c), JSON.stringify(abTests(c))]]
+  },
+  {
+    id: 'solo-ab-card',
+    title: "HI-2854's B: the same task as a Solo card Combwork starts on the agent: its start task carries the whole card and says it is the agent's, so it neither reads nor starts it, and its submit acks the task",
+    startedByCombwork: true,
+    async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await setWorkflow(c, SOLO, 'solo')
+      const n = await c.card('s', { title: 'CSV line parser', description: AB_TASK })
+      const r = await c.inv('tasks:start', n, { kind: 'agent', agentId: c.agents.coder.id }, { confirm: true })
+      if (!r?.agentId) throw new Error(`setup: the card didn't start: ${JSON.stringify(r)}`)
+    },
+    prompt: (c) => `Work on task #${c.cards.s}.`,
+    fake: (c) => `cw cw_inbox {} then ${AB_FAKE_WORK} then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "CSV line parser" then cw cw_submit {"card":"#${c.cards.s}","summary":"csv.js parses a CSV line; 8 tests pass."}`,
+    expect: (o, c) => {
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['the parser and its 8 tests, passing (node --test)', abGreen(c), JSON.stringify(abTests(c))],
+        ['the card is Done (Solo: committed is done)', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
+        ['read nothing of the card again: its task had it whole (no cw_read_task)', !ran(o, 'cw_read_task').length, calls],
+        ["didn't start it again: its task said it was its own (no cw_start_card)", !ran(o, 'cw_start_card').length, calls]
       ]
     }
   },
