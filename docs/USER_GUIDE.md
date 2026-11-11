@@ -1115,7 +1115,7 @@ Measured with Claude Code (Opus 5.5, medium effort) on a small task (a CSV line 
 | | Requests | Cache read | API-equivalent cost |
 |---|---|---|---|
 | Plain, as from a terminal | 3–5 | 123k–216k | $0.12–$0.15 |
-| As a card, Combwork 1.3 | 12 | 583k | $0.27–$0.28 |
+| As a card, before this version's change | 12 | 583k | $0.27–$0.28 |
 | As a card, this version | 8 | 368k–371k | $0.20–$0.21 |
 
 On a task that size, a card's coordination cost about twice the plain run before, and about one and a half times now. What the card still adds: reading its task from the inbox, loading the work-on-card skill and the submit tool, and submitting. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card. On a real card the work dominates, and it is a few percent.
