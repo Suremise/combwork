@@ -741,11 +741,11 @@ interface CombworkMessageValues {
   'board.queue.pause.setAsideTip': { files: string | number }
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined
-  'board.queue.pause.staged': { files: string; target: string | number }
+  'board.queue.pause.staged': { files: string; target: string | number; count: number }
   'board.queue.pause.subfolderTarget': { card: string | number }
   'board.queue.pause.targetMovesFast': { target: string | number }
   'board.queue.pause.uncounted': undefined
-  'board.queue.pause.unstagedChanges': { files: string; target: string | number }
+  'board.queue.pause.unstagedChanges': { files: string; target: string | number; count: number }
   'board.queue.pause.wrongBranch': { target: string | number }
   'board.queue.pauseFailed': undefined
   'board.queue.pauseTip': undefined
