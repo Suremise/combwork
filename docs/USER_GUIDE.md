@@ -1106,6 +1106,20 @@ The **Overview** tab updates as sessions change (at most every 15 seconds; **Set
 **Tables.** Combwork's longer tables work the same way: the compactions, archived cards, keyboard shortcuts, Performance's and Compare's tables, Storage and the Overviews' tables by project and by agent. Click a column's header to sort by it (again for the other way, a third time for the table's own order); Combwork remembers each table's sort and rows per page. A table with many rows has filters under its headers and pages under it.
 - **API-equivalent cost** — what the session would have cost at API prices. On a subscription you are not charged this; it is a measure of how heavy the session is. Claude Code calculates it itself; for Codex, Combwork **estimates** it from a price table (shown with **≈**). Combwork ships the published prices as starting values, and you can change, add and remove them in each provider's settings page (**API prices**) if they change or you have different rates. For a model Combwork has no price for, the cost shows as unknown (**$?** in the agent's footer, **Unknown** on the Overview; a total that includes such sessions shows what is known with **+ ?**, as does a session that used such a model beside priced ones); hover it to see which model, and add its price under **API prices** to see the estimate.
 
+### What Combwork adds to an agent's tokens <a id="combwork-tokens"></a>
+
+Claude Code's `/usage` may show a line such as **MCP servers: combwork 26%** and suggest turning it off when you don't need it. That figure counts every request that followed one of Combwork's tool calls, across all your sessions on the machine: each request re-reads the whole conversation so far (mostly from the cache), so it is calls × context, not what Combwork's tools and replies themselves take. Combwork's fixed part is small: about 2k tokens of tool descriptions, instructions and skills, loaded as needed. What it adds is **requests**: reading the task, starting the card, submitting it, each re-reading the conversation.
+
+Measured with Claude Code (Opus 5.5, medium effort) on a small task (a CSV line parser and eight tests, run until green), in a project with no version control and no review, as a solo user works, twice each in Combwork's test harness:
+
+| | Requests | Cache read | API-equivalent cost |
+|---|---|---|---|
+| Plain, as from a terminal | 3–5 | 123k–216k | $0.12–$0.15 |
+| As a card, Combwork 1.3 | 12 | 583k | $0.27–$0.28 |
+| As a card, this version | 8 | 368k–371k | $0.20–$0.21 |
+
+On a task that size, a card's coordination cost about twice the plain run before, and about one and a half times now. What the card still adds: reading its task from the inbox, loading the work-on-card skill and the submit tool, and submitting. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card. On a real card the work dominates, and it is a few percent.
+
 ### Long conversations <a id="long-conversations"></a>
 
 A conversation's transcript keeps everything that happened in it, and compacting doesn't make it smaller: it only shortens what the agent has in its context. A very long one (100 MB and more) slows down the CLI and Combwork, and can make typing in the terminals stutter. The size shows on the right of each agent's footer (and when you hover its context), and beside each session in the Sessions tab (the Assistant's conversations too); past **Settings → Sessions → Warn when a transcript is over** (20 MB; projects can set their own) it turns amber, with a ⚠. Combwork also tells you once when a conversation passes it, when the agent's turn is over (a conversation grows during a turn, so you hear of it once the agent can act on it).

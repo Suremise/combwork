@@ -24,7 +24,7 @@
 
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { projectAgents } from '../shared/defaults'
-import { taskPrompt } from '../shared/tasks'
+import { cardStartPrompt, type StartTaskMeta } from './cardStartPrompt'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import { SLOT_DIRTY_GATE, type Fact, type FactData, type StartedData, type StageId } from '../shared/workflow/facts'
@@ -762,7 +762,9 @@ function uses(wf: Workflow, l: SlotLease): boolean {
 // --- The window's Start hands its prompt to the placement.
 
 /** Window Starts handing their card's prompt to the slot's placement (startTask), by project and card. */
-const offered = new Map<string, { prompt: string | null; ready: Promise<void> }>()
+const offered = new Map<string, { prompt: StartPrompt | null; ready: Promise<void> }>()
+/** A Start's prompt and what its delivery records (HI-2854: cardStartPrompt's meta). */
+type StartPrompt = { text: string; meta: StartTaskMeta }
 const offerKey = (projectPath: string, n: number): string => `${projectPath.toLowerCase()}#${n}`
 
 /**
@@ -770,11 +772,11 @@ const offerKey = (projectPath: string, n: number): string => `${projectPath.toLo
  * Read first) is given to the slot's placement rather than typed where the agent is now. Call before the card moves;
  * the returned function gives the prompt, or null when the Start didn't go through (the card's own prompt is used then).
  */
-export function expectStartPrompt(projectPath: string, n: number): (prompt: string | null) => void {
+export function expectStartPrompt(projectPath: string, n: number): (prompt: StartPrompt | null) => void {
   const key = offerKey(projectPath, n)
   let given = false
   let res!: () => void
-  const entry = { prompt: null as string | null, ready: new Promise<void>((r) => (res = r)) }
+  const entry = { prompt: null as StartPrompt | null, ready: new Promise<void>((r) => (res = r)) }
   offered.set(key, entry)
   return (p) => {
     if (given) return
@@ -1690,7 +1692,9 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         if (isPlacedHow(was)) how = was
       }
     } else {
-      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
+      // HI-2854: with the whole card when it fits, and what its delivery records (the receipt the Start's prompt was made at).
+      const start = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? (await cardStartPrompt(ws, card, agentId, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane }))
+      const cardPrompt = start.text
       // Its lane's brief as it is now (HI-1795), after the card's own prompt (the window's or offered one kept whole): in
       // every placement of the lane's cards, whatever conversation works the card. Fixed with the delivery once made.
       // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
@@ -1698,7 +1702,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
       // agent-protocol: the sender is the product's name, Combwork
-      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { ...start.meta, how } } // i18n-ignore: who a delivery is from, as agents read it
       // Its builder can't take a line now (HI-2191: its input blocked, a line of Combwork's being typed, watching, working):
       // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
       // pass wrote the lane each time, which ran the next pass: HB3's every second. Said once for each reason.

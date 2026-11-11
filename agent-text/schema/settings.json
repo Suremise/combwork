@@ -1367,6 +1367,12 @@
   "settings.advanced.cw.prompt.rawCardStart.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.prompt.wholeCardMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.wholeCardMax.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.queue.checkMinutes.desc": {
     "placeholders": {}
   },

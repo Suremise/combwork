@@ -49,6 +49,29 @@ Codex run.
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
 <!-- old-name: begin baseline-run-records -->
+## A solo card's fewer round trips (HI-2854): fakes, Claude Code, Codex, fixtures v133, 11 November 2026
+
+Darren's decisions (11 Nov): a card's start task carries the whole card when it fits and says it is the agent's;
+cw_submit refuses an agent that hasn't seen a decision or a comment of the user's, in every ruleset, giving them; a
+card's start task is acked by the agent's start or submit of it. work-on-card no longer reads the card again before
+submitting. Two new scenarios measure the card's own A/B: **solo-ab-plain** (an Independent agent typed the task: model
+trials only) and **solo-ab-card** (the same task as a Solo card Combwork starts: no cw_read_task, no cw_start_card;
+fake Claude Code and model trials). card-decision accepts the refused submit, which gives the decision in full, as
+seeing it and as its notice.
+- **Before** (e8426638c, fixtures v130): fakes all pass (`hi2854-before-fake`, `-fake-codex`, `-fake-copilot`);
+  Claude Code 8 of 8 (`hi2854-before-claude`, $1.78); Codex 7 of 8 (`hi2854-before-codex`: inbox-act-then-ack acked
+  after acting, as before).
+- **After** (3b69ebf70 and 1386db6da): fakes all pass (`hi2854-after-fake`, `-fake-codex`, `-fake-copilot`; card-decision
+  and solo-ab-card again at 1386db6da); Codex 8 of 8 (`hi2854-after-codex`); Claude Code 8 of 8 with card-decision at
+  1386db6da (2 of 2, after its check took the refusal) and card-loop-rounds 2 of 2 (one miss on its wording at
+  62ea8de35: "paused until you decide").
+- **The A/B like-for-like** (HR2's round 1; fixtures v135; Claude Code, Opus 5.5, medium; alpha with no version control,
+  Solo with accept, as the card's tokentest; `--repeat 2`): plain 3 and 5 requests, 123k and 216k cache read, $0.124 and
+  $0.148 (`hi2854-ab-none`); the card **before** on e8426638c (a temporary worktree, base product code, this harness) 12
+  and 12, 583k, $0.278 and $0.273; the card **after** at 8e511979d 8 and 8, 368k and 371k, $0.211 and $0.198. The card's
+  tokentest measurement had 11, 528k, $0.27. An earlier A/B in a Git project (the card committing; `hi2854-ab-final`) had
+  the card at 8 or 9.
+
 ## Start the next version, the Assistant's cw_branch (HI-2811): fakes, Claude Code, Codex, fixtures v128, 9 November 2026
 
 HI-2807 gave the Assistant `cw_branch` (`nextVersion`) with no scenario. Three new ones, each a single turn (a scenario

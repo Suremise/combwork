@@ -9,10 +9,10 @@ Your watch, your card in Review: the card, `changes: ["verdict", "column", "comm
 ## Builder
 
 For each card, in order:
-1. Do its work with the **work-on-card** skill (`cw_start_card` first). The reviewer reviews what you submit (work-on-card, Finish): for a code card in Git or jj, commit each round's work and name the commit in its summary; a no-code card has nothing to commit. `cw_submit`, and end your turn (SKILL.md, Waiting).
+1. Do its work with the **work-on-card** skill (`cw_start_card` first, unless your task says it's yours). The reviewer reviews what you submit (work-on-card, Finish): for a code card in Git or jj, commit each round's work and name the commit in its summary; a no-code card has nothing to commit. `cw_submit`, and end your turn (SKILL.md, Waiting).
 2. **A change asked of the card in Review**: make it (for a code card in Git or jj, commit it), and hand it over first (SKILL.md, Waiting). A run asked for: reply naming it, then watch again.
 3. **Passed**: its finish is the project's, and the card says what's next (work-on-card, Finish). **Done**: the lane goes on, whatever the card's own prompt named: with the rules on Combwork starts the next card for you (end your turn), else take it unprompted (`cw_lane` `next`) until none is left.
-4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings (committed, for a code card in Git or jj), and submit again with what changed (naming the commit, for a code card in Git or jj): the next round. Suggestions that aren't blocking become follow-up cards (`cw_create_task`).
+4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings (committed, for a code card in Git or jj), and submit again with what changed (naming the commit): the next round. Suggestions that aren't blocking become follow-up cards (`cw_create_task`).
 
 **Checks in a round:** each submission carries a run record (work-on-card). After a round's fixes rerun the checks they affect; to pass, its final code needs the checks the project's notes require (if they don't say, its full checks).
 

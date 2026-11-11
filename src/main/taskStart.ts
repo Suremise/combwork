@@ -4,7 +4,8 @@ import type { DeliverySender } from '../shared/deliveries'
 import { projectAgents } from '../shared/defaults'
 import { deliverNow, launchWith, NotGiven } from './deliveries'
 import { msg } from '../shared/i18n'
-import { rawTaskPrompt, taskPrompt } from '../shared/tasks'
+import { rawTaskPrompt } from '../shared/tasks'
+import { cardStartPrompt } from './cardStartPrompt'
 import type { TaskCard, TaskStartTarget } from '../shared/types'
 import { emit } from './events'
 import { addAgent, removeAgent } from './projectAgents'
@@ -251,7 +252,9 @@ async function giveCard(
     // Already Active with no slot (HR2's round 1: a start from before this fix, given again) is refused the same way.
     if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw combworkError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
     const inLane = laneBuilds(await rawLanes(workspaceOf(p)), basename(p), agentId, n)
-    const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.combworkMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
+    // HI-2854: with the whole card when it fits, and what its delivery records (the card's start task, in this cycle).
+    const start = advanced.get<boolean>(RAW_CARD_START) ? { text: rawTaskPrompt(card, note), meta: {} } : await cardStartPrompt(workspaceOf(p), card, agentId, !!sessions.combworkMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
+    const prompt = start.text
     // Started in a slot (#1438): Combwork gives it to the agent there once the slot is ready (a new conversation where the
     // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
     // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).
@@ -259,7 +262,7 @@ async function giveCard(
       // The caller's authority, after the last await before the card is handed to its slot (HI-2420).
       commit?.()
       slotted = true
-      toSlot(prompt)
+      toSlot(start)
       if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
       return { card, agentId, agentName, added, typed: false, slotted: true }
     }
@@ -269,7 +272,7 @@ async function giveCard(
     commit?.()
     // A task delivery (#649), given now or not at all: typed into a running agent (and while it is typed, an agent that
     // starts work or that the user types in meanwhile doesn't get the rest), or the prompt it is started with.
-    const nd = { agentId, agentName, kind: 'task' as const, from: senderOf(actor), card: n, body: prompt, need: 'free' as const }
+    const nd = { agentId, agentName, kind: 'task' as const, from: senderOf(actor), card: n, body: prompt, need: 'free' as const, meta: start.meta }
     const holds = (): boolean => {
       try {
         commit?.()

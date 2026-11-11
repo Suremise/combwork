@@ -422,7 +422,13 @@ export interface FactData {
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
   Decision: { decision: string; generation: number; text: string; removed?: boolean }
-  DecisionsReceived: { agent: string; generation: number }
+  /**
+   * What an agent has received of the card: its decisions up to `generation`, and (HI-2854) the user's comments up to
+   * `comments` (a UserComment's generation), when the receipt covers them.
+   */
+  DecisionsReceived: { agent: string; generation: number; comments?: number }
+  /** HI-2854: a comment the user wrote on the card (its id), each a new comment generation: what cw_submit checks the builder has seen. */
+  UserComment: { comment: string; generation: number }
   /**
    * Paths the card's builder took Combwork's file locks on this cycle (#1481, G16: its own changes in a shared folder),
    * relative to the project folder with `/`: each only once a cycle, and only while the card is its builder's current one.
@@ -523,6 +529,10 @@ export interface CardState {
   generation: number
   /** The generation each agent has received. */
   received: Record<string, number>
+  /** HI-2854: the newest UserComment generation on the card (0: none). */
+  commentGeneration: number
+  /** HI-2854: the comment generation each agent has received. */
+  receivedComments: Record<string, number>
   /** The revision the latest submission's passes now cover (moved by carry-overs and the queue's updates), and its base. */
   approved: { revision: string | null; base: string | null } | null
   /** A content-stale pass (a new revision that isn't the same change), until the builder submits again or its line returns to the approved revision. */
@@ -595,6 +605,8 @@ export const emptyState = (): CardState => ({
   verdicts: [],
   generation: 0,
   received: {},
+  commentGeneration: 0,
+  receivedComments: {},
   approved: null,
   stale: null,
   forward: null,
@@ -649,7 +661,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
         const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq, lines: s.lines })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq, lines: s.lines })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -853,8 +865,13 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'DecisionsReceived': {
         const d = f.data as FactData['DecisionsReceived']
         s.received[d.agent] = Math.max(s.received[d.agent] ?? 0, d.generation)
+        // Never back (HI-2854): a late receipt of an older read leaves a newer one as it is.
+        if (typeof d.comments === 'number') s.receivedComments[d.agent] = Math.max(s.receivedComments[d.agent] ?? 0, d.comments)
         break
       }
+      case 'UserComment':
+        s.commentGeneration = Math.max(s.commentGeneration, (f.data as FactData['UserComment']).generation)
+        break
       case 'LineRenamed': {
         // Its line is the new name from here on: reconciliation reads the branch by it, and never finds it gone (#1305).
         const d = f.data as FactData['LineRenamed']

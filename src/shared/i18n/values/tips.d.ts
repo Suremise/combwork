@@ -177,6 +177,8 @@ interface CombworkMessageValues {
   'tips.combworkMerges.title': undefined
   'tips.combworkSkills.text': undefined
   'tips.combworkSkills.title': undefined
+  'tips.combworkTokens.text': undefined
+  'tips.combworkTokens.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined

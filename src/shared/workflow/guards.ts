@@ -180,7 +180,8 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     return { rule: 'submit.identity', values: { card: i.card.key, missing: 'no', commit: short(b.commit), email: b.email, command: fix.resetAuthor } } // i18n-ignore: a select key, as typed
   },
   'submit.ownRunsStopped': (i) => (i.runsGoing?.length ? { rule: 'submit.ownRunsStopped', values: { card: i.card.key, runs: i.runsGoing.join(', ') } } : null),
-  'submit.decisionsReceived': (i) => (i.agent !== null && (i.state.received[i.agent] ?? 0) < i.state.generation ? { rule: 'submit.decisionsReceived', values: { card: i.card.key } } : null),
+  // HI-2854: the user's comments too (Darren's B), so the builder needn't read the card again before it submits.
+  'submit.decisionsReceived': (i) => (i.agent !== null && ((i.state.received[i.agent] ?? 0) < i.state.generation || (i.state.receivedComments[i.agent] ?? 0) < i.state.commentGeneration) ? { rule: 'submit.decisionsReceived', values: { card: i.card.key } } : null),
   'review.notAuthor': (i) => (i.agent !== null && i.state.builders.includes(i.agent) ? { rule: 'review.notAuthor', values: { card: i.card.key } } : null),
   'review.decisionsReceived': (i) => (i.agent !== null && (i.state.received[i.agent] ?? 0) < i.state.generation ? { rule: 'review.decisionsReceived', values: { card: i.card.key } } : null),
   'verdict.reviewing': (i) => {

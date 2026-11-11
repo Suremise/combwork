@@ -266,6 +266,8 @@
   "tips.combworkMerges.title": "Deja que Combwork fusione las tarjetas aprobadas",
   "tips.combworkSkills.text": "Los agentes y el Asistente reciben las habilidades propias de Combwork: work-on-card, review-agent-work, handover y más. Combwork las mantiene al día; las que edites siguen siendo tuyas.",
   "tips.combworkSkills.title": "Habilidades para trabajar con Combwork",
+  "tips.combworkTokens.text": "El /usage de Claude Code cuenta cada solicitud que sigue a una llamada a las herramientas de Combwork, y cada una vuelve a leer toda la conversación: su parte de combwork es llamadas por contexto. El inicio de una tarjeta ahora lleva la tarjeta entera cuando cabe, así que el agente la lee una sola vez.",
+  "tips.combworkTokens.title": "Qué cuenta «combwork» en /usage",
   "tips.hooksMissing.text": "Si una actualización de la CLI o una directiva impide que los hooks de un agente lleguen a Combwork, su panel dice Estado desconocido en lugar de un estado que puede ser incorrecto, no se escribe nada en él y su carril se pausa. El banner sobre su panel dice por qué cuando Combwork lo sabe.",
   "tips.hooksMissing.title": "Cuando dejan de llegar los hooks de un agente",
   "tips.howDoYouWork.text": "La pestaña Control de versiones de un proyecto nuevo pregunta “¿Cómo trabajas?”: Individual, Pareja o Equipo, y sugiere el que encaja con sus agentes. Elegir lo configura con un clic; Ahora no mantiene tus valores predeterminados.",

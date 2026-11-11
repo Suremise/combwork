@@ -1036,7 +1036,8 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const { e, n, cycle, ws } = await owed()
     state.conv = resume
     await place(ws, e.project, e.wf, n, cycle, lease)
-    expect(state.deliveries.map((d) => d.meta)).toEqual([{ how: 'resumed' }])
+    // HI-2854: with what marks it the card's start task.
+    expect(state.deliveries.map((d) => d.meta)).toEqual([{ cardTask: true, how: 'resumed' }])
   })
 
   it("its conversation's lookup failing (unknown): nothing launched, tried again; resumed once it can be read", async () => {
@@ -1384,7 +1385,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
   it("a window Start's own prompt is kept whole, the brief after it", async () => {
     state.lanes = async () => keptLanes() as never
     const { e, n, cycle, ws } = await laneCard()
-    expectStartPrompt(e.project, n)('Work on task AM-1 from the window, with the user\'s note: be quick.')
+    expectStartPrompt(e.project, n)({ text: 'Work on task AM-1 from the window, with the user\'s note: be quick.', meta: {} })
     await place(ws, e.project, e.wf, n, cycle, laneLease)
     expect(bodies()[0]).toMatch(/^Work on task AM-1 from the window, with the user's note: be quick\.\n\nYour lane's brief/)
     expect(bodies()[0]).toMatch(BRIEF)

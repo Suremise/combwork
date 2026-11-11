@@ -22,12 +22,12 @@ import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import { loopReviewerOf } from './loopReviewer'
 import { readStep } from './platform/historyPorts'
-import type { CardKind } from '../shared/workflow/facts'
+import type { CardKind, Fact } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
@@ -556,16 +556,73 @@ export async function readTask(n: number, actor: TaskActor): Promise<TaskCard> {
  * readTask, with the card's decision generation read in the same snapshot as the card (#1216): what an agent reading it
  * in full is given, for its receipt (never a decision written after the read).
  */
-export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number }> {
+/**
+ * A card with its decision and comment generations read in one snapshot (HI-2854), in the given workspace, for a start
+ * task that carries the whole card: what it gives is what its receipt records. Null when it isn't there.
+ */
+export async function cardSnapshot(ws: WorkspaceService, n: number): Promise<{ card: TaskCard; generation: number; comments: number; archived: number; at: number } | null> {
+  if (!Number.isInteger(n) || n < 1 || !ws.path) return null
+  const ids = await ws.projectIds()
+  if (!ws.path) return null
+  const { raw, generation, comments, key } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: commentGenerations(ws, [n]).get(n) ?? 0, key: cardKeys(ws, [n]).get(n) }))
+  if (!raw) return null
+  const card = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
+  // Comments it archived, or may have lost before archiving existed: either way, not all of them are on the card.
+  const a = commentArchiveOf(ws, n)
+  return { card, generation, comments, archived: a.archived + (a.mayHaveBeenLost ? 1 : 0), at: Date.now() }
+}
+
+/** A page of a card's comment archive, as cardWithFacts searches it (HI-2641 archives past the 500 a card keeps). */
+const ARCHIVE_PAGE = 500
+
+/**
+ * A card, its facts and the archived comments of the user's it needs, all read in one snapshot (HI-2854, HR2's rounds 1
+ * and 2): what a refused submit gives an agent of its unseen decisions and comments, and the receipt of exactly those,
+ * come from the same board state, so nothing written between two reads is counted as given. Of the archive, only the
+ * comments of `want` (ids) are kept, searched page by page from the newest, however deep, until all are found. Null
+ * when it isn't there, or no longer in `project` (a card moved to another project since its intent was checked).
+ */
+export async function cardWithFacts(ws: WorkspaceService, n: number, opts: { project?: string; want?: (facts: Fact[], onCard: ReadonlySet<string>) => ReadonlySet<string> } = {}): Promise<{ card: TaskCard; facts: Fact[]; archived: TaskComment[] } | null> {
+  if (!Number.isInteger(n) || n < 1 || !ws.path) return null
+  const ids = await ws.projectIds()
+  if (!ws.path) return null
+  const got = boardRead(ws, () => {
+    const raw = cardDoc(ws, n)
+    const facts = cardFacts(ws, n)
+    const onCard = new Set(((raw as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
+    const wanted = new Set(opts.want?.(facts, onCard) ?? [])
+    const archived: TaskComment[] = []
+    const total = wanted.size ? commentArchiveOf(ws, n).archived : 0
+    for (let end = total; end > 0 && wanted.size; end -= ARCHIVE_PAGE) {
+      for (const c of archivedComments(ws, n, Math.max(0, end - ARCHIVE_PAGE), Math.min(ARCHIVE_PAGE, end)).comments as TaskComment[]) {
+        if (c.id && wanted.delete(c.id)) archived.push(c)
+      }
+    }
+    return { raw, key: cardKeys(ws, [n]).get(n), facts, archived }
+  })
+  if (!got.raw) return null
+  const card = withoutGone(clean(got.raw, n, ids, got.key), (x) => hasCard(ws, x))
+  if (opts.project !== undefined && card.project.toLowerCase() !== opts.project.toLowerCase()) return null
+  return { card, facts: got.facts, archived: got.archived }
+}
+
+export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number }> {
   const ws = workspace
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
   if (!ws.path) throw unknownTask(n)
-  const { raw, generation, key } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0, key: cardKeys(ws, [n]).get(n) }))
+  // HI-2854: an agent's receipt of the user's comments in the same snapshot, only as far as the comments this read gives
+  // (never past one archived since, HR2's round 1 finding 2); for anyone else, the newest.
+  const agent = actor.kind === 'agent' ? actor.self?.agentId : undefined
+  const { raw, generation, comments, key } = boardRead(ws, () => {
+    const doc = cardDoc(ws, n)
+    const given = new Set(((doc as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
+    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n) }
+  })
   if (!raw) throw unknownTask(n)
   const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
-  return { card: c, generation }
+  return { card: c, generation, comments, at: Date.now() }
 }
 
 /**
