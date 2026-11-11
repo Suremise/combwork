@@ -72,6 +72,7 @@
   "service.folderChanges.busy": "Un agente o una ejecución está trabajando en {folder} ({what}). Vuelve a intentarlo cuando termine.",
   "service.folderChanges.changed": "Los cambios en {folder} ya no son los que se muestran. Vuelve a mirar.",
   "service.folderChanges.commitFailed": "Git no hizo el commit: {why}",
+  "service.folderChanges.deletedKept": "{file} está preparado para quitarse de Git: haz tú el commit en Git; Combwork no lo volverá a añadir.",
   "service.folderChanges.detached": "{folder} no está en una rama, así que Combwork no hace commit allí.",
   "service.folderChanges.indexBusy": "Otro comando git está usando el repositorio. Vuelve a intentarlo en un momento.",
   "service.folderChanges.midOperation": "Git está en medio de {state, select, merge {una fusión} rebase {un rebase} cherryPick {un cherry-pick} other {un revert}} en {folder}. Termina o cancela esa operación primero.",
