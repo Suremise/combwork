@@ -280,6 +280,8 @@
   "tips.inboxNotices.title": "消息在步骤之间送达忙碌的智能体",
   "tips.isolatedChecks.text": "在共享文件夹中，如果检查运行期间另一个智能体编辑了文件，这次检查就不计数。cw-progress --check typecheck --isolated 会在卡片修订版本上的一个专属副本中运行检查，其他任何东西都不会写入。在进度面板中点击停止，即可结束该检查及其启动的所有进程。",
   "tips.isolatedChecks.title": "谁也破坏不了的检查",
+  "tips.jjCards.text": "在 jj 项目中，每张卡片都在自己的槽位中工作。卡片通过评审后，由你自行集成：版本控制 → 仓库会列出等待你处理的内容，一旦其工作进入目标，Combwork 就会把卡片移到已完成。",
+  "tips.jjCards.title": "jj 项目中的卡片",
   "tips.jjOperations.text": "在 jj 项目中，“版本控制”→“操作”按名称列出 jj 的操作。“预览撤销”会显示撤销其中某个操作会改变什么，并在不会改变其他内容时给出要运行的命令。Combwork 从不运行它。",
   "tips.jjOperations.title": "预览撤销 jj 操作",
   "tips.keepAwake.text": "智能体工作时，Combwork 会阻止 Windows 进入睡眠（屏幕仍可锁定），等它们完成后再允许睡眠。在“设置”→“常规”中选择何时这样做。",

@@ -1812,8 +1812,8 @@
     "description": "In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj."
   },
   "git.vc.store.toJj": {
-    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards don’t run in a jj project yet.",
-    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none). Keep jj, .jj and .git."
+    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own, and you integrate the reviewed work yourself: Combwork never moves a bookmark or pushes.",
+    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none; HI-2874: jj cards run). A bookmark is jj’s name for a branch. Keep jj, .jj and .git."
   },
   "git.vc.store.unknown": {
     "defaultMessage": "{gate}: couldn’t be checked ({what}), so it counts as used",

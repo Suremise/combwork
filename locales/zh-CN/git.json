@@ -490,7 +490,7 @@
   "git.vc.store.slot": "{project}：槽位 {slot}，借给了 {agent}",
   "git.vc.store.stock": "Git for Windows 自带的默认设置（它的 LFS 过滤器、Office 文档的 diff 驱动）不计入：只计入仓库或你自己的 Git 设置所用的内容。",
   "git.vc.store.toGit": "Combwork 会保留 .jj：如果不再需要，请用 jj 将其删除。",
-  "git.vc.store.toJj": "Combwork 不会创建 jj 仓库，也不会更改其共存方式：.jj 以及存在时的 .git 保持原样。卡片尚不能在 jj 项目中运行。",
+  "git.vc.store.toJj": "Combwork 不会创建 jj 仓库，也不会更改其共存方式：.jj 以及存在时的 .git 保持原样。卡片各自在自己的槽位中运行，评审后的工作由你自行集成：Combwork 从不移动书签，也从不推送。",
   "git.vc.store.unknown": "{gate}：无法检查（{what}），因此视为已使用",
   "git.vc.store.unsupported": "无论仓库如何，jj 都不支持：",
   "git.vc.store.uses": "{gate}：已使用（{what}）",

@@ -280,6 +280,8 @@
   "tips.inboxNotices.title": "Wiadomości docierają do zajętego agenta między krokami",
   "tips.isolatedChecks.text": "We wspólnym folderze sprawdzenie się nie liczy, jeśli w trakcie inny agent coś zmieni. cw-progress --check typecheck --isolated uruchamia je we własnej kopii na rewizji karty, do której nic innego nie zapisuje. „Zatrzymaj” w panelu Postęp kończy je razem ze wszystkim, co uruchomiło.",
   "tips.isolatedChecks.title": "Sprawdzenie, którego nikt nie zepsuje",
+  "tips.jjCards.text": "W projekcie jj każda karta pracuje we własnym slocie. Gdy któraś przejdzie przegląd, integrujesz ją sam: Kontrola wersji → Repozytorium pokazuje, co na ciebie czeka, a Combwork przenosi kartę do Gotowe, gdy jej praca znajdzie się w celu.",
+  "tips.jjCards.title": "Karty w projekcie jj",
   "tips.jjOperations.text": "W projekcie jj Kontrola wersji → Operacje wyświetla operacje jj według nazw. Podgląd cofnięcia pokazuje, co zmieniłoby cofnięcie jednej z nich, i podaje polecenie do uruchomienia, gdy nic innego by się nie zmieniło. Combwork nigdy go nie uruchamia.",
   "tips.jjOperations.title": "Podgląd cofnięcia operacji jj",
   "tips.keepAwake.text": "Gdy agent pracuje, Combwork nie pozwala Windows przejść w uśpienie (ekran nadal może się zablokować), a pozwala, gdy agenci skończą. Kiedy – wybierzesz w Ustawienia → Ogólne.",

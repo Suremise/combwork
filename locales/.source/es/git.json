@@ -453,7 +453,7 @@
   "git.vc.store.slot": "{project}: slot {slot}, lent to {agent}",
   "git.vc.store.stock": "Git for Windows’ own default settings (its LFS filter, the diff driver for Office documents) don’t count: only what the repository or your own Git settings use.",
   "git.vc.store.toGit": "Combwork leaves .jj in place: remove it with jj if you no longer want it.",
-  "git.vc.store.toJj": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards don’t run in a jj project yet.",
+  "git.vc.store.toJj": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own, and you integrate the reviewed work yourself: Combwork never moves a bookmark or pushes.",
   "git.vc.store.unknown": "{gate}: couldn’t be checked ({what}), so it counts as used",
   "git.vc.store.unsupported": "Not supported with jj, whatever the repository:",
   "git.vc.store.uses": "{gate}: used ({what})",

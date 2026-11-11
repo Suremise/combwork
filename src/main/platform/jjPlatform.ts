@@ -1,6 +1,6 @@
 // jj's workflow adapter (HI-2799's J6, filled in by HI-2868's J9b1, design HI-2868/s7–s19): what the runtime asks of a jj
-// project's cards, through Review. Behind the guard: every jj ruleset still carries `start.platformReady` until J9e (a
-// test compiles without it through compile.ts' seam), so nothing here runs for a real card yet.
+// project's cards, through Review and its reconciliation to Integrated (J9b2). On for real cards since J9e (HI-2874),
+// which retired the start guard J6 put in every jj ruleset.
 //
 // Decision A (HI-2794) throughout: nothing here makes or moves a bookmark, or pushes. Its only writes are J9a's owned slot
 // writes (through the pool, never here), J3's boundary snapshots, and create-only `refs/cw/cards/…` pins in the Git store.

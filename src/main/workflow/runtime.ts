@@ -1047,9 +1047,6 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
-    // HI-2799: a platform whose card work isn't enabled yet (jj) refuses before its adapter is asked anything; no override
-    // crosses it, since the adapter couldn't do what it would allow.
-    if (r.guards.start.includes('start.platformReady')) return { rule: 'start.platformReady', values: { card: card.key } }
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)

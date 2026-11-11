@@ -20,8 +20,8 @@ import type { GitFilesStatus } from '../../shared/types'
 
 /**
  * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
- * `PlatformId`'s own. jj's port is still reached only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`),
- * never `slotWorkspaces`, until jj's card work is enabled (no jj card starts yet: `start.platformReady`).
+ * `PlatformId`'s own. jj's port is reached through the pools' platform port (`workspacesFor`, registered by the app,
+ * J9a) or by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`), never `slotWorkspaces` (Git's).
  */
 export type JjPlatform = Extract<PlatformId, 'jj'>
 /** The platforms a workspace port can be: a project's. */

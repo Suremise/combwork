@@ -1,7 +1,6 @@
 // jj's card work's dependencies, composed by the app (HI-2868, J9b1; design HI-2868/s7 §1, s13): what JjPlatform needs
 // beside jj, from the app's own services, so platform code imports no app module. Given to each project's workflow
-// through service.ts' `setJjCards` (slotCards.ts sets it while slots run). Behind the guard: nothing here runs for a
-// real card until J9e lifts `start.platformReady`.
+// through service.ts' `setJjCards` (slotCards.ts sets it while slots run). Real cards use it since J9e (HI-2874).
 //
 // - the jj workspace port: J9a's registered one (slotsApp.ts' jjPort), with its bindings in the workspace database;
 // - the store's lock: the app's re-entrant store lock (the repository lock, one per store);

@@ -5,7 +5,7 @@
 import { execFileSync } from 'child_process'
 import { cpSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, beforeEach, expect } from 'vitest'
+import { afterEach, expect } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
 import { Workflow } from '../src/main/workflow/runtime'
@@ -18,7 +18,6 @@ import { mergeBundles, type SqlDb } from '../src/main/platform/jjObligations'
 import { boardPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { commitPublishOff } from '../src/main/jjPublish'
-import { setJjCardsReadyForTests } from '../src/shared/workflow/compile'
 import { preset } from '../src/shared/workflow/options'
 import { agentOf } from '../src/shared/workflow/facts'
 import { admitted } from './admitted'
@@ -27,9 +26,7 @@ import { tempDir } from './tempDir'
 import { B1, moved } from './workflow/harness'
 
 export const closers: (() => void)[] = []
-beforeEach(() => setJjCardsReadyForTests(true))
 afterEach(() => {
-  setJjCardsReadyForTests(false)
   for (const c of closers.splice(0)) c()
 })
 

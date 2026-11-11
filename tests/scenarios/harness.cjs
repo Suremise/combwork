@@ -614,9 +614,6 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A jj scenario (HI-2800, sc.jj): the pinned jj first on Combwork's PATH (whatever PATH the provider's settings gave
     // it, Copilot's and Codex's included), so its sessions' shells find it too, with a jj config of the run's own.
     if (sc.jj) Object.assign(env, jjScenarioEnv(root, env.PATH ?? lib.baseEnv().PATH))
-    // jj's card scenarios (HI-2870, sc.jjCards): jj card starts on in this test copy, before J9e lifts the guard (compile.ts'
-    // jjCardsTestSwitch: an unpackaged build only).
-    if (sc.jjCards) env.CW_TEST_JJ_CARDS = '1'
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))

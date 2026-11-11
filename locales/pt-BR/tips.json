@@ -280,6 +280,8 @@
   "tips.inboxNotices.title": "Mensagens chegam a um agente ocupado entre os passos",
   "tips.isolatedChecks.text": "Numa pasta compartilhada, uma verificação não conta se outro agente editar algo enquanto ela roda. cw-progress --check typecheck --isolated a roda numa cópia só dela, na versão do cartão, onde nada mais escreve. Parar, no painel Progresso, encerra a verificação e tudo o que ela iniciou.",
   "tips.isolatedChecks.title": "Uma verificação que ninguém estraga",
+  "tips.jjCards.text": "Em um projeto jj, cada cartão trabalha em um slot próprio. Quando um passa na revisão, você mesmo o integra: Controle de versão → Repositório lista o que espera por você, e o Combwork move o cartão para Concluído assim que o trabalho dele estiver no destino.",
+  "tips.jjCards.title": "Cartões em um projeto jj",
   "tips.jjOperations.text": "Em um projeto jj, Controle de versão → Operações lista as operações do jj pelo nome. Prévia de desfazer mostra o que desfazer uma delas mudaria, e dá o comando para executar quando nada mais mudaria. O Combwork nunca o executa.",
   "tips.jjOperations.title": "Veja a prévia de desfazer uma operação do jj",
   "tips.keepAwake.text": "Enquanto um agente trabalha, o Combwork impede o Windows de entrar em suspensão (a tela ainda pode bloquear) e permite a suspensão quando os agentes terminam. Escolha quando em Configurações → Geral.",
