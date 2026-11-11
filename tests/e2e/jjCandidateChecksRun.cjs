@@ -216,7 +216,10 @@ const lintCmd = `${node} -e "if(require('fs').existsSync(${JSON.stringify(lintFa
     check('the failing card: its lint fails on the candidate: back in Doing', !!(await until(async () => (await card(c2.n))?.column === 'doing', HUNG_MS)), (await card(c2.n))?.column)
     const failed2 = (await inv('tasks:facts', c2.n)).find((f) => f.kind === 'IntegrationFailed')
     const comments2 = (await card(c2.n))?.comments ?? []
-    check('…IntegrationFailed for its lint, its comment naming the check; the candidate never offered', failed2?.data?.reason === 'checks' && failed2?.data?.check === 'lint' && comments2.some((c) => /merge check lint failed on the candidate/.test(c.text)) && (await repo.locator(`[data-jj-integrate-card="${c2.n}"]`).count()) === 0, JSON.stringify({ failed2: failed2?.data, comments: comments2.map((c) => c.text) }))
+    check('…IntegrationFailed for its lint, its comment naming the check', failed2?.data?.reason === 'checks' && failed2?.data?.check === 'lint' && comments2.some((c) => /merge check lint failed on the candidate/.test(c.text)), JSON.stringify({ failed2: failed2?.data, comments: comments2.map((c) => c.text) }))
+    // Never offered: it leaves Waiting for you to integrate (once the panel has read the board's change).
+    const row2 = repo.locator(`[data-jj-integrate-card="${c2.n}"]`)
+    check('…and leaves Waiting, never offered', !!(await until(async () => (await row2.count()) === 0, HUNG_MS)) && (await row2.locator('[data-jj-command="candidate"]').count()) === 0, await text(row2))
 
     await quiet.evaluate((el) => el.remove())
   } finally {
