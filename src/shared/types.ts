@@ -4736,6 +4736,8 @@ export interface ProgressRun {
    * it, and it can be stopped from the panel: its processes are in the copy's job).
    */
   copy?: string
+  /** HI-2938: Combwork's own run in a check copy whose processes are its lease's job (a jj candidate's check): Stop ends them. */
+  stoppable?: boolean
 }
 
 /**

@@ -28,11 +28,18 @@ interface CombworkMessageValues {
   'jj.history.capped': { n: number }
   'jj.ids.tip': { change: string | number; commit: string | number }
   'jj.integrate.candidate': { commit: string | number; change: string | number; style: string; target: string | number; expected: string | number }
+  'jj.integrate.candidateBuilt': { commit: string | number; style: string; target: string | number; expected: string | number }
   'jj.integrate.candidateHow': { target: string | number }
+  'jj.integrate.candidatePassed': { commit: string | number; change: string | number; style: string; target: string | number; expected: string | number; checks: string | number }
   'jj.integrate.candidateSigning': undefined
   'jj.integrate.candidateUnknown': { why: string | number }
   'jj.integrate.card': { card: string | number; title: string | number; commit: string | number; target: string | number }
   'jj.integrate.change': { change: string | number }
+  'jj.integrate.checksAgain': undefined
+  'jj.integrate.checksFailing': { why: string | number }
+  'jj.integrate.checksRunning': { check: string | number; position: number; total: number }
+  'jj.integrate.checksStopped': { check: string | number }
+  'jj.integrate.checksWaiting': undefined
   'jj.integrate.head': undefined
   'jj.integrate.how': { target: string | number }
   'jj.integrate.noMerge': undefined

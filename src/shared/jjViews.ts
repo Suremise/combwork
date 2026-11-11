@@ -220,8 +220,21 @@ export interface JjWaitingCard {
   candidate: JjWaitingCandidate | null
 }
 
+/**
+ * HI-2938: a candidate's merge checks: running (`done` of `names`, `current` the one running), passed (only then is it
+ * offered), waiting for a check copy, stopped (Stop: Run Checks Again), or failing transiently (`misses` in a row).
+ */
+export interface JjWaitingChecks {
+  state: 'running' | 'passed' | 'waiting' | 'stopped' | 'failing'
+  names: string[]
+  done: number
+  current?: string
+  why?: string
+  misses?: number
+}
+
 export type JjWaitingCandidate =
-  | { state: 'ready'; result: string; change: string; expected: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; at: number }
+  | { state: 'ready'; result: string; change: string; expected: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; checks?: JjWaitingChecks; at: number }
   | { state: 'signing'; at: number }
   | { state: 'unknown'; why: string; at: number }
 

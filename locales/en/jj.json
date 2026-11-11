@@ -107,9 +107,17 @@
     "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts; no merge checks were run on it.",
     "description": "Under a passed jj card (HI-2871): Combwork built a candidate for the user to integrate: the reviewed change brought onto the target bookmark’s current commit ({expected}, short) as a new commit ({commit}, short; {change} its jj change id, short). {style} says how (keep the select keys). It has no conflicts; Combwork ran no merge checks on it."
   },
+  "jj.integrate.candidateBuilt": {
+    "defaultMessage": "Candidate built: commit {commit}, {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. It’s offered once its merge checks pass.",
+    "description": "Under a passed jj card (HI-2938): Combwork built a candidate (a new commit, {commit} short) on the target bookmark {target} at its commit {expected}; it isn’t offered to integrate until the project’s merge checks pass on it. Keep the select keys."
+  },
   "jj.integrate.candidateHow": {
     "defaultMessage": "To integrate it, move {target} to the candidate:",
     "description": "Above the jj command that integrates a passed card’s candidate (HI-2871): it moves the target bookmark {target} to the candidate commit. Combwork never runs it."
+  },
+  "jj.integrate.candidatePassed": {
+    "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts, and its merge checks passed: {checks}.",
+    "description": "Under a passed jj card (HI-2938): the candidate Combwork built for the user to integrate (as jj.integrate.candidate) has no conflicts and passed the project’s merge checks ({checks}: their names, already joined as a list). Keep the select keys."
   },
   "jj.integrate.candidateSigning": {
     "defaultMessage": "No candidate: this repository signs its commits, and Combwork doesn’t make commits in it. Integrate it yourself, for example:",
@@ -126,6 +134,26 @@
   "jj.integrate.change": {
     "defaultMessage": "change {change}",
     "description": "Beside a passed jj card’s reviewed commit (HI-2869): its jj change id (short). “change” is jj’s term."
+  },
+  "jj.integrate.checksAgain": {
+    "defaultMessage": "Run Checks Again",
+    "description": "A button under a jj card’s candidate (HI-2938): runs the project’s merge checks on it again, after they were stopped or kept failing. It changes nothing in the repository."
+  },
+  "jj.integrate.checksFailing": {
+    "defaultMessage": "Its merge checks couldn’t run ({why}). Combwork tries again by itself.",
+    "description": "Under a jj card’s candidate (HI-2938): the project’s merge checks failed several times for a reason that isn’t the work’s (the machine, the network, a time limit); {why} is the check and what it said (keep it as it is). Combwork retries them."
+  },
+  "jj.integrate.checksRunning": {
+    "defaultMessage": "Running its merge checks: {check} ({position, number} of {total, number}).",
+    "description": "Under a jj card’s candidate (HI-2938): Combwork is running the project’s merge checks on it; {check} is the one running (its name), {position} of {total}."
+  },
+  "jj.integrate.checksStopped": {
+    "defaultMessage": "Its merge checks were stopped ({check}). Run them again to have it offered.",
+    "description": "Under a jj card’s candidate (HI-2938): the user stopped its merge check {check} (its name) from the Progress panel; it isn’t offered until they run again and pass."
+  },
+  "jj.integrate.checksWaiting": {
+    "defaultMessage": "Its merge checks wait for a free check copy.",
+    "description": "Under a jj card’s candidate (HI-2938): its merge checks wait until one of the project’s check copies (working folders Combwork keeps for checks) is free."
   },
   "jj.integrate.head": {
     "defaultMessage": "Waiting for you to integrate",

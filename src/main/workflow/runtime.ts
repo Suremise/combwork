@@ -248,6 +248,11 @@ export interface WorkflowConfig {
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
+  /**
+   * After a write that moved a card, once it is committed: from and to (HI-2938: a jj card's pass changes no jj operation
+   * or ref, so the app asks for its reconciliation here, which builds its candidate).
+   */
+  moved?: (card: CardRecord, from: StageId, to: StageId) => void
   /** Test seams: called between gathering and the transaction. */
   hooks?: { beforeWrite?: (move: string) => void | Promise<void>; unsubmittedRead?: () => void | Promise<void> }
   /**
@@ -683,6 +688,7 @@ export class Workflow {
    */
   async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>): Promise<T> {
     const also = alongsideOf.getStore()
+    let movedTo: { from: StageId; to: StageId } | null = null
     const out = await this.locked(async () => {
       const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
@@ -704,8 +710,19 @@ export class Workflow {
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
       if (also && w && (w as Write).written.length) await also.written(w)
+      const done = w as Write | null
+      if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
       return r
     })
+    // Set in the write's continuation above (TypeScript can't see it there).
+    const m = movedTo as { from: StageId; to: StageId } | null
+    if (m && this.cfg.moved) {
+      try {
+        this.cfg.moved(card, m.from, m.to)
+      } catch {
+        // A hook's own failure never undoes or fails the committed write.
+      }
+    }
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
   }

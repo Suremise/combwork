@@ -57,8 +57,9 @@ export interface QueueRuns {
  * caller is Combwork's own: only Combwork changes these runs. An install's title is its command line: `titleFromCommand` keeps
  * it from the Agent API's public form (#620).
  */
-export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined): QueueRuns {
-  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
+export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined, extra: { copy?: string; stoppable?: boolean } = {}): QueueRuns {
+  // HI-2938: `extra` places the runs in a check copy (its name) whose job Stop ends (a jj candidate's checks).
+  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...extra, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
   return {
     start: (r) => {
       if (!on()) return null

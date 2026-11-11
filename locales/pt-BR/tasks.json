@@ -128,7 +128,7 @@
   "tasks.history.fromOlder": "Adicionado de um Combwork mais antigo, onde foi criado como #{was}",
   "tasks.history.given": "Entregue ao agente {agent}",
   "tasks.history.imported": "Trazido de volta com o projeto {project} (era #{was})",
-  "tasks.history.jjCandidateReturned": "Voltou do seu candidato sobre {target}: {reason, select, conflict {tem um conflito com {target}} other {não está atualizado com {target}}}{files, select, none {} other { (em {files})}}. O construtor traz {target} com o jj e o envia de novo.",
+  "tasks.history.jjCandidateReturned": "Voltou do seu candidato sobre {target}: {reason, select, conflict {tem um conflito com {target}} checks {sua verificação de merge {check} falhou no candidato} other {não está atualizado com {target}}}{files, select, none {} other { (em {files})}}. O construtor {reason, select, checks {corrige o problema} other {traz {target} com o jj}} e o envia de novo.",
   "tasks.history.kind": "{how, select, made {Criado sem código} proposed {Proposto sem código} confirmed {Confirmado sem código} kept {Mantido com código} other {Tipo mudado para {kind, select, code {com código} other {sem código}}}}",
   "tasks.history.labels": "Rótulos: {labels}",
   "tasks.history.labelsAdded": "Rótulos: adicionou {labels}",

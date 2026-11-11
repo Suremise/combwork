@@ -838,6 +838,8 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
 export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
   if (typeof v === 'boolean') return tr(v ? T.on : T.off)
   if (key === 'review') return tr(accepts(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+  // HI-2938: where the user integrates, the install comes before each candidate's checks, not a merge.
+  if (key === 'mergeInstall' && v === 'always' && !merges(platform) && !accepts(platform)) return tr(VALUE_TEXT.mergeInstall.alwaysCandidate)
   const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
   if (values && typeof v === 'string' && values[v]) return tr(values[v])
   // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.

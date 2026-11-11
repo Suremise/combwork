@@ -10,7 +10,8 @@
 // - the card's lease and slot rows, read synchronously in the write under way (the final Submitted transaction's);
 // - the pins' ownership records in board_meta.
 
-import { basename } from 'path'
+import { basename, join } from 'path'
+import { statSync } from 'original-fs'
 import { git } from './git'
 import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
@@ -26,6 +27,10 @@ import { mergeBundles, type SqlDb } from './platform/jjObligations'
 import { SlotStore } from './slots'
 import { attemptsKey, readAttempts, saveAttemptIn } from './platform/jjCandidateStep'
 import type { WorkspaceService } from './workspace'
+import { candidateCheckLease, candidateLeaseBack, candidateRun, copyAt, copyLeaseFreed, takeStopped } from './copiesApp'
+import { appQueueChecks } from './workflow/queueChecksApp'
+import { jobSpawn } from './workflow/jobSpawn'
+import type { Spawn } from './workflow/queueChecks'
 
 /** A project's jj card dependencies in a workspace. `projectId`: the slot tables' id of the project (as poolFor keys it). */
 export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId: () => string): JjCardDeps {
@@ -116,6 +121,54 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         return v && 'seq' in v ? v : null
       },
       write: (ref, rec) => journal(`jj_pin:${ref}`).write(rec)
+    },
+    // HI-2938: the merge checks on a candidate: a check copy of the project's pool at the candidate's commit, its job
+    // holding every process (jobSpawn), the merge queue's runner placed in the copy (Stop ends the lease's job).
+    candidateChecks: {
+      // The setup command with project.json's identity read just before it (a change between them changes the stamp
+      // read after: the result's publication then refuses, HR1's round 1 finding 3).
+      setup: async () => {
+        const stamp = setupStamp()
+        const setup = (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
+        return { setup, stamp }
+      },
+      setupStamp: () => setupStamp(),
+      lease: async (card, revision) => {
+        const r = await candidateCheckLease(ws, projectPath, card, revision)
+        if (!('lease' in r)) return r
+        const id = r.lease.id
+        return { id, folder: r.folder, spawn: jobSpawn(r.job), copy: r.copy, give: (why: string, end?: boolean) => candidateLeaseBack(ws, projectPath, id, why, !!end) }
+      },
+      leaseFreed: (id) => copyLeaseFreed(ws, projectPath, id),
+      runCheck: (name, command, folder, ctx, spawn) => checksIn(folder, spawn).runCheck(name, command, folder, ctx),
+      install: (folder, ctx, spawn) => checksIn(folder, spawn).install(folder, true, ctx),
+      stopped: (run) => takeStopped(run),
+      // The workspace's life: its close ends a running check's job and gives the lease back (HI-2938/s11 §3).
+      signal: ws.lifetime
     }
+  }
+
+  /** project.json's identity now (its file id, size and time), synchronously: one stat. */
+  function setupStamp(): string {
+    try {
+      const st = statSync(join(projectPath, '.combwork', 'project.json'))
+      return `${st.ino}:${st.size}:${st.mtimeMs}`
+    } catch {
+      return 'none'
+    }
+  }
+
+  /** The queue's runner for a check copy: its runs in the copy (stoppable), each run its lease's ref as it starts. */
+  function checksIn(folder: string, spawn: Spawn): ReturnType<typeof appQueueChecks> {
+    const at = (async () => copyAt(ws, projectPath, folder))()
+    return appQueueChecks(
+      ws,
+      projectPath,
+      spawn,
+      (run) => {
+        if (run) void at.then((c) => (c?.lease ? candidateRun(ws, projectPath, c.lease.id, run) : undefined)).catch(() => undefined)
+      },
+      { copy: basename(folder), stoppable: true }
+    )
   }
 }

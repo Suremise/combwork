@@ -324,10 +324,22 @@
   "workflow.option.mergeChecks.desc": {
     "placeholders": {}
   },
+  "workflow.option.mergeChecks.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.jjTitle": {
+    "placeholders": {}
+  },
   "workflow.option.mergeChecks.title": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.title": {
@@ -1451,6 +1463,9 @@
     "placeholders": {}
   },
   "workflow.value.mergeInstall.always": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.alwaysCandidate": {
     "placeholders": {}
   },
   "workflow.value.mergeInstall.onManifestChange": {

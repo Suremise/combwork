@@ -128,7 +128,7 @@
   "tasks.history.fromOlder": "Aus einer älteren Version von Combwork hinzugefügt, wo sie als #{was} erstellt wurde",
   "tasks.history.given": "Agent {agent} zugewiesen",
   "tasks.history.imported": "Mit {project} zurückgeholt (war #{was})",
-  "tasks.history.jjCandidateReturned": "Von ihrem Kandidaten auf {target} zurückgegeben: {reason, select, conflict {sie hat einen Konflikt mit {target}} other {sie ist nicht auf dem Stand von {target}}}{files, select, none {} other { (in {files})}}. Ihr Builder holt {target} mit jj herein und reicht sie erneut ein.",
+  "tasks.history.jjCandidateReturned": "Von ihrem Kandidaten auf {target} zurückgegeben: {reason, select, conflict {sie hat einen Konflikt mit {target}} checks {ihr Merge-Check {check} ist auf dem Kandidaten fehlgeschlagen} other {sie ist nicht auf dem Stand von {target}}}{files, select, none {} other { (in {files})}}. Ihr Builder {reason, select, checks {behebt es} other {holt {target} mit jj herein}} und reicht sie erneut ein.",
   "tasks.history.kind": "{how, select, made {Ohne Code angelegt} proposed {Ohne Code vorgeschlagen} confirmed {Ohne Code bestätigt} kept {Als Code behalten} other {Art geändert zu {kind, select, code {Code} other {ohne Code}}}}",
   "tasks.history.labels": "Labels: {labels}",
   "tasks.history.labelsAdded": "Labels: {labels} hinzugefügt",
