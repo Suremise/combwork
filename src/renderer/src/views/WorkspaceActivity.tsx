@@ -415,7 +415,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(entries), [entriesKey])
   const mapOn = mapShow.map
-  const map = useActivityMap({ active, animate: active && live && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at })
+  // Animated once live and the snapshot released (HI-2939): see the project's tab.
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at })
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
   const pickMapAgent = useCallback((key: string) => setView({ agents: [key], forCard: undefined }), [setView])
 

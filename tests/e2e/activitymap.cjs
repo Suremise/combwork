@@ -114,18 +114,24 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await lib.until(async () => (await page.locator('.activity-pill').count()) > 0, HUNG_MS, 250)
     const frozen1 = await counts()
     check('frozen: no pulse for the calls that came meanwhile (counted in the pill instead)', frozen1.pulses === frozen0.pulses, JSON.stringify([frozen0, frozen1]))
-    // Back to live: the calls held aren't sent as new (a new baseline).
+    // Back to live: the calls held aren't sent as new (a new baseline). Counted from before Play (HI-2939: the burst came
+    // with Play itself, before the pill went).
     await head.getByRole('button', { name: 'Play', exact: true }).click()
     await lib.until(async () => (await page.locator('.activity-pill').count()) === 0, HUNG_MS, 250)
-    const relive = await counts()
     await lib.until(async () => (await countAt('read')) >= 1, HUNG_MS, 250)
-    check('going live again: what was held sends no burst of pulses', (await counts()).pulses === relive.pulses, JSON.stringify([relive, await counts()]))
+    const relive = await counts()
+    check('going live again: what was held sends no burst of pulses', relive.pulses === frozen1.pulses && relive.flying === 0, JSON.stringify([frozen1, relive]))
 
     // --- Hidden (the window minimised): no map reads, drawing or pulses.
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
       document.dispatchEvent(new Event('visibilitychange'))
     })
+    // Taken once the map has the hide (pulses still in flight are dropped: one drawing), then nothing more may come.
+    await lib.until(async () => {
+      const c = await counts()
+      return !c.active && c.flying === 0
+    }, HUNG_MS, 100)
     const hidden0 = await counts()
     await turn('hb1', 'window 100000 then context 20000 then tool Read src/alpha/f.ts then tool Write src/alpha/g.ts')
     const hidden1 = await counts()
