@@ -151,6 +151,44 @@ describe('editLanes (HI-2898)', () => {
     await expect(edit({ op: 'cancel', lane: l.id, rev: rec.listRev! })).rejects.toThrow(/no queued change/)
   })
 
+  it('Cancel change never puts back a card another lane holds now, nor one that has started (HI-2943)', async () => {
+    const [a, t, b, c, x] = [await make('A'), await make('Transferred'), await make('B'), await make('C'), await make('X')]
+    const from = await start('b1', [a, t, b, c])
+    const to = await start('b2', [x])
+    await doing(a, 'b1')
+    await doing(x, 'b2')
+    // A reorder queued behind A, then T moved to B2's lane (still queued on B1's: not a plain removal of its list).
+    await edit({ op: 'move', lane: from.id, rev: 0, card: c, to: 1 })
+    await edit({ op: 'transfer', card: t, from: { lane: from.id, rev: 1 }, to: { lane: to.id, rev: 0 } })
+    expect((await raw(from.id)).pending).toEqual([a, c, b])
+    // Queued on B2's too (X in flight there).
+    const listOf = (r: { cards: number[]; pending?: number[] }): number[] => r.pending ?? r.cards
+    expect(listOf(await raw(to.id))).toEqual([x, t])
+    // Cancel drops the reorder, and T stays on B2's lane only: B1's list is its applied one without T, at once (a removal).
+    await edit({ op: 'cancel', lane: from.id, rev: (await raw(from.id)).listRev! })
+    const [f, g] = [await raw(from.id), await raw(to.id)]
+    expect(f.cards).toEqual([a, b, c])
+    expect(f.pending).toBeUndefined()
+    expect(listOf(g)).toEqual([x, t])
+    expect([f, g].filter((r) => listOf(r).includes(t))).toHaveLength(1)
+    // A card the queued change took off that has started since (on no lane): refused, nothing changed.
+    const [d, e] = [await make('D'), await make('E')]
+    const l = await start('b3', [d, e])
+    await doing(d, 'b3')
+    // F added behind D, then E taken off: still queued (not a plain removal of the applied list), E back on the board.
+    // A lane's revision before its first edit is 0 (its record has none yet).
+    const revOf = async (): Promise<number> => (await raw(l.id)).listRev ?? 0
+    const f2 = await make('F')
+    await edit({ op: 'add', lane: l.id, rev: await revOf(), card: f2, at: 1 })
+    const queued = (await raw(l.id)).pending!
+    await edit({ op: 'remove', lane: l.id, rev: await revOf(), card: e })
+    expect((await raw(l.id)).pending).toEqual(queued.filter((n) => n !== e))
+    await doing(e, 'b1')
+    const rev = await revOf()
+    await expect(edit({ op: 'cancel', lane: l.id, rev })).rejects.toThrow(/isn’t in To do/)
+    expect((await raw(l.id)).pending).toEqual(queued.filter((n) => n !== e))
+  })
+
   it('removes a queued card back to the board, and undoes it', async () => {
     const [a, b] = [await make('A'), await make('B')]
     const l = await start('b1', [a, b])

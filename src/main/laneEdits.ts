@@ -246,8 +246,8 @@ function queuedHere(ws: WorkspaceService, l: LaneRecord, n: number): void {
 interface Plan {
   op: LaneEdit['op']
   card: number | null
-  /** Each lane with its new working list, or (an undo) the list to put back exactly, or (cancel) its queued change gone. */
-  lanes: { lane: LaneRecord; next: number[]; restore?: Omit<LaneListState, 'rev' | 'lane'>; cancel?: true }[]
+  /** Each lane with its new working list (cancel: the applied list, checked, HI-2943), or (an undo) the list to put back exactly. */
+  lanes: { lane: LaneRecord; next: number[]; restore?: Omit<LaneListState, 'rev' | 'lane'> }[]
   /** The card brought into a lane (add, Move here), with the lane it leaves (Move here). */
   brings: { card: number; into: LaneRecord; leaving: LaneRecord | null } | null
   /** An undo's card: its agent put back, while it is as the edit left it. */
@@ -278,7 +278,11 @@ function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<s
   const list = working(l)
   if (e.op === 'cancel') {
     if (!l.pending) refuse(ws, 409, M.noQueued, { lane: pairOf(l) })
-    return { op: e.op, card: null, lanes: [{ lane: l, next: [...l.cards], cancel: true }], brings: null, undoCard: null, back: [], def }
+    // The list as it applies now, through every check an edit gets (HI-2943), never put back unchecked: a card the queued
+    // change took off that another running lane holds now (Move here after a queued reorder) stays there, and each other
+    // card it brings back is checked as any card brought in (below). What's left saves as any edit's list does.
+    const held = (n: number): boolean => lanes.some((x) => x !== l && running(x) && x.project.toLowerCase() === l.project.toLowerCase() && (x.cards.includes(n) || !!x.pending?.includes(n)))
+    return { op: e.op, card: null, lanes: [{ lane: l, next: l.cards.filter((n) => list.includes(n) || !held(n)) }], brings: null, undoCard: null, back: [], def }
   }
   if (e.op === 'remove') return { op: e.op, card: e.card, lanes: [{ lane: l, next: list.filter((n) => n !== e.card) }], brings: null, undoCard: null, back: [], def }
   if (e.op === 'move') {
@@ -325,14 +329,15 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         const was = working(x.lane)
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!)
-        if (x.cancel) continue
         keepsFixed(ws, x.lane, was, x.next, p.card)
         // An undo sets the applied list back too: its fixed start kept there as well.
         if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)
         keepsDependencies(ws, x.lane, was, x.next)
         // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, from
         // the lane it leaves in this undo; its earlier work, assignment and history are checked against the token below.
-        if (p.op === 'undo') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null, fresh: true, work: false, def: defOf(x.lane) })
+        // Cancel Change's cards back from its queued change the same (HI-2943), from no other lane: one another running
+        // lane holds is refused here, on the board as it is now, if it got there after the plan left it out.
+        if (p.op === 'undo' || p.op === 'cancel') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.op === 'undo' ? (p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null) : null, fresh: true, work: false, def: defOf(x.lane) })
       }
       if (p.brings) bringable(ws, lanes, p.brings.into, p.brings.card, { leaving: p.brings.leaving, fresh: true, work: true, def: defOf(p.brings.into) })
       // The card's assignment, through the card-change owner, in this change (HR1's s17): a card brought in that is given
@@ -382,9 +387,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
       // each card it brings back was checked as any card brought in.
       for (const x of p.lanes) {
         const l = x.lane
-        if (x.cancel) {
-          delete l.pending
-        } else if (x.restore) {
+        if (x.restore) {
           l.cards = [...x.restore.cards]
           if (x.restore.pending) l.pending = [...x.restore.pending]
           else delete l.pending
