@@ -93,10 +93,10 @@ export async function jjBoundary(w: BoundaryOf, owner: Owner, o: BoundaryOptions
     if (isJjUnknown(tool)) return refused('unknown', tool.detail ?? tool.jjUnknown)
     if (singleHead(w.jjRepo) !== before) return refused('moved', 'beforeSnapshot')
     // The snapshot: written, and a stale workspace is never brought up to date by it (stale recovery is J2's, explicit).
-    // Its owner and the head again under the file gate's admission, right before jj starts (HI-2918).
-    const recheck = (): string | null => (!owner.still() ? 'owner' : singleHead(w.jjRepo) !== before ? 'moved' : null)
+    // Its owner again under the file gate's admission, right before jj starts (HI-2918); the heads are compared after,
+    // as before.
+    const recheck = (): string | null => (owner.still() ? null : 'owner')
     const r = await runner.run(w.folder, ['util', 'snapshot', '--config=snapshot.auto-update-stale=false'], { write: true, signal: o.signal, timeout: o.timeout, recheck })
-    if (r.refused === 'moved') return refused('moved', 'beforeSnapshot')
     if (!owner.still() || r.refused) return refused('owner')
     if (r.cancelled) return refused('cancelled')
     if (!r.ok) return refused(/stale/i.test(r.err) ? 'stale' : 'unknown', r.err)

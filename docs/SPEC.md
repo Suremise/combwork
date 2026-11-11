@@ -3064,8 +3064,39 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   is never shown once the slot can be read again. At most one read runs per folder. An answer that couldn't be read
   never replaces a known one, so a stale slot keeps its Stale and Recover…. One entry per slot, per pool lifetime. **Not
   an ordering of Combwork's reads against its writes:** the probe samples quiet and another reader can start after it.
-  Node opens files without `FILE_SHARE_DELETE`, so a Combwork read of a file jj replaces can fail jj's write ("Access
-  is denied"); that is HI-2918.
+  That ordering is the file gate's (next).
+- **Combwork's file gate** (HI-2918, design HI-2918/s14, `platform/jjFileGate.ts`): jj replaces a file by renaming a
+  temporary one over it, which Windows refuses while any process has the file open, whatever its share mode.
+  - **Two failures:** a workspace's `.jj/working_copy/checkout` open meanwhile makes the write fail after its
+    operation is committed, so the workspace is left stale. A Git store's ref or `HEAD` open meanwhile makes jj's export
+    fail with only a warning (exit 0), so Git's refs stay behind jj's until its next command there.
+  - **Who takes the gate:** every jj write of Combwork's takes it exclusively for its workspace root, its Git store and
+    any workspace it makes (`workspace add`'s destination, keyed before it exists), for its process's whole life. Writes
+    run on main's thread, so the admission ends exactly when the process tree has. Combwork's readers of those files
+    take it shared for the life of their read: the working copy's `checkoutOf` and the control's bytes (async),
+    `readCheckout` (sync); the store's `gitBranches` (async), `gitState`, `refFromFiles` and the publish print (sync),
+    the worker's print and preview requests (held until the worker answers or has exited), and git run on a jj store
+    (`storeGitGated`, and Git's history port as jj code asks it, `storeGatedHistory`). A sync reader never waits: while a
+    write holds or waits on its key it gets nothing, read as unreadable.
+  - **Keys:** a path's key is its nearest existing ancestor's real path with the rest appended, lower-cased, so
+    aliases meet and a folder not made yet has the key it will have. A key that can't be read refuses rather than
+    running ungated.
+  - **Admission:** all of a request's keys at once or none, so overlapping writes can't deadlock. Writers come first;
+    a queued request leaves when its signal aborts or the runner shuts down. A key with no holder and no waiter is
+    forgotten.
+  - **Recheck:** a write's pre-write proof runs again after its admission and before jj starts (`recheck`):
+    ownedMove's guard, the record's fence and ownership, recovery's `mine()` (HI-2913's held fence unsplit), the
+    controls' sync checks before `workspace add` and `forget`, the boundary's and candidates' owner. It runs with a
+    ticket for exactly its keys: a reader in its own call tree reads without waiting behind it, every such read is
+    awaited before jj starts, and the ticket is revoked after.
+  - **Not covered:** jj's own reads (`--at-op --ignore-working-copy` open neither kind of file) need no gate.
+    Processes that aren't Combwork's (agents, the user's tools, a scanner) can still fail a jj write.
+  - **Tests:** `jjFileGate.test.ts` (ordering, atomic grants, abort, release, tickets, keys), `jjRunner.test.ts` (a
+    write's admission, recheck and cancellation), `jjFileGateReal.test.ts` (each reader class against 27 writes, both
+    modes; with the gate passed through, the working copy's readers failed up to 14 of 27 writes and left the slot
+    stale), `jjSlotPrepReal.test.ts` (a real guard under its admission, ownership lost while queued, a held recovery's
+    shape, `workspace add`'s destination), `jjFileGateInventory.test.ts` (every jj file that reads these files is
+    gated or says where).
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
