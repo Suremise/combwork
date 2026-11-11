@@ -81,6 +81,7 @@
   "service.folderChanges.readFailed": "Git konnte die Änderungen des Ordners nicht lesen: {why}",
   "service.folderChanges.stashFailed": "Git hat die Änderungen nicht beiseitegelegt: {why}",
   "service.folderChanges.stashPartial": "Git hat beim Beiseitelegen der Änderungen ein Problem gemeldet, nachdem es sie in einem Stash ({stash}) gesichert hatte. Prüfe git stash list und die Dateien, bevor du weitermachst. Git meldete: {why}",
+  "service.folderChanges.unplaced": "Git hat nicht gesagt, in welchem Repository {folder} liegt, daher committet Combwork .gitignore nicht, solange es die dort arbeitenden Agenten nicht prüfen kann. Versuche es noch einmal.",
   "service.folderChanges.wrongBranch": "{folder} ist jetzt nicht auf {target}. Sieh noch einmal nach.",
   "service.forward.byAssistant": "dem Assistenten",
   "service.forward.byUser": "dir",

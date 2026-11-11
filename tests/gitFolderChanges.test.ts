@@ -343,9 +343,13 @@ describe("Files' Commit it from a project in a larger repository (HI-2962)", () 
     writeFileSync(join(proj, 'b.txt'), 'staged b\n')
     sh(proj, 'add', 'b.txt')
     const before = head()
-    for (const fail of [{ folder: join(proj, 'other') }, { folder: join(proj, 'other'), empty: true }]) {
+    const cases = [
+      { fail: { folder: join(proj, 'other') }, said: /Git could not read the folder's changes: fatal: unable to read the repository/ },
+      { fail: { folder: join(proj, 'other'), empty: true }, said: /Git didn't say which repository .*other is in/ }
+    ]
+    for (const { fail, said } of cases) {
       failTopIn = fail
-      await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(/Git could not read the folder's changes/)
+      await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(said)
       expect(head()).toBe(before)
       expect(sh(proj, 'diff', '--cached', '--name-only')).toBe('b.txt')
       expect(sh(proj, 'diff', '--name-only')).toBe('.gitignore')

@@ -33,6 +33,7 @@ const M = {
   changed: msg({ id: 'service.folderChanges.changed', defaultMessage: "The changes in {folder} aren't the ones shown any more. Look again.", description: 'HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.' }),
   nothing: msg({ id: 'service.folderChanges.nothing', defaultMessage: '{file} has no changes to commit.', description: "HI-2944: an error from Files' Commit it after Exclude from Git: the ignore file ({file}, such as .gitignore) has no uncommitted change." }),
   readFailed: msg({ id: 'service.folderChanges.readFailed', defaultMessage: "Git could not read the folder's changes: {why}", description: "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done." }),
+  unplaced: msg({ id: 'service.folderChanges.unplaced', defaultMessage: "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.", description: "HI-2962: an error from Files' Commit it after Exclude from Git: a project folder ({folder}, a path) inside the same repository couldn't be placed by git (it answered nothing), so nothing was committed. Keep .gitignore: a file name." }),
   indexBusy: msg({ id: 'service.folderChanges.indexBusy', defaultMessage: 'Another git command is using the repository. Try again in a moment.', description: "HI-2944: an error from Commit or Set aside: git's index is locked by another git command." }),
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
@@ -218,7 +219,13 @@ async function projectsInTree(own: string, top: string): Promise<string[]> {
     if (samePlace(p, own) || !inFolder(p, top)) continue
     const r = await git(p, ['rev-parse', '--show-toplevel'])
     const found = r.ok ? r.out.trim() : ''
-    if (!found) throw INDEX_BUSY.test(r.err) ? combworkError(M.indexBusy) : combworkError(M.readFailed, { why: gitErrorLine(r.err) || r.err.trim().slice(0, 400) || 'no top folder' }) // i18n-ignore: stands in for git's own (English) words
+    if (!found) {
+      if (!r.ok && INDEX_BUSY.test(r.err)) throw combworkError(M.indexBusy)
+      // Git's own words when it gave any; else said in the window's words, the folder named.
+      const why = r.ok ? '' : gitErrorLine(r.err) || r.err.trim().slice(0, 400)
+      log.warn(`Commit it: git didn't place ${userText(p)}: ${userText(why || '(no answer)')}`)
+      throw why ? combworkError(M.readFailed, { why }) : combworkError(M.unplaced, { folder: p })
+    }
     if (samePlace(found, top)) out.push(p)
   }
   return out
