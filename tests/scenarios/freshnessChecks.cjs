@@ -20,7 +20,7 @@ function refusedWithDecision(calls, words, from, until) {
     const at = Date.parse(x.at)
     if (!(at > from && at < until)) return false
     if (!/\(submit\.decisionsReceived\)/.test(String(x.error ?? ''))) return false
-    return unreadLines(x.error).some((l) => /^Decision \(/.test(l) && l.endsWith(`: ${words}`))
+    return unreadLines(x.error).some((l) => l.startsWith('Decision (') && l.endsWith(`: ${words}`))
   })
 }
 
