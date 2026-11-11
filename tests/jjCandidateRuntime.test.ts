@@ -717,6 +717,40 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(strayPins(w, card)).toEqual([])
     })
   })
+
+  // HI-2989 (found by HI-2967): the user integrates the candidate after a run's proof read the target, before its step.
+  describe.each([true, false] as const)('integrated between the proof and the step (HI-2989), colocated: %s', (colocated) => {
+    for (const style of ['rebase', 'squash', 'merge'] as const) {
+      it(`${style}: nothing built or returned in that run; the next run's proof makes it Integrated via the candidate, Done`, async () => {
+        const w = await world(colocated, { candidates: true })
+        const { card } = await approved(w)
+        reapply(w, card, { style })
+        const jjp = new JjPlatform(w.wf)
+        await jjp.reconcile(w.wf.store.card(card.id), {})
+        const cycle = w.wf.state(card).cycle
+        const c = shown(w, card, cycle)!.offer!
+        expect(c.style).toBe(style)
+        const before = entries(w, card, cycle).length
+        // The run's second read of the target (its step's, after its proof's): the user sets main onto the candidate first.
+        const real = w.deps.integration
+        let n = 0
+        w.deps.integration = async () => {
+          if (++n === 2) w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', c.result)
+          return real()
+        }
+        await jjp.reconcile(w.wf.store.card(card.id), {})
+        w.deps.integration = real
+        expect(w.main()).toBe(c.result)
+        expect(w.wf.state(card).stage).toBe('approved')
+        expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+        expect(entries(w, card, cycle)).toHaveLength(before)
+        await jjp.reconcile(w.wf.store.card(card.id), {})
+        const f = w.store.facts(card.id).find((x) => x.kind === 'Integrated')
+        expect(jjIntegratedOf((f?.data as { platform?: unknown } | undefined)?.platform)).toMatchObject({ via: 'candidate', head: c.result })
+        expect(w.wf.state(card).stage).toBe('done')
+      })
+    }
+  })
 })
 
 /** Of the card's attempts' commits, those still in the user's log that main doesn't reach (HI-2990: none once settled). */
