@@ -104,6 +104,26 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(started.publish).toMatchObject({ remote: 'origin', ref: 'refs/heads/main', endpoint: bare })
   })
 
+  it('the snapshot store unreadable at the save (HI-2993): nothing published or begun, tried again as a failed read, then merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, transport } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    let fails = 1
+    const saves: string[] = []
+    const flaky = { ...transport, save: async (...args: Parameters<typeof transport.save>) => {
+      saves.push(fails > 0 ? 'refused' : 'kept')
+      if (fails-- > 0) throw new Error("the transport store couldn't be read: EBUSY")
+      return transport.save(...args)
+    } }
+    const before = head(bare)
+    const out = await e.queue({ transport: flaky }).drain('main')
+    expect(saves).toEqual(['refused', 'kept'])
+    expect(out.map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).not.toBe(before)
+    // One begun publication only: the refused save began nothing.
+    expect(e.store.facts(a.id).filter((f) => f.kind === 'IntegrationStarted')).toHaveLength(1)
+  })
+
   it('a local target behind its remote: tested on the remote head, which the merge contains, and the local one fast-forwarded', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following()
     const theirsHead = theirs(bare)
