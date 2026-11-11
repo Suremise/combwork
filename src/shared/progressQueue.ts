@@ -112,8 +112,11 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
  * merge of the last few seconds, a Combwork running it (a lease), or a card in flight whose own ruleset has Combwork merge into
  * it; and, empty, while the current options have Combwork merge into it. So after a switch to "The agent merges" (or Git →
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
+ * HI-2893: never a past branch's queue (`past`: its target none of the project's targets now, holding no entry).
  */
 export function queueShown(v: QueueView, now: number): boolean {
+  // HI-2893: never a past branch's (none of the project's targets now, nothing in it): its history is Version Control's.
+  if (v.past) return false
   // HI-2679: a target behind another of its project's (or one whose heads can't be read) shows too, with nothing queued.
   return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0 || !!v.forward?.behind.some((b) => b.commits !== 0)
 }
@@ -230,12 +233,12 @@ export function mergedText(r: QueueRecent, tr: Tr): string {
 export function returnWhy(r: QueueRecent, check: string | null, target: string, tr: Tr, list: (items: string[]) => string): string {
   const files = r.files?.slice(0, 3) ?? []
   const more = (r.files?.length ?? 0) - files.length
-  const reason = r.reason === 'conflict' || r.reason === 'checks' || r.reason === 'hook' || r.reason === 'folderBusy' || r.reason === 'notUpToDate' || r.reason === 'focused' ? r.reason : 'other'
+  const reason = r.reason === 'conflict' || r.reason === 'checks' || r.reason === 'hook' || r.reason === 'folderBusy' || r.reason === 'notUpToDate' || r.reason === 'focused' || r.reason === 'direction' ? r.reason : 'other'
   const why = tr(
     msg({
       id: 'board.queue.returnWhy',
-      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}',
-      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
+      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} other {{why}}}',
+      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review, or (direction, HI-2892) it was a forward merge against the release path's direction (into an older version or main) made without the user's override; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
     }),
     { reason, files: files.length ? (more > 0 ? list([...files, tr(msg({ id: 'board.queue.filesMore', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no "and" written around a list).' }), { n: more })]) : list(files)) : 'none', check: check ?? 'none', target, why: r.reason ?? '' } // i18n-ignore: select keys, never shown
   )

@@ -5,7 +5,11 @@
 
 export type PlatformId = 'none' | 'git' | 'jj'
 
-export type Capability = 'revisions' | 'isolation' | 'integration' | 'containment' | 'sameness' | 'authorship' | 'observe'
+/**
+ * `checkCopies` (HI-2868): a check can run in a copy of its own at the card's revision (`--isolated`). Apart from
+ * `isolation` (slots): jj has slots in 1.5.0 but no check copies yet.
+ */
+export type Capability = 'revisions' | 'isolation' | 'checkCopies' | 'integration' | 'containment' | 'sameness' | 'authorship' | 'observe'
 
 /**
  * What the window can change in a platform's repository (SPEC §16.3.6 port 5, HI-2788's R3): an operation is offered only
@@ -106,7 +110,7 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
+  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, operations: [], revisionShort: short, gates: [] },
@@ -154,8 +158,11 @@ export interface Detection {
   platform: PlatformId
   /** The repository's root: Git's, or the jj workspace's. */
   root?: string
-  /** jj's (HI-2799), read from its files as hints (J0's detection confirms them before a switch). */
-  jj?: { colocated: boolean }
+  /**
+   * jj's (HI-2799), read from its files as hints (J0's detection confirms them before a switch). `inGit` (HI-2896): a
+   * non-colocated repository inside a Git working tree, that tree's root (a git command in the project would reach it).
+   */
+  jj?: { colocated: boolean; inGit?: string }
   /** Another system found (Mercurial, Subversion…): not supported, so None. */
   other?: string
   /** The project is a subfolder of a larger repository: its actions affect that whole repository. */

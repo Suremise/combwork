@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "このワークスペースで有効な{cli}のアカウントがないため、アシスタントを起動できません。アカウントを追加してサインインしてください。",
+  "assistant.banner.noAccountAny": "このワークスペースで有効なアカウントがないため、アシスタントを起動できません。Combworkが対応するいずれかのコーディングエージェントのアカウントを追加してサインインしてください。アシスタントはアカウントの順序で最初のものを使います。",
+  "assistant.banner.noAccountFor": "{others, select, yes {アシスタントは{cli}で動きますが、このワークスペースで有効な{cli}のアカウントがないため、起動できません。アカウントを追加するか、アシスタントの設定で別のコーディングエージェントのアカウントを選んでください。} other {アシスタントは{cli}で動きますが、このワークスペースで有効な{cli}のアカウントがないため、起動できません。アカウントを追加してサインインしてください。}}",
+  "assistant.banner.signedOut": "アシスタントの{cli}のアカウント「{name}」はサインアウトしているため、アシスタントを起動できません。「設定」→「アカウントと接続」でもう一度サインインしてください。",
   "assistant.chooseConnections.agent": "エージェント",
   "assistant.chooseConnections.next": "変更後",
   "assistant.chooseConnections.now": "現在",

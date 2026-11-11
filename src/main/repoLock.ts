@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'async_hooks'
+import { existsSync } from 'original-fs'
 import { app } from 'electron'
 import { realpath } from 'original-fs/promises'
 import { basename, join } from 'path'
@@ -7,10 +9,11 @@ import type { RepoLockHolder } from './repoLockCore'
 import type { LockReply, LockRequest, TakeAnswer } from './repoLockWorker'
 import { advanced } from './advanced'
 import { toast } from './events'
-import { withFileLock } from './fsutil'
+import { fileLockDepth, withFileLock } from './fsutil'
 import { git } from './git'
 import { combworkError } from './combworkError'
 import { commonDirSync } from './platform/git'
+import { gitVeto } from './platform/repoBoundary'
 import { createLogger, userText } from './logger'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { REPO_LOCK_FILE } from './repoLockCore'
@@ -133,6 +136,12 @@ const profile = (): string => {
  */
 export async function commonGitDir(folder: string): Promise<string> {
   const known = commonDirSync(folder)
+  // Never git's answer for a folder a nearer non-colocated `.jj` holds (HI-2896, s13 §1): git would name a repository
+  // above it, or none; an unreadable `.jj` is refused the same way.
+  // A `.git` read here with a `.jj` beside it is asked of the boundary too (HR1's round 1): a valid jj repository naming
+  // another store is unknown, not Git's.
+  const veto = known && !existsSync(join(folder, '.jj')) ? null : await gitVeto(folder)
+  if (veto) throw combworkError(msg({ id: 'git.repoLock.jjFolder', defaultMessage: "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.", description: 'An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git.' }), { folder }, { kind: 'conflict' })
   const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = known ?? (r?.ok ? r.out.trim() : '')
   if (dir) return realpath(dir).catch(() => dir)
@@ -149,13 +158,155 @@ export type { RepoLockOptions } from './platform/repoContext'
  */
 export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
   const dir = await commonGitDir(folder)
-  return withFileLock(join(dir, REPO_LOCK_FILE), async () => {
-    const waitSeconds = advanced.number(REPO_LOCK_WAIT)
+  return takeStores([{ store: dir, folder }], fn, opts)
+}
+
+/**
+ * The repository locks one async context is inside (HI-2896, design s13 §2 and s16 §1, HR1's): each physical take is an
+ * owner, live from its last lock taken until just before its first release. A nested take runs straight through for a
+ * store only a *live* inherited owner holds: an async continuation that outlives its take (its owner no longer live)
+ * takes the lock again like anyone else, never riding another holder's.
+ */
+interface StoreOwner {
+  readonly keys: ReadonlySet<string>
+  live: boolean
+  /**
+   * The callbacks admitted on this owner's claim (HI-2896/s104, HR1's round 2): the owner keeps its locks, and stays
+   * live, until each has settled, so none runs on a store another holder has taken.
+   */
+  readonly dependents: Set<Promise<unknown>>
+  /** A folder of its first store, for the log. */
+  readonly folder: string
+}
+const owners = new AsyncLocalStorage<readonly StoreOwner[]>()
+
+/** The stores this async context holds now, by key (its live owners'). */
+export const heldStoreKeys = (): Set<string> => new Set((owners.getStore() ?? []).filter((o) => o.live).flatMap((o) => [...o.keys]))
+
+/** A store's key, as every take compares them (platformFence's storeKey: separators one way, case folded). */
+export const storeKeyOf = (store: string): string => store.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+
+/**
+ * Runs fn holding the repository locks of `stores` (each a Git dir: a common git dir, or jj's store), whatever platform
+ * names them (s13 §2): each store once by its key (callers resolve real paths, as commonGitDir and J0 do), in the key's
+ * order, so no two takers in this process or another wait on each other. A store this context already holds (a live
+ * owner's) runs straight through. A nested take of a store ordered before one it holds can't wait (it would hold and wait
+ * out of order): it takes the lock only if it is free at once, else refuses.
+ */
+export async function takeStores<T>(stores: readonly { store: string; folder: string }[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
+  // A take whose inherited claim expired while it waited for its own locks is made again from the start (HR1's round 1
+  // on HI-2896): owners only ever stop being live, so this ends once every store it needs is held by it or a live owner.
+  for (;;) {
+    const r = await takeOnce(stores, fn, opts)
+    if (r !== RETAKE) return r as T
+  }
+}
+
+/** takeOnce's answer when a store it relied on an inherited owner for was released while it waited: nothing of fn ran. */
+const RETAKE: unique symbol = Symbol('retake')
+
+async function takeOnce<T>(stores: readonly { store: string; folder: string }[], fn: () => Promise<T>, opts: RepoLockOptions): Promise<T | typeof RETAKE> {
+  const inherited = owners.getStore() ?? []
+  const held = heldStoreKeys()
+  const byKey = new Map<string, { store: string; folder: string }>()
+  // The stores this take leaves to a live inherited owner: each checked again right before fn runs.
+  const relied = new Set<string>()
+  for (const s of stores) {
+    const k = storeKeyOf(s.store)
+    if (held.has(k)) relied.add(k)
+    else if (!byKey.has(k)) byKey.set(k, s)
+  }
+  /**
+   * fn admitted (s104): in one tick, the live inherited owner of each store this take relies on found (else RETAKE: one
+   * expired, maybe while this take waited for its own locks), fn started in `ctx`, and its promise pinned to each of those
+   * owners, which keep their locks until it settles. Nothing is awaited between the check and the pins.
+   */
+  const admit = (ctx: readonly StoreOwner[]): Promise<T> | typeof RETAKE => {
+    const pins = new Set<StoreOwner>()
+    for (const k of relied) {
+      const o = inherited.find((x) => x.live && x.keys.has(k))
+      if (!o) return RETAKE
+      pins.add(o)
+    }
+    // Its completion registered before fn is invoked (HR1's s104 answer): a synchronous throw settles and unpins it too.
+    // It always resolves (never rejects), so nothing is left unhandled; the caller keeps fn's own outcome.
+    let finished!: () => void
+    const completion = new Promise<void>((r) => (finished = r))
+    for (const o of pins) {
+      o.dependents.add(completion)
+      void completion.then(() => void o.dependents.delete(completion))
+    }
+    let p: Promise<T>
+    try {
+      p = owners.run(ctx, fn)
+    } catch (e) {
+      finished()
+      throw e
+    }
+    p.then(finished, finished)
+    return p
+  }
+  if (!byKey.size) return admit(inherited)
+  const keys = [...byKey.keys()].sort()
+  const top = [...held].sort().pop()
+  const owner: StoreOwner = { keys: new Set(keys), live: true, dependents: new Set(), folder: byKey.get(keys[0])!.folder }
+  const inner = async (): Promise<T | typeof RETAKE> => {
+    try {
+      const run = admit([...inherited, owner])
+      return run === RETAKE ? RETAKE : await run
+    } finally {
+      // Every callback admitted on this claim settled first (s104); then, in the tick that finds none left, no longer
+      // live, before the first lock is released: a continuation that runs later takes the lock again.
+      const slow = owner.dependents.size ? setTimeout(() => log.warn(`A callback started under the repository lock of ${userText(owner.folder)} still runs 30 s after its holder finished: the lock is kept until it ends`), 30_000) : null
+      slow?.unref?.()
+      for (;;) {
+        if (!owner.dependents.size) {
+          owner.live = false
+          break
+        }
+        await Promise.allSettled([...owner.dependents])
+      }
+      if (slow) clearTimeout(slow)
+    }
+  }
+  const from = (i: number): Promise<T | typeof RETAKE> => {
+    if (i === keys.length) return inner()
+    const s = byKey.get(keys[i])!
+    // Ordered before a store held outside this take: never waited for (s13 §2's order rule).
+    const noWait = top !== undefined && keys[i] < top
+    return physicalLock(s.store, s.folder, () => from(i + 1), opts, noWait)
+  }
+  try {
+    return await from(0)
+  } finally {
+    owner.live = false
+  }
+}
+
+/** Runs fn holding the locks of contexts' stores (s13 §2: whatever platform named them, one owner, one order). */
+export function withStoreLocks<T>(ctxs: readonly { store: string; folder: string }[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
+  return takeStores(ctxs, fn, opts)
+}
+
+/** A nested take out of the stores' order, its lock held elsewhere (s13 §2): refused rather than waited for. */
+function lockOrderError(folder: string): Error {
+  log.warn(`A repository lock of ${userText(folder)} was asked for out of order while it was held elsewhere: refused, not waited for`)
+  return combworkError(msg({ id: 'git.repoLock.order', defaultMessage: 'This repository is busy with another change. Nothing was changed: try again in a moment.', description: "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other." }), undefined, { kind: 'conflict' })
+}
+
+/** One store's lock, across processes (the core's row) and in this one (withFileLock on its file). */
+async function physicalLock<T>(dir: string, folder: string, fn: () => Promise<T>, opts: RepoLockOptions, noWait: boolean): Promise<T> {
+  const file = join(dir, REPO_LOCK_FILE)
+  // Out of order: taken only if no take in this process has it or waits for it (JS runs this check and the take at once).
+  if (noWait && fileLockDepth(file) > 0) throw lockOrderError(folder)
+  return withFileLock(file, async () => {
+    const waitSeconds = noWait ? 0 : advanced.number(REPO_LOCK_WAIT)
     const onWait = (h: RepoLockHolder): void => {
       log.info(`Waiting for the repository lock of ${userText(folder)}, held by ${userText(h.profile)} (pid ${h.pid})`)
       if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Combwork is merging into this repository ({profile})', description: "A notification's title: this Combwork waits to merge into (or change) a repository because another Combwork (its profile folder's name, {profile}, e.g. Combwork-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Combwork waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Combwork is merging into this repository": how long this Combwork waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
     }
     const got = (await thread.ask({ type: 'take', dir, profile: profile(), waitMs: waitSeconds * 1000, noticeAfterMs: NOTICE_AFTER_MS }, onWait)) as TakeAnswer
+    if ('timedOut' in got && noWait) throw lockOrderError(folder)
     if ('timedOut' in got) {
       log.warn(`Gave up waiting for the repository lock of ${userText(folder)}, held by ${userText(got.timedOut.profile)} (pid ${got.timedOut.pid})`)
       throw combworkError(msg({ id: 'git.repoLock.busy', defaultMessage: 'Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.', description: "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it." }), { profile: got.timedOut.profile }, { kind: 'conflict' })
@@ -205,10 +356,12 @@ export async function withNamedLock<T>(dir: string, file: string, fn: () => Prom
 export async function withRepoLocks<T>(folders: readonly string[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
   const found: { store: string; folder: string }[] = []
   for (const f of folders) {
+    // A folder in no repository takes none; one a nearer non-colocated `.jj` holds is refused (HI-2896), never skipped.
+    if (!commonDirSync(f) && (await gitVeto(f))) await commonGitDir(f)
     const dir = await commonGitDir(f).catch(() => null)
     if (dir) found.push({ store: dir, folder: f })
   }
-  return withLocksInOrder(inStoreOrder(found), fn, opts)
+  return takeStores(found, fn, opts)
 }
 
 /**

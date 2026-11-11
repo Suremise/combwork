@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "No hay ninguna cuenta de {cli} activada en este espacio de trabajo, así que el Asistente no puede iniciarse. Agrega una e inicia sesión en ella.",
+  "assistant.banner.noAccountAny": "No hay ninguna cuenta activada en este espacio de trabajo, así que el Asistente no puede iniciarse. Agrega una para cualquier agente de programación compatible con Combwork e inicia sesión en ella: el Asistente usa la primera en tu orden de cuentas.",
+  "assistant.banner.noAccountFor": "{others, select, yes {El Asistente usa {cli} y no hay ninguna cuenta de {cli} activada en este espacio de trabajo, así que no puede iniciarse. Agrega una o elige la cuenta de otro agente de programación en la configuración del Asistente.} other {El Asistente usa {cli} y no hay ninguna cuenta de {cli} activada en este espacio de trabajo, así que no puede iniciarse. Agrega una e inicia sesión en ella.}}",
+  "assistant.banner.signedOut": "{name}, la cuenta de {cli} del Asistente, tiene la sesión cerrada, así que el Asistente no puede iniciarse. Vuelve a iniciar sesión en ella en Configuración → Cuentas y conexiones.",
   "assistant.chooseConnections.agent": "Agente",
   "assistant.chooseConnections.next": "Después",
   "assistant.chooseConnections.now": "Ahora",

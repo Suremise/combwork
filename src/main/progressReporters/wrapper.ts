@@ -583,7 +583,7 @@ export function uncountedLine(answer: unknown, isolated: boolean): string | null
   const { name, counted, whyNot, changes, platform } = c as Record<string, unknown>
   if (counted !== false || typeof name !== 'string' || typeof whyNot !== 'string' || !Object.hasOwn(UNCOUNTED, whyNot)) return null
   const listed = Array.isArray(changes) ? changes.filter((x): x is string => typeof x === 'string').map((x) => (Object.hasOwn(MARKS, x) ? say(MARKS[x]) : x)) : []
-  return say(UNCOUNTED[whyNot], { check: name, listed: listed.length ? 'yes' : 'no', changes: listed.join(', '), isolate: !isolated && isPlatformId(platform) && hasCapability(platform, 'isolation') ? 'yes' : 'no' })
+  return say(UNCOUNTED[whyNot], { check: name, listed: listed.length ? 'yes' : 'no', changes: listed.join(', '), isolate: !isolated && isPlatformId(platform) && hasCapability(platform, 'checkCopies') ? 'yes' : 'no' })
 }
 
 /**

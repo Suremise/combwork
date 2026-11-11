@@ -49,14 +49,14 @@ import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLan
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { gitCantRead, isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
-import { holder, poolFor, setSlotFreed } from './slotsApp'
+import { holder, poolFor, poolIfMade, setSlotFreed } from './slotsApp'
 import { brokerWorkingIn } from './agentProcesses'
 import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
@@ -66,7 +66,8 @@ import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
-import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
+import { agentRunsGoing, setJjCards, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
+import { jjCardsFor } from './jjCards'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
@@ -605,6 +606,8 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
  * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
  */
 async function leavable(projectPath: string, folder: string, target: string | null): Promise<Checkout | null> {
+  // A non-colocated jj slot (HI-2896): Git can't read it: kept.
+  if (await gitCantRead(folder)) return null
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return null
   const checkout = port().checkout(folder)
@@ -699,6 +702,8 @@ async function takeWritten(ws: WorkspaceService, projectPath: string, pool: Slot
 
 /** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
 async function cleanAndContained(projectPath: string, folder: string, target: string | null): Promise<boolean> {
+  // A non-colocated jj slot (HI-2896): Git can't read it (none there, or a repository above it): not taken over.
+  if (await gitCantRead(folder)) return false
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return false
   const head = await port().head(folder)
@@ -1014,6 +1019,9 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
   const finish = s.finished.seq
   const line = s.started.line
+  // A jj card's slot (HI-2866) is put back on its target by the pool's own settle, an owned write under the slot's
+  // operation (SlotPool.detach); this path holds no such operation, so it never asks Git about a jj slot or acts on one.
+  if (isJjLineKey(line)) return false
   // The finish this was for, still the card's: Done in that finish, on that lease and line.
   const own = (): boolean => {
     if (!alive()) return false
@@ -1268,9 +1276,12 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         line: st.line!,
         base: st.base!,
         install,
+        ...(st.target ? { target: st.target } : {}),
         // At the boundary: the card still this cycle's, the rules on, its builder quiet.
         ready: async () => (gone() ? 'the card moved on, or the rules are off' : quiet(projectPath, builder) ? null : 'its builder is busy'), // i18n-ignore: why a preparation waits, for the log
-        around: (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
+        // A jj card's preparation takes its store's lock itself, rechecking its fence and the folder's quiet inside it
+        // (HI-2866: the lock isn't re-entrant, and a non-colocated project folder has no Git of its own to lock).
+        around: isJjLineKey(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
       })
     )
     if ('ok' in r) {
@@ -2016,6 +2027,8 @@ export function startSlotCards(): void {
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
   setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn })
+  // jj's card work's dependencies (HI-2868), for each project's workflow.
+  setJjCards(jjCardsFor)
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
     const ws = workspaceFor(projectPath)
@@ -2030,6 +2043,10 @@ export function startSlotCards(): void {
     if (!where) return
     const ws = workspaceFor(where)
     if (ws?.path && heldRetries.has(retireKey(ws, where))) void settleSlotCards(ws, where)
+    // A session ending or going quiet may be what a slot owing a settle waited for (HI-2906): its pool's owed pass now
+    // (coalesced with one running). Only a pool already made: nothing owed is in one that isn't.
+    const made = ws?.path ? poolIfMade(ws, where) : null
+    if (made) void made.then((p) => p.owedPass()).catch((x) => log.warn(`looking at the slots that owe a settle in ${userText(where)}`, x))
   })
   setSlotFreed((ws, project) => {
     for (const l of slotFreed) l(project)
@@ -2079,6 +2096,7 @@ export function startSlotCards(): void {
     setLaneSlots(null)
     setSlotFreed(null)
     setSlotStarts(null)
+    setJjCards(null)
     setBuilderCount(null)
   }
 }

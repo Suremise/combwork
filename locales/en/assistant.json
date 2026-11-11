@@ -1,7 +1,15 @@
 {
-  "assistant.banner.connectionSetup": {
-    "defaultMessage": "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.",
-    "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can't start until one is."
+  "assistant.banner.noAccountAny": {
+    "defaultMessage": "No account is on in this workspace, so the Assistant can't start. Add one for any coding agent Combwork supports and sign it in: the Assistant runs on the first one in your order of accounts.",
+    "description": "Banner in the Assistant panel (HI-2899) when the Assistant names no coding agent CLI of its own (a new workspace) and no account (a sign-in or server, of any CLI: Claude Code, Codex, Copilot…) is on in the workspace. Its button opens Settings → Accounts & Connections."
+  },
+  "assistant.banner.noAccountFor": {
+    "defaultMessage": "{others, select, yes {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one, or choose another coding agent's account in the Assistant's settings.} other {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one and sign it in.}}",
+    "description": "Banner in the Assistant panel (HI-2899) when the Assistant runs on a coding agent CLI chosen in its settings ({cli}: \"Codex\") and none of that CLI's accounts is on in the workspace. {others}: yes when another CLI's account is on, to choose in the Assistant's settings (a second button opens them); keep the select keys."
+  },
+  "assistant.banner.signedOut": {
+    "defaultMessage": "{name}, the Assistant's {cli} account, is signed out, so the Assistant can't start. Sign it in again in Settings → Accounts & Connections.",
+    "description": "Banner in the Assistant panel (HI-2899) when the account the Assistant runs on ({name}: the user's name for its connection; {cli}: \"Claude Code\") is signed out. Settings → Accounts & Connections is where accounts are signed in: its button opens it."
   },
   "assistant.chooseConnections.agent": {
     "defaultMessage": "Agent",

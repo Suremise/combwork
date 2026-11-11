@@ -1,6 +1,8 @@
 // Generated from locales/en/tips.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface CombworkMessageValues {
+  'tips.activityMap.text': undefined
+  'tips.activityMap.title': undefined
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
   'tips.activityWorkspace.text': undefined
@@ -23,6 +25,8 @@ interface CombworkMessageValues {
   'tips.agentStates.title': undefined
   'tips.agentWorkflowRole.text': undefined
   'tips.agentWorkflowRole.title': undefined
+  'tips.agentsSignedCommits.text': undefined
+  'tips.agentsSignedCommits.title': undefined
   'tips.agentsTempFolder.text': undefined
   'tips.agentsTempFolder.title': undefined
   'tips.allKeysToCli.text': undefined
@@ -250,6 +254,8 @@ interface CombworkMessageValues {
   'tips.gitInit.title': undefined
   'tips.gitRemotes.text': undefined
   'tips.gitRemotes.title': undefined
+  'tips.gitSigning.text': undefined
+  'tips.gitSigning.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
   'tips.gotoProject.text': { key: string | number }
@@ -278,6 +284,8 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
+  'tips.jjCards.text': undefined
+  'tips.jjCards.title': undefined
   'tips.jjOperations.text': undefined
   'tips.jjOperations.title': undefined
   'tips.keepAwake.text': undefined
@@ -286,6 +294,8 @@ interface CombworkMessageValues {
   'tips.laneApplyNow.title': undefined
   'tips.laneBranchSquash.text': undefined
   'tips.laneBranchSquash.title': undefined
+  'tips.laneEdit.text': undefined
+  'tips.laneEdit.title': undefined
   'tips.laneGates.text': undefined
   'tips.laneGates.title': undefined
   'tips.laneNext.text': undefined
@@ -524,6 +534,8 @@ interface CombworkMessageValues {
   'tips.storageCleanup.title': undefined
   'tips.storagePurge.text': undefined
   'tips.storagePurge.title': undefined
+  'tips.submodulesInDiffs.text': undefined
+  'tips.submodulesInDiffs.title': undefined
   'tips.submodulesLfs.text': undefined
   'tips.submodulesLfs.title': undefined
   'tips.taskbarBadge.text': undefined

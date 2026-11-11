@@ -448,10 +448,18 @@
     "text": "Put a card in Doing back in Todo, unstarted. why is written as a comment."
   },
   "tool.queue.arg.from": {
-    "text": "forward: the branch to bring in; target is the one brought up to date. Both the project's targets."
+    "text": "forward: the branch to bring in; target is the one brought up to date, one of the project's targets; from is another of them or the repository's default branch (main, after a release)."
   },
   "tool.queue.arg.items": {
     "text": "retarget: the card keys, lane names and slot names to move, from the preview named."
+  },
+  "tool.queue.arg.override": {
+    "text": "forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.",
+    "note": "HI-2892."
+  },
+  "tool.queue.arg.past": {
+    "text": "list: true also lists past branches' queues (not a target now, nothing in them).",
+    "note": "HI-2893."
   },
   "tool.queue.arg.preview": {
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."

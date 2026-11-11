@@ -74,7 +74,8 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         expect(isUnknown(await h.port.record!(a, yes, idB))).toBe(true)
         // jj has no checked-out line: every line operation refused, never mapped to a near equivalent (R5.2).
         expect((await h.port.prepare(a, 'card', base)).err).toBe(JJ_REFUSED.line)
-        expect((await h.port.detach(a, base)).err).toBe(JJ_REFUSED.line)
+        // A detach settles one card's binding (HI-2866): without one named (and bound), refused.
+        expect((await h.port.detach(a, base)).err).toBe(JJ_REFUSED.notBound)
         expect((await h.port.dropLine(repo, 'main', base)).err).toBe(JJ_REFUSED.line)
       })
 
@@ -258,10 +259,21 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
     expect(h.journals.of('lr').read()).toBeNull()
   })
 
-  it('the control workspace is made only when the project folder is quiet, and is never a slot', async () => {
-    const h = harness({ quiet: async () => false })
+  it('the control workspace is made only when no agent works in the project folder (its hold), and is never a slot', async () => {
+    const h = harness({ busy: 'p|a1' })
     const { repo, root, base } = h.repo('control', false)
     expect((await h.port.create(repo, join(root, 'slot-a'), base)).err).toBe(JJ_REFUSED.control)
     expect(readdirSync(root)).toEqual([])
+  })
+
+  it("a project's first slot makes the worktrees folder the control and the slot go in, which jj doesn't make (HI-2870)", async () => {
+    const h = harness()
+    const { repo, root, base } = h.repo('first', true)
+    // As the app has it: the control and the slots in the project's worktrees folder, absent before its first slot.
+    const worktrees = join(root, 'not-yet', 'project')
+    const port = h.portWith({ control: (r) => ({ folder: join(worktrees, '.cw-jj-control'), journal: h.journals.of(`jj_control:${r.toLowerCase()}`) }) })
+    expect(await port.create(repo, join(worktrees, 'slot-a'), base)).toEqual({ ok: true, err: '' })
+    expect(readFileSync(join(worktrees, 'slot-a', 'base.txt'), 'utf8')).toBe('base\n')
+    expect((h.journals.of(`jj_control:${repo.toLowerCase()}`).read() as { phase?: string } | null)?.phase).toBe('ready')
   })
 })

@@ -143,6 +143,11 @@ export interface Tx {
   putCard(card: CardRecord): void
   meta(key: string): string | null
   setMeta(key: string, value: string): void
+  /**
+   * Raw statements in this transaction (HI-2882: an Integrated jj card's obligation and retained-bundle rows, written with
+   * its fact, so the fact never exists without them).
+   */
+  sql(fn: (db: DatabaseSync) => void): void
   /** A commit seen on a shared folder's line, and whose it is: false when it was already recorded. */
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean
 }
@@ -820,6 +825,19 @@ export class FactStore {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
 
+  /** The provenance epoch's key: the project's stable id (never its name or key, which a rename changes), else its scope. */
+  private epochKey(): string {
+    return `provenance_epoch:${(this.scope.projectId?.() ?? this.scope.project).toLowerCase()}`
+  }
+
+  /**
+   * The project's provenance epoch (HI-2868): how many submissions and adoptions its cards have had recorded, moved in
+   * each one's own transaction. Read in the write under way if there is one.
+   */
+  provenanceEpoch(): number {
+    return this.conn.read((db) => Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.epochKey()) as { value: string } | undefined)?.value ?? 0))
+  }
+
   private metaKey(key: string): string {
     return `workflow:${this.scope.project.toLowerCase()}:${key}`
   }
@@ -838,6 +856,9 @@ export class FactStore {
         const seq = nextSeq(card)
         const full = { ...f, seq, card, at: at() } as Fact<K>
         w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
+        // The project's provenance epoch (HI-2868): moved in the same transaction as every accepted submission or adoption,
+        // so an intent that decided on the provenance before it (jj's attribution) sees it moved in its own write.
+        if (f.kind === 'Submitted' || f.kind === 'Adopted') w.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(this.epochKey())
         return full
       }
       const tx: Tx = {
@@ -864,6 +885,7 @@ export class FactStore {
         },
         meta: (k) => this.meta(k),
         setMeta: (k, v) => this.setMeta(k, v),
+        sql: (statements) => this.conn.write(() => statements(w as DatabaseSync)),
         recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
       }
       return fn(tx)
@@ -878,17 +900,28 @@ export class FactStore {
  */
 function writeLane(db: DatabaseSync, l: LaneList, at: string): void {
   const cards = (db.prepare('SELECT card FROM lane_cards WHERE lane = ? ORDER BY ord').all(l.id) as { card: number }[]).map((r) => r.card)
-  if (cards.length !== l.cards.length || cards.some((c, i) => c !== l.cards[i])) {
+  const run = db.prepare('SELECT has_pending FROM lane_runs WHERE lane = ?').get(l.id) as { has_pending: number } | undefined
+  const pending = run?.has_pending ? (db.prepare('SELECT card FROM lane_pending WHERE lane = ? ORDER BY ord').all(l.id) as { card: number }[]).map((r) => r.card) : null
+  const listChanged = cards.length !== l.cards.length || cards.some((c, i) => c !== l.cards[i])
+  if (listChanged) {
     db.prepare('DELETE FROM lane_cards WHERE lane = ?').run(l.id)
     const ins = db.prepare('INSERT INTO lane_cards (lane, ord, card) VALUES (?, ?, ?)')
     l.cards.forEach((c, i) => ins.run(l.id, i, c))
     db.prepare('UPDATE lanes SET updated_at = ? WHERE id = ?').run(at, l.id)
   }
+  // Its list's revision (HI-2898, LaneRecord.listRev): up by one when this write changes its cards or its queued list,
+  // in the same transaction, as lanes.ts' own saves do.
+  if (listChanged || JSON.stringify(pending) !== JSON.stringify(l.pending ?? null)) bumpListRev(db, l.id)
   if (l.ended) db.prepare("UPDATE lanes SET state = 'ended', ended_at = ?, updated_at = ? WHERE id = ? AND state = 'active'").run(at, at, l.id)
   db.prepare('INSERT INTO lane_runs (lane, ruleset, current_card, has_pending) VALUES (?, ?, ?, ?) ON CONFLICT (lane) DO UPDATE SET ruleset = excluded.ruleset, current_card = excluded.current_card, has_pending = excluded.has_pending').run(l.id, l.ruleset, l.current, l.pending ? 1 : 0)
   db.prepare('DELETE FROM lane_pending WHERE lane = ?').run(l.id)
   const ins = db.prepare('INSERT INTO lane_pending (lane, ord, card) VALUES (?, ?, ?)')
   l.pending?.forEach((c, i) => ins.run(l.id, i, c))
+}
+
+/** A lane's list revision up by one (HI-2898), in its row's `extra` (missing: 0). */
+function bumpListRev(db: DatabaseSync, lane: string): void {
+  db.prepare("UPDATE lanes SET extra = json_set(CASE WHEN json_type(extra) = 'object' THEN extra ELSE '{}' END, '$.listRev', coalesce(CASE WHEN json_type(extra) = 'object' THEN json_extract(extra, '$.listRev') END, 0) + 1) WHERE id = ?").run(lane) // i18n-ignore: SQL
 }
 
 /** The columns beside the document a create or an update gives (each left as it is when not given). */

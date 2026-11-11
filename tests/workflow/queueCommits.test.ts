@@ -150,6 +150,9 @@ describe("Combwork's queue commits (#1350)", () => {
     const waiter = join(e.home, 'hook-wait.js')
     writeFileSync(waiter, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)\n`)
     sh(e.project, 'config', 'commit.gpgsign', 'true')
+    // HI-1185: a signer the signing check doesn't run by itself (not a known installation), so the commit reaches its hook
+    // as before; a repository whose own gpg can't sign now pauses `signing` before any commit (queueSigning.test.ts).
+    sh(e.project, 'config', 'gpg.program', process.execPath.replace(/\\/g, '/'))
     hook(e, 'pre-merge-commit', `exec node "${waiter.replace(/\\/g, '/')}"`)
     const before = head(e)
     expect(await e.queue({ signTimeoutMs: 3000 }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'hookTimedOut' }])

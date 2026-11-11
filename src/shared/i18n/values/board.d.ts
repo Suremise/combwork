@@ -456,6 +456,26 @@ interface CombworkMessageValues {
   'board.lane.workRevision': { review: string; revision: string | number }
   'board.lane.workStalePass': { now: string; approved: string | number; current: string | number }
   'board.lane.workVerdict': { pass: string; revision: string; current: string }
+  'board.laneEdit.add': undefined
+  'board.laneEdit.cancelChange': undefined
+  'board.laneEdit.cards': undefined
+  'board.laneEdit.dismiss': undefined
+  'board.laneEdit.done': { op: string; card: string | number; lane: string | number }
+  'board.laneEdit.handle': { card: string | number }
+  'board.laneEdit.locked': { card: string | number }
+  'board.laneEdit.moveHere': undefined
+  'board.laneEdit.noMatch': undefined
+  'board.laneEdit.notLast': undefined
+  'board.laneEdit.nothingToUndo': undefined
+  'board.laneEdit.onOther': { builder: string | number }
+  'board.laneEdit.otherWorkspace': undefined
+  'board.laneEdit.queued': { card: string | number }
+  'board.laneEdit.remove': { card: string | number }
+  'board.laneEdit.said': { card: string | number; at: string | number; n: number }
+  'board.laneEdit.search': undefined
+  'board.laneEdit.stuck': { card: string | number }
+  'board.laneEdit.undo': undefined
+  'board.laneEdit.undoFailed': undefined
   'board.laneStart.addCard': undefined
   'board.laneStart.agentState': { agent: string | number; status: string | number }
   'board.laneStart.applyNow': undefined
@@ -507,6 +527,9 @@ interface CombworkMessageValues {
   'board.lanes.edgeValue': { shown: string | number; count: number }
   'board.lanes.end': undefined
   'board.lanes.endFailed': { lane: string | number }
+  'board.lanes.endedCards': { n: number }
+  'board.lanes.endedToday': { n: number }
+  'board.lanes.endedTook': { time: string | number }
   'board.lanes.expand': { open: string; lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.freshBlocked': { agent: string | number; why: string; reason: string | number }
@@ -973,6 +996,7 @@ interface CombworkMessageValues {
   'board.work.base': undefined
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
+  'board.work.change': { commits: number; change: string | number }
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
@@ -1005,6 +1029,8 @@ interface CombworkMessageValues {
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
+  'board.work.via': { via: string }
+  'board.work.workspace': undefined
   'board.workQueue.advance': { target: string | number }
   'board.workQueue.advancing': { target: string | number }
   'board.workQueue.answerFailed': undefined

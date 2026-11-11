@@ -209,7 +209,7 @@ const R = {
   queueRunBy: agentMsg({ id: 'reply.queue.runBy', text: 'run by {by}', note: "A merge queue's state: another Combwork runs it." }),
   queueRunning: agentMsg({ id: 'reply.queue.running', text: 'running', note: "A merge queue's state: running." }),
   queueEmpty: agentMsg({ id: 'reply.queue.empty', text: 'empty', note: "A merge queue's state: nothing in it." }),
-  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}: {state}.', note: "cw_queue list's line for a target's queue." }),
+  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}{past, select, yes { (a past branch: not a target now)} other {}}: {state}.', note: "cw_queue list's line for a target's queue. HI-2893: past yes for a past branch's queue." }),
   queueHow: agentMsg({ id: 'reply.queue.how', text: "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}", note: "A merge queue stopped part way (#1351): a command that settles it, what for and where to run it. Joined by \"; \", its first letter made a capital." }),
   queueFilesMore: agentMsg({ id: 'reply.queue.filesMore', text: '{files}, {n} more', note: 'A list cut short (files, processes): those shown, and how many more.' }),
   queueStuck: agentMsg({ id: 'reply.queue.stuck', text: 'Stopped part way ({phase}): {hasBranch, select, yes {the folder is on {branch}} other {the folder has no branch}}, {target} at {ref} (expected {expected}, result {result}){hasFiles, select, yes {; files {files}} other {}}.', note: 'An advance into the checked-out target left part way (#1351): where it stands; how to settle it follows.' }),
@@ -1297,7 +1297,7 @@ export function queueText(q: QueuePublic): string {
     : q.runBy && !q.runHere
       ? say(R.queueRunBy, { by: q.runBy })
       : say(q.testing || q.queued.length ? R.queueRunning : R.queueEmpty)
-  const lines = [say(R.queueHead, { target: q.target, project: q.project, state })]
+  const lines = [say(R.queueHead, { target: q.target, project: q.project, state, past: q.past ? 'yes' : 'no' })]
   const st = q.paused?.stuck
   if (st) {
     // An advance into the checked-out target left part way (#1351): where it stands, and how to settle it.

@@ -31,11 +31,13 @@ export interface StartPlan {
   deliverables?: Manifest
   /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */
   baselineGen?: number
+  /** What only this platform records of the start (`Started.platform`; jj's workspace and its identity, HI-2868). */
+  platform?: Record<string, unknown>
 }
 
 /** A submission's platform side: the revision with its fixed endpoints, key and files, and the guards' platform inputs. */
 export type SubmitPlan =
-  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[] }
+  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[]; platform?: Record<string, unknown> }
   | { ok: false; refusal: GuardRefusal }
 
 /** What a finish needs from the platform, gathered before the transaction. */
@@ -173,4 +175,14 @@ export interface PlatformAdapter {
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
   observe(onChange: (e: ObserveEvent) => void): Disposable
+  /**
+   * Once per reconciliation run of the project, after its cards (HI-2882, jj's): the platform's own passes (jj's publish
+   * observations and retained bundles). `more`: work remains for a continuation run. Absent: nothing.
+   */
+  afterRun?(signal?: AbortSignal): Promise<{ more: boolean }>
+  /**
+   * Something its repository watch says may have changed, or its tick (HI-2882): `what` as the watch names it. Whether a
+   * reconciliation run is wanted for it. Absent: always.
+   */
+  invalidated?(what: string): Promise<boolean>
 }

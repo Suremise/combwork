@@ -28,11 +28,19 @@ interface CombworkMessageValues {
   'jj.history.capped': { n: number }
   'jj.ids.tip': { change: string | number; commit: string | number }
   'jj.integrate.card': { card: string | number; title: string | number; commit: string | number; target: string | number }
-  'jj.integrate.contained': { target: string | number }
+  'jj.integrate.change': { change: string | number }
   'jj.integrate.head': undefined
   'jj.integrate.how': { target: string | number }
   'jj.integrate.noMerge': undefined
   'jj.integrate.none': undefined
+  'jj.integrate.notChecked': { target: string | number }
+  'jj.integrate.notYet': { target: string | number; when: string | number }
+  'jj.integrate.unknown': { target: string | number; when: string | number; why: string }
+  'jj.leftovers.head': undefined
+  'jj.leftovers.hint': undefined
+  'jj.leftovers.more': { n: number }
+  'jj.leftovers.show': undefined
+  'jj.leftovers.why': { why: string; name: string }
   'jj.ops.absent': undefined
   'jj.ops.added': { n: number; ids: string | number }
   'jj.ops.by': { user: string | number; workspace: string | number }
@@ -74,6 +82,7 @@ interface CombworkMessageValues {
   'jj.ops.refused.stale': undefined
   'jj.ops.refused.tool': undefined
   'jj.ops.refused.unimported': undefined
+  'jj.ops.refused.unimportedStore': undefined
   'jj.ops.refused.workingCopy': undefined
   'jj.ops.snapshot': undefined
   'jj.ops.tracked': { commit: string | number; state: string }
@@ -99,6 +108,14 @@ interface CombworkMessageValues {
   'jj.row.commit': undefined
   'jj.row.description': undefined
   'jj.row.noDescription': undefined
+  'jj.toCheck.changed': undefined
+  'jj.toCheck.differs': { what: string; was: string | number; now: string }
+  'jj.toCheck.head': undefined
+  'jj.toCheck.mark': undefined
+  'jj.toCheck.markMessage': undefined
+  'jj.toCheck.markTitle': { card: string | number }
+  'jj.toCheck.more': undefined
+  'jj.toCheck.row': { card: string | number; result: string | number; target: string | number; was: string; remote: string | number; when: string | number }
   'jj.unknown.heads': { detail: string | number }
   'jj.unknown.moved': undefined
   'jj.unknown.noRepo': undefined

@@ -2,7 +2,7 @@
 // so jj's runner ends a jj command's tree as cw-progress ends its command's. Node built-ins only: cw-progress, which runs
 // outside the asar, loads it as a chunk (AGENTS.md, cw-mcp.js and cw-progress.js).
 
-import { spawnSync, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 
 /** A process as Windows lists it: its id, the id its parent had, and when it started (Unix ms). */
@@ -49,10 +49,63 @@ export function treeToEnd(list: ListedProcess[], root: number): ListedProcess[] 
  * pids it ended.
  */
 function endListed(targets: ListedProcess[]): number[] {
+  const r = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', endListedPs(targets)], { windowsHide: true, encoding: 'utf8', timeout: 10_000 })
+  return pidsOf(String(r.stdout ?? ''))
+}
+
+/** The PowerShell that ends each listed process through a handle whose start time it checked (endListed's). */
+function endListedPs(targets: ListedProcess[]): string {
   const list = targets.map((t) => `${t.pid}:${t.started}`).join(',')
-  const ps = `foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $null = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $p.Kill(); $id } } catch {} }`
-  const r = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, encoding: 'utf8', timeout: 10_000 })
-  return String(r.stdout ?? '').split(/\r?\n/).map(Number).filter((n) => n > 0)
+  return `foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $null = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $p.Kill(); $id } } catch {} }`
+}
+
+/** The pids a PowerShell run printed, a line each. */
+const pidsOf = (out: string): number[] => out.split(/\r?\n/).map(Number).filter((n) => n > 0)
+
+/** A PowerShell command's output, run without blocking (bounded; '' when it couldn't run). */
+function powershell(command: string, timeoutMs = 10_000): Promise<string> {
+  return new Promise((res) => {
+    let c: ChildProcess
+    try {
+      c = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch {
+      return res('')
+    }
+    const out: Buffer[] = []
+    const t = setTimeout(() => {
+      try {
+        c.kill()
+      } catch {
+        // gone
+      }
+    }, timeoutMs)
+    c.stdout?.on('data', (d: Buffer) => out.push(d))
+    c.once('error', () => {
+      clearTimeout(t)
+      res('')
+    })
+    c.once('close', () => {
+      clearTimeout(t)
+      res(Buffer.concat(out).toString('utf8'))
+    })
+  })
+}
+
+/**
+ * endTree without blocking the caller's thread (HI-1185: Electron's main thread carries every keystroke): the same
+ * listing, identity check and order, through PowerShell runs it awaits rather than spawnSync.
+ */
+export async function endTreeAsync(child: ChildProcess, platform = process.platform): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  if (platform === 'win32' && child.pid) {
+    const tree = treeToEnd(parseProcessList(await powershell(LIST_PS)), child.pid)
+    if (tree.length && pidsOf(await powershell(endListedPs(tree))).includes(child.pid)) return
+  }
+  try {
+    child.kill()
+  } catch {
+    // already gone
+  }
 }
 
 /**

@@ -23,8 +23,14 @@
 // What stays, always:
 // - The CLI test homes' sign-ins, config, sandbox setup and databases (`codex`: all but the above; `claude`: never
 //   opened); scenario results and baselines; the claims
-//   and locks (`e2e-lanes`, `heavy-slots`, `build-locks`), the concurrency checker's folders (it removes its own:
-//   tempWorktrees.mjs) and the Progress panel's timings. Logs (`e2e\logs`) are pruned by the runner (logs.mjs).
+//   and locks (`e2e-lanes`, `heavy-slots`, `build-locks`, `codex-home-locks`), the concurrency checker's folders (it
+//   removes its own: tempWorktrees.mjs) and the Progress panel's timings. Logs (`e2e\logs`) are pruned by the runner
+//   (logs.mjs).
+// - What is set up once, by hand or pinned, that a suite or release check runs (HI-2902; the age rule took them):
+//   `agy-probe` (the agy profile onboarded once by hand: antigravityreal), `tools` (portable tools fetched and checked:
+//   npm run jj:fetch), and the pinned CLI copies `copilot-<version>` (the Copilot builds a release's two-version run
+//   uses, HI-2780) and `opencode-<version>` (opencodereal's pinned build). Each is listed as kept, with its reason
+//   (KEPT, KEPT_PATTERNS); a new such folder goes in one of them.
 // - A lane a runner holds.
 // - Anything a card that isn't Done (nor archived) cites (evidence.cjs: its path, a path inside it, or a folder it is
 //   in), listed as "kept: cited by #n"; once the card is Done, the age rule applies. While the board can't be read (none
@@ -59,9 +65,23 @@ export const KEPT = {
   'heavy-slots': 'the heavy-run slots',
   'build-locks': "the worktrees' build locks",
   concurrency: "the concurrency checker's folders (it removes its own)",
+  'codex-home-locks': "the Codex test home's lease (codexHomeLock.mjs)",
   tools: 'portable tools the real fixtures run, each checked as it was fetched (npm run jj:fetch, HI-2793)',
+  'agy-probe': "the agy profile onboarded once by hand, past agy's first-run screens (antigravityreal; tests/e2e/README.md, The real Antigravity CLI)",
   'progress-timings.json': "the Progress panel's suite timings",
   'config.json': "the machine's test settings (heavySlots, sideSlots, modelTrials, smallRun: slots.mjs CONFIG_FILE, #589, HI-2070)"
+}
+
+/** Folders in combwork-test kept by their name's shape, whatever their age, and why: the pinned CLI copies (HI-2902). */
+export const KEPT_PATTERNS = [
+  { pattern: /^copilot-\d+(?:\.\d+)+$/, why: "a pinned Copilot CLI copy, checked by its SHA-256 when fetched (a release's two-version run, HI-2780)" },
+  { pattern: /^opencode-\d+(?:\.\d+)+$/, why: "a pinned OpenCode build, checked by its SHA-256 (opencodereal; tests/e2e/README.md, The real OpenCode)" }
+]
+
+/** Why a name directly in combwork-test stays whatever its age, or null. */
+export function keptWhy(name) {
+  if (Object.hasOwn(KEPT, name)) return KEPT[name]
+  return KEPT_PATTERNS.find((k) => k.pattern.test(name))?.why ?? null
 }
 
 /**
@@ -162,7 +182,13 @@ export function plan({ root, days = PRUNE_DAYS, now = Date.now(), held = () => f
   for (const name of safeList(e2e)) if (name !== 'lanes' && name !== 'logs') look(join(e2e, name), { area: 'e2e' })
   for (const name of safeList(join(root, 'scratch'))) look(join(root, 'scratch', name), { area: 'scratch' })
   for (const name of safeList(join(root, 'tmp'))) look(join(root, 'tmp', name), { area: 'tmp', maxDays: Math.min(days, TMP_DAYS) })
-  for (const name of safeList(root)) if (!(name in KEPT) && !['e2e', 'scratch', 'tmp'].includes(name)) look(join(root, name), { area: 'other' })
+  for (const name of safeList(root)) {
+    if (['e2e', 'scratch', 'tmp'].includes(name)) continue
+    const kept = keptWhy(name)
+    // Kept whatever its age: listed with its reason (the dry run shows it), never removed.
+    if (kept) out.push({ path: join(root, name), rel: name, area: 'kept', remove: false, why: kept })
+    else look(join(root, name), { area: 'other' })
+  }
   out.push(...codexPlan({ root, days, now, ev }))
   return out
 }
@@ -427,10 +453,10 @@ export function areaSizes(root = runContext.TEST_ROOT) {
   for (let k = 0; k < LANES; k++) add(`e2e\\lanes\\${k}`, join(e2e, 'lanes', String(k)))
   add('e2e\\logs', join(e2e, 'logs'))
   rows.push(['e2e (suites run on their own, probes)', safeList(e2e).filter((n) => n !== 'lanes' && n !== 'logs').reduce((t, n) => t + sizeOf(join(e2e, n)), 0)])
-  for (const name of Object.keys(KEPT)) add(name, join(root, name))
+  for (const name of safeList(root).filter((n) => keptWhy(n))) add(name, join(root, name))
   add('scratch', join(root, 'scratch'))
   add('tmp (test runs)', join(root, 'tmp'))
-  rows.push(['other (one-off)', safeList(root).filter((n) => !(n in KEPT) && !['e2e', 'scratch', 'tmp'].includes(n)).reduce((t, n) => t + sizeOf(join(root, n)), 0)])
+  rows.push(['other (one-off)', safeList(root).filter((n) => !keptWhy(n) && !['e2e', 'scratch', 'tmp'].includes(n)).reduce((t, n) => t + sizeOf(join(root, n)), 0)])
   return rows
 }
 

@@ -9,6 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
+import type { JjCardDeps } from '../platform/jjPlatform'
 import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
@@ -86,6 +87,13 @@ export interface SlotStarts {
 let slotStarts: SlotStarts | null = null
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
+}
+
+/** jj's card work's dependencies for a project (HI-2868: the app's jjCards.ts, set while slots run); none: jj answers nothing. */
+type JjCards = (ws: WorkspaceService, projectPath: string, projectId: () => string) => JjCardDeps
+let jjCards: JjCards | null = null
+export function setJjCards(f: JjCards | null): void {
+  jjCards = f
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -189,6 +197,7 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
 function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
+  let jjDeps: JjCardDeps | undefined
   return new Workflow({
     // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
@@ -202,6 +211,11 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    // jj's card work (HI-2868), composed once for the project while slots run.
+    get jj() {
+      jjDeps ??= jjCards?.(ws, project.path, () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path))
+      return jjDeps
+    },
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],

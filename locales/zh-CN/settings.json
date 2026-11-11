@@ -593,6 +593,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "重启后恢复：就绪时限",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "智能体的编程智能体在一个回合中可以持续等待重试其模型请求（被限流，或无法连接到服务）多久，之后 Combwork 会通知助手，每个回合一次。0：从不。",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "等待重试：在此之后通知助手",
+  "settings.advanced.cw.sessions.signFailFast.desc": "当仓库对提交签名时，智能体使用 Git for Windows 的 gpg 或 ssh-keygen、GnuPG 的 gpg 或 Windows 的 ssh-keygen 提交，会在无人值守的情况下签名，或立即失败并告诉智能体原因，而不是等待一个没人能输入的密码短语。签名保持开启，你的 git 和 gpg 设置也从不更改：会话只在自己的环境中使用 Combwork 的签名程序。其他签名程序照旧运行。关闭后，会话照旧使用 git 自己的签名程序。",
+  "settings.advanced.cw.sessions.signFailFast.title": "智能体的签名提交从不等待密码短语",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "智能体的签名提交允许 gpg 或 ssh-keygen 运行多久，超时后 Combwork 会结束它，提交失败。这足够你触碰硬件密钥；到那时仍在运行的签名程序是在等人。",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "智能体的签名程序：超时放弃",
   "settings.advanced.cw.sessions.terminalType.desc": "Combwork 以 TERM=xterm-256color（与其终端一致）启动每个会话，且不带 Windows Terminal 的 WT_SESSION，因此无论 Combwork 是从“开始”菜单还是从终端打开，各 CLI 的显示都相同（Claude Code 显示 ❯ 而不是 >）。你自己的环境或会话环境中的 TERM 会保留。关闭后，会话获得打开 Combwork 时的环境。",
   "settings.advanced.cw.sessions.terminalType.title": "会话声明其终端为 xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "显示“帮助”→“开发者控制台”（Ctrl+Alt+J）：每个 CLI 发给 Combwork 的内容，以及 Combwork 对它的解读。",
@@ -1630,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
   "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",
   "settings.advanced.opencode.version.desc": "opencode --version 的输出：版本是其第一个分组。Combwork 只使用 OpenCode 2 或更高版本。设置错误时，将找不到 OpenCode。",
-  "settings.advanced.opencode.version.title": "opencode --version 中的版本"
+  "settings.advanced.opencode.version.title": "opencode --version 中的版本",
+  "settings.advanced.cw.activity.mapMotion.desc": "智能体每次调用工具时，活动地图会沿辐条向对应站点发出一个点，调用结束时再返回。“跟随 Windows”遵循 Windows 的“显示动画”设置；“开”总是移动；“关”只点亮站点。",
+  "settings.advanced.cw.activity.mapMotion.off": "关",
+  "settings.advanced.cw.activity.mapMotion.on": "开",
+  "settings.advanced.cw.activity.mapMotion.system": "跟随 Windows",
+  "settings.advanced.cw.activity.mapMotion.title": "活动地图的移动脉冲"
 }

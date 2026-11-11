@@ -84,10 +84,13 @@ interface CombworkMessageValues {
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
+  'service.forward.direction': { to: string | number; from: string | number; why: string; dir: string }
+  'service.forward.directionRetry': { card: string | number; why: string; to: string | number; from: string | number }
   'service.forward.missing': { unknown: string; branch: string | number }
   'service.forward.noGit': undefined
   'service.forward.notAgents': undefined
-  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number }
+  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number; sources: string | number }
+  'service.forward.openNoOverride': { card: string | number; to: string | number; from: string | number }
   'service.forward.raced': undefined
   'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }
@@ -95,6 +98,7 @@ interface CombworkMessageValues {
   'service.fsutil.notCopied': { name: string | number }
   'service.git.exitCode': { code: string | number }
   'service.git.failed': { command: string | number; why: string | number }
+  'service.git.gitlinkUnread': { path: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
   'service.gitCompare.noBranch': { branch: string | number }
@@ -196,6 +200,22 @@ interface CombworkMessageValues {
   'service.keys.prefix': { key: string | number; other: string | number }
   'service.keys.taken': { key: string | number }
   'service.keys.unknownProject': undefined
+  'service.laneEdit.already': { card: string | number }
+  'service.laneEdit.cardChanged': { card: string | number }
+  'service.laneEdit.changed': { lane: string | number }
+  'service.laneEdit.dependency': { card: string | number; dep: string | number }
+  'service.laneEdit.done': { card: string | number }
+  'service.laneEdit.ended': { lane: string | number }
+  'service.laneEdit.fixedPlace': { card: string | number }
+  'service.laneEdit.invalid': undefined
+  'service.laneEdit.keptWork': { card: string | number }
+  'service.laneEdit.noQueued': { lane: string | number }
+  'service.laneEdit.notOnLane': { card: string | number }
+  'service.laneEdit.notQueued': { card: string | number }
+  'service.laneEdit.notTodo': { card: string | number }
+  'service.laneEdit.onLane': { card: string | number; builder: string | number }
+  'service.laneEdit.otherProject': { card: string | number; project: string | number }
+  'service.laneEdit.since': undefined
   'service.laneStart.busy': { status: string; agent: string | number }
   'service.laneStart.done': { card: string | number }
   'service.laneStart.needsReviewer': { project: string | number }

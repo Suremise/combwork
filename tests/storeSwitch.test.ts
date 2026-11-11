@@ -5,7 +5,7 @@
 // own checks (its confirmation, the gates, the fallback) are stood in for here (`storeSwitchSeams.repo`): the real-jj
 // tests run them.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, realpathSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -27,7 +27,8 @@ const { CopyStore } = await import('../src/main/copies')
 const { boardConn } = await import('../src/main/slotsApp')
 const { metaOf } = await import('../src/main/platform/fenceAdmit')
 const { beginSwitch, MEMBER_KEY, readFence, storeKey } = await import('../src/main/platform/platformFence')
-const { commonGitDir } = await import('../src/main/repoLock')
+const { commonGitDir, heldStoreKeys, storeKeyOf } = await import('../src/main/repoLock')
+const { withFolderRepoLocks } = await import('../src/main/platform/repoPorts')
 const { agentActor } = await import('../src/shared/workflow/facts')
 
 type WS = ReturnType<typeof createWorkspaceService>
@@ -127,8 +128,10 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     }
     expect(await platformIn(w, p)).toBe('jj')
     expect(await platformIn(w, q)).toBe('jj')
-    // After: Q's start resolves afresh under jj and meets jj's refusal; P's stale runtime is refused as changed.
-    expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'start.platformReady' })
+    // After: Q's start resolves afresh under jj (since J9e, HI-2874, it reaches jj's adapter, which can't read this
+    // fixture's folder as a jj repository); P's stale runtime is refused as changed.
+    expect((await workflowFor(w, q))!.currentRuleset(false).options.platform).toBe('jj')
+    expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.unknown' })
     const card = await inWorkspace(w, () => tasks.createTask({ title: 'Stale', project: 'p' }, user))
     expect(await store.boardWrite(w, async () => staleP.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ refused: true, rule: 'platform.changed' })
     // A Git slot lease of Q (compiled Git) is refused as changed; a jj one isn't refused by the fence.
@@ -141,8 +144,8 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     const switchingBack = sw.setPlatform(w, q, 'git', { expected: 'jj', token: back.store!.token })
     await pause2.at
     try {
-      // Q compiles jj's rules now, whose start refuses first; its Git copy lease meets the fence.
-      expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'start.platformReady' })
+      // Q compiles jj's rules now (its start reaches jj's adapter, J9e); its Git copy lease meets the fence.
+      expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.unknown' })
       await expect(copyTake(w, p)).rejects.toThrow(/being switched/)
       await expect(slotTake(w, q)).rejects.toThrow(/being switched/)
     } finally {
@@ -297,5 +300,68 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await platformIn(w, p)).toBe('none')
     expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'platform.switching' })
     void q
+  })
+})
+
+/**
+ * A workspace that is one non-colocated jj repository (HI-2896): `.jj` with its Git store inside (`.jj/repo/store/git`, a
+ * bare repository, J0's layout written by hand: jj's own checks are stood in for here), no `.git`; projects p and q in it.
+ */
+async function separateWorkspace(): Promise<{ w: WS; p: string; q: string; gitStore: string }> {
+  const ws = join(base, `sep-${++n}`)
+  const p = join(ws, 'p')
+  const q = join(ws, 'q')
+  for (const d of [p, q, ws]) mkdirSync(join(d, '.combwork'), { recursive: true })
+  const st = join(ws, '.jj', 'repo', 'store')
+  mkdirSync(st, { recursive: true })
+  writeFileSync(join(st, 'type'), 'git')
+  writeFileSync(join(st, 'git_target'), 'git')
+  git(st, 'init', '-q', '--bare', 'git')
+  for (const [dir, id] of [[p, 'p'], [q, 'q']] as const) writeFileSync(join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, id, platform: 'none', agents: [{ id: `b-${id}`, name: `B${id.toUpperCase()}`, role: 'builder' }, { id: `r-${id}`, name: `R${id.toUpperCase()}`, role: 'reviewer' }], workflow: { platform: 'none', preset: 'solo', options: {} } }))
+  const w = createWorkspaceService()
+  await w.open(ws)
+  opened.push(w)
+  return { w, p, q, gitStore: join(st, 'git') }
+}
+
+describe('a non-colocated jj repository switches too (HI-2896)', () => {
+  it('to jj: its group is its store inside .jj, the switch holds that store’s lock; back to Git refused (no Git working copy); None its own', async () => {
+    const { w, p, q, gitStore } = await separateWorkspace()
+    const check = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(check.refused).toBeNull()
+    expect(check.store?.group.map((g) => g.name)).toEqual(['p'])
+    let held: string[] = []
+    ss.storeSwitchSeams.at = (pt) => {
+      if (pt === 'afterBegin') held = [...heldStoreKeys()]
+    }
+    await sw.setPlatform(w, p, 'jj', { expected: 'none', token: check.store!.token })
+    expect(held).toEqual([storeKeyOf(realpathSync(gitStore))])
+    expect(await platformIn(w, p)).toBe('jj')
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'jj' } } } })
+    // Q joins: the same store, so the same group.
+    expect((await sw.checkPlatformSwitch(w, q, 'jj')).store?.group.map((g) => g.name).sort()).toEqual(['p', 'q'])
+    // Back to Git: refused before anything, with its own reason; None is the project's own switch.
+    expect((await sw.checkPlatformSwitch(w, p, 'git')).refused).toEqual({ why: 'jjNoGitCopy' })
+    await expect(sw.setPlatform(w, p, 'git', { expected: 'jj' })).rejects.toThrow(/No Git working copy here/)
+    expect(await platformIn(w, p)).toBe('jj')
+    await sw.setPlatform(w, p, 'none', { expected: 'jj' })
+    expect(await platformIn(w, p)).toBe('none')
+  })
+
+  it('its slots folder inside a Git working tree refuses the switch (jjInGit); its .jj unreadable refuses the lock, never skips it', async () => {
+    const { w, p } = await separateWorkspace()
+    // The workspace's slots folder (beside it) inside a Git working tree made later.
+    const outer = join(w.path!, '..')
+    const slots = w.worktreesRoot
+    mkdirSync(slots, { recursive: true })
+    git(slots, 'init', '-q')
+    const c = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(c.refused).toMatchObject({ why: 'jjInGit' })
+    void outer
+    // A damaged .jj (its store's type gone): the project's lock refused, nothing run.
+    writeFileSync(join(w.path!, '.jj', 'repo', 'store', 'type'), '')
+    let ran = false
+    await expect(withFolderRepoLocks([p], async () => void (ran = true))).rejects.toThrow(/couldn't read the jj repository/)
+    expect(ran).toBe(false)
   })
 })

@@ -7,6 +7,7 @@ import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
+import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -1927,6 +1928,9 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
+  /** HI-2869: the platform that made it (jj's, when not Git's), and, for a jj slot, stale (another workspace rewrote it). */
+  platform?: 'jj'
+  stale?: true
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -3777,6 +3781,8 @@ export interface GitDiff {
   original: string
   modified: string
   binary: boolean
+  /** HI-2864: either side is a submodule (mode 160000). Its sides are git's own `Subproject commit` lines; a file's or link's side is its content. */
+  gitlink?: GitlinkChange
 }
 
 /** A recent workspace as a window sees it (File → Open Recent, the welcome page; #144). */
@@ -4355,6 +4361,8 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /** Its list's revision (HI-2898, LaneRecord.listRev): what a window edit of its list names, refused once it moved. */
+  listRev: number
   /**
    * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
@@ -4415,6 +4423,58 @@ export interface LaneSlotInfo {
   line: string | null
   state: 'ready' | 'preparing'
   since: string
+}
+
+/** A running lane as a window edit of its list saw it (HI-2898): its id and its list's revision (LaneInfo.listRev). */
+export interface LaneSeen {
+  lane: string
+  rev: number
+}
+
+/**
+ * A window edit of a running lane's list (HI-2898, Progress → Lanes): each names the revision it was made on, and is
+ * refused once that moved. `to` and `at` are places in the lane's working list (its queued list when it has one): `to`
+ * where the card ends up, `at` before which card it goes (none: last).
+ */
+export type LaneEdit =
+  | ({ op: 'move'; card: number; to: number } & LaneSeen)
+  | ({ op: 'add'; card: number; at?: number } & LaneSeen)
+  | ({ op: 'remove'; card: number } & LaneSeen)
+  | ({ op: 'cancel' } & LaneSeen)
+  | { op: 'transfer'; card: number; from: LaneSeen; to: LaneSeen; at?: number }
+  | { op: 'undo'; undo: LaneEditUndo }
+
+/** A lane's list as an edit left it or found it: its cards, its queued list (null: none) and their revision. */
+export interface LaneListState {
+  lane: string
+  cards: number[]
+  pending: number[] | null
+  rev: number
+}
+
+/**
+ * What undoing a window edit of lanes needs (HI-2898): each lane's list before it and the revision the edit left it at,
+ * the card's agent before and after when the edit changed it, with the card's history entry the edit left (its token:
+ * any change of the card since moves it on), and the cards it would bring back. Undone whole or not at all.
+ */
+export interface LaneEditUndo {
+  lanes: { before: Omit<LaneListState, 'rev'>; rev: number }[]
+  card: { number: number; before: string | null; after: string | null; head: string | null } | null
+  /**
+   * Each card the undo would bring back onto a lane (one the edit took off, or Move here's), as the edit left it: its last
+   * history entry, and whether it kept work from an earlier start then. The undo is refused once one of them changed
+   * since (started, given to an agent, moved), or gained such work (HR1's round 1).
+   */
+  back: { number: number; head: string | null; work: boolean }[]
+}
+
+/** What a window edit of lanes did (HI-2898): for its notification, and its Undo (null: nothing to undo). */
+export interface LaneEditResult {
+  op: LaneEdit['op']
+  card: number | null
+  /** Each lane it changed, with the card in flight its change was queued after (null: applied now). */
+  lanes: { lane: string; queuedAfter: number | null }[]
+  undo: LaneEditUndo | null
 }
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */

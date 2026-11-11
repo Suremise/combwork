@@ -593,6 +593,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "Fortsetzen nach einem Neustart: bereit innerhalb von",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "Wie lange der Coding-Agent eines Agenten in einem Durchgang darauf warten darf, seine Modellanfrage erneut zu senden (Ratenlimit oder Dienst nicht erreichbar), bevor Combwork den Assistenten informiert, einmal pro Durchgang. 0: nie.",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "Warten auf neuen Versuch: Assistenten informieren nach",
+  "settings.advanced.cw.sessions.signFailFast.desc": "Wenn ein Repository Commits signiert, signiert der Commit eines Agenten mit gpg oder ssh-keygen von Git for Windows, gpg von GnuPG oder ssh-keygen von Windows, ohne dass jemand da ist, oder er schlägt sofort fehl und sagt dem Agenten warum, statt auf eine Passphrase zu warten, die niemand eingeben kann. Das Signieren bleibt an, und deine git- und gpg-Einstellungen werden nie geändert: Sitzungen bekommen nur in ihrer Umgebung einen Signierer von Combwork. Andere Signierer laufen wie bisher. Ausgeschaltet nutzen Sitzungen wie bisher den Signierer von git.",
+  "settings.advanced.cw.sessions.signFailFast.title": "Signierte Commits der Agenten warten nie auf eine Passphrase",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "Wie lange der signierte Commit eines Agenten gpg oder ssh-keygen laufen lässt, bevor Combwork es beendet und der Commit fehlschlägt. Lang genug für einen Hardware-Schlüssel, den du berührst; ein Signierer, der dann noch läuft, wartet auf jemanden.",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "Signierer der Agenten: aufgeben nach",
   "settings.advanced.cw.sessions.terminalType.desc": "Combwork startet jede Sitzung mit TERM=xterm-256color, wie ihr Terminal ist, und ohne das WT_SESSION von Windows Terminal, damit die CLIs gleich zeichnen, ob Combwork aus dem Startmenü oder aus einem Terminal geöffnet wurde (Claude Code zeichnet ❯ statt >). Ein TERM in deiner eigenen Umgebung oder der der Sitzung bleibt. Ausgeschaltet bekommen Sitzungen die Umgebung, mit der Combwork geöffnet wurde.",
   "settings.advanced.cw.sessions.terminalType.title": "Sitzungen melden ihr Terminal als xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "Hilfe → Entwicklerkonsole (Strg+Alt+J) zeigen: was jede CLI an Combwork sendet, neben dem, was Combwork daraus gemacht hat.",
@@ -1630,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Wie lange der private Server eines OpenCode-Agenten Zeit hat zu antworten, bevor der Start aufgibt und ihn beendet. Zu kurz, startet ein Agent auf einem langsamen PC nicht.",
   "settings.advanced.opencode.server.readySeconds.title": "Server: Zeit zum Starten",
   "settings.advanced.opencode.version.desc": "Was opencode --version ausgibt: Die Version ist die erste Gruppe. Combwork verwendet nur OpenCode 2 oder neuer. Falsch, wird OpenCode nicht gefunden.",
-  "settings.advanced.opencode.version.title": "Die Version in opencode --version"
+  "settings.advanced.opencode.version.title": "Die Version in opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "Die Aktivitätskarte schickt für jeden Tool-Aufruf eines Agenten einen Punkt entlang einer Speiche zu seiner Station und zurück, wenn er endet. „Wie Windows es sagt“ folgt der Windows-Einstellung „Animationen anzeigen“; „Ein“ bewegt sie immer; „Aus“ lässt nur die Station aufleuchten.",
+  "settings.advanced.cw.activity.mapMotion.off": "Aus",
+  "settings.advanced.cw.activity.mapMotion.on": "Ein",
+  "settings.advanced.cw.activity.mapMotion.system": "Wie Windows es sagt",
+  "settings.advanced.cw.activity.mapMotion.title": "Bewegte Impulse der Aktivitätskarte"
 }

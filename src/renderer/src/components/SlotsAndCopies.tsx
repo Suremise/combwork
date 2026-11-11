@@ -7,7 +7,7 @@ import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
 import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
-import { cardLabelOf, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { NumberField } from './NumberField'
 import { Icon, Switch } from './ui'
 import { ORIGIN_TEXT } from '../workflowOrigins'
@@ -48,6 +48,13 @@ const T = {
     gone: msg({ id: 'workflow.slots.state.gone', defaultMessage: 'Folder missing', description: 'A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it).' }),
     removing: msg({ id: 'workflow.slots.state.removing', defaultMessage: 'Being removed', description: 'A slot’s state in the list under “Slots and copies”.' })
   } satisfies Record<SlotView['state'], ReturnType<typeof msg>>,
+  // HI-2869: a stale jj slot and its recovery (J9a's explicit action).
+  stale: msg({ id: 'workflow.slots.stale', defaultMessage: 'Stale: another jj workspace changed it', description: 'Beside a jj slot in the list under “Slots and copies” (HI-2869): its files are behind its working-copy commit because another jj workspace rewrote it; it isn’t lent until recovered. “workspace” is jj’s term.' }),
+  recover: msg({ id: 'workflow.slots.recover', defaultMessage: 'Recover…', description: 'A button beside a stale jj slot (HI-2869): brings it up to date, keeping any edits jj hadn’t recorded (asks first).' }),
+  recoverTitle: msg({ id: 'workflow.slots.recoverTitle', defaultMessage: 'Recover {slot}?', description: 'The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name.' }),
+  recoverMessage: msg({ id: 'workflow.slots.recoverMessage', defaultMessage: 'Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.', description: 'The confirmation before recovering a stale jj slot (HI-2869); the folder edits are copied into is listed under it.' }),
+  recovered: msg({ id: 'workflow.slots.recovered', defaultMessage: '{slot} is recovered.', description: 'A notice after a stale jj slot was recovered (HI-2869).' }),
+  notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869). {why} picks the reason: keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
@@ -220,9 +227,24 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                     {list.map((s) => (
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
-                        <td>{tr(T.state[s.state])}</td>
+                        <td>
+                          {tr(T.state[s.state])}
+                          {s.stale && (
+                            <>
+                              {' · '}
+                              <span className="s-desc" data-stale="">
+                                {tr(T.stale)}
+                              </span>
+                            </>
+                          )}
+                        </td>
                         <td>{lentText(s, agentName, card) ?? ''}</td>
                         <td>
+                          {s.stale && (
+                            <button className="btn subtle small" data-action="recover" onClick={() => void recoverSlot(project.path, s, reload)}>
+                              {tr(T.recover)}
+                            </button>
+                          )}
                           {s.writer?.held && (
                             <>
                               <span className="s-desc" data-held={s.writer.agent}>
@@ -387,4 +409,22 @@ function Field({ value, placeholder, onCommit, multiline }: { value: string; pla
   }
   if (multiline) return <textarea className="input mono" rows={3} value={text} placeholder={placeholder} onChange={(e) => type(e.target.value)} onBlur={commit} />
   return <input className="input mono" value={text} placeholder={placeholder} onChange={(e) => type(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
+}
+
+/** A stale jj slot recovered, the user's explicit action (HI-2869, J9a's `slots:recoverStale`), after their confirmation. */
+async function recoverSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
+  const aside = `${s.folder.replace(/[\\/][^\\/]+$/, '')}${s.folder.includes('\\') ? '\\' : '/'}.cw-recovery${s.folder.includes('\\') ? '\\' : '/'}${s.name}`
+  if (!(await confirm({ title: tr(T.recoverTitle, { slot: s.name }), message: tr(T.recoverMessage), list: [aside], confirmLabel: tr(T.recover).replace('…', '') }))) return
+  const r = await call('slots:recoverStale', projectPath, s.name).catch(() => ({ ok: false as const, why: '' }))
+  if (r.ok) notify('success', tr(T.recovered, { slot: s.name }))
+  else notify('warning', tr(T.notRecovered, { slot: s.name, why: recoverWhy(r.why) }))
+  reload()
+}
+
+/** The select key of a refused recovery's reason (the port's refusal text, English, never shown). */
+function recoverWhy(why: string): string {
+  if (/busy|in use|quiet/i.test(why)) return 'busy' // i18n-ignore: a select key
+  if (/stale/i.test(why)) return 'notStale' // i18n-ignore: a select key
+  if (/identity|recorded/i.test(why)) return 'identity' // i18n-ignore: a select key
+  return 'other' // i18n-ignore: a select key
 }

@@ -34,7 +34,17 @@ import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes, setWriterHost, writerCleared, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import type { WorkspaceFilesOutcome } from './platform/workspacePort'
+import type { WorkspaceFilesOutcome, WorkspacePort } from './platform/workspacePort'
+import { registerWorkspacePort, workspacePortForPlatform, workspacePortOf } from './platform/workspacePorts'
+import { createJjWorkspacePort, type JjWorkspacePort } from './platform/jjWorkspacePort'
+import { recoverStale } from './platform/jjRecovery'
+import { git } from './git'
+import { boardPrepStore } from './platform/jjSlotPrep'
+import { historyFor } from './platform/historyPorts'
+import { takeStores } from './repoLock'
+import { trash } from './trash'
+import { holdLaunches } from './launchHolds'
+import type { PlatformId } from '../shared/platform/descriptors'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
@@ -261,8 +271,88 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
   }
 }
 
+/**
+ * A store's repository lock (HI-2866), as jj's port takes it around each write: the one owner every platform's takes go
+ * through (repoLock.ts `takeStores`, HI-2896), so a take inside one this context holds (live) runs straight through,
+ * whichever platform named the store.
+ */
+export function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
+  return takeStores([{ store, folder: store }], fn, { quiet: true })
+}
+
+/**
+ * jj's workspace port with the app's dependencies (HI-2866), registered once: its control workspace beside the project's
+ * slots with its record in the workspace database, the project folder's quiet (no session, no process), the store's
+ * lock, the Recycle Bin, the slots' bindings in the workspace database (jjSlotPrep.ts), and §16.3.2's containment on
+ * the store for a slot's reuse.
+ */
+export function jjPort(): JjWorkspacePort {
+  const known = workspacePortOf('jj')
+  if (known) return known as JjWorkspacePort
+  const port = createJjWorkspacePort({
+    control: (repo) => {
+      const ws = workspaceFor(repo)
+      const folder = join(ws ? ws.worktreesRoot : join(repo, '..'), basename(repo), '.cw-jj-control')
+      const journal = ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_control:${repo.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
+      return { folder, journal }
+    },
+    // HI-2887 (Darren's r9: automatic): the project folder held against agent launches while its control is made.
+    projectHold: (repo) => holdLaunches(repo),
+    // Darren's (a) on HI-2887: a lost control is made again automatically, under the same hold.
+    remakeAllowed: () => true,
+    made: (repo, ws) => log.info(`Made jj's control workspace for ${userText(basename(repo))} at ${userText(ws)}: the project folder's working copy recorded once`),
+    lock: storeLock,
+    trash: async (p) => void (await trash(p)),
+    prep: (store) => {
+      const ws = workspaceFor(store)
+      return ws ? boardPrepStore(boardConn(ws)) : null
+    },
+    contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at)
+  })
+  registerWorkspacePort('jj', port)
+  return port
+}
+
+/**
+ * A stale jj slot recovered, the user's explicit action (HI-2866; the window's Recover…, J9c): J2's `recoverStale` under
+ * the pool's operation of the slot, the preserved bytes outside every workspace (the project's worktrees folder's
+ * `.cw-recovery`). A protocol code when refused.
+ */
+export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const pool = await poolFor(ws, projectPath)
+  return pool.recoverStale(name, async (s, fence, journal, quietNow) => {
+    const r = await recoverStale(
+      { port: jjPort(), git: (cwd, args) => git(cwd, args), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
+      { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
+    )
+    return r.ok ? { ok: true } : { ok: false, why: r.why }
+  })
+}
+
+/** Each project's platform as last read (HI-2866): which port its pools make new slots and copies with. */
+const platforms = new Map<string, PlatformId>()
+const platformKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}
+${projectPath.toLowerCase()}`
+async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<void> {
+  const p = (await ws.projectConfig(projectPath).catch(() => null))?.platform
+  if (p === 'jj') jjPort()
+  platforms.set(platformKey(ws, projectPath), p === 'jj' ? 'jj' : 'git')
+}
+/** The port a project's new slots and copies are made with now (Git's unless the project uses jj). */
+export function projectWorkspaces(ws: WorkspaceService, projectPath: string): WorkspacePort {
+  return workspacePortForPlatform(platforms.get(platformKey(ws, projectPath)) ?? 'git')
+}
+/** Reads a project's platform again (before a lending). */
+export const refreshProjectWorkspaces = (ws: WorkspaceService, projectPath: string): Promise<void> => readPlatform(ws, projectPath)
+
 const pools = new Map<string, { life: AbortSignal; pool: Promise<SlotPool> }>()
 const poolKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
+
+/** A project's slot pool in a workspace if one has been made (never makes one): for what only concerns existing slots. */
+export function poolIfMade(ws: WorkspaceService, projectPath: string): Promise<SlotPool> | null {
+  const known = pools.get(poolKey(ws, projectPath))
+  return known && known.life === ws.lifetime && !known.life.aborted ? known.pool : null
+}
 
 /** A project's slot pool in a workspace (made on first use, for the workspace's life). */
 export function poolFor(ws: WorkspaceService, projectPath: string): Promise<SlotPool> {
@@ -271,10 +361,13 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
   if (known && known.life === ws.lifetime && !known.life.aborted) return known.pool
   const pool = (async () => {
     const cfg = await ws.projectConfig(projectPath)
+    await readPlatform(ws, projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const store = new SlotStore(boardConn(ws), cfg.id ?? basename(projectPath))
     const made: SlotPool = new SlotPool({
       store,
+      workspacesFor: () => projectWorkspaces(ws, projectPath),
+      refreshPorts: () => readPlatform(ws, projectPath),
       project: projectPath,
       root,
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),
@@ -323,6 +416,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
     sweepSealsOf(root, { once: true })
     // Writers a Combwork that has gone left, settled where what was kept of their runs allows (HI-1886).
     void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Combwork that has gone in ${userText(projectPath)}`, e))
+    // Slots that owed a settle when Combwork last ran (HI-2906): looked at now.
+    void made.owedPass().catch((e) => log.warn(`looking at the slots that owe a settle in ${userText(projectPath)}`, e))
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -823,7 +918,10 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const l = pool.openLease(s.name)
       const w = s.writer
       const held = !!w && (await writerHeld(w))
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null }
+      // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's.
+      const jj = s.platform === 'jj'
+      const stale = jj && s.state !== 'gone' && s.state !== 'removing' ? (await jjPort().stale(s.folder).catch(() => null)) === true : false
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}) }
     })
   )
 }

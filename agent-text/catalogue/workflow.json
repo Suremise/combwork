@@ -157,9 +157,37 @@
     "note": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces.",
     "audience": "both"
   },
+  "workflow.jj.containment": {
+    "text": "whether a jj card's change is in its target (decided by jj's integration proof, not enabled yet)",
+    "note": "HI-2868: what Combwork couldn't read for a jj project's card: containment in its target is decided by a later card's proof."
+  },
   "workflow.jj.notYet": {
     "text": "a jj project's card work (not enabled yet)",
     "note": "HI-2799: what Combwork couldn't read for a card of a project using jj: its card work isn't enabled yet."
+  },
+  "workflow.jj.start.carryTarget": {
+    "text": "its earlier work is in slot {slot} on {target}",
+    "note": "HI-2868: why a restarted jj card could not start: its earlier work is still in its slot, on another target bookmark. {slot} is the slot name, {target} the bookmark."
+  },
+  "workflow.jj.start.inGit": {
+    "text": "the slot is inside the Git repository at {root}, which git commands in it would reach",
+    "note": "HI-2896: why a jj card could not start: its slot of a jj repository not colocated with Git is inside a Git working tree ({root}, made or moved there after the switch)."
+  },
+  "workflow.jj.start.noSlot": {
+    "text": "no slot for its builder",
+    "note": "HI-2868: why a jj card could not start: its builder was lent no slot."
+  },
+  "workflow.jj.start.notWorkspace": {
+    "text": "the slot is not a jj workspace Combwork made",
+    "note": "HI-2868: why a jj card could not start: its slot folder is not a workspace Combwork made."
+  },
+  "workflow.jj.start.slots": {
+    "text": "jj cards work in slots",
+    "note": "HI-2868: why a jj card could not start: the project does not give cards slots."
+  },
+  "workflow.jj.start.target": {
+    "text": "a jj project needs a target bookmark (Work merges into)",
+    "note": "HI-2868: why a jj card could not start: no target bookmark is set. Work merges into is a name in the window."
   },
   "workflow.move.answer": {
     "text": "Answer",
@@ -904,6 +932,16 @@
   "workflow.refused.platform.changed.next": {
     "text": "Start it again: it is then checked under {platform}’s rules.",
     "note": "HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.jjRefused.message": {
+    "text": "{why, select, mergeWorkingCopy {{card}: the slot's working copy has more than one parent, so its work isn't one line of commits.} notFromBase {{card}: the work in its slot doesn't start from the card's base {base}.} otherCard {{card}: commit {commit} is {other}'s work.} divergent {{card}: commit {commit} is divergent in jj (its change has more than one visible commit).} conflicted {{card}: commit {commit} has unresolved conflicts.} tooLong {{card}: its work has more than {max, number} commits.} unbound {{card}: its slot isn't prepared for this card any more.} isolated {{card}: jj projects have no check copies yet.} other {{card}: jj refused it.}}",
+    "note": "HI-2868: a refused move on a card of a project using jj (Jujutsu): why its work can't be taken as it is. {card} is a card key like AM-12; {commit} and {base} are short commit ids; {other} is another card's key; {max} is a number. 'working copy' and 'divergent' are jj's terms. Translate each sentence.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.jjRefused.next": {
+    "text": "{why, select, mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {Put the card back and start it again.} isolated {Run the check again without --isolated, in the card's slot.} other {Look at the slot with jj, then try again.}}",
+    "note": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit and --isolated are commands: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence.",
     "audience": "both"
   },
   "workflow.refused.platform.switching.message": {

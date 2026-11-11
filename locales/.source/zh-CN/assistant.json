@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.",
+  "assistant.banner.noAccountAny": "No account is on in this workspace, so the Assistant can't start. Add one for any coding agent Combwork supports and sign it in: the Assistant runs on the first one in your order of accounts.",
+  "assistant.banner.noAccountFor": "{others, select, yes {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one, or choose another coding agent's account in the Assistant's settings.} other {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one and sign it in.}}",
+  "assistant.banner.signedOut": "{name}, the Assistant's {cli} account, is signed out, so the Assistant can't start. Sign it in again in Settings → Accounts & Connections.",
   "assistant.chooseConnections.agent": "Agent",
   "assistant.chooseConnections.next": "After",
   "assistant.chooseConnections.now": "Now",

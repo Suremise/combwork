@@ -7,8 +7,10 @@
 
 import type { ConflictsRecord } from './conflicts'
 import type { FocusedChoice, FocusedTest } from './focused'
+import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
+import type { ForwardOverride } from './forwardOrder'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
@@ -33,6 +35,8 @@ export interface FileChange {
   path: string
   /** git's letter (A, M, D, R…), or None's A / M / D against the card's start. */
   status: string
+  /** HI-2864: Git only, either side a submodule (mode 160000): what each side is, a gitlink's commit with it. */
+  gitlink?: { from: GitlinkSide; to: GitlinkSide }
 }
 
 /** None: a card's paths with their content hashes (never contents), §16.3.3. */
@@ -248,9 +252,10 @@ export const DECISION_ANSWERS_MAX = 20
 /**
  * `pushRefused` and `notPublished` (HI-1183, follow mode): the publication was refused (the project's pre-push hook, or the
  * remote: a hook, a protected branch) before anything was written, or the user said an unknown one wasn't published;
- * both transient, the card queued again.
+ * both transient, the card queued again. `direction` (HI-2892): a forward merge against the release path's direction with no
+ * override recorded for its pair, never merged (forwardOrder.ts).
  */
-export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished'
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished' | 'direction'
 
 /**
  * Why the queue returned a card for its focused tests (G20, HI-1367), with `IntegrationFailed.focused`: none chosen for
@@ -397,7 +402,8 @@ export interface FactData {
    * head as asked (each attempt's own frozen commit is its entry's `revision`). Written right after its `Started` (whose
    * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
    */
-  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string }
+  /** HI-2892: `override`, the user's explicit choice of a pair against the release path's direction (forwardOrder.ts). */
+  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string; override?: ForwardOverride }
   /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its

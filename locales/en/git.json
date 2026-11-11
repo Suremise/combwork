@@ -391,6 +391,26 @@
     "defaultMessage": "jj doesn’t support submodules.",
     "description": "Why jj can’t be used with submodules (HI-2799). Keep jj."
   },
+  "git.gitlink.binary": {
+    "defaultMessage": "The file’s side is binary: its content can’t be shown.",
+    "description": "HI-2864: in place of git's lines for a submodule replaced by a binary file (or the reverse): that file isn't text."
+  },
+  "git.gitlink.dirty": {
+    "defaultMessage": "Its folder has uncommitted changes inside.",
+    "description": "HI-2864: after a submodule's row in the Changes tab: the submodule's own folder has changes not committed in it."
+  },
+  "git.gitlink.hideGit": {
+    "defaultMessage": "Hide git’s diff",
+    "description": "HI-2864: the same button once git's own lines are shown: hides them again."
+  },
+  "git.gitlink.showGit": {
+    "defaultMessage": "Show git’s diff",
+    "description": "HI-2864: a button under a submodule's row in the Changes tab: shows the change as git itself writes it (\"Subproject commit …\" lines)."
+  },
+  "git.gitlink.summary": {
+    "defaultMessage": "{change, select, moved {Submodule {path}: {from} → {to}} added {Submodule {path} added at {to}} removed {Submodule {path} removed (was {from})} toFile {Submodule {path} ({from}) replaced by a file} toLink {Submodule {path} ({from}) replaced by a symbolic link} fromFile {A file replaced by submodule {path} ({to})} other {A symbolic link replaced by submodule {path} ({to})}}",
+    "description": "HI-2864: a change to a submodule (a git repository inside the project, kept at one commit) in a diff or a card's list of changed files. {path}: its folder. {from}/{to}: the commit before and after (short ids). {change} picks the kind: moved to another commit, added, removed, replaced by a file or symbolic link, or a file or symbolic link replaced by it. Keep the select keys. Glossary: submodule, commit."
+  },
   "git.head.detachedAt": {
     "defaultMessage": "detached at {commit}",
     "description": "What the project folder has checked out when HEAD is detached. {commit} is a short commit hash. Lower case: also in the status bar (\"detached at abc1234 · rebasing\")."
@@ -855,6 +875,14 @@
     "defaultMessage": "Outcome",
     "description": "A column heading of the Git tab's merge queue history: merged (with the result), returned (with why) or taken out."
   },
+  "git.queue.past": {
+    "defaultMessage": "{n, plural, one {Past branches (# branch)} other {Past branches (# branches)}}",
+    "description": "HI-2893: a folded part of the Version Control tab's Merge queue section: the history of the queues of branches that aren't the project's targets any more (Work merges into, Other branches work can merge into), {n} of them. A click unfolds it."
+  },
+  "git.queue.pastTip": {
+    "defaultMessage": "Branches that work no longer merges into, with nothing in their queue: what their queues merged and returned.",
+    "description": "HI-2893: tooltip of Past branches in the Version Control tab's Merge queue section."
+  },
   "git.queue.reading": {
     "defaultMessage": "Reading the merge queues…",
     "description": "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue."
@@ -999,9 +1027,21 @@
     "defaultMessage": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
     "description": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it."
   },
+  "git.repoLock.jjFolder": {
+    "defaultMessage": "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.",
+    "description": "An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git."
+  },
   "git.repoLock.noGitDir": {
     "defaultMessage": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "description": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message."
+  },
+  "git.repoLock.order": {
+    "defaultMessage": "This repository is busy with another change. Nothing was changed: try again in a moment.",
+    "description": "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other."
+  },
+  "git.repoLock.unknownRepo": {
+    "defaultMessage": "Combwork couldn't read the jj repository at {root} ({why}), so nothing was changed.",
+    "description": "An error (HI-2896): a change needed the lock of a project's repository, and the jj (Jujutsu) repository holding the folder couldn't be read ({why}: a short code, kept in English). Keep jj."
   },
   "git.repoLock.waiting": {
     "defaultMessage": "Another Combwork is merging into this repository ({profile})",
@@ -1078,6 +1118,94 @@
   "git.setup.withoutGit": {
     "defaultMessage": "Without a repository, agents work in the project folder, and Combwork has no worktrees or merging for it.",
     "description": "The Version Control tab of a Git project whose folder isn't a git repository."
+  },
+  "git.signing.cantSign": {
+    "defaultMessage": "Can’t sign: {message}",
+    "description": "The Signing check’s result: signing failed, with the signer’s own words ({message}, in English)."
+  },
+  "git.signing.checkAgain": {
+    "defaultMessage": "Check again",
+    "description": "Button in the Signing section: checks once more whether commits can be signed with nobody there."
+  },
+  "git.signing.checking": {
+    "defaultMessage": "Checking…",
+    "description": "The Signing section while its check runs (a few seconds at most)."
+  },
+  "git.signing.couldNotComplete": {
+    "defaultMessage": "Couldn’t sign unattended: the signer didn’t finish within a few seconds with nobody there (it may be waiting for someone).",
+    "description": "The Signing check’s result: the signer was still running at the check’s time limit; never proof that it asked."
+  },
+  "git.signing.defaultKey": {
+    "defaultMessage": "Not set (git’s default)",
+    "description": "In the Signing table: no signing key is set, so git uses its own default (the committer’s identity for OpenPGP)."
+  },
+  "git.signing.format": {
+    "defaultMessage": "Format",
+    "description": "Row of the Signing table: how commits are signed (gpg.format: OpenPGP, SSH or X.509)."
+  },
+  "git.signing.formatName": {
+    "defaultMessage": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
+    "description": "A signing format’s name in the Signing table. Keep the select keys."
+  },
+  "git.signing.heading": {
+    "defaultMessage": "Signing",
+    "description": "Heading in Version Control → Branches & remotes (HI-1185), under Commit identity: how commits are signed."
+  },
+  "git.signing.howGpg": {
+    "defaultMessage": "To sign unattended with gpg, let gpg-agent keep the passphrase: set default-cache-ttl and max-cache-ttl in gpg-agent.conf, then sign once by hand (a commit of your own) to unlock it for that long.",
+    "description": "How-to under a Signing check that needs someone, for OpenPGP signing. Keep gpg-agent, default-cache-ttl, max-cache-ttl and gpg-agent.conf as they are."
+  },
+  "git.signing.howSsh": {
+    "defaultMessage": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, and point user.signingkey at its .pub file.",
+    "description": "How-to under a Signing check that needs someone, for SSH signing. Keep ssh-add, user.signingkey and .pub as they are; OpenSSH Authentication Agent is the Windows service’s name."
+  },
+  "git.signing.key": {
+    "defaultMessage": "Key",
+    "description": "Row of the Signing table: the signing key (user.signingkey), shortened."
+  },
+  "git.signing.limits": {
+    "defaultMessage": "A check that succeeds says only that this signer signed just now. An agent already running, a smartcard or a hardware key may still ask in its own way.",
+    "description": "A note under the Signing check: what a successful check means, and what Combwork can’t control."
+  },
+  "git.signing.needsSomeone": {
+    "defaultMessage": "Would ask for a passphrase: signing needs someone there now, so the merge queue pauses before each signed merge until you unlock the key.",
+    "description": "The Signing check’s result: the signer needs a passphrase, a PIN or an unlocked agent."
+  },
+  "git.signing.no": {
+    "defaultMessage": "No",
+    "description": "In the Signing table: commits are not signed."
+  },
+  "git.signing.notChecked": {
+    "defaultMessage": "{why, select, program {Not checked: Combwork runs only the signing programs of Git for Windows, GnuPG and Windows’ OpenSSH by itself, not {path}.} keyCommand {Not checked: the key comes from a command (gpg.ssh.defaultKeyCommand), which Combwork doesn’t run by itself.} x509 {Not checked: Combwork can’t check X.509 signing.} other {Not checked: a hardware key asks for a touch, which Combwork can’t check.}} The merge queue’s commits still sign as usual, and pause if signing waits.",
+    "description": "The Signing section when Combwork didn’t run the check: a program it doesn’t run by itself ({path}: its path), a key command, X.509, or a hardware key. Keep the select keys."
+  },
+  "git.signing.off": {
+    "defaultMessage": "Commits aren’t signed.",
+    "description": "The Signing section when git doesn’t sign commits."
+  },
+  "git.signing.program": {
+    "defaultMessage": "Program",
+    "description": "Row of the Signing table: the signing program git runs, as a path."
+  },
+  "git.signing.scope": {
+    "defaultMessage": "{scope, select, system {set for the computer} global {set for you} local {set in this repository} worktree {set in this folder} command {set for this command} other {}}",
+    "description": "After a setting in the Signing table, where git found it (git config scopes). Keep the select keys."
+  },
+  "git.signing.signs": {
+    "defaultMessage": "Signs commits",
+    "description": "Row of the Signing table: whether git signs commits (commit.gpgsign)."
+  },
+  "git.signing.unattended": {
+    "defaultMessage": "Signs without asking: this signer and key signed a test just now with nobody there. The merge queue’s commits sign unattended while that holds.",
+    "description": "The Signing check’s result: signing worked with no prompt (at the moment of the check; a cache can expire)."
+  },
+  "git.signing.unreadable": {
+    "defaultMessage": "Combwork couldn’t read how this repository signs: {message}",
+    "description": "The Signing section when git couldn’t read its settings; {message} is git’s own words."
+  },
+  "git.signing.yes": {
+    "defaultMessage": "Yes",
+    "description": "In the Signing table: commits are signed."
   },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
@@ -1412,16 +1540,16 @@
     "description": "Atop the Version Control tab of a Git project whose .git was removed or moved."
   },
   "git.vc.fact.jj": {
-    "defaultMessage": "This folder is a jj repository at {root}{colocated, select, yes {, colocated with Git} other {}}.",
-    "description": "Atop the Version Control tab (HI-2799): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj. Keep jj and Git."
+    "defaultMessage": "This folder is a jj repository at {root}, {colocated, select, yes {colocated with Git} other {not colocated with Git}}.",
+    "description": "Atop the Version Control tab (HI-2799, HI-2896): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj, not colocated that Git’s data is inside .jj (both are supported). Keep jj and Git."
   },
   "git.vc.fact.jjGone": {
     "defaultMessage": "The jj repository is gone from this folder.",
     "description": "Atop the Version Control tab of a project using jj (Jujutsu, HI-2799) whose .jj folder was removed or moved. Keep jj."
   },
-  "git.vc.fact.jjSeparate": {
-    "defaultMessage": "This folder is a jj repository at {root} with no colocated Git repository: Combwork doesn’t support that yet.",
-    "description": "Atop the Version Control tab (HI-2799): a jj (Jujutsu) repository whose Git data is inside .jj (not colocated), which Combwork can’t use yet. Keep jj and Git."
+  "git.vc.fact.jjInGit": {
+    "defaultMessage": "This folder is a jj repository at {root}, not colocated, inside the Git repository at {git}: Combwork can’t use jj here.",
+    "description": "Atop the Version Control tab (HI-2896): a jj (Jujutsu) repository whose Git data is inside .jj, in a folder that is itself inside a Git working tree ({git}); git commands in it would reach that repository, so jj isn’t offered. Keep jj and Git."
   },
   "git.vc.fact.none": {
     "defaultMessage": "This folder has no version control.",
@@ -1481,7 +1609,7 @@
   },
   "git.vc.offer.jjFound": {
     "defaultMessage": "jj found at {root}: switch to jj?",
-    "description": "An offer atop the Version Control tab (HI-2799): a jj (Jujutsu) repository colocated with Git was found in the project folder. Combwork never switches by itself. Keep jj."
+    "description": "An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj."
   },
   "git.vc.offer.jjGone": {
     "defaultMessage": "The jj repository is gone: switch this project back to {platform}?",
@@ -1599,6 +1727,10 @@
     "defaultMessage": "{n, plural, one {{projects} was added: how do you work?} other {{projects} were added: how do you work?}} A preset sets up a workflow in one click.",
     "description": "A notice for projects Combwork found in the workspace (or the Assistant added) that have no workflow yet: it offers the \"How do you work?\" step (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
   },
+  "git.vc.store.autocrlf": {
+    "defaultMessage": "Git converts line endings here (core.autocrlf). If this repository doesn’t need that, turn it off for it alone: run {command} in it, then Check Again.",
+    "description": "Under Git attributes in the warning before switching to jj (HI-2872), when Git’s line-ending conversion is on. {command} is a git command, kept as it is; core.autocrlf is a Git setting; Check Again is the dialog’s button."
+  },
   "git.vc.store.card": {
     "defaultMessage": "{project}: {card} {title}, in flight",
     "description": "A card started and not done, in the switch’s warning (HI-2799). {card} is its key."
@@ -1671,13 +1803,17 @@
     "defaultMessage": "{project}: slot {slot}, lent to {agent}",
     "description": "In the switch’s warning (HI-2799): a slot (a card’s own folder) still lent to an agent (glossary 2.5: slot)."
   },
+  "git.vc.store.stock": {
+    "defaultMessage": "Git for Windows’ own default settings (its LFS filter, the diff driver for Office documents) don’t count: only what the repository or your own Git settings use.",
+    "description": "Under the gates in the warning before switching to jj (HI-2872): Git for Windows’ stock system settings are ignored. Keep Git for Windows (a product’s name) and LFS."
+  },
   "git.vc.store.toGit": {
     "defaultMessage": "Combwork leaves .jj in place: remove it with jj if you no longer want it.",
     "description": "In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj."
   },
   "git.vc.store.toJj": {
-    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj and .git stay as they are. Cards don’t run in a jj project yet.",
-    "description": "In the warning before switching to jj (HI-2799). Keep jj, .jj and .git."
+    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own, and you integrate the reviewed work yourself: Combwork never moves a bookmark or pushes.",
+    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none; HI-2874: jj cards run). A bookmark is jj’s name for a branch. Keep jj, .jj and .git."
   },
   "git.vc.store.unknown": {
     "defaultMessage": "{gate}: couldn’t be checked ({what}), so it counts as used",
@@ -1739,9 +1875,13 @@
     "defaultMessage": "{n, plural, one {This card in flight finishes under {from}’s rules (old rules):} other {These cards in flight finish under {from}’s rules (old rules):}}",
     "description": "In the warning before switching version control, above the cards already started (glossary: old rules). {from} is None or Git. Unlike other option changes, a switch can’t be applied to them."
   },
-  "git.vc.switch.jjSeparate": {
-    "defaultMessage": "This jj repository has no colocated Git repository, which Combwork doesn’t support yet.",
-    "description": "Why a project can’t be switched to jj (HI-2799): its jj repository keeps Git’s data inside .jj rather than beside it (not colocated). Keep jj and Git."
+  "git.vc.switch.jjInGit": {
+    "defaultMessage": "This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.",
+    "description": "Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git."
+  },
+  "git.vc.switch.jjNoGitCopy": {
+    "defaultMessage": "No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.",
+    "description": "Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is."
   },
   "git.vc.switch.jjTool": {
     "defaultMessage": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.",
@@ -1768,8 +1908,8 @@
     "description": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there."
   },
   "git.vc.switch.noJj": {
-    "defaultMessage": "No jj repository here. Combwork never makes one: create it with jj, colocated with Git.",
-    "description": "Why a project can’t be switched to jj (Jujutsu, HI-2799): its folder has no jj repository. Keep jj and Git."
+    "defaultMessage": "No jj repository here. Combwork never makes one: create it with jj.",
+    "description": "Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj."
   },
   "git.vc.switch.notSwitched": {
     "defaultMessage": "{project} is a Git repository now, but it wasn't switched to Git: {error}",

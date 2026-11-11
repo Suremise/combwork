@@ -83,4 +83,4 @@ function commandText(input) {
   return input
 }
 
-module.exports = { gitMutations, gitMutationsIn }
+module.exports = { gitMutations, gitMutationsIn, commands, gitCall, commandText, SHELL_TOOL }

@@ -16,7 +16,7 @@ import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
 import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
 import type { HookListing } from '../../../shared/hooks'
@@ -707,14 +707,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * A hook's occurrence identity (HI-2777), from Claude Code's own ids as its recorded hooks carry them (2.1.291,
    * 2.1.296): a tool call's tool_use_id (PreToolUse, PostToolUse), a prompt's prompt_id (UserPromptSubmit, one each), and
    * the process's own start (SessionStart with source "startup": one launch is one process). A Stop repeats under its
-   * prompt_id (stop_hook_active), and the others carry none: never matched.
+   * prompt_id (stop_hook_active), and the others carry none: never matched. A prompt_id isn't one prompt's alone
+   * (HI-2850, 2.1.321): a message queued while a turn runs is submitted into it under its prompt_id, and two queued
+   * with the same text have the same body, so it isn't unique (hookTwins: a copy only while the first is answered).
    */
-  hookOccurrence(body: Record<string, any>): string | null {
+  hookOccurrence(body: Record<string, any>): HookOccurrence | null {
     const id = (v: unknown): string | null => (typeof v === 'string' && /^[\w.:-]{1,128}$/.test(v) ? v : null)
     const ev = body.hook_event_name
-    if (ev === 'PreToolUse' || ev === 'PostToolUse') return id(body.tool_use_id) ? `${ev}:${body.tool_use_id}` : null
-    if (ev === 'UserPromptSubmit') return id(body.prompt_id) ? `${ev}:${body.prompt_id}` : null
-    if (ev === 'SessionStart' && body.source === 'startup') return id(body.session_id) ? `${ev}:startup:${body.session_id}` : null
+    if (ev === 'PreToolUse' || ev === 'PostToolUse') return id(body.tool_use_id) ? { key: `${ev}:${body.tool_use_id}`, unique: true } : null
+    if (ev === 'UserPromptSubmit') return id(body.prompt_id) ? { key: `${ev}:${body.prompt_id}`, unique: false } : null
+    if (ev === 'SessionStart' && body.source === 'startup') return id(body.session_id) ? { key: `${ev}:startup:${body.session_id}`, unique: true } : null
     return null
   }
 

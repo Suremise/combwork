@@ -260,7 +260,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'independentlaunch', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'assistantcodex', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'independentlaunch', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
     // The shared tab strip selects every suite driving one, its keyboard and attachment users too (HI-1902).
     for (const f of ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts']) expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['keys', 'cardattach', 'image', 'vcswitch', 'versioncontrol', 'workflowdefaults', 'advanced']))
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
@@ -861,11 +861,12 @@ describe("the installer's suites check the packaged build they test (#274)", () 
     expect(repeatStatus({ repeat: 1, runs: [{ ok: true }], before: 'abc', after: 'abc', buildStale: false, packagedStale: 'x' }).valid).toBe(false)
   })
 
-  it("a run of only the installer's suites doesn't need the dev build in out/, unless packaged-progress checks it", () => {
+  it("a run of only the installer's suites doesn't need the dev build in out/, unless packaged-progress or packaged-sign checks it", () => {
     const pk = suites.filter((s) => (s.needs ?? []).includes('packaged'))
-    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'])
+    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'])
     expect(needsDevBuild(pk, {})).toBe(false)
     expect(needsDevBuild(pk, { CW_PROGRESS_CHECK_DEV: '1' })).toBe(true)
+    expect(needsDevBuild(pk, { CW_SIGN_CHECK_DEV: '1' })).toBe(true)
     expect(needsDevBuild([...pk, suites.find((s) => s.name === 'board')!], {})).toBe(true)
     expect(needsDevBuild([], {})).toBe(true)
   })

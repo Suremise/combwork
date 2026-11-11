@@ -25,6 +25,7 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { forwardDirection, forwardPermitted } from '../../shared/workflow/forwardOrder'
 import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -186,6 +187,11 @@ export interface QueueConfig {
    * a memory one in tests). Left out, follow mode pauses `remoteUnsupported`: nowhere safe to keep one.
    */
   transport?: TransportStore
+  /**
+   * HI-1185: runs a program other than git for the queue, bounded (the signing check's signer): the runner's recorded run
+   * in the app, in its lease's job; left out, a bounded spawn of the platform's own (tests).
+   */
+  spawn?: CandidateHost['spawn']
 }
 
 /**
@@ -1238,6 +1244,9 @@ export class MergeQueue {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
+      // HI-2892: a forward merge against the release path's direction, its request with no override, is never merged: it
+      // comes back with why, whatever let it be queued (one from before, or the default branch changed since).
+      if (s.forward && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
       // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
       const blockers = this.wf.queueWaitingOn(card.id)
       if (blockers.length) return this.waiting(card, entry, blockers)
@@ -1290,8 +1299,10 @@ export class MergeQueue {
           snap = f.snap
         }
         // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read (the
-        // remote's, following it).
-        const found = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, onto)
+        // remote's, following it). A forward merge (HI-2885) only when its source is in the target's history: one whose
+        // files the target already has (main after a release, into the next version) still lands as a merge commit.
+        const there = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, onto)
+        const found = s.forward && !isUnknown(there) && there && there.method !== 'merge' && there.method !== 'fastForward' ? null : there
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
@@ -1481,6 +1492,21 @@ export class MergeQueue {
   }
 
   /** The history port of the card's platform (port 3, HI-2792): the queue's step reads ask it. */
+  /**
+   * HI-2892: whether a forward merge may go, as its direction reads now (the default branch as the card's own port names
+   * it; one it can't name or that is gone counts as none, so it makes no direction) or with its request's override.
+   */
+  private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean> {
+    const f = s.forward
+    if (!f) return true
+    const H = this.history(card, s)
+    const d = await H.defaultTarget(this.project).catch(() => null)
+    const named = d && !isUnknown(d) ? d : null
+    const there = named ? await H.lineHead(this.project, named).catch(() => null) : null
+    const main = named && there && !isUnknown(there) ? named : null
+    return forwardPermitted(forwardDirection(f.from, f.to, main), f.override)
+  }
+
   private history(card: CardRecord, s?: CardState): HistoryPort {
     return historyFor(this.wf.rulesetOf(card, s).options.platform)
   }
@@ -1492,7 +1518,7 @@ export class MergeQueue {
 
   /** What a candidate's step is given of the queue: the repository, its own worktree, its runner and this round's reads. */
   private host(reads: EntryReads): CandidateHost {
-    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads, skipSmudge: async () => !!(await this.cfg.gitFilesOn?.().catch(() => true)) }
+    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), ...(this.cfg.spawn ? { spawn: this.cfg.spawn } : {}), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads, skipSmudge: async () => !!(await this.cfg.gitFilesOn?.().catch(() => true)) }
   }
 
   /**

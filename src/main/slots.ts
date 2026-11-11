@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
@@ -513,7 +513,7 @@ export class SlotStore {
         if (held) return { ok: false as const, refusal: { why: 'inUse' as const, slot: held.slot as string, agent: held.agent as string, card: (held.card as number | null) ?? null, lane: (held.lane as string | null) ?? null } }
         const all = (db.prepare('SELECT * FROM slots WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(slotOfRow)
         // Only a slot of this pool's platform (HI-2795, R2.6): a Git slot finishes under Git, never lent from a jj pool.
-        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name))
+        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && this.freeIn(db, s)
         let slot: Slot | undefined
         let fresh = false
         // Names reserved by renames under way (#1441): never made by a lend, asked for by name or not.
@@ -563,6 +563,22 @@ export class SlotStore {
       if (hit) return { ok: false, refusal: { why: 'noSlot', size: o.size } }
       throw e
     }
+  }
+
+  /**
+   * A slot free for a lease, its platform aside (HI-2886: `take` lends only these, and only these no longer use the target
+   * they recorded): ready, no failed setup, no operation, job or writer, no open lease of any kind, not set aside.
+   */
+  private freeIn(db: DatabaseSync, s: Slot): boolean {
+    return s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name))
+  }
+
+  /**
+   * The slots that use the target they record (HI-2886), on one snapshot: every slot recording one but a free one
+   * (`freeIn`), whose recorded target is only the last its lease served. Inside a board write, that write's own state.
+   */
+  targetsInUse(): { name: string; target: string }[] {
+    return this.conn.read((db) => this.slotsIn(db).flatMap((s) => (s.target && !this.freeIn(db, s) ? [{ name: s.name, target: s.target }] : [])))
   }
 
   private dispatchOf(db: DatabaseSync, agent: string): SlotLease | null {
@@ -889,7 +905,21 @@ export class SlotStore {
           }
         }),
       write: (v) => this.conn.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(v))),
-      clear: () => this.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key))
+      clear: () => this.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)),
+      update: (fn) =>
+        this.conn.write((db) => {
+          const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined
+          let current: unknown = null
+          try {
+            current = r ? (JSON.parse(r.value) as unknown) : null
+          } catch {
+            current = { unreadable: true }
+          }
+          const next = fn(current)
+          if (next === undefined) return false
+          db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(next))
+          return true
+        })
     }
   }
 
@@ -1167,6 +1197,12 @@ export interface PoolDeps {
   store: SlotStore
   /** How its slots' folders are made, inspected, prepared and removed (HI-2786's R4); unset: `slotWorkspaces()`, Git's worktrees. */
   workspaces?: WorkspacePort
+  /**
+   * The port its new slots are made with, by its project's platform now (HI-2866: the app's, so a project switched between
+   * Git and jj lends the new platform's), when `workspaces` isn't set; `refreshPorts` reads the platform again first.
+   */
+  workspacesFor?: () => WorkspacePort
+  refreshPorts?: () => Promise<void>
   /** The project's folder (its repository). */
   project: string
   /** Where its slots go: `<workspace>.worktrees/<project>` (worktreesRoot). */
@@ -1188,6 +1224,8 @@ export interface PoolDeps {
   inFlight?: (card: number) => boolean | Promise<boolean>
   /** Settings → Advanced, Remove idle slots after a day. */
   removeIdle?: () => boolean
+  /** The owed pass's wake (HI-2906): a timer by default; tests give a scheduler they fire themselves. */
+  later?: (fn: () => void, ms: number) => { cancel(): void }
   /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
   ended?: (lease: SlotLease, slot: Slot) => void
   /**
@@ -1370,6 +1408,48 @@ async function combworkSkillFolders(folder: string): Promise<string[]> {
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
+/** The longest pause between two owed passes (HI-2906/s101), as a held lane slot's (HI-2466). */
+const OWED_PASS_MAX_MS = 30_000
+
+/** board_meta: a slot that owes a settle (HI-2906/s101), by its project's id. */
+export const owedKey = (project: string, slot: string): string => `slot_settle_owed:${project}:${slot}`
+
+/** The default scheduler of the owed pass's wake: an unref'd timer. */
+const laterBy = (fn: () => void, ms: number): { cancel(): void } => {
+  const t = setTimeout(fn, ms)
+  t.unref?.()
+  return { cancel: () => clearTimeout(t) }
+}
+
+/** What one settle attempt's fences saw (HI-2906): whether any of them found the folder no longer quiet. */
+interface QuietLatch {
+  lostQuiet: boolean
+  /** What its first refusal saw (for the log), where it was read. */
+  why?: string
+}
+
+/** A fence whose refusals (a false `still`, an unheld `commit`) set the attempt's latch before they are answered. */
+function latched(fence: WorkspaceFence, latch: QuietLatch | undefined): WorkspaceFence {
+  if (!latch) return fence
+  const commit = fence.commit
+  return {
+    still: async () => {
+      const ok = await fence.still()
+      if (!ok) latch.lostQuiet = true
+      return ok
+    },
+    ...(commit
+      ? {
+          commit: async <T>(fn: (db: FenceDb) => T) => {
+            const r = await commit<T>(fn)
+            if (!r.held) latch.lostQuiet = true
+            return r
+          }
+        }
+      : {})
+  }
+}
+
 export class SlotPool {
   private readonly store: SlotStore
   /** The operations this pool runs now, awaited as it closes. */
@@ -1382,7 +1462,7 @@ export class SlotPool {
 
   /** The workspace lifecycle port its slots are made and inspected with (SPEC §16.3.6 Port 2): the deps', else the slots' platform's. */
   private get port(): WorkspacePort {
-    return this.deps.workspaces ?? slotWorkspaces()
+    return this.deps.workspaces ?? this.deps.workspacesFor?.() ?? slotWorkspaces()
   }
 
   /**
@@ -1403,20 +1483,65 @@ export class SlotPool {
    * What's in a slot's folder, read by the holder of its operation (`token`): the port's explicit record where it has
    * one (jj: a snapshot, which only the holder may take, HI-2795), else `dirty` (Git, its git command unchanged).
    */
-  private async dirtyOwned(s: Slot, token: string): Promise<Maybe<string[]>> {
+  private async dirtyOwned(s: Slot, token: string, latch?: QuietLatch): Promise<Maybe<string[]>> {
     const port = this.portOf(s)
     if (!port.record) return port.dirty(s.folder)
     // A record is a write in the folder (HR1, HI-2795 round 1): only once nothing else writes there, proved right before
     // it: the operation still holds the slot with no writer or job on it, no session in it, and no process in it.
-    if (!(await this.quietFor(s, token))) return { unknown: true, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
-    const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
-    return port.record(s.folder, fence, s.identity ?? null)
+    const busy = { unknown: true as const, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
+    const why = await this.notQuiet(s, token)
+    if (why) {
+      if (latch) {
+        latch.lostQuiet = true
+        latch.why ??= why
+      }
+      return busy
+    }
+    const fence: WorkspaceFence = latched({ still: () => this.quietFor(s, token) }, latch)
+    const r = await port.record(s.folder, fence, s.identity ?? null)
+    // The record refused because its fence lost quiet during it (HI-2906): busy, not dirty.
+    return isUnknown(r) && latch?.lostQuiet ? busy : r
+  }
+
+  /**
+   * A jj write's fence for this operation (HI-2866): `still` is quietFor; `commit` runs a final record (the binding's
+   * publication) in the store's own transaction, only while the row there is still this operation's (the token), with
+   * no writer or job, and (for a lease's write) the lease still open: one commit with the record, so an owner cancelled
+   * or replaced while the write waited for the database publishes nothing (HR1's round 2).
+   */
+  private ownedFence(s: Slot, token: string, lease: string | null): WorkspaceFence {
+    return {
+      still: () => this.quietFor(s, token),
+      commit: async <T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }> => {
+        try {
+          return await this.store.fenced(s.name, token, (db, now) => {
+            if (now.writer || now.job) return { held: false as const }
+            if (lease !== null) {
+              const open = db.prepare('SELECT 1 AS one FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL').get(lease, this.store.project)
+              if (!open || now.op?.lease !== lease) return { held: false as const }
+            }
+            return { held: true as const, value: fn(db) }
+          })
+        } catch (e) {
+          if (e instanceof OpLost) return { held: false }
+          throw e
+        }
+      }
+    }
   }
 
   /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
   private async quietFor(s: Slot, token: string): Promise<boolean> {
-    const held = await this.store.fenced(s.name, token, (_db, now) => !now.writer && !now.job).catch(() => false)
-    return held && !this.deps.sessionIn?.(s.folder) && (await quiet(s.folder))
+    return (await this.notQuiet(s, token)) === null
+  }
+
+  /** What keeps a slot from being quiet for this operation (quietFor's answer, for the log): null when it is. English. */
+  private async notQuiet(s: Slot, token: string): Promise<string | null> {
+    const held = await this.store.fenced(s.name, token, (_db, now) => (now.writer ? 'writer' : now.job ? 'job' : null)).catch(() => 'operation lost') // agent-protocol: a log line's detail, never sent to an agent
+    if (held) return held
+    const session = this.deps.sessionIn?.(s.folder)
+    if (session) return `session ${session}` // agent-protocol: a log line's detail, never sent to an agent
+    return (await quiet(s.folder)) ? null : 'the folder is in use' // agent-protocol: a log line's detail, never sent to an agent
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -1520,6 +1645,8 @@ export class SlotPool {
   async lend(req: LeaseRequest, o: { target?: string; install?: boolean } = {}): Promise<LendResult> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane') // agent-protocol: a programming error (its caller's), never an agent's or the user's
     if (this.closed) return { ok: false, refusal: { why: 'noSlot', size: 0 } }
+    // The project's platform read again first (HI-2866): a lending is made with the platform in force now.
+    await this.deps.refreshPorts?.()
     await this.refresh()
     const target = o.target ?? (await this.defaultTarget())
     const holder = await this.deps.holder.self()
@@ -1642,16 +1769,23 @@ export class SlotPool {
    * free and as it was read, so another look of it (this pool's or another Combwork's, a finished card's slot question)
    * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
    */
-  private async settle(name: string): Promise<void> {
+  private async settle(name: string): Promise<boolean> {
     const seen = this.store.slot(name)
-    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return
-    if (seen.state === 'creating' || seen.state === 'removing') return
+    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return false
+    if (seen.state === 'creating' || seen.state === 'removing') return false
     // Set aside by a retarget (HI-2680): stays as it is, whatever its folder now looks like, until it is removed.
-    if (this.store.asideOf(name)) return
+    if (this.store.asideOf(name)) return false
     const token = newToken()
     let s: Slot = seen
     let to: SlotState = seen.state
     let began = false
+    // HI-2906 (design s101): its look or its detach couldn't run while something still left the folder, known from what
+    // this attempt's own fences saw (the latch), never from a later check. The slot then owes a settle: recorded in this
+    // attempt's fenced end write, with its row, and run by the pool's owed pass.
+    let busyDetach = false
+    // What the end write does to the slot's owed record: set (busy), cleared (decided), or left (the look couldn't say).
+    const end: { owed: 'set' | 'clear' | 'keep' } = { owed: 'keep' }
+    const latch: QuietLatch = { lostQuiet: false }
     try {
       // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
       // a pool takes its row, once written, for an abandoned one (HR2's HI-2170 round 1, finding 1).
@@ -1664,27 +1798,180 @@ export class SlotPool {
         began = true
         s = this.store.slot(name) ?? seen
         try {
-          const now = await this.look(s, token)
+          const now = await this.looks(s, token, latch)
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
           // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
           // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
-          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s)))) to = now
+          if (now === 'busy') busyDetach = true
+          else if (now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token, latch))) {
+            // A refusal for good (the work not in the target, the target moved) waits for the next refresh or event; one
+            // while the folder wasn't quiet yet (its builder's session or a process still leaving it: jj's owned move is
+            // fenced by quiet) is asked again soon, as nothing else may say when it has gone (HI-2906).
+            busyDetach = latch.lostQuiet
+            // For the log only (the latch decided): what is in the way now, read after the refusal.
+            if (busyDetach && !latch.why) latch.why = `the detach's fence; now: ${(await this.notQuiet(s, token)) ?? 'quiet'}` // agent-protocol: a log line's detail, never sent to an agent
+          } else if (now !== null) to = now
+          // Busy: owed. Decided (ready, dirty, gone, or a refusal for good, which waits for the next event): not owed. The
+          // listing failed (null): as it was.
+          end.owed = busyDetach ? 'set' : now === null ? 'keep' : 'clear'
         } finally {
-          // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
-          await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
-            if (!(e instanceof OpLost)) throw e
-            // Taken over meanwhile: what it found isn't the slot's, its new holder's look is.
-            to = s.state
-          })
+          // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again), and its
+          // owed record with it, in one transaction: lost meanwhile (taken over), neither is written.
+          let wrote = false
+          await this.store
+            .fenced(name, token, (db) => {
+              this.store.setIn(db, name, to, {}, { op: null })
+              if (end.owed === 'set') db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(owedKey(this.store.project, name), JSON.stringify({ why: latch.why ?? 'busy', since: Date.now() })) // agent-protocol: SQL
+              else if (end.owed === 'clear') db.prepare('DELETE FROM board_meta WHERE key = ?').run(owedKey(this.store.project, name)) // agent-protocol: SQL
+              wrote = true
+            })
+            .catch((e) => {
+              if (!(e instanceof OpLost)) throw e
+              // Taken over meanwhile: what it found isn't the slot's, its new holder's look is.
+              to = s.state
+            })
+          if (!wrote) end.owed = 'keep'
         }
       })
     } finally {
       // After its row's write, only a change: a pass that settles slots asks for itself again, so a slot that stays dirty
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
+      // Owed now: the pool's owed pass is asked for (after its pause), after this settle's fenced end. While a pass runs,
+      // its own end reads the records (with no await since its last settle) and asks, with its pause grown.
+      if (end.owed === 'set') {
+        log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): it owes a settle, looked at again by the pool`)
+        if (!this.owedRunning) this.wakeOwed()
+      }
     }
+    return began
+  }
+
+  /** The owed pass running now (at most one), and whether another was asked for while it ran (HI-2906). */
+  private owedRunning: Promise<void> | null = null
+  private owedAgain = false
+  /** The one pending wake of the owed pass, and how many passes in a row have found a slot still owed (its pause). */
+  private owedWake: { cancel(): void } | null = null
+  private owedTries = 0
+  private owedOwned = false
+
+  /** The slots of this project that owe a settle (HI-2906), by name. */
+  owedSlots(): string[] {
+    const prefix = owedKey(this.store.project, '')
+    return this.store.conn.read((db) => (db.prepare('SELECT key FROM board_meta WHERE substr(key, 1, ?) = ?').all(prefix.length, prefix) as { key: string }[]).map((r) => r.key.slice(prefix.length))) // agent-protocol: SQL
+  }
+
+  /** A slot's owed record (tests, the log): why and since when, or null. */
+  owedOf(name: string): { why: string; since: number } | null {
+    const v = this.store.conn.read((db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(owedKey(this.store.project, name)) as { value: string } | undefined) // agent-protocol: SQL
+    try {
+      return v ? (JSON.parse(v.value) as { why: string; since: number }) : null
+    } catch {
+      return { why: 'unreadable', since: 0 } // agent-protocol: a log detail
+    }
+  }
+
+  /** Whether a wake of the owed pass is pending (tests). */
+  owedWakePending(): boolean {
+    return !!this.owedWake
+  }
+
+  /**
+   * The owed pass asked for after its pause (1 s, doubling with each pass that still finds a slot owed, at most
+   * OWED_PASS_MAX_MS), unless one is pending or the pool is closed. A wake owns nothing: the records stay until a settle
+   * decides them, so a wake cancelled, or a pass that finds a slot taken, loses nothing (HI-2906/s101).
+   */
+  private wakeOwed(): void {
+    if (this.closed || this.owedWake) return
+    if (!this.owedOwned) {
+      // One listener for the pool: its close cancels the pending wake (the running pass is in `running`, awaited).
+      this.owedOwned = true
+      this.life.signal.addEventListener('abort', () => {
+        this.owedWake?.cancel()
+        this.owedWake = null
+      }, { once: true })
+    }
+    const ms = Math.min(OWED_PASS_MAX_MS, 1000 * 2 ** this.owedTries)
+    const later = this.deps.later ?? laterBy
+    this.owedWake = later(() => {
+      this.owedWake = null
+      void this.owedPass().catch((e) => log.warn('looking at slots that owe a settle', e))
+    }, ms)
+  }
+
+  /**
+   * The owed pass (HI-2906/s101): each slot of this project that owes a settle, settled in turn (the ordinary settle, which
+   * re-reads everything under the slot's operation and decides its record in its fenced end). One at a time: asked for
+   * while one runs, it runs again once that ends. Records for slots no longer in the pool go. Afterwards, while any slot
+   * still owes one, the next pass is asked for (its pause growing); none, the pause starts again from 1 s.
+   */
+  owedPass(): Promise<void> {
+    if (this.closed) return Promise.resolve()
+    if (this.owedRunning) {
+      this.owedAgain = true
+      return this.owedRunning
+    }
+    const run = (async () => {
+      do {
+        this.owedAgain = false
+        for (const name of this.owedSlots()) {
+          if (this.closed) return
+          if (!this.store.slot(name)) {
+            // A slot removed since: its record can't keep the pass alive. Its absence proved again in the delete itself, so a
+            // slot of that name made meanwhile (and its fresh record) keeps it (HR1's round 4).
+            await this.store.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ? AND NOT EXISTS (SELECT 1 FROM slots WHERE project = ? AND name = ?)').run(owedKey(this.store.project, name), this.store.project, name)) // agent-protocol: SQL
+            continue
+          }
+          await this.settle(name)
+        }
+      } while (this.owedAgain && !this.closed)
+    })()
+    const tracked = run.finally(() => {
+      this.running.delete(tracked)
+      if (this.owedRunning === tracked) this.owedRunning = null
+      if (this.closed) return
+      // Decided right here, with no await since the pass's last settle: a slot still owed (busy again, or taken by another
+      // settle meanwhile, whose own end asks too) asks for the next pass.
+      if (this.owedSlots().length) {
+        this.owedTries++
+        this.wakeOwed()
+      } else this.owedTries = 0
+    })
+    this.running.add(tracked)
+    this.owedRunning = tracked
+    return tracked
+  }
+
+  /**
+   * A stale jj slot's recovery (HI-2866, J2's `recoverStale`): the user's explicit action, never the pool's clean-up. Run
+   * under a settle-kind operation of the slot (taken only while it is free and as it was read, as a look is), with that
+   * operation's quiescence as its fence and its own journal, so an interrupted recovery resumes on the next try. `run`
+   * is the caller's (the app's: J2's recovery with its dependencies). A slot of another platform, busy, or not stale is
+   * refused with why; a recovered slot rejoins the pool only through its next look and preparation's check.
+   */
+  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>): Promise<{ ok: true } | { ok: false; why: string }> {
+    const seen = this.store.slot(name)
+    if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
+    if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
+    if (seen.op || seen.writer || this.store.openLease(name) || seen.state === 'creating' || seen.state === 'removing') return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    const token = newToken()
+    let out: { ok: true } | { ok: false; why: string } = { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    await this.op(token, async () => {
+      const holder = await this.deps.holder.self()
+      if (this.closed || !(await this.store.beginSettle(name, seen.state, seen.folder, token, holder))) return
+      try {
+        const s = this.store.slot(name) ?? seen
+        const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
+        out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), () => this.quietFor(s, token))
+      } finally {
+        await this.store.fenced(name, token, (db) => this.store.setIn(db, name, seen.state, {}, { op: null })).catch((e) => {
+          if (!(e instanceof OpLost)) throw e
+        })
+      }
+    })
+    return out
   }
 
   /**
@@ -1692,7 +1979,7 @@ export class SlotPool {
    * worktree (a carried lease, #1441) stays on its agent's own line. False when it should be and isn't (unread, or the
    * switch failed); true when it is, or needn't be.
    */
-  private async detach(s: Slot): Promise<boolean> {
+  private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<boolean> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
     const port = this.portOf(s)
@@ -1700,7 +1987,10 @@ export class SlotPool {
     if (isUnknown(h.line)) return false
     if (!h.line) return true
     if (isUnknown(h.target) || !h.target) return false
-    const r = await port.detach(s.folder, h.target)
+    // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
+    // with the folder quiet, the target read again right before it. Git ignores the options.
+    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
+    const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
       return false
@@ -1714,10 +2004,20 @@ export class SlotPool {
    * worktrees (HI-2810, SPEC §16.3.6 R2.1: unknown is never gone, nor ready), so the caller keeps the slot as it is.
    */
   private async look(s: Slot, token: string): Promise<SlotState | null> {
+    const l = await this.looks(s, token)
+    return l === 'busy' ? 'dirty' : l
+  }
+
+  /**
+   * As `look`, but `busy` when its check couldn't run because something still worked in the folder (HI-2906: jj's record
+   * is fenced by quiet), so the settle leaves the slot as it was and looks again soon, never marking it dirty for that.
+   */
+  private async looks(s: Slot, token: string, latch?: QuietLatch): Promise<SlotState | 'busy' | null> {
     const there = await this.present(s)
     if (there === null) return null
     if (!there) return 'gone'
-    const d = await this.dirtyOwned(s, token)
+    const d = await this.dirtyOwned(s, token, latch)
+    if (isUnknown(d) && d.detail === 'busy') return 'busy'
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
@@ -1813,6 +2113,8 @@ export class SlotPool {
       }
       if (s.state === 'lent' || s.state === 'dirty' || s.state === 'gone') await this.settle(s.name)
     }
+    // And the slots that owe a settle (HI-2906): the owed pass, which runs one at a time.
+    if (!this.closed) await this.owedPass()
   }
 
   /**
@@ -2164,7 +2466,7 @@ export class SlotPool {
    * quiet): a reason, and nothing changes. A slot already on the line is prepared (a repeat changes nothing). `retry`:
    * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
    */
-  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
+  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
     const lease = this.store.lease(leaseId)
     if (!lease || lease.to) return { error: sayStored(T.leaseEnded) }
     const name = lease.slot
@@ -2183,7 +2485,8 @@ export class SlotPool {
         }
         const there = on === p.line
         if (!there) {
-          const d = await this.port.dirty(slot.folder)
+          // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
+          const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {
             await end()
             return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
@@ -2221,7 +2524,10 @@ export class SlotPool {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last()
             if (notYet) return { notYet }
-            return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn })
+            // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
+            // the lease and the card's target. Git ignores them.
+            const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
+            return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn, ...owned })
           }
           const r = await (p.around ? p.around(sw) : sw())
           if ('notYet' in r) {
@@ -2548,9 +2854,12 @@ export class SlotPool {
     const t = await port.lineHead(this.deps.project, target)
     if (isUnknown(t) || !t) return { why: 'cantCheck', detail: sayStored(T.noBranch, { target }) }
     if (t === head) return null
-    const base = await lineHistory().mergeBase(this.deps.project, t, head)
+    // A jj slot's commits are its store's (HI-2866): §16.3.2's test asked of that Git store (a non-colocated project folder
+    // has no Git of its own); a Git slot's of the project, as before.
+    const repo = port.platform === 'jj' && s.identity?.store ? s.identity.store : this.deps.project
+    const base = await lineHistory().mergeBase(repo, t, head)
     if (isUnknown(base) || !base) return { why: 'cantCheck', detail: sayStored(T.noBase, { target }) }
-    const c = await lineHistory().contains(this.deps.project, target, { base, revision: head }, t)
+    const c = await lineHistory().contains(repo, target, { base, revision: head }, t)
     if (isUnknown(c)) return { why: 'cantCheck', detail: c.what }
     return c ? null : { why: 'unmerged', target }
   }

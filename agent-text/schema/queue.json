@@ -56,6 +56,11 @@
       "target": "plain"
     }
   },
+  "queue.failure.direction": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "queue.failure.focused.newProof": {
     "placeholders": {
       "tests": "plain"
@@ -199,6 +204,9 @@
       "target": "plain"
     }
   },
+  "queue.next.direction": {
+    "placeholders": {}
+  },
   "queue.next.fix": {
     "placeholders": {}
   },
@@ -263,6 +271,22 @@
     "placeholders": {}
   },
   "queue.returned.subjectIt": {
+    "placeholders": {}
+  },
+  "queue.signing.exited": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "queue.signing.noSshKey": {
+    "placeholders": {}
+  },
+  "queue.signing.notFound": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "queue.signing.unfinished": {
     "placeholders": {}
   },
   "queue.wake.left.decision": {

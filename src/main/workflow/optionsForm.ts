@@ -37,7 +37,7 @@ import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
-import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
+import { refuseRemovedTargets, retargetPreview, slotUses } from './retarget'
 import { newlyMissing, projectTargets, refuseMissingTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
@@ -401,10 +401,11 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
         o.check?.()
         return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
       })
-    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
-    // the board's write (serial with every writer of those), the file written in it.
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything uses it, checked in
+    // the board's write (serial with every writer of those, slot leases and operations too), the file written in it. The
+    // pool opened before the locks, its slots read in the write (HI-2886).
     if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
-      const slots = await slotTargets(ws, project.path)
+      const slots = await slotUses(ws, project.path)
       await withLanesLock(ws, () =>
         boardWrite(ws, async () => {
           await refuseRemovedTargets(ws, project.path, was.otherTargets ?? [], will.otherTargets ?? [], will.target || null, slots)

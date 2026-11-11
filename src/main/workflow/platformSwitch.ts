@@ -95,6 +95,14 @@ export async function setPlatform(ws: WorkspaceService, projectPath: string, raw
   // Git ↔ jj (HI-2799): the repository's switch, its own locks and fence (storeSwitch.ts); refused when what the window
   // showed isn't the platform in force, or the group it showed isn't the group now.
   if (storeWide(current, to, now.detected)) {
+    // What the folder shows refuses first (HI-2896: no Git working copy to go back to, a jj repository inside a Git
+    // working tree), before the group's token is compared: the warning showed that refusal, not a group.
+    const refused = switchRefused(to, now.detected)
+    if (refused) {
+      const t = switchRefusalText(refused)
+      // agent-text: switchRefusalText
+      throw new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
+    }
     const expected = o.expected === undefined || o.expected === null ? current : platformArg(o.expected)
     return storeSwitch(ws, project.path, expected, to, { token: o.token, ...(o.guard ? { guard: o.guard } : {}) })
   }

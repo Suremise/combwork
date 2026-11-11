@@ -51,12 +51,12 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     }
   }, jj: runner }
 
-  /** A colocated repository: base, then main's commit, a bookmark main on it, and @ an empty child. */
-  async function repo(name: string) {
+  /** A colocated repository (or not, HI-2896): base, then main's commit, a bookmark main on it, and @ an empty child. */
+  async function repo(name: string, colocated = true) {
     const parent = tempDir(`jjv-${name}-`)
     const root = join(parent, 'repo')
     mkdirSync(root)
-    jj(root, 'git', 'init', '--colocate')
+    jj(root, 'git', 'init', colocated ? '--colocate' : '--no-colocate')
     writeFileSync(join(root, 'base.txt'), 'base\n')
     jj(root, 'commit', '-m', 'base')
     writeFileSync(join(root, 'a.txt'), 'one\n')
@@ -248,5 +248,43 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     // Unreadable is "uses it": git itself failing.
     const broken = await assessJj(r.root, r.ctx.store, { ...gitDeps, git: async () => ({ ok: false, out: '', err: 'boom' }) })
     expect(broken.attributes).toMatchObject({ unknown: expect.stringContaining('boom') })
+  })
+
+  it('not colocated (HI-2896): the views read through jj’s store; no bookmark is marked as differing from Git, exported or not', async () => {
+    const r = await repo('sep', false)
+    expect(r.ctx.colocated).toBe(false)
+    const v = await noWrite(r, () => jjRepoView(r.root, runner))
+    if (isJjViewUnknown(v)) throw new Error(JSON.stringify(v))
+    expect(v).toMatchObject({ colocated: false, heads: 1 })
+    const main = (): Promise<unknown> => jjBookmarks(r.root, runner).then((b) => (isJjViewUnknown(b) ? b : b.rows.find((x) => x.name === 'main' && x.remote === null)))
+    expect(await noWrite(r, main)).toMatchObject({ commit: r.id('main') })
+    expect(((await main()) as { gitDiffers?: true }).gitDiffers).toBeUndefined()
+    // One manual export, then main moved: T@git is behind, which nobody sees without a Git working copy.
+    jj(r.root, 'git', 'export')
+    jj(r.root, 'bookmark', 'set', 'main', '-r', 'main-', '--allow-backwards')
+    expect(((await main()) as { gitDiffers?: true }).gitDiffers).toBeUndefined()
+    const h = await noWrite(r, () => jjHistory(r.root, runner))
+    expect(!isJjViewUnknown(h) && h.rows.some((x) => x.bookmarks.includes('main'))).toBe(true)
+  })
+
+  it('not colocated (HI-2896): the assessment asks the store, never the folder (no .git there), and reads jj’s tracked files and the root’s own on disk', async () => {
+    const r = await repo('sepcompat', false)
+    const sep = { separate: { jjRepo: r.ctx.jjRepo } }
+    expect(await assessJj(r.root, r.ctx.store, gitDeps, sep)).toEqual({ attributes: { clear: true }, lfs: { clear: true }, submodules: { clear: true }, hooks: { clear: true }, signing: { clear: true } })
+    mkdirSync(join(r.root, 'deep'))
+    writeFileSync(join(r.root, 'deep', '.gitattributes'), '*.bin filter=lfs diff=lfs merge=lfs -text\n')
+    jj(r.root, 'commit', '-m', 'deep attributes')
+    writeFileSync(join(r.ctx.store, 'hooks', 'pre-commit'), '#!/bin/sh\nexit 0\n')
+    git(r.ctx.store, '--git-dir', r.ctx.store, 'config', 'commit.gpgSign', 'true')
+    // The root's own .gitattributes, not recorded by jj yet (no jj command since): read from disk.
+    writeFileSync(join(r.root, '.gitattributes'), '*.txt text eol=lf\n')
+    const used = await assessJj(r.root, r.ctx.store, gitDeps, sep)
+    expect(used.lfs).toMatchObject({ uses: expect.arrayContaining([expect.stringContaining('filter=lfs')]) })
+    expect(used.attributes).toMatchObject({ uses: expect.arrayContaining([expect.stringContaining('eol=lf')]) })
+    expect(used.hooks).toMatchObject({ uses: [expect.stringContaining('pre-commit')] })
+    expect(used.signing).toMatchObject({ uses: ['commit.gpgsign (local)'] })
+    // Without `separate` git would be asked in a folder with no .git: unknown, never clear.
+    const asFolder = await assessJj(r.root, r.ctx.store, gitDeps)
+    expect(asFolder.submodules).toMatchObject({ unknown: expect.any(String) })
   })
 })

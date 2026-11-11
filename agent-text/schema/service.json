@@ -284,6 +284,22 @@
       "file": "plain"
     }
   },
+  "service.forward.direction": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "why": "select",
+      "dir": "select"
+    }
+  },
+  "service.forward.directionRetry": {
+    "placeholders": {
+      "card": "plain",
+      "why": "select",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "service.forward.missing": {
     "placeholders": {
       "unknown": "select",
@@ -300,7 +316,15 @@
     "placeholders": {
       "from": "plain",
       "to": "plain",
-      "targets": "plain"
+      "targets": "plain",
+      "sources": "plain"
+    }
+  },
+  "service.forward.openNoOverride": {
+    "placeholders": {
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
     }
   },
   "service.forward.raced": {
@@ -330,6 +354,11 @@
     "placeholders": {
       "command": "plain",
       "why": "plain"
+    }
+  },
+  "service.git.gitlinkUnread": {
+    "placeholders": {
+      "path": "plain"
     }
   },
   "service.git.outside": {
@@ -679,6 +708,85 @@
     }
   },
   "service.keys.unknownProject": {
+    "placeholders": {}
+  },
+  "service.laneEdit.already": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.cardChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.changed": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.dependency": {
+    "placeholders": {
+      "card": "plain",
+      "dep": "plain"
+    }
+  },
+  "service.laneEdit.done": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.ended": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.fixedPlace": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.invalid": {
+    "placeholders": {}
+  },
+  "service.laneEdit.keptWork": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.noQueued": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.notOnLane": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.notQueued": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.notTodo": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.onLane": {
+    "placeholders": {
+      "card": "plain",
+      "builder": "plain"
+    }
+  },
+  "service.laneEdit.otherProject": {
+    "placeholders": {
+      "card": "plain",
+      "project": "plain"
+    }
+  },
+  "service.laneEdit.since": {
     "placeholders": {}
   },
   "service.laneStart.busy": {

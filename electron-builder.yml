@@ -19,10 +19,14 @@ extraResources:
   # What the build is (#1647, scripts/appIdentity.mjs): local or a release, its version and commit.
   - from: out/identity/build-identity.json
     to: build-identity.json
+  # The signer launcher agents' sessions get (HI-2867), compiled at build from resources/cw-sign/cw-sign.cs.
+  - from: out/bin
+    to: bin
 asarUnpack:
   - '**/node_modules/@lydell/node-pty*/**'
   - out/main/cw-mcp.js
   - out/main/cw-progress.js
+  - out/main/cw-sign.js
   - out/main/cw-close-runner.js
   # Code cw-mcp.js (or cw-progress.js) shares with the main process (e.g. shared/combworkGuidance.ts) is split into chunks,
   # which the CLIs load from outside the asar too.

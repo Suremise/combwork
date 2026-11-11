@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { SigningInfo } from './gitSigning'
 import type { BranchStart, ResolvedStart, StartPoints } from './nextVersion'
 import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
@@ -101,6 +102,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneEdit,
+  LaneEditResult,
   LaneStartRequest,
   LaneStartInfo,
   LaneStartResult,
@@ -173,7 +176,7 @@ import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
-import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjView } from './jjViews'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjLeftover, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjToCheckRow, JjView, JjWaitingCard } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -456,6 +459,8 @@ export interface CombworkRequests {
   'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
+  /** A stale jj slot recovered (HI-2866): the user's explicit action; a protocol code when refused. */
+  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
   /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */
@@ -942,6 +947,14 @@ export interface CombworkRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * The user edits a running lane's list (HI-2898, Progress → Lanes): moves, adds or removes a queued card, cancels its
+   * queued change, moves a card here from another lane, or undoes such an edit. Applied or queued as `cw_lane start` is;
+   * refused, with nothing changed, once the lane's list moved on from the revision the edit names.
+   */
+  'lanes:edit': (edit: LaneEdit) => LaneEditResult
+  /** The window's workspace's lanes that ended at or after `since` (an ISO time, HI-2898: today's, from local midnight). */
+  'lanes:endedSince': (since: string) => LaneInfo[]
   /** The user retries a lane's new conversations no more tried (HI-2034: an agent busy as the lane started): how many. */
   'lanes:retryFresh': (laneId: string) => number
   /** Test copies only (HI-2034): a lane agent owed its new conversation, as a busy start leaves it, `minutesAgo` since. */
@@ -1095,7 +1108,17 @@ export interface CombworkRequests {
   'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
   /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
   'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
+  /** HI-2869: the passed jj cards with their last containment observation for exactly their approval. */
+  'jj:waiting': (projectPath: string) => JjWaitingCard[]
+  /** HI-2869: a page of the publish records to check (J9b2's checkThis), after a cursor. */
+  'jj:toCheck': (projectPath: string, after?: { target: string; checkAt: number; card: string; cycle: number; bundle: string } | null) => { rows: JjToCheckRow[]; more: boolean }
+  /** HI-2869: Mark as checked, the user's acknowledgement (false: the record changed meanwhile). */
+  'jj:markChecked': (projectPath: string, row: { target: string; card: string; cycle: number; bundle: string; checkAt: number }) => boolean
+  /** HI-2869: what an interrupted or lost set-up left (after a prune of the ones proved gone). */
+  'jj:leftovers': (projectPath: string) => { rows: JjLeftover[]; total: number }
   'git:info': (projectPath: string) => GitRepoInfo
+  /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
+  'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops

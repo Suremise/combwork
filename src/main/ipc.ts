@@ -50,7 +50,8 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, listLanes, stampLaneProjects } from './lanes'
+import { endLane, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
@@ -139,16 +140,17 @@ import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
-import { poolFor, slotTest, slotViews } from './slotsApp'
+import { poolFor, recoverStaleSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
+import { jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
 import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
@@ -1051,7 +1053,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
-    'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
+    // Never asked of Git in a non-colocated jj project (HI-2896): git there finds no repository, or one above it.
+    'slots:gitFiles': async (p) => {
+      const at = workspace.assertProject(p)
+      return (await gitCantRead(at)) ? null : ((await slotWorkspaces().files?.status(at)) ?? null)
+    },
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
     'github:set': async (p, change) => {
@@ -1065,6 +1071,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return slotLevelForm(workspace, level)
     },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
+    // A stale jj slot recovered, the user's explicit action (HI-2866).
+    'slots:recoverStale': (p, slot) => recoverStaleSlot(workspace, workspace.assertProject(p), String(slot)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
@@ -1593,6 +1601,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
     },
+    // The user's edit of a running lane's list (HI-2898): every field checked here, then by laneEdits as it saves.
+    'lanes:edit': (edit) => editLanes(currentWorkspace(), laneEditOf(edit)),
+    'lanes:endedSince': (since) => (workspace.path ? lanesEndedSince(currentWorkspace(), endedSinceOf(since)) : []),
     'lanes:retryFresh': (id) => {
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return retryFreshStart(currentWorkspace(), id)
@@ -1799,9 +1810,16 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
     'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
     'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
+    'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
     // The Operations section (HI-2800): read only; the preview's command is the user's to run.
     'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
     'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),
+    // The window for jj cards (HI-2869): reads, the user's acknowledgement, and what a set-up left.
+    'jj:waiting': (p) => jjWaiting(workspace, workspace.assertProject(p)),
+    'jj:toCheck': (p, after) => jjToCheck(workspace, workspace.assertProject(p), after ?? null),
+    'jj:markChecked': (p, row) => jjMarkChecked(workspace, workspace.assertProject(p), row),
+    'jj:leftovers': (p) => jjLeftovers(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

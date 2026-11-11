@@ -145,7 +145,7 @@ export const API = {
     nextVersion: agentMsg({ id: 'api.change.nextVersion', text: 'start the next version of {project}', note: 'HI-2807: cw_branch nextVersion.' }),
     retargetAny: agentMsg({ id: 'api.change.retargetAny', text: "move cards and slots to a project's new target" }),
     retarget: agentMsg({ id: 'api.change.retarget', text: 'move cards and slots from {from} to {to} in {project}' }),
-    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
+    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}', note: 'HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice).' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
     planTemplate: agentMsg({ id: 'api.change.planTemplate', text: 'plan loading a template' }),
@@ -177,6 +177,7 @@ export const API = {
     isolatedNeedsCheck: agentMsg({ id: 'api.check.isolatedNeedsCheck', text: '--isolated runs a check in a copy of its own: use it with --check <name>' }),
     leaseArgs: agentMsg({ id: 'api.check.leaseArgs', text: 'lease, pid, after and before are required' }),
     noVcs: agentMsg({ id: 'api.check.noVcs', text: 'This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card\'s files' }),
+    noCopies: agentMsg({ id: 'api.check.noCopies', text: "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot", note: 'HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0).' }),
     onlyIsolated: agentMsg({ id: 'api.check.onlyIsolated', text: 'Only an agent\'s isolated check puts its launcher in a check copy\'s job' }),
     waiting: agentMsg({ id: 'api.check.waiting', text: 'waiting for {what}' })
   },
@@ -253,7 +254,7 @@ export const API = {
     nextVersionStarted: agentMsg({ id: 'api.done.nextVersionStarted', text: 'Started {name} from {from} ({commit}) in {project}: {added, select, yes {{from} added to the other branches work can merge into, } other {}}work merges into {name} now', note: 'HI-2807: Start the next version. {commit} is a short hash.' }),
     retargeted: agentMsg({ id: 'api.done.retargeted', text: 'Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why' }),
     forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: '{to} has everything of {from} already: nothing queued' }),
-    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}" }),
+    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{card} is bringing {to} up to date with {from} already}}", note: 'HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card.' }),
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
@@ -391,7 +392,7 @@ export const API = {
     stopBeforeDeactivating: agentMsg({ id: 'api.project.stopBeforeDeactivating', text: 'Stop the running session before deactivating the project' }),
     vcsGit: agentMsg({ id: 'api.project.vcsGit', text: 'git at {root}{subfolder, select, yes { (a subfolder of that repository)} other {}}', note: 'The version control found in a project folder.' }),
     vcsUnsupported: agentMsg({ id: 'api.project.vcsUnsupported', text: '{name} (not supported: None)' }),
-    vcsJj: agentMsg({ id: 'api.project.vcsJj', text: 'jj at {root}{colocated, select, yes { (colocated with git)} other { (no colocated git: not supported)}}', note: 'HI-2799: a jj repository found in a project folder.' })
+    vcsJj: agentMsg({ id: 'api.project.vcsJj', text: 'jj at {root}{colocated, select, yes { (colocated with git)} other { (not colocated: no git working copy)}}', note: 'HI-2799: a jj repository found in a project folder.' })
   },
   provider: {
     notInstalled: agentMsg({ id: 'api.provider.notInstalled', text: 'not installed' })
@@ -403,7 +404,8 @@ export const API = {
     retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
     retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
     branchArgs: agentMsg({ id: 'api.queue.branchArgs', text: 'name and from are required: the new branch and where it starts (a branch, a tag or a commit)', note: 'HI-2807: cw_branch create without them.' }),
-    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets" }),
+    overrideArg: agentMsg({ id: 'api.queue.overrideArg', text: 'override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction', note: 'HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true.' }),
+    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },
   settings: {

@@ -10,6 +10,7 @@ import { gitProblem } from './gitTool'
 import { workTargetOf } from './gitRepo'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
+import { isJjLineKey } from './platform/workspacePorts'
 
 const log = createLogger('branches')
 
@@ -83,6 +84,9 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
  */
 export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
   const { project, worktree } = found
+  // A jj card's line is a slot's locator (HI-2866), never a Git branch: nothing for git to check (HI-2896: in a
+  // non-colocated jj project git there finds no repository at all, every check a warning).
+  if (isJjLineKey(worktree.branch)) return null
   // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
   // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
   if ((await G.lineHead(project.path, worktree.branch)) === null) return null

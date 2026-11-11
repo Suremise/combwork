@@ -16,6 +16,7 @@
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import type { QueueFileSide, QueueStuck } from '../../shared/workflow/queue'
 import type { Maybe } from './types'
+import type { SigningStatus } from '../../shared/gitSigning'
 
 /** How the queue runs a command that may run the repository's hooks or sign (#1350): its environment and bound. */
 export interface QueueGitOptions {
@@ -82,11 +83,16 @@ export interface CandidateHost {
   project: string
   folder: string
   run: QueueRun
+  /**
+   * HI-1185: a program other than git run to its end within a bound, its tree ended there (the signing check's signer),
+   * in the queue's run (its lease's job). Left out, a bounded spawn of its own (tests).
+   */
+  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number }) => Promise<QueueGitResult>
   /** The longest a signed commit runs (Advanced `cw.queue.signSeconds`). */
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
-  reads: { signs?: Promise<boolean | Again> }
+  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus> }
   /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
   skipSmudge?: () => Promise<boolean>
 }

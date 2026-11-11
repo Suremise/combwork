@@ -28,6 +28,7 @@ import { call, errorMessage } from '../api'
 import { offered } from '../repoOps'
 import { DocEditor } from '../components/DocEditor'
 import { DiffView } from '../components/Editors'
+import { GitlinkDiff } from '../components/GitlinkDiff'
 import { COMPARE_ROOT, CompareGroup, ComparePage, compareRoot, parseCompareRoot, useCompareLines } from '../components/ChangesCompare'
 import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '../components/ChangesLeftovers'
 import { useGitRead } from './GitTab'
@@ -1296,7 +1297,9 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
               </div>
             )}
             <div className="editor-host">
-              {diff.binary ? (
+              {diff.gitlink ? (
+                <GitlinkDiff diff={diff} change={diff.gitlink} inline={inline} />
+              ) : diff.binary ? (
                 <div className="empty-state">{diff.modified || tr(C.binary)}</div>
               ) : (
                 <DiffView original={diff.original} modified={diff.modified} language={languageFor(diff.path)} inline={inline} />

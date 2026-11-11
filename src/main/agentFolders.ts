@@ -12,7 +12,7 @@ import { basename } from 'path'
 import { boardRead, boardWrite, boardWriteOp } from './boardStore'
 import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { isUnknown } from './platform/types'
 import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperObservation, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setCombworkIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { combworkError } from './combworkError'
@@ -265,6 +265,8 @@ export class ClaimRefused extends Error {
 /** What the user's Resume taking a free slot compares in its write: the folder's head now, clean (null: dirty or unknown). */
 async function headNow(folder: string): Promise<string | null> {
   if (!existsSync(folder)) return null
+  // A non-colocated jj slot (HI-2896): never asked of Git (none there, or one above it): unknown, so not taken.
+  if (await gitCantRead(folder)) return null
   const [head, dirty] = await Promise.all([slotWorkspaces().head(folder), slotWorkspaces().dirty(folder)])
   return isUnknown(head) || isUnknown(dirty) || dirty.length ? null : head
 }

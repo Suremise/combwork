@@ -21,7 +21,7 @@ import { agentMsg, say, sayWithId, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { sessions } from './sessions'
-import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
+import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf, projectWorkspaces, refreshProjectWorkspaces } from './slotsApp'
 import { slotLevelsOf, slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { COPY_TEXT, CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
@@ -53,8 +53,12 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
     const cfg = await ws.projectConfig(projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const workspacePath = ws.path ?? ''
+    await refreshProjectWorkspaces(ws, projectPath)
     const made = new CopyPool({
       store: new CopyStore(boardConn(ws), cfg.id ?? basename(projectPath)),
+      // Its project's platform's copies (HI-2866: jj's for a jj project), read again before each lending.
+      workspacesFor: () => projectWorkspaces(ws, projectPath),
+      refreshPorts: () => refreshProjectWorkspaces(ws, projectPath),
       project: projectPath,
       dir: copiesDirOf(ws.worktreesRoot, projectPath),
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),

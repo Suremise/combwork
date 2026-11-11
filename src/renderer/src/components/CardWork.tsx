@@ -15,6 +15,7 @@ import { agentFolder, awayFromProject } from '../agentPlace'
 import { cx, timeAgo } from '../util'
 import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { CardRoundCostTable } from './CardCost'
+import { GitlinkRow } from './GitlinkDiff'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -34,6 +35,9 @@ const M = {
   base: msg({ id: 'board.work.base', defaultMessage: 'Base', description: "A label in the card dialog's Work section: the revision the card's work started from follows (a short commit id, a3f2c1d)." }),
   folder: msg({ id: 'board.work.folder', defaultMessage: 'Folder', description: "A label in the card dialog's Work section: the folder the card's work is done in follows (the project folder, or its own folder)." }),
   projectFolder: msg({ id: 'board.work.projectFolder', defaultMessage: 'The project folder', description: "The card dialog's Work section, after Folder: the card's work is done in the project's own folder (not a folder of its own)." }),
+  workspace: msg({ id: 'board.work.workspace', defaultMessage: 'Workspace', description: "A label in the card dialog's Work section (HI-2869): the jj workspace (a slot) a jj card's work is in follows. “workspace” is jj's term." }),
+  change: msg({ id: 'board.work.change', defaultMessage: '{commits, plural, one {change {change}} other {change {change}, # commits}}', description: "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term." }),
+  via: msg({ id: 'board.work.via', defaultMessage: '{via, select, ancestry {(found in its history)} replay {(its change found applied again)} sameTree {(the target already had it)} candidate {(from a prepared candidate)} other {}}', description: "After how a jj card went into its target, in the card dialog's Work section (HI-2869): how jj proved it was there. Keep the select keys; other stays empty." }),
   target: msg({ id: 'board.work.target', defaultMessage: 'Target', description: "A label in the card dialog's Work section: where the card's work goes once approved follows (the target branch, main). Glossary: target branch." }),
   revisions: msg({ id: 'board.work.revisions', defaultMessage: 'Revisions, newest first', description: "A heading in the card dialog's Work section, above the revisions the builder submitted for review. Glossary: revision." }),
   round: msg({ id: 'board.work.round', defaultMessage: 'Round {round, number}', description: "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)." }),
@@ -159,7 +163,9 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
   const rows: [string, React.ReactNode][] = []
   // A field that couldn't be read when the work started says so, with why (never shown as none).
   const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, unread(field, v))}</span>
-  if (v.line) rows.push([tr(M.branch), <code key="line">{v.line}</code>])
+  // A jj card (HI-2869): its slot workspace in its line's place (the line is a key, never shown).
+  if (v.workspace) rows.push([tr(M.workspace), <code key="line">{v.workspace}</code>])
+  else if (v.line) rows.push([tr(M.branch), <code key="line">{v.line}</code>])
   else if (v.unknown.line) rows.push([tr(M.branch), notRead('line')])
   if (v.base) rows.push([tr(M.base), <RevisionCode key="base" id={v.base} short={short} />])
   else if (v.unknown.base) rows.push([tr(M.base), notRead('base')])
@@ -194,6 +200,7 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
         <div className="card-work-merged">
           <Icon name="git-merge" /> {tr(M.integrated, { method: v.integration.method, target: v.integration.target, result: short(v.integration.result) })}
           {v.integration.by === 'outside' && <> {tr(M.outsideCombwork)}</>}
+          {v.integration.via && <span className="faint"> {tr(M.via, { via: v.integration.via })}</span>}
         </div>
       )}
       {v.accepted && (
@@ -250,6 +257,12 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
       <div className="card-work-rev-head">
         {/* Its parts with middle dots between them; the time relative, the date and time in full on hover, as elsewhere. */}
         {r.revision ? <RevisionCode id={r.revision} short={short} /> : !r.unknown.revision && <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
+        {r.change && (
+          <span className="faint mono" title={r.change} data-change={r.change}>
+            {' '}
+            {tr(M.change, { change: r.change.slice(0, 12), commits: r.chain ?? 1 })}
+          </span>
+        )}
         <span className="faint card-work-dot">{tr(M.round, { round: r.round })}</span>
         {r.by && <span className="faint card-work-dot">{agentName(r.by)}</span>}
         <span className="faint card-work-dot" title={formatDateTime(r.at)}>
@@ -274,8 +287,10 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
               <span className="card-work-file-status">{f.status}</span>
               {openable ? (
                 <button type="button" className="link" title={tr(M.openFile, { path: f.path })} onClick={() => open(f.path)}>
-                  {f.path}
+                  {f.gitlink ? <GitlinkRow path={f.path} change={f.gitlink} className="gitlink-file" /> : f.path}
                 </button>
+              ) : f.gitlink ? (
+                <GitlinkRow path={f.path} change={f.gitlink} className="gitlink-file" />
               ) : (
                 <span>{f.path}</span>
               )}

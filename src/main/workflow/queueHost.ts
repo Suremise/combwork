@@ -334,6 +334,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     },
     holds: () => runner.holds(),
     git: (cwd, args, opts) => runner.git(cwd, args, 'testMerge', opts),
+    // HI-1185: the signing check's signer, in the lease's job as the test merge's commands are.
+    spawn: (file, args, o) => runner.run('testMerge', file, args, { cwd: o.cwd, env: o.env, timeoutMs: o.timeoutMs, ...(o.input !== undefined ? { input: o.input } : {}) }),
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),

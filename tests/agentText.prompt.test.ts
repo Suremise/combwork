@@ -134,7 +134,7 @@ function briefs(): { name: string; text: string }[] {
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
   out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as const)
-    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
+    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates'] as const)
       for (const okBefore of [{ mode: 'every' }, { mode: 'labels', labels: ['ui'] }])
         out.push({ name: `rules ${review} ${finish} ${okBefore.mode}`, text: laneRules({ review, finish, preChecks: ['lint'], okBefore, target: 'main' } as never).join('\n') })
   out.push({ name: 'rules off', text: laneRules(null).join('\n') })

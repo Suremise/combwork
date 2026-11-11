@@ -136,7 +136,7 @@ import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
-import { carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
+import { answering, carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
 import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
 import { launchHookTimeouts } from './providers/claude/adapter'
 import { unusedWorktreeCounts } from './unusedWorktrees'
@@ -335,7 +335,9 @@ async function serveHook(req: IncomingMessage, res: ServerResponse, run: string)
       // with its reply: the turn ledger learns what the Stop was told (#648).
       // A delivery of an occurrence already taken (HI-2777: Claude Code ran both Combwork's and a differing admin snippet's
       // handler): answered from the first one's reply, its decision always and its context only if no response carried it.
-      const claim = claimTwin(run, sessions.hookOccurrence(run, body), () => sessions.hooksDoubled(run))
+      // Only a copy, its body the same; of a prompt, only while the first is being answered (HI-2850).
+      const claim = claimTwin(run, sessions.hookOccurrence(run, body), body, () => sessions.hooksDoubled(run))
+      if (claim?.first) answering(res, claim.entry)
       if (claim && !claim.first) {
         const twin = await claim.entry.twinReply(TWIN_WAIT_MS)
         if (twin.carries) carrying(res, claim.entry)
@@ -2439,7 +2441,8 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
     if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
-  const views = await queueViews(ws, p)
+  // HI-2893: of the live queues only: a past branch's is named or never picked.
+  const views = (await queueViews(ws, p)).filter((x) => !x.past)
   if (views.length === 1) return views[0].target
   throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
@@ -2461,7 +2464,9 @@ route('GET', '/v1/queue', async ({ query }) => {
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
   if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, apiSaid(API.queue.targetArg))
-  return (await queueViews(ws, p, target)).map(publicQueue)
+  // HI-2893: the project's targets' queues and any holding an entry; past branches' only with past=true, or one named.
+  const past = query.get('past') === 'true'
+  return (await queueViews(ws, p, target)).filter((v) => !v.past || past || !!target).map(publicQueue)
 })
 
 route('POST', '/v1/queue/pause', async ({ body }) => {
@@ -2681,12 +2686,15 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
   const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
   const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
   if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
-  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
-    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+  // HI-2892: the user's explicit override of the release path's direction, only as the JSON boolean true.
+  if (body?.override !== undefined && body.override !== true && body.override !== false) throw new HttpError(400, say(API.queue.overrideArg))
+  const override = body?.override === true
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to, override: override ? 'yes' : 'no' }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard, { override }).catch((e: unknown) => {
       throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
     })
     const made = 'upToDate' in r ? null : r
-    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
   })
 })
@@ -4577,7 +4585,10 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (!hasCapability(platformIdOf(caller.projectPath, cfg?.platform), 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  const platform = platformIdOf(caller.projectPath, cfg?.platform)
+  if (!hasCapability(platform, 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  // jj has slots but no check copies yet (HI-2868): refused before any copy is leased, the check run in the card's slot.
+  if (!hasCapability(platform, 'checkCopies')) throw new HttpError(400, apiSaid(API.check.noCopies))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

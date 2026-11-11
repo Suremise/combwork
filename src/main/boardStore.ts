@@ -16,6 +16,7 @@ import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, 
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
 import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
+import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -358,6 +359,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: WORKSPACE_IDENTITY_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => WORKSPACE_IDENTITY_STEP.up(db)
+  },
+  {
+    // HI-2882 (jj's J9b2): jj integrations' publish obligations, their per-target sequence and sweep, and the retained
+    // proof bundles (schema/jjPublishStep.ts). In the 1.0 group, as 25–28 are.
+    version: 29,
+    name: JJ_PUBLISH_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => JJ_PUBLISH_STEP.up(db)
   }
 ]
 

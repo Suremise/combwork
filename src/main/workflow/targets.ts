@@ -53,6 +53,26 @@ export async function branchExists(projectPath: string, branch: string): Promise
   return isUnknown(h) ? 'unknown' : !!h
 }
 
+/**
+ * HI-2885 (SPEC §16.9): the branches a forward merge may bring into one of a project's `targets`: those targets, and the
+ * repository's default branch (`main`) whether or not it is one of them, once a release has gone to it. Only a default
+ * branch git names and that exists now: one git can't read adds nothing.
+ */
+export async function forwardSources(ws: WorkspaceService, projectPath: string, targets: readonly string[]): Promise<string[]> {
+  const main = await defaultBranch(ws, projectPath)
+  return [...new Set([...targets, ...(main ? [main] : [])])]
+}
+
+/**
+ * The repository's default branch as the project's own platform port names it, only when it exists now (HI-2885); null
+ * when git names none or can't say: then nothing counts as main, so it never makes a direction (HI-2892).
+ */
+export async function defaultBranch(ws: WorkspaceService, projectPath: string): Promise<string | null> {
+  const H = historyOf(projectPlatform(projectPath, (await ws.projectConfig(projectPath)).platform).id)
+  const d = H ? await H.defaultTarget(projectPath).catch(() => null) : null
+  return d && !isUnknown(d) && (await branchExists(projectPath, d)) === true ? d : null
+}
+
 /** The branches a project's options name as targets: Work merges into (when set) and Other branches work can merge into. */
 const namedTargets = (o: { target?: string; otherTargets?: string[] }): string[] => [...new Set([o.target ?? '', ...(o.otherTargets ?? [])].map((b) => b.trim()).filter(Boolean))]
 

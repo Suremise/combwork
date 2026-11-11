@@ -7,7 +7,8 @@
 
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { gitHistory } from './gitHistory'
-import type { HistoryPort, ObservePort } from './history'
+import type { Disposable, HistoryPort, ObserveEvent, ObservePort } from './history'
+import { jjRepoWatch } from './jjRepoWatch'
 import { observer } from './observe'
 
 /** Each platform's history; absent for a platform with none (None). In the order lineHistory looks. */
@@ -47,3 +48,10 @@ export function readStep<T>(fn: () => Promise<T>): Promise<T> {
 
 /** The watcher: every project's events and every working folder's write record, whatever its platform. */
 export const observePort: ObservePort = observer
+
+/** A platform's own repository watch beside the watcher (HI-2882: jj's operations and refs), by platform; absent: none. */
+export type RepoWatch = (project: string, onChange: (e: ObserveEvent) => void) => Disposable
+const WATCHES: Partial<Record<PlatformId, RepoWatch>> = { jj: (project, onChange) => jjRepoWatch(project, onChange) }
+
+/** The platform's repository watch, or null (Git and None have the watcher's alone). */
+export const repoWatchOf = (platform: PlatformId): RepoWatch | null => WATCHES[platform] ?? null

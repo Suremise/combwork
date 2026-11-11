@@ -600,6 +600,7 @@
     "placeholders": {
       "target": "plain",
       "project": "plain",
+      "past": "select",
       "state": "plain"
     }
   },

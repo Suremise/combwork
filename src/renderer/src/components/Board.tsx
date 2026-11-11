@@ -46,6 +46,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, firstReadyConnection, offeredConnections, useConnections } from './ConnectionChoice'
 import { CardCostLine } from './CardCost'
 import { useLaneOf, useLanes } from '../laneSource'
+import { CARD_DRAG } from '../laneEdits'
 import { DocRefViewer, problemLines } from './DocRefViewer'
 import { boardLayout, cardColumn, cardStage, ownStageName, type BoardProject, type BoardStageColumn } from '../boardStages'
 import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
@@ -878,6 +879,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const startDrag = useCallback((e: React.DragEvent, c: TaskCard, column: BoardColumnId): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', cardLabel(c))
+    // Its number too, for a lane in Progress → Lanes to take it (HI-2898).
+    e.dataTransfer.setData(CARD_DRAG, String(c.number))
     dragNow.current = { n: c.number, column, before: c.number }
     showDrag(dragNow.current)
     dropsNow.current = { n: c.number, columns: null }

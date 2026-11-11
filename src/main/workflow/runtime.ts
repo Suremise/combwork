@@ -23,9 +23,11 @@ import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusa
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
+import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
@@ -191,6 +193,8 @@ export interface WorkflowConfig {
   slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
+  /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
+  jj?: JjCardDeps
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
   /**
@@ -445,6 +449,8 @@ interface SubmitGathered {
   files: FactData['Submitted']['files']
   commits?: string[]
   paths?: string[]
+  /** What only the platform records of the submission (`Submitted.platform`: jj's ids and chain, HI-2868). */
+  platform?: Record<string, unknown>
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
   /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
   focusedOp?: AbortSignal
@@ -1041,9 +1047,6 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
-    // HI-2799: a platform whose card work isn't enabled yet (jj) refuses before its adapter is asked anything; no override
-    // crosses it, since the adapter couldn't do what it would allow.
-    if (r.guards.start.includes('start.platformReady')) return { rule: 'start.platformReady', values: { card: card.key } }
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
@@ -1392,7 +1395,7 @@ export class Workflow {
    * source frozen at `d.source`. Under its own rules (`forwardOf`), recorded with these facts. Only from the forward
    * request (queueControls' `forwardMerge`), as the user or the Assistant: refused for a card started before.
    */
-  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
+  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string; override?: ForwardOverride }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1401,7 +1404,7 @@ export class Workflow {
       const now = w.state()
       if (now.started || now.stage !== 'todo') return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'start', moves: '' } } as GuardRefusal // i18n-ignore: intent names
       w.fact('Started', { folder: 'project', line: null, base: d.base, target: d.to, builder: 'combwork', cardKind: 'code' }) // i18n-ignore: a fact's kind and codes, not text
-      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by, ...(d.override ? { override: d.override } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       w.move('active', 'intent')
       this.enqueueForward(w, d.source)
       return null
@@ -1481,6 +1484,12 @@ export class Workflow {
         } else {
           w.move('done', 'derived')
         }
+        return
+      case 'userIntegrates':
+        // jj (HI-2868, option A): the user integrates what passed. It waits in Approved, its OK asked there first where G10
+        // applies, until reconciliation finds it in its target (J9b2); Combwork never merges or moves anything for it.
+        if (hasStage(r, 'approved')) w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
       default:
         return
@@ -1639,6 +1648,7 @@ export class Workflow {
     let files: FactData['Submitted']['files'] = []
     let commits: string[] | undefined
     let paths: string[] | undefined
+    let platform: Record<string, unknown> | undefined
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder: this.folderOf(s) }
     const warnings: string[] = []
     // A lock taken before the submission is in the cards' records before it reads them (G16, submit.clean: #1481).
@@ -1656,7 +1666,7 @@ export class Workflow {
     if (card.kind === 'code') {
       const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit, predicted })
       if (!plan.ok) return plan.refusal
-      ;({ revision, base, key, files, commits, paths } = plan)
+      ;({ revision, base, key, files, commits, paths, platform } = plan)
       Object.assign(inputs, plan.inputs)
       warnings.push(...plan.warnings, ...(await this.pathNotices(card, o, !!args.paths, op)))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
@@ -1670,7 +1680,7 @@ export class Workflow {
       inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
       // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
       const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
-      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'isolation') && !last.isolated }
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'checkCopies') && !last.isolated }
     }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
@@ -1687,7 +1697,7 @@ export class Workflow {
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
-    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
+    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), ...(platform ? { platform } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
 
   /** Each card's latest submission's operation (`submitOperation`): a newer one aborts the one before (its pick, and its write). */
@@ -1734,10 +1744,11 @@ export class Workflow {
       ...(args.followUp ? { followUp: true } : {}),
       ...(g.paths ? { paths: g.paths } : {}),
       ...(g.commits ? { commits: g.commits } : {}),
+      ...(g.platform ? { platform: g.platform } : {}),
       ...(g.warnings.length ? { warnings: g.warnings } : {}),
       ...(g.inputs.focused ? { focused: g.inputs.focused } : {})
     })
-    if (g.revision) w.action('pin', { ref: `refs/cw/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
+    if (g.revision) w.action('pin', { ref: `refs/cw/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq, card: g.card.id })
     if (g.o.review === 'none') {
       this.finish(w, g.fin)
       return
@@ -2167,7 +2178,7 @@ export class Workflow {
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'isolation'))
+    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'checkCopies'))
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */

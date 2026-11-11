@@ -429,7 +429,8 @@ export function previewOf(input: OpPreviewInput): OpPreviewCore {
   if (!did.length && !c.added.length && !c.hidden.length) return { ...core, refused: 'nothing' }
   // E8: Git's actual refs and HEAD what jj recorded at H (a plain Git move jj hasn't imported leaves the operation heads
   // as they were, and the user's command would import it first: outside the preview's moment).
-  if (!input.git || !gitAgrees(H, input.git)) return { ...core, refused: 'unimported' }
+  // Not colocated (HI-2896): only a git command on the store inside .jj can do that, and `jj git import` is the user's way in.
+  if (!input.git || !gitAgrees(H, input.git)) return { ...core, refused: input.git && !input.git.colocated ? 'unimportedStore' : 'unimported' }
   // E4: no working-copy change (the user's command would update files there, which the preview can't see).
   if (did.some((d) => d.key.startsWith('wc:'))) return { ...core, refused: 'workingCopy' }
   // E5: a Git ref changed only as jj's export of the jj ref it changed to the same value; Git's HEAD never. jj's import

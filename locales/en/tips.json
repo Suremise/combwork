@@ -1,4 +1,12 @@
 {
+  "tips.activityMap.text": {
+    "defaultMessage": "Activity draws its agents as a honeycomb: each tool call goes out to its station (Read, Edit, Shell, Agents, Tools, You), with a context ring for each agent. Pick one agent in Agents ▾ for its own map; Show turns the map, its feed and the rings off.",
+    "description": "A tip (HI-2903). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (the station names are the map's: Read, Edit, Shell, Agents, Tools, You)."
+  },
+  "tips.activityMap.title": {
+    "defaultMessage": "A map of what your agents are doing",
+    "description": "A tip's title (HI-2903)."
+  },
   "tips.activityTab.text": {
     "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -86,6 +94,14 @@
   "tips.agentWorkflowRole.title": {
     "defaultMessage": "Builders and reviewers",
     "description": "A tip's title. Glossary: builder, reviewer."
+  },
+  "tips.agentsSignedCommits.text": {
+    "defaultMessage": "In a repository that signs commits, an agent's commit signs with nobody there or fails at once, saying why, instead of waiting for a passphrase nobody can type. Signing stays on; your git settings never change. Settings → Advanced turns it off.",
+    "description": "A tip (HI-2867). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.agentsSignedCommits.title": {
+    "defaultMessage": "Agents' signed commits don't wait for you",
+    "description": "A tip's title (HI-2867): an agent's commit in a repository that signs never waits for a passphrase."
   },
   "tips.agentsTempFolder.text": {
     "defaultMessage": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
@@ -995,6 +1011,14 @@
     "defaultMessage": "Push to a backup remote",
     "description": "A tip's title."
   },
+  "tips.gitSigning.text": {
+    "defaultMessage": "Version Control → Branches & remotes → Signing shows how your repository signs commits and whether it can sign with nobody there. If it would ask for a passphrase, it says how to set it up so the merge queue’s signed merges go ahead unattended.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: merge queue."
+  },
+  "tips.gitSigning.title": {
+    "defaultMessage": "Signed merges without waiting",
+    "description": "A tip's title (HI-1185): the Signing section shows whether commits can be signed with nobody there, so the merge queue's signed merges don't wait."
+  },
   "tips.gitView.text": {
     "defaultMessage": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {example} is the status bar's git item as Combwork shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."
@@ -1107,6 +1131,14 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjCards.text": {
+    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, you integrate it yourself: Version Control → Repository lists what waits for you, and Combwork moves the card to Done once its work is in the target.",
+    "description": "A tip (HI-2874). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
+  },
+  "tips.jjCards.title": {
+    "defaultMessage": "Cards in a jj project",
+    "description": "A tip's title (HI-2874). Keep jj."
+  },
   "tips.jjOperations.text": {
     "defaultMessage": "In a jj project, Version Control → Operations lists jj’s operations by name. Preview Undo shows what undoing one would change, and gives you the command to run when nothing else would change. Combwork never runs it.",
     "description": "A tip (HI-2800). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
@@ -1138,6 +1170,14 @@
   "tips.laneBranchSquash.title": {
     "defaultMessage": "An agent's branch kept up to date between cards",
     "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
+  "tips.laneEdit.text": {
+    "defaultMessage": "In Progress → Lanes, open a running lane to drag its waiting cards into a new order, take one off, or add one with Add Card… or by dragging it from the board. Ctrl+Z undoes it.",
+    "description": "A tip (HI-2898). Progress → Lanes is the Progress panel's tab; Add Card… a button there. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.laneEdit.title": {
+    "defaultMessage": "Change a lane's cards yourself",
+    "description": "A tip's title (HI-2898). A lane is Combwork's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
   "tips.laneGates.text": {
     "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
@@ -2091,6 +2131,14 @@
     "defaultMessage": "Purge what Combwork keeps",
     "description": "A tip's title."
   },
+  "tips.submodulesInDiffs.text": {
+    "defaultMessage": "When a card moves a submodule to another commit, Changes and a card’s Work section show it as “Submodule lib/sub: 0bbdde2 → 0fc182f”. Show git’s diff shows git’s own lines.",
+    "description": "A tip (HI-2864). A submodule: a git repository inside the project, kept at one commit. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.submodulesInDiffs.title": {
+    "defaultMessage": "A moved submodule in one line",
+    "description": "A tip's title (HI-2864). A submodule: a git repository inside the project, kept at one commit."
+  },
   "tips.submodulesLfs.text": {
     "defaultMessage": "With submodules or Git LFS, Combwork checks out the submodules and fetches the LFS files in each slot and review copy before its setup script, never changing your repository’s settings. Slots and copies → Set up submodules and LFS turns it off.",
     "description": "A tip (HI-1182). A slot: a folder Combwork lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Keep Git LFS. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -2272,8 +2320,8 @@
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
   },
   "tips.versionControlJj.text": {
-    "defaultMessage": "In a jj repository colocated with Git, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
-    "description": "A tip (HI-2799). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and Git."
+    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
+    "description": "A tip (HI-2799, HI-2896: colocated with Git or not). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
   },
   "tips.versionControlJj.title": {
     "defaultMessage": "See a jj repository",

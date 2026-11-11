@@ -572,6 +572,18 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
   }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  // Advanced settings (HI-2867): the scenario's own (sc.advanced), then the run's (--advanced), in its profile's advanced.json.
+  const advancedValues = { ...sc.advanced, ...opts.advanced }
+  if (Object.keys(advancedValues).length) {
+    const advFile = path.join(userData, 'advanced.json')
+    let had = {}
+    try {
+      had = JSON.parse(fs.readFileSync(advFile, 'utf8'))
+    } catch {
+      // none yet
+    }
+    fs.writeFileSync(advFile, JSON.stringify({ ...had, format: 1, values: { ...had.values, ...advancedValues } }, null, 2))
+  }
 
   const port = opts.port ?? 47930
   const started = Date.now()
@@ -1123,9 +1135,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.notes = ((await api('GET', '/v1/shared')).body ?? []).flatMap(function flat(e) {
       return e.isDir ? (e.children ?? []).flatMap(flat) : [e.relPath]
     })
-    observed.gitStatus = ctx.git('status', '--porcelain')
+    // A non-colocated jj project (HI-2896, sc.separate) has no .git: no Git status or branches to read.
+    observed.gitStatus = sc.separate ? '' : ctx.git('status', '--porcelain')
     // alpha's branches and its Work merges into and other branches as the run left them (HI-2811: Start the next version).
-    observed.branches = String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
+    observed.branches = sc.separate ? [] : String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
     observed.targets = await inv('workflow:form', alpha).then((f) => ({ target: f?.options?.target ?? null, otherTargets: f?.options?.otherTargets ?? [] })).catch(() => null)
     // A scenario's own reading of what the run left, through Combwork (its `after`), for its checks: `observed.after`.
     if (sc.after) observed.after = await sc.after(ctx).catch((e) => ({ error: String(e?.message ?? e) }))
