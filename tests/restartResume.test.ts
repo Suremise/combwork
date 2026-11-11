@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
-import { atStart, checkRequest, mergeSnapshot, parseRecord, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
+import { atStart, checkRequest, mergeSnapshot, parseRecord, recordOpen, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
 
@@ -62,6 +62,16 @@ describe('the restart record', () => {
       ['a1', 'new', 'pending'],
       ['a2', 's1', 'pending']
     ])
+  })
+
+  // HI-2909 (the Assistant's scope, after HR2's round 2): a skip not yet named keeps its record open, but a later close
+  // replaces the earlier record's unreported skips: the notice accounts for the agents of the latest close.
+  it("a skip not yet named keeps the record open; a later close replaces the earlier record's unreported skips", () => {
+    const before: RestartRecord = { version: 1, reason: 'update', entries: [entry({ agentId: 'idle', state: 'skipped', why: 'idle' }), entry({ agentId: 'old', state: 'skipped', why: 'expired' })] }
+    expect(recordOpen(before)).toBe(true)
+    expect(recordOpen({ ...before, entries: before.entries.map((e) => ({ ...e, reported: true })) })).toBe(false)
+    const after = mergeSnapshot(before, [entry({ agentId: 'a2' })], 'restart')
+    expect(after.entries.map((e) => [e.agentId, e.state])).toEqual([['a2', 'pending']])
   })
 
   it('at a start: what the last run left queued or starting is pending again, and what waited over a day is skipped', () => {

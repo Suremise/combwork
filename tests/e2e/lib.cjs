@@ -1918,22 +1918,39 @@ async function haikuAutoMode(inv, host, agentId = 'assistant', timeoutMs = 15000
 }
 
 /**
- * The connection dialog's warning about Auto with Haiku (#129; HI-2145: model and mode are a connection's since
- * HI-2108): there exactly when the CLI says Auto isn't offered (saying the session runs in Manual), none when it says
- * it is, the shipped guess ("may not offer") when it doesn't say. Opens Settings → Accounts & Connections (Ctrl+,),
- * Edit… on a Claude Code account's first connection, chooses Haiku and Auto there, waits for the warning to be as it
- * should (the window may still be taking in what the CLI said: the shipped guess first), then cancels, saving
- * nothing. Returns [ok, what it found].
+ * A sign-in account's own model catalogue as its connections see it (HI-2852: the app's accountInfo): the one read in its
+ * folder, null while none is read or kept (the fallback list); the CLI home's only where the CLI's accounts aren't read.
  */
-async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
+async function accountCatalog(inv, provider, accountId) {
+  const info = (await inv('provider:info'))[provider]
+  if (!info?.accountCatalogs) return info?.catalog ?? null
+  return info.accountCatalogs[accountId]?.catalog ?? null
+}
+
+/**
+ * The connection dialog's warning about Auto with Haiku (#129; HI-2145: model and mode are a connection's since
+ * HI-2108): there exactly when the account's models say Auto isn't offered (saying the session runs in Manual), none
+ * when they say it is, the shipped guess ("may not offer") when they don't say. Since HI-2852 they are the account's own,
+ * read in its folder (accountCatalog), not the CLI home's (HI-2901). Waits for the account's catalogue to be read
+ * (`read`, default: any), then opens Settings → Accounts & Connections (Ctrl+,), Edit… on a Claude Code account's first
+ * connection, chooses Haiku and Auto there, waits for the warning to be as it should (the window may still be taking in
+ * what the CLI said), then cancels, saving nothing. `prepare(folder)`, for an account it adds: sets up what the CLI
+ * answers in that account's folder, then asks again. Returns [ok, what it found].
+ */
+async function haikuAutoCaveat(page, { prepare, read = (catalog) => !!catalog, timeoutMs = 10000 } = {}) {
   // A Combwork account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
   // has none listed (that home isn't shown in Settings), so one is added for the look, never signed in, and removed after.
-  // The warning depends on what the CLI said about its models, not on the account.
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const listed = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code')
   const account = listed ?? (await inv('connections:add', 'claude-code', 'Auto with Haiku'))
   const form = page.locator('[data-connection-form]')
   try {
+    if (prepare && !listed) {
+      await prepare((await inv('connections:list')).connections.find((c) => c.id === account.id)?.folder)
+      await inv('provider:refresh', 'claude-code')
+    }
+    // Its own read lands after it is added (a never signed-in account is asked too: Claude Code 2.1.322 answers).
+    if (!(await until(async () => read(await accountCatalog(inv, 'claude-code', account.id)), timeoutMs))) return [false, `the account's models: ${JSON.stringify((await accountCatalog(inv, 'claude-code', account.id))?.models?.map((m) => [m.value, m.supportsAuto]) ?? null)}`]
     await page.keyboard.press('Control+,')
     const nav = page.locator('.settings-nav .row[data-section="accounts"]')
     await nav.waitFor({ timeout: timeoutMs })
@@ -1945,9 +1962,10 @@ async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
     await form.locator('select').first().selectOption('haiku', { timeout: timeoutMs })
     await form.locator('select[data-mode]').selectOption('auto', { timeout: timeoutMs })
     const caveat = () => form.locator('.mode-caveat', { hasText: 'Auto with Haiku' }).allInnerTexts()
-    const right = (c) => (autoOffered === true ? !c.length : autoOffered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
-    const ok = !!(await until(async () => right(await caveat()), timeoutMs))
-    return [ok, JSON.stringify(await caveat())]
+    const autoOffered = async () => (await accountCatalog(inv, 'claude-code', account.id))?.models.find((m) => m.value === 'haiku')?.supportsAuto
+    const right = (c, offered) => (offered === true ? !c.length : offered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
+    const ok = !!(await until(async () => right(await caveat(), await autoOffered()), timeoutMs))
+    return [ok, JSON.stringify({ caveat: await caveat(), autoOffered: (await autoOffered()) ?? null })]
   } finally {
     if (await form.count()) {
       await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click({ timeout: timeoutMs }).catch(() => undefined)
@@ -2061,4 +2079,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

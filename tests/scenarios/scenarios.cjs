@@ -3330,7 +3330,8 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      // Left running (HI-2891): since HI-2815 a builder stopped with Stop isn't started for its lane's first card.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
     },
@@ -3979,7 +3980,7 @@ module.exports.SCENARIOS = [
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
       await c.inv('tasks:update', n, { decision: 'Have a design checked by the reviewer before you build anything.' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
     },
     prompt: (c) =>
       `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
@@ -4220,7 +4221,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
       await c.inv('tasks:update', a, { decision: 'Part 2 tests the name the user picks, "Ann" or "Bo": the Assistant brings their pick in a message once part 1 is committed. Do part 1, then wait for that message; don\'t ask the user yourself.' })
-      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
       await c.startAssistant()
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
