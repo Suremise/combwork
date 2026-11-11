@@ -136,6 +136,16 @@ export function chainIsBinding(chain: readonly string[], prev: JjBinding | null)
   return chain.length === allowed.size && chain.every((c) => allowed.has(c))
 }
 
+/**
+ * Whether a preparation carries the slot's binding (HI-2868, s10 §3): a restart of the same card in its own slot, its
+ * earlier binding kept with no jj write, only when the slot is the folder it was bound in (its generation), on the same
+ * target, from the same base, under a new key. The port's preparation and the pool's dirty check (HI-2981: the edits
+ * left in the folder are that card's own, as on Git's same branch) both ask this, so they never disagree.
+ */
+export function carriesBinding(ptr: JjBinding | null, next: Pick<JjBinding, 'card' | 'key' | 'generation' | 'target' | 'base'>): ptr is JjBinding {
+  return !!ptr && ptr.card !== null && ptr.card === next.card && ptr.key !== next.key && ptr.generation === next.generation && ptr.target === next.target && ptr.base === next.base
+}
+
 /** The board_meta keys. */
 export const pointerKey = (store: string, workspace: string): string => `slot_jjcur:${store.toLowerCase()}:${workspace}`
 export const journalKey = (store: string, workspace: string, prep: string): string => `slot_jjprep:${store.toLowerCase()}:${workspace}:${prep}`

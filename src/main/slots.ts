@@ -2569,7 +2569,10 @@ export class SlotPool {
           return { error: sayStored(T.branchUnread, { slot: name }) }
         }
         const there = on === p.line
-        if (!there) {
+        // The same card started again in its own slot (HI-2981: jj gives each start a new key): what is in the folder is
+        // that card's own uncommitted work, kept as on Git's same branch, never refused as another's.
+        const carried = !there && !!(await this.port.carries?.(slot.folder, p.line, p.base, { identity: slot.identity ?? null, ...(p.target ? { target: p.target } : {}) }))
+        if (!there && !carried) {
           // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
           const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {

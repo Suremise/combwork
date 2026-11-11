@@ -231,6 +231,13 @@ export interface WorkspacePort {
    * them); Git ignores them, its git commands unchanged.
    */
   prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions & OwnedWrite): Promise<WorkspaceStep>
+  /**
+   * Whether preparing `line` from `base` carries the folder's current binding (HI-2981; jj: the same card started again
+   * in its own slot, on the same target and base, under a new key): its uncommitted edits are then that card's own, as
+   * on Git's same branch, so the pool doesn't refuse them. False whenever it can't tell. Git has none: its same line is
+   * the same name.
+   */
+  carries?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null; target?: string }): Promise<boolean>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

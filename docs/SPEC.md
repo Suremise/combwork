@@ -3224,7 +3224,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   cycle, known at the plan, the cycle rechecked by the evidence in the Started write). `Started.platform.jj` records the
   slot's workspace, store and generation. **A restart** of the same card in the same slot (its binding this card's, one
   of its own keys, the same folder generation and target) **carries**: the start records the old base, and J9a's
-  preparation publishes the new key with the old base and submitted commits, no jj write. On another target it is
+  preparation publishes the new key with the old base and submitted commits, no jj write. What the card left in the
+  folder uncommitted is its own and stays (HI-2981): the pool's dirty refusal is skipped when the port's `carries`
+  says the preparation carries the slot's binding (`carriesBinding`, the same test the preparation makes), as Git's
+  same branch skips it; any other preparation over uncommitted edits is refused as before. On another target it is
   refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
   recovered.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
