@@ -3800,7 +3800,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'start-target-changes',
-    title: "A builder starts a card while the user's .gitignore change sits uncommitted where main is checked out (HI-2944): its start warns of it; the builder leaves it alone (no commit, stash or discard) and tells the user",
+    title: "A builder starts a card while the user's .gitignore change sits uncommitted where main is checked out (HI-2944): its start warns of it (the user is told in the window); the builder leaves it alone: no commit, stash or discard",
     files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n", '.gitignore': 'node_modules/\n' },
     async setup(c) {
       await pairRules(c)
@@ -3817,14 +3817,13 @@ module.exports.SCENARIOS = [
       const started = ran(o, 'cw_start_card').find((x) => x.ok)
       return [
         ['started it with cw_start_card', !!started, calls],
-        ["its start's reply warned of main's folder's uncommitted .gitignore", /has uncommitted changes \(\.gitignore\)/.test(replies(o, 'cw_start_card')), replies(o, 'cw_start_card').slice(0, 400)],
+        // The reply as the Combwork MCP server sent it (its log), on every provider.
+        ["its start's reply warned of the target's folder's uncommitted .gitignore", /has uncommitted changes \(\.gitignore\)/.test(started?.reply ?? ''), String(started?.reply ?? '').slice(0, 400)],
         ["left the user's change as it was: .gitignore still changed, its text the same", (c.read('.gitignore') ?? '').replace(/\r\n/g, '\n') === c.dirty && /\.gitignore/.test(o.gitStatus), o.gitStatus],
         ['committed nothing in the project folder', c.git('rev-parse', 'HEAD').trim() === c.head, c.git('log', '--oneline', '-3')],
-        ['set nothing aside (no stash)', c.git('stash', 'list').trim() === '', c.git('stash', 'list')],
-        ['told the user about the uncommitted .gitignore', /\.gitignore/.test(o.finalReply ?? ''), JSON.stringify((o.finalReply ?? '').slice(0, 300))]
+        ['set nothing aside (no stash)', c.git('stash', 'list').trim() === '', c.git('stash', 'list')]
       ]
-    },
-    fakeSkips: ['told the user about the uncommitted .gitignore']
+    }
   },
   {
     id: 'review-in-copy',

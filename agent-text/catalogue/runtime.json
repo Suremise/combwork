@@ -76,8 +76,8 @@
     "note": "A start's warning beside its refusal (#1438): why no slot is free."
   },
   "runtime.start.targetChanges": {
-    "text": "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Tell the user; don't commit or discard them yourself.",
-    "note": "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes. {files}: up to five paths, then how many more."
+    "text": "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.",
+    "note": "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to five paths, then how many more."
   },
   "runtime.submit.movedAhead": {
     "text": "moved ahead of {cards} (not started); its reviewer is told",
