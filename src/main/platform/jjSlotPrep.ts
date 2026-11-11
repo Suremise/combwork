@@ -129,7 +129,8 @@ export function journalOf(v: unknown): JjPrepJournal | null {
 /**
  * Whether a slot's chain over its binding's base is what reuse allows (s10 §2 step 3): exactly the binding's submitted
  * commits (none for a detached binding or a card that made nothing), in any order, nothing else. `chain`: the commits of
- * `base::@ ~ base`, the working copy left out only when it is empty.
+ * `base::@ ~ base`, the working copy left out only when it is empty. The other shape reuse allows (HI-2923: committed
+ * work under an empty working copy, all of it in the target, the binding's record of it missing or not) is the port's.
  */
 export function chainIsBinding(chain: readonly string[], prev: JjBinding | null): boolean {
   const allowed = new Set(prev?.submitted ?? [])

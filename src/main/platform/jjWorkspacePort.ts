@@ -576,7 +576,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
    * A slot moved onto `next.base` for a binding, as an owned, journalled write (HI-2866/s10 §2, s13; HR1's round 1):
    * under the store's lock, the journal planned with the pointer it starts from (`prev`) and taken up by this attempt (a
    * fresh `run`), then the folder recorded, its chain over `prev`'s base checked (exactly `prev`'s submitted commits,
-   * contained in `prev`'s target; with no binding, an empty working copy), `next.base` visible, and for a detach the
+   * contained in `prev`'s target, or, HI-2923, any committed work under an empty working copy, all of it contained there;
+   * with no binding, an empty working copy), `next.base` visible, and for a detach the
    * target still at it. The guard (the fence, the folder's identity, the pointer still exactly `prev`, the operation head
    * still the check's) runs after every journal write and right before each jj write, and again right before the binding
    * is published, whose compare and swap also requires the journal still this attempt's.
@@ -725,13 +726,21 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // An empty range alone proves nothing (a working copy on unrelated history has none); its integration is still
         // required below.
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
-        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
-        if (j.prev?.submitted.length) {
-          if (!j.prev.target || !deps.contains) return refuse(JJ_REFUSED.notIntegrated)
+        const exact = chainIsBinding(chain, j.prev)
+        // Or (HI-2923) committed work over the previous base under an empty working copy with one parent, whatever the
+        // binding recorded of it (its submitted commits can be missing): moved only once everything from the base to that
+        // parent is in the target (below), so nothing the slot holds is lost; an edit in the working copy stays refused.
+        const committed = !!j.prev && wc.empty && wc.parents.length === 1 && chain.length > 0
+        if (!onPrevBase && !exact && !committed) return refuse(JJ_REFUSED.unintegrated)
+        const tip = exact || onPrevBase ? j.prev?.submitted.at(-1) : wc.parents[0]
+        if (j.prev && tip) {
+          // Not in the target: the card's own recorded work isn't yet; anything else the slot holds isn't the card's.
+          const why = exact || onPrevBase ? JJ_REFUSED.notIntegrated : JJ_REFUSED.unintegrated
+          if (!j.prev.target || !deps.contains) return refuse(why)
           const th = await bookmarkAt(folder, H, j.prev.target)
-          if (isUnknown(th) || !th) return refuse(JJ_REFUSED.notIntegrated)
-          const c = await deps.contains(store, j.prev.target, { base: j.prev.base, revision: j.prev.submitted[j.prev.submitted.length - 1] }, th)
-          if (isUnknown(c) || !c) return refuse(JJ_REFUSED.notIntegrated)
+          if (isUnknown(th) || !th) return refuse(why)
+          const c = await deps.contains(store, j.prev.target, { base: j.prev.base, revision: tip }, th)
+          if (isUnknown(c) || !c) return refuse(why)
         }
         const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
         if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)

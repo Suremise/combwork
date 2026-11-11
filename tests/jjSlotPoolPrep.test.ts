@@ -508,6 +508,38 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(await w.port.line(row.folder)).toBe(key2)
       })
 
+      it("HI-2923: a lane's card copied onto a moved main is recognised by its work being in the target, even with its submitted commits never recorded on the binding; work that isn't there is still refused", async () => {
+        const w = world(colocated)
+        const lent = await w.pool.lend({ lane: 'L5', agent: 'a-l' }, { target: 'main' })
+        if (!lent.ok) throw new Error('not lent')
+        const row = w.store.slot(lent.slot.name)!
+        const key1 = jjLineKey(row.identity!.workspace, 1, 1)
+        expect(await w.pool.prepare(lent.lease.id, { line: key1, base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+        writeFileSync(join(row.folder, 'one.txt'), 'one\n')
+        w.h.jj(row.folder, 'commit', '-m', 'card 1')
+        const R = w.h.id(row.folder, `${row.identity!.workspace}@-`)
+        // No port.submitted: the binding's record of the card's commits is missing (as when the pin's record didn't land).
+        w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'the user moves on')
+        w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', 'description(exact:"the user moves on\n")')
+        // An extra commit of the slot's own over the card's, never integrated: refused, nothing moved.
+        writeFileSync(join(row.folder, 'two.txt'), 'two\n')
+        w.h.jj(row.folder, 'commit', '-m', 'more work')
+        const key2 = jjLineKey(row.identity!.workspace, 2, 2)
+        w.h.jj(w.repo, '--ignore-working-copy', 'duplicate', '-r', R, '--onto', 'main')
+        const copy = w.h.id(w.repo, `description(exact:"card 1\n") & ~${R}`)
+        w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', copy)
+        const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
+        expect(r1, JSON.stringify(r1)).toHaveProperty('error')
+        expect(await w.port.line(row.folder)).toBe(key1)
+        expect(readFileSync(join(row.folder, 'two.txt'), 'utf8')).toBe('two\n')
+        // That work abandoned by the user: the slot holds only the card's commit, its copy in main: prepared on main's head.
+        w.h.jj(row.folder, 'abandon', '-r', 'description(exact:"more work\n")')
+        const r2 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
+        expect(r2, JSON.stringify(r2)).toMatchObject({ ok: true })
+        expect(await w.port.line(row.folder)).toBe(key2)
+        expect(w.h.id(row.folder, `${row.identity!.workspace}@-`)).toBe(copy)
+      })
+
       /** A lane's slot left stale by the user's rebase of its card's commit (the old suggestion), its next card not prepared. */
       async function staleLane(w: ReturnType<typeof world>) {
         const lent = await w.pool.lend({ lane: 'L2', agent: 'a-l' }, { target: 'main' })
