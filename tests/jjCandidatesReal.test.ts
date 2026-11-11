@@ -328,6 +328,56 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
       expect(w.log(`${rec.recovered.commits[0]} & ::visible_heads()`)).toHaveLength(1)
     })
 
+    /** `n` operations of the user's own after an attempt (HI-2992: the operation log moves on before recovery). */
+    const moreOps = (w: World, n: number): void => {
+      for (let i = 0; i < n; i++) h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', 'main', '-m', `their work ${i}`)
+    }
+
+    it('HI-2992: a crash between writes, then more operations than the walk reads: settled from the journal alone, then dropped', async () => {
+      const w = await world(colocated)
+      await expect(prepareJjCandidate(w.deps({ hook: (p) => void (p === 'pinned' && (() => { throw new Error('crash') })()) }), w.req('merge'))).rejects.toThrow('crash')
+      const last = w.journal.at(-1)!
+      expect(last.step).toBeUndefined()
+      moreOps(w, 6)
+      const rec = await recoverJjAttempt(w.deps({ opsLimit: 3, opsPage: 2 }), last)
+      if (isInterrupted(rec)) throw new Error(JSON.stringify(rec))
+      expect(rec.record.givenUp).toBeUndefined()
+      expect(rec.recovered.commits).toEqual(last.commits)
+      const d = await dropJjAttempt(w.deps(), rec.record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d))
+      for (const c of last.commits) expect(w.log(`${c} & ::visible_heads()`)).toEqual([])
+      for (const p of d.record.pins) expect(await w.ref(p.ref)).toBeNull()
+    })
+
+    it("HI-2992: a crash inside a write (its step journalled), its base past the walk: the step given up, the rest recovered and dropped", async () => {
+      const w = await world(colocated)
+      // The squash's second write journalled, then the crash before jj runs it: the scratch merge is the attempt's.
+      await expect(prepareJjCandidate(w.deps({ hook: (p) => void (p === 'run:squash' && (() => { throw new Error('crash') })()) }), w.req('squash'))).rejects.toThrow('crash')
+      const last = w.journal.at(-1)!
+      expect(last.step?.name).toBe('squash')
+      expect(last.commits).toHaveLength(1)
+      moreOps(w, 6)
+      const rec = await recoverJjAttempt(w.deps({ opsLimit: 3, opsPage: 2 }), last)
+      if (isInterrupted(rec)) throw new Error(JSON.stringify(rec))
+      expect(rec.record).toMatchObject({ givenUp: ['squash'] })
+      expect(rec.record.step).toBeUndefined()
+      const d = await dropJjAttempt(w.deps(), rec.record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d))
+      expect(w.log(`${last.commits[0]} & ::visible_heads()`)).toEqual([])
+      for (const p of d.record.pins) expect(await w.ref(p.ref)).toBeNull()
+    })
+
+    it('HI-2992: the walk pages back to the base operation (a step under way, the base within the bound): nothing given up', async () => {
+      const w = await world(colocated)
+      await expect(prepareJjCandidate(w.deps({ hook: (p) => void (p === 'run:squash' && (() => { throw new Error('crash') })()) }), w.req('squash'))).rejects.toThrow('crash')
+      const last = w.journal.at(-1)!
+      moreOps(w, 6)
+      const rec = await recoverJjAttempt(w.deps({ opsLimit: 100, opsPage: 2 }), last)
+      if (isInterrupted(rec)) throw new Error(JSON.stringify(rec))
+      expect(rec.record.givenUp).toBeUndefined()
+      expect(rec.recovered.commits).toEqual(last.commits)
+    })
+
     it('a crash between a pin\'s create and its journal: ambiguous, kept and never dropped', async () => {
       const w = await world(colocated)
       const rows: JjAttemptRecord[] = []

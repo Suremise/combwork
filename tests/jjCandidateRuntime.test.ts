@@ -717,6 +717,32 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
   })
 
+  // HI-2992 (found by HI-2967): a candidate's build interrupted, then more operations than recovery's old walk read.
+  describe.each([true, false] as const)('an interrupted attempt recovered however far the operation log moved on (HI-2992), colocated: %s', (colocated) => {
+    it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: 170_000 }, async () => {
+      const w = await world(colocated, { candidates: true })
+      w.deps.candidateHook = async (point) => {
+        if (point === 'pinned') throw new Error('crash')
+      }
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await expect(jjp.reconcile(card, {})).rejects.toThrow('crash')
+      w.deps.candidateHook = undefined
+      const cycle = w.wf.state(card).cycle
+      const [crashed] = entries(w, card, cycle)
+      expect(crashed.record.phase).toBe('pinned')
+      // Combwork closed while the user goes on: more operations than the old walk's 200.
+      for (let i = 0; i < 205; i++) w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-m', `work ${i}`)
+      const told: string[] = []
+      await jjp.reconcile(w.wf.store.card(card.id), { unknown: (what?: string) => void told.push(String(what)) })
+      expect(told).toEqual([])
+      expect(shown(w, card, cycle)).toMatchObject({ state: 'ready' })
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === crashed.record.attempt)?.state).toBe('dropped')
+      for (const c of crashed.record.commits) expect(visible(w, c)).toBe(false)
+      expect(strayPins(w, card).filter((r) => r.includes(`/${crashed.record.attempt}/`))).toEqual([])
+    })
+  })
+
   // HI-2989 (found by HI-2967): the user integrates the candidate after a run's proof read the target, before its step.
   describe.each([true, false] as const)('integrated between the proof and the step (HI-2989), colocated: %s', (colocated) => {
     for (const style of ['rebase', 'squash', 'merge'] as const) {

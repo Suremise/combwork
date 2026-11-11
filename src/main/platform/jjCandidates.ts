@@ -102,6 +102,11 @@ export interface JjAttemptRecord {
    * while any are recorded, drop refuses.
    */
   uncertain?: string[]
+  /**
+   * HI-2992: steps recovery gave up (interrupted mid-write, the base operation past its walk): whatever such a write made
+   * isn't the attempt's, never owned or touched; the rest of the attempt is recovered and dropped as ever.
+   */
+  givenUp?: string[]
 }
 
 /** What one write may make: its shape, checked against the operation's delta (shapeProblem). */
@@ -186,8 +191,10 @@ export interface JjCandidateDeps {
   signal?: AbortSignal
   timeout?: number
   hook?: (point: JjCandidatePoint, r: JjAttemptRecord) => Promise<void> | void
-  /** How many operations recovery walks back at most (default 200): past it, unknown. */
+  /** How many operations recovery's walk reads at most (default OPS_WALK_MAX, HI-2992): past it, a step under way is given up. */
   opsLimit?: number
+  /** How many operations the walk reads a page (default OPS_PAGE; the tests' seam). */
+  opsPage?: number
 }
 
 export interface JjCandidateRequest {
@@ -903,6 +910,37 @@ export async function inspectJjCandidate(deps: Pick<JjCandidateDeps, 'runner' | 
   return jjSameRevision({ base: c.base, commit: p.value.rev }, { base: c.expected, commit: p.value.res }, deps.sameChange)
 }
 
+/** How many operations recovery's walk reads at most (HI-2992), and how many a page. */
+export const OPS_WALK_MAX = 10_000
+const OPS_PAGE = 1_000
+
+/**
+ * The operations after `base` up to `head`, oldest first (HI-2992), read a page at a time from the newest back, each page
+ * `--at-op` the previous page's oldest operation's parent: never more than `max` in all. `unreachable` when `base` isn't
+ * within `max`, isn't in this history at all (the root reached), or lies past a page holding an operation with several
+ * parents (concurrent operations merged: a page past it could miss one of its branches).
+ */
+async function walkTo(a: Attempt, head: string, base: string, max: number, per = OPS_PAGE): Promise<JjOpEntry[] | 'unreachable'> {
+  const found: JjOpEntry[] = []
+  let at = head
+  for (;;) {
+    const page = Math.min(per, max - found.length)
+    if (page <= 0) return 'unreachable'
+    const ls = lines(await a.read(at, ['op', 'log', '--no-graph', '--limit', String(page), '-T', OP_T]))
+    for (const l of ls) {
+      const e = parseOpLine(l)
+      if (!e) throw new Stop('malformed', l)
+      if (e.id === base) return found.reverse()
+      found.push(e)
+    }
+    const last = found.at(-1)
+    // The root reached (or nothing read) without the base: it isn't in this history.
+    if (ls.length < page || !last || !last.parents.length) return 'unreachable'
+    if (found.slice(-ls.length).some((e) => e.parents.length !== 1)) return 'unreachable'
+    at = last.parents[0]
+  }
+}
+
 /** What recovery found of an attempt: never a success, never anything abandoned or dropped. */
 export interface JjRecovered {
   recovered: {
@@ -928,7 +966,7 @@ export interface JjRecovered {
 /**
  * An interrupted attempt's recovery (s14 §11, s17 §1, HR2's round 1): explicit, its later caller's to run. Its objects are
  * found only by provenance: operations carrying its marker, walking back from the single head to its planned operation
- * (bounded). A marked operation's commits are the attempt's only when that operation was validated in the attempt (its
+ * (paged and bounded, and only for a write under way: HI-2992, below). A marked operation's commits are the attempt's only when that operation was validated in the attempt (its
  * journal's `ops`), or is its journalled last step validated now as the attempt would have (the step's parent, nothing
  * else changed in its view, the step's shape); any other marked operation's additions are `uncertain`: kept apart, never
  * owned. Refs only through its journal's pins. What it owns unpinned is pinned (create-only); nothing is abandoned or
@@ -940,18 +978,23 @@ export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptR
   try {
     a.check()
     const head = a.head()
-    const limit = deps.opsLimit ?? 200
-    const log: JjOpEntry[] = []
-    for (const l of lines(await a.read(head, ['op', 'log', '--no-graph', '--limit', String(limit + 1), '-T', OP_T]))) {
-      const e = parseOpLine(l)
-      if (!e) throw new Stop('malformed', l)
-      log.push(e)
-    }
-    const reach = log.findIndex((e) => e.id === rec.baseOp)
-    if (reach < 0) throw new Stop('malformed', log.length > limit ? 'history:capped' : 'history:baseOp')
     const owns = new Set(rec.commits)
     const uncertain = new Set(rec.uncertain ?? [])
-    for (const e of log.slice(0, reach).reverse()) {
+    // HI-2992: only a write under way (its step journalled, its command maybe run) needs the walk: every write journals
+    // its step before jj runs and clears it only once its operation is validated (or provably made nothing), so with no
+    // step there is no marked operation the journal doesn't know, and the attempt is settled from its journal however far
+    // the operation log has moved on. A walk that can't reach the base operation gives the step up (journalled in
+    // `givenUp`): whatever that write may have made isn't the attempt's (never owned, never touched), and the rest of the
+    // attempt is recovered and dropped as ever (the Assistant's (a)).
+    let walk: JjOpEntry[] = []
+    if (rec.step) {
+      const w = await walkTo(a, head, rec.baseOp, deps.opsLimit ?? OPS_WALK_MAX, deps.opsPage)
+      if (w === 'unreachable') {
+        rec.givenUp = [...(rec.givenUp ?? []), rec.step.name]
+        rec.step = undefined
+      } else walk = w
+    }
+    for (const e of walk) {
       if (!markerIn(e.args, rec.attempt)) continue
       if (e.parents.length !== 1) throw new Stop('malformed', `merge op ${e.id}`) // i18n-ignore: a protocol detail for logs and tests, never shown
       const parent = e.parents[0]
