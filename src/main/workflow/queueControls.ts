@@ -627,7 +627,7 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   const done = await cardBatch(ws, async (): Promise<ForwardResolved> => {
     guard?.()
     const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { pinTarget: true, ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
-    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source }, by, guard), undefined, guard)
+    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source, ...(f.override ? { override: f.override } : {}) }, by, guard), undefined, guard)
     if (isRefusal(marked.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
     // Refused (a Retry, a Remove or another Resolve since it was read): thrown, so the card made just now goes too.
     const ended = await runIntent(wf, rec.id, actor, (x) => x.resolveForward(rec.id, { entry: back.entry, resolver: wf.store.card(made.number).key }, reason, by, guard), undefined, guard)

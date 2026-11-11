@@ -10,6 +10,7 @@ import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
 import type { FactData } from '../../src/shared/workflow/facts'
 import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
+import type { ForwardOverride } from '../../src/shared/workflow/forwardOrder'
 
 let env: Env | null = null
 afterEach(() => {
@@ -30,10 +31,10 @@ function conflicting(o: Partial<WorkflowOptions> = {}) {
 const head = (e: Env, ref: string): string => sh(e.project, 'rev-parse', ref)
 
 /** A forward merge of main into 1.2.0, queued and returned with its conflict. */
-async function returned(e: Env) {
+async function returned(e: Env, override?: ForwardOverride) {
   const card = e.wf.createCard({ title: 'Bring 1.2.0 up to date with main' })
   const source = head(e, 'main')
-  const r = await e.wf.forwardStart(card.key, { from: 'main', to: '1.2.0', source, base: sh(e.project, 'merge-base', 'main', '1.2.0') }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0'))
+  const r = await e.wf.forwardStart(card.key, { from: 'main', to: '1.2.0', source, base: sh(e.project, 'merge-base', 'main', '1.2.0'), ...(override ? { override } : {}) }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0'))
   moved(r)
   expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
   return { card, source }
@@ -44,7 +45,9 @@ async function resolveOnBuilder(e: Env, forward: { id: number; key: string }) {
   const back = e.wf.returnedForward(e.wf.store.card(forward.id))
   expect(back).not.toBeNull()
   const made = e.wf.createCard({ title: 'Resolve: bring 1.2.0 up to date with main', target: back!.to })
-  moved(await e.wf.markForwardResolution(made.key, { forward: forward.key, from: back!.from, to: back!.to, source: back!.source }, 'user'))
+  // As queueControls does: the forward's own override carried (HI-2998).
+  const override = e.wf.state(e.wf.store.card(forward.id)).forward?.override
+  moved(await e.wf.markForwardResolution(made.key, { forward: forward.key, from: back!.from, to: back!.to, source: back!.source, ...(override ? { override } : {}) }, 'user'))
   moved(await e.wf.resolveForward(forward.key, { entry: back!.entry, resolver: made.key }, 'merge by hand', 'user'))
   return { made, back: back! }
 }
@@ -197,5 +200,49 @@ describe('a resolution whose destination is Work merges into (HI-2985)', () => {
     e.wf.store.updateCard(made.id, { target: '1.2.0' })
     moved(await e.wf.start(made.key, B1))
     expect(e.wf.state(made).started?.target).toBe('1.2.0')
+  })
+})
+
+describe("a resolution whose direction no longer reads forward at its merge (HI-2998)", () => {
+  /** main into 1.2.0 resolved on a builder, reviewed and approved; then main is gone, so main into 1.2.0 reads unknown. */
+  async function approvedThenMainGone(override?: ForwardOverride) {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    const { card: fwd, source } = await returned(e, override)
+    const { made } = await resolveOnBuilder(e, fwd)
+    expect(e.wf.state(made).resolves?.override).toEqual(override)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const folder = started.data!.folder as string
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict
+    }
+    commit(folder, { 'fix.txt': 'resolved\n' }, 'Merge main, resolved')
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged' }))
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    // Checked at Resolve, forward then; the default branch changes before its merge (here: main deleted).
+    sh(e.project, 'branch', '-D', 'main')
+    return { e, made, fwd }
+  }
+
+  it('is returned to its builder with why, nothing merged, and told not to submit it again', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, made, fwd } = await approvedThenMainGone()
+    const dest = head(e, '1.2.0')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'returned', reason: 'direction' }])
+    expect(head(e, '1.2.0')).toBe(dest)
+    const s = e.wf.state(made)
+    expect(s.stage).toBe('active')
+    const failed = e.wf.store.facts(made.id).findLast((f) => f.kind === 'IntegrationFailed')!.data as FactData['IntegrationFailed']
+    const said = returnedComment(made.key, failed, { from: 'main', to: '1.2.0', resolution: fwd.key }).text
+    expect(said).toContain(`the resolution of ${fwd.key}`)
+    expect(said).toContain('Don’t submit it again')
+    expect(said).not.toContain('Remove from queue')
+  })
+
+  it("merges when its forward's request recorded the user's override", { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, made } = await approvedThenMainGone({ by: 'user', dir: 'unknown', why: 'unordered' })
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
   })
 })
