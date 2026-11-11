@@ -125,11 +125,22 @@ async function refNow(deps: JjIntegrationDeps, ref: string): Promise<string | nu
 
 const readsOf = (deps: JjIntegrationDeps): JjReads => new JjReads({ folder: deps.folder, jjRepo: deps.view.jjRepo }, deps.runner, { signal: deps.signal, timeout: deps.timeout })
 
+/** How many whole reads `jjTargetHead` makes at most while the operation head moves under them (HI-2916). */
+export const TARGET_READS = 3
+
 /**
  * The target's head (s11 §1, s14 §1′), all at the single head H: the local bookmark (none: null), not conflicted, its
  * commit neither divergent nor conflicted, the export matrix holding; the heads and Git's ref the same after the reads.
+ * A read that the operation head moved under (`moved`) is made again whole, at most TARGET_READS reads in all (HI-2916:
+ * Combwork's own jj operations beside it, a slot made or detached, move it); nothing of a moved read is kept.
  */
 export async function jjTargetHead(deps: JjIntegrationDeps, target: string): Promise<JjEvidence<JjTargetHead | null>> {
+  let r = await targetHeadOnce(deps, target)
+  for (let i = 1; i < TARGET_READS && isJjUnknown(r) && r.jjUnknown === 'moved'; i++) r = await targetHeadOnce(deps, target)
+  return r
+}
+
+async function targetHeadOnce(deps: JjIntegrationDeps, target: string): Promise<JjEvidence<JjTargetHead | null>> {
   const reads = readsOf(deps)
   const ok = await reads.supported()
   if (isJjUnknown(ok)) return ok

@@ -14,6 +14,7 @@ import { jjContextOf } from '../src/main/platform/jjDetect'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { readOpHeads } from '../src/main/platform/jjView'
 import type { RunResult } from '../src/main/platform/repoContext'
+import type { JjRunner } from '../src/main/platform/jjRunner'
 import { isCandidate, isInterrupted, pinPrefix, prepareJjCandidate, prepareJjUpdate, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle } from '../src/main/platform/jjCandidates'
 import {
   bundlePrefix,
@@ -22,6 +23,7 @@ import {
   jjContains,
   jjTargetHead,
   memoryObligations,
+  TARGET_READS,
   observePublish,
   reconstructObligations,
   type JjBundle,
@@ -211,6 +213,42 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
         expect(await w.ref('refs/heads/main')).toBe(w.T)
         expect(await jjTargetHead(w.deps(), 'main')).toMatchObject({ head: later, gitRef: w.T })
       })
+
+    it("the target's head read again whole while an operation lands under its read, at most TARGET_READS reads; another failure not read again (HI-2916)", async () => {
+      const w = await world(colocated)
+      // A runner that lands an unrelated jj operation after the target read's bookmark listing, `moves` times.
+      let moves = 0
+      let lists = 0
+      const runner: JjRunner = {
+        run: async (folder, args, o) => {
+          const r = await h.runner.run(folder, args, o)
+          if (args.includes('bookmark') && args.includes('list')) {
+            lists++
+            if (moves-- > 0) w.jj('new', 'main', '--no-edit', '-m', 'elsewhere')
+          }
+          return r
+        },
+        readiness: () => h.runner.readiness(),
+        readinessNow: () => h.runner.readinessNow(),
+        problem: () => h.runner.problem(),
+        shutdown: (ms) => h.runner.shutdown(ms)
+      }
+      // Moved under the first two reads: the third's answer, read whole at the head it ends on.
+      moves = TARGET_READS - 1
+      const th = await jjTargetHead(w.deps({ runner }), 'main')
+      expect(th).toMatchObject({ head: w.T, op: readOpHeads(w.deps().view.jjRepo)![0] })
+      expect(lists).toBe(TARGET_READS)
+      // Moved under every read: unknown (moved) once they're spent, never an answer from a moved read.
+      moves = 99
+      lists = 0
+      expect(await jjTargetHead(w.deps({ runner }), 'main')).toMatchObject({ jjUnknown: 'moved' })
+      expect(lists).toBe(TARGET_READS)
+      // A failure that isn't a move (the listing fails): read once.
+      lists = 0
+      const failing: JjRunner = { ...runner, run: async (folder, args, o) => (args.includes('bookmark') && args.includes('list') ? (lists++, { ok: false, out: '', err: 'boom', buf: Buffer.alloc(0), code: 1 }) : h.runner.run(folder, args, o)) }
+      expect(await jjTargetHead(w.deps({ runner: failing }), 'main')).toMatchObject({ jjUnknown: 'failed' })
+      expect(lists).toBe(1)
+    })
 
     it('two operation heads: unknown, nothing merged', async () => {
       const w = await world(colocated)

@@ -192,6 +192,7 @@ export const SUITES = [
   { name: 'intents' },
   { name: 'isolatedcheck' },
   { name: 'isolation', everything: "the run context (runContext.cjs) and testQuiet.ts: what every test copy and its children are given" },
+  { name: 'jjafterpush' },
   { name: 'jjreopen' },
   { name: 'jjview' },
   { name: 'jjwindow' },
