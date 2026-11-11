@@ -160,11 +160,11 @@ const TARGET = 'integration'
     // GET /v1/queue and listed with past=true, marked; named, it is listed as it is.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     // Once the removed card's run has ended and main's runner let its lease go (HI-2927: until then it is live).
-    const idle = await until(async () => {
+    const mainIdle = await until(async () => {
       const m = (await api(reviewer.token, 'GET', '/v1/queue?target=main')).body?.[0]
       return m && !m.testing && !m.queued.length && !m.runBy && !m.paused
     }, HUNG_MS)
-    check('…main\'s queue ends idle once its card is taken out', !!idle)
+    check('…main\'s queue ends idle once its card is taken out', !!mainIdle)
     const live = await api(reviewer.token, 'GET', '/v1/queue')
     const withPast = await api(reviewer.token, 'GET', '/v1/queue?past=true')
     const named = await api(reviewer.token, 'GET', '/v1/queue?target=main')
