@@ -140,6 +140,8 @@ export const AREAS = [
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
+  // HI-2914: a jj card's observation after a restart, and the reconciler's debounce under Waiting's repeated reads.
+  { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/jjRepoWatch.ts', 'src/main/jjWindow.ts'], suites: ['jjreopen'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
   // The Agent API for apps that show Combwork (#620): viewer tokens, the discovery file, the event stream's events.
