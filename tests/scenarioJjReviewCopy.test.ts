@@ -132,6 +132,26 @@ describe("what changed in a jj review copy while its reviewer had it", () => {
     expect(writes([{ name: 'Bash', input: "echo it's fine\njj new", cwd: COPY }])).toEqual(['jj new'])
   })
 
+  it("HR2's round 1: a wrapped script keeps its quotes, an escaped apostrophe is no quote, a heredoc ends only at its own tag", () => {
+    const COPY = 'C:\\ws\\.copies\\alpha\\copy-1'
+    const writes = (tools: Tool[]): string[] => copyWrites({ tools }, COPY)
+    // cmd /c and pwsh -Command take the rest as written: a read-only script inside stays one word.
+    expect(writes([{ name: 'Bash', input: 'cmd /c node -e "const f = (x) => x"', cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'PowerShell', input: 'pwsh -Command node -e "const f = (x) => x"', cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'Bash', input: 'cmd /c jj commit -m "a > b"', cwd: COPY }])).toEqual(['jj commit -m a > b'])
+    // Bash escapes outside quotes: an escaped apostrophe is a plain one, an escaped `;` no separator.
+    expect(writes([{ name: 'Bash', input: "echo it\\'s fine; jj new", cwd: COPY }])).toEqual(['jj new'])
+    expect(shellCommands('echo a\\;b c').map((x) => x.words)).toEqual([['echo', 'a;b', 'c']])
+    expect(writes([{ name: 'Bash', input: 'echo a \\> b', cwd: COPY }])).toEqual([])
+    // A Windows path's backslashes stay.
+    expect(shellCommands('jj -R C:\\ws\\copy commit').map((x) => x.words)).toEqual([['jj', '-R', 'C:\\ws\\copy', 'commit']])
+    // A heredoc ends only at a line that is exactly its tag (<<- after leading tabs only, never spaces).
+    expect(writes([{ name: 'Bash', input: 'cat <<EOF\n  EOF\njj new\nEOF\njj st', cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'Bash', input: 'cat <<-EOF\n\t\tnotes\n\tEOF\njj new', cwd: COPY }])).toEqual(['jj new'])
+    expect(writes([{ name: 'Bash', input: 'cat <<-EOF\n  EOF\njj new\nEOF', cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'Bash', input: 'cat <<EOF\r\nnotes\r\nEOF\r\njj new', cwd: COPY }])).toEqual(['jj new'])
+  })
+
   it('shellCommands: words and the bare command, quotes, separators, here-strings', () => {
     const cmds = (t: string) => shellCommands(t).map((c) => c.words)
     expect(cmds('jj log -r @- && jj diff | head; cat a || echo b')).toEqual([['jj', 'log', '-r', '@-'], ['jj', 'diff'], ['head'], ['cat', 'a'], ['echo', 'b']])
