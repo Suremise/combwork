@@ -2507,7 +2507,12 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
   name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
   child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
-  repository or workspace, is refused.
+  repository or workspace, is refused. A prune forgets only this project's workspaces whose folders are gone, each
+  proved again under the store's lock (HI-2946): still registered under that name at that root, read afresh at an
+  operation; then, with the control's proof at the forget's admission right before jj starts, that operation still the
+  single head (any registration changed since, such as the name forgotten and added again at another root, waits for
+  the next prune) and its folder still absent. A folder back by then (restored or replaced while the prune waited)
+  keeps its registration and everything in it.
 - **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
   operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
   jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
