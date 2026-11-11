@@ -8343,7 +8343,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     (below), with **Cancel Change** after the line.
   - **Editing a lane's cards** (HI-2898, carrying HI-1927; Darren 10 Nov: the picker and dragging from the board, Move
     here, the local day): in the Lanes tab, a running lane's open cards show its working list (its queued list when it
-    has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down), comes off
+    has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down, on its row or
+    its key or ×; HI-2970: inside the opened cards they never move the lane, which takes them on its own row only), comes off
     with × or Delete (back to the board, never deleted); Add Card… searches the project's Todo cards by key or title, and
     a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
     (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
