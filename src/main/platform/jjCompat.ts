@@ -2,7 +2,7 @@
 // repository uses that jj doesn't support, read from what Git and jj would actually apply, never one source of it: Git's
 // effective config at every level and include (`git config --list --show-origin --show-scope --includes`, run in the
 // repository), every attribute source Git applies (the system's, the global one, every tracked `.gitattributes` and, in a
-// colocated working tree, every untracked one Git sees (HI-2978), the root's even when ignored, the store's
+// colocated working tree, every untracked one Git sees (HI-2978), and any on disk in a folder holding a tracked file, ignored or not, the store's
 // `info/attributes`), jj's effective config (`jj config list`), and the repository's files. Anything it can't
 // read, list or resolve is "uses it" (unknown): the gate stays closed. Read-only: never a write, a snapshot or an import.
 // Git for Windows' stock system settings, as its installer writes them, aren't a use (HI-2872): only those values, at
@@ -43,6 +43,8 @@ const DEFAULTS: CompatDeps = { git: (cwd, args) => storeGitGated(cwd, args, () =
 
 /** At most this many tracked .gitattributes files are read; more is unknown (fail closed). */
 export const ATTR_FILES_MAX = 2000
+/** At most this many folders holding tracked files are looked in for an untracked `.gitattributes`; more is unknown. */
+export const ATTR_DIRS_MAX = 100_000
 /** At most this much of one attribute file is read; larger is unknown. */
 export const ATTR_FILE_MAX = 1024 * 1024
 /**
@@ -164,6 +166,19 @@ const unknownAt = (a: Assessment, g: RepoGate, what: string): void => {
   a[g] = { unknown: what.slice(0, 300) }
 }
 
+/** Every folder (relative, `/`-separated, the root's left out) holding a tracked path, each once. */
+export function trackedDirs(paths: readonly string[]): string[] {
+  const dirs = new Set<string>()
+  for (const p of paths) {
+    for (let i = p.lastIndexOf('/'); i > 0; i = p.lastIndexOf('/', i - 1)) {
+      const d = p.slice(0, i)
+      if (dirs.has(d)) break
+      dirs.add(d)
+    }
+  }
+  return [...dirs]
+}
+
 /** A file's text, bounded: null when absent; 'unreadable' when it can't be read or is larger than the bound. */
 async function bounded(p: string): Promise<string | null | 'unreadable'> {
   const st = await stat(p).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? null : 'unreadable' as const))
@@ -266,7 +281,7 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     if (attrFiles.length > ATTR_FILES_MAX) unknownAt(a, 'attributes', `${attrFiles.length} .gitattributes files`) // i18n-ignore: what was found, shown as data beside its message
     else for (const [, p] of attrFiles) sources.push(join(root, p))
     // Untracked ones Git applies too (HI-2978): in a colocated working tree, each one Git lists as untracked and not
-    // ignored; the root's own on disk in either mode (not colocated: recorded by jj or not yet), even ignored.
+    // ignored; then, in either mode, those beside tracked files on disk, ignored or not (below).
     const seen = new Set(attrFiles.map(([, p]) => p))
     if (!o.separate) {
       const others = await deps.git(root, ['ls-files', '-z', '-o', '--exclude-standard', '--', ':(glob)**/.gitattributes'])
@@ -282,7 +297,25 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
           }
       }
     }
-    if (!seen.has('.gitattributes') && (await stat(join(root, '.gitattributes')).catch(() => null))) sources.push(join(root, '.gitattributes'))
+    // Ignored ones Git applies all the same (HR1's HI-2978 round 1): the `.gitattributes` on disk in every folder holding
+    // a tracked file, and the root's, whatever Git's untracked listing leaves out (bounded: past ATTR_DIRS_MAX folders,
+    // unknown; a read that fails, unknown).
+    const dirs = trackedDirs(rows.map((r) => r.split('\t')[1] ?? ''))
+    if (dirs.length > ATTR_DIRS_MAX) unknownAt(a, 'attributes', `${dirs.length} folders with tracked files`) // i18n-ignore: what was found, shown as data beside its message
+    else {
+      const look = ['', ...dirs].map((d) => (d ? `${d}/.gitattributes` : '.gitattributes')).filter((p) => !seen.has(p))
+      for (let i = 0; i < look.length; i += 64) {
+        const found = await Promise.all(look.slice(i, i + 64).map(async (p) => [p, await stat(join(root, p)).then((st) => (st.isFile() ? 'file' : null), (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? null : 'unreadable'))] as const))
+        for (const [p, kind] of found) {
+          if (kind === 'unreadable') unknownAt(a, 'attributes', join(root, p))
+          else if (kind === 'file') {
+            seen.add(p)
+            sources.push(join(root, p))
+          }
+        }
+      }
+      if (seen.size > ATTR_FILES_MAX) unknownAt(a, 'attributes', `${seen.size} .gitattributes files`) // i18n-ignore: what was found, shown as data beside its message
+    }
     for (const r of rows) if (r.startsWith('160000 ')) add(a, 'submodules', `gitlink ${r.split('\t')[1] ?? ''}`)
   }
   for (const src of sources) {

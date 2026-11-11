@@ -307,6 +307,21 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     writeFileSync(join(r2.root, '.gitattributes'), '*.txt -crlf\n')
     const a2 = (await assessJj(r2.root, r2.ctx.store, gitDeps)).attributes
     expect(a2).toEqual({ uses: [`${join(r2.root, '.gitattributes')}: *.txt -crlf`] })
+    // HR1's round 1: an ignored .gitattributes beside a tracked file in a subfolder, which Git applies (it converts), is read.
+    const r3 = await repo('crlf-nested-ignored')
+    git(r3.root, 'config', 'core.autocrlf', 'false')
+    mkdirSync(join(r3.root, 'sub', 'deep'), { recursive: true })
+    writeFileSync(join(r3.root, 'sub', 'deep', 'a.txt'), 'one\ntwo\n')
+    writeFileSync(join(r3.root, '.gitignore'), '**/.gitattributes\n')
+    jj(r3.root, 'commit', '-m', 'nested')
+    expect(git(r3.root, 'ls-files', 'sub')).toBe('sub/deep/a.txt')
+    writeFileSync(join(r3.root, 'sub', '.gitattributes'), '*.txt crlf\n')
+    expect(git(r3.root, 'check-ignore', 'sub/.gitattributes')).toBe('sub/.gitattributes')
+    expect(git(r3.root, 'check-attr', 'crlf', '--', 'sub/deep/a.txt')).toBe('sub/deep/a.txt: crlf: set')
+    rmSync(join(r3.root, 'sub', 'deep', 'a.txt'))
+    git(r3.root, 'checkout', '--', 'sub/deep/a.txt')
+    expect(readFileSync(join(r3.root, 'sub', 'deep', 'a.txt'), 'utf8')).toBe('one\r\ntwo\r\n')
+    expect((await assessJj(r3.root, r3.ctx.store, gitDeps)).attributes).toEqual({ uses: [`${join(r3.root, 'sub', '.gitattributes')}: *.txt crlf`] })
   })
 
   it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {
