@@ -104,7 +104,7 @@ function jjRepo(dir, o = {}) {
   jjRepo(loose, { loose: true })
   project(loose, { platform: 'none' })
 
-  const env = { ...gitEnvOfTools(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}` }
+  const env = lib.withPathFirst({ ...gitEnvOfTools() }, jjDir())
   delete env.CW_USER_DATA
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
