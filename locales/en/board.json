@@ -2859,6 +2859,14 @@
     "defaultMessage": "{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Combwork could merge into a checked-out branch ({target})."
   },
+  "board.queue.pause.commit": {
+    "defaultMessage": "Commit",
+    "description": "HI-2944: a button on a merge paused on uncommitted changes (the Merges tab, Version Control → Merge queue, a card's Work section): commits exactly the files named, in the folder the branch is checked out in, then the merge goes on."
+  },
+  "board.queue.pause.commitTip": {
+    "defaultMessage": "Commit these files as they are now, on {target}, and let the merge go on.",
+    "description": "HI-2944: tooltip of Commit on a paused merge. {target} is the branch."
+  },
   "board.queue.pause.fetchFailed": {
     "defaultMessage": "Fetching {target}’s remote failed (git’s message follows): a sign-in, the network or the address. Fix it, then resume.",
     "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): before a test merge, fetching the remote branch the target ({target}: a branch) follows failed; git's own message follows."
@@ -2935,6 +2943,14 @@
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced."
   },
+  "board.queue.pause.setAside": {
+    "defaultMessage": "Set Aside",
+    "description": "HI-2944: a button on a merge paused on uncommitted changes: sets the files named aside (a git stash Combwork names), then the merge goes on."
+  },
+  "board.queue.pause.setAsideTip": {
+    "defaultMessage": "Keep these changes in a git stash (git stash pop brings them back) and let the merge go on.",
+    "description": "HI-2944: tooltip of Set Aside on a paused merge. Keep git stash pop as it is: a command."
+  },
   "board.queue.pause.signing": {
     "defaultMessage": "Signing the merge commit failed.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing failed (its message follows)."
@@ -2944,8 +2960,8 @@
     "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Combwork can't type."
   },
   "board.queue.pause.staged": {
-    "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes."
+    "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes. HI-2944: Commit and Set Aside are buttons beside it."
   },
   "board.queue.pause.subfolderTarget": {
     "defaultMessage": "This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.",
@@ -2960,8 +2976,8 @@
     "description": "Why a merge queue is paused, on its card in the Progress panel: its checks passed but didn't count (the folder changed during them, say). Glossary 2.3: merge checks; 2.4: work."
   },
   "board.queue.pause.unstagedChanges": {
-    "defaultMessage": "{files, select, none {Files the merge changes} other {{files}}} have changes in the folder {target} is checked out in. Commit or undo them, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names) have changes in the folder where the target ({target}: a branch) is checked out. Keep the select keys and the word none."
+    "defaultMessage": "{files, select, none {Files the merge changes} other {{files}}} have uncommitted changes in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names) have changes in the folder where the target ({target}: a branch) is checked out. HI-2944: Commit and Set Aside are buttons beside it. Keep the select keys and the word none."
   },
   "board.queue.pause.wrongBranch": {
     "defaultMessage": "The folder {target} was checked out in is on another branch now.",

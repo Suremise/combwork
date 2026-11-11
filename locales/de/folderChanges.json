@@ -1,0 +1,9 @@
+{
+  "folderChanges.commitFailed": "Commit nicht möglich",
+  "folderChanges.committed": "{count, plural, one {# Datei committet} other {# Dateien committet}} auf {branch}.",
+  "folderChanges.resumed": "Der Merge geht weiter.",
+  "folderChanges.setAside": "{count, plural, one {# Datei beiseitegelegt} other {# Dateien beiseitegelegt}} auf {branch}.",
+  "folderChanges.setAsideDetail": "Git bewahrt sie in einem Stash namens „{name}“ auf: git stash pop holt sie zurück.",
+  "folderChanges.setAsideFailed": "Die Änderungen konnten nicht beiseitegelegt werden",
+  "folderChanges.stillPaused": "Der Merge ist noch angehalten: Der Grund steht dort."
+}

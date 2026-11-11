@@ -142,6 +142,28 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
   })
 
+  it("HI-2944: a start whose target's folder has uncommitted changes says so and tells the window, before it is written; never refused", async () => {
+    const e = pair()
+    const told: unknown[] = []
+    const cfg = e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }
+    cfg.targetChanges = (c, card) => told.push({ ...(c as object), card })
+    // Clean: nothing said.
+    const clean = e.wf.createCard({ title: 'clean' })
+    const s0 = await e.wf.start(clean.key, B1)
+    moved(s0)
+    expect(s0.warnings ?? []).toEqual([])
+    expect(told).toEqual([])
+    // The user's .gitignore line, uncommitted where main is checked out: said, the start written all the same.
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    const card = e.wf.createCard({ title: 'A' })
+    cfg.targetChanges = (c, key) => told.push({ ...(c as object), card: key, written: e.kinds(card.id).includes('Started') })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    expect((s.warnings ?? []).join('\n')).toMatch(/^main's folder .+ has uncommitted changes \(\.gitignore\): a merge into main that changes them pauses/m)
+    expect(told).toMatchObject([{ target: 'main', files: ['.gitignore'], card: card.key, written: false }])
+    expect(e.kinds(card.id)).toContain('Started')
+  })
+
   it('the conditions are checked inside the lock and the fence, and the fence names the folder', async () => {
     const e = pair()
     await queued(e)

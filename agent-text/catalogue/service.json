@@ -339,6 +339,76 @@
     "note": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer.",
     "audience": "both"
   },
+  "service.folderChanges.agentBusy": {
+    "text": "{agent} is working in {folder}. Try again once it has finished.",
+    "note": "HI-2944: an error from Commit or Set aside: an agent ({agent}) works in the folder ({folder}, a path); nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.busy": {
+    "text": "An agent or a run is working in {folder} ({what}). Try again once it has finished.",
+    "note": "HI-2944: an error from Commit or Set aside: an agent holds files or a run works in the folder ({folder}, a path); {what} names the first file or run's folder; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.changed": {
+    "text": "The changes in {folder} aren't the ones shown any more. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.commitFailed": {
+    "text": "Git did not commit: {why}",
+    "note": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were.",
+    "audience": "both"
+  },
+  "service.folderChanges.detached": {
+    "text": "{folder} isn't on a branch, so Combwork doesn't commit there.",
+    "note": "HI-2944: an error from Commit it (Files) or Commit: the folder ({folder}, a path) has a detached HEAD (git's term), so nothing is committed.",
+    "audience": "both"
+  },
+  "service.folderChanges.indexBusy": {
+    "text": "Another git command is using the repository. Try again in a moment.",
+    "note": "HI-2944: an error from Commit or Set aside: git's index is locked by another git command.",
+    "audience": "both"
+  },
+  "service.folderChanges.midOperation": {
+    "text": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
+    "note": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.moved": {
+    "text": "Where {target} is checked out changed meanwhile. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: the folder the branch {target} is checked out in changed while Combwork waited to act; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.noTarget": {
+    "text": "{target} isn't checked out in a folder of this project now: nothing to commit or set aside there.",
+    "note": "HI-2944: an error from Commit or Set aside (a paused merge, a start's warning): the branch {target} isn't checked out anywhere now.",
+    "audience": "both"
+  },
+  "service.folderChanges.nothing": {
+    "text": "{file} has no changes to commit.",
+    "note": "HI-2944: an error from Files' Commit it after Exclude from Git: the ignore file ({file}, such as .gitignore) has no uncommitted change.",
+    "audience": "both"
+  },
+  "service.folderChanges.readFailed": {
+    "text": "Git could not read the folder's changes: {why}",
+    "note": "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.stashFailed": {
+    "text": "Git did not set the changes aside: {why}",
+    "note": "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were.",
+    "audience": "both"
+  },
+  "service.folderChanges.stashPartial": {
+    "text": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
+    "note": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command.",
+    "audience": "both"
+  },
+  "service.folderChanges.wrongBranch": {
+    "text": "{folder} isn't on {target} now. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done.",
+    "audience": "both"
+  },
   "service.forward.direction": {
     "text": "{to} isn’t brought up to date with {from}: {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Nothing was queued. {dir, select, backward {Bring {from} up to date with {to} instead, or, if you mean it, ask the Assistant with your explicit override.} other {If you mean it, ask the Assistant with your explicit override.}}",
     "note": "HI-2892: a forward merge refused: it would bring branch {to} up to date with branch {from} against the release path’s direction (forward merges go from a release, or main, into the next version). {why} says why (select: translate each; keep the keys): {to} is an older version, {to} is the repository’s default branch (main), the two names are the same version, or Combwork can’t order them. {dir}: backward (the reverse is the right way) or other. Branch names stay as they are.",
@@ -1012,6 +1082,11 @@
   "service.providers.unknownHost": {
     "text": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
     "note": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.",
+    "audience": "both"
+  },
+  "service.queue.pauseChanged": {
+    "text": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).",
     "audience": "both"
   },
   "service.repoOps.notOffered": {

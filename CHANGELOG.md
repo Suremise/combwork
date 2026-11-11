@@ -28,6 +28,10 @@
 
 ### Fixed
 
+- **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:
+  - The paused merge (Merges, Version Control → Merge queue, the card's Work section) has **Commit** and **Set Aside** for the files it names, and the merge goes on.
+  - When a card or lane starts and that folder has uncommitted changes, Combwork says so before work begins, with the same buttons.
+  - **Exclude from Git**'s notification has **Commit It** for `.gitignore`, and its menu says which choice needs a commit (**Shared with the repository**) and which doesn't (**Only on this PC**).
 - **A signing key written out in full as `ssh-…` no longer pauses the merge queue** (HI-2933). With `user.signingkey` set to the key itself (`ssh-ed25519 AAAA… you@example.com`, as 1Password and GitHub's docs give it), git signs with it, but Combwork's signing check took it for a file name, couldn't sign and paused the queue, and Version Control → Branches & remotes → Signing showed part of the key. Combwork now reads it as git does: the check signs with that key, and Signing shows only its type and comment.
 - **A slot no longer stays lent after its card is Done when the builder was restarting** (HI-2920). A builder restarted for its tools (or switched to another connection) just as its card finished took its old slot back for itself, so the slot never returned to the pool and the next card couldn't have it. Such a restart now resumes only where the agent may still work, and a stop while it gets ready leaves the slot alone.
 - **A jj lane's later card whose slot can't be prepared no longer starts its builder** (HI-2923). The builder was started again with the lane's brief, as if the card were the lane's first. It now stays stopped, and the card's Work section says why the slot wasn't prepared.

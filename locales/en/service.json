@@ -319,6 +319,62 @@
     "defaultMessage": "{file} is too large to show here.",
     "description": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer."
   },
+  "service.folderChanges.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}. Try again once it has finished.",
+    "description": "HI-2944: an error from Commit or Set aside: an agent ({agent}) works in the folder ({folder}, a path); nothing was done."
+  },
+  "service.folderChanges.busy": {
+    "defaultMessage": "An agent or a run is working in {folder} ({what}). Try again once it has finished.",
+    "description": "HI-2944: an error from Commit or Set aside: an agent holds files or a run works in the folder ({folder}, a path); {what} names the first file or run's folder; nothing was done."
+  },
+  "service.folderChanges.changed": {
+    "defaultMessage": "The changes in {folder} aren't the ones shown any more. Look again.",
+    "description": "HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done."
+  },
+  "service.folderChanges.commitFailed": {
+    "defaultMessage": "Git did not commit: {why}",
+    "description": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were."
+  },
+  "service.folderChanges.detached": {
+    "defaultMessage": "{folder} isn't on a branch, so Combwork doesn't commit there.",
+    "description": "HI-2944: an error from Commit it (Files) or Commit: the folder ({folder}, a path) has a detached HEAD (git's term), so nothing is committed."
+  },
+  "service.folderChanges.indexBusy": {
+    "defaultMessage": "Another git command is using the repository. Try again in a moment.",
+    "description": "HI-2944: an error from Commit or Set aside: git's index is locked by another git command."
+  },
+  "service.folderChanges.midOperation": {
+    "defaultMessage": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
+    "description": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done."
+  },
+  "service.folderChanges.moved": {
+    "defaultMessage": "Where {target} is checked out changed meanwhile. Look again.",
+    "description": "HI-2944: an error from Commit or Set aside: the folder the branch {target} is checked out in changed while Combwork waited to act; nothing was done."
+  },
+  "service.folderChanges.noTarget": {
+    "defaultMessage": "{target} isn't checked out in a folder of this project now: nothing to commit or set aside there.",
+    "description": "HI-2944: an error from Commit or Set aside (a paused merge, a start's warning): the branch {target} isn't checked out anywhere now."
+  },
+  "service.folderChanges.nothing": {
+    "defaultMessage": "{file} has no changes to commit.",
+    "description": "HI-2944: an error from Files' Commit it after Exclude from Git: the ignore file ({file}, such as .gitignore) has no uncommitted change."
+  },
+  "service.folderChanges.readFailed": {
+    "defaultMessage": "Git could not read the folder's changes: {why}",
+    "description": "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done."
+  },
+  "service.folderChanges.stashFailed": {
+    "defaultMessage": "Git did not set the changes aside: {why}",
+    "description": "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were."
+  },
+  "service.folderChanges.stashPartial": {
+    "defaultMessage": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
+    "description": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command."
+  },
+  "service.folderChanges.wrongBranch": {
+    "defaultMessage": "{folder} isn't on {target} now. Look again.",
+    "description": "HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done."
+  },
   "service.forward.byAssistant": {
     "defaultMessage": "the Assistant",
     "description": "HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant."
@@ -1095,6 +1151,10 @@
     "defaultMessage": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
     "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button."
   },
+  "service.queue.pauseChanged": {
+    "defaultMessage": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
+    "description": "HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else)."
+  },
   "service.repoOps.notOffered": {
     "defaultMessage": "Version control ({platform}) doesn’t offer that here.",
     "description": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation."
@@ -1110,6 +1170,30 @@
   "service.slots.resumeHeld": {
     "defaultMessage": "Combwork can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Combwork gives it {card} once it can.",
     "description": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Combwork hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Combwork never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English."
+  },
+  "service.targetChanges.commit": {
+    "defaultMessage": "Commit",
+    "description": "HI-2944: a button of the warning: commits exactly the files it names, in that folder."
+  },
+  "service.targetChanges.message": {
+    "defaultMessage": "{folder} has {count, plural, one {an uncommitted change} other {# uncommitted changes}}: {files}. A merge into {target} that changes them pauses until they are committed or set aside.",
+    "description": "HI-2944: the warning's text. {folder} is the folder's name; {files} lists up to five paths (then how many more); {target} the branch. Work starts anyway."
+  },
+  "service.targetChanges.more": {
+    "defaultMessage": "{files} and {more, plural, one {# more} other {# more}}",
+    "description": "HI-2944: a list of paths cut at five ({files}), and how many more there are."
+  },
+  "service.targetChanges.setAside": {
+    "defaultMessage": "Set Aside",
+    "description": "HI-2944: a button of the warning: sets the files it names aside (a git stash Combwork names), so the merge can go on."
+  },
+  "service.targetChanges.show": {
+    "defaultMessage": "Show Changes",
+    "description": "HI-2944: a button of the warning: opens the Version Control tab's changes."
+  },
+  "service.targetChanges.title": {
+    "defaultMessage": "Uncommitted changes where {target} is checked out",
+    "description": "HI-2944: a warning's title when a card or lane starts: the folder the branch {target} is checked out in (where the merge queue merges into it) has uncommitted changes."
   },
   "service.templates.v09": {
     "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",

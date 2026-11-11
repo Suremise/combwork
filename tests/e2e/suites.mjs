@@ -155,6 +155,7 @@ export const SUITES = [
   { name: 'filelinks' },
   { name: 'files' },
   { name: 'flightrecorder' },
+  { name: 'foldercommit' },
   { name: 'followupsubmit' },
   { name: 'footerfit' },
   { name: 'foryou' },

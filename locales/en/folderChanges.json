@@ -1,0 +1,30 @@
+{
+  "folderChanges.commitFailed": {
+    "defaultMessage": "Could not commit",
+    "description": "HI-2944: an error notification's title: Commit of a folder's uncommitted changes (a paused merge, a start's warning, Files' Commit it) was refused."
+  },
+  "folderChanges.committed": {
+    "defaultMessage": "{count, plural, one {Committed # file} other {Committed # files}} on {branch}.",
+    "description": "HI-2944: a notification after Commit: the files committed in the folder's branch {branch}."
+  },
+  "folderChanges.resumed": {
+    "defaultMessage": "The merge goes on.",
+    "description": "HI-2944: under the notification after Commit or Set aside on a paused merge: the merge queue resumed."
+  },
+  "folderChanges.setAside": {
+    "defaultMessage": "{count, plural, one {Set # file aside} other {Set # files aside}} on {branch}.",
+    "description": "HI-2944: a notification after Set aside: the files stashed in the branch {branch}."
+  },
+  "folderChanges.setAsideDetail": {
+    "defaultMessage": "Git keeps them in a stash named \"{name}\": git stash pop brings them back.",
+    "description": "HI-2944: under the notification after Set aside: where the changes are and how to get them back. {name} is the stash's message. Keep git stash pop as it is: a command."
+  },
+  "folderChanges.setAsideFailed": {
+    "defaultMessage": "Could not set the changes aside",
+    "description": "HI-2944: an error notification's title: Set aside of a folder's uncommitted changes was refused."
+  },
+  "folderChanges.stillPaused": {
+    "defaultMessage": "The merge is still paused: see why on it.",
+    "description": "HI-2944: under the notification after Commit or Set aside on a paused merge: the queue stays paused (something else still stops it, shown on the paused merge)."
+  }
+}

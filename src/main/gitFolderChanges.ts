@@ -7,6 +7,7 @@
 // they were, and a stash git made before it failed is kept and named.
 import { resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
+import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { changingFolder } from './folderFence'
@@ -36,6 +37,13 @@ const M = {
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
+}
+
+/** What changes the folder, as its fence names it: the log, and an agent's reply refused meanwhile (agent-facing). */
+const FENCE = {
+  commit: agentMsg({ id: 'folderChanges.fence.commit', text: 'a commit of changes the user chose', note: "HI-2944: what changes a folder while the user's Commit runs there (a paused merge, a start's warning): Combwork types nothing into an agent there meanwhile." }),
+  setAside: agentMsg({ id: 'folderChanges.fence.setAside', text: 'setting aside changes the user chose', note: "HI-2944: what changes a folder while the user's Set aside (a git stash) runs there." }),
+  ignore: agentMsg({ id: 'folderChanges.fence.ignore', text: 'a commit of .gitignore', note: "HI-2944: what changes the project folder while Files' Commit it commits .gitignore." })
 }
 
 /** The most a commit or stash may take: a hook or a signer can wait; a bound for a hung one, never how long it should take. */
@@ -152,7 +160,7 @@ async function setAsidePaths(folder: string, files: string[], message: string): 
     }
     throw failed(M.stashFailed, r.err)
   }
-  if (!made) throw failed(M.stashFailed, r.err || r.out || 'no stash was made')
+  if (!made) throw failed(M.stashFailed, r.err || r.out || 'no stash was made') // i18n-ignore: stands in for git's own (English) words
   return made
 }
 
@@ -168,8 +176,7 @@ export async function settleChanges(projectPath: string, target: string, action:
   if (isUnknown(where)) throw failed(M.commitFailed, where.detail ?? where.what)
   const seen = where[target]
   if (!seen) throw combworkError(M.noTarget, { target })
-  // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
-  const what = action === 'commit' ? 'a commit of changes the user chose' : 'setting aside changes the user chose'
+  const what = say(action === 'commit' ? FENCE.commit : FENCE.setAside)
   return withRepoLock(
     projectPath,
     () =>
@@ -184,7 +191,7 @@ export async function settleChanges(projectPath: string, target: string, action:
         if (!shown.length || !shown.every((p) => now.has(p))) throw combworkError(M.changed, { folder })
         // A rename's other side goes with it: committed or set aside, the rename stays whole.
         const files = [...new Set(shown.flatMap((p) => [p, ...(now.get(p)?.from ? [now.get(p)!.from!] : [])]))]
-        const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label}`
+        const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label}` // i18n-ignore: the commit's or stash's message, in the repository (English, as Combwork's other commits)
         const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked), message) : await setAsidePaths(folder, files, message)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
@@ -200,17 +207,16 @@ export async function settleChanges(projectPath: string, target: string, action:
  */
 export async function commitIgnore(projectPath: string): Promise<FolderChangesDone> {
   const repo = await filesRepo(projectPath)
-  // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
   return withRepoLock(
     repo.cwd,
     () =>
-      changingFolder(repo.cwd, 'a commit of .gitignore', async () => {
+      changingFolder(repo.cwd, say(FENCE.ignore), async () => {
         const branch = await assertQuiet(repo.cwd, repo.cwd, null)
         // Its paths from the repository's top (the project folder may be a folder in a larger repository).
         const now = await changedIn(repo.top)
         const file = '.gitignore'
         if (!now.has(file)) throw combworkError(M.nothing, { file })
-        const message = 'Update .gitignore'
+        const message = 'Update .gitignore' // i18n-ignore: the commit's message, in the repository (English, as Combwork's other commits)
         const made = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
         log.info(`Committed .gitignore in ${userText(repo.cwd)} on ${userText(branch)}`)
         return { action: 'commit', folder: repo.cwd, branch, files: [file], message, made }

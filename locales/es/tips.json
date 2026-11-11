@@ -346,6 +346,8 @@
   "tips.mergeMessage.title": "Fusiones con tus propios mensajes de commit",
   "tips.mergePush.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo puede hacer push de la rama de destino después de cada fusión, nunca forzado. Si el remoto lo rechaza, la cola se pausa y explica por qué: haz pull y reanuda, o desactívalo y reanuda.",
   "tips.mergePush.title": "Haz push de cada fusión a tu remoto",
+  "tips.mergeQueueCommit.text": "Una fusión pausada por tus cambios sin commit, donde su rama está activa, tiene Hacer commit y Apartar: de cualquier forma la fusión continúa. Combwork también te avisa cuando una tarjeta o un carril empieza con cambios así allí.",
+  "tips.mergeQueueCommit.title": "Haz commit o aparta lo que pausa una fusión",
   "tips.mergeQueueFolder.text": "Cuando la cola de fusión fusiona en una rama activa en una carpeta (main en la carpeta del proyecto), también actualiza la carpeta, pero se pausa en vez de tocar un archivo que estás cambiando. En Configuración → Avanzado puedes hacer que antes te pregunte en Para ti.",
   "tips.mergeQueueFolder.title": "Fusionar en la carpeta en la que trabajas",
   "tips.mergeQueuePanel.text": "La pestaña Fusiones del panel Progreso muestra cada cola de fusión: la tarjeta que está probando y cuánto suelen tardar sus comprobaciones, las tarjetas que esperan y una tarjeta que devolvió, hasta que la hayas visto. Pausar la cola y Reanudar la cola también están ahí.",

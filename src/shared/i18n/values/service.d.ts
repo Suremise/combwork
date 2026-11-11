@@ -81,6 +81,20 @@ interface CombworkMessageValues {
   'service.filesGit.nothing': undefined
   'service.filesGit.ruleChanged': undefined
   'service.filesGit.tooLarge': { file: string | number }
+  'service.folderChanges.agentBusy': { agent: string | number; folder: string | number }
+  'service.folderChanges.busy': { folder: string | number; what: string | number }
+  'service.folderChanges.changed': { folder: string | number }
+  'service.folderChanges.commitFailed': { why: string | number }
+  'service.folderChanges.detached': { folder: string | number }
+  'service.folderChanges.indexBusy': undefined
+  'service.folderChanges.midOperation': { state: string; folder: string | number }
+  'service.folderChanges.moved': { target: string | number }
+  'service.folderChanges.noTarget': { target: string | number }
+  'service.folderChanges.nothing': { file: string | number }
+  'service.folderChanges.readFailed': { why: string | number }
+  'service.folderChanges.stashFailed': { why: string | number }
+  'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
@@ -275,10 +289,17 @@ interface CombworkMessageValues {
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.providers.unknownHost': { cli: string | number }
+  'service.queue.pauseChanged': undefined
   'service.repoOps.notOffered': { platform: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }
+  'service.targetChanges.commit': undefined
+  'service.targetChanges.message': { folder: string | number; count: number; files: string | number; target: string | number }
+  'service.targetChanges.more': { files: string | number; more: number }
+  'service.targetChanges.setAside': undefined
+  'service.targetChanges.show': undefined
+  'service.targetChanges.title': { target: string | number }
   'service.templates.v09': { n: number }
   'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined

@@ -352,6 +352,8 @@
   "tips.mergeMessage.title": "Merges with your own commit messages",
   "tips.mergePush.text": "With Combwork merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",
   "tips.mergePush.title": "Push each merge to your remote",
+  "tips.mergeQueueCommit.text": "A merge paused on your uncommitted changes, where its branch is checked out, has Commit and Set Aside: either way the merge goes on. Combwork also tells you when a card or lane starts with such changes there.",
+  "tips.mergeQueueCommit.title": "Commit or set aside what pauses a merge",
   "tips.mergeQueueFolder.text": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
   "tips.mergeQueueFolder.title": "Merging into the folder you work in",
   "tips.mergeQueuePanel.text": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",

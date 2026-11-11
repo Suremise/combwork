@@ -1411,6 +1411,14 @@
     "defaultMessage": "Push each merge to your remote",
     "description": "A tip's title (G18): the workflow option that has Combwork's merge queue push the target branch after each merge."
   },
+  "tips.mergeQueueCommit.text": {
+    "defaultMessage": "A merge paused on your uncommitted changes, where its branch is checked out, has Commit and Set Aside: either way the merge goes on. Combwork also tells you when a card or lane starts with such changes there.",
+    "description": "A tip (HI-2944). Names of Combwork's buttons: keep them as Combwork shows them."
+  },
+  "tips.mergeQueueCommit.title": {
+    "defaultMessage": "Commit or set aside what pauses a merge",
+    "description": "A tip's title (HI-2944): a merge paused on the user's uncommitted changes in the folder its branch is checked out in."
+  },
   "tips.mergeQueueFolder.text": {
     "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. For you is the board's list of what waits for the user."
