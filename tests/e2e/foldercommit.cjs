@@ -124,7 +124,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     await q.openByTitle(page, b.n)
     const pausedB = dialog.locator('.card-work-queue-paused')
     const aside = pausedB.locator('[data-action="set-aside-changes"]')
-    check("the card's Work section: the staged pause, with Set Aside", !!(await waitHung(async () => (await aside.count()) === 1)) && /staged/.test(await pausedB.innerText()), await pausedB.innerText().catch(() => ''))
+    check("the card's Work section: the staged pause, with Set Aside", !!(await waitHung(async () => (await aside.count()) === 1)) && /keep\.txt is staged|keep\.txt are staged/.test(await pausedB.innerText()), await pausedB.innerText().catch(() => ''))
     await f.themes(page, pausedB, 'foldercommit-card-staged')
     await aside.click()
     const keyB = (await h.card(b.n))?.key

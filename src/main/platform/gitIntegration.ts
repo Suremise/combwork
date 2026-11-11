@@ -388,11 +388,18 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     const folder = where[target]
     if (!folder) return null
     if (reason === 'wrongBranch') return (await G.branch(folder)) === target ? null : {}
-    if (reason === 'staged') return (await git(folder, ['diff', '--cached', '--quiet'])).code === 0 ? null : {}
+    // HI-2944: the files staged now, and the folder they were seen in (an older pause gets it here: Commit and Set aside
+    // act only where the changes were seen).
+    if (reason === 'staged') {
+      const staged = await git(folder, ['diff', '--cached', '--name-only', '-z'])
+      if (!staged.ok) return {}
+      const names = staged.out.split('\0').filter(Boolean)
+      return names.length ? { files: names, folder } : null
+    }
     if (!files?.length) return null
     const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
     const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-    return !st.ok || busy.length ? { files: busy.length ? busy : files } : null
+    return !st.ok || busy.length ? { files: busy.length ? busy : files, ...(st.ok ? { folder } : {}) } : null
   }
 }
 

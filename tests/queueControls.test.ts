@@ -5,7 +5,7 @@
 // stand-in (nothing runs by itself), its runs driven here.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -402,6 +402,29 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     await expect(settle('commit', ['a.txt'], { card: p.card, reason: p.reason, at: p.at! })).rejects.toThrow(/Resume the queue/)
     expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
   })
+
+  for (const reason of ['unstagedChanges', 'staged'] as const) {
+    it(`an older ${reason} pause: refused, then Resume (still changed) records where it saw them, then Commit and the merge goes on`, async () => {
+      const { w, repo, wf, settle } = await paused()
+      if (reason === 'staged') git(repo, 'add', 'a.txt')
+      await wf.locked(() => wf.store.setQueuePause('main', { reason, card: 'p-1', files: ['a.txt'] }))
+      const old = wf.store.queuePause('main')!
+      await expect(settle('commit', ['a.txt'], { card: old.card, reason: old.reason, at: old.at! })).rejects.toThrow(/Resume the queue/)
+      // Resume, the change still there: still paused, now naming the folder (and the files staged now), a new pause.
+      const r = await inWorkspace(w, () => resumeQueue(w, repo, 'main'))
+      expect(r.resumed).toBe(false)
+      const now = wf.store.queuePause('main')!
+      expect(now).toMatchObject({ reason, files: ['a.txt'] })
+      expect(resolve(now.folder ?? '').toLowerCase()).toBe(resolve(repo).toLowerCase())
+      // The old pause shown is stale now: refused as changed.
+      await expect(settle('commit', ['a.txt'], { card: old.card, reason: old.reason, at: old.at! })).rejects.toThrow(/pause changed meanwhile/)
+      // The pause as shown now: committed, and the merge goes on.
+      const done = await settle('commit', ['a.txt'], { card: now.card, reason: now.reason, at: now.at! })
+      expect(done).toMatchObject({ resumed: true, done: { files: ['a.txt'] } })
+      expect(git(repo, 'status', '--porcelain')).toBe('')
+      expect(wf.store.queuePause('main')).toBeNull()
+    })
+  }
 })
 
 describe("the window's listing (#1356: which queues the panel can show)", () => {

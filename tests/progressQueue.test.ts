@@ -252,6 +252,9 @@ describe('what a queue card says', () => {
     expect(pauseText({ reason: 'signing', card: 'HI-61', files: [], by: null, at: null, message: 'gpg: no secret key' }, 'main', tr, list)).toBe('Signing the merge commit failed.\ngpg: no secret key')
     expect(pauseText({ reason: 'approval', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toMatch(/^HI-61 is ready to merge into main/)
     expect(pauseText({ reason: 'somethingNew', card: null, files: [], by: null, at: null }, 'main', tr, list)).toBe('Paused (somethingNew).')
+    // HI-2944: a staged pause names its files (Commit and Set Aside act on them), or says changes when it has none.
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt and b.ts are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Changes are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     for (const reason of ['targetMovesFast', 'folderBusy', 'wrongBranch', 'staged', 'identity', 'needsYou', 'uncounted', 'checkedOut', 'rulesOff', 'signingWaits', 'hookTimedOut']) expect(pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).not.toMatch(/^Paused \(/)
   })
 
