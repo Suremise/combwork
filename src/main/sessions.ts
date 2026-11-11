@@ -1070,7 +1070,7 @@ export interface StartOptions {
   keepWatch?: boolean
   /** A new conversation's purpose (#1434): where the agent works for it (agentFolders.ts); its role's own when absent. */
   purpose?: FolderPurpose
-  /** Resume All and startup's resume (#1434): a conversation resumes only where it may now, never taking a free slot. */
+  /** Resume All, startup's and a switch's resume (#1434, HI-2920): a conversation resumes only where it may now, never taking a free slot. */
   auto?: boolean
   /**
    * HI-2540: the user was asked before this resume whether to start a new conversation instead of one that can't
@@ -2150,6 +2150,8 @@ class SessionManager {
     const fa = folderAgent(agent)
     // The agent's own runs that have ended, their writers' releases still being written: its slot is theirs until then.
     await this.earlierWritersSettled(projectPath, agent.id, WRITER_SETTLE_MS)
+    // Stopped while it waited (HI-2920): it claims nothing.
+    this.assertStarting(liveId(projectPath, agent.id))
     try {
       const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
       // Its slot's writer is this run's from now: released once its processes are known to have ended, or its start is
@@ -2708,7 +2710,9 @@ class SessionManager {
         }
         this.switchResuming.add(id)
         try {
-          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))
+          // Automatic (HI-2920): only where it may resume now, never taking a free slot by hand. Its run's card lease
+          // ended meanwhile (Done), a take would leave a carried lease no one runs under.
+          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, auto: true, ...(sessionId ? { resumeId: sessionId } : {}) }))
         } catch (e) {
           const slot = (e as { busySlot?: unknown }).busySlot
           if (typeof slot !== 'string' || !hostOpen()) throw e
