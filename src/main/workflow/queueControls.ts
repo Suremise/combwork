@@ -17,7 +17,7 @@ import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
-import { branchExists, defaultBranch, forwardSources, projectTargets } from './targets'
+import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
 import { forwardDirection, forwardPermitted, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
@@ -129,10 +129,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
-  // HI-2893: a queue whose target is none of the project's targets now, and that holds no entry, is a past branch's.
-  const named = await projectTargets(ws, projectPath).catch(() => null)
-  const current = named ? [named.default, ...named.others] : []
-  for (const v of views) if (!current.includes(v.target) && !v.testing && !v.queued.length) v.past = true
+  markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
   const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
@@ -143,6 +140,18 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
     if (f.others.length) v.forward = f
   }
   return views
+}
+
+/**
+ * HI-2893: marks `past` each queue whose target is none of the project's targets now and that holds nothing: its history
+ * is Version Control's. HI-2927: nothing is no entry testing or queued, no card in flight into it, no pause (a stuck one
+ * too) and no Combwork running it, so those stay controllable; and targets that can't be read (`null`: not Git now, git's
+ * default unreadable) mark none past: unknown isn't "no targets".
+ */
+export function markPast(views: QueueView[], named: ProjectTargets | null): void {
+  if (!named) return
+  const current = [named.default, ...named.others]
+  for (const v of views) if (!current.includes(v.target) && !v.testing && !v.queued.length && !v.inFlight.length && !v.paused && !v.runBy) v.past = true
 }
 
 /** The project's targets that exist now (HI-2679): Work merges into and the others listed; none without a Git workflow. */

@@ -8002,8 +8002,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
   out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
   the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
-  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
-  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  or queued, HI-2927: no card in flight into it, no pause, a stuck one too, and no Combwork running it, so those stay
+  controllable) is a past branch's (`QueueView.past`, set in every listing); targets that can't be read (the project not
+  Git now, git's default unreadable) make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
   history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
   only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
