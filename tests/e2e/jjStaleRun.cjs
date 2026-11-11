@@ -57,11 +57,16 @@ const toolEnv = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_
 const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
 
-/** How often the app's log says it gave B1 card n in its slot (placement, after the slot's preparation). */
+/**
+ * How often the app's log says it gave B1 card n in its slot (placement, after the slot's preparation): its tries less
+ * those that waited instead ("#n waits to resume …", tried again by the next pass), so a card given once counts 1.
+ */
 function givings(n) {
   const log = path.join(userData, 'logs', 'combwork.log')
-  const re = new RegExp(`\\[slots\\] Giving \\S{0,1}B1\\S{0,1} #${n} in `)
-  return (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').split(/\r?\n/).filter((l) => re.test(l)).length
+  const lines = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').split(/\r?\n/)
+  const tried = new RegExp(`\\[slots\\] Giving \\S{0,1}B1\\S{0,1} #${n} in `)
+  const waited = new RegExp(`\\[slots\\] #${n} waits to resume `)
+  return lines.filter((l) => tried.test(l)).length - lines.filter((l) => waited.test(l)).length
 }
 
 ;(async () => {
@@ -291,7 +296,8 @@ function givings(n) {
       tries++
       const r = await inv('slots:recoverStale', shop, slotName).catch((e) => ({ ok: false, why: String(e) }))
       answers.push(r.ok ? 'ok' : r.why)
-      return r.ok && (await notStale())
+      // Recovered: no more tries (the slot list reads it again in its own time; the next check waits for that).
+      return r.ok
     }, HUNG_MS * 3)
     console.log(`INFO Recover… tries after B1 stopped: ${answers.join(', ')}`)
     const logText = () => (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '')
