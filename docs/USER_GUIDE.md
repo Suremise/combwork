@@ -1297,7 +1297,7 @@ In the **Lanes** tab, open a running lane (the chevron before its name) to chang
 - **Move a card:** drag a card waiting its turn by its row to another place; a line shows where it goes. With the keyboard, Tab to the card and press **Alt+Up** or **Alt+Down**.
 - **Take a card off:** the **×** at the end of its row, or **Delete** on it. It goes back to the board, in Todo: nothing is deleted.
 - **Add a card:** **Add Card…** at the end of the cards opens a search: type part of a key or a title, then click a card or press **Enter** for the first. Or drag a card from the board (the **Tasks** view) onto the lane's row, where it goes last, or into its open cards, where you drop it. A card given to another agent is taken off that agent, so the lane takes it.
-- **Only cards still waiting their turn move.** The card being worked shows a lock, and it and the cards before it (done, in review, approved) keep their places.
+- **Only cards still waiting their turn move.** The card being worked shows a lock, and it and the cards before it (done, in review, approved) keep their places: a card dropped on one of them stays where it was.
 
 A change made while a card is being worked waits until that card is Done, as a change by the Assistant or the builder does: it shows under the lane's bar (*Next, once HI-12 is Done: …*) with **Cancel Change**, which drops it. A card you've since moved to another lane with **Move Here** stays on that lane; one that has started since can't come back, so Cancel Change says so and changes nothing. Between cards it applies at once. Either way, the builder reads its cards as they are next. Changes made quickly one after another (Alt+Down twice, say) are made in turn, each from where the last one left the cards.
 

@@ -983,7 +983,12 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
       before = e.clientY < box.top + box.height / 2 ? n : (list[list.indexOf(n) + 1] ?? null)
     }
     // A card dragged from the board isn't known until the drop: placed as a new one.
-    if (droppedPlace(rows, own ? dragCard : null, before) === null) return setDropBefore(undefined)
+    if (droppedPlace(rows, own ? dragCard : null, before) === null) {
+      // Nowhere to drop over a row that keeps its place (HI-2969): stopped here, or the list and the lane's row would
+      // take it as "after the last row" and the card would go last, the opposite end from where it was dropped.
+      e.stopPropagation()
+      return setDropBefore(undefined)
+    }
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
