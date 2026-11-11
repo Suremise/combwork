@@ -822,6 +822,45 @@ export class CopyPool {
    * Returns a lease (a verdict, a review given up, the run's end, its holder's session ended): the copy `returning`,
    * then freed only through the barrier (tried at once, and again on every refresh). Whether it was open.
    */
+  /**
+   * HI-2950: the pool's free jj copies still at `at` (a candidate's commit, where its checks left them) moved onto `to` (the
+   * target's head it was built on), so nothing of theirs stays on the candidate and it can be dropped. Each the copy's own
+   * reset (the port's `resetTo`: tracked changes dropped, what isn't ignored removed), as the copy recorded it, under an
+   * operation of a lease's kind on a free copy (a crash is recovered as a lease's reset: the copy made again), never while a
+   * run or a process is in it. A copy leased or returning isn't touched (its barrier frees it first: try again later).
+   * Whether no copy is left at `at`.
+   */
+  async parkFree(at: string, to: string): Promise<boolean> {
+    let clear = true
+    for (const c of this.store.copies()) {
+      if (c.revision !== at) continue
+      const port = this.portOf(c)
+      if (c.state !== 'free' || c.op || !port.identity) {
+        clear = false
+        continue
+      }
+      const token = newToken()
+      let ok = false
+      await this.op(token, async () => {
+        if (!(await this.store.startOp(c.name, 'lease', 'free', token, await this.deps.holder.self()))) return
+        try {
+          if (this.deps.runIn(c.folder) || !(await quiet(c.folder))) {
+            await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'free', {}, { op: null }))
+            return
+          }
+          await this.store.fenced(c.name, token, () => undefined)
+          const r = await port.resetTo(c.folder, to, { identity: c.identity ?? null, fence: this.fenceOf(c.name, token) })
+          ok = r.ok
+          await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'free', ok ? { revision: to } : {}, { op: null }))
+        } catch (e) {
+          if (!(e instanceof OpLost)) throw e
+        }
+      })
+      if (!ok) clear = false
+    }
+    return clear
+  }
+
   async returnCopy(lease: string, why: string): Promise<boolean> {
     const l = await this.store.returnLease(lease, why)
     if (!l) return false
