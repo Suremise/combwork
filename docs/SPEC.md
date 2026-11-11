@@ -6174,7 +6174,11 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   latest 20 outcomes (merged with the result; returned with why, the files and the log; cancelled), the pause (why, the
   card, the files, who and when) and which Combwork runs it. The window reads it with `queue:list` and is told of each change
   (`queue-changed`); the Agent API with `GET /v1/queue` (a project agent its own project's; outcomes say whether there is
-  a log rather than carry it); the Assistant and agents with `cw_queue` (`list`).
+  a log rather than carry it); the Assistant and agents with `cw_queue` (`list`). Every reader lists the same targets,
+  classified by one rule (HI-2994, `queueViews`): those with an entry or a pause, those with cards in flight under
+  Combwork merges, the current options' target and the project's other existing targets, each read with its cards in
+  flight, so a past branch's queue (`markPast`) is the same for agents as for the user; the panel then shows those
+  `queueShown` says, the Agent API leaves out past branches' only. The window's own: forward merges and the returns' seam.
 - **Who may (OP-9):** the user from the window; the Assistant within Settings → Assistant → Control (Control agents),
   through its change boundary (its actions, the per-message limit), with a reason for Remove from queue and Retry merge;
   a project agent never (403, saying whose they are), nor a script (403).

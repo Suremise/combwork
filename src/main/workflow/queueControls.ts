@@ -65,9 +65,11 @@ interface QueueScope {
 }
 
 /**
- * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them. `window`: the
- * window's listing (#1356), which also lists the targets that only have cards in flight under Combwork merges, or are the
- * current options' target, so the panel can decide which show.
+ * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them: the same
+ * targets and the same classification for each (HI-2994), so agents see every queue the user does. Listed: the targets
+ * with an entry or a pause, those with cards in flight under Combwork merges, the current options' target and the
+ * project's other existing targets; the panel then decides which show (queueShown), the API leaves out past branches'.
+ * `window`: the window's own detail, each target's forward merges and the returns' test seam.
  */
 export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
   const stamp = viewsStamp(ws, projectPath)
@@ -124,16 +126,19 @@ function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
 async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
-  const scope = window ? await queueScope(wf, projectPath) : undefined
-  // HI-2679: the window's listing has each of the project's targets that exists, so a destination with nothing queued
-  // yet has its card (its reminder and its Bring up to date… button).
-  const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
-  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
-  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
+  // branch's (markPast, HI-2927), for agents as for the user.
+  const scope = await queueScope(wf, projectPath)
+  // HI-2679: each of the project's targets that exists, so a destination with nothing queued yet has its card (its
+  // reminder and its Bring up to date… button), and its queue is cw_queue's too.
+  const targets = scope.current ? await existingTargets(ws, projectPath) : []
+  const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
+  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))
   markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
-  const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
+  // The window's alone (its Bring up to date… button and how far behind): not read for the API's listing.
+  const sources = window && targets.length ? await forwardSources(ws, projectPath, targets) : []
   const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
   for (const v of views) {
     if (!targets.includes(v.target)) continue
@@ -219,7 +224,7 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
-export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope): QueueView {
+export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope, window = false): QueueView {
   const store = wf.store
   // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
   // card reads and refusals give agents too).
@@ -228,7 +233,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, window ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const { returns, returnsMore } = outcomes
   const recent = historyOf(wf, target, outcomes.recent)
   const p = store.queuePause(target)

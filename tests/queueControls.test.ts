@@ -449,8 +449,8 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
   it("lists the current options' target, empty, and a card in flight under Combwork merges keeps it after a switch to the agent merging", async () => {
     const { w, wt, repo } = await workspace()
     const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
-    // Nothing queued: the Agent API lists no queue; the window's listing has main, Combwork merging into it.
-    expect(await inWorkspace(w, () => queueViews(w, repo))).toEqual([])
+    // Nothing queued: the window's listing has main, Combwork merging into it, and (HI-2994) so does the Agent API's.
+    expect(await inWorkspace(w, () => queueViews(w, repo))).toMatchObject([{ target: 'main', combworkMerges: true, inFlight: [], queued: [] }])
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: true, inFlight: [], queued: [] }])
     const card = await approved(w, wt)
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: true, inFlight: [card], queued: [{ card }] }])
