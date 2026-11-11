@@ -162,6 +162,59 @@ describe("the slot listing's staleness (HI-2912)", () => {
     expect(w.reads).toHaveLength(2)
   })
 
+  for (const order of ['old read ends first', 'new read ends first'] as const) {
+    it(`a folder replaced while the old one's read is under way: the new caller has its own read, and the old answer is never kept for the new folder (${order}) (HR1)`, async () => {
+      const w = world()
+      const row = w.slot('slot-a')
+      const old = w.view.staleOf('slot-a')
+      await w.flush()
+      expect(w.reads).toHaveLength(1)
+      // Replaced at the same path (another generation) while that read goes on: a new listing doesn't join it.
+      w.generations.set(row.folder, 'g2')
+      const fresh = w.view.staleOf('slot-a')
+      await w.flush()
+      expect(w.reads).toHaveLength(2)
+      const ends = order === 'old read ends first' ? [0, 1] : [1, 0]
+      const answers = [false, true]
+      for (const i of ends) {
+        w.reads[i].answer(answers[i])
+        await w.flush()
+      }
+      // The old read's caller saw g1 before and g2 after: nothing kept, what was known (nothing) returned.
+      expect(await old).toBe(false)
+      expect(await fresh).toBe(true)
+      // Busy now: the kept answer is the new folder's own (Stale), not the old read's.
+      w.owed.add('slot-a')
+      expect(await w.view.staleOf('slot-a')).toBe(true)
+    })
+  }
+
+  it('removed while its read is under way: the late answer keeps nothing for it (HR1)', async () => {
+    const w = world()
+    w.slot('slot-a')
+    const asked = w.view.staleOf('slot-a')
+    await w.flush()
+    w.view.keepOnly([])
+    w.reads[0].answer(true)
+    await asked
+    expect(w.view.size).toBe(0)
+    // Even made again under the same name and busy at once: nothing of the old read shows.
+    w.slot('slot-a', { op: { token: 't' } })
+    expect(await w.view.staleOf('slot-a')).toBe(false)
+  })
+
+  it('being removed while its read is under way: nothing kept, then gone (HR1)', async () => {
+    const w = world()
+    const row = w.slot('slot-a')
+    const asked = w.view.staleOf('slot-a')
+    await w.flush()
+    row.state = 'removing'
+    expect(await w.view.staleOf('slot-a')).toBe(false)
+    w.reads[0].answer(true)
+    expect(await asked).toBe(false)
+    expect(w.view.size).toBe(0)
+  })
+
   it('a slot removed, gone or being removed: what was kept for it goes', async () => {
     const w = world()
     w.slot('slot-a')
