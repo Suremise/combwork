@@ -15,9 +15,9 @@
 //   (ready), no review copy leased;
 // - card 4, on its own, a true conflict (it and the user's main change the same line), resolved by hand while
 //   integrating: that changes the card's change, so Combwork can't prove it is there and fails closed: it stays waiting,
-//   nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is recorded apart, and
-//   what its slot does then is logged for HI-2924, not asserted.
-// Screenshots of Waiting (card 2 not in main yet) and the Work section (card 2's route), both themes.
+//   nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is their word that
+//   it's integrated (HI-2924): "Done by you, integration not proved", and its slot back in the pool.
+// Screenshots of Waiting (card 2 not in main yet) and the Work section (card 2's route; card 4's Done), both themes.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -343,7 +343,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     await integratedAs(n3, 'card 3', { revision: R3, result: R3b, via: 'replay' })
 
     // --- Cleanup: the lane ends with its last card, its slot back in the pool, no review copy leased.
-    check('the lane ends with its last card', !!(await until(async () => ((await inv('lanes:list')) ?? []).every((l) => l.ended || !(l.cards ?? []).includes(n1)), HUNG_MS)), JSON.stringify(await inv('lanes:list')))
+    check('the lane ends with its last card', !!(await until(async () => (await laneOf(n1))?.state === 'ended', HUNG_MS)), JSON.stringify(await laneOf(n1)))
     for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
     const back = await until(async () => {
       const s = ((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === slotFolder.toLowerCase())
@@ -399,9 +399,27 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
     const done4 = await inv('tasks:move', n4, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
     check('the user moves card 4 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n4)) === 'done', HUNG_MS)) && (await integrationOf(n4)) === null, JSON.stringify({ done4, column: await column(n4), integration: await integrationOf(n4) }))
-    // What its slot does after that is HI-2924's to decide: its state logged as it stands, not asserted (and not waited for).
+    // HI-2924 (Darren's decision): the user's own Done is their word that it's integrated. The Work section says so, and
+    // the slot (holding exactly the submitted commits) goes back to the pool without a proof.
+    const unproved = await until(async () => (await inv('tasks:work', n4))?.doneUnproved ?? null, HUNG_MS)
+    check("card 4's Work section: Done by you, integration not proved", !!unproved?.at && (await integrationOf(n4)) === null, JSON.stringify({ doneUnproved: (await inv('tasks:work', n4))?.doneUnproved, integration: await integrationOf(n4) }))
+    await showBoard(h.page)
+    await openByTitle(h.page, n4)
+    const work4 = h.page.locator('.card-work')
+    check('…and the window says so', !!(await until(async () => (await text(work4)).includes('Done by you, integration not proved'), HUNG_MS)), await text(work4))
+    for (const theme of ['dark', 'light']) {
+      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await work4.first().screenshot({ path: path.join(shots, `${SUITE}-work-done-unproved-${theme}.png`) })
+    }
+    await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await h.page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
     for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
-    console.log(`INFO card 4's slot after the user's Done (HI-2924, as it stands): ${JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase()))}`)
+    const back4 = await until(async () => {
+      const s = ((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())
+      return s && s.state === 'ready' ? s : null
+    }, HUNG_MS * 2)
+    check("card 4's slot back in the pool after the user's Done (ready)", !!back4, JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())))
+    check('…main still the user\'s resolved copy; nothing pushed', id(shop, 'main') === R4c && remoteMain() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c }))
   } finally {
     await h.app.close().catch(() => undefined)
   }
