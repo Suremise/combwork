@@ -3097,6 +3097,11 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   card's commit moved it off), besides exactly the binding's submitted commits (`chainIsBinding`, unchanged). An empty
   range alone never authorizes it (a working copy on unrelated history has none); the previous card's work must still
   be in its target (§16.3.2).
+- **A lane's later card whose slot couldn't be prepared** (HI-2923): its builder (stopped before a jj preparation) is
+  not started with the lane's brief, which only the lane's first card's start carries (`briefAfterFailedPrepare`); the
+  card waits, not started in that slot, with the failure in its Work section and its builder's wake. Work committed in
+  the slot before its preparation (on the last card's original commit, its copy in the target) is that slot's own
+  unintegrated work: refused and kept, never moved.
 - **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
   again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
   matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
@@ -3157,7 +3162,11 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that
   records nothing moves), the folder's generation, the slot's binding pointer, the lease and slot rows (open, the same
   slot, no operation or job, its builder's writer only), and the target's ref. `content` is the same without the epoch,
-  so another card's submission meanwhile gathers the intent again once instead of refusing it.
+  so another card's submission meanwhile gathers the intent again once instead of refusing it. A Todo card's evidence
+  keeps the single operation head beside its target's ref (the head witnesses jj's whole view of the target, not only
+  its export), so a start beside Combwork's own jj operations (a slot made, another detached) is gathered again up to
+  three times while only that moved, each pass read afresh, and refused once they're spent (HI-2916). The target's read
+  itself is made again whole when the head moves under it, at most three reads.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
   transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
 - **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,

@@ -26,7 +26,7 @@ if (!exe) {
 }
 
 const SUITE = 'jjreopen'
-const PORT = Number(lib.port(47939))
+const PORT = Number(lib.port(47718))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')
@@ -127,7 +127,7 @@ const onDb = (fn) => {
         const v = await inv('tasks:work', n)
         return v?.folder && v.workspace ? v : null
       }, HUNG_MS)
-      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started, w }))
+      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started: started?.moved?.column ?? started, w, work: w ? null : await inv('tasks:work', n), slots: await inv('slots:list', shop), log: w ? [] : lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|\[workflow\]|lease/.test(l)).slice(-40) }, null, 1))
       if (!w) throw new Error('no slot')
       return { n, key, w }
     }

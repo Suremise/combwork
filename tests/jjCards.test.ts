@@ -25,6 +25,7 @@ import type { Workflow } from '../src/main/workflow/runtime'
 import { JjPlatform } from '../src/main/platform/jjPlatform'
 import { jjLineKey } from '../src/main/platform/jjSlotPrep'
 import { jjChainOf } from '../src/main/platform/jjFacts'
+import { readOpHeads } from '../src/main/platform/jjView'
 import { RETIRED_GUARD } from '../src/shared/workflow/compile'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
@@ -162,6 +163,78 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       const sub = w.store.facts(card.id).findLast((f) => f.kind === 'Submitted')!
       expect(sub.data).toMatchObject({ revision: w.h.id(a.folder, `${a.identity.workspace}@-`) })
       expect(sub.data).not.toMatchObject({ revision: P })
+    })
+
+    it.each(['start', 'drag'] as const)("%s: an unrelated jj operation before each of its first three writes gathers it again each time; one before every write refuses once the passes are spent (HI-2916)", async (how) => {
+      const w = await world(colocated)
+      const elsewhere = (): void => void w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'elsewhere')
+      // The agent's start, or the user's drag into Active (its own gather and write).
+      const go = (key: string, builder: typeof B1) => (how === 'start' ? w.wf.start(key, builder) : w.wf.move(key, 'active', 'user', { confirm: true, builder: builder === B2 ? 'B2' : 'B1' }))
+      // Before each of the first three writes (#1206's one pass would refuse the second): started on the fourth gather.
+      let writes = 0
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++ < 3 && elsewhere()) }
+      // Each pass's slot given back only once the pass after it has started with it or not: the lease the start is
+      // written with is never given back while a later pass still gathers (each pass gets the same one here).
+      const givenBack: string[] = []
+      w.wf.cfg.slotUnused = async (lease) => void givenBack.push(lease)
+      const card = w.wf.createCard({ title: 'churn' })
+      moved(await go(card.key, B1))
+      expect(writes).toBe(4)
+      expect(w.wf.state(card).started).toMatchObject({ base: w.main(), target: 'main', slot: 'slot-a', lease: 'L1' })
+      expect(givenBack).toEqual([])
+      // Before every write: refused as evidence that changed once its passes are spent, nothing started.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++, elsewhere()) }
+      const other = w.wf.createCard({ title: 'continual' })
+      refusedBy(await go(other.key, B2), 'evidence.changed')
+      expect(writes).toBe(4)
+      expect(w.wf.state(other).started).toBeFalsy()
+      // Nothing of that refused start is left (HR1's round 1): the same card, tried again with an operation before its
+      // first three writes, has its whole budget and starts on the fourth gather.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++ < 3 && elsewhere()) }
+      moved(await go(other.key, B2))
+      w.wf.cfg.hooks = undefined
+      expect(writes).toBe(4)
+      expect(w.wf.state(other).started).toMatchObject({ slot: 'slot-b' })
+    })
+
+    it("start: the target made invalid by a jj operation between its gather and its write, the Git ref unchanged: gathered again and validated afresh, never started on the old plan (HI-2916)", async () => {
+      const w = await world(colocated)
+      // X and Y on main; main moved to X (exported where colocated), its operation before that kept.
+      w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'x')
+      const X = w.h.id(w.repo, 'description(exact:"x\n")')
+      w.h.jj(w.repo, '--ignore-working-copy', 'new', X, '--no-edit', '-m', 'y')
+      const Y = w.h.id(w.repo, 'description(exact:"y\n")')
+      const op0 = readOpHeads(w.ctx.jjRepo)![0]
+      w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', X)
+      const ref0 = w.refAt('refs/heads/main')
+      // Not colocated, nothing was ever exported (HI-2896).
+      if (colocated) expect(ref0).toBe(X)
+      // Before the first write, main set to Y from the operation before X's (a concurrent operation, merged by the next
+      // read): colocated, jj can't export it, so main is Y in jj and X in Git (partialExport); not colocated, it is just
+      // the target moved, which Git never sees.
+      let once = true
+      w.wf.cfg.hooks = {
+        beforeWrite: () => {
+          if (!once) return
+          once = false
+          w.h.jj(w.repo, '--ignore-working-copy', '--at-op', op0, 'bookmark', 'set', 'main', '-r', Y)
+          w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'list')
+        }
+      }
+      const card = w.wf.createCard({ title: 'target changed' })
+      const out = await w.wf.start(card.key, B1)
+      w.wf.cfg.hooks = undefined
+      expect(once).toBe(false)
+      expect(w.refAt('refs/heads/main')).toBe(ref0)
+      if (colocated) {
+        expect(out).toMatchObject({ refused: true, rule: 'platform.unknown', values: { what: { id: 'workflow.unreadable.target' } } })
+        expect(w.wf.state(card).started).toBeFalsy()
+      } else {
+        moved(out)
+        expect(w.wf.state(card).started).toMatchObject({ base: Y, target: 'main' })
+      }
     })
 
     it.each(['submit', 'move'] as const)("%s: the builder's writer leaving the slot between the plan and the write gathers it again; another agent's refuses (HI-2890)", async (how) => {
