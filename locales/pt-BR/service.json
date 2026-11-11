@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task} terminou",
   "service.providers.taskFailed": "{task} terminou com o código {code}",
   "service.providers.unknownHost": "Nenhum projeto usa mais esse host do GitHub para {cli}. Clique em Verificar de novo e depois faça login.",
+  "service.queue.catchUpNoCommit": "O cartão {card} já foi mesclado e está no remoto de {target}: um commit aqui poria em {target} um que o remoto dele não tem. Deixe as alterações de lado em vez disso, e {target} se atualiza.",
   "service.queue.pauseChanged": "A pausa da fila de merge mudou nesse meio-tempo: nada recebeu commit nem foi deixado de lado. Confira de novo.",
   "service.queue.pauseNoFolder": "O Combwork não sabe em qual pasta essas alterações estavam. Retome a fila: ela verifica de novo e diz onde.",
   "service.repoOps.notOffered": "O controle de versão ({platform}) não oferece isso aqui.",

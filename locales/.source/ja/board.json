@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} is ready to merge into {target}, which is checked out: it waits for your OK in For you.",
   "board.queue.pause.byAssistant": "Paused by the Assistant. The queue merges nothing until it is resumed.",
   "board.queue.pause.byYou": "Paused by you. The queue merges nothing until you resume it.",
+  "board.queue.pause.catchUpChanges": "{card} is merged and on {target}’s remote already, but {files, select, none {files it changes have changes} other {{count, plural, one {{files} has changes} other {{files} have changes}}}} in the folder {target} is checked out in, so the local {target} isn’t up to date with it yet. Set them aside, and it catches up.",
   "board.queue.pause.checkedOut": "{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.",
   "board.queue.pause.commit": "Commit",
   "board.queue.pause.commitTip": "Commit {files} as they are now, on {target}, and let the merge go on.",

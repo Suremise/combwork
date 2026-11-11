@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task} finished",
   "service.providers.taskFailed": "{task} exited with code {code}",
   "service.providers.unknownHost": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
+  "service.queue.catchUpNoCommit": "{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.",
   "service.queue.pauseChanged": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
   "service.queue.pauseNoFolder": "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.",
   "service.repoOps.notOffered": "Version control ({platform}) doesn’t offer that here.",

@@ -30,9 +30,12 @@ export function FolderChangeButtons({ projectPath, target, paused }: { projectPa
   const files = fmt.list(paused.files)
   return (
     <span className="folder-change-buttons">
-      <button type="button" className="btn small" disabled={busy} data-action="commit-changes" title={tr(T.commitTip, { target, files })} onClick={() => void act('commit')}>
-        <Icon name="git-commit" /> {tr(T.commit)}
-      </button>
+      {/* HI-2988: a catch-up's pause (the card merged and published already): set aside only, never committed there. */}
+      {!paused.catchUp && (
+        <button type="button" className="btn small" disabled={busy} data-action="commit-changes" title={tr(T.commitTip, { target, files })} onClick={() => void act('commit')}>
+          <Icon name="git-commit" /> {tr(T.commit)}
+        </button>
+      )}
       <button type="button" className="btn small subtle" disabled={busy} data-action="set-aside-changes" title={tr(T.setAsideTip, { files })} onClick={() => void act('setAside')}>
         <Icon name="archive" /> {tr(T.setAside)}
       </button>

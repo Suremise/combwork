@@ -395,6 +395,24 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     expect(() => git(elsewhere, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
   })
 
+  it('a catch-up’s pause (follow mode, the card merged and published): Set Aside only, worded for the merged card; Commit refused (HI-2988)', async () => {
+    const { w, repo, wf, ref, head, settle } = await paused()
+    const { catchUpKey } = await import('../src/main/workflow/mergeQueue')
+    // The catch-up owed for main names the paused card: the pause is its.
+    await wf.locked(() => wf.store.setMeta(catchUpKey('main'), JSON.stringify({ from: head(), to: head(), card: 'p-1', entry: 'e1' })))
+    expect((await inWorkspace(w, () => queueViews(w, repo))).find((v) => v.target === 'main')?.paused).toMatchObject({ reason: 'unstagedChanges', card: 'p-1', catchUp: true })
+    const before = head()
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/p-1 is merged and on main’s remote already: a commit here would put one on main that its remote doesn’t have/)
+    expect(head()).toBe(before)
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+    expect(await settle('setAside', ['a.txt'], ref)).toMatchObject({ done: { action: 'setAside' } })
+    expect(git(repo, 'stash', 'list', '--format=%s')).toMatch(/Combwork: set aside before bringing main up to date with p-1/)
+    // Another card's catch-up owed: not this pause's, which offers both.
+    await wf.locked(() => wf.store.setMeta(catchUpKey('main'), JSON.stringify({ from: head(), to: head(), card: 'p-9', entry: 'e9' })))
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files: ['a.txt'], folder: repo }))
+    expect((await inWorkspace(w, () => queueViews(w, repo))).find((v) => v.target === 'main')?.paused?.catchUp).toBeUndefined()
+  })
+
   it("a pause that doesn't name its folder (from before it was recorded): refused, saying to Resume", async () => {
     const { repo, wf, settle } = await paused()
     await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files: ['a.txt'] }))

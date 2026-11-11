@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} est prête à être fusionnée dans {target}, qui est extraite : elle attend ton accord dans Pour toi.",
   "board.queue.pause.byAssistant": "Suspendue par l’Assistant. La file ne fusionne rien tant qu’elle n’est pas reprise.",
   "board.queue.pause.byYou": "Suspendue par toi. La file ne fusionne rien tant que tu ne la reprends pas.",
+  "board.queue.pause.catchUpChanges": "La carte {card} est fusionnée et déjà sur le dépôt distant de {target}, mais {files, select, none {des fichiers qu’elle modifie ont des modifications} other {{count, plural, one {{files} a des modifications} many {{files} ont des modifications} other {{files} ont des modifications}}}} dans le dossier où {target} est extraite : la branche {target} locale n’est donc pas encore à jour. Mets-les de côté, et elle se met à jour.",
   "board.queue.pause.checkedOut": "{target} est extraite dans un dossier. Combwork y fusionne désormais : reprends pour continuer.",
   "board.queue.pause.commit": "Commiter",
   "board.queue.pause.commitTip": "Commiter {files} tels qu’ils sont maintenant, sur {target}, et laisser la fusion continuer.",

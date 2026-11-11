@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} está pronto para o merge em {target}, que está em checkout: aguarda sua aprovação em Para você.",
   "board.queue.pause.byAssistant": "Pausada pelo Assistente. A fila não faz merge de nada até ser retomada.",
   "board.queue.pause.byYou": "Pausada por você. A fila não faz merge de nada até você retomá-la.",
+  "board.queue.pause.catchUpChanges": "O cartão {card} já foi mesclado e está no remoto de {target}, mas {files, select, none {arquivos que ele altera têm alterações} other {{count, plural, one {{files} tem alterações} other {{files} têm alterações}}}} na pasta em que {target} está em checkout, então o {target} local ainda não está em dia com ele. Deixe-as de lado, e ele se atualiza.",
   "board.queue.pause.checkedOut": "{target} está em checkout em uma pasta. Agora o Combwork faz o merge ali também: retome para continuar.",
   "board.queue.pause.commit": "Fazer commit",
   "board.queue.pause.commitTip": "Fazer commit de {files} como estão agora, em {target}, e deixar o merge continuar.",

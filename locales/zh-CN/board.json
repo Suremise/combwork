@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} 已准备好合并到已检出的 {target}：正在“待你处理”中等待你的批准。",
   "board.queue.pause.byAssistant": "已被助手暂停。恢复之前，队列不会合并任何内容。",
   "board.queue.pause.byYou": "已被你暂停。在你恢复之前，队列不会合并任何内容。",
+  "board.queue.pause.catchUpChanges": "{card} 已合并，并且已在 {target} 的远程上，但{files, select, none {它更改的文件} other {{count, plural, other {{files}}}}}在检出 {target} 的文件夹中有更改，所以本地的 {target} 还没有跟上它。搁置它们后，本地分支就会跟上。",
   "board.queue.pause.checkedOut": "{target} 已在某个文件夹中检出。现在 Combwork 也会合并到那里：恢复即可继续。",
   "board.queue.pause.commit": "提交",
   "board.queue.pause.commitTip": "按当前状态在 {target} 上提交 {files}，并让合并继续。",

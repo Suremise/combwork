@@ -158,6 +158,11 @@ export interface QueuePauseInfo {
   message?: string
   /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
   stuck?: QueueStuck
+  /**
+   * HI-2988: the owed catch-up's pause (follow mode: `card` merged and published already, the local target behind it):
+   * its changes are set aside, never committed there.
+   */
+  catchUp?: true
 }
 
 /** A project's queue for one target. */

@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task}が完了しました",
   "service.providers.taskFailed": "{task}が終了コード{code}で終了しました",
   "service.providers.unknownHost": "現在、{cli}でそのGitHubホストを使っているプロジェクトはありません。「再確認」してからサインインしてください。",
+  "service.queue.catchUpNoCommit": "{card}はマージ済みで、{target}のリモートにもう入っています。ここでコミットすると、リモートにないコミットが{target}にできてしまいます。代わりに変更を退避すると、{target}が追いつきます。",
   "service.queue.pauseChanged": "その間にマージキューの一時停止が変わりました。コミットも退避もしていません。もう一度確認してください。",
   "service.queue.pauseNoFolder": "これらの変更がどのフォルダーにあったか Combwork にはわかりません。キューを再開してください。もう一度確認して場所を示します。",
   "service.repoOps.notOffered": "バージョン管理（{platform}）では、ここでその操作はできません。",

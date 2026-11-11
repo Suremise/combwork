@@ -2855,6 +2855,10 @@
     "defaultMessage": "Paused by you. The queue merges nothing until you resume it.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)."
   },
+  "board.queue.pause.catchUpChanges": {
+    "defaultMessage": "{card} is merged and on {target}’s remote already, but {files, select, none {files it changes have changes} other {{count, plural, one {{files} has changes} other {{files} have changes}}}} in the folder {target} is checked out in, so the local {target} isn’t up to date with it yet. Set them aside, and it catches up.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-2988, “The target branch follows its remote”): the card ({card}: its key) was merged and pushed to the remote, and bringing the local branch ({target}) up to date with it waits for files with uncommitted or staged changes in the folder where it is checked out ({files}: a list of names, five at most, or none; {count}: how many in all). Set Aside is a button beside it (as translated there). Keep the select keys and the word none."
+  },
   "board.queue.pause.checkedOut": {
     "defaultMessage": "{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Combwork could merge into a checked-out branch ({target})."

@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "Karta {card} jest gotowa do scalenia z gałęzią {target}, która jest wybrana w folderze: czeka na Twoją zgodę w sekcji Dla Ciebie.",
   "board.queue.pause.byAssistant": "Wstrzymana przez Asystenta. Kolejka nic nie scala, dopóki nie zostanie wznowiona.",
   "board.queue.pause.byYou": "Wstrzymana przez Ciebie. Kolejka nic nie scala, dopóki jej nie wznowisz.",
+  "board.queue.pause.catchUpChanges": "Karta {card} jest scalona i już na zdalnym repozytorium gałęzi {target}, ale {files, select, none {pliki, które zmienia, mają zmiany} other {{count, plural, one {plik {files} ma zmiany} few {pliki {files} mają zmiany} many {pliki {files} mają zmiany} other {pliki {files} mają zmiany}}}} w folderze, w którym wybrana jest gałąź {target}, więc lokalna gałąź {target} nie jest z nią jeszcze aktualna. Odłóż je, a się zaktualizuje.",
   "board.queue.pause.checkedOut": "Gałąź {target} jest wybrana w folderze. Combwork scala teraz do niej także tam: wznów, aby kontynuować.",
   "board.queue.pause.commit": "Zrób commit",
   "board.queue.pause.commitTip": "Zrób commit plików {files} w obecnej postaci na gałęzi {target} i pozwól scalaniu trwać dalej.",

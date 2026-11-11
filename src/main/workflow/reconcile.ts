@@ -23,6 +23,7 @@ import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
+import { catchUpKey, catchUpOf } from './mergeQueue'
 import { inTargetNow } from '../../shared/workflow/workView'
 import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
@@ -450,12 +451,45 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     // isn't is the change looked for, in the same head.
     const resultIn = await H.isAncestor(project, i.result, th)
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
-    if (resultIn) return
+    // In it again (HI-2988: caught up, or merged back): a mark it had cleared.
+    if (resultIn) {
+      if (s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
+      return
+    }
+    // HI-2988: published to its remote (follow mode, G21), the card's result is the remote's: a local target whose
+    // catch-up to it is still owed, or merely behind it, hasn't left it.
+    if (catchUpOf(wf.store.meta(catchUpKey(i.target)))?.card === card.key) return
+    if (published(wf, card, s)) {
+      const behind = await H.isAncestor(project, th, i.result)
+      if (isUnknown(behind)) return hooks.unknown?.(behind.what)
+      if (behind) return
+    }
     const sub = s.latest
     const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))
   }
+}
+
+/**
+ * HI-2988: a Done card's leaving its target and coming back, each observation keyed to the transition it follows (the
+ * latest fact of the opposite kind, read in its write): two Combworks observing one transition write one fact, and the
+ * same heads visited again (reset away and back, twice) make new ones. `LeftTarget` follows the integration or the last
+ * `BackInTarget`; `BackInTarget` follows the last `LeftTarget`.
+ */
+const LEFT: ReadonlySet<string> = new Set(['LeftTarget']) // i18n-ignore: fact kinds
+const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget']) // i18n-ignore: fact kinds
+const lastSeq = (w: Write, card: number, kinds: ReadonlySet<string>): number => w.tx.facts(card).findLast((f) => kinds.has(f.kind))?.seq ?? 0
+
+/**
+ * HI-2988: whether a Done card's integration was published to its target's remote (follow mode): its advance's
+ * `IntegrationStarted` recorded the publication, or the queue found it published by someone else while following.
+ */
+function published(wf: Workflow, card: CardRecord, s: CardState): boolean {
+  const i = s.integrated
+  if (!i?.entry) return false
+  if (wf.store.facts(card.id).some((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === i.entry && !!(f.data as FactData['IntegrationStarted']).publish)) return true
+  return i.by === 'outside' && wf.cfg.options().followRemote === true
 }
 
 async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {

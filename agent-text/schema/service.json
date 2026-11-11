@@ -1066,6 +1066,12 @@
       "cli": "plain"
     }
   },
+  "service.queue.catchUpNoCommit": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
   "service.queue.pauseChanged": {
     "placeholders": {}
   },
