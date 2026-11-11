@@ -305,9 +305,8 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
     const done4 = await inv('tasks:move', n4, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
     check('the user moves card 4 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n4)) === 'done', HUNG_MS)) && (await integrationOf(n4)) === null, JSON.stringify({ done4, column: await column(n4), integration: await integrationOf(n4) }))
-    // What its slot does after that is HI-2924's to decide: logged here as it stands, not asserted.
+    // What its slot does after that is HI-2924's to decide: its state logged as it stands, not asserted (and not waited for).
     for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
-    await until(async () => (((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())?.state ?? '') === 'ready', 15000)
     console.log(`INFO card 4's slot after the user's Done (HI-2924, as it stands): ${JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase()))}`)
   } finally {
     await h.app.close().catch(() => undefined)
