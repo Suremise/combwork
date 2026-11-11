@@ -453,7 +453,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
     // In it again (HI-2988: caught up, or merged back): a mark it had cleared.
     if (resultIn) {
-      if (s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+      if (s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
       return
     }
     // HI-2988: published to its remote (follow mode, G21), the card's result is the remote's: a local target whose
@@ -467,9 +467,19 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const sub = s.latest
     const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))
   }
 }
+
+/**
+ * HI-2988: a Done card's leaving its target and coming back, each observation keyed to the transition it follows (the
+ * latest fact of the opposite kind, read in its write): two Combworks observing one transition write one fact, and the
+ * same heads visited again (reset away and back, twice) make new ones. `LeftTarget` follows the integration or the last
+ * `BackInTarget`; `BackInTarget` follows the last `LeftTarget`.
+ */
+const LEFT: ReadonlySet<string> = new Set(['LeftTarget'])
+const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget'])
+const lastSeq = (w: Write, card: number, kinds: ReadonlySet<string>): number => w.tx.facts(card).findLast((f) => kinds.has(f.kind))?.seq ?? 0
 
 /**
  * HI-2988: whether a Done card's integration was published to its target's remote (follow mode): its advance's

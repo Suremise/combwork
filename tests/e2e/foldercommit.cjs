@@ -153,6 +153,33 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     check('Commit It: .gitignore alone committed, keep.txt still changed', !!(await waitHung(() => git('rev-parse', 'HEAD') !== at || null)) && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)
     check('…the line committed as written', git('show', 'HEAD:.gitignore').replace(/\r\n/g, '\n').endsWith('/reference/\n/notes/'), git('show', 'HEAD:.gitignore'))
     git('checkout', '--', 'keep.txt')
+
+    // --- HI-2988: a catch-up's pause (follow mode: the card merged and on the remote already, main behind it), seeded
+    // with Combwork closed as such a pause is stored: the catch-up owed for main names the paused card. The paused merge
+    // offers Set Aside alone, and says the card is merged.
+    await h.app.close()
+    fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'the user is editing this\n')
+    const { DatabaseSync } = require('node:sqlite')
+    const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    const scope = db.prepare("SELECT project FROM cards WHERE number = ?").get(b.n)?.project ?? 'alpha'
+    const now = git('rev-parse', 'HEAD')
+    db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(`workflow:${scope.toLowerCase()}:queue.catchUp:main`, JSON.stringify({ from: now, to: now, card: keyB, entry: 'seeded' }))
+    db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(scope, 'main')
+    db.prepare('DELETE FROM workflow_queue_pause_files WHERE project = ? AND target = ?').run(scope, 'main')
+    db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, paused_at, folder) VALUES (?, ?, ?, ?, ?, ?)').run(scope, 'main', 'unstagedChanges', keyB, new Date().toISOString(), fx.alpha)
+    db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)').run(scope, 'main', 0, 'keep.txt', null)
+    db.close()
+    const h2 = await q.startCombwork(fx, { port: PORT, keepOptions: true })
+    try {
+      const m2 = await q.mergesTab(h2)
+      const aside2 = m2.card('main').locator('[data-action="set-aside-changes"]')
+      check('a catch-up’s pause: Set Aside alone, no Commit', !!(await waitHung(async () => (await aside2.count()) === 1)) && (await m2.card('main').locator('[data-action="commit-changes"]').count()) === 0, await m2.text('main'))
+      check('…saying the card is merged and on the remote already', new RegExp(`${keyB} is merged and on main’s remote already, but keep\\.txt has changes`).test(await m2.text('main')), await m2.text('main'))
+      await f.themes(h2.page, m2.card('main'), 'foldercommit-merges-catchup')
+    } finally {
+      await h2.app.close().catch(() => {})
+      git('checkout', '--', 'keep.txt')
+    }
   } catch (e) {
     check('no unexpected error', false, e.stack || String(e))
   } finally {
