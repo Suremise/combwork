@@ -454,12 +454,12 @@
     "text": "retarget: the card keys, lane names and slot names to move, from the preview named."
   },
   "tool.queue.arg.override": {
-    "text": "forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.",
-    "note": "HI-2892."
+    "text": "forward: true only when the user explicitly asked for this merge against the release path; recorded on its card.",
+    "note": "HI-2892; HI-2960: within 120 characters, the refusal says which direction is against it."
   },
   "tool.queue.arg.past": {
-    "text": "list: true also lists past branches' queues (not a target now, nothing in them).",
-    "note": "HI-2893."
+    "text": "true: also past branches' queues (no longer targets).",
+    "note": "HI-2893; HI-2960: shortened to keep the agent tool list within its total (toolLimits.cjs)."
   },
   "tool.queue.arg.preview": {
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
@@ -471,7 +471,7 @@
     "text": "The target branch."
   },
   "tool.queue.description": {
-    "text": "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
+    "text": "Your project's merge queues, one per target branch, merging approved cards in turn: what tests now, what waits, recent outcomes, whether paused."
   },
   "tool.queue.description.assistant": {
     "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
