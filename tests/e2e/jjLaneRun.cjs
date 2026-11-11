@@ -349,13 +349,15 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const remoteBefore = remoteMain()
     // main moved under the approved card: its candidate, built again on main's new head, conflicts, and the card goes back
     // to its builder with the conflict's file named and a comment saying so (the return, not a pass that stays).
-    const queue4 = async () => (await inv('tasks:work', n4))?.queue ?? null
+    // Its return is an IntegrationFailed naming the candidate's attempt (`jj:…`: jj has no queue entry, so the Work
+    // section's queue stays empty).
+    const failed4 = async () => ((await inv('tasks:facts', n4)) ?? []).findLast((f) => f.kind === 'IntegrationFailed')?.data ?? null
     const returned4 = await until(async () => {
-      const q = await queue4()
-      return (await column(n4)) === 'doing' && q?.state === 'failed' && q.failure === 'conflict' ? q : null
+      const f = await failed4()
+      return (await column(n4)) === 'doing' && f?.reason === 'conflict' ? f : null
     }, HUNG_MS)
-    console.log(`INFO card 4, main moved under it: ${JSON.stringify({ column: await column(n4), queue: await queue4() })}`)
-    check('main moved under approved card 4 (a conflicting change): its rebuilt candidate conflicts, and it goes back to its builder', !!returned4 && String(returned4.entry).startsWith('jj:') && (returned4.files ?? []).includes('shared.txt'), JSON.stringify(returned4))
+    console.log(`INFO card 4, main moved under it: ${JSON.stringify({ column: await column(n4), failed: await failed4() })}`)
+    check('main moved under approved card 4 (a conflicting change): its rebuilt candidate conflicts, and it goes back to its builder', !!returned4 && String(returned4.entry).startsWith('jj:') && returned4.revision === R4 && returned4.target === 'main', JSON.stringify(returned4))
     const told4 = await until(async () => ((await card(n4))?.comments ?? []).some((c) => /came back from its jj candidate/.test(c.text ?? '')), HUNG_MS)
     check('…with a comment saying it came back from its candidate', !!told4, JSON.stringify(((await card(n4))?.comments ?? []).slice(-2)))
     check('…nothing Integrated, main the user\'s, nothing pushed', (await integrationOf(n4)) === null && remoteMain() === remoteBefore, JSON.stringify({ integration: await integrationOf(n4), remote: remoteMain(), remoteBefore }))
