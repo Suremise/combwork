@@ -358,7 +358,10 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       }
       await deps.hooks?.beforeUpdate?.()
       if (!(await mine())) return refuse('fence')
-      const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true })
+      // The whole proof again under the file gate's admission, right before jj starts (HI-2918; with HI-2913's held path,
+      // its held fence unsplit and in its own order).
+      const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true, recheck: async () => ((await mine()) ? null : 'fence') })
+      if (up.refused) return refuse('fence')
       if (!up.ok && (await port.stale(folder)) === true) return refuse('update', up.err)
     }
     await deps.hooks?.afterUpdate?.()
@@ -512,7 +515,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const ws = await treeOf(cur.WS)
       const exact = !!x && !!ws && manifest.every((e) => (x.get(e.path)?.blob ?? null) === (e.kind === 'file' ? e.blob : null)) && [...x.keys()].every((p) => manifest.some((e) => e.path === p) || x.get(p)?.blob === ws.get(p)?.blob)
       if (safe.ok && lines(safe.out).length === 1 && exact && (await mine())) {
-        const ab = await port.jj(folder, ['abandon', cur.X], { write: true })
+        const ab = await port.jj(folder, ['abandon', cur.X], { write: true, recheck: async () => ((await mine()) ? null : 'fence') })
         xKept = !ab.ok
       }
     }

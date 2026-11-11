@@ -12,7 +12,7 @@
 
 import { basename } from 'path'
 import { git } from './git'
-import { jjRunner } from './platform/jjRunner'
+import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
 import { jjContextOf } from './platform/jjDetect'
 import { boundaryOf, canonicalStore } from './platform/repoBoundary'
@@ -30,13 +30,18 @@ import type { WorkspaceService } from './workspace'
 export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId: () => string): JjCardDeps {
   const slots = (): SlotStore => new SlotStore(boardConn(ws), projectId() || basename(projectPath))
   const journal = (key: string) => slots().journal(key)
-  const gitOn = (store: string, args: readonly string[]) => git(store, ['--git-dir', store, ...args])
+  // Under Combwork's file gate for the store (HI-2918): a jj write of Combwork's exporting there never meets its reads.
+  const gitOn = (store: string, args: readonly string[]) => {
+    const full = ['--git-dir', store, ...args]
+    return storeGitGated(store, full, () => git(store, full))
+  }
   return {
     runner: jjRunner,
     port: () => jjPort(),
     lock: (store) => (fn) => storeLock(store, fn),
     git: gitOn,
-    history: historyFor('git'),
+    // Git's history of the jj store, under Combwork's file gate for it (HI-2918).
+    history: storeGatedHistory(historyFor('git')),
     integration: async (): Promise<JjIntegrationDeps | null> => {
       const d = await jjContextOf(projectPath, jjRunner).catch(() => null)
       if (!d || !('jj' in d)) return null
@@ -46,7 +51,7 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         view: { jjRepo: ctx.jjRepo, store: ctx.store, colocated: ctx.colocated },
         folder: projectPath,
         git: (args) => gitOn(ctx.store, args),
-        gitContains: (store, target, c, at) => historyFor('git').contains(store, target, c, at),
+        gitContains: (store, target, c, at) => storeGatedHistory(historyFor('git')).contains(store, target, c, at),
         // The store checked again inside its lock (HI-2896, s13 §3): a colocation change since this context was read
         // refuses before any pin or journal write.
         lock: (fn) =>

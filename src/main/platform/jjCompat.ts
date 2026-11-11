@@ -16,7 +16,7 @@ import { readdir, readFile, stat } from 'original-fs/promises'
 import type { Gate } from '../../shared/platform/descriptors'
 import type { RunResult } from './repoContext'
 import { git } from '../git'
-import { jjRunner, type JjRunner } from './jjRunner'
+import { jjRunner, storeGitGated, type JjRunner } from './jjRunner'
 import { readOpHeads } from './jjView'
 
 /** The gates a repository's own use decides (the rest are jj's own limits, closed whatever the repository uses). */
@@ -37,7 +37,8 @@ export interface CompatDeps {
   jj: JjRunner
 }
 
-const DEFAULTS: CompatDeps = { git: (cwd, args) => git(cwd, args), jj: jjRunner }
+// Its git reads of a jj store under Combwork's file gate for it (HI-2918).
+const DEFAULTS: CompatDeps = { git: (cwd, args) => storeGitGated(cwd, args, () => git(cwd, args)), jj: jjRunner }
 
 /** At most this many tracked .gitattributes files are read; more is unknown (fail closed). */
 export const ATTR_FILES_MAX = 2000

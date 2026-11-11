@@ -472,7 +472,11 @@ class Attempt {
       await this.deps.journal(structuredClone(this.rec))
       await this.hook(`run:${name}`)
       const who = this.deps.identity ? [`--config=user.name=${toml(this.deps.identity.name)}`, `--config=user.email=${toml(this.deps.identity.email)}`] : []
-      const r = await this.deps.runner.run(this.deps.folder, ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false', marker(this.rec.attempt), ...who, ...args], { write: true, signal: this.deps.signal, timeout: this.deps.timeout })
+      // Its owner again under the file gate's admission, right before jj starts (HI-2918). A head moved meanwhile is
+      // left to the race detection after the write, as before (what that operation made is recovered as uncertain).
+      const recheck = (): string | null => (this.deps.owner.still() ? null : 'owner')
+      const r = await this.deps.runner.run(this.deps.folder, ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false', marker(this.rec.attempt), ...who, ...args], { write: true, signal: this.deps.signal, timeout: this.deps.timeout, recheck })
+      if (r.refused) throw new Stop('owner', name)
       if (r.cancelled) throw new Stop('cancelled', name)
       const heads = readOpHeads(this.deps.view.jjRepo)
       if (!heads || heads.length !== 1) throw new Stop('raced', `heads after ${name}`) // i18n-ignore: a protocol detail for logs and tests, never shown

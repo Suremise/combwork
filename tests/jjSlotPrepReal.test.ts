@@ -18,16 +18,18 @@
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { readOpHeads } from '../src/main/platform/jjView'
 import { boardPrepStore, jjLineKey, type JjBinding, type JjPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceFence, WorkspaceIdentity } from '../src/main/platform/workspacePort'
-import { generationOf } from '../src/main/platform/jjWorkspacePort'
+import { checkoutOf, generationOf } from '../src/main/platform/jjWorkspacePort'
 import { isUnknown } from '../src/main/platform/types'
 import { quiet } from '../src/main/slots'
+import { jjFileGate, pathKey, rootKey } from '../src/main/platform/jjFileGate'
+import { workspaceGateKeys } from '../src/main/platform/jjRunner'
 import { SlotStaleView, type StaleViewRow } from '../src/main/slotStaleView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 
@@ -217,6 +219,92 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       }
       // Before (the listing reading whatever the slot's state): every attempt refused, the folder in use (HI-2912).
       expect(tries.every((t) => t > 0), `attempts per detach: ${JSON.stringify(tries)}`).toBe(true)
+    })
+
+    it("a write's real owned guard runs under its admission (its checkout read through its ticket); ownership lost while queued writes nothing (HI-2918)", async () => {
+      const w = await world(colocated)
+      const keys = (await workspaceGateKeys(w.slot))!
+      // Queued behind a reader of the slot's checkout; its fence lost while it waits: its recheck refuses, nothing runs.
+      let owned = true
+      const reader = await jjFileGate.acquire([keys.root], 'shared')
+      const lost = prepareFor(w, 1, 1, { fence: { still: () => owned } })
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      const heads = w.heads()?.join()
+      owned = false
+      reader.release()
+      expect((await lost).ok).toBe(false)
+      expect(w.heads()?.join()).toBe(heads)
+      // Kept: the preparation's guards (owns → checkoutOf) read through their tickets, no wait behind their own write.
+      const reader2 = await jjFileGate.acquire([keys.root], 'shared')
+      const kept = prepareFor(w, 1, 2)
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      reader2.release()
+      expect(await kept).toMatchObject({ ok: true })
+      expect(jjFileGate.size).toBe(0)
+    })
+
+    it("a held recovery's shape as a recheck: its rename probe finds the slot quiet while a Combwork reader waits outside (HI-2918, HI-2913)", async () => {
+      const w = await world(colocated)
+      const keys = (await workspaceGateKeys(w.slot))!
+      const first = await jjFileGate.acquire([keys.root], 'shared')
+      const seen: { checkout: unknown; quiet: boolean | null } = { checkout: null, quiet: null }
+      const write = h.runner.run(w.slot, ['status'], {
+        write: true,
+        recheck: async () => {
+          // Slow reads first, then the probe, then a proof (HB5's order): the reader outside is queued, holding nothing.
+          seen.checkout = await checkoutOf(w.slot)
+          seen.quiet = await quiet(w.slot)
+          return seen.quiet ? null : 'the folder is in use'
+        }
+      })
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      // A Combwork reader outside the write's call tree: queued behind it (writers first).
+      const outside = checkoutOf(w.slot)
+      first.release()
+      expect((await write).ok).toBe(true)
+      expect(seen.quiet).toBe(true)
+      expect(seen.checkout).not.toBeNull()
+      expect(await outside).not.toBeNull()
+      expect(jjFileGate.size).toBe(0)
+    })
+
+    it("workspace add holds its destination for its whole run: a reader of it waits, then reads the made workspace (HI-2918)", async () => {
+      const w = await world(colocated)
+      const dest = join(dirname(w.slot), 'slot-b')
+      const destKey = rootKey((await pathKey(dest))!)
+      const made = w.port.create(w.repo, dest, w.main())
+      let seenHeld = false
+      let read: Promise<unknown> | null = null
+      // Until the add has the destination: then a reader of it is started (its folder may already be there).
+      for (let settled = false; !settled; ) {
+        if (jjFileGate.writing(destKey)) {
+          seenHeld = true
+          read ??= checkoutOf(dest)
+        }
+        settled = await Promise.race([made.then(() => true), new Promise<boolean>((res) => setImmediate(() => res(false)))])
+      }
+      expect((await made).ok).toBe(true)
+      expect(seenHeld).toBe(true)
+      expect(await read).not.toBeNull()
+      expect(await pathKey(dest)).toBe(destKey.slice('root:'.length))
+      expect(jjFileGate.size).toBe(0)
+    })
+
+    it("removal's forget, granted with a slot writer queued behind it: its guard reads the removed slot through its ticket, no deadlock (HI-2918, HR2's round 1)", async () => {
+      const w = await world(colocated)
+      const keys = (await workspaceGateKeys(w.slot))!
+      // A reader of the store holds both writes back until they are queued in this order: the removal's forget, then a
+      // write in the slot (its root and the store, both in the forget's admission).
+      const reader = await jjFileGate.acquire([keys.store], 'shared')
+      const removal = w.port.remove(w.repo, w.slot, { identity: w.identity, journal: h.journals.of(`remove-${colocated}`), fence: yes })
+      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(1)
+      const slotWrite = h.runner.run(w.slot, ['status'], { write: true })
+      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(2)
+      reader.release()
+      // The forget's recheck (fence, owns → the removed slot's checkout, the control's check) finishes; it runs and lets go.
+      expect(await removal).toMatchObject({ ok: true })
+      await slotWrite
+      expect(jjFileGate.size).toBe(0)
     })
 
     it("a detach after Done: back on the target's head; the target moving first refuses it, nothing written", async () => {
