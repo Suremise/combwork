@@ -186,6 +186,28 @@ describe.skipIf(!exe)(`the real jj (${TESTED_JJ.version})`, () => {
     expect(await jjContextOf(plain, runner)).toEqual({ none: true })
   })
 
+  it('a Git repository inside a non-colocated jj workspace (HI-2976): detected as Git at its own root, as its boundary says; no jj offer', async () => {
+    const { detect, projectPlatform } = await import('../src/main/platform/registry')
+    const { boundaryOf } = await import('../src/main/platform/repoBoundary')
+    const { pinnedContextOf } = await import('../src/main/platform/jjViews')
+    const outer = make('outer-of-git', '--no-colocate')
+    const inner = join(outer, 'inner')
+    mkdirSync(inner)
+    git(inner, 'init', '-q', '-b', 'main')
+    expect(detect(inner)).toMatchObject({ platform: 'git' })
+    same(detect(inner).root!, inner)
+    const b = await boundaryOf(inner)
+    if (!('git' in b)) throw new Error(JSON.stringify(b))
+    same(b.git.root, inner)
+    expect(projectPlatform(inner, 'git').offer).toBeUndefined()
+    expect(projectPlatform(inner, 'none').offer).toEqual({ offer: 'git', why: 'gitFound' })
+    // jj's own views don't take it as jj's (pinned reads start from the same detection), and Git answers there.
+    expect(await pinnedContextOf(inner, runner)).toEqual({ none: true })
+    expect(git(inner, 'rev-parse', '--show-toplevel').trim().toLowerCase()).toBe(inner.replace(/\\/g, '/').toLowerCase())
+    // The jj workspace itself is still jj's.
+    expect(detect(outer)).toMatchObject({ platform: 'jj', jj: { colocated: false } })
+  })
+
   it('a missing jj is unknown, never a guess from its files', async () => {
     const root = make('missing', '--no-colocate')
     const none = createJjRunner({ env: { ...env, PATH: tempDir('jj-empty-path-') } })
