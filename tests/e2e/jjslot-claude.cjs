@@ -68,6 +68,12 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
   jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
   fs.mkdirSync(path.join(shop, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(shop, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: 'jj', workflow: { platform: 'jj', preset: 'solo', options: { target: 'main' }, presetAsked: 'chosen' } }))
+  // The suite's folder trusted in the test home (the runner resets the home before each run; real suites run one at a
+  // time): Claude Code trusts the folders under it, the slot's too, so no trust question waits on a key press.
+  const homeJson = path.join(CLAUDE_TEST_HOME, '.claude.json')
+  const homeCfg = fs.existsSync(homeJson) ? JSON.parse(fs.readFileSync(homeJson, 'utf8')) : {}
+  homeCfg.projects = { ...homeCfg.projects, [work.replace(/\\/g, '/')]: { ...homeCfg.projects?.[work.replace(/\\/g, '/')], hasTrustDialogAccepted: true } }
+  fs.writeFileSync(homeJson, JSON.stringify(homeCfg, null, 2))
   lib.enableProviders(userData, ['claude-code'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -157,6 +163,8 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
         console.log(`INFO process listing failed: ${e}`)
       }
       console.log(`INFO leftovers: ${JSON.stringify((await inv('session:leftovers')).filter((l) => l.agentId === b1.id))}`)
+      // What jj and the pool said meanwhile (a write that failed, a stale slot), from the app's log.
+      for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /\[(WARN|ERROR)\] \[(slots|jj|slotCards|workspacePort)\]/.test(x))) console.log(`INFO app: ${l.slice(0, 500)}`)
     }
   } finally {
     await app.close().catch(() => undefined)
