@@ -2782,7 +2782,8 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
-  Git branch).
+  Git branch); HI-2990: a squash onto a head that already holds the change, its restore making no operation, its step
+  cleared, then recovered and dropped with nothing left.
 
 ##### jj's integration evidence (1.5.0's J5, HI-2798)
 
@@ -3362,7 +3363,10 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
   (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
   `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
-  (J5's `jjTargetHead`); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  (J5's `jjTargetHead`); a head that already reaches a done candidate of the reviewed revision and base (the user
+  integrated it after the run's proof read the target) ends the step with nothing built, dropped or published (`none:
+  'reached'`), and the next run's proof credits it (HI-2989: a rebase built there failed `notUpToDate` and returned a card
+  the user had integrated); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
   answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
   keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
   Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
@@ -3404,7 +3408,9 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
   options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
   rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
-  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build; HI-2989,
+  each style in both modes: main set onto the candidate between a run's proof and its step, nothing built or returned,
+  Integrated via the candidate by the next run), and the e2e suites
   `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The merge checks on a jj card's candidate (1.5.0, HI-2938)
@@ -3526,7 +3532,7 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
   strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
-  (its files, or its description alone) kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
+  (its files, or its description alone) kept, a squash attempt cut short by a crash, then the user's own merge, Integrated with the rules off and its drop crashed);
   `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
   `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
   while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward

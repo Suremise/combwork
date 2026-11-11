@@ -762,7 +762,8 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
     await put({ state: 'unknown', why: step.unknown })()
     return hooks.unknown?.(`candidate: ${step.unknown}`)
   }
-  if ('none' in step) return put({ state: 'signing' })()
+  // HI-2989: the target already holds its candidate: nothing written (the offer stays as it was; the proof credits it).
+  if ('none' in step) return step.none === 'reached' ? undefined : put({ state: 'signing' })()
   // A candidate or a return is published only while the target is still at the head it was built on.
   const expected = 'offer' in step ? step.offer.expected : step.returned.expected
   if (!ports.headIs || !(await ports.headIs(fp.target, expected))) return

@@ -387,6 +387,27 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
       expect(await jjCandidateNow(w.deps(), out.candidate)).toBe('superseded')
       expect(await w.ref(`${pinPrefix('HI-1', out.record.attempt)}candidate`)).toBe(out.candidate.result)
     })
+
+    it('HI-2990: a step that makes no operation (a squash onto a head that already holds the change) clears its journalled step; recovered and dropped, nothing left', async () => {
+      const w = await world(colocated)
+      const first = await prepareJjCandidate(w.deps(), w.req('squash'))
+      if (!isCandidate(first)) throw new Error(JSON.stringify(first))
+      // Built again on the first candidate: the scratch merge and the empty commit are made; the restore has nothing to do.
+      const out = await prepareJjCandidate(w.deps(), w.req('squash', { expected: first.candidate.result }))
+      expect(isInterrupted(out) && out.interrupted.why, JSON.stringify(out)).toBe('failed')
+      if (!isInterrupted(out)) return
+      expect(out.record.step).toBeUndefined()
+      expect(out.record.commits).toHaveLength(2)
+      for (const c of out.record.commits) expect(w.log(`${c} & ::visible_heads()`)).toEqual([c])
+      const rec = await recoverJjAttempt(w.deps(), out.record)
+      if (isInterrupted(rec)) throw new Error(JSON.stringify(rec))
+      expect(rec.recovered.uncertain).toEqual([])
+      const dropped = await dropJjAttempt(w.deps(), rec.record, 'main')
+      if (isInterrupted(dropped)) throw new Error(JSON.stringify(dropped))
+      expect(dropped.dropped.kept).toEqual([])
+      for (const c of out.record.commits) expect(w.log(`${c} & ::visible_heads()`)).toEqual([])
+      for (const p of dropped.record.pins) expect(await w.ref(p.ref)).toBeNull()
+    })
   })
 
   type World = Awaited<ReturnType<typeof world>>
