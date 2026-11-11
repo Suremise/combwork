@@ -5,7 +5,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import type { TranscriptItem } from '../src/shared/types'
 import { ConversationParser } from '../src/main/providers/claude/conversation'
@@ -402,5 +402,23 @@ describe('the context reads follow the live state under the same session (HI-292
     expect(two.key).toBe(one.key)
     expect(one.entries[0]).toBe(e)
     expect(mapContextKey(null)).toBe('')
+  })
+
+  it("the workspace view's entries, taken in before limits or a model came, read them from the hosts now (HR1's round 1)", () => {
+    type HostLive = { sessionId: string; status: string; modelId?: string; localLimits?: typeof limits }
+    const before: HostLive = { sessionId: 's1', status: 'ready' }
+    // Its entries as shownHosts took them in (a status or session change); the hosts replaced since, same session and status.
+    const stale = [{ key: 'C:\\WS\\Alpha\na1', path: 'C:\\WS\\Alpha', agentId: 'a1', live: before }]
+    const hostsThen = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: before }] }]
+    const hostsNow = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: { ...before, localLimits: limits } }] }]
+    const modelNow = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: { ...before, modelId: 'qwen3' } }] }]
+    const then = mapContextEntries(stale, (e) => liveIn(hostsThen, e.path, e.agentId))
+    const now = mapContextEntries(stale, (e) => liveIn(hostsNow, e.path, e.agentId))
+    expect(mapContextEntries(stale, (e) => e.live).key).toBe(then.key)
+    expect(now.key).not.toBe(then.key)
+    expect(now.entries[0].live?.localLimits).toEqual(limits)
+    expect(mapContextEntries(stale, (e) => liveIn(modelNow, e.path, e.agentId)).key).not.toBe(then.key)
+    // Gone from the hosts: no live state, nothing to read.
+    expect(mapContextEntries(stale, (e) => liveIn<HostLive>([], e.path, e.agentId)).entries[0].live).toBeNull()
   })
 })

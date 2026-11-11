@@ -11,7 +11,7 @@ import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type Me
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
+import { liveIn, mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
@@ -411,8 +411,9 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     })
     return mode === 'single' ? out.slice(0, 1) : out
   }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
-  // Keyed by what each ring depends on, not only the session id (HI-2929: a setup ending, local limits set after the launch).
-  const forContexts = mapContextEntries(entries, (e) => e.live)
+  // Each agent's live state as the hosts have it now, keyed by what its ring depends on (HI-2929: a setup ending, local
+  // limits or a model set later). Not the entries' own: shownHosts is taken in only when a status or session changes.
+  const forContexts = mapContextEntries(entries, (e) => liveIn(hosts, e.path, e.agentId))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map

@@ -139,6 +139,15 @@ export function mapContextKey(live: { sessionId: string; settingUp?: boolean; mo
 }
 
 /**
+ * An agent's live state as the hosts have it now, by its host's path (any case) and its id (HI-2929, HR1's round 1): the
+ * workspace view's entries are taken in only when a status or session changes, so they can hold an older live state.
+ */
+export function liveIn<L>(hosts: readonly { path: string; agents: readonly { id: string; live?: L | null }[] }[], path: string, agentId: string): L | null {
+  const p = path.toLowerCase()
+  return hosts.find((h) => h.path.toLowerCase() === p)?.agents.find((a) => a.id === agentId)?.live ?? null
+}
+
+/**
  * The entries the map's context reads take (HI-2929): each with its live state as `liveOf` has it now, and their key,
  * which changes with what the ring depends on (mapContextKey), not only with the session id.
  */
