@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 131
+const FIXTURES_VERSION = 132
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -381,7 +381,8 @@ const AB_FAKE_WORK =
 /** node --test in alpha: its output's pass and fail counts. */
 const abTests = (c) => {
   const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
-  return { status: r.status, pass: Number(/^# pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^# fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
+  // TAP's "# pass 8", or the spec reporter's "ℹ pass 8".
+  return { status: r.status, pass: Number(/^(?:#|ℹ) pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^(?:#|ℹ) fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
 }
 /** Green with at least 8 tests. */
 const abGreen = (c) => {
@@ -1573,7 +1574,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-decision',
-    title: 'A decision recorded while the agent works on the card (#357): flagged in its next board reply, and it re-reads the card before Review',
+    title: 'A decision recorded while the agent works on the card (#357): flagged in its next board reply, and it sees it before Review (re-reading the card, or given it by its refused submit, HI-2854)',
     files: { 'login.html': '<form><input name="user"><input name="password" type="password"></form>\n' },
     async setup(c) {
       await c.card('a', { title: 'Login form errors', description: 'Show the login form\'s validation errors (empty user, empty password) in login.html.' })
@@ -1601,7 +1602,8 @@ module.exports.SCENARIOS = [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
         ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')), `${between.length} call(s) between`],
-        ['read the card again after the decision, before handing it on', decided > 0 && review > 0 && cardReads(o, c.cards.a).some((t) => t > decided && t < review), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}`],
+        // HI-2854: or its submit was refused for the decision it hadn't seen, which gives the decision in full.
+        ['saw the decision before handing it on (read the card again, or a submit refused for it)', decided > 0 && review > 0 && (cardReads(o, c.cards.a).some((t) => t > decided && t < review) || o.combworkCalls.some((x) => x.tool === 'cw_submit' && !x.ok && Date.parse(x.at) > decided && Date.parse(x.at) < review)), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}, refused submits ${o.combworkCalls.filter((x) => x.tool === 'cw_submit' && !x.ok).map((x) => Date.parse(x.at)).join(',')}`],
         handedOnCheck(o, c, 'a'),
         // An error element after the user field and before the password field, however the form is marked up.
         ['the errors are under their fields', /name=["']?user\b[\s\S]*?(error|invalid)[\s\S]*?name=["']?password\b/i.test(c.read('login.html') ?? ''), (c.read('login.html') ?? '').slice(0, 400)]

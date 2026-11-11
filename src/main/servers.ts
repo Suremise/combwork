@@ -3980,6 +3980,9 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
         const ws = requireWorkspace()
         const now = await tasks.readTask(ref.n, actor).catch(() => null)
         const unread = now ? await giveUnseen(ws, self.agentId, now).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [])) : []
+        // Given in full: the reply flag's baseline moves too, so its next reply doesn't flag them again.
+        const me = agentCaller()
+        if (unread.length && me) noteCardRead(me, ref.n)
         if (unread.length) throw new tasks.WorkflowRefusedError({ ...e.refusal, unread })
       }
       throw e
