@@ -72,7 +72,7 @@ export class JjFileGate {
   /** Waits for the keys in `mode`, all at once; rejects (GateRefused) when `signal` aborts first. */
   acquire(keys: readonly string[], mode: GateMode, signal?: AbortSignal): Promise<Grant> {
     const ks = [...new Set(keys)].sort()
-    if (!ks.length) return Promise.reject(new GateRefused('no keys'))
+    if (!ks.length) return Promise.reject(new GateRefused('no keys')) // i18n-ignore: a protocol detail, for the log
     if (signal?.aborted) return Promise.reject(new GateRefused('aborted'))
     return new Promise<Grant>((grant, fail) => {
       const r: Request = { keys: ks, mode, grant, fail }
@@ -112,7 +112,7 @@ export class JjFileGate {
     // could be waiting for this write's own keys. Granted now, or refused (the recheck's read fails, so it refuses).
     if (t?.live) {
       const now = this.tryShared(keys)
-      if (!now) throw new GateRefused("a key its write doesn't hold, not free now")
+      if (!now) throw new GateRefused("a key its write doesn't hold, not free now") // i18n-ignore: a protocol detail, for the log
       try {
         const p = fn()
         t.borrows.add(p)
@@ -141,7 +141,7 @@ export class JjFileGate {
    * through it is awaited before this settles, then the ticket is revoked. `fn`'s answer (null: go on; else why not).
    */
   async recheck<T>(g: Grant, fn: () => Promise<T> | T): Promise<T> {
-    if (g.mode !== 'exclusive') throw new Error('a recheck needs an exclusive grant')
+    if (g.mode !== 'exclusive') throw new Error('a recheck needs an exclusive grant') // i18n-ignore: a programming error, for the log
     const t: Ticket = { keys: new Set(g.keys), live: true, borrows: new Set() }
     try {
       return await this.tickets.run(t, async () => fn())
