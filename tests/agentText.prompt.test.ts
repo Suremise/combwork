@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
-import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt } from '../src/shared/tasks'
+import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt, taskStartPrompt } from '../src/shared/tasks'
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
 import { laneNextWaitReason } from '../src/main/cardStall'
@@ -37,6 +37,9 @@ function prompts(): { name: string; text: string }[] {
         for (const cs of [[], comments.slice(0, 1), comments, [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }]])
           for (const a of [0, 1, 12])
             out.push({ name: `prompt ${withTools} ${inLane} ${from} ${cs.length} ${a}`, text: taskPrompt({ ...card, comments: cs, blockedBy: a ? [3, 4] : [] } as never, withTools, { from, note: 'Only the tests.', inLane, attachments: atts(a) }) })
+  // HI-2854: the whole card, the agent's already.
+  const decisions = [{ id: 'd1', text: 'Items 2 to 5 only.', decidedBy: 'user', recordedBy: 'Assistant', at: '2026-10-03T10:00:00Z' }]
+  for (const inLane of [true, false]) out.push({ name: `whole ${inLane}`, text: taskStartPrompt({ ...card, comments, decisions } as never, true, { inLane, yours: true, wholeMax: 6000 }).text })
   const ok = [
     { ref: 'docs/A.md#intro', size: 1234 },
     { ref: 'docs/B.md', size: 23456 },

@@ -26,6 +26,10 @@
   - **Names, never content**: a file by its last two folders, a web page by its host, a command only as its tool.
   - **Show** turns the map, its feed and the rings on and off. It is frozen when Activity is, draws nothing while hidden, and follows Windows' **Show animations** (Settings → Advanced → **The Activity map's moving pulses** to choose).
 
+### Changed
+
+- **A card costs fewer requests** (HI-2854). A card's start task now carries the whole card, its decisions and every comment, when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), and says when the card is already the agent's, so the agent neither reads it again nor starts it. Submitting no longer needs a fresh read either: a submit is refused while the card has a decision or a comment of yours the agent hasn't seen, in every workflow, Solo included, and the refusal gives them. The task a card was started with is acknowledged by the agent starting or submitting it. The user guide's **What Combwork adds to an agent's tokens** explains `/usage`'s "combwork" line, with the measurements.
+
 ### Fixed
 
 - **A slot no longer stays lent after its card is Done when the builder was restarting** (HI-2920). A builder restarted for its tools (or switched to another connection) just as its card finished took its old slot back for itself, so the slot never returned to the pool and the next card couldn't have it. Such a restart now resumes only where the agent may still work, and a stop while it gets ready leaves the slot alone.

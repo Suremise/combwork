@@ -176,12 +176,53 @@ describe('recording facts from the board’s moves (#1216)', () => {
     expect(pre.pre_workflow).toBe(0)
   })
 
-  it('a change that records nothing new writes no fact: a comment, a title', async () => {
+  it("a change that records nothing new writes no fact: an agent's comment, a title; the user's comment is a UserComment (HI-2854)", async () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Quiet', project: 'p' }, user))).number
-    await inWorkspace(w, () => tasks.commentTask(card, 'Just a comment', user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Just a comment', builder))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Just a comment', { kind: 'assistant' }))
     await inWorkspace(w, () => tasks.updateTask(card, { title: 'Renamed' }, user))
     expect(kinds(w, card)).toEqual([])
+    await inWorkspace(w, () => tasks.commentTask(card, 'Mine', user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Mine too', user))
+    expect(factsOf(w, card).filter((f) => f.kind === 'UserComment').map((f) => (f.data as { generation: number }).generation)).toEqual([1, 2])
+  })
+
+  it("HI-2854: a refused submit's unseen decisions and comments of the user's, each in full, received with it; a removed decision counts, unlisted; an agent's comment never", async () => {
+    const { giveUnseen } = await import('../src/main/cardFreshness')
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Unseen', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Use SQLite' }, { kind: 'assistant' }))
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Gone soon' }, user))
+    const gone = (await inWorkspace(w, () => tasks.getTask(card))).decisions!.find((d) => d.text === 'Gone soon')!
+    await inWorkspace(w, () => tasks.editDecision(card, gone.id, null, user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Keep the JSON identical.', user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Round 1 ready.', builder))
+    const now = await inWorkspace(w, () => tasks.getTask(card))
+    const lines = await giveUnseen(w, 'a1', now)
+    expect(lines).toEqual([expect.stringMatching(/^Decision \(\d{4}-\d\d-\d\d, recorded by Assistant\): Use SQLite$/), expect.stringMatching(/^Comment from the user \(\d{4}-\d\d-\d\d\): Keep the JSON identical\.$/)])
+    expect(foldCard(factsOf(w, card))).toMatchObject({ received: { a1: 3 }, receivedComments: { a1: 1 } })
+    // Received: nothing more to give, until the user writes again.
+    expect(await giveUnseen(w, 'a1', now)).toEqual([])
+    await inWorkspace(w, () => tasks.commentTask(card, 'One more.', user))
+    expect(await giveUnseen(w, 'a1', await inWorkspace(w, () => tasks.getTask(card)))).toEqual([expect.stringMatching(/One more\.$/)])
+  })
+
+  it("HI-2854: a full read receives the user's comments as far as it saw them, never back, and never one written after it", async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Commented', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.commentTask(card, 'First', user))
+    const given = await inWorkspace(w, () => tasks.readTaskSeen(card, builder))
+    expect(given.comments).toBe(1)
+    await inWorkspace(w, () => tasks.commentTask(card, 'Second', user))
+    await recordDecisionsReceived(w, 'a1', card, given.generation, 'p', given.comments)
+    expect(foldCard(factsOf(w, card))).toMatchObject({ commentGeneration: 2, receivedComments: { a1: 1 } })
+    const later = await inWorkspace(w, () => tasks.readTaskSeen(card, builder))
+    await recordDecisionsReceived(w, 'a1', card, later.generation, 'p', later.comments)
+    // An older read's receipt, late: the newer one stands.
+    await recordDecisionsReceived(w, 'a1', card, given.generation, 'p', given.comments)
+    expect(foldCard(factsOf(w, card)).receivedComments.a1).toBe(2)
+    expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 0, comments: 1 }, { agent: 'a1', generation: 0, comments: 2 }])
   })
 
   it("#1348: a card in Merging (its column Passed) that a change leaves in Passed isn't moved back to Approved", async () => {

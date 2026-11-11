@@ -266,6 +266,8 @@
   "tips.combworkMerges.title": "让 Combwork 合并已批准的卡片",
   "tips.combworkSkills.text": "智能体和助手会获得 Combwork 自带的技能：work-on-card、review-agent-work、handover 等。Combwork 会让它们保持最新；你编辑过的技能则归你所有。",
   "tips.combworkSkills.title": "用于配合 Combwork 工作的技能",
+  "tips.combworkTokens.text": "Claude Code 的 /usage 会统计每次 Combwork 工具调用之后的请求，而每个请求都会重新读取整段对话，所以 combwork 的占比是“调用次数 × 上下文”。现在开始卡片时，只要放得下就会附上整张卡片，代理只需读一次。",
+  "tips.combworkTokens.title": "/usage 中的“combwork”统计什么",
   "tips.hooksMissing.text": "如果 CLI 更新或策略使智能体的钩子无法到达 Combwork，它的窗格会显示“状态未知”，而不是可能有误的状态，Combwork 不会向它输入任何内容，它的通道会暂停。Combwork 能判断原因时，窗格上方的横幅会说明原因。",
   "tips.hooksMissing.title": "当智能体的钩子不再到达时",
   "tips.howDoYouWork.text": "新项目的“版本控制”标签页会询问“你如何工作？”：单人、结对或团队，并推荐适合其智能体的那个。选择即可一键设置；“暂不”则保留你的默认值。",

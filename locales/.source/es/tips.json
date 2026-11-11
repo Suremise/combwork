@@ -175,6 +175,8 @@
   "tips.combworkMerges.title": "Let Combwork merge approved cards",
   "tips.combworkSkills.text": "Agents and the Assistant get Combwork's own skills: work-on-card, review-agent-work, handover and more. Combwork keeps them up to date; ones you edit stay yours.",
   "tips.combworkSkills.title": "Skills for working with Combwork",
+  "tips.combworkTokens.text": "Claude Code's /usage counts every request after one of Combwork's tool calls, each re-reading the whole conversation, so its combwork share is calls times context. A card's start now carries the whole card when it fits, so the agent reads it once.",
+  "tips.combworkTokens.title": "What \"combwork\" in /usage counts",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "Compact summarises the conversation so every later message costs less. Give it a focus (\"keep the API decisions, drop the test output\") and the agent keeps what matters. {key}",
   "tips.compactFocus.title": "Compact with a focus",

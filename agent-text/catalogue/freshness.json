@@ -1,0 +1,10 @@
+{
+  "freshness.unread.comment": {
+    "text": "Comment from the user ({date}): {text}",
+    "note": "HI-2854: a refused submit's unseen comment the user wrote, on a line of its own below the refusal. date: YYYY-MM-DD; text: the comment in full."
+  },
+  "freshness.unread.decision": {
+    "text": "Decision ({date}, recorded by {by}): {text}",
+    "note": "HI-2854: a refused submit's unseen decision, on a line of its own below the refusal. date: YYYY-MM-DD; by: who recorded it; text: the decision in full."
+  }
+}

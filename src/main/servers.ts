@@ -86,7 +86,8 @@ import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateR
 import { slotAt } from '../shared/agentFolders'
 import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type StallAgent } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { giveUnseen } from './cardFreshness'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -3258,6 +3259,15 @@ route('GET', '/v1/tasks', async ({ query }) => {
   return query.get('history') === 'true' ? views : views.map(withoutHistory)
 })
 
+// HI-2854: a card's start task that carried the whole card, read with cw_inbox, is a full read of it as it was then: the
+// generations it was made at are received (never later ones), and the flag's baseline moves to when it was made.
+onCardTaskReceived((host, agentId, n, seen) => {
+  const agent = { projectPath: host, agentId }
+  if (lastCardRead(agent, n) < seen.at) noteCardRead(agent, n, seen.at)
+  const ws = workspaceFor(host)
+  if (ws) void recordDecisionsReceived(ws, agentId, n, seen.decisions, basename(host), seen.comments)
+})
+
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
   // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
@@ -3279,8 +3289,10 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     noteCardRead(me, view.number)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
+    // HI-2854: the user's comments too, only from a read that gave every comment it keeps in full (not comments=n or
+    // summary=true, which may leave one out).
     const ws = contextWorkspace()
-    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project)
+    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project, n === null && !summary ? seen.comments : undefined)
   }
   const lean = n === null ? view : newestComments(view, n)
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
@@ -3961,11 +3973,23 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   const ref = intentRef(param)
   const actor = await taskActor()
   if (actor.kind !== 'assistant') {
-    const { done: ran, card } = await runCardIntent(ref, actor, intent)
+    const self = actor.kind === 'agent' ? actor.self : undefined
+    const { done: ran, card } = await runCardIntent(ref, actor, intent).catch(async (e: unknown) => {
+      // HI-2854: a submit refused for what its builder hasn't seen gives it those, in full, received with the refusal.
+      if (self && intent.kind === 'submit' && e instanceof tasks.WorkflowRefusedError && e.refusal.rule === 'submit.decisionsReceived') {
+        const ws = requireWorkspace()
+        const now = await tasks.readTask(ref.n, actor).catch(() => null)
+        const unread = now ? await giveUnseen(ws, self.agentId, now).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [])) : []
+        if (unread.length) throw new tasks.WorkflowRefusedError({ ...e.refusal, unread })
+      }
+      throw e
+    })
+    // HI-2854: the task Combwork started the card with is acked by its builder's start or submit of it (still recorded).
+    const me = agentCaller()
+    if (me && self && (intent.kind === 'start' || intent.kind === 'submit')) await ackCardTask(me.projectPath, me.agentId, card).catch((err) => log.warn('acking a card\'s task by its start or submit', err))
     const done = await withLaneOrder(intent, card, ran)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
     // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
-    const self = actor.kind === 'agent' ? actor.self : undefined
     const watch = self ? await armIntentWatch(requireWorkspace(), self.agentId, card, { submit: intent.kind === 'submit', failed: intent.kind === 'verdict' && !intent.pass }) : null
     const out = watch ? { ...done, watch } : done
     // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.

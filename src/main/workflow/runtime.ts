@@ -899,6 +899,18 @@ export class Workflow {
     return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
   }
 
+  /**
+   * HI-2854 (Darren's B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
+   * All off: their compiled guards and ids unchanged, so the user's drags there still ask nothing), is refused all the
+   * same while the agent hasn't seen a decision or a comment of the user's: work-on-card no longer reads the card again
+   * before submitting. In the submit's write, under its lock; nothing with the rules off, or what an override leaves out.
+   */
+  private agentHasSeen(w: Write, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    const id: GuardId = 'submit.decisionsReceived'
+    if (!this.enforced() || !inputs.agent || (only && !only(id)) || (w.ruleset?.guards.submit ?? []).includes(id)) return null
+    return evaluate([id], this.guardInputs(w, inputs))
+  }
+
   private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
     return this.idsOf(w.ruleset, move, only)
   }
@@ -1625,7 +1637,7 @@ export class Workflow {
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
       const ins = this.submitInputs(g)
-      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
+      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
       ahead = this.enforced() && !args.drag && !followUp && g.o.review !== 'none' ? this.laneReorder(w, card) : null

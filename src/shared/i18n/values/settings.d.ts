@@ -561,6 +561,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.prompt.clearDraft.title': undefined
   'settings.advanced.cw.prompt.rawCardStart.desc': undefined
   'settings.advanced.cw.prompt.rawCardStart.title': undefined
+  'settings.advanced.cw.prompt.wholeCardMax.desc': undefined
+  'settings.advanced.cw.prompt.wholeCardMax.title': undefined
   'settings.advanced.cw.queue.checkMinutes.desc': undefined
   'settings.advanced.cw.queue.checkMinutes.title': undefined
   'settings.advanced.cw.queue.checkedOutTarget.ask': undefined

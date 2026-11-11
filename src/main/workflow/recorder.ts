@@ -273,6 +273,22 @@ export function decisionGenerations(ws: WorkspaceService, numbers: number[]): Ma
   return out
 }
 
+/**
+ * Cards' comment generations (HI-2854: the newest `UserComment` fact's; 0 for none), read in the caller's snapshot as
+ * decisionGenerations are: what a reply or a task gives an agent of the user's comments is bound to the generation read with it.
+ */
+export function commentGenerations(ws: WorkspaceService, numbers: number[]): Map<number, number> {
+  const out = new Map<number, number>()
+  if (!numbers.length) return out
+  try {
+    const rows = boardRead(ws, (db) => db.prepare("SELECT card, max(json_extract(data, '$.generation')) AS g FROM card_facts WHERE kind = 'UserComment' AND card IN (SELECT value FROM json_each(?)) GROUP BY card").all(JSON.stringify(numbers)) as { card: number; g: number }[]) // i18n-ignore: SQL
+    for (const r of rows) out.set(r.card, Number(r.g) || 0)
+  } catch {
+    // A board waiting for its upgrade has no facts: none.
+  }
+  return out
+}
+
 function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard | null, after: TaskCard): void {
   const n = after.number
   const actor = actorOf(ctx?.actor)
@@ -411,6 +427,11 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     const now = new Map((after.decisions ?? []).map((d) => [d.id, d.text]))
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
+    // HI-2854: each comment the user adds, a new comment generation: what cw_submit checks its builder has seen.
+    if (ctx?.actor.kind === 'user') {
+      let cg = earlier.commentGeneration
+      for (const c of added(before?.comments ?? [], after.comments)) if (c.id) tx.append(n, { kind: 'UserComment', actor, source: 'recorded', ...ruleset(), data: { comment: c.id, generation: ++cg } }) // i18n-ignore: a fact's kind and codes, not text
+    }
     // A lane reviewer's comment taken as its request to the builder (#1410, tasks.ts' laneReviewerAsks): the runtime's
     // ReviewerRequest, made on the board (cw_request_builder's own is the runtime's, made there).
     const asked = moves && history.some((h) => h.whatText?.id === HISTORY.reviewerRequest.id) ? after.comments.find((c) => c.id === comment)?.text : undefined
@@ -511,9 +532,10 @@ function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<strin
  * looked up later. Recorded once per generation, in a board change of its own, only while the workspace (and the card's
  * project, when given) is the one the receipt was for. In the background: never in the read's way.
  */
-export async function recordDecisionsReceived(ws: WorkspaceService, agentId: string, n: number, generation: number, project?: string): Promise<void> {
+export async function recordDecisionsReceived(ws: WorkspaceService, agentId: string, n: number, generation: number, project?: string, comments?: number): Promise<void> {
   const path = ws.path
-  if (!path || !(generation > 0)) return
+  const withComments = typeof comments === 'number' && comments > 0
+  if (!path || (!(generation > 0) && !withComments)) return
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   try {
@@ -524,8 +546,10 @@ export async function recordDecisionsReceived(ws: WorkspaceService, agentId: str
         const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined) // i18n-ignore: SQL
         if (!card || card.pre_workflow || (project !== undefined && card.project.toLowerCase() !== project.toLowerCase())) return
         const store = FactStore.forBoard(ws, { project: card.project, key: '' })
-        if ((foldCard(store.facts(n)).received[agentId] ?? 0) >= generation) return
-        store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation } }))
+        const s = foldCard(store.facts(n))
+        const newComments = withComments && (s.receivedComments[agentId] ?? 0) < comments!
+        if ((s.received[agentId] ?? 0) >= generation && !newComments) return
+        store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation: Math.max(0, generation), ...(newComments ? { comments } : {}) } }))
       },
       { alive }
     )

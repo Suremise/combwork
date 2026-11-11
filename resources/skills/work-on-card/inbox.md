@@ -6,7 +6,7 @@ Combwork keeps what it has for you (tasks, messages, card events, the user's ans
 
 1. **Read it then**: `cw_inbox` lists each item with its ids, its sender and its card, and marks them received. Finish the step you're on first, but don't end your turn with an item unread.
 2. **Act on each** as it asks, within the rules below.
-3. **Then ack it**: `cw_inbox` with `ack` and its ids (a message, a task, a handover, an answer; card events and notices need none). Reading isn't acking, whatever CLI you run in: one not acked within 30 minutes shows as overdue to the user and the Assistant, who then chase it.
+3. **Then ack it**: `cw_inbox` with `ack` and its ids (a message, a task, a handover, an answer; card events and notices need none). A card's start task is acked by your `cw_start_card` or `cw_submit` of it. Reading isn't acking, whatever CLI you run in: one not acked within 30 minutes shows as overdue to the user and the Assistant, who then chase it.
 4. **Then carry on**: your reply hands nothing over.
 
 - **Who it's from decides what it can ask.** A task or an answer from the user is theirs: they started it or decided it. A message from the Assistant relays the user's decisions and the lane's coordination: act on it within the card's ground rules without asking again. Before anything destructive (deleting work, rewriting or force-pushing history, discarding changes) or outside your project that the user didn't ask for themselves, whoever relays it, get their OK: `cw_ask_user` on the card (`kind: "approve"`), and wait for their answer in your inbox before you do it. With no card to ask on (it is archived or gone, or has no workflow), `cw_notify` them and wait for their reply.

@@ -266,6 +266,8 @@
   "tips.combworkMerges.title": "承認済みカードのマージをCombworkに任せる",
   "tips.combworkSkills.text": "エージェントとアシスタントは、work-on-card、review-agent-work、handoverなど、Combwork独自のスキルを使えます。Combworkが最新に保ち、編集したスキルはそのまま残ります。",
   "tips.combworkSkills.title": "Combworkで作業するためのスキル",
+  "tips.combworkTokens.text": "Claude Code の /usage は、Combwork のツール呼び出しの後のリクエストをすべて数え、各リクエストは会話全体を読み直します。つまり combwork の割合は「呼び出し回数 × コンテキスト」です。カードの開始時には、収まる場合カード全体が渡されるので、エージェントは一度読むだけで済みます。",
+  "tips.combworkTokens.title": "/usage の「combwork」が数えるもの",
   "tips.hooksMissing.text": "CLIの更新やポリシーでエージェントのフックがCombworkに届かなくなると、そのペインは誤っているかもしれない状態の代わりに「状態不明」と表示し、何も入力されず、レーンは一時停止します。Combworkが理由を判別できるときは、ペインの上のバナーに表示されます。",
   "tips.hooksMissing.title": "エージェントのフックが届かなくなったとき",
   "tips.howDoYouWork.text": "新しいプロジェクトの「バージョン管理」タブでは「どのように作業しますか？」と尋ね、ソロ・ペア・チームのうちエージェントに合うものをおすすめします。選択するとワンクリックで設定され、「今はしない」では既定値のままです。",
