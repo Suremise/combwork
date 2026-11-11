@@ -2309,9 +2309,12 @@ a configured path outside what it can read, a tool that doesn't answer) is "uses
   repository still count. Its `core.autocrlf true` still counts (Git converts every text file's line endings, which
   jj doesn't): the dialog says to turn it off for that repository alone (`git config core.autocrlf false` in it).
 - **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
-- **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
-  the store's `hooks/` that isn't a `*.sample`.
-- **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
+- **hooks:** a hook in the folder Git runs hooks from, as Git itself names it (`git rev-parse --git-path hooks`, HI-2941:
+  `core.hooksPath` at any level with Git's own expansion, `~/` and `%(prefix)/` included, a relative one from the working
+  tree's top; else the store's `hooks/`), never a `*.sample`. Git unable to name it is unknown, never clear.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` on at any level, read as Git reads a boolean (HI-2942: any nonzero
+  number too, `2`, `0x10` or `1k`; a value Git refuses counts, failing closed), or jj's `signing.behavior` set to `own`
+  or `force`.
 
 ##### jj's runner and detection (1.5.0's J0, HI-2793)
 
@@ -2535,7 +2538,11 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
 - **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
   released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
-  with no port there is kept (`cantCheck`).
+  with no port there is kept (`cantCheck`), its refresh, settle and owed pass leaving it as it is. HI-2936: after a
+  switch, the old platform's slots and copies are never lent again: they don't count toward the pool's size, and the
+  idle tidy removes each once unused for a day (its own port, the removal's guards: unmerged or uncommitted work keeps
+  it); the app registers jj's port while a project's board still holds a jj slot or copy, so a project switched back
+  to Git settles, keeps or removes them by jj.
 - **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
   forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
   worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
@@ -4223,7 +4230,10 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
   it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
   slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
-  any kind, not set aside), whose recorded target is only the last its lease served; the slots read inside the save's board write, the
+  any kind, not set aside), whose recorded target is only the last its lease served (HI-2928: once that branch is
+  deleted, a free slot's idle tidy and Remove check it against the default target instead (never for a jj preparation's
+  key, which has no head by design), so work in it that isn't
+  there keeps it, `unmerged`, and a slot with none is freed, rather than kept as `cantCheck`); the slots read inside the save's board write, the
   pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
   every slot recording it, its clean-up checking against it),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
@@ -6042,7 +6052,8 @@ under two names, read together with the last line git reads winning. Each value'
 
 **The check** signs a throwaway payload, in a temp folder removed after, in the commit's folder and environment, bounded
 at 5 s with its tree ended there. It runs only what Combwork can vouch for: the program a commit would run is resolved to
-a full path first (the configured one, or git's default on the commit's PATH with PATHEXT), and is run only when that
+a full path first, as git for Windows finds it (HI-2934: a path as given, with no extension added; a name in each folder
+of the commit's PATH in turn, `<name>.exe` then `<name>`, never by PATHEXT), and is run only when that
 path is a known installation: Git for Windows' own `usr\bin\gpg.exe` or `usr\bin\ssh-keygen.exe` (beside the git
 Combwork runs, or its `--exec-path`), GnuPG's `…\GnuPG\bin\gpg.exe` under Program Files, or Windows' own
 `System32\OpenSSH\ssh-keygen.exe`. Anything else, an unrecognised default found on PATH included, is `notChecked` and is
@@ -6050,7 +6061,8 @@ never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`
 - openpgp: `--batch --no-tty --pinentry-mode error --no-autostart --status-fd=2 -bsau <key>` on stdin, the key being
   `user.signingkey` or git's default, the committer's identity as that commit would have it (`git var
   GIT_COMMITTER_IDENT` with its overrides).
-- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal `key::` key written to a temp file as git does, a path's
+- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
+  written to a temp file as git does, a path's
   `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
 - Outcomes: `unattended`, `needsSomeone` (the signer's words), `couldNotComplete` (the bound: never taken as proof
   either way), `cantSign` (its words), `notChecked`, `off`, `unreadable` (never taken for off).
@@ -6095,7 +6107,9 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **Only the session's environment, never config.** A session with Combwork's tools (none "as from a terminal") gets two
   `GIT_CONFIG_*` entries, first so the user's own entries after them still win: `gpg.program` and `gpg.ssh.program` set
   to `cw-sign.exe`, and the variables it reads (`CW_SIGN_*`). Entries naming another Combwork's `cw-sign.exe` (a dev
-  build started from a session) are dropped. Combwork writes no git, ssh or gpg configuration.
+  build started from a session) are dropped. A `GIT_CONFIG_COUNT` git takes, 0 or empty included (HI-2934), gets them;
+  one git refuses, or an entry missing, is left as it is for git to refuse. Combwork writes no git, ssh or gpg
+  configuration.
 - **The launcher, `cw-sign.exe`** (`resources/cw-sign/cw-sign.cs`, compiled at each build by Windows' own .NET Framework
   `csc.exe` into `out/bin`, shipped as `resources\bin`; none built, sessions get no entries and sign as before). Git
   names one program with no arguments of its own, a `.cmd` loses arguments to cmd's parsing and a `#!/bin/sh` script
@@ -6115,10 +6129,14 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
   sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
   no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
   default: long enough for a hardware key's touch). Verification and every other signer run as before, the protection
-  being for known installations only: started as git for Windows starts them (HR2's round 1), a `.cmd` or `.bat` through
-  `cmd /c` with git's own command line (each part quoted as git's `quote_arg_msvc` quotes it, so cmd reads it as it
-  did), a `#!` script through its interpreter looked up on PATH as git looks it up, anything else as it is, with git's
-  arguments, stdio and exit; sharing the launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
+  being for known installations only. Every signer, known or not, is started as git for Windows starts it (HR2's round
+  1, HI-2934): a `.cmd` or `.bat` through `cmd /c` with git's own command line (so cmd reads it as it did), a `#!`
+  script through its interpreter looked up on PATH as git looks it up (the interpreter, the script's path, then git's
+  arguments), anything else, an `.exe` included, with git's command line, written out as is; each word quoted as git
+  quotes it, `quote_arg_msys2` for MSYS2's `sh` and `quote_arg_msvc` for the rest, so an MSYS2 program (Git's own gpg
+  and ssh-keygen among them) neither globs a `*`, `?` or `{` nor reads a `'` as a quote (a profile such as
+  `C:\Users\O'Brien`), where Node's own quoting would let it. Git's stdio and exit are kept; an unknown signer shares the
+  launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
@@ -8056,8 +8074,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
   out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
   the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
-  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
-  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  or queued, HI-2927: no card in flight into it, no pause, a stuck one too, and no Combwork running it, so those stay
+  controllable) is a past branch's (`QueueView.past`, set in every listing); targets that can't be read (the project not
+  Git now, git's default unreadable) make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
   history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
   only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
@@ -8140,7 +8159,13 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       started on them if they aren't running, as an update by the user or the Assistant does.
     - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
       one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
-      a lane gone, ended or at another revision is refused, nothing saved. Every check is made again at the write, under
+      a lane gone, ended or at another revision is refused, nothing saved. **Quick edits in turn** (HI-2932): the window
+      asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
+      from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
+      board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
+      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
+      Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
       facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
       before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:

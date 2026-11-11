@@ -2,11 +2,12 @@
 // heat, partial and unknown states, the pulses' baseline, and the context number the pane footer shows.
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, stationTitle, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
+import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
 import { ConversationParser } from '../src/main/providers/claude/conversation'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
@@ -372,5 +373,82 @@ describe("the context number, as the pane footer shows it", () => {
 
   it('turns amber at 70 % and red at 90 %', () => {
     expect([null, 0, 69, 70, 89, 90, 100].map(contextLevel)).toEqual(['none', 'ok', 'ok', 'amber', 'amber', 'red', 'red'])
+  })
+})
+
+describe('the context reads follow the live state under the same session (HI-2929)', () => {
+  const limits = { model: 'qwen3', connection: 'local', applied: true, context: { value: 32768, from: null } }
+  type Live = { sessionId: string; settingUp?: boolean; modelId?: string; localLimits?: typeof limits } | null
+  const entry = (live: Live): { key: string; live: Live } => ({ key: 'a1', live })
+
+  it('reads again when a setup ends', () => {
+    const setting = mapContextEntries([entry({ sessionId: 's1', settingUp: true })], (e) => e.live)
+    const set = mapContextEntries(setting.entries, (): Live => ({ sessionId: 's1' }))
+    expect(set.key).not.toBe(setting.key)
+    expect(set.entries[0].live).toEqual({ sessionId: 's1' })
+  })
+
+  it('reads again when local limits or the model arrive after the launch', () => {
+    const at = mapContextKey({ sessionId: 's1' })
+    expect(mapContextKey({ sessionId: 's1', localLimits: limits })).not.toBe(at)
+    expect(mapContextKey({ sessionId: 's1', modelId: 'qwen3' })).not.toBe(at)
+    // The window it then shows is the launch-declared one, as the footer has it.
+    expect(contextShown({ contextTokens: 8192 }, { localLimits: limits }).pct).toBe(25)
+  })
+
+  it('keeps the same key, and the same entries, while nothing it depends on changes', () => {
+    const e = entry({ sessionId: 's1', localLimits: limits })
+    const one = mapContextEntries([e], (x) => x.live)
+    const two = mapContextEntries([e], (): Live => ({ sessionId: 's1', localLimits: { ...limits } }))
+    expect(two.key).toBe(one.key)
+    expect(one.entries[0]).toBe(e)
+    expect(mapContextKey(null)).toBe('')
+  })
+
+  it("the workspace view's entries, taken in before limits or a model came, read them from the hosts now (HR1's round 1)", () => {
+    type HostLive = { sessionId: string; status: string; modelId?: string; localLimits?: typeof limits }
+    const before: HostLive = { sessionId: 's1', status: 'ready' }
+    // Its entries as shownHosts took them in (a status or session change); the hosts replaced since, same session and status.
+    const stale = [{ key: 'C:\\WS\\Alpha\na1', path: 'C:\\WS\\Alpha', agentId: 'a1', live: before }]
+    const hostsThen = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: before }] }]
+    const hostsNow = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: { ...before, localLimits: limits } }] }]
+    const modelNow = [{ path: 'c:\\ws\\alpha', agents: [{ id: 'a1', live: { ...before, modelId: 'qwen3' } }] }]
+    const then = mapContextEntries(stale, (e) => liveIn(hostsThen, e.path, e.agentId))
+    const now = mapContextEntries(stale, (e) => liveIn(hostsNow, e.path, e.agentId))
+    expect(mapContextEntries(stale, (e) => e.live).key).toBe(then.key)
+    expect(now.key).not.toBe(then.key)
+    expect(now.entries[0].live?.localLimits).toEqual(limits)
+    expect(mapContextEntries(stale, (e) => liveIn(modelNow, e.path, e.agentId)).key).not.toBe(then.key)
+    // Gone from the hosts: no live state, nothing to read.
+    expect(mapContextEntries(stale, (e) => liveIn<HostLive>([], e.path, e.agentId)).entries[0].live).toBeNull()
+  })
+})
+
+describe("a station's hover: whole messages in every language (HI-2930)", () => {
+  const catalogue = (code: string): Record<string, string> => JSON.parse(readFileSync(join(__dirname, '..', 'locales', code, 'activity.json'), 'utf8'))
+  afterEach(() => setLanguage('en', {}))
+
+  it('says none as a case of the message, and a call named "none" stays its name', () => {
+    expect(stationTitle({ status: 'ok', count: 2, heat: 3 }, 'Read', '')).toBe('Read: 2 calls this turn, 3 calls in the last ten minutes of the turns read. Last: none')
+    setLanguage('fr', catalogue('fr'))
+    expect(stationTitle({ status: 'ok', count: 1, heat: 1 }, 'Lecture', '')).toMatch(/Dernier : aucun$/)
+    expect(stationTitle({ status: 'ok', count: 1, heat: 1 }, 'Lecture', 'none')).toMatch(/Dernier : none$/)
+  })
+
+  it('a station not counted yet: its status in the message, with the language\'s own punctuation', () => {
+    expect(stationTitle({ status: 'notReported', count: 0, heat: 0 }, 'Read', '')).toBe('Read: not reported')
+    expect(stationTitle({ status: 'loading', count: 0, heat: 0 }, 'Read', '')).toBe('Read: loading…')
+    setLanguage('fr', catalogue('fr'))
+    expect(stationTitle({ status: 'notReported', count: 0, heat: 0 }, 'Lecture', '')).toBe('Lecture : non signalé')
+    setLanguage('ja', catalogue('ja'))
+    expect(stationTitle({ status: 'loading', count: 0, heat: 0 }, '読み取り', '')).toBe('読み取り：読み込み中…')
+  })
+
+  it('every locale has both messages, with the select keys kept', () => {
+    for (const code of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
+      const c = catalogue(code)
+      expect(c['activity.map.stationTip'], code).toMatch(/\{hasLast, select, yes \{\{last\}\} other \{[^{}]+\}\}$/)
+      expect(c['activity.map.stationTipPending'], code).toMatch(/\{status, select, notReported \{[^{}]+\} other \{[^{}]+\}\}$/)
+    }
   })
 })

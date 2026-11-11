@@ -195,6 +195,8 @@ export const SUITES = [
   { name: 'jjafterpush' },
   { name: 'jjcandidate' },
   { name: 'jjcandidatenc' },
+  { name: 'jjlane' },
+  { name: 'jjlanenc' },
   { name: 'jjreopen' },
   { name: 'jjslot-claude', needs: ['claude'], claudeHome: 'test' },
   { name: 'jjstale' },

@@ -9,7 +9,7 @@ import { B1, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
 import { tempDir } from '../tempDir'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import type { QueueConfig, QueueGitResult } from '../../src/main/workflow/mergeQueue'
-import { cancelSigningChecks, checkSigning, knownInstallation, resolveProgram, SigningCancelled, signerSaid, signingTestHooks, viewSigningCounts, viewSigningTestHooks, viewSigning, type SignDeps } from '../../src/main/platform/gitSigning'
+import { cancelSigningChecks, checkSigning, knownInstallation, literalSshKey, resolveProgram, shownKey, SigningCancelled, signerSaid, signingTestHooks, viewSigningCounts, viewSigningTestHooks, viewSigning, type SignDeps } from '../../src/main/platform/gitSigning'
 import { boundedSpawn, endBoundedSpawns } from '../../src/main/platform/boundedSpawn'
 import { endAllOwnedWork, endOwnedWork, onOwnerGone, resetOwnedWorkForTests } from '../../src/main/platform/ownedWork'
 import { gitExe } from '../../src/main/gitTool'
@@ -234,8 +234,13 @@ describe('the signing check (HI-1185)', () => {
     writeFileSync(script, `@echo ran > "${marker}"\r\n`)
     const custom = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'gpg.ssh.program': script, 'user.signingkey': 'key::ssh-ed25519 AAAA x' }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
     expect((await checkSigning(custom.d)).status).toMatchObject({ kind: 'notChecked', why: 'program' })
-    const viaPath = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': 'key::ssh-ed25519 AAAA x' }), { env: { ...gitEnv(), PATH: `${dir};${gitEnv().PATH ?? gitEnv().Path ?? ''}` }, spawn: (f, a, o) => boundedSpawn(f, a, o) })
-    expect((await checkSigning(viaPath.d)).status).toMatchObject({ kind: 'notChecked', why: 'program' })
+    // Found first on PATH as git finds it (HI-2934: <name>.exe, never a .cmd by PATHEXT): an .exe there, never run.
+    const pathDir = slash(tempDir('custom-path-'))
+    writeFileSync(join(pathDir, 'ssh-keygen.exe'), '')
+    const viaPath = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': 'key::ssh-ed25519 AAAA x' }), { env: { ...gitEnv(), PATH: `${pathDir};${gitEnv().PATH ?? gitEnv().Path ?? ''}` }, spawn: (f, a, o) => boundedSpawn(f, a, o) })
+    const found = await checkSigning(viaPath.d)
+    expect(found.status).toMatchObject({ kind: 'notChecked', why: 'program' })
+    expect(slash(found.program ?? '').toLowerCase()).toBe(`${pathDir}/ssh-keygen.exe`.toLowerCase())
     const keyCommand = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'gpg.ssh.defaultKeyCommand': script }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
     expect((await checkSigning(keyCommand.d)).status).toMatchObject({ kind: 'notChecked', why: 'keyCommand' })
     expect(existsSync(marker)).toBe(false)
@@ -249,6 +254,32 @@ describe('the signing check (HI-1185)', () => {
     const real = (k: { key: string }) => deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': k.key }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
     expect((await checkSigning(real(keyPair()).d)).status).toEqual({ kind: 'unattended' })
     expect((await checkSigning(real(keyPair('secret-passphrase-4')).d)).status).toMatchObject({ kind: 'needsSomeone', format: 'ssh' })
+  })
+
+  it('HI-2933: a value starting `ssh-` is the key itself, as git reads it: written to a temp key.pub, only its type and comment shown', async () => {
+    const literal = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAb/cD+ef/gh me@x'
+    // The temp key is gone once the check ends: read while the signer runs.
+    const seen: { file: string; text: string }[] = []
+    const r = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': literal }), {
+      spawn: async (_f, args) => {
+        const file = args[args.indexOf('-f') + 1]
+        seen.push({ file, text: readFileSync(file, 'utf8') })
+        return { ok: true, out: '', err: '', code: 0 }
+      }
+    })
+    signingTestHooks.eligible = () => true
+    const info = await checkSigning(r.d)
+    expect(info.status).toEqual({ kind: 'unattended' })
+    expect(seen).toHaveLength(1)
+    expect(slash(seen[0].file)).toMatch(/\/combwork-sign-[^/]+\/key\.pub$/)
+    expect(seen[0].text).toBe(`${literal}\n`)
+    expect(info.key).toEqual({ scope: 'local', value: 'ssh-ed25519 me@x' })
+    // Shown as git's other literal form is, and a path still by its file name.
+    expect(shownKey('ssh', literal)).toBe('ssh-ed25519 me@x')
+    expect(shownKey('ssh', `key::${literal}`)).toBe('ssh-ed25519 me@x')
+    expect(shownKey('ssh', 'ssh-rsa AAAAB3Nza/x/y')).toBe('ssh-rsa')
+    expect(shownKey('ssh', 'C:/keys/id_ed25519.pub')).toBe('id_ed25519.pub')
+    expect(literalSshKey('~/.ssh/ssh-key.pub')).toBeNull()
   })
 
   it('a signer’s words, classified; a bound reached is never taken for a passphrase', () => {

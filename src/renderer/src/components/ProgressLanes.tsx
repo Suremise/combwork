@@ -4,8 +4,8 @@ import { RUNS_KEEP_PX, laneCardTime, laneWaitTime, draggedLaneRows, droppedLaneO
 import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
-import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
-import { droppedPlace, nudgedPlace, queueRows, type QueueRow } from '@shared/laneQueueEdit'
+import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages, TaskCard } from '@shared/types'
+import { addedPlace, droppedPlace, nudgedPlace, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
 import { dayBounds, dayKey } from '@shared/laneDay'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
@@ -18,7 +18,7 @@ import { NO_PROJECTS, activityAgentKey, cardLabelOf, confirm, get, notify, openV
 import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
 import { openLaneStart } from './LaneStartDialog'
 import { lanesOf, saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
-import { CARD_DRAG, editLane, undoLaneEdit } from '../laneEdits'
+import { CARD_DRAG, editLaneInTurn, undoLaneEdit, type EditOutcome } from '../laneEdits'
 import { useNow } from '../usage'
 import { cx } from '../util'
 import { useAdvancedValue } from '../advanced'
@@ -860,13 +860,13 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           <Icon name="history" /> <span className="progress-lane-queued-text">{queued}</span>
           {/* Cancel Change (HI-2898): drops the queued change, bound to the list shown. */}
           {editing && (
-            <button type="button" className="link progress-lane-cancel-change" data-action="lane-cancel-change" onClick={() => editing.run({ op: 'cancel', lane: l.id, rev: l.listRev })}>
+            <button type="button" className="link progress-lane-cancel-change" data-action="lane-cancel-change" onClick={() => void editing.run((now, _rows, rev) => ({ op: 'cancel', lane: now.id, rev: rev(now.id) }))}>
               {tr(EDIT.cancel)}
             </button>
           )}
         </div>
       )}
-      {refusal && editing && <RefusalLine lane={l} refusal={refusal} onMoveHere={editing.run} onDismiss={dismiss} />}
+      {refusal && editing && <RefusalLine refusal={refusal} onMoveHere={(m) => void editing.run((now, rows, rev) => ({ op: 'transfer', card: m.card, from: { lane: m.from.id, rev: rev(m.from.id) }, to: { lane: now.id, rev: rev(now.id) }, ...addedPlace(rows, m.before) }), { [m.from.id]: m.from.listRev })} onDismiss={dismiss} />}
       {expanded && <LaneQueue lane={l} badges={badges} {...(editing ? { edit: editing } : {})} />}
     </div>
   )
@@ -885,12 +885,36 @@ const QUEUE_ICON: Record<QueueState, string> = { done: 'pass', doing: 'circle-fi
 /** A lane's card dragged within its queue (HI-2898): its number. */
 const QUEUE_DRAG = 'application/x-combwork-lane-card'
 
-/** Editing a running lane's queue in the Lanes tab (HI-2898): asks main for an edit, and adds a card where it goes. */
+/**
+ * Editing a running lane's queue in the Lanes tab (HI-2898): asks main for an edit, and adds a card where it goes. Each
+ * edit is asked in turn (HI-2932, editLaneInTurn) and made when its turn comes, from the lane as it is then (`now`, its
+ * rows) and the revision `rev` gives; null: nothing left to do. `also`: another lane it changes, with its revision shown.
+ */
 interface QueueEditing {
-  run: (e: LaneEdit) => void
-  add: (card: number, at?: number) => void
+  run: (make: QueueEditMaker, also?: Readonly<Record<string, number>>) => Promise<EditOutcome>
+  /** A card added before another (its number), or last (null or none): placed when its turn comes. */
+  add: (card: number, before?: number | null) => void
   all: Lane[]
 }
+type QueueEditMaker = (now: Lane, rows: QueueRow[], rev: (lane: string) => number) => LaneEdit | null
+
+/** A lane as the store has it now (HI-2932: an edit asked in turn is made from it), or null once it's gone. */
+function laneNow(id: string): Lane | null {
+  const s = get()
+  return lanesOf(s.lanes ?? [], s.workspace?.projects ?? []).find((x) => x.id === id) ?? null
+}
+
+/** The board's cards as the queue reads them (queueRows). */
+const boardCards = (tasks: readonly TaskCard[]): Map<number, BoardCard> => new Map(tasks.map((t) => [t.number, { number: t.number, title: t.title, column: t.column, agent: t.agent }]))
+
+/** A lane's queue rows as the store has them now. */
+const rowsNow = (l: Lane): QueueRow[] => queueRows(l, boardCards(get().tasks), l.builder.agentId)
+
+/** Taking a card off when its turn comes; nothing to do once it is no longer waiting there (a second Delete on it). */
+const removing =
+  (card: number): QueueEditMaker =>
+  (now, rows, rev) =>
+    rows.some((r) => r.card.number === card && r.queued) ? { op: 'remove', lane: now.id, rev: rev(now.id), card } : null
 
 const EDIT = {
   handle: msg({ id: 'board.laneEdit.handle', defaultMessage: 'Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off', description: "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key." }),
@@ -929,7 +953,7 @@ const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (
 function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, WorkBadge>; edit?: QueueEditing }) {
   const tasks = useStore((s) => s.tasks)
   const now = Date.now()
-  const board = useMemo(() => new Map(tasks.map((t) => [t.number, { number: t.number, title: t.title, column: t.column, agent: t.agent }])), [tasks])
+  const board = useMemo(() => boardCards(tasks), [tasks])
   const rows: QueueRow[] = edit ? queueRows(l, board, l.builder.agentId) : l.info.map((card) => ({ card, queued: false }))
   const list = rows.map((r) => r.card.number)
   const [dragCard, setDragCard] = useState<number | null>(null)
@@ -976,19 +1000,36 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
     if (!n || !Number.isInteger(n) || n <= 0) return
     // A card of this lane dragged from the board is a move too.
     if (list.includes(n)) {
-      const to = droppedPlace(rows, n, before)
-      if (to !== null) edit.run({ op: 'move', lane: l.id, rev: l.listRev, card: n, to })
+      if (droppedPlace(rows, n, before) === null) return
+      // Placed by the rows as they are when its turn comes (HI-2932): before the same card.
+      void edit.run((cur, r, rev) => {
+        const to = droppedPlace(r, n, before)
+        return to === null ? null : { op: 'move', lane: cur.id, rev: rev(cur.id), card: n, to }
+      })
       return
     }
-    edit.add(n, droppedPlace(rows, null, before) ?? undefined)
+    // Placed by the card it goes before, when its turn comes (HR1's round 1: two quick drops keep their order).
+    edit.add(n, before)
   }
   const nudge = (n: number, by: -1 | 1): void => {
-    const to = nudgedPlace(rows, n, by)
     const label = cardLabelOf({ tasks }, n)
-    if (to === null) return setSaid(tr(EDIT.stuck, { card: label }))
+    if (!edit || nudgedPlace(rows, n, by) === null) return setSaid(tr(EDIT.stuck, { card: label }))
     refocus.current = n
-    setSaid(tr(EDIT.moved, { card: label, at: to + 1, n: rows.length }))
-    edit?.run({ op: 'move', lane: l.id, rev: l.listRev, card: n, to })
+    // One place on from where it is when its turn comes (HI-2932: two quick presses, two places), and said once made:
+    // a refused move is never announced as made.
+    void edit
+      .run((cur, r, rev) => {
+        const to = nudgedPlace(r, n, by)
+        return to === null ? null : { op: 'move', lane: cur.id, rev: rev(cur.id), card: n, to }
+      })
+      .then((o) => {
+        if (o === 'skipped') return setSaid(tr(EDIT.stuck, { card: label }))
+        if (o !== 'made') return
+        const after = laneNow(l.id)
+        const r = after ? rowsNow(after) : []
+        const at = r.findIndex((x) => x.card.number === n)
+        if (at >= 0) setSaid(tr(EDIT.moved, { card: label, at: at + 1, n: r.length }))
+      })
   }
   return (
     <>
@@ -1037,7 +1078,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                       } else if (e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault()
                         e.stopPropagation()
-                        edit.run({ op: 'remove', lane: l.id, rev: l.listRev, card: c.number })
+                        void edit.run(removing(c.number))
                       }
                     }
                   }
@@ -1062,7 +1103,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                   {time.merged.slice(0, 7)}
                 </button>
               )}
-              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={() => edit.run({ op: 'remove', lane: l.id, rev: l.listRev, card: c.number })} />}
+              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={() => void edit.run(removing(c.number))} />}
             </li>
           )
         })}
@@ -1173,7 +1214,7 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
 /** A refused edit, shown under its lane (HI-2898): main's reason, and Move here for a card another lane has. */
 interface Refusal {
   text: string
-  moveHere: { card: number; from: Lane; at?: number } | null
+  moveHere: { card: number; from: Lane; before?: number | null } | null
 }
 
 /**
@@ -1183,30 +1224,43 @@ interface Refusal {
 function useQueueEditing(l: Lane, all: Lane[] | undefined): { editing: QueueEditing | null; refusal: Refusal | null; dismiss: () => void } {
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   if (!all || !laneRunning(l.state) || l.frozen) return { editing: null, refusal: null, dismiss: () => undefined }
-  const names = { lane: lanePair(l) }
-  const run = (e: LaneEdit, card?: number, at?: number): void => {
+  // The revision as shown now, when the user asks (HI-2932): the edit, made in its turn, names the lane's then only when
+  // nothing but this window's own edits came between.
+  const run = (make: QueueEditMaker, also: Readonly<Record<string, number>> = {}, add?: { card: number; before?: number | null }): Promise<EditOutcome> => {
     setRefusal(null)
-    void editLane(e, names).then((why) => {
-      if (why === null) return
-      const from = card !== undefined && e.op === 'add' ? all.find((x) => x.id !== l.id && laneRunning(x.state) && (x.cards.includes(card) || !!x.queued?.includes(card))) : undefined
-      setRefusal({ text: why, moveHere: from && card !== undefined ? { card, from, ...(at !== undefined ? { at } : {}) } : null })
+    return editLaneInTurn({ ...also, [l.id]: l.listRev }, (rev) => {
+      const now = laneNow(l.id)
+      if (!now || !laneRunning(now.state) || now.frozen) return null
+      const e = make(now, rowsNow(now), rev)
+      return e && { edit: e, names: { lane: lanePair(now) } }
+    }).then((o) => {
+      if (typeof o === 'object') {
+        const others = lanesOf(get().lanes ?? [], get().workspace?.projects ?? [])
+        const from = add ? others.find((x) => x.id !== l.id && laneRunning(x.state) && (x.cards.includes(add.card) || !!x.queued?.includes(add.card))) : undefined
+        setRefusal({ text: o.refused, moveHere: from && add ? { card: add.card, from, ...(add.before !== undefined ? { before: add.before } : {}) } : null })
+      }
+      return o
     })
   }
   return {
-    editing: { run: (e) => run(e), add: (card, at) => run({ op: 'add', lane: l.id, rev: l.listRev, card, ...(at !== undefined ? { at } : {}) }, card, at), all },
+    editing: {
+      run: (make, also) => run(make, also),
+      add: (card, before) => void run((now, rows, rev) => ({ op: 'add', lane: now.id, rev: rev(now.id), card, ...addedPlace(rows, before) }), {}, { card, ...(before !== undefined ? { before } : {}) }),
+      all
+    },
     refusal,
     dismiss: () => setRefusal(null)
   }
 }
 
 /** The refusal of an edit, in place under its lane (HI-2898), with Move here when another lane has the card. */
-function RefusalLine({ lane: l, refusal: r, onMoveHere, onDismiss }: { lane: Lane; refusal: Refusal; onMoveHere: (e: LaneEdit) => void; onDismiss: () => void }) {
+function RefusalLine({ refusal: r, onMoveHere, onDismiss }: { refusal: Refusal; onMoveHere: (m: NonNullable<Refusal['moveHere']>) => void; onDismiss: () => void }) {
   return (
     <div className="progress-lane-refusal" role="alert" data-refusal="">
       <Icon name="warning" />
       <span className="progress-lane-refusal-text">{r.text}</span>
       {r.moveHere && (
-        <button type="button" className="btn small" data-action="lane-move-here" onClick={() => onMoveHere({ op: 'transfer', card: r.moveHere!.card, from: { lane: r.moveHere!.from.id, rev: r.moveHere!.from.listRev }, to: { lane: l.id, rev: l.listRev }, ...(r.moveHere!.at !== undefined ? { at: r.moveHere!.at } : {}) })}>
+        <button type="button" className="btn small" data-action="lane-move-here" onClick={() => onMoveHere(r.moveHere!)}>
           {tr(EDIT.moveHere)}
         </button>
       )}

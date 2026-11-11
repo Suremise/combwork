@@ -459,6 +459,57 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(again.slot.target).toBe('1.0.0')
   })
 
+  it("HI-2936: after a switch from jj, a leftover jj slot neither fails a Git lending nor fills the pool; removed by its own port once it has one", async () => {
+    const w = world({ builders: 1 })
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(first.lease.id, 'done')
+    // slot-a as jj left it (HI-2906's busy detach): lent with no lease, its folder there; jj's port not registered here.
+    await w.store.conn.write((db) => void db.prepare("UPDATE slots SET platform = 'jj', state = 'lent' WHERE project = ? AND name = 'slot-a'").run(w.store.project))
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ platform: 'jj', state: 'lent' })
+    // A Git card starts in a new slot: the pool's size (1) counts Git's slots alone.
+    const second = await lent(w, { agent: 'a2', card: 2 })
+    expect(second.slot).toMatchObject({ name: 'slot-b' })
+    expect(w.store.slot('slot-b')?.platform ?? 'git').toBe('git')
+    // Idle, it is kept while it has no port; never a Git slot removed in its place.
+    w.clock.now += IDLE_MS
+    expect(await w.pool.tidy()).toEqual([])
+    expect(w.store.slot('slot-a')).toBeTruthy()
+    // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
+    // idle tidy removes it by that port; the Git slot stays.
+    const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
+    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
+    try {
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')?.state).toBe('ready')
+      expect(await w.pool.tidy()).toEqual(['slot-a'])
+      expect(w.store.slot('slot-a')).toBeNull()
+      expect(existsSync(first.slot.folder)).toBe(false)
+      expect(w.store.slot('slot-b')?.state).toBe('lent')
+    } finally {
+      registerWorkspacePort('jj', undefined as unknown as Parameters<typeof registerWorkspacePort>[1])
+    }
+  })
+
+  it("HI-2928: a free slot whose own target was deleted is checked against the default target: freed when its head is there, kept unmerged when not", async () => {
+    const w = world({ builders: 1 })
+    line100(w)
+    const r = await w.pool.lend({ agent: 'a1', card: 1 }, { target: '1.0.0' })
+    if (!r.ok) throw new Error(`refused: ${JSON.stringify(r.refusal)}`)
+    expect(await w.pool.serves(r.lease.id, 'a1', '1.0.0')).toBe(true)
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', target: '1.0.0' })
+    // 1.0.0 deleted with its commit not in main: the slot's head (1.0.0's) is unmerged there, so it is kept, saying so.
+    sh(w.project, 'branch', '-D', '1.0.0')
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'unmerged', target: 'main' })
+    // Its commit in main: nothing would be lost, so it can be removed.
+    sh(w.project, 'merge', '-q', '--no-edit', sh(r.slot.folder, 'rev-parse', 'HEAD').trim())
+    expect(await w.pool.check('slot-a')).toBeNull()
+    expect(await w.pool.remove('slot-a')).toBeNull()
+    expect(existsSync(r.slot.folder)).toBe(false)
+  })
+
   it("a carried slot made from main, handed off to a card for another line and serving it: released, it waits detached at that line's head (HI-2185)", async () => {
     const w = world({ builders: 3 })
     const folder = join(w.root, 'hb3')
