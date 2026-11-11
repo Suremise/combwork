@@ -31,7 +31,7 @@ import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey } from './jjFileGate'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import type { OwnedWrite, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
-import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
+import { chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
 /** Why a jj workspace step was refused (a protocol code: the pool words what it shows). */
 export const JJ_REFUSED = {
@@ -921,6 +921,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         return step(true)
       })
     },
+    forgetIn: (db, id) => forgetBindingIn(db, id.store, id.workspace),
     identity: async (folder) => {
       const ctx = await contextOf(folder)
       const op = await pinned(folder)

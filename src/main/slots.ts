@@ -1327,6 +1327,8 @@ export interface SlotAside {
   at: string
 }
 export const asideKey = (project: string, slot: string): string => `slot_aside:${project}:${slot}`
+/** A stale jj slot's recovery journal (HI-2866), kept by the slot's name: forgotten with its row (HI-2979). */
+export const recoverKey = (project: string, slot: string): string => `slot_jjrecover:${project}:${slot}`
 function retargetIntentOf(v: string): RetargetIntent | null {
   try {
     const i = JSON.parse(v) as Partial<RetargetIntent>
@@ -1578,6 +1580,17 @@ export class SlotPool {
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
+  /**
+   * A slot's row deleted, with everything kept by its name (HI-2979): its rename's aside, its recovery's journal, and
+   * what its platform keeps by its workspace (jj's binding pointer and preparation journals), in the caller's write.
+   */
+  private forgetIn(db: FenceDb, s: Slot, port: WorkspacePort): void {
+    db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, s.name)
+    db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, s.name))
+    db.prepare('DELETE FROM board_meta WHERE key = ?').run(recoverKey(this.store.project, s.name))
+    if (s.identity) port.forgetIn?.(db, s.identity)
+  }
+
   private removalJournal(name: string): WorkspaceJournal {
     return this.store.journal(`slot_wsremove:${this.store.project}:${name}`)
   }
@@ -2032,7 +2045,7 @@ export class SlotPool {
         }
         if (held && !(await still())) return
         const fence: WorkspaceFence = { still }
-        out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), still)
+        out = await run(s, fence, this.store.journal(recoverKey(this.store.project, name)), still)
       } finally {
         await this.store.fenced(name, token, (db) => this.store.setIn(db, name, seen.state, {}, { op: null })).catch((e) => {
           if (!(e instanceof OpLost)) throw e
@@ -2350,10 +2363,7 @@ export class SlotPool {
           const port = this.portOf(s)
           const r = await port.remove(this.deps.project, s.folder, { identity: s.identity ?? null, journal, fence: { still: () => this.store.fenced(s.name, token, () => true).catch(() => false) } })
           if (r.ok) {
-            await this.store.fenced(s.name, token, (db) => {
-              db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, s.name)
-              db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, s.name))
-            })
+            await this.store.fenced(s.name, token, (db) => this.forgetIn(db, s, port))
             log.info(`Removed slot ${userText(s.name)} (${userText(s.folder)}), resuming a removal cut short`)
           } else {
             log.warn(`Slot ${userText(s.name)}'s removal, cut short, couldn't be finished: ${userText(r.err)}; kept`)
@@ -2463,7 +2473,13 @@ export class SlotPool {
         if (this.port.identity) {
           const id = await this.port.identity(slot.folder)
           if (!id) return await fail(sayStored(T.identityUnread))
-          await this.store.fenced(name, token, (db) => db.prepare('UPDATE slots SET store = ?, workspace = ?, generation = ? WHERE project = ? AND name = ?').run(id.store, id.workspace, id.generation, this.store.project, name))
+          // A workspace made under a name a removed one had (HI-2979): whatever was kept by that name is an older
+          // generation's (a slot removed before its records were, or its folder deleted), forgotten in the same write.
+          await this.store.fenced(name, token, (db) => {
+            db.prepare('UPDATE slots SET store = ?, workspace = ?, generation = ? WHERE project = ? AND name = ?').run(id.store, id.workspace, id.generation, this.store.project, name)
+            db.prepare('DELETE FROM board_meta WHERE key = ?').run(recoverKey(this.store.project, name))
+            this.port.forgetIn?.(db, id)
+          })
         }
         log.info(`Made slot ${userText(name)} at ${at.slice(0, 7)} in ${userText(slot.folder)}`)
         if (opts.copy.trim()) await this.port.copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
@@ -2869,10 +2885,7 @@ export class SlotPool {
           const r = await removeIt()
           if (r) return r
         } else await port.prune(this.deps.project)
-        await this.store.fenced(name, token, (db) => {
-          db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, name)
-          db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, name))
-        })
+        await this.store.fenced(name, token, (db) => this.forgetIn(db, slot, port))
         log.info(`Removed slot ${userText(name)} (${userText(slot.folder)})`)
         return null
       } catch (e) {

@@ -3029,6 +3029,14 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   pinned); unreadable or mismatched is unknown, a detached binding (`key` null) and no binding are none, and an
   unfinished preparation is never shown. `submitted` (J9b records it at a submission, by compare and swap while the slot
   is still bound to that key and generation) is what a reuse of the slot allows over the base.
+- **What is kept by a workspace's name goes with it** (HI-2979). A workspace's name is the slot's
+  (`cw-<project hash>-<folder>`), so a slot removed and made again under the same name gets the same name with a new
+  generation, and an older generation's pointer would make every read of it unknown for good. The pool deletes the
+  pointer, every `slot_jjprep` journal of that workspace and the slot's `slot_jjrecover` journal in the same write
+  that deletes its row (a removal, or a removal resumed), through the port's `forgetIn`; and again in the write that
+  records a newly made workspace's identity (its folder made, or made again where it was gone), which also clears
+  rows left by a removal before this. Publishing a binding prunes the workspace's other preparations' journals that
+  are done, so they don't grow with each card cycle.
 - **`prepare` and `detach` are owned, journalled writes** (`WorkspacePort`'s new optional `OwnedWrite`: the row's
   identity, the holder's fence, the lease, a detach's `settles` and `target`; Git ignores them, its git commands
   unchanged). Each preparation has its own journal, `slot_jjprep:<store>:<workspace>:<prep>`, planned with a copy of the

@@ -140,6 +140,17 @@ export function chainIsBinding(chain: readonly string[], prev: JjBinding | null)
 export const pointerKey = (store: string, workspace: string): string => `slot_jjcur:${store.toLowerCase()}:${workspace}`
 export const journalKey = (store: string, workspace: string, prep: string): string => `slot_jjprep:${store.toLowerCase()}:${workspace}:${prep}`
 
+/**
+ * Deletes every board_meta row a jj workspace's bindings keep (HI-2979): its pointer and all its preparations' journals,
+ * in the caller's write. The workspace's name is reused when a slot of the same name is made again (a new generation),
+ * and an older generation's pointer would make every read of the new one unknown for good.
+ */
+export function forgetBindingIn(db: BoardDb, store: string, workspace: string): void {
+  db.prepare('DELETE FROM board_meta WHERE key = ?').run(pointerKey(store, workspace)) // i18n-ignore: SQL, never shown
+  const prefix = journalKey(store, workspace, '')
+  db.prepare('DELETE FROM board_meta WHERE substr(key, 1, ?) = ?').run(prefix.length, prefix) // i18n-ignore: SQL, never shown
+}
+
 /** A database as board_meta's store uses it (a fence's transaction hands the same). */
 export type BoardDb = FenceDb
 
@@ -175,6 +186,19 @@ export function boardPrepStore(conn: BoardRw): JjPrepStore {
     }
     put(db, pointerKey(store, workspace), next)
     put(db, journalKey(store, workspace, j.prep), { ...j, phase: 'done' })
+    // The workspace's earlier preparations, done, are history nothing reads again (HI-2979): pruned as this one is
+    // published, so the journals stay one per preparation in flight plus this one, never one per card cycle for good.
+    const prefix = journalKey(store, workspace, '')
+    const rows = db.prepare('SELECT key, value FROM board_meta WHERE substr(key, 1, ?) = ? AND key <> ?').all(prefix.length, prefix, journalKey(store, workspace, j.prep)) as { key: string; value: string }[] // i18n-ignore: SQL, never shown
+    for (const r of rows) {
+      let done = false
+      try {
+        done = journalOf(JSON.parse(r.value))?.phase === 'done'
+      } catch {
+        done = false
+      }
+      if (done) db.prepare('DELETE FROM board_meta WHERE key = ?').run(r.key) // i18n-ignore: SQL, never shown
+    }
     return true
   }
   return {
