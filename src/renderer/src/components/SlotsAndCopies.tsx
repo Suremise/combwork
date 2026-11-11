@@ -3,7 +3,8 @@ import type { CopyView, GitFilesStatus, ProjectInfo, SlotView, WorkflowLevel } f
 import { SLOT_COPY_TEXT, type SlotLevelForm, type SlotOptionOrigin } from '@shared/slotDefaults'
 import { COPIES_REVIEW } from '@shared/advanced'
 import { reviewsWork, agentWorkflowRole } from '@shared/workflow/roles'
-import { msg, tr } from '@shared/i18n'
+import { fmt, msg, tr } from '@shared/i18n'
+import { revisionShort } from '@shared/platform/descriptors'
 import * as actions from '../actions'
 import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
@@ -54,6 +55,13 @@ const T = {
   recoverTitle: msg({ id: 'workflow.slots.recoverTitle', defaultMessage: 'Recover {slot}?', description: 'The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name.' }),
   recoverMessage: msg({ id: 'workflow.slots.recoverMessage', defaultMessage: 'Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.', description: 'The confirmation before recovering a stale jj slot (HI-2869); the folder edits are copied into is listed under it.' }),
   recovered: msg({ id: 'workflow.slots.recovered', defaultMessage: '{slot} is recovered.', description: 'A notice after a stale jj slot was recovered (HI-2869).' }),
+  // HI-2996: what Recover… did, when there is something to look at.
+  recoveredTitle: msg({ id: 'workflow.slots.recoveredTitle', defaultMessage: '{slot} is recovered: look at these', description: 'HI-2996: the title of the window shown after a stale jj slot ({slot}, its name) was recovered, when the recovery left something for the user to look at: copies it wrote, deleted files it kept, or a commit it kept.' }),
+  recoveredCopies: msg({ id: 'workflow.slots.recoveredCopies', defaultMessage: '{n, plural, one {# file had changed meanwhile, so your version of it was written beside it, under the name below.} other {# files had changed meanwhile, so your version of each was written beside it, under the names below.}} Compare them, keep what you want under the original name, then delete the copies: a card’s work that holds one can’t be submitted.', description: 'HI-2996: after a stale jj slot was recovered: files the user had edited (not yet recorded by jj) had also changed in the update, so Combwork kept the update in the file and wrote the user’s version beside it as a copy (listed under this, as paths). The user compares and deletes the copies; a card can’t be submitted for review while they are in its work.' }),
+  recoveredPutBack: msg({ id: 'workflow.slots.recoveredPutBack', defaultMessage: '{n, plural, =0 {No other file needed putting back.} one {# other file was put back as it was.} other {# other files were put back as they were.}}', description: 'HI-2996: after a stale jj slot was recovered, the number of the user’s edited files put back unchanged (nothing to look at for these).' }),
+  recoveredKeptDeleted: msg({ id: 'workflow.slots.recoveredKeptDeleted', defaultMessage: '{n, plural, one {You had deleted {files}, but it changed or came back meanwhile, so it was kept.} other {You had deleted {files}, but they changed or came back meanwhile, so they were kept.}}', description: 'HI-2996: after a stale jj slot was recovered: files the user had deleted there (not yet recorded by jj) changed in the update or were created again, so Combwork kept them rather than deleting them. {files} lists their paths, joined as a list.' }),
+  recoveredAsides: msg({ id: 'workflow.slots.recoveredAsides', defaultMessage: '{n, plural, one {# file was created again during the recovery, so the version it had before was left beside it: {files}.} other {# files were created again during the recovery, so the version each had before was left beside it: {files}.}} Keep what you want of it, then delete it.', description: 'HI-2996: after a stale jj slot was recovered: while it put files back, something created some of them again, so Combwork left the version the file had just before (moved aside) under another name beside it. {files} lists their full paths, joined as a list. The user keeps what they want and deletes that copy.' }),
+  recoveredDivergent: msg({ id: 'workflow.slots.recoveredDivergent', defaultMessage: 'jj also kept commit {commit}, which holds what it recorded of the slot during the recovery. It shows as divergent in jj: once you’ve looked at it, abandon it with jj abandon {commit}.', description: 'HI-2996: after a stale jj slot was recovered, jj made a commit of the slot’s files that Combwork couldn’t prove was only what it kept, so it left it (a divergent change in jj). {commit} is its short id. jj abandon is a command: keep it as it is.' }),
   notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
@@ -416,9 +424,27 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
   const aside = `${s.folder.replace(/[\\/][^\\/]+$/, '')}${s.folder.includes('\\') ? '\\' : '/'}.cw-recovery${s.folder.includes('\\') ? '\\' : '/'}${s.name}`
   if (!(await confirm({ title: tr(T.recoverTitle, { slot: s.name }), message: tr(T.recoverMessage), list: [aside], confirmLabel: tr(T.recover).replace('…', '') }))) return
   const r = await call('slots:recoverStale', projectPath, s.name).catch(() => ({ ok: false as const, why: '' }))
-  if (r.ok) notify('success', tr(T.recovered, { slot: s.name }))
-  else notify('warning', tr(T.notRecovered, { slot: s.name, why: recoverWhy(r.why) }))
   reload()
+  if (!r.ok) return notify('warning', tr(T.notRecovered, { slot: s.name, why: recoverWhy(r.why) }))
+  // What it did (HI-2996): said in a window when it wrote copies, kept deletions or kept a commit; else a notice.
+  const done = r.recovered
+  if (!done || (!done.copies.length && !done.asides.length && !done.keptDeleted.length && !done.divergent)) return notify('success', tr(T.recovered, { slot: s.name }))
+  const sep = s.folder.includes('\\') ? '\\' : '/'
+  const full = (copy: string): string => `${s.folder}${sep}${copy.split('/').join(sep)}`
+  const copies = done.copies.map((c) => full(c.copy))
+  const paragraphs = [
+    copies.length ? tr(T.recoveredPutBack, { n: done.restored }) : null,
+    done.asides.length ? tr(T.recoveredAsides, { n: done.asides.length, files: fmt.list(done.asides.map((a) => full(a.copy))) }) : null,
+    done.keptDeleted.length ? tr(T.recoveredKeptDeleted, { n: done.keptDeleted.length, files: fmt.list(done.keptDeleted) }) : null,
+    done.divergent ? tr(T.recoveredDivergent, { commit: revisionShort('jj', done.divergent) }) : null
+  ].filter((x): x is string => !!x)
+  await confirm({
+    title: tr(T.recoveredTitle, { slot: s.name }),
+    message: copies.length ? tr(T.recoveredCopies, { n: copies.length }) : tr(T.recoveredPutBack, { n: done.restored }),
+    list: copies,
+    okOnly: true,
+    ...(paragraphs.length ? { content: <div data-recovered="">{paragraphs.map((p, i) => <p key={i}>{p}</p>)}</div> } : {})
+  })
 }
 
 /** The select key of a refused recovery's reason (the port's refusal text, English, never shown). */

@@ -154,16 +154,18 @@ export function Dialogs() {
     return (
       <Modal
         title={dialog.title}
-        icon={dialog.danger ? 'warning' : 'question'}
+        icon={dialog.danger ? 'warning' : dialog.okOnly ? 'info' : 'question'}
         wide={dialog.wide}
         onClose={() => close(false)}
         busy={!!action.busy}
         error={action.error}
         footer={
           <>
-            <button className="btn subtle" onClick={() => close(false)}>
-              {dialog.cancelLabel ?? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
-            </button>
+            {!dialog.okOnly && (
+              <button className="btn subtle" onClick={() => close(false)}>
+                {dialog.cancelLabel ?? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
+              </button>
+            )}
             <BusyButton
               className={dialog.action ? cx(actClass(dialog.action), 'solid') : dialog.danger ? 'danger' : 'primary'}
               autoFocus

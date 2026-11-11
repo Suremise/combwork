@@ -224,7 +224,13 @@ export const RETAIN_PAGE = 8
 export const RETAIN_EVERY_MS = 6 * 60 * 60 * 1000
 
 /** A jj refusal of a card's move, worded by its code (`platform.jjRefused`). */
-type JjWhy = 'tooLarge' | 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound'
+type JjWhy = 'tooLarge' | 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound' | 'recovered'
+
+/**
+ * A file Recover… of a stale slot wrote beside another (HI-2996, jjRecovery.ts): its copy of the user's version, or the
+ * file it moved aside. Never part of a card's work unasked: a submission whose change holds one is refused, naming them.
+ */
+export const RECOVERY_COPY = /\.cw-(?:recovered|before-recovery)-[^/]+$/
 
 /** What prime reads for the evidence: a started card's slot (its view, lease and binding), or a Todo card's target. */
 interface Primed {
@@ -565,6 +571,13 @@ export class JjPlatform implements PlatformAdapter {
     const ch = await this.H.change(ctx.store, mb, P.commit)
     if (isUnknown(ch)) return { ok: false, refusal: this.unknownRefusal(card, ch, 'submit') }
     if (!ch.files.length) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'none' } } }
+    // Recover…'s copies in any commit of the chain, not only its net change (HR1's HI-2996 round 1): a copy added and
+    // deleted later is still in the history the integration takes. Every path a commit adds or changes, from the store;
+    // a merge's against each of its parents (HR2's round 2: git log shows no merge's diff by default).
+    const touched = await d.git(ctx.store, ['log', '--no-renames', '--diff-merges=separate', '--format=', '--name-only', '--diff-filter=d', '-z', `${base0}..${P.commit}`])
+    if (!touched.ok) return { ok: false, refusal: this.unknownRefusal(card, unknown(UNREADABLE.commitsSince, { revision: P.commit.slice(0, 7), base: base0.slice(0, 7) }), 'submit') }
+    const copies = [...new Set(touched.out.split('\0').map((x) => x.trim()).filter((x) => x && RECOVERY_COPY.test(x)))]
+    if (copies.length) return { ok: false, refusal: this.refused(card, 'recovered', { files: copies.slice(0, 5).join(', ') + (copies.length > 5 ? ', …' : '') }) }
     const inputs: Partial<GuardInputs> = {}
     if (args.guards.includes('submit.clean')) inputs.dirty = []
     if (args.guards.includes('submit.ready')) inputs.conflicts = []

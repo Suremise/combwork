@@ -27,7 +27,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -335,7 +335,7 @@ export function jjPort(): JjWorkspacePort {
  * `.cw-recovery`). A protocol code when refused. A slot a lease still holds (HI-2913) goes through slotCards' `recoverHeldSlot`:
  * let through only for a card whose preparation there failed.
  */
-export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
+export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<RecoverOutcome> {
   const pool = await poolFor(ws, projectPath)
   const run: Parameters<SlotPool['recoverStale']>[1] = async (s, fence, journal, quietNow) => {
     const r = await recoverStale(
@@ -345,7 +345,8 @@ export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string
     // Files jj leaves out for its size limit (HI-2973) are back on disk but in no commit: the slot's next record lists
     // them as uncommitted, so it is kept, never reused or removed with them in it.
     if (r.ok && r.leftOut.length) log.info(`Slot ${userText(s.name)} recovered with files jj leaves out for snapshot.max-new-file-size: ${userText(r.leftOut.slice(0, 10).join(', '))}`)
-    return r.ok ? { ok: true } : { ok: false, why: r.why }
+    // What it did, for the window (HI-2996): the copies it wrote beside, the deletions it kept, a divergent commit kept.
+    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, asides: r.asides, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why }
   }
   const held = pool.openLease(name)
   const out = held ? await (await import('./slotCards')).recoverHeldSlot(ws, projectPath, pool, name, held, run) : await pool.recoverStale(name, run)

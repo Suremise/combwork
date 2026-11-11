@@ -59,7 +59,10 @@ import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
-import type { AppSettings, ProjectConfig, WorkspaceConfig } from '../shared/types'
+import type { AppSettings, ProjectConfig, SlotRecovery, WorkspaceConfig } from '../shared/types'
+
+/** A stale jj slot's recovery (HI-2866): what it did (HI-2996), or why it was refused (a protocol code). */
+export type RecoverOutcome = { ok: true; recovered?: SlotRecovery } | { ok: false; why: string }
 import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
 import { COPY_PREFIX } from './providers/common'
 
@@ -2007,7 +2010,7 @@ export class SlotPool {
    * `beginRecover`, never by relaxing a free slot's settle; the lease ending, being replaced or the cycle moving on stops
    * the recovery at its next write (its journal resumes it on the next Recover…).
    */
-  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>, held?: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }): Promise<{ ok: true } | { ok: false; why: string }> {
+  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<RecoverOutcome>, held?: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }): Promise<RecoverOutcome> {
     const seen = this.store.slot(name)
     if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
     if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
@@ -2019,7 +2022,7 @@ export class SlotPool {
       return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
     }
     const token = newToken()
-    let out: { ok: true } | { ok: false; why: string } = { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    let out: RecoverOutcome = { ok: false, why: 'busy' } // i18n-ignore: a protocol code
     await this.op(token, async () => {
       const holder = await this.deps.holder.self()
       if (this.closed) return

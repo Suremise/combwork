@@ -81,7 +81,7 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
       it("HI-2781's case: the unrecorded edit is back in the checkout, the earlier recorded file untouched, no divergent revision left", async () => {
         const s = await stale(colocated)
         const r = await run(s, s.deps())
-        expect(r).toMatchObject({ ok: true, restored: ['local.txt'], beside: [], late: [], xKept: false })
+        expect(r).toMatchObject({ ok: true, restored: ['local.txt'], beside: [], late: [], xKept: false, copies: [], asides: [], x: null })
         expect(readFileSync(join(s.slot, 'local.txt'), 'utf8')).toBe('mine\n')
         expect(readFileSync(join(s.slot, 'early.txt'), 'utf8')).toBe('early\n')
         expect(readFileSync(join(s.slot, 'd.txt'), 'utf8')).toBe('d\n')
@@ -115,6 +115,8 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
         expect(readFileSync(join(s.slot, 'shared.txt'), 'utf8')).toBe('ONE\ntwo\n')
         const beside = readdirSync(s.slot).find((f) => f.startsWith('shared.txt.cw-recovered-'))!
         expect(readFileSync(join(s.slot, beside), 'utf8')).toBe('one\nTWO\n')
+        // HI-2996: the copy named as written, relative to the folder, for the window to list.
+        expect(r.copies).toEqual([{ path: 'shared.txt', copy: beside }])
         // X held exactly the preserved delta, now visible beside the file: abandoned, no divergence left.
         expect(r.xKept).toBe(false)
         expect(divergentCount(s)).toBe(0)
@@ -164,6 +166,24 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
         expect(divergentCount(s)).toBe(0)
       })
 
+      it('an overlap whose path is recreated at the seam (HI-2996): the moved-aside update and the preserved version both stay beside it, and the result names each', async () => {
+        const s = await stale(colocated, {
+          destEdit: (repo) => writeFileSync(join(repo, 'shared.txt'), 'ONE\ntwo\n'),
+          local: (slot) => writeFileSync(join(slot, 'shared.txt'), 'one\nTWO\n')
+        })
+        const r = await run(s, s.deps({ hooks: { beforePlace: (path) => void (path === 'shared.txt' && writeFileSync(join(s.slot, 'shared.txt'), 'the writer\'s\n')) } }))
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(readFileSync(join(s.slot, 'shared.txt'), 'utf8')).toBe('the writer\'s\n')
+        const aside = readdirSync(s.slot).find((f) => f.startsWith('shared.txt.cw-before-recovery-'))!
+        const beside = readdirSync(s.slot).find((f) => f.startsWith('shared.txt.cw-recovered-'))!
+        expect(readFileSync(join(s.slot, aside), 'utf8')).toBe('ONE\ntwo\n')
+        expect(readFileSync(join(s.slot, beside), 'utf8')).toBe('one\nTWO\n')
+        // Every file it left beside reaches the summary: its copy of your version, and the update's moved aside.
+        expect(r.copies).toEqual([{ path: 'shared.txt', copy: beside }])
+        expect(r.asides).toEqual([{ path: 'shared.txt', copy: aside }])
+      })
+
       it('a write at the seam (the path recreated between the move aside and the placing): the writer\'s file stays, the preserved bytes beside it; an existing recovery file is never overwritten', async () => {
         const s = await stale(colocated)
         const r = await run(s, s.deps({
@@ -195,7 +215,11 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
         expect(r.restored.sort()).toEqual(['after-preserve.txt', 'local.txt'])
         expect(r.late).toEqual(['after-rescan.txt'])
         expect(r.xKept).toBe(true)
-        expect(readdirSync(s.slot).some((f) => f.startsWith('after-rescan.txt.cw-recovered-') && f.endsWith('-late'))).toBe(true)
+        const lateCopy = readdirSync(s.slot).find((f) => f.startsWith('after-rescan.txt.cw-recovered-') && f.endsWith('-late'))
+        expect(lateCopy).toBeTruthy()
+        // HI-2996: the late copy and the commit kept, named for the window.
+        expect(r.copies).toEqual([{ path: 'after-rescan.txt', copy: lateCopy }])
+        expect(r.x).toMatch(/^[0-9a-f]{40}$/)
       })
 
       it('an unrelated divergent change is left as it is: never taken for the recovery\'s revision, never abandoned', async () => {
