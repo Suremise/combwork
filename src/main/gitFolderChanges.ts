@@ -209,14 +209,17 @@ export async function settleChanges(projectPath: string, target: string, shownFo
 
 /**
  * The workspace's projects in the working tree whose top is `top` (HI-2962): `own` first, then each other project folder
- * in it that git finds in the same tree (never one that is a repository of its own, nor another worktree).
+ * in it that git finds in the same tree (never one that is a repository of its own, nor another worktree). One git can't
+ * place (its read failed, or answered nothing) refuses, never skipped: its agents may be working in this tree.
  */
 async function projectsInTree(own: string, top: string): Promise<string[]> {
   const out = [own]
   for (const p of await workspace.listProjectPaths()) {
     if (samePlace(p, own) || !inFolder(p, top)) continue
     const r = await git(p, ['rev-parse', '--show-toplevel'])
-    if (r.ok && samePlace(r.out.trim(), top)) out.push(p)
+    const found = r.ok ? r.out.trim() : ''
+    if (!found) throw INDEX_BUSY.test(r.err) ? combworkError(M.indexBusy) : combworkError(M.readFailed, { why: gitErrorLine(r.err) || r.err.trim().slice(0, 400) || 'no top folder' }) // i18n-ignore: stands in for git's own (English) words
+    if (samePlace(found, top)) out.push(p)
   }
   return out
 }

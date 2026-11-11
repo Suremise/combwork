@@ -13,11 +13,15 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
+let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
   const real = await original<typeof import('../src/main/git')>()
   return {
     ...real,
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
+      if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
+        return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
       const r = await real.git(cwd, args, max, input, opts)
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
@@ -84,6 +88,7 @@ beforeEach(() => {
   agentAt = null
   agentChecks = []
   fencedProbe = null
+  failTopIn = null
   failStashAfter = false
 })
 
@@ -332,6 +337,19 @@ describe("Files' Commit it from a project in a larger repository (HI-2962)", () 
     expect(checked[0]).toBe(norm(nested))
     expect(checked).toContain(norm(join(proj, 'other')))
     expect(checked).not.toContain(norm(join(proj, 'own')))
+  })
+
+  it("another project git can't place (its read failed, or answered nothing) refuses it: nothing committed, the index as it was", async () => {
+    writeFileSync(join(proj, 'b.txt'), 'staged b\n')
+    sh(proj, 'add', 'b.txt')
+    const before = head()
+    for (const fail of [{ folder: join(proj, 'other') }, { folder: join(proj, 'other'), empty: true }]) {
+      failTopIn = fail
+      await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(/Git could not read the folder's changes/)
+      expect(head()).toBe(before)
+      expect(sh(proj, 'diff', '--cached', '--name-only')).toBe('b.txt')
+      expect(sh(proj, 'diff', '--name-only')).toBe('.gitignore')
+    }
   })
 
   it('the whole tree is fenced while it commits, not only the project folder', async () => {
