@@ -640,7 +640,25 @@ export interface WorkBadge {
   startedAt: string | null
   /** When this cycle's change was integrated (its merge), else accepted (no merge); null while neither (HI-1926). */
   endedAt: string | null
+  /** HI-2959: a forward merge the queue returned, waiting for the user (forwardWait); absent for any other card. */
+  forwardWait?: ForwardWait
   lastSeq: number
+}
+
+/**
+ * HI-2959: a forward merge the queue returned, in Active with no agent by design: its branches, and whether only Remove
+ * from queue ends it (`removeOnly`: returned against the release path's direction, where Retry and Resolve are refused).
+ */
+export interface ForwardWait {
+  from: string
+  to: string
+  removeOnly: boolean
+}
+
+/** A card's forward wait (ForwardWait) from its work: a forward merge in Active, its last attempt failed or declined. */
+export function forwardWaitOf(v: Pick<WorkView, 'forward' | 'stage' | 'queue'>): ForwardWait | null {
+  if (!v.forward || v.stage !== 'active' || (v.queue?.state !== 'failed' && v.queue?.state !== 'cancelled')) return null
+  return { from: v.forward.from, to: v.forward.to, removeOnly: v.queue.failure === 'direction' }
 }
 
 /** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
@@ -671,6 +689,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
   const runs = [...newest.values()]
   const verdict = v.verdicts.at(-1)
   const latest = v.revisions.at(-1)
+  const forwardWait = forwardWaitOf(v)
   return {
     card: v.card,
     stage: v.stage,
@@ -705,6 +724,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
     endedAt: v.integration?.at ?? v.accepted?.at ?? null,
+    ...(forwardWait ? { forwardWait } : {}),
     lastSeq: v.lastSeq
   }
 }

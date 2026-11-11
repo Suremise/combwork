@@ -346,6 +346,15 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(wf.state(wf.store.card(old.number))).toMatchObject({ stage: 'active', integrated: null })
     await expect(inWorkspace(w, () => controls.queueCardChange(w, old.number, user, 'retryMerge', 'again'))).rejects.toThrow(new RegExp(`${old.key} isn’t merged again: its request recorded no override, and 1\\.4\\.0 is an older version than 1\\.5\\.0`))
     expect(wf.state(wf.store.card(old.number)).stage).toBe('active')
+    // HI-2959: nor handed to a builder (the Assistant's or the user's Resolve): refused for its direction, the board
+    // unchanged, its stall naming Remove from queue alone.
+    const cards = wf.store.cards().length
+    for (const by of [assistant, user]) await expect(inWorkspace(w, () => controls.resolveForward(w, old.number, by, 'by hand'))).rejects.toThrow(new RegExp(`${old.key} isn’t merged again: its request recorded no override`))
+    expect(wf.store.cards().length).toBe(cards)
+    expect(wf.state(wf.store.card(old.number)).stage).toBe('active')
+    expect(wf.returnedForward(wf.store.card(old.number))).toBeNull()
+    const { forwardWaitOf } = await import('../src/main/queueReturn')
+    expect(await forwardWaitOf(w, repo, old.number)).toEqual({ from: '1.5.0', to: '1.4.0', removeOnly: true })
     // Remove from queue ends it, nothing merged.
     await inWorkspace(w, () => controls.queueCardChange(w, old.number, user, 'removeFromQueue', 'not this way'))
     expect(wf.state(wf.store.card(old.number)).stage).toBe('done')
@@ -425,6 +434,21 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(wf.state(wf.store.card(card!.number))).toMatchObject({ stage: 'merging', forward: { override: { dir: 'backward', why: 'older' } } })
     expect(await drain(w, repo, '1.4.0')).toMatchObject([{ outcome: 'integrated' }])
     expect(git(repo, 'merge-base', '--is-ancestor', settled, '1.4.0') === '').toBe(true)
+  })
+
+  it('HI-2959: a forward made with the override that conflicts can still be handed to a builder; the card merges as a merge commit', async () => {
+    const { w, repo } = await versions({ conflict: true })
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, '1.5.0', '1.4.0', user, undefined, { override: true }))
+    const card = 'card' in made ? made.card : null
+    expect(await drain(w, repo, '1.4.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const { forwardWaitOf } = await import('../src/main/queueReturn')
+    expect(await forwardWaitOf(w, repo, card!.number)).toEqual({ from: '1.5.0', to: '1.4.0', removeOnly: false })
+    const r = await inWorkspace(w, () => controls.resolveForward(w, card!.number, assistant, 'by hand'))
+    const wf = (await workflowFor(w, repo))!
+    expect(r).toMatchObject({ from: '1.5.0', to: '1.4.0', source: git(repo, 'rev-parse', '1.5.0') })
+    expect(wf.state(wf.store.card(card!.number)).stage).toBe('done')
+    expect(wf.store.card(r.card.number).target).toBe('1.4.0')
+    expect(wf.rulesetOf(wf.store.card(r.card.number)).options.style).toBe('merge')
   })
 })
 

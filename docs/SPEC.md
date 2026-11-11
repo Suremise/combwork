@@ -5656,11 +5656,15 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
   queue** ends it in Done with `IntegrationCancelled`, never an `Integrated` (refused while it advances);
 - a project agent's every intent on it is refused (`forward.notAgents`). Its return says so: its comment's next step is
   the user's or the Assistant's three choices (Retry merge, Resolve on a builder, Remove from queue), never a builder's
-  `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it" (HI-2959).
+  `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it", on the board too (its
+  work badge's `forwardWait`, `stalledReason`'s): only Remove from queue for one returned for its direction (HI-2959).
 
 **Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
 to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
-`resolve`, `POST /v1/queue/resolve`, its reason required; never a project agent or a script). One board change
+`resolve`, `POST /v1/queue/resolve`, its reason required; never a project agent or a script). As Retry, only in the
+release path's direction as it reads now unless its request recorded the user's override (HI-2892); one returned for its
+direction is never handed over (Remove from queue alone ends it), so a builder's card never makes a merge the forward
+rules refuse. One board change
 (`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
 the forward's destination (its Merges into), linked to it, its description the files in conflict, the returned attempt's
 frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by}, written before its start

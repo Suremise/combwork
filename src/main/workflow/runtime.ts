@@ -2828,12 +2828,15 @@ export class Workflow {
 
   /**
    * HI-2959: the attempt Resolve on a builder would hand over, on a forward merge the queue returned (Active, its last
-   * entry failed, or its advance declined): that entry, its frozen source and what came back; null for any other card.
+   * entry failed, or its advance declined): that entry, its frozen source and what came back; null for any other card,
+   * and for one returned against the release path's direction (HI-2892: Remove from queue alone ends that).
    */
   returnedForward(card: CardRecord, s: CardState = this.state(card)): { entry: string; from: string; to: string; source: string; failed: FactData['IntegrationFailed'] | null } | null {
     const last = s.entries.at(-1)
     if (!s.forward || s.stage !== 'active' || !last || (last.state !== 'failed' && last.state !== 'cancelled')) return null
     const failed = this.store.facts(card.id).findLast((f) => f.kind === 'IntegrationFailed' && (f.data as FactData['IntegrationFailed']).entry === last.id)
+    // Returned against the release path's direction (HI-2892): only Remove from queue ends it, never a builder's merge.
+    if ((failed?.data as FactData['IntegrationFailed'] | undefined)?.reason === 'direction') return null
     return { entry: last.id, from: s.forward.from, to: s.forward.to, source: last.revision, failed: failed ? (failed.data as FactData['IntegrationFailed']) : null }
   }
 

@@ -609,6 +609,11 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   const found = await forwardCard(ws, n)
   if (!found) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: `#${n}` }), { kind: 'invalid' })
   const { wf, rec, projectPath } = found
+  // HI-2892, as Retry: only in the release path's direction as it reads now, unless its own request recorded the user's
+  // override; one returned for its direction is ended by Remove from queue alone, never handed to a builder.
+  const f = wf.state(rec).forward!
+  const d = forwardDirection(f.from, f.to, await defaultBranch(ws, projectPath))
+  if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
   const back = wf.returnedForward(rec)
   if (!back) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: rec.key }), { kind: 'conflict' })
   const by = actor.kind === 'assistant' ? 'assistant' : 'user'

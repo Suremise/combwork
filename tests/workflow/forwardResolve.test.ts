@@ -9,6 +9,7 @@ import { forwardOf, MERGE_COMMIT, rulesBaseId } from '../../src/shared/workflow/
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
 import type { FactData } from '../../src/shared/workflow/facts'
+import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
 
 let env: Env | null = null
 afterEach(() => {
@@ -134,5 +135,17 @@ describe('a forward merge resolved on a builder (HI-2959)', () => {
     expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned' }])
     for (const r of [await e.wf.start(card.key, B1), await e.wf.putBack(card.key, B1)]) expect(isRefusal(r) && r.rule).toBe('forward.notAgents')
     expect(isRefusal(e.wf.resolve(card.key, B1)) && (e.wf.resolve(card.key, B1) as { rule: string }).rule).toBe('forward.notAgents')
+  })
+
+  it("the board's badge says what a returned forward waits for: Remove alone when returned for its direction", () => {
+    const forward = { from: 'main', to: '1.2.0', source: 'abc', by: 'user' as const }
+    const q = (state: NonNullable<WorkView['queue']>['state'], failure?: FactData['IntegrationFailed']['reason']): WorkView['queue'] => ({ entry: 'e', revision: 'abc', target: '1.2.0', state, ...(failure ? { failure } : {}) })
+    expect(forwardWaitOf({ forward, stage: 'active', queue: q('failed', 'conflict') })).toEqual({ from: 'main', to: '1.2.0', removeOnly: false })
+    expect(forwardWaitOf({ forward, stage: 'active', queue: q('cancelled') })).toEqual({ from: 'main', to: '1.2.0', removeOnly: false })
+    expect(forwardWaitOf({ forward, stage: 'active', queue: q('failed', 'direction') })).toEqual({ from: 'main', to: '1.2.0', removeOnly: true })
+    // Queued, merging or Done, or not a forward: none.
+    expect(forwardWaitOf({ forward, stage: 'merging', queue: q('open') })).toBeNull()
+    expect(forwardWaitOf({ forward, stage: 'done', queue: q('cancelled') })).toBeNull()
+    expect(forwardWaitOf({ forward: null, stage: 'active', queue: q('failed', 'conflict') })).toBeNull()
   })
 })

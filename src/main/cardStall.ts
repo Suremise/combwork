@@ -12,6 +12,7 @@ import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
 import { projectPreferences } from './workflow/preferences'
 import { forwardWaitOf, queueReturnOf, staleApprovalOf } from './queueReturn'
+import type { ForwardWait } from '../shared/workflow/workView'
 import { isResuming } from './restartResume'
 import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
@@ -25,8 +26,6 @@ import type { SafeguardNote } from '../shared/safeguards'
 import type { ProviderId } from '../shared/types'
 
 /** Why a lane's next card is stalled once the cards it depends on are Done (HI-2618). Agent-facing. */
-/** HI-2959: a forward merge the queue returned, in Doing with no agent: what it waits for, not a builder. */
-const FORWARD_WAITS = agentMsg({ id: 'stall.forward.waits', text: 'A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for the user or the Assistant: Retry merge, Resolve on a builder (a card for a builder to resolve it) or Remove from queue.', note: "HI-2959: the stalled reason of a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) that came back from the merge queue. Retry merge, Resolve on a builder and Remove from queue are the window's commands." })
 const DEPS_DONE = agentMsg({ id: 'stall.laneNext.depsDone', text: "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}", note: "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")." })
 
 /**
@@ -225,7 +224,7 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
  * check (stepWaitMs: its project's workflow option Design check wait, HI-1766), and who owes its review (`due`,
  * reviewDueOf, HI-2636).
  */
-export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: { from: string; to: string } | null): string | null {
+export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: ForwardWait | null): string | null {
   const cause = cardStallCause(c, agentNow, wsPath, lane, stepWaitMs, returned, stale, due, forward)
   if (!cause) return null
   // HI-2754: the agent the stall is about, idle after its latest turn was stopped by its provider's safety filter: said
@@ -241,7 +240,7 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
  * waits, an agent not running, a deadlocked lane, a review copy). That agent as it is live in the card's project (its
  * name, provider, status and safeguard note), when it is.
  */
-export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: { from: string; to: string } | null): StallCause | null {
+export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: ForwardWait | null): StallCause | null {
   // Waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window and was reported stalled four times): what it
   // waits for is said on the card, never a stall, until it is cleared or the card leaves Doing.
   if (c.waitingFor && c.column === 'doing') return null
@@ -283,9 +282,7 @@ export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath:
   return (
     about(startFailedReason(c, agentNow)) ??
     about(startWaitingReason(c, agentNow)) ??
-    // HI-2959: a returned forward merge has no agent by design: what it waits for, in place of "no agent has it".
-    about(forward && !c.agent && c.column === 'doing' && !c.archived ? say(FORWARD_WAITS, { from: forward.from, to: forward.to }) : null) ??
-    about(stalledReason(c, agentNow)) ??
+    about(stalledReason(c, agentNow, undefined, forward)) ??
     about(notWatchingReason(c, notWatching), notWatchingAgent(c, notWatching)?.agentId) ??
     about(back, c.agent) ??
     about(waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), undefined, due?.owed, due?.reviews) : null, due?.owed?.agentId) ??

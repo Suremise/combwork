@@ -2,6 +2,7 @@ import type { WorkspaceService } from './workspace'
 import { queueStateOf, resubmittedText, returnedWake } from './workflow/queueState'
 import type { Workflow } from './workflow/runtime'
 import { workflowFor } from './workflow/service'
+import type { ForwardWait } from '../shared/workflow/workView'
 
 /** What queueReturnOf finds of a card the merge queue returned: when, its wake's text, and its cycle's builder. */
 export interface QueueReturn {
@@ -81,13 +82,17 @@ export async function staleApprovalOf(ws: WorkspaceService, projectPath: string,
 
 /**
  * HI-2959: a forward merge the queue returned, waiting for the user or the Assistant (Retry merge, Resolve on a builder,
- * Remove from queue): its branches; null for any other card, or unreadable.
+ * Remove from queue; Remove alone when returned for its direction), as the window's badge reads it; null for any other
+ * card, or unreadable.
  */
-export async function forwardWaitOf(ws: WorkspaceService, projectPath: string, n: number): Promise<{ from: string; to: string } | null> {
+export async function forwardWaitOf(ws: WorkspaceService, projectPath: string, n: number): Promise<ForwardWait | null> {
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   try {
-    const back = wf ? wf.returnedForward(wf.store.card(n)) : null
-    return back ? { from: back.from, to: back.to } : null
+    if (!wf) return null
+    const s = wf.state(wf.store.card(n))
+    const last = s.entries.at(-1)
+    if (!s.forward || s.stage !== 'active' || (last?.state !== 'failed' && last?.state !== 'cancelled')) return null
+    return { from: s.forward.from, to: s.forward.to, removeOnly: last.failure?.reason === 'direction' }
   } catch {
     return null
   }

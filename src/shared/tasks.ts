@@ -3,6 +3,7 @@ import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
 import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, ProgressRun, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
+import type { ForwardWait } from './workflow/workView'
 
 /**
  * The window's tr() (#798), passed in: agent scripts (cw-mcp.js) import this module and must not load the
@@ -166,6 +167,7 @@ export function columnColor(colors: Partial<Record<TaskColumn, string>> | undefi
 /** The Agent API's stall reasons (its `stalled`), as agents read them: the window says its own (tr, board.stalled.*). */
 const ST = {
   noAgent: agentMsg({ id: 'stall.doing.noAgent', text: 'In Doing, but no agent has it.', note: 'A card in Doing that no agent has (#170).' }),
+  forwardWaits: agentMsg({ id: 'stall.forward.waits', text: "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for the user or the Assistant: {removeOnly, select, yes {it went against the release path's direction, so only Remove from queue ends it.} other {Retry merge, Resolve on a builder (a card for a builder to resolve it) or Remove from queue.}}", note: "HI-2959: the stalled reason of a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) that came back from the merge queue. removeOnly yes: it was refused for the release path's direction (HI-2892). Retry merge, Resolve on a builder and Remove from queue are the window's commands." }),
   startWaiting: agentMsg({ id: 'stall.doing.startWaiting', text: '{agent} waits to start: {why}', note: "HI-2304: the card's agent can't start in its slot yet. why: what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")." }),
   startFailed: agentMsg({ id: 'stall.doing.startFailed', text: "{agent}'s start failed: {why}", note: "HI-1976: the card's agent couldn't be started. why: the failure, in Combwork's or the CLI's own words." }),
   removed: agentMsg({ id: 'stall.agent.removed', text: '{agent} was removed.', note: "The card's agent (or reviewer) was removed from the project." }),
@@ -206,12 +208,21 @@ const ST = {
  * has finished its turn isn't stalled: it is waiting for the user to look. Cards in any other column never are: nobody is
  * expected to be on them (On Hold and Passed included, #170).
  */
-export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr): string | null {
+export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr, forward?: ForwardWait | null): string | null {
   if (card.archived || card.column !== 'doing') return null
+  // HI-2959: a returned forward merge has no agent by design: what it waits for, in place of "no agent has it".
+  if (!card.agent && forward) return forwardWaitText(forward, tr)
   if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Active, but no agent has it.', description: 'Why a card in the Active column is stalled (on the card). Active is the column.' })) : say(ST.noAgent)
   if (!agentNow) return removedText(card.agentName, tr)
   if (!agentNow.running) return notRunningText(agentNow.name, tr)
   return null
+}
+
+/** HI-2959: what a returned forward merge waits for (stalledReason), in the window's language with `tr`. */
+function forwardWaitText(f: ForwardWait, tr?: Tr): string {
+  const values = { from: f.from, to: f.to, removeOnly: f.removeOnly ? 'yes' : 'no' } // i18n-ignore: select keys
+  if (!tr) return say(ST.forwardWaits, values)
+  return tr(msg({ id: 'board.stalled.forwardWaits', defaultMessage: "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for you. {removeOnly, select, yes {It went against the release path's direction: Remove from queue ends it.} other {Open it for Retry merge, Resolve on a Builder… or Remove from queue.}}", description: "HI-2959: why a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) in the Active column has no agent, on the card: it came back from the merge queue and waits for the user. removeOnly yes: refused for the release path's direction (only Remove from queue). Keep the select keys; the commands as translated in the card's Work section." }), values)
 }
 
 /** A card's agent as the stall check reads it: its name, whether it runs (or starts), and why its start failed when it does (HI-1976). */

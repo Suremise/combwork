@@ -173,6 +173,13 @@ const TARGET = 'integration'
     await h.page.keyboard.press('Control+Alt+I')
     const cardDialog = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
     await q.showBoard(h.page)
+    // The board's warning says it waits for you, never "no agent has it".
+    const tile = h.page.locator(`.task-card[data-task="${clashCard}"]`)
+    const warned = await until(async () => {
+      const t = (await tile.innerText().catch(() => '')).replace(/\s+/g, ' ')
+      return /it waits for you\. Open it for Retry merge, Resolve on a Builder… or Remove from queue\./.test(t) && !/no agent has it/.test(t) ? t : null
+    }, HUNG_MS)
+    check('…its card on the board says it waits for you, with your choices', !!warned, (await tile.innerText().catch(() => '')).replace(/\s+/g, ' '))
     await q.openByTitle(h.page, clashCard)
     await until(async () => (await cardDialog.count()) === 1, HUNG_MS)
     const part = cardDialog.locator('.card-work-queue')

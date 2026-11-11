@@ -902,6 +902,7 @@ interface CombworkMessageValues {
   'board.slots.youMerging': undefined
   'board.slots.youMergingStart': undefined
   'board.stall.hintFollowUp': undefined
+  'board.stall.hintForward': undefined
   'board.stall.hintLaneOrder': undefined
   'board.stall.hintLoopStep': undefined
   'board.stall.hintNobody': undefined
@@ -911,6 +912,7 @@ interface CombworkMessageValues {
   'board.stall.hintReviewWait': undefined
   'board.stall.hintWakeUntaken': undefined
   'board.stalled.followUpWait': { builder: string | number; card: string | number; waited: string | number }
+  'board.stalled.forwardWaits': { from: string | number; to: string | number; removeOnly: string }
   'board.stalled.laneOrderWait': { reviewer: string | number; other: string | number; card: string | number; builder: string | number; waited: string | number }
   'board.stalled.loopStepWait': { builder: string | number; card: string | number; waited: string | number }
   'board.stalled.noAgent': undefined

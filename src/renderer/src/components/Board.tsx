@@ -23,7 +23,7 @@ import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
-import { useWorkBadges } from '../cardWork'
+import { badgeSource, useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { RULE_NAMES, workflowMessage } from '@shared/workflow/texts'
 import { refusalLines, type Refusal, type RefusalFormat } from '@shared/workflow/refusals'
@@ -110,7 +110,7 @@ export function cardStalled(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrd
 }
 
 /** What a stalled card's hover says to do, by why it is stalled. */
-type StallKind = 'nobody' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order' | 'loop-step' | 'follow-up'
+type StallKind = 'nobody' | 'forward' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order' | 'loop-step' | 'follow-up'
 
 /** The agents as every card's stall reads them: those that may loop on a card, and those watching cards. */
 function stallAgentsOf(projects: ProjectInfo[]) {
@@ -146,8 +146,11 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { agent } = cardAgent(projects, c)
   // Main's start state (HI-1977): an agent starting isn't stalled, one whose start failed says why.
   const now = agent ? stallAgentOf(agent) : null
-  const nobody = startFailedReason(c, now, tr) ?? startWaitingReason(c, now, tr) ?? stalledReason(c, now, tr)
-  if (nobody) return { text: nobody, kind: 'nobody' }
+  // HI-2959: a returned forward merge (no agent by design) says what it waits for, from its work badge.
+  const badges = badgeSource.get()
+  const forward = badges.ws === get().workspace?.path ? (badges.badges.get(c.number)?.forwardWait ?? null) : null
+  const nobody = startFailedReason(c, now, tr) ?? startWaitingReason(c, now, tr) ?? stalledReason(c, now, tr, forward)
+  if (nobody) return { text: nobody, kind: forward && !c.agent ? 'forward' : 'nobody' }
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
@@ -208,6 +211,7 @@ function stallHint(kind: StallKind): string {
   if (kind === 'lane-order') return tr(msg({ id: 'board.stall.hintLaneOrder', defaultMessage: "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.", description: "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive." }))
   if (kind === 'loop-step') return tr(msg({ id: 'board.stall.hintLoopStep', defaultMessage: 'Its builder waits for its reviewer to check the design it posted. Ask the reviewer to answer it, or tell the builder to go ahead as posted.', description: 'Tooltip on a card stalled in Doing (#1382): in a card loop, the builder posted a design for its reviewer to check before building, and nobody answered.' }))
   if (kind === 'follow-up') return tr(msg({ id: 'board.stall.hintFollowUp', defaultMessage: 'Its builder waits for its reviewer to check the follow-up it posted. Show the reviewer and ask it to answer it.', description: 'Tooltip on a card stalled in Review or Passed (#1467): in a card loop, the builder posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot\'s), and nobody answered.' }))
+  if (kind === 'forward') return tr(msg({ id: 'board.stall.hintForward', defaultMessage: 'Combwork’s own card, which no agent works on: open it and choose in its Work section.', description: "HI-2959: tooltip on a forward merge card (Combwork's own card bringing one branch up to date with another) back from the merge queue in the Active column: no agent works on it, so the user chooses what to do in the card dialog's Work section." }))
   if (kind === 'review-wait') return tr(msg({ id: 'board.stall.hintReviewWait', defaultMessage: "Its reviewer's watch didn't wake it. Show the reviewer and ask it to review the card.", description: 'Tooltip on a card stalled in Review: its reviewer watches it but has not started.' }))
   return tr(msg({ id: 'board.stall.hintNobody', defaultMessage: 'Nobody is working on it. Start it again (on this agent or another), or move it back to Todo.', description: 'Tooltip on a card stalled in Doing: no agent is working on it. Todo is a board column.' }))
 }

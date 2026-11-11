@@ -46,7 +46,8 @@
   "stall.forward.waits": {
     "placeholders": {
       "from": "plain",
-      "to": "plain"
+      "to": "plain",
+      "removeOnly": "select"
     }
   },
   "stall.lane.orderWait": {
