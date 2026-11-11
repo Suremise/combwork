@@ -478,6 +478,7 @@
   "workflow.slots.held": "Retenido por una sesión terminada del agente {agent}",
   "workflow.slots.inUse": "Slots en uso y listos",
   "workflow.slots.inherit": "Heredar",
+  "workflow.slots.keptFor": "Reservado para {card}: sus commits aún no están en el destino",
   "workflow.slots.lentCard": "{agent}, para {card}",
   "workflow.slots.lentLane": "{agent}, para un carril",
   "workflow.slots.levelInherit": "Heredar",

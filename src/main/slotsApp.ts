@@ -981,7 +981,8 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // the pool works on the slot or it owes a settle (HI-2912, slotStaleView.ts): its last answer for that folder.
       const jj = s.platform === 'jj'
       const stale = jj ? await view.staleOf(s.name) : false
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}) }
+      const keptFor = jj && s.state === 'dirty' ? pool.keptCard(s.name) : null
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}) }
     })
   )
 }

@@ -478,6 +478,7 @@
   "workflow.slots.held": "エージェント{agent}の終了したセッションが保持",
   "workflow.slots.inUse": "使用中と準備済みのスロット",
   "workflow.slots.inherit": "継承",
+  "workflow.slots.keptFor": "{card} 用に保持：そのコミットはまだターゲットにありません",
   "workflow.slots.lentCard": "{agent}、{card}用",
   "workflow.slots.lentLane": "{agent}、レーン用",
   "workflow.slots.levelInherit": "継承",

@@ -478,6 +478,7 @@
   "workflow.slots.held": "Zajęty przez zakończoną sesję agenta {agent}",
   "workflow.slots.inUse": "Zajęte i gotowe sloty",
   "workflow.slots.inherit": "Dziedzicz",
+  "workflow.slots.keptFor": "Zachowany dla karty {card}: jej commity nie są jeszcze w celu",
   "workflow.slots.lentCard": "{agent}, dla karty {card}",
   "workflow.slots.lentLane": "{agent}, dla toru",
   "workflow.slots.levelInherit": "Dziedzicz",

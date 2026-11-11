@@ -489,6 +489,7 @@
   "workflow.slots.held": "Held by an ended session of agent {agent}",
   "workflow.slots.inUse": "Slots in use and ready",
   "workflow.slots.inherit": "Inherit",
+  "workflow.slots.keptFor": "Kept for {card}: its committed work isn’t in the target yet",
   "workflow.slots.lentCard": "{agent}, for {card}",
   "workflow.slots.lentLane": "{agent}, for a lane",
   "workflow.slots.levelInherit": "Inherit",

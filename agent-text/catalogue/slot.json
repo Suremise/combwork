@@ -103,6 +103,22 @@
     "text": "its agent reviews now",
     "note": "As slot.hold.draining: the agent is reviewing."
   },
+  "slot.kept.busy": {
+    "text": "something works in it now",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) is not lent back now: an operation, a session or a process holds it."
+  },
+  "slot.kept.gone": {
+    "text": "its folder is gone",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) can't be lent back: its folder was deleted."
+  },
+  "slot.kept.other": {
+    "text": "another slot was asked for",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) is not the one lent: the start named another slot."
+  },
+  "slot.kept.stale": {
+    "text": "its binding isn't this card's at the folder's generation any more: recover or remove the slot",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) can't be lent back: jj's record of the slot no longer names the card."
+  },
   "slot.laneEnd.merged": {
     "text": "{card} merged at {commit}",
     "note": "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters."
@@ -186,6 +202,10 @@
   "slot.refusal.inUse": {
     "text": "{slot} is in use by {agent} for {what}",
     "note": "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane."
+  },
+  "slot.refusal.kept": {
+    "text": "{slot} holds this card's committed work from before it was put back, kept for it there: it gets that slot back, never a fresh one ({why})",
+    "note": "HI-2995: a jj card's start refused while its own earlier work is kept in a slot that can't be lent back to it now. {why} is slot.kept.*."
   },
   "slot.refusal.lane": {
     "text": "lane {lane}",

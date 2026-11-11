@@ -103,6 +103,18 @@
   "slot.hold.reviews": {
     "placeholders": {}
   },
+  "slot.kept.busy": {
+    "placeholders": {}
+  },
+  "slot.kept.gone": {
+    "placeholders": {}
+  },
+  "slot.kept.other": {
+    "placeholders": {}
+  },
+  "slot.kept.stale": {
+    "placeholders": {}
+  },
   "slot.laneEnd.merged": {
     "placeholders": {
       "card": "plain",
@@ -223,6 +235,12 @@
       "slot": "plain",
       "agent": "plain",
       "what": "plain"
+    }
+  },
+  "slot.refusal.kept": {
+    "placeholders": {
+      "slot": "plain",
+      "why": "plain"
     }
   },
   "slot.refusal.lane": {

@@ -63,6 +63,7 @@ const T = {
   recoveredAsides: msg({ id: 'workflow.slots.recoveredAsides', defaultMessage: '{n, plural, one {# file was created again during the recovery, so the version it had before was left beside it: {files}.} other {# files were created again during the recovery, so the version each had before was left beside it: {files}.}} Keep what you want of it, then delete it.', description: 'HI-2996: after a stale jj slot was recovered: while it put files back, something created some of them again, so Combwork left the version the file had just before (moved aside) under another name beside it. {files} lists their full paths, joined as a list. The user keeps what they want and deletes that copy.' }),
   recoveredDivergent: msg({ id: 'workflow.slots.recoveredDivergent', defaultMessage: 'jj also kept commit {commit}, which holds what it recorded of the slot during the recovery. It shows as divergent in jj: once you’ve looked at it, abandon it with jj abandon {commit}.', description: 'HI-2996: after a stale jj slot was recovered, jj made a commit of the slot’s files that Combwork couldn’t prove was only what it kept, so it left it (a divergent change in jj). {commit} is its short id. jj abandon is a command: keep it as it is.' }),
   notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
+  keptFor: msg({ id: 'workflow.slots.keptFor', defaultMessage: 'Kept for {card}: its committed work isn’t in the target yet', description: 'HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
@@ -94,7 +95,7 @@ const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? 'platform' : o)
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
   const l = s.lease
-  if (!l) return null
+  if (!l) return s.keptFor !== undefined ? tr(T.keptFor, { card: card(s.keptFor) }) : null
   if (l.kind === 'carried') return tr(T.carried, { agent: agentName(l.agent) })
   if (l.card !== null) return tr(T.lentCard, { agent: agentName(l.agent), card: card(l.card) })
   return tr(T.lentLane, { agent: agentName(l.agent) })
@@ -246,7 +247,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                             </>
                           )}
                         </td>
-                        <td>{lentText(s, agentName, card) ?? ''}</td>
+                        <td data-kept-for={s.keptFor}>{lentText(s, agentName, card) ?? ''}</td>
                         <td>
                           {s.stale && (
                             <button className="btn subtle small" data-action="recover" onClick={() => void recoverSlot(project.path, s, reload)}>

@@ -93,6 +93,12 @@ export interface WorkspaceHeads {
 export interface WorkspaceStep {
   ok: boolean
   err: string
+  /**
+   * A refused detach because the slot holds its binding's own work not in the target yet (HI-2995; jj: the chain not
+   * integrated, or not the binding's): kept for its card, not a refusal to retry. Never set for a transient one (the
+   * fence, an uncertain write, the head moved, a read that failed).
+   */
+  kept?: boolean
 }
 
 /** HI-1182: how Combwork checks a folder out while submodules and Git LFS are set up there (Git: LFS files left as pointers, `git lfs pull` fills them). */
@@ -238,6 +244,12 @@ export interface WorkspacePort {
    * the same name.
    */
   carries?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null; target?: string }): Promise<boolean>
+  /**
+   * Whether the folder's binding is still `card`'s at the folder's generation, its working copy on the binding's base
+   * (HI-2995: a slot kept for a card put back with committed work, revalidated before it is lent back to that card).
+   * False whenever it can't tell. Git has none.
+   */
+  heldFor?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<boolean>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

@@ -491,6 +491,7 @@ interface CombworkMessageValues {
   'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
+  'workflow.slots.keptFor': { card: string | number }
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
   'workflow.slots.levelInherit': undefined

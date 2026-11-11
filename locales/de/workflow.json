@@ -478,6 +478,7 @@
   "workflow.slots.held": "Gehalten von einer beendeten Sitzung von Agent {agent}",
   "workflow.slots.inUse": "Belegte und bereite Slots",
   "workflow.slots.inherit": "Erben",
+  "workflow.slots.keptFor": "Für {card} aufbewahrt: seine Commits sind noch nicht im Ziel",
   "workflow.slots.lentCard": "{agent}, für {card}",
   "workflow.slots.lentLane": "{agent}, für eine Lane",
   "workflow.slots.levelInherit": "Erben",
