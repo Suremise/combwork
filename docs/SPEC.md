@@ -2309,8 +2309,9 @@ a configured path outside what it can read, a tool that doesn't answer) is "uses
   repository still count. Its `core.autocrlf true` still counts (Git converts every text file's line endings, which
   jj doesn't): the dialog says to turn it off for that repository alone (`git config core.autocrlf false` in it).
 - **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
-- **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
-  the store's `hooks/` that isn't a `*.sample`.
+- **hooks:** a hook in the folder Git runs hooks from, as Git itself names it (`git rev-parse --git-path hooks`, HI-2941:
+  `core.hooksPath` at any level with Git's own expansion, `~/` and `%(prefix)/` included, a relative one from the working
+  tree's top; else the store's `hooks/`), never a `*.sample`. Git unable to name it is unknown, never clear.
 - **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
 
 ##### jj's runner and detection (1.5.0's J0, HI-2793)

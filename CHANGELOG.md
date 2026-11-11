@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- **Switching to jj no longer misses Git hooks set with `~/`** (HI-2941). With `core.hooksPath` set to `~/hooks` (or another form Git expands), Combwork looked for a folder named `~` in the repository, found no hooks and allowed the switch, though jj then skips the hooks Git ran. It now looks where Git runs hooks from, and refuses the switch when hooks are there.
 - **Agents' signed commits run the signer exactly as git does** (HI-2934). With Combwork's signer in an agent's session, some commits failed or ran a different program where the same commit signed without Combwork:
   - **A `'`, `*`, `?` or `{` in an argument** (a key under `C:\Users\O'Brien`, say) reached Git's own ssh-keygen or gpg changed: it's now passed on as git passes it.
   - **A signer named without a path** is found as git finds it (`gpg.exe`, then `gpg`, folder by folder on PATH), never a `gpg.cmd` git would pass over. Version Control → Branches & remotes → Signing's check finds it the same way.
