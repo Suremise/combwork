@@ -21,6 +21,7 @@ import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunn
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
+import { quoteArgMsvc } from '../src/main/platform/signerRules'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -638,6 +639,19 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
       w.store.addQueueProc = add
     }
     await a.runner.release()
+  })
+
+  const msysEcho = join('C:\\Program Files\\Git', 'usr', 'bin', 'echo.exe')
+  it.skipIf(!existsSync(msysEcho))("HI-2947: a command run verbatim gets its command line as given, its first word too: Git's MSYS2 echo keeps a quoted ', * and {", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'verbatim', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    try {
+      // The signing check's shape: words quoted as git quotes them, and the program's path (with its space) as argv0.
+      const r = await a.runner.run('testMerge', msysEcho, [quoteArgMsvc("C:\\Users\\O'Brien{a,b}*~")], { argv0: quoteArgMsvc(msysEcho), windowsVerbatimArguments: true, timeoutMs: 30_000 })
+      expect(r).toMatchObject({ ok: true, code: 0 })
+      expect(r.out.trim()).toBe("C:\\Users\\O'Brien{a,b}*~")
+    } finally {
+      await a.runner.release()
+    }
   })
 
   it("HI-2042: a command ended by a signal is never code 1 (git's \"no\"): the launcher says so by its nonce; a real exit 1, and a look-alike line, stay the command's", async () => {

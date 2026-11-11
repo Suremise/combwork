@@ -87,7 +87,7 @@ export interface CandidateHost {
    * HI-1185: a program other than git run to its end within a bound, its tree ended there (the signing check's signer),
    * in the queue's run (its lease's job). Left out, a bounded spawn of its own (tests).
    */
-  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number }) => Promise<QueueGitResult>
+  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; argv0?: string; verbatim?: boolean }) => Promise<QueueGitResult>
   /** The longest a signed commit runs (Advanced `cw.queue.signSeconds`). */
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>

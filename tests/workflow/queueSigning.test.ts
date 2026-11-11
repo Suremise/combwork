@@ -2,7 +2,7 @@
 // temporary repositories for the queue's paths (each commit made is verified); an injected spawn for how the command is
 // built (the test-only eligibility seam), never a real agent or a user's key.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 import { B1, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
@@ -15,6 +15,7 @@ import { endAllOwnedWork, endOwnedWork, onOwnerGone, resetOwnedWorkForTests } fr
 import { gitExe } from '../../src/main/gitTool'
 import { withLauncherEnv } from '../../src/main/gitWorker'
 import { git } from '../../src/main/git'
+import { quoteArgMsvc } from '../../src/main/platform/signerRules'
 
 let env: Env | null = null
 afterEach(() => {
@@ -41,6 +42,20 @@ const sshKeygen = (): string => keygen
 function keyPair(passphrase = ''): { key: string; pub: string } {
   const key = slash(join(tempDir('key-'), 'id_ed25519'))
   execFileSync(sshKeygen(), ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
+  return { key, pub: `${key}.pub` }
+}
+
+/**
+ * HI-2947: a key pair moved into a folder named `name` (made where it is plain: Node's own quoting, which the key's
+ * maker gets here, would lose a ' to Git's MSYS2 ssh-keygen too).
+ */
+function keyPairIn(name: string): { key: string; pub: string } {
+  const made = keyPair()
+  const dir = join(tempDir('key-q-'), name)
+  mkdirSync(dir)
+  const key = slash(join(dir, 'id_ed25519'))
+  copyFileSync(made.key, key)
+  copyFileSync(made.pub, `${key}.pub`)
   return { key, pub: `${key}.pub` }
 }
 
@@ -165,13 +180,13 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
 describe('the signing check (HI-1185)', () => {
   /** A recording spawn: the argv each signer run got, answered `reply`. */
   function deps(cwd: string, over: Partial<SignDeps> = {}, reply: Partial<QueueGitResult> = { ok: true, code: 0 }) {
-    const ran: { file: string; args: string[]; input?: string }[] = []
+    const ran: { file: string; args: string[]; input?: string; argv0?: string; verbatim?: boolean }[] = []
     const d: SignDeps = {
       git: async (c, args) => {
         const r = await git(c, args)
         return { ok: r.ok, out: r.out, err: r.err, code: r.code }
       },
-      spawn: async (file, args, o) => (ran.push({ file, args, ...(o.input !== undefined ? { input: o.input } : {}) }), { ok: false, out: '', err: '', code: 1, ...reply }),
+      spawn: async (file, args, o) => (ran.push({ file, args, ...(o.input !== undefined ? { input: o.input } : {}), argv0: o.argv0, verbatim: o.verbatim }), { ok: false, out: '', err: '', code: 1, ...reply }),
       cwd,
       who: [],
       env: gitEnv(),
@@ -216,7 +231,9 @@ describe('the signing check (HI-1185)', () => {
     const r2 = deps(repo({ 'commit.gpgsign': 'true', 'gpg.program': a }), { who: ['-c', `gpg.openpgp.program=${b}`, '-c', 'user.name=Queue Bot', '-c', 'user.email=queue@example.invalid'] })
     const info = await checkSigning(r2.d)
     expect(slash(r2.ran[0].file).toLowerCase()).toBe(b.toLowerCase())
-    expect(r2.ran[0].args).toEqual(['--batch', '--no-tty', '--pinentry-mode', 'error', '--no-autostart', '--status-fd=2', '-bsau', 'Queue Bot <queue@example.invalid>'])
+    // HI-2947: as git starts it: its words quoted as git quotes them (quote_arg_msvc), passed verbatim, its first word given.
+    expect(r2.ran[0].args).toEqual(['--batch', '--no-tty', '--pinentry-mode', 'error', '--no-autostart', '--status-fd=2', '-bsau', '"Queue Bot <queue@example.invalid>"'])
+    expect(r2.ran[0]).toMatchObject({ argv0: quoteArgMsvc(b), verbatim: true })
     expect(r2.ran[0].input).toContain('Combwork checks that signing works')
     expect(info.status).toEqual({ kind: 'unattended' })
     // gpg.program set while the format is ssh: not ssh's program.
@@ -256,13 +273,26 @@ describe('the signing check (HI-1185)', () => {
     expect((await checkSigning(real(keyPair('secret-passphrase-4')).d)).status).toMatchObject({ kind: 'needsSomeone', format: 'ssh' })
   })
 
+  it("HI-2947: a key path holding ' and { reaches Git's ssh-keygen as git passes it (quote_arg_msvc), and one holding * too", async () => {
+    // A ' unquoted is taken off by MSYS2's runtime (O'Brien read as OBrien): with Node's quoting the check couldn't sign.
+    const real = (key: string) => deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': key }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
+    const k = keyPairIn("O'Brien{a}")
+    expect((await checkSigning(real(k.key).d)).status).toEqual({ kind: 'unattended' })
+    // Windows has no * in a file name: one named so is said by ssh-keygen as given, never globbed or unquoted.
+    const starred = `${slash(tempDir('key-star-'))}/O'Brien{a,b}*/id_ed25519`
+    const missing = await checkSigning(real(starred).d)
+    expect(missing.status).toMatchObject({ kind: 'cantSign' })
+    expect(JSON.stringify(missing.status)).toContain("O'Brien{a,b}*/id_ed25519")
+  })
+
   it('HI-2933: a value starting `ssh-` is the key itself, as git reads it: written to a temp key.pub, only its type and comment shown', async () => {
     const literal = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAb/cD+ef/gh me@x'
     // The temp key is gone once the check ends: read while the signer runs.
     const seen: { file: string; text: string }[] = []
     const r = deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': literal }), {
       spawn: async (_f, args) => {
-        const file = args[args.indexOf('-f') + 1]
+        // Its words come quoted as git quotes them (HI-2947): the path without them.
+        const file = args[args.indexOf('-f') + 1].replace(/^"|"$/g, '')
         seen.push({ file, text: readFileSync(file, 'utf8') })
         return { ok: true, out: '', err: '', code: 0 }
       }
