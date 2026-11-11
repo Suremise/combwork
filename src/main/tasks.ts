@@ -17,7 +17,7 @@ import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
 import type { CombworkErrorKind, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
-import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
+import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
@@ -2675,11 +2675,14 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       if (reason.length > MAX_WAITING) throw combworkError(ERR.waitingTooLong, { max: MAX_WAITING }, { kind: 'invalid' })
       if (reason) {
         if (card.column !== 'doing') throw combworkError(ERR.waitingNotActive, { card: cardRef(n), active: stageName('active', await stageNamesOf(ws, card.project)) }, { kind: 'conflict' })
-        const mark = whole ? { reason, by: whole.by, at: whole.at } : { reason, by, at: new Date().toISOString() }
-        // A mark set here never carries a request's ref (HI-2915): set over a request's own mark, even with its words, it
-        // replaces it, so that request's end leaves it.
-        if (reason !== card.waitingFor?.reason || card.waitingFor?.ask || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
-          if (reason !== card.waitingFor?.reason || card.waitingFor?.ask) said.push(storedText(HISTORY.waiting, { reason }))
+        // Undo's whole mark keeps the ref of the request it waited on (HI-2931), so that request's end still takes it off; the
+        // Agent API gives only a string (servers.ts), never a whole mark.
+        const mark: TaskWaiting = whole ? { reason, by: whole.by, at: whole.at, ...(whole.ask ? { ask: whole.ask } : {}) } : { reason, by, at: new Date().toISOString() }
+        // A new mark set here never carries a request's ref (HI-2915): set over a request's own mark, even with its words,
+        // it replaces it, so that request's end leaves it.
+        const sameAsk = (mark.ask ?? null) === (card.waitingFor?.ask ?? null)
+        if (reason !== card.waitingFor?.reason || !sameAsk || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
+          if (reason !== card.waitingFor?.reason || !sameAsk) said.push(storedText(HISTORY.waiting, { reason }))
           card.waitingFor = mark
         }
       } else if (card.waitingFor) {
