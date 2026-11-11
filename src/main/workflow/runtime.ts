@@ -993,7 +993,10 @@ export class Workflow {
       // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
       // with Combwork's own jj operations beside it).
       const gathers = this.platform(g.o).startGathers ?? 1
-      if (await this.revalidate(card, from, g.o, g.before, gathers)) return this.regather(card, () => this.start(ref, actor, opts))
+      // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
+      // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
+      // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
+      if (await this.revalidate(card, from, g.o, g.before, gathers)) return await this.regather(card, () => this.start(ref, actor, opts))
       let laneMoved = false
       let baselineMoved = false
       let evidenceMoved = false
@@ -1040,10 +1043,10 @@ export class Workflow {
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })
-      if (out && (laneMoved || baselineMoved) && !this.gathering.depth(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
+      if (out && (laneMoved || baselineMoved) && !this.gathering.depth(card.id)) return await this.regather(card, () => this.start(ref, actor, opts))
       // Its fingerprint moved again between the last gather and the write, its answer by content still the same: gathered
       // again from the top while its platform allows more passes (none beyond #1206's one unless it says so), else refused.
-      if (out && evidenceMoved && gathers > 1 && this.gathering.depth(card.id) < gathers && (await this.sameContent(card, from, g.o, g.before))) return this.regather(card, () => this.start(ref, actor, opts))
+      if (out && evidenceMoved && gathers > 1 && this.gathering.depth(card.id) < gathers && (await this.sameContent(card, from, g.o, g.before))) return await this.regather(card, () => this.start(ref, actor, opts))
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
@@ -2586,8 +2589,8 @@ export class Workflow {
       await this.cfg.hooks?.beforeWrite?.('move')
       // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
       const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
-      if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-      if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
       // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
       const decided = (now: string[]): void => {
@@ -2633,7 +2636,7 @@ export class Workflow {
         if (!(e instanceof DragUndone)) throw e
         // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
         // allows more passes (`start`'s rule, HI-2916).
-        if (startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers && (await this.sameContent(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+        if (startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers && (await this.sameContent(card, s, gs.o, gs.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)

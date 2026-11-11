@@ -173,10 +173,15 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       // Before each of the first three writes (#1206's one pass would refuse the second): started on the fourth gather.
       let writes = 0
       w.wf.cfg.hooks = { beforeWrite: () => void (writes++ < 3 && elsewhere()) }
+      // Each pass's slot given back only once the pass after it has started with it or not: the lease the start is
+      // written with is never given back while a later pass still gathers (each pass gets the same one here).
+      const givenBack: string[] = []
+      w.wf.cfg.slotUnused = async (lease) => void givenBack.push(lease)
       const card = w.wf.createCard({ title: 'churn' })
       moved(await go(card.key, B1))
       expect(writes).toBe(4)
-      expect(w.wf.state(card).started).toMatchObject({ base: w.main(), target: 'main', slot: 'slot-a' })
+      expect(w.wf.state(card).started).toMatchObject({ base: w.main(), target: 'main', slot: 'slot-a', lease: 'L1' })
+      expect(givenBack).toEqual([])
       // Before every write: refused as evidence that changed once its passes are spent, nothing started.
       writes = 0
       w.wf.cfg.hooks = { beforeWrite: () => void (writes++, elsewhere()) }

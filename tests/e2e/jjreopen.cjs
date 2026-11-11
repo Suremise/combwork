@@ -127,7 +127,7 @@ const onDb = (fn) => {
         const v = await inv('tasks:work', n)
         return v?.folder && v.workspace ? v : null
       }, HUNG_MS)
-      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started, w }))
+      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started: started?.moved?.column ?? started, w, work: w ? null : await inv('tasks:work', n), slots: await inv('slots:list', shop), log: w ? [] : lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|\[workflow\]|lease/.test(l)).slice(-40) }, null, 1))
       if (!w) throw new Error('no slot')
       return { n, key, w }
     }

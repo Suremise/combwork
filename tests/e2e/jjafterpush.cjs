@@ -114,7 +114,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
         const v = await inv('tasks:work', n)
         return v?.folder && v.workspace ? v : null
       }, HUNG_MS)
-      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started, w }))
+      check(`${key} starts in a jj slot, ${b.name} there`, !!w && !!(await ready(b.id)), JSON.stringify({ started: started?.moved?.column ?? started, w, work: w ? null : await inv('tasks:work', n), slots: await inv('slots:list', shop), log: w ? [] : lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|\[workflow\]|lease/.test(l)).slice(-40) }, null, 1))
       if (!w) throw new Error('no slot')
       return { n, key, w }
     }
@@ -148,7 +148,8 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
       return v?.folder && v.workspace ? v : null
     }, HUNG_MS)
     // A slot of its own, or card 1's once that one is back in the pool: either is the pool's to pick.
-    check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2,JSON.stringify({ w2, slots: await inv('slots:list', shop) }))  } finally {
+    check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2, JSON.stringify({ w2, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#2\b/.test(l)).slice(-40) }, null, 1))
+  } finally {
     await h.app.close().catch(() => undefined)
   }
   console.log(failed ? `${failed} FAILED` : 'ALL PASSED')
