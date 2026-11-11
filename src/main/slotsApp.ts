@@ -36,7 +36,9 @@ import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes,
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import type { WorkspaceFilesOutcome, WorkspacePort } from './platform/workspacePort'
 import { registerWorkspacePort, workspacePortForPlatform, workspacePortOf } from './platform/workspacePorts'
-import { createJjWorkspacePort, type JjWorkspacePort } from './platform/jjWorkspacePort'
+import { createJjWorkspacePort, generationOf, type JjWorkspacePort } from './platform/jjWorkspacePort'
+import { isUnknown } from './platform/types'
+import { SlotStaleView } from './slotStaleView'
 import { recoverStale } from './platform/jjRecovery'
 import { git } from './git'
 import { boardPrepStore } from './platform/jjSlotPrep'
@@ -913,19 +915,42 @@ export function stopSlots(): void {
   WorkspaceService.closingTasks.delete(forgetPools)
 }
 
+/** Each pool's view of its jj slots' staleness (HI-2912): gone with the pool, so a workspace opened again starts afresh. */
+const staleViews = new WeakMap<SlotPool, SlotStaleView>()
+function staleViewOf(pool: SlotPool): SlotStaleView {
+  let v = staleViews.get(pool)
+  if (!v) {
+    v = new SlotStaleView({
+      row: (name) => pool.slots().find((x) => x.name === name) ?? null,
+      owes: (name) => pool.owedOf(name) !== null,
+      read: async (folder) => {
+        const r = await jjPort().stale(folder)
+        return isUnknown(r) ? null : r
+      },
+      generation: generationOf
+    })
+    staleViews.set(pool, v)
+  }
+  return v
+}
+
 /**
  * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
  * Combwork is this one or one known to have gone: Release Slot… is offered for it.
  */
 export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
+  const slots = pool.slots()
+  const view = staleViewOf(pool)
+  view.keepOnly(slots.map((s) => s.name))
   return Promise.all(
-    pool.slots().map(async (s) => {
+    slots.map(async (s) => {
       const l = pool.openLease(s.name)
       const w = s.writer
       const held = !!w && (await writerHeld(w))
-      // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's.
+      // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's. Not read while
+      // the pool works on the slot or it owes a settle (HI-2912, slotStaleView.ts): its last answer for that folder.
       const jj = s.platform === 'jj'
-      const stale = jj && s.state !== 'gone' && s.state !== 'removing' ? (await jjPort().stale(s.folder).catch(() => null)) === true : false
+      const stale = jj ? await view.staleOf(s.name) : false
       return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}) }
     })
   )

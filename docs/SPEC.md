@@ -3055,6 +3055,19 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   pool's start and by `refresh()`. A wake owns nothing: cancelled, or finding a slot taken, it loses nothing. The pool's
   close cancels the wake and awaits the running pass and settles. A refusal for good and known dirty files aren't owed:
   the next refresh or event looks again, with no periodic jj loop. Git's detach takes no fence, so Git is unchanged.
+- **The slot listing doesn't compete with the pool** (HI-2912): quiet is a rename probe, and Windows refuses to rename a
+  folder that is a process's working folder or has a file open in it. The listing's staleness (`slotViews`) runs jj in
+  the slot and reads its `.jj/working_copy/checkout`. Polled (jjwindow's waits, the window's Slots and copies while
+  shown), it kept the probe failing, so an owed settle found the slot busy for minutes after its builder had gone (a
+  real Claude Code session leaves nothing there: no process names the folder, no leftovers). Now, while the slot has an
+  operation or a job, or owes a settle, the listing reads nothing of the folder and shows the answer it last read for
+  that path (`SlotStaleView`, slotStaleView.ts). The decision is made from the slot's state right before the read would
+  start, nothing awaited between. Each read checks the folder's creation generation first, so another folder's answer
+  is never shown once the slot can be read again. At most one read runs per folder. An answer that couldn't be read
+  never replaces a known one, so a stale slot keeps its Stale and Recover…. One entry per slot, per pool lifetime. **Not
+  an ordering of Combwork's reads against its writes:** the probe samples quiet and another reader can start after it.
+  Node opens files without `FILE_SHARE_DELETE`, so a Combwork read of a file jj replaces can fail jj's write ("Access
+  is denied"); that is HI-2918.
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
