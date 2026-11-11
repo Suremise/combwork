@@ -223,7 +223,7 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     for (const at of ['leased', 'beforeCheck:typecheck', 'install'] as const) {
       const life4 = new AbortController()
       const h = parts()
-      h.deps.hook = (p) => void (p === at && life4.abort())
+      h.deps.hook = (point) => void (point === at && life4.abort())
       const install = h.deps.install
       h.deps.install = async (...a) => {
         if (at === 'install') life4.abort()
