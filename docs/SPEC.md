@@ -3343,15 +3343,20 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
   lock, Git's replay on the store for sameness (a replay that can't be read: unknown, never "not the same").
 - **The fingerprint** (`JjCandidateFingerprint`): the approval (`approvalOf`: cycle, approved submission, revision, base,
-  key, recorded jj commit, target; the stage Approved), the effective ruleset's id (its options' hash: an Override that
+  key, recorded jj commit, target; the stage Approved, its pass holding: no Stale recorded and the slot's observed head
+  the approved revision, HR3's round 1), the effective ruleset's id (its options' hash: an Override that
   applies other options changes it) and the style and strict used. Each attempt is journalled with it (board_meta
   `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
   owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
   options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
+- **Withdrawn first** (HR3's round 1): a ready offer whose head isn't the target's any more (or can't be read) is deleted
+  (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never leaves it.
 - **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
   the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
   `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
-  containment record), shown only while its fingerprint is the card's now (`candidateShown`). A conflict, or not up to
+  containment record), shown only while its fingerprint is the card's now and, a ready one, while the target's head as
+  the window just read it (`jjWaiting`'s `targetHeads`) is the head it was built on (`candidateShown`): a moved target
+  hides it at once, before any reconciliation and across restarts. A conflict, or not up to
   date (a merge in a rebase's suffix, not on top, or strict's update not the same change): `IntegrationFailed` (entry
   `jj:<attempt>`; jj has no merge queue) with its files, hunks and log, the card to Active, its builder woken in jj's words
   (`jjReturnedWake`) and the card's comment (`tasks.history.jjCandidateReturned`). A repository that signs
@@ -3371,7 +3376,9 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
 - **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
   Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
   options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
-  rebase and strict merge; a signing repository).
+  rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
+  rebuild is interrupted, after a restart too; a stale pass after the offer and during the build), and the e2e suites
+  `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 

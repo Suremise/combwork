@@ -60,7 +60,8 @@ const shown = (w: World, card: { key: string }, cycle: number): JjCandidateShown
   const raw = w.store.boardMeta(candidateKey('p-jj', card.key, cycle))
   return raw ? (JSON.parse(raw) as JjCandidateShown) : null
 }
-const waiting = (w: World, card: number) => waitingOf(w.wf, 'p-jj').find((c) => c.card === card)
+/** The window's row for a card, with main's head read now, as jjWaiting reads it (`wf`: another process's, a restart). */
+const waiting = (w: World, card: number, wf = w.wf) => waitingOf(wf, 'p-jj', new Map([['main', w.main()]])).find((c) => c.card === card)
 const visible = (w: World, commit: string): boolean => w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${commit} & ::visible_heads()`, '-T', 'commit_id').trim().length > 0
 const withOptions = (w: World, o: Partial<WorkflowOptions>) => void (w.wf.cfg.options = () => ({ ...opts, ...o }))
 /** The options changed and applied to the card in flight, as the window's Apply to cards in flight records it (optionsForm.ts). */
@@ -70,7 +71,10 @@ function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): v
   w.store.tx((tx) => tx.append(card.id, { kind: 'Override', actor: 'user', source: 'recorded', ruleset: r.id, data: { rules: Object.keys(o).map((k) => `option.${k}`), move: APPLY_OPTIONS, by: 'user', reason: '' } } as never))
 }
 
-describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, () => {
+/** A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine. */
+const REAL_JJ_MS = 60_000
+
+describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
     it("Approved: a candidate built and shown; the user's bookmark set onto it is Integrated via the candidate, Done", async () => {
       const w = await world(colocated, { candidates: true })
@@ -128,6 +132,69 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(w.wf.state(card).stage).toBe('active')
       expect(shown(w, card, w.wf.state(card).cycle)).toBeNull()
       expect(waiting(w, card.id)).toBeUndefined()
+    })
+  })
+
+  describe("an offer's lifetime (colocated, HR3's round 1)", () => {
+    it('a ready offer, then the target moves and the rebuild is interrupted: withdrawn at once, and after a restart', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      expect(waiting(w, card.id)?.candidate).toMatchObject({ state: 'ready' })
+      onTarget(w, 'theirs.txt', 'theirs\n')
+      // Shown no longer as soon as main moved, before any reconciliation.
+      expect(waiting(w, card.id)?.candidate).toBeNull()
+      // The rebuild interrupted (a crash after its write): the old offer's row was withdrawn before it began.
+      w.deps.candidateHook = async (point) => {
+        if (point === 'written') throw new Error('crash')
+      }
+      await expect(jjp.reconcile(w.wf.store.card(card.id), {})).rejects.toThrow('crash')
+      expect(shown(w, card, cycle)).toBeNull()
+      expect(waiting(w, card.id)?.candidate).toBeNull()
+      // After a restart (another process's workflow on the same database): still nothing offered until rebuilt.
+      const other = w.another()
+      expect(waiting(w, card.id, other)?.candidate).toBeNull()
+      w.deps.candidateHook = undefined
+      await new JjPlatform(other).reconcile(other.store.card(card.id), {})
+      expect(waiting(w, card.id, other)?.candidate).toMatchObject({ state: 'ready', expected: w.main() })
+    })
+
+    it('a stale pass after a ready offer: no longer offered', async () => {
+      const w = await world(true, { candidates: true })
+      const a = w.slots['slot-a']
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      expect(waiting(w, card.id)?.candidate).toMatchObject({ state: 'ready' })
+      // The builder changes its work in the slot after the approval: the next reconciliation observes it (Stale).
+      writeFileSync(join(a.folder, 'later.txt'), 'later\n')
+      w.h.jj(a.folder, 'commit', '-m', 'later')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stale).toBeTruthy()
+      expect(w.wf.state(card).stage).toBe('approved')
+      expect(waiting(w, card.id)?.candidate ?? null).toBeNull()
+    })
+
+    it('a pass gone stale while its candidate is built: nothing offered or returned', async () => {
+      let once: (() => void) | null = null
+      const w = await world(true, { candidates: true })
+      w.deps.candidateHook = async (point) => {
+        if (point === 'written' && once) {
+          const f = once
+          once = null
+          f()
+        }
+      }
+      const { card, P } = await approved(w)
+      once = () => w.store.tx((tx) => tx.append(card.id, { kind: 'Stale', actor: 'outside', source: 'observed', data: { approved: P, current: 'f'.repeat(40), why: 'change' } } as never))
+      await new JjPlatform(w.wf).reconcile(card, {})
+      expect(once).toBeNull()
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)).toBeNull()
+      expect(entries(w, card, cycle).every((e) => e.record.outcome !== 'candidate')).toBe(true)
+      expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
     })
   })
 

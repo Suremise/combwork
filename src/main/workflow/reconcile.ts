@@ -523,23 +523,33 @@ export const CANDIDATE_MISSES = 3
 
 export const candidateKey = (project: string, card: string, cycle: number): string => `jj_candidate:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`
 
-/** A jj card's candidate fingerprint now (null: not an approval a candidate is built for). */
+/**
+ * A jj card's candidate fingerprint now (null: not an approval a candidate is built for): Approved, its pass holding (no
+ * Stale recorded, and its slot's observed head the approved revision: HR3's round 1). The one predicate for reuse, J4's
+ * owner, publication and display.
+ */
 export function candidateFingerprint(wf: Workflow, card: CardRecord, s: CardState): JjCandidateFingerprint | null {
   const snap = approvalOf(card, s)
   if (!snap || snap.stage !== 'approved' || !s.approved || !snap.target) return null
+  if (s.stale || (s.head && s.head !== snap.revision)) return null
   const r = wf.rulesetOf(card, s)
   return { cycle: snap.cycle, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, ruleset: r.id, style: r.options.style, strict: r.options.strict }
 }
 
-/** The card's candidate record, only while it was made for its fingerprint now (a stale row, a crash's, shows nothing). */
-export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string): JjCandidateShown | null {
+/**
+ * The card's candidate record, only while it was made for its fingerprint now (a stale row, a crash's, shows nothing);
+ * a ready one only while `headNow` (the target's head as just read; undefined: not read) is the head it was built on
+ * (HR3's round 1): a target that moved hides it at once, whatever its rebuild does, across restarts too.
+ */
+export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string, headNow?: string | null): JjCandidateShown | null {
   // The record first: a card with none (most) needs no fingerprint read.
   const raw = wf.store.boardMeta(candidateKey(project, card.key, s.cycle))
   const fp = raw ? candidateFingerprint(wf, card, s) : null
   if (!fp || !raw) return null
   try {
     const rec = JSON.parse(raw) as JjCandidateShown
-    return sameFingerprint(rec.fp, fp) ? rec : null
+    if (!sameFingerprint(rec.fp, fp)) return null
+    return rec.state !== 'ready' || (!!headNow && rec.offer?.expected === headNow) ? rec : null
   } catch {
     return null
   }
@@ -561,8 +571,6 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
     const c = wf.store.card(card.id)
     return stillIn(c, wf.state(c))
   }
-  const gen = await reserveContained(wf, project)
-  const step = await ports.candidate(card, s, fp, still)
   const key = candidateKey(project, card.key, fp.cycle)
   const prior = (db: { prepare(sql: string): { get(...a: string[]): unknown } }): JjCandidateShown | null => {
     const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
@@ -572,6 +580,26 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
       return null
     }
   }
+  // HR3's round 1: a ready offer whose head isn't the target's any more (or can't be read) is withdrawn before anything
+  // is recovered, dropped or rebuilt, so an interrupted or failed rebuild never leaves it offered. Only that exact row.
+  const raw = wf.store.boardMeta(key)
+  let had: JjCandidateShown | null = null
+  try {
+    had = raw ? (JSON.parse(raw) as JjCandidateShown) : null
+  } catch {
+    had = null
+  }
+  if (had?.state === 'ready' && had.offer && !(ports.headIs && (await ports.headIs(fp.target, had.offer.expected)))) {
+    const seen = had
+    await wf.write(card, null, 'outside', (w) => {
+      w.tx.sql((db) => {
+        const now = prior(db)
+        if (now && now.gen === seen.gen && now.offer?.attempt === seen.offer?.attempt) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // i18n-ignore: SQL
+      })
+    })
+  }
+  const gen = await reserveContained(wf, project)
+  const step = await ports.candidate(card, s, fp, still)
   const put = (rec: Omit<JjCandidateShown, 'gen' | 'fp' | 'at'>) => async (): Promise<void> => {
     await wf.write(card, null, 'outside', (w) => {
       if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
