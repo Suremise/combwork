@@ -5,7 +5,7 @@
 // committed, submitted, passed and integrated by the test as jjwindow does; B1 is stopped. Its folder must be quiet, so
 // the pool's settle detaches the slot (jj's detach is fenced by the folder's quiet, slots.ts `quiet`, a rename probe: a
 // process Claude Code left with its working folder there would keep it out); then the slot must be back in the pool
-// (ready, not lent), which fails with a real Claude Code until HI-2920 (a restart for its tools takes it). Not back,
+// (ready, not lent): a restart for B1's tools, under way across Done, never takes it (HI-2920). Not back,
 // the processes naming this run's folders and Combwork's leftovers for B1 are listed, for what held it. The suite never
 // probes the folder itself: two rename probes at once can strand a folder under its aside name (slots.ts, HI-1753).
 // Each wait on the CLI is a lib.cliStep: a usage limit, sign-in or network failure there makes the suite a SKIP.
@@ -155,14 +155,14 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     // folder's quiet; the pool's retries' pauses grow to 30 s, HI-2906: two of the longest beyond the usual bound).
     const detached = await until(() => logLines().some((l) => l.includes(`${slot}⁩ detached at`)), HUNG_MS * 2)
     check('after Done and B1 stopped, its folder is quiet: the slot is detached', !!detached, JSON.stringify(await inv('slots:list', shop)))
-    // And back in the pool, not lent. HI-2920: a restart for B1's tools, under way across Done, takes the freed slot as a
-    // carried lease, so this fails with a real Claude Code until that is fixed.
+    // And back in the pool, not lent. HI-2920: a restart for B1's tools, under way across Done, took the freed slot as a
+    // carried lease; its resume is automatic now, so it never does.
     const back = await until(async () => {
       const s = (await inv('slots:list', shop)).find((x) => x.name === slot)
       return s && s.state === 'ready' ? s : null
     }, detached ? HUNG_MS : 1)
-    check('…and back in the pool (ready, not lent) (HI-2920 while it fails)', !!back, JSON.stringify(await inv('slots:list', shop)))
-    for (const l of logLines().filter((x) => /isn't quiet|detaching|detached|resumes in/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
+    check('…and back in the pool (ready, not lent)', !!back, JSON.stringify(await inv('slots:list', shop)))
+    for (const l of logLines().filter((x) => /isn't quiet|detaching|detached|resumes in|restarting it|connection switch/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
     if (!detached || !back) {
       // What still names this run's folders (read only, nothing ended), and what Combwork lists as B1's leftovers.
       try {

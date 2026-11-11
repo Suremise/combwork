@@ -6419,6 +6419,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
   Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
 - **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
   "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A switch's resume is automatic too** (HI-2920): a connection switch, a usage move or a restart for its tools resumes
+  only where `canResumeNow` allows, never taking a free slot by hand. Its run's lease ended meanwhile (its card Done), it
+  is refused and the slot stays in the pool; a stop while its start waits for the old run's writer claims nothing.
 - **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Combwork lets its turn finish (not in a
   turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
   gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes
