@@ -289,6 +289,29 @@ export function commentGenerations(ws: WorkspaceService, numbers: number[]): Map
   return out
 }
 
+/**
+ * How far a reply that gives these comments (`given`: their ids) takes `agent`'s receipt of a card's user comments
+ * (HI-2854, HR2's round 1 finding 2): from its receipt now, through each UserComment above it in order, stopping before the
+ * first the reply doesn't give (one archived since: HI-2641), so a receipt never passes words left out. Read in the
+ * caller's snapshot. With no facts (a board waiting for its upgrade), 0.
+ */
+export function commentReceiptFor(ws: WorkspaceService, n: number, agent: string, given: ReadonlySet<string>): number {
+  try {
+    return boardRead(ws, (db) => {
+      const now = Number((db.prepare("SELECT max(json_extract(data, '$.comments')) AS g FROM card_facts WHERE kind = 'DecisionsReceived' AND card = ? AND json_extract(data, '$.agent') = ?").get(n, agent) as { g: number | null } | undefined)?.g) || 0 // i18n-ignore: SQL
+      const rows = db.prepare("SELECT json_extract(data, '$.comment') AS id, json_extract(data, '$.generation') AS g FROM card_facts WHERE kind = 'UserComment' AND card = ? AND json_extract(data, '$.generation') > ? ORDER BY json_extract(data, '$.generation')").all(n, now) as { id: string; g: number }[] // i18n-ignore: SQL
+      let reach = now
+      for (const r of rows) {
+        if (!given.has(r.id)) break
+        reach = Number(r.g)
+      }
+      return reach
+    })
+  } catch {
+    return 0
+  }
+}
+
 function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard | null, after: TaskCard): void {
   const n = after.number
   const actor = actorOf(ctx?.actor)

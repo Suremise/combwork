@@ -207,6 +207,50 @@ describe('recording facts from the board’s moves (#1216)', () => {
     expect(await giveUnseen(w, 'a1', card)).toEqual([expect.stringMatching(/One more\.$/)])
   })
 
+  it("HI-2854 (HR2's round 1): a comment and a decision edit landing between a refusal's snapshot and its receipt are neither given nor received; the retry is refused for them, then goes on", async () => {
+    const { unseenIn, giveUnseen } = await import('../src/main/cardFreshness')
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Interleaved', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Old words' }, user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'First', user))
+    // The refusal's snapshot, then the user edits the decision and writes again before its receipt is written.
+    const snap = (await tasks.cardWithFacts(w, card))!
+    const u = unseenIn(snap, 'a1')
+    expect(u.lines).toEqual([expect.stringMatching(/: Old words$/), expect.stringMatching(/: First$/)])
+    const d = (await inWorkspace(w, () => tasks.getTask(card))).decisions![0]
+    await inWorkspace(w, () => tasks.editDecision(card, d.id, 'New words', user))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Second', user))
+    await recordDecisionsReceived(w, 'a1', card, u.generation, 'p', u.comments)
+    const s = foldCard(factsOf(w, card))
+    expect(s).toMatchObject({ generation: 2, received: { a1: 1 }, commentGeneration: 2, receivedComments: { a1: 1 } })
+    // The retry: refused again, with exactly what it missed (the new words, the second comment).
+    const again = await giveUnseen(w, 'a1', card)
+    expect(again).toEqual([expect.stringMatching(/: New words$/), expect.stringMatching(/: Second$/)])
+    // And another between that refusal and the next retry: given then, never skipped.
+    await inWorkspace(w, () => tasks.commentTask(card, 'Third', user))
+    expect(await giveUnseen(w, 'a1', card)).toEqual([expect.stringMatching(/: Third$/)])
+    expect(await giveUnseen(w, 'a1', card)).toEqual([])
+  })
+
+  it("HI-2854 (HR2's round 1 finding 2): a full read's comment receipt stops before the first comment of the user's it doesn't give (archived since), from where the agent's receipt is", async () => {
+    const { commentReceiptFor } = await import('../src/main/workflow/recorder')
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Archived', project: 'p' }, user))).number
+    for (const t of ['One', 'Two', 'Three']) await inWorkspace(w, () => tasks.commentTask(card, t, user))
+    const ids = (await inWorkspace(w, () => tasks.getTask(card))).comments.map((c) => c.id!)
+    // Every comment given: up to the newest. The second missing (archived): only the first.
+    expect(commentReceiptFor(w, card, 'a1', new Set(ids))).toBe(3)
+    expect(commentReceiptFor(w, card, 'a1', new Set([ids[0], ids[2]]))).toBe(1)
+    // Once the agent has the second (a receipt of 2), a reply without it goes on from there.
+    await recordDecisionsReceived(w, 'a1', card, 0, 'p', 2)
+    expect(commentReceiptFor(w, card, 'a1', new Set([ids[2]]))).toBe(3)
+    // Another agent's receipt is its own.
+    expect(commentReceiptFor(w, card, 'a2', new Set([ids[2]]))).toBe(0)
+    // The read itself: an agent's full read records only as far as it gives.
+    const seen = await inWorkspace(w, () => tasks.readTaskSeen(card, reviewer))
+    expect(seen.comments).toBe(3)
+  })
+
   it("HI-2854: a full read receives the user's comments as far as it saw them, never back, and never one written after it", async () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Commented', project: 'p' }, user))).number

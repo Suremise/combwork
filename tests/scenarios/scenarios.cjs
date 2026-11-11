@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 134
+const FIXTURES_VERSION = 135
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -369,6 +369,9 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
  * The Solo and Pair presets' options for a Git project (preset() in src/shared/workflow/options.ts, which the harness
  * can't load: its imports name no extension), Pair's target being the repository's branch, set by the scenario.
  */
+/** card-decision's decision recorded while the agent works (HI-2854: what a refused submit must give in full). */
+const CARD_DECISION_LATER = 'Show each error under its own field, not in a banner at the top.'
+const { refusedWithDecision } = require('./freshnessChecks.cjs')
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
 /** HI-2854's A/B task (the card's own: a CSV line parser and 8 node:test cases, run until green). */
 const AB_TASK =
@@ -1595,7 +1598,7 @@ module.exports.SCENARIOS = [
       if (c.decidedAt) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing') return
-      await c.inv('tasks:update', c.cards.a, { decision: 'Show each error under its own field, not in a banner at the top.' })
+      await c.inv('tasks:update', c.cards.a, { decision: CARD_DECISION_LATER })
       c.decidedAt = Date.now()
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
@@ -1611,10 +1614,11 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
-        // HI-2854: or its submit was refused for it, the refusal giving the decision in full (and moving the flag's baseline).
-        ['a board reply before it read the card again flagged the new decision (or a submit refused for it)', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')) || o.combworkCalls.some((x) => x.tool === 'cw_submit' && !x.ok && Date.parse(x.at) > decided && Date.parse(x.at) < reread), `${between.length} call(s) between`],
-        // HI-2854: or its submit was refused for the decision it hadn't seen, which gives the decision in full.
-        ['saw the decision before handing it on (read the card again, or a submit refused for it)', decided > 0 && review > 0 && (cardReads(o, c.cards.a).some((t) => t > decided && t < review) || o.combworkCalls.some((x) => x.tool === 'cw_submit' && !x.ok && Date.parse(x.at) > decided && Date.parse(x.at) < review)), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}, refused submits ${o.combworkCalls.filter((x) => x.tool === 'cw_submit' && !x.ok).map((x) => Date.parse(x.at)).join(',')}`],
+        // HI-2854: or its submit was refused for it, the refusal giving the decision in full (and moving the flag's baseline):
+        // only that refusal with the decision's words (freshnessChecks.cjs, HR2's round 1 finding 3).
+        ['a board reply before it read the card again flagged the new decision (or a submit refused for it gave it)', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')) || refusedWithDecision(o.combworkCalls, CARD_DECISION_LATER, decided, reread), `${between.length} call(s) between`],
+        // HI-2854: or its submit was refused for the decision it hadn't seen, the refusal giving it in full.
+        ['saw the decision before handing it on (read the card again, or a submit refused for it gave it)', decided > 0 && review > 0 && (cardReads(o, c.cards.a).some((t) => t > decided && t < review) || refusedWithDecision(o.combworkCalls, CARD_DECISION_LATER, decided, review)), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}, refused submits ${o.combworkCalls.filter((x) => x.tool === 'cw_submit' && !x.ok).map((x) => Date.parse(x.at)).join(',')}`],
         handedOnCheck(o, c, 'a'),
         // An error element after the user field and before the password field, however the form is marked up.
         ['the errors are under their fields', /name=["']?user\b[\s\S]*?(error|invalid)[\s\S]*?name=["']?password\b/i.test(c.read('login.html') ?? ''), (c.read('login.html') ?? '').slice(0, 400)]

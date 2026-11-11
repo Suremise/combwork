@@ -3852,13 +3852,17 @@ these moments).
   submits). Each comment the user writes on the card is a `UserComment` fact with a **comment generation** of its own (not
   the decision generation, so a comment makes no pass or approval stale), and `DecisionsReceived` also records the comment
   generation an agent has received (`comments`). Only a full read gives it (`cw_read_task` with no `comments`, `summary`
-  or `latestComment`), or a card's start task that carried the whole card (below), never a narrowed read. Receipts only
+  or `latestComment`), or a card's start task that carried the whole card (below), never a narrowed read, and only as far as the comments it
+  gives: from the agent's receipt, through each of the user's comments in order, stopping before the first it leaves out
+  (archived since, HI-2641). Receipts only
   go forward: a late, older one leaves a newer one as it is. A comment by the Assistant or an agent doesn't hold a
   submit; their words reach the builder in its inbox. **The refusal gives them**: an agent's refused submit lists each
   unseen decision and comment of the user's in full (`unread` in the refusal, one line each, with who and when), and
   records exactly those as received before it replies, so the next submit goes on, unless another came meanwhile, which
-  refuses it again. A decision or comment written after the facts were read for the refusal is neither listed nor counted
-  as received.
+  refuses it again. The card, its facts and its newest archived comments are read in one snapshot: a decision is given in
+  its newest fact's words, a comment from the card or its archive, and one found in neither stops the receipt before it
+  (the refusal says to read the archive). A decision or comment written after that snapshot is neither listed nor
+  counted as received.
 - **A start task that carries the whole card** (HI-2854): a card's start prompt (taskStart, a slot's placement) carries
   its decisions and every comment, each in full with who and when, ending "This is the card in full…", only when all of it
   fits uncut within Settings → Advanced, **A card in full at its start, up to** (6,000 characters; 0: never), with no

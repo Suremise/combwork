@@ -22,7 +22,7 @@ import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { actorOf, cardFacts, changeByRuntime, commentGenerations, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import { loopReviewerOf } from './loopReviewer'
@@ -597,8 +597,14 @@ export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card:
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
   if (!ws.path) throw unknownTask(n)
-  // HI-2854: its comment generation in the same snapshot, for a receipt of the user's comments.
-  const { raw, generation, comments, key } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: commentGenerations(ws, [n]).get(n) ?? 0, key: cardKeys(ws, [n]).get(n) }))
+  // HI-2854: an agent's receipt of the user's comments in the same snapshot, only as far as the comments this read gives
+  // (never past one archived since, HR2's round 1 finding 2); for anyone else, the newest.
+  const agent = actor.kind === 'agent' ? actor.self?.agentId : undefined
+  const { raw, generation, comments, key } = boardRead(ws, () => {
+    const doc = cardDoc(ws, n)
+    const given = new Set(((doc as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
+    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n) }
+  })
   if (!raw) throw unknownTask(n)
   const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
