@@ -292,7 +292,9 @@ const OP_T = `id ++ "${SEP}" ++ parents.map(|p| p.id()).join(",") ++ "${SEP}" ++
 const BOOKMARK_T = `name ++ "${SEP}" ++ if(remote, remote, "") ++ "${SEP}" ++ conflict ++ "${SEP}" ++ if(normal_target, normal_target.commit_id(), "") ++ "${SEP}" ++ added_targets.map(|c| c.commit_id()).join(",") ++ "${SEP}" ++ removed_targets.map(|c| c.commit_id()).join(",") ++ "\\n"`
 const TAG_T = `name ++ "${SEP}" ++ if(normal_target, normal_target.commit_id(), "") ++ "\\n"`
 const WORKSPACE_T = `name ++ "${SEP}" ++ target.commit_id() ++ "\\n"`
-const CONFLICT_T = `if(conflict, path ++ "${SEP}" ++ conflict_side_count ++ "\\n")`
+/** A commit's description and author (HI-2990: what jj's own rebase keeps), compared as read. */
+const META_T = `description ++ "${SEP}" ++ author.name() ++ "${SEP}" ++ author.email() ++ "${SEP}" ++ author.timestamp() ++ "\\n"`
+const CONFLICT_T =`if(conflict, path ++ "${SEP}" ++ conflict_side_count ++ "\\n")`
 
 /** An operation as its log shows it: its id, parents and attributes (its args among them). */
 export interface JjOpEntry {
@@ -1047,8 +1049,8 @@ async function reachedNow(a: Attempt, target: string, ids: readonly string[]): P
  * rewritten (the builder's `jj describe -r @-` under a merge candidate, say) leaves the recorded commit hidden and its
  * change id on a new visible commit, which a drop by recorded ids would leave in the user's log. Per change of the
  * attempt's hidden commits, exactly one visible commit outside the attempt's, not divergent, and the same change as the
- * attempt's last commit of that change (`jj interdiff` empty: rebased, never edited; a change the user made to it is
- * theirs and kept). Read at the single head; never owned until the drop adopts them.
+ * attempt's last commit of that change (`jj interdiff` empty) with the same description and author (HR1's round 1):
+ * rebased, never edited; a change the user made to its files or its metadata is theirs and kept. Read at the single head; never owned until the drop adopts them.
  */
 async function successorsOf(a: Attempt): Promise<string[]> {
   const rec = a.rec
@@ -1068,6 +1070,10 @@ async function successorsOf(a: Attempt): Promise<string[]> {
     const from = rec.commits.filter((c) => was.some((w) => w.commit === c && w.change === change)).at(-1)!
     const diff = await a.read(op, ['interdiff', '--from', from, '--to', now[0].commit, '--summary'])
     if (lines(diff).length) continue
+    // Its metadata too (HR1's round 1): jj's rebase keeps the description and the author; the user's `jj describe` or
+    // `jj metaedit` changes them with the files untouched, and that edit is theirs.
+    const meta = async (id: string): Promise<string> => a.read(op, ['log', '--no-graph', '-r', id, '-T', META_T])
+    if ((await meta(from)) !== (await meta(now[0].commit))) continue
     found.push(now[0].commit)
   }
   if (!a.reads.stillAt(op)) throw new Stop('raced', 'successors read') // i18n-ignore: a protocol detail for logs and tests, never shown

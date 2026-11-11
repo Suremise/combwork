@@ -3505,14 +3505,15 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   never takes it for an uncertain one (a squash's restore with nothing to restore, its scratch commit left otherwise).
 - **Successors** (HI-2990): when jj rewrote an attempt's commit itself (its automatic rebase after the builder rewrote an
   ancestor, so the recorded commit is hidden and its change id on a new visible commit), the drop adopts that successor:
-  exactly one visible commit of the change outside the attempt's, not divergent, not reached by the target, and with an
-  empty `jj interdiff` from the attempt's commit (rebased, never edited: a change of the user's to it stays theirs). It is
+  exactly one visible commit of the change outside the attempt's, not divergent, not reached by the target, with an
+  empty `jj interdiff` from the attempt's commit and its description and author unchanged (HR1's round 1: rebased, never
+  edited; a change of the user's to its files or its metadata stays theirs). It is
   journalled into the attempt's commits and pinned before the guarded abandon, as the attempt's own.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
   strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
-  kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
+  (its files, or its description alone) kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
   `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
   `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
   while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward

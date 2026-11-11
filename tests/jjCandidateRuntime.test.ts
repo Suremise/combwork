@@ -641,22 +641,27 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(visible(w, now.result)).toBe(true)
     })
 
-    it('a successor the user changed is theirs: kept, and the attempt dropped again later', async () => {
-      const w = await world(colocated, { candidates: true })
-      const { card } = await approved(w)
-      const jjp = new JjPlatform(w.wf)
-      await jjp.reconcile(card, {})
-      const cycle = w.wf.state(card).cycle
-      const first = shown(w, card, cycle)!.offer!
-      // The user rewrites the candidate itself with content of their own: not a rebase, so never Combwork's to abandon.
-      w.h.jj(w.repo, 'new', 'main', '-m', 'scratch')
-      writeFileSync(join(w.repo, 'mine.txt'), 'mine\n')
-      w.h.jj(w.repo, 'squash', '--into', first.result, '-m', 'theirs now')
-      onTarget(w, 'theirs.txt', 'theirs\n')
-      await jjp.reconcile(w.wf.store.card(card.id), {})
-      expect(ofChange(w, first.change)).toHaveLength(1)
-      expect(entries(w, card, cycle).find((e) => e.record.attempt === first.attempt)?.state).toBe('dropped')
-    })
+    for (const how of ['its files', 'its description alone'] as const) {
+      it(`a successor the user changed (${how}) is theirs: kept, and the attempt settled`, async () => {
+        const w = await world(colocated, { candidates: true })
+        const { card } = await approved(w)
+        const jjp = new JjPlatform(w.wf)
+        await jjp.reconcile(card, {})
+        const cycle = w.wf.state(card).cycle
+        const first = shown(w, card, cycle)!.offer!
+        // The user rewrites the candidate itself: not jj's rebase, so never Combwork's to abandon (HR1's round 1: a
+        // description of theirs with the files untouched included).
+        if (how === 'its files') {
+          w.h.jj(w.repo, 'new', 'main', '-m', 'scratch')
+          writeFileSync(join(w.repo, 'mine.txt'), 'mine\n')
+          w.h.jj(w.repo, 'squash', '--into', first.result, '-m', 'theirs now')
+        } else w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', first.result, '-m', 'USER EDIT: keep this explanation')
+        onTarget(w, 'theirs.txt', 'theirs\n')
+        await jjp.reconcile(w.wf.store.card(card.id), {})
+        expect(ofChange(w, first.change)).toHaveLength(1)
+        expect(entries(w, card, cycle).find((e) => e.record.attempt === first.attempt)?.state).toBe('dropped')
+      })
+    }
 
     it('squash: an attempt cut short by the user integrating the candidate mid-run is recovered and dropped after Integrated (its scratch commit included)', async () => {
       const w = await world(colocated, { candidates: true })
