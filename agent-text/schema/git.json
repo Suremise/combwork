@@ -126,6 +126,11 @@
       "state": "select"
     }
   },
+  "git.vc.switch.jjToolBack": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
   "git.vc.switch.jjUnknown": {
     "placeholders": {
       "code": "plain"
