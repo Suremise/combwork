@@ -66,7 +66,8 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
   fs.rmSync(work, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   fs.mkdirSync(claudeHome, { recursive: true })
-  fs.writeFileSync(jjConfig, '[user]\nname = "Combwork Test"\nemail = "test@example.invalid"\n[ui]\npaginate = "never"\n')
+  // No editor jj could open: a step that would need one fails at once, never waits for input or shows a window.
+  fs.writeFileSync(jjConfig, '[user]\nname = "Combwork Test"\nemail = "test@example.invalid"\n[ui]\npaginate = "never"\neditor = "cw-no-editor-in-tests"\n')
   fs.writeFileSync(gitConfig, `[user]\n\tname = ${lib.TEST_GIT_IDENTITY.name}\n\temail = ${lib.TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`)
   fs.mkdirSync(shop, { recursive: true })
   fs.writeFileSync(path.join(shop, '.gitignore'), '.combwork/\n')
@@ -241,7 +242,8 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // The user resolves it: the commit's file as they want it, squashed into the copy.
     jj(shop, 'new', R3b, '-m', 'resolve')
     fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by card three and the user', 5: 'six, by card two' }))
-    jj(shop, 'squash')
+    // Its own description kept (-u): with both described, jj would ask an editor to combine them (HB5 on HI-2923).
+    jj(shop, 'squash', '-u')
     const R3c = id(shop, `change_id(${id(shop, R3b, 'change_id')})`)
     check('…resolved: no conflict stored', id(shop, R3c, 'if(conflict, "yes", "no")') === 'no')
     jj(shop, 'bookmark', 'set', 'main', '-r', R3c)
