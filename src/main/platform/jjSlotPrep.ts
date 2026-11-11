@@ -147,8 +147,20 @@ export const journalKey = (store: string, workspace: string, prep: string): stri
  */
 export function forgetBindingIn(db: BoardDb, store: string, workspace: string): void {
   db.prepare('DELETE FROM board_meta WHERE key = ?').run(pointerKey(store, workspace)) // i18n-ignore: SQL, never shown
-  const prefix = journalKey(store, workspace, '')
-  db.prepare('DELETE FROM board_meta WHERE substr(key, 1, ?) = ?').run(prefix.length, prefix) // i18n-ignore: SQL, never shown
+  const [from, to] = journalRange(store, workspace)
+  db.prepare('DELETE FROM board_meta WHERE key >= ? AND key < ?').run(from, to) // i18n-ignore: SQL, never shown
+}
+
+/**
+ * The keys of a workspace's preparation journals as a range, [from, to): every key starting with the journals' prefix
+ * and nothing else (its last character, `:`, raised by one for the end). board_meta's keys compare as UTF-8 bytes, whose
+ * order is code points' order, so a store path with any character (a non-BMP one included) is exact, and the range
+ * uses the key's index. Never `substr` with a JavaScript length: that counts UTF-16 units, SQLite code points (HR1,
+ * HI-2979 round 1).
+ */
+export function journalRange(store: string, workspace: string): [string, string] {
+  const from = journalKey(store, workspace, '')
+  return [from, `${from.slice(0, -1)};`]
 }
 
 /** A database as board_meta's store uses it (a fence's transaction hands the same). */
@@ -188,8 +200,8 @@ export function boardPrepStore(conn: BoardRw): JjPrepStore {
     put(db, journalKey(store, workspace, j.prep), { ...j, phase: 'done' })
     // The workspace's earlier preparations, done, are history nothing reads again (HI-2979): pruned as this one is
     // published, so the journals stay one per preparation in flight plus this one, never one per card cycle for good.
-    const prefix = journalKey(store, workspace, '')
-    const rows = db.prepare('SELECT key, value FROM board_meta WHERE substr(key, 1, ?) = ? AND key <> ?').all(prefix.length, prefix, journalKey(store, workspace, j.prep)) as { key: string; value: string }[] // i18n-ignore: SQL, never shown
+    const [from, to] = journalRange(store, workspace)
+    const rows = db.prepare('SELECT key, value FROM board_meta WHERE key >= ? AND key < ? AND key <> ?').all(from, to, journalKey(store, workspace, j.prep)) as { key: string; value: string }[] // i18n-ignore: SQL, never shown
     for (const r of rows) {
       let done = false
       try {
