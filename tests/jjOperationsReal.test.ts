@@ -394,9 +394,10 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     }))
     expect(made).toBe(true)
     expect(isJjViewUnknown(late) && late.jjUnknown).toBe('moved')
-    // And with the tag there, jj hasn't imported it: E8.
+    // And with the tag there, jj hasn't imported it: E8, as a store not colocated refuses it (HI-2896, SPEC: `jj git
+    // import` is the user's way in, with no Git working copy to show the change).
     const after = await jjOperationPreview(real, O, null, runner)
-    expect(!isJjViewUnknown(after) && after.refused).toBe('unimported')
+    expect(!isJjViewUnknown(after) && after.refused).toBe('unimportedStore')
   })
   it("off main's thread (HR2's round 3): with 4,000 loose tags, the worker's preview keeps the event loop free where the same work on this thread blocks it; past the print's bounds, no command", async () => {
     const r = await repo('manytags')
