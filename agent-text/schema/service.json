@@ -1054,6 +1054,9 @@
   "service.queue.pauseChanged": {
     "placeholders": {}
   },
+  "service.queue.pauseNoFolder": {
+    "placeholders": {}
+  },
   "service.repoOps.notOffered": {
     "placeholders": {
       "platform": "plain"
