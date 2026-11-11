@@ -319,6 +319,15 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
 const FILES_NAMED = 3
 const filesNamed = (files: readonly string[]): string => (files.length <= FILES_NAMED ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, FILES_NAMED).join(', '), more: files.length - FILES_NAMED }))
 
+/**
+ * HI-2984: whether the target's folder with uncommitted changes is worth a start's warning (and the window's notice):
+ * only when the rules merge something into the target (a finish other than Committed, whose target is just the line
+ * the work is committed on) and that folder isn't where the work is built (Solo's: the agent's own folder, maybe its
+ * own half-done work, never a merge's).
+ */
+const targetChangesApply = (o: WorkflowOptions, folder: string, workFolder: string | null): boolean =>
+  o.finish !== 'committed' && (workFolder === null || resolvePath(folder).toLowerCase() !== resolvePath(workFolder).toLowerCase())
+
 const W = {
   forwardResolving: agentMsg({ id: 'runtime.forward.resolving', text: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.', note: 'HI-2959: the comment on a forward merge card (Combwork merging branch {from} into {to}) ended by Resolve on a builder. {card}: the new card’s key; {source}: a short commit id.' }),
   choiceCarryOn: agentMsg({ id: 'runtime.choice.carryOn', text: 'carry on', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
@@ -1130,9 +1139,10 @@ export class Workflow {
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key }))
     // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
-    // a merge into it that changes them pauses. A warning only; never asked of a dry run (a drag's plan).
+    // a merge into it that changes them pauses. A warning only; never asked of a dry run (a drag's plan). HI-2984: only
+    // where something merges into the target, from another folder than the one the card is built in.
     const tc = !dry && data.target ? await this.platform(o).targetChanges?.(String(data.target)).catch(() => null) : null
-    if (tc) {
+    if (tc && targetChangesApply(o, tc.folder, data.folder === 'project' ? this.cfg.project : String(data.folder))) {
       warnings.push(say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) }))
       this.cfg.targetChanges?.(tc, card.key)
     }
@@ -1341,8 +1351,10 @@ export class Workflow {
    * the window, and the warning for the caller's reply; null when there are none (or no such folder, or no platform read).
    */
   async targetChangesWarning(target: string): Promise<string | null> {
-    const tc = await this.platform(this.cfg.options()).targetChanges?.(target).catch(() => null)
-    if (!tc) return null
+    const o = this.cfg.options()
+    const tc = await this.platform(o).targetChanges?.(target).catch(() => null)
+    // HI-2984: as a card's start says it (targetChangesApply): the lane's cards are built in the project folder, or slots.
+    if (!tc || !targetChangesApply(o, tc.folder, o.folder === 'project' ? this.cfg.project : null)) return null
     this.cfg.targetChanges?.(tc, '')
     return say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) })
   }

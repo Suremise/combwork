@@ -182,6 +182,33 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     expect(told[0]?.files).toHaveLength(7)
   })
 
+  // HI-2984: Solo merges nothing, and its target's folder is the folder the agent works in (maybe its own half-done work):
+  // the warning was false there, at every start.
+  it('HI-2984: a Solo start in a dirty project folder says nothing of a merge and tells the window nothing', async () => {
+    const e = (env = setup({ ...preset('git', 'solo'), preChecks: [], mergeChecks: [] }))
+    expect([e.options.finish, e.options.folder]).toEqual(['committed', 'project'])
+    const told: unknown[] = []
+    ;(e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }).targetChanges = (c) => told.push(c)
+    writeFileSync(join(e.project, 'wip.txt'), 'half done\n')
+    const card = e.wf.createCard({ title: 'A' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    expect((s.warnings ?? []).join('\n')).not.toMatch(/uncommitted changes/)
+    expect(told).toEqual([])
+    // A lane started there: the same.
+    expect(await e.wf.targetChangesWarning('main')).toBeNull()
+    expect(told).toEqual([])
+  })
+
+  it("HI-2984: a pair lane's start, its target checked out dirty in the project folder while cards build in slots, still says it", async () => {
+    const e = pair()
+    const told: unknown[] = []
+    ;(e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }).targetChanges = (c) => told.push(c)
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    expect(await e.wf.targetChangesWarning('main')).toMatch(/^main's folder .+ has uncommitted changes \(\.gitignore\): a merge into main that changes them pauses/)
+    expect(told).toMatchObject([{ target: 'main', files: ['.gitignore'] }])
+  })
+
   it('the conditions are checked inside the lock and the fence, and the fence names the folder', async () => {
     const e = pair()
     await queued(e)
