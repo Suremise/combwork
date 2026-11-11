@@ -3,7 +3,7 @@
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, stationTitle, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -319,7 +319,7 @@ function Station({ view: st, name, colours }: { view: MapStationView; name: stri
   const waitingHere = st.station === 'you' && active
   const sub = st.status === 'notReported' ? tr(M.notReported) : st.status === 'loading' ? tr(M.loading) : tr(M.count, { n: st.count })
   const last = st.lastKind === 'prompt' ? tr(M.prompt) : st.last
-  const title = st.status === 'ok' ? tr(M.stationTip, { station: name, n: st.count, heat: st.heat, last: last || 'none' }) : `${name}: ${sub}`
+  const title = stationTitle(st, name, last)
   return (
     <g className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status)} data-station={st.station} data-count={st.count} data-status={st.status} data-failed={st.failed ? 'yes' : 'no'}>
       <title>{title}</title>
@@ -443,7 +443,6 @@ const M = {
   feedHeading: msg({ id: 'activity.map.feedHeading', defaultMessage: 'Last actions', description: "The heading of the Activity map's feed: the agents' latest tool calls." }),
   noCalls: msg({ id: 'activity.map.noCalls', defaultMessage: 'No tool calls yet.', description: "The Activity map's feed when the agents shown have made no tool call in the turns read." }),
   partial: msg({ id: 'activity.map.partial', defaultMessage: 'From the latest calls read: not the whole history.', description: "Under the Activity map's feed when its counts are a sample (an agent made more calls than the map counts, or more agents run than it reads)." }),
-  stationTip: msg({ id: 'activity.map.stationTip', defaultMessage: '{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {last, select, none {none} other {{last}}}', description: "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool), none when there is none. Keep the select keys." }),
   prompt: msg({ id: 'activity.map.prompt', defaultMessage: 'Prompt', description: "On the Activity map and its feed: a prompt the agent was given (at the You station), named by this word only, never its text." }),
   show: msg({ id: 'activity.map.show', defaultMessage: 'Show', description: "Before the Activity tab's toggles for its map: Map, Feed, Context." }),
   toggleMap: msg({ id: 'activity.map.toggleMap', defaultMessage: 'Map', description: "A toggle above the Activity tab: show its map (a honeycomb of what agents do)." }),
