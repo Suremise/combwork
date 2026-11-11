@@ -40,7 +40,7 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleEnded, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
+import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
 import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from '../workflow/jjCandidateChecks'
 import { jjCandidateEntry } from '../workflow/jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
@@ -51,7 +51,7 @@ import { CW_RUNS } from '../progress'
 import { createLogger, userText } from '../logger'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
 import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
-import { cleanCycle, cycleLive, readAttemptsValue, dropCandidates, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { cleanCycle, cycleLive, readAttemptsValue, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -848,16 +848,25 @@ export class JjPlatform implements PlatformAdapter {
     return now === 'current'
   }
 
-  /** HI-2871: an integrated cycle's candidates dropped (jjCandidateStep's `dropCandidates`); a failure only logged. */
+  /**
+   * HI-2871: an integrated cycle's candidates dropped at once, as the sweep's clean-up (`cleanCycle`, HI-2990: the same
+   * one, under the card's lock, the cycle still over its owner); what it leaves unresolved the sweep finds again. A
+   * failure only logged.
+   */
   private async candidatesDone(card: CardRecord, cycle: number): Promise<void> {
+    const wf = this.wf
     const rec = this.deps?.records
     const integ = await this.deps?.integration()
-    if (!rec?.attempts || !rec.saveAttempt || !integ) return
+    if (!wf || !rec?.attempts || !rec.saveAttempt || !integ) return
     const attempts = rec.attempts
     const save = rec.saveAttempt
-    const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false }
+    const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false, ...(this.deps?.candidateHook ? { hook: this.deps.candidateHook } : {}) }
     const park = this.deps?.candidateChecks?.parkCopies
-    await dropCandidates({ j4, entries: () => attempts(card.key, cycle), save: (e) => save(card.key, cycle, e), ...(park ? { park } : {}) }).catch(() => 0)
+    const still = (): boolean => {
+      const c = wf.store.card(card.id)
+      return cycleOver(c, wf.state(c), cycle)
+    }
+    await this.withCardLock(card.id, () => cleanCycle({ j4, entries: () => attempts(card.key, cycle), save: (e) => save(card.key, cycle, e), still, ...(park ? { park } : {}) })).catch((e) => checksLog.warn(`dropping #${userText(card.key)}'s candidates after Integrated`, e)) // i18n-ignore: a log line, English
   }
 
   private async candidateStep(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep> {
@@ -1001,7 +1010,7 @@ export class JjPlatform implements PlatformAdapter {
   /**
    * HI-2950's sweep (design HI-2950/s10), from `afterRun` whatever the cards' stages: the project's candidate journals
    * read by one key-prefix query; each card and cycle with something left to do (an attempt not dropped or kept, a checks
-   * journal, the window's record) whose cycle has ended (`cycleEnded`) is cleaned up, a fair page at a time after a durable
+   * journal, the window's record) whose cycle is over (`cycleOver`: ended, or Integrated, HI-2990) is cleaned up, a fair page at a time after a durable
    * cursor (so one that stays unresolved never starves the rest): under the card's lock, its attempts recovered and
    * dropped with the cycle still ended as their owner, then its rows deleted in a write that finds it still ended; a checks
    * journal only once its lease is freed. `more`: due ones beyond the page.
@@ -1037,7 +1046,7 @@ export class JjPlatform implements PlatformAdapter {
       const cardKey = m[1]
       const cycle = Number(m[2])
       const card = byKey(cardKey)
-      if (card && !cycleEnded(card, wf.state(card), cycle)) continue
+      if (card && !cycleOver(card, wf.state(card), cycle)) continue
       const entries = readAttemptsValue(row.value)
       const rows = rec.read((db) => (db.prepare('SELECT COUNT(*) AS n FROM board_meta WHERE key = ? OR (key > ? AND key < ?)').get(candidateKey(project, cardKey, cycle), `jj_candidate_checks:${project}:${cardKey}:${cycle}:`, `jj_candidate_checks:${project}:${cardKey}:${cycle}:\uffff`) as { n: number }).n) // i18n-ignore: SQL
       if (!cycleLive(entries) && !rows) continue
@@ -1053,7 +1062,7 @@ export class JjPlatform implements PlatformAdapter {
       const card = byKey(x.cardKey)
       const still = (): boolean => {
         const c = byKey(x.cardKey)
-        return !c || cycleEnded(c, wf.state(c), x.cycle)
+        return !c || cycleOver(c, wf.state(c), x.cycle)
       }
       const clean = async (): Promise<void> => {
         if (!still()) return
