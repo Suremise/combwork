@@ -21,7 +21,7 @@ import type { MapShow } from '../activityView'
  * What the map read, drew and animated, counted (HI-2903): its e2e suite reads them from a test copy's window to prove
  * it costs nothing while hidden (no reads, renders or pulses), and that Map off and frozen stop its own work.
  */
-const mapCounts = { renders: 0, pulses: 0, reads: 0, turnReads: 0, turnsApplied: 0, active: false }
+const mapCounts = { renders: 0, pulses: 0, flying: 0, reads: 0, turnReads: 0, turnsApplied: 0, active: false }
 ;(window as unknown as { __cwActivityMap?: typeof mapCounts }).__cwActivityMap = mapCounts
 
 /** An agent the map shows: its key (the filter's value: an agent id, or at the workspace level its host's and id), its host and its tab. */
@@ -156,6 +156,9 @@ export function useActivityMap(o: { active: boolean; animate: boolean; scope: st
   const held = useRef<MapModel | null>(null)
   const model = useMemo(() => (o.active || !held.current ? buildMapModel(mapInputs(o.entries, o.contexts, o.mode), o.at) : held.current), [o.active, o.entries, o.contexts, o.mode, o.at])
   held.current = model
+  useLayoutEffect(() => {
+    mapCounts.active = o.active
+  }, [o.active])
   const [pulses, setPulses] = useState<MapPulse[]>([])
   const base = useRef<{ scope: string; seen: Map<string, boolean> | null; sessions: Set<string> }>({ scope: '', seen: null, sessions: new Set() })
   const ids = useRef(0)
@@ -227,11 +230,12 @@ export interface ActivityMapProps {
 
 /** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
 export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick }: ActivityMapProps) {
-  // Each drawing counted as it lands (a layout effect: no write during render).
+  const motion = useMotion()
+  // Each drawing counted as it lands (a layout effect: no write during render), and the pulses then in flight.
   useLayoutEffect(() => {
     mapCounts.renders++
+    mapCounts.flying = pulses.length
   })
-  const motion = useMotion()
   const colours = useMemo(() => new Map(model.agents.map((a, i) => [a.key, mode === 'single' ? undefined : i])), [model.agents, mode])
   const one = mode === 'single' ? (model.agents[0] ?? null) : null
   const working = model.agents.filter((a) => a.state === 'working').length

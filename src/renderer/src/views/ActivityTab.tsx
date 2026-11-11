@@ -329,7 +329,9 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
-  const map = useActivityMap({ active, animate: active && live && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at: input.at })
+  // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
+  // held ones (from those, what came while frozen was sent as a burst).
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at: input.at })
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
   const pickMapAgent = useCallback((key: string) => setView({ agents: [key] }), [setView])
