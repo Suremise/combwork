@@ -476,12 +476,25 @@ class Attempt {
       // left to the race detection after the write, as before (what that operation made is recovered as uncertain).
       const recheck = (): string | null => (this.deps.owner.still() ? null : 'owner')
       const r = await this.deps.runner.run(this.deps.folder, ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false', marker(this.rec.attempt), ...who, ...args], { write: true, signal: this.deps.signal, timeout: this.deps.timeout, recheck })
-      if (r.refused) throw new Stop('owner', name)
+      // HI-2990: a step that provably made nothing (jj refused before it started, or it ended with the head where it was,
+      // still under the lock) is no longer under way: its journalled step cleared, so recovery and drop never take it for
+      // an uncertain one and keep the attempt's commits for good (a squash's restore with nothing to restore, say).
+      const nothing = async (): Promise<void> => {
+        this.rec.step = undefined
+        await this.deps.journal(structuredClone(this.rec))
+      }
+      if (r.refused) {
+        await nothing()
+        throw new Stop('owner', name)
+      }
       if (r.cancelled) throw new Stop('cancelled', name)
       const heads = readOpHeads(this.deps.view.jjRepo)
       if (!heads || heads.length !== 1) throw new Stop('raced', `heads after ${name}`) // i18n-ignore: a protocol detail for logs and tests, never shown
       const op = heads[0]
-      if (op === parent) throw new Stop('failed', r.err || `${name}: no operation`) // i18n-ignore: a protocol detail for logs and tests, never shown
+      if (op === parent) {
+        await nothing()
+        throw new Stop('failed', r.err || `${name}: no operation`) // i18n-ignore: a protocol detail for logs and tests, never shown
+      }
       const entry = await this.opEntry(op)
       const added = await this.commits(op, `::visible_heads() ~ ::at_operation(${parent}, visible_heads())`)
       const removed = (await this.commits(op, `at_operation(${parent}, ::visible_heads()) ~ ::visible_heads()`)).map((c) => c.commit)
@@ -1030,12 +1043,44 @@ async function reachedNow(a: Attempt, target: string, ids: readonly string[]): P
 }
 
 /**
+ * The visible successors jj made of an attempt's hidden commits (HI-2990): jj's own rebase of a commit whose parent was
+ * rewritten (the builder's `jj describe -r @-` under a merge candidate, say) leaves the recorded commit hidden and its
+ * change id on a new visible commit, which a drop by recorded ids would leave in the user's log. Per change of the
+ * attempt's hidden commits, exactly one visible commit outside the attempt's, not divergent, and the same change as the
+ * attempt's last commit of that change (`jj interdiff` empty: rebased, never edited; a change the user made to it is
+ * theirs and kept). Read at the single head; never owned until the drop adopts them.
+ */
+async function successorsOf(a: Attempt): Promise<string[]> {
+  const rec = a.rec
+  if (!rec.commits.length) return []
+  const op = a.head()
+  const shown = new Set((await a.commits(op, visibleOf(rec.commits))).map((c) => c.commit))
+  const hidden = rec.commits.filter((c) => !shown.has(c))
+  if (!hidden.length) return []
+  // Named by their ids, hidden commits are read as they were (their change ids among them).
+  const was = await a.commits(op, set(hidden))
+  const mine = new Set(rec.commits)
+  const found: string[] = []
+  for (const change of new Set(was.map((c) => c.change))) {
+    const now = (await a.commits(op, `change_id(${change}) & ::visible_heads()`)).filter((c) => !mine.has(c.commit))
+    if (now.length !== 1 || now[0].divergent) continue
+    // The attempt's latest commit of that change: its commits are recorded in the order its operations made them.
+    const from = rec.commits.filter((c) => was.some((w) => w.commit === c && w.change === change)).at(-1)!
+    const diff = await a.read(op, ['interdiff', '--from', from, '--to', now[0].commit, '--summary'])
+    if (lines(diff).length) continue
+    found.push(now[0].commit)
+  }
+  if (!a.reads.stillAt(op)) throw new Stop('raced', 'successors read') // i18n-ignore: a protocol detail for logs and tests, never shown
+  return found
+}
+
+/**
  * An attempt's clean-up (s14 §11, s17 §1–2, HR2's round 1): its still-visible commits abandoned (guarded), then its owned
  * refs deleted with exact-old deletes. Refused for anything the target reaches (the candidate, or any pinned commit, an
  * ancestor of the target bookmark, local or remote, or of its Git branch), read again under the lock right before each
  * delete: a target that moved onto a pinned commit meanwhile stops the drop with that pin and the rest kept. Refused
  * whole while the record has uncertain commits (recovery's), and when the target can't be read. Ambiguous and colliding
- * refs are never deleted.
+ * refs are never deleted. The successors jj made of its hidden commits (`successorsOf`, HI-2990) are adopted first.
  */
 export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptRecord, target: string): Promise<JjDropped | JjInterrupted> {
   const rec = structuredClone(record)
@@ -1046,8 +1091,25 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
     // A write whose operation was never validated (interrupted mid-step): recovery first.
     if (rec.step) throw new Stop('uncertain', `step:${rec.step.name}`)
     const owned = rec.pins.filter((p) => p.state === 'created')
-    const ids = [...new Set([...rec.commits, ...owned.map((p) => p.oid)])]
-    const { op, reached } = await reachedNow(a, target, ids)
+    const ids0 = [...new Set([...rec.commits, ...owned.map((p) => p.oid)])]
+    const successors = await successorsOf(a)
+    const r0 = await reachedNow(a, target, [...ids0, ...successors])
+    // HI-2990: the successors jj made of the attempt's commits (none the target reaches) adopted, journalled and pinned
+    // before anything is abandoned, so they are dropped with the rest, guarded as the rest.
+    const adopt = successors.filter((c) => !r0.reached.has(c))
+    if (adopt.length) {
+      rec.commits.push(...adopt)
+      await deps.journal(structuredClone(rec))
+      const prefix = pinPrefix(rec.card, rec.attempt)
+      let n = rec.pins.length
+      for (const c of adopt) {
+        let ref = `${prefix}s${n++}`
+        while (rec.pins.some((p) => p.ref === ref)) ref = `${prefix}s${n++}`
+        await a.pin(ref, c)
+      }
+    }
+    const ids = [...ids0, ...adopt]
+    const { op, reached } = adopt.length ? await reachedNow(a, target, ids) : r0
     const visible = (await a.commits(op, visibleOf(ids))).map((c) => c.commit)
     const kept = visible.length ? await a.abandon(visible.filter((c) => !reached.has(c) && rec.commits.includes(c))) : []
     const keptRefs: JjDropped['dropped']['keptRefs'] = []

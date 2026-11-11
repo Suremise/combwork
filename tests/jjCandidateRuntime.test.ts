@@ -8,8 +8,11 @@
 //   returned, and the next run builds afresh;
 // - a conflict with the target: the card back to its builder (IntegrationFailed, jj's words), never offered;
 // - an interrupted attempt (stopped after its pins): recovered and dropped by the next run, which builds afresh;
-// - rebase and strict merge styles; a repository that signs: none built, and the record says so.
+// - rebase and strict merge styles; a repository that signs: none built, and the record says so;
+// - HI-2990: nothing of a card's left in the log for good (superseded updates after their candidates, a candidate jj
+//   rebased, a squash attempt cut short, Integrated cycles swept).
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
+import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -585,4 +588,151 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(waiting(w, card.id)?.candidate).toMatchObject({ state: 'signing' })
     })
   })
+
+  // HI-2990 (found by HI-2967's probes): what a clean-up skipped or held back is tried again until the cycle is settled.
+  describe.each([true, false] as const)('nothing left in the log for good (HI-2990), colocated: %s', (colocated) => {
+    it('strict merge, the target moved twice: each superseded update dropped after its candidate; after Integrated, only what the target reaches', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      onTarget(w, 'theirs1.txt', 'one\n')
+      reapply(w, card, { style: 'merge', strict: true })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const first = shown(w, card, cycle)!.offer!
+      expect(first.updated).toMatch(/^[0-9a-f]{40}$/)
+      onTarget(w, 'theirs2.txt', 'two\n')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const second = shown(w, card, cycle)!.offer!
+      expect(second.result).not.toBe(first.result)
+      // The old update (the old candidate's parent) dropped in the same step, once its candidate was: not kept back.
+      expect(visible(w, first.result)).toBe(false)
+      expect(visible(w, first.updated!)).toBe(false)
+      const oldUpdate = entries(w, card, cycle).find((e) => e.record.result === first.updated)!
+      expect(oldUpdate).toMatchObject({ state: 'dropped', record: { kind: 'update' } })
+      expect(w.refAt(`refs/cw/jj/${card.key}/${oldUpdate.record.attempt}/candidate`)).toBeNull()
+      // The user integrates the second: Done, and nothing of the card's left beyond what main reaches.
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', second.result)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      await jjp.afterRun()
+      expect(left(w, card, cycle)).toEqual([])
+      expect(strayPins(w, card)).toEqual([])
+    })
+
+    it('the builder rewrites the reviewed commit under a merge candidate: the candidate jj rebased is dropped too, not only the recorded one', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const first = shown(w, card, cycle)!.offer!
+      // A new description of the reviewed commit in the slot: jj rebases the candidate (a child of it) onto the rewrite.
+      w.h.jj(w.slots['slot-a'].folder, 'describe', '-r', '@-', '-m', 'jj work, reworded')
+      expect(visible(w, first.result)).toBe(false)
+      expect(ofChange(w, first.change)).toHaveLength(1)
+      for (let i = 0; i < 3; i++) await jjp.reconcile(w.wf.store.card(card.id), {})
+      const now = shown(w, card, cycle)!.offer!
+      expect(now.attempt).not.toBe(first.attempt)
+      // The successor jj made: adopted, pinned and abandoned with the attempt; its pins gone.
+      expect(ofChange(w, first.change)).toEqual([])
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === first.attempt)?.state).toBe('dropped')
+      expect(strayPins(w, card).filter((r) => r.includes(`/${first.attempt}/`))).toEqual([])
+      expect(visible(w, now.result)).toBe(true)
+    })
+
+    it('a successor the user changed is theirs: kept, and the attempt dropped again later', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const first = shown(w, card, cycle)!.offer!
+      // The user rewrites the candidate itself with content of their own: not a rebase, so never Combwork's to abandon.
+      w.h.jj(w.repo, 'new', 'main', '-m', 'scratch')
+      writeFileSync(join(w.repo, 'mine.txt'), 'mine\n')
+      w.h.jj(w.repo, 'squash', '--into', first.result, '-m', 'theirs now')
+      onTarget(w, 'theirs.txt', 'theirs\n')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(ofChange(w, first.change)).toHaveLength(1)
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === first.attempt)?.state).toBe('dropped')
+    })
+
+    it('squash: an attempt cut short by the user integrating the candidate mid-run is recovered and dropped after Integrated (its scratch commit included)', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      reapply(w, card, { style: 'squash' })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      // The next run: its proof reads the target (not contained), then the user sets main onto the candidate, then its
+      // step builds on the new head: its restore has nothing to restore, so the attempt stops with its first commits made.
+      const real = w.deps.integration
+      let n = 0
+      w.deps.integration = async () => {
+        if (++n === 2) w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', c.result)
+        return real()
+      }
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      w.deps.integration = real
+      const cut = entries(w, card, cycle).find((e) => e.record.attempt !== c.attempt)
+      expect(cut?.record).toMatchObject({ phase: 'writing' })
+      expect(cut?.record.step).toBeUndefined()
+      expect(cut!.record.commits.some((x) => visible(w, x))).toBe(true)
+      // Integrated (Done) by the next run, which never runs the candidate step again: the sweep settles the attempt.
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      await jjp.afterRun()
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === cut!.record.attempt)?.state).toBe('dropped')
+      expect(left(w, card, cycle)).toEqual([])
+      expect(strayPins(w, card)).toEqual([])
+      expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'description(substring:"combwork scratch") & ::visible_heads()', '-T', 'commit_id').trim()).toBe('')
+    })
+
+    it('Integrated recorded with the rules off, its drop then cut short (a crash): the sweep drops the unused candidate, the card still Approved', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card, P } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      w.wf.cfg.reconcileActs = false
+      w.deps.candidateHook = async (point) => {
+        if (point.startsWith('beforeAbandon:')) throw new Error('crash')
+      }
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      w.deps.candidateHook = undefined
+      expect(w.wf.state(card)).toMatchObject({ stage: 'approved', integrated: expect.anything() })
+      expect(visible(w, c.result)).toBe(true)
+      // A restart's first sweep: the Integrated cycle is visited, as an ended one is.
+      await new JjPlatform(w.another()).afterRun()
+      expect(visible(w, c.result)).toBe(false)
+      expect(strayPins(w, card)).toEqual([])
+    })
+  })
 })
+
+/** Of the card's attempts' commits, those still in the user's log that main doesn't reach (HI-2990: none once settled). */
+function left(w: World, card: { key: string }, cycle: number): string[] {
+  const ids = [...new Set(entries(w, card, cycle).flatMap((e) => e.record.commits))]
+  return ids.filter((c) => visible(w, c) && !w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${c} & ::main`, '-T', 'commit_id').trim())
+}
+
+/** The card's pins holding a commit main doesn't reach (HI-2990: none once its cycle is settled). */
+function strayPins(w: World, card: { key: string }): string[] {
+  const out = execFileSync('git', ['--git-dir', w.ctx.store, 'for-each-ref', '--format=%(objectname) %(refname)', `refs/cw/jj/${card.key}/`], { env: w.h.env, encoding: 'utf8' })
+  return out
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter((l) => !w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${l.split(' ')[0]} & ::main`, '-T', 'commit_id').trim())
+    .map((l) => l.split(' ')[1])
+}
+
+/** The visible commits of a change id (its successors, once jj rewrote it). */
+const ofChange = (w: World, change: string): string[] =>
+  w.h
+    .jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `change_id(${change}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"')
+    .split(/\r?\n/)
+    .filter(Boolean)

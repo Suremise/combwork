@@ -3482,8 +3482,13 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   workflow's, so a workflow's first sweep (after a restart) begins a pass at the start, whatever the cursor (HR1's round
   4). The `moved` hook asks for a run on a move
   into Todo or Done too.
+- **Integrated cycles too** (HI-2990): the sweep's predicate and owner is `cycleOver` (reconcile.ts): ended, or the
+  current cycle with Integrated recorded, whatever its stage (Done, or Approved when the rules were off). The drop right
+  after the Integrated write (`candidatesDone`) is the same `cleanCycle`, under the card's lock; what it can't finish (a
+  check copy still leased at the candidate, a held drop, an attempt cut short, a crash before it) the sweep finds again
+  until the cycle is settled.
 - **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
-  run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleEnded` the
+  run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleOver` the
   owner (read before every J4 write, pin delete and abandon); an interrupted drop is left as it was (found again next
   sweep), only J4's `uncertain` kept for good; failures keep their pinned evidence. Then its window record and its checks
   journals deleted in a write that finds the cycle still ended, a checks journal only once its lease is freed.
@@ -3492,12 +3497,26 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   candidate step), the pool's free copies at it are reset onto the head it was built on (the port's `resetTo`, under an
   operation of a lease's kind, never while a run or a process is in one); a copy leased or returning leaves the drop
   untried and unresolved until it is freed. A drop J4 keeps back for anything but the target reaching it (a working copy
-  or a bookmark on it) settles nothing: the entry stays live and is dropped again later (HR1's round 1).
+  or a bookmark on it) settles nothing: the entry stays live and is dropped again later (HR1's round 1), by the sweep and
+  by the candidate step's supersession alike (HI-2990: its phase `dropped` with no state, whatever its outcome).
+- **Order and leftovers** (HI-2990): candidates are dropped before the updates they were built on (strict's update is
+  their parent, so dropped first it would be kept back by its child). A step that provably made nothing (jj refused it
+  before it ran, or it ended with the operation head unmoved, under the lock) clears its journalled step, so recovery
+  never takes it for an uncertain one (a squash's restore with nothing to restore, its scratch commit left otherwise).
+- **Successors** (HI-2990): when jj rewrote an attempt's commit itself (its automatic rebase after the builder rewrote an
+  ancestor, so the recorded commit is hidden and its change id on a new visible commit), the drop adopts that successor:
+  exactly one visible commit of the change outside the attempt's, not divergent, not reached by the target, and with an
+  empty `jj interdiff` from the attempt's commit (rebased, never edited: a change of the user's to it stays theirs). It is
+  journalled into the attempt's commits and pinned before the guarded abandon, as the attempt's own.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
-  candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`);
+  candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
+  strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
+  kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
+  `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
   `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
-  while its lease is out, the copy parked and the candidate dropped); e2e `jjcandidate`/`jjcandidatenc` (a card put back
+  while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward
+  while a check runs at the candidate, dropped by the sweep once the copy is freed); e2e `jjcandidate`/`jjcandidatenc` (a card put back
   to Todo in the app: its candidate leaves the jj log by itself).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)

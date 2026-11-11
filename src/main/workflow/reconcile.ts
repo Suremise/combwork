@@ -594,14 +594,21 @@ export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, pro
 export const cycleEnded = (card: Pick<CardRecord, 'stage'>, s: Pick<CardState, 'cycle' | 'integrated'>, cycle: number): boolean => cycle < s.cycle || (cycle === s.cycle && (card.stage === 'todo' || (card.stage === 'done' && !s.integrated)))
 
 /**
- * An ended cycle's rows for the window and its checks (HI-2950/s10) deleted, only in a write that finds the cycle still
- * ended in its own transaction (the card reopened or re-approved meanwhile: nothing deleted). `checks`: the checks
+ * Whether a card's cycle is over, so nothing of its candidates is wanted any more (HI-2990): ended (`cycleEnded`), or its
+ * current one with Integrated recorded, whatever the card's stage (Done, or still Approved when Integrated was recorded
+ * while the rules were off). Integrated is final for its cycle: a reopen is a new one. The sweep's predicate and its owner.
+ */
+export const cycleOver = (card: Pick<CardRecord, 'stage'>, s: Pick<CardState, 'cycle' | 'integrated'>, cycle: number): boolean => cycleEnded(card, s, cycle) || (cycle === s.cycle && !!s.integrated)
+
+/**
+ * An over cycle's rows for the window and its checks (HI-2950/s10, HI-2990) deleted, only in a write that finds the cycle
+ * still over in its own transaction (the card reopened or re-approved meanwhile: nothing deleted). `checks`: the checks
  * journals' keys whose leases are freed. Whether it deleted.
  */
 export async function clearEndedCycle(wf: Workflow, card: CardRecord, project: string, cycle: number, checks: readonly string[]): Promise<boolean> {
   let done = false
   await wf.write(card, null, 'combwork', (w) => {
-    if (!cycleEnded(wf.store.card(card.id), w.state(), cycle)) return
+    if (!cycleOver(wf.store.card(card.id), w.state(), cycle)) return
     w.tx.sql((db) => {
       const del = db.prepare('DELETE FROM board_meta WHERE key = ?') // i18n-ignore: SQL
       del.run(candidateKey(project, card.key, cycle))
@@ -949,7 +956,8 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
         if (wf.cfg.reconcileActs && w.current !== 'done') w.move('done', 'derived')
       })
       // HI-2871: integrated (by its candidate or the user's own way): the cycle's other candidates dropped from the
-      // user's log, the one the target reaches kept.
+      // user's log, the one the target reaches kept. What this can't finish (a copy still leased, a held drop, a crash
+      // before it) is the sweep's, which visits Integrated cycles too (HI-2990).
       if (wf.state(wf.store.card(card.id)).integrated) await ports.candidatesDone?.(card, s.cycle)
       return
     }
