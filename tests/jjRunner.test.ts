@@ -326,7 +326,7 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     expect(port.refSync(s.store)).toBe('abc')
     // A store whose key can't be read isn't run against: refused.
     expect(await storeGitGated(s.top, ['--git-dir', s.broken, 'log'], async () => ({ ok: true, out: 'ran', err: '', buf: Buffer.alloc(0), code: 0 }))).toMatchObject({ ok: false, code: -1 })
-    await expect(storeGatedHistory({ contains: async () => true }).contains(s.broken)).rejects.toThrow(/key/)
+    await expect(storeGatedHistory({ contains: async (store: string) => store.length > 0 }).contains(s.broken)).rejects.toThrow(/key/)
     expect(jjFileGate.size).toBe(0)
   })
 
