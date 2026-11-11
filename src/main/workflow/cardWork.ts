@@ -419,6 +419,7 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         return `${r(x.revision)} into ${x.target} as ${r(x.result)} (${x.method}, by ${x.by})`
       }
       case 'MergedInPart':
+      case 'BackInTarget':
       case 'LeftTarget': {
         const x = d as FactData['LeftTarget']
         return `${r(x.revision)}, ${x.target}`

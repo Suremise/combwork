@@ -321,6 +321,13 @@ export function catchUpOf(value: string | null): CatchUp | null {
   }
 }
 
+/**
+ * HI-2988: whether a pause is the owed catch-up's (a card already merged and published, the local target behind it): the
+ * catch-up owed for `target` names the paused card. Its changes are set aside, never committed on the local target,
+ * which would then have a commit its remote lacks.
+ */
+export const catchUpPaused = (catchUp: string | null, pause: { card: string } | null | undefined): boolean => !!pause?.card && catchUpOf(catchUp)?.card === pause.card
+
 /** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
 export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
 
@@ -1054,8 +1061,10 @@ export class MergeQueue {
     if (has) return done()
     const behind = await I.contains(this.project, local, c.to)
     if (isUnknown(behind)) return null
-    // Commits the remote lacks (the user's, since): left as they are; the next entry's fetch pauses `remoteDiverged`.
-    if (!behind) return done()
+    // Commits the remote lacks (the user's, since): left as they are, never forced or merged by Combwork, and the catch-up
+    // still owed (HI-2988: dropping it left the published merge out of the local target, all looking well): paused
+    // `remoteDiverged`, naming the published card, until the user brings the local target in line with its remote.
+    if (!behind) return this.catchUpPause(target, c, 'remoteDiverged', [target])
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null

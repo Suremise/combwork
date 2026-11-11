@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task}: zakończono",
   "service.providers.taskFailed": "{task}: zakończono z kodem {code}",
   "service.providers.unknownHost": "Żaden projekt nie używa teraz tego hosta GitHub dla {cli}. Kliknij Sprawdź ponownie, a potem się zaloguj.",
+  "service.queue.catchUpNoCommit": "Karta {card} jest scalona i już na zdalnym repozytorium gałęzi {target}: commit tutaj dodałby do {target} commit, którego jej zdalne repozytorium nie ma. Zamiast tego odłóż zmiany, a {target} się zaktualizuje.",
   "service.queue.pauseChanged": "Wstrzymanie kolejki scalania zmieniło się w międzyczasie: nie zrobiono commita ani niczego nie odłożono. Sprawdź ponownie.",
   "service.queue.pauseNoFolder": "Combwork nie wie, w którym folderze były te zmiany. Wznów kolejkę: sprawdzi ponownie i poda, gdzie.",
   "service.repoOps.notOffered": "Kontrola wersji ({platform}) nie oferuje tego tutaj.",

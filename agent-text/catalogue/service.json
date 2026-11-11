@@ -1099,6 +1099,11 @@
     "note": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.",
     "audience": "both"
   },
+  "service.queue.catchUpNoCommit": {
+    "text": "{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.",
+    "note": "HI-2988: an error from Commit on a paused merge queue whose target follows its remote: the card ({card}: its key) is already merged and published, and the pause is the local branch ({target}) catching up with it; only Set Aside (a button’s name: as translated there) is offered.",
+    "audience": "both"
+  },
   "service.queue.pauseChanged": {
     "text": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
     "note": "HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).",

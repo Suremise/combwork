@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card}は、チェックアウト中の{target}にマージする準備ができています。「要対応」で承認を待っています。",
   "board.queue.pause.byAssistant": "アシスタントが一時停止しました。再開されるまでキューは何もマージしません。",
   "board.queue.pause.byYou": "手動で一時停止しました。再開するまで、キューは何もマージしません。",
+  "board.queue.pause.catchUpChanges": "{card}はマージ済みで、{target}のリモートにもう入っていますが、{files, select, none {それが変更するファイル} other {{count, plural, other {{files}}}}}に、{target}がチェックアウトされているフォルダーで変更があるため、ローカルの{target}はまだそれに追いついていません。退避すると追いつきます。",
   "board.queue.pause.checkedOut": "{target}はフォルダーでチェックアウトされています。現在、Combworkはそこにもマージできます。続けるには再開してください。",
   "board.queue.pause.commit": "コミット",
   "board.queue.pause.commitTip": "{files}を現在の状態で{target}にコミットし、マージを続けます。",

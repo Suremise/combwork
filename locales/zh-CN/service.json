@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task}已完成",
   "service.providers.taskFailed": "{task}已退出，退出码 {code}",
   "service.providers.unknownHost": "现在没有项目为 {cli} 使用该 GitHub 主机。请先点击“重新检查”，再登录。",
+  "service.queue.catchUpNoCommit": "{card} 已合并，并且已在 {target} 的远程上：在这里提交会让 {target} 多出一个其远程没有的提交。请改为搁置这些更改，{target} 就会跟上。",
   "service.queue.pauseChanged": "合并队列的暂停在此期间发生了变化：没有提交或搁置任何内容。请重新查看。",
   "service.queue.pauseNoFolder": "Combwork 不知道这些更改位于哪个文件夹。请恢复队列：它会重新检查并说明位置。",
   "service.repoOps.notOffered": "版本控制（{platform}）在此不提供该操作。",

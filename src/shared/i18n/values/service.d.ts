@@ -294,6 +294,7 @@ interface CombworkMessageValues {
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.providers.unknownHost': { cli: string | number }
+  'service.queue.catchUpNoCommit': { card: string | number; target: string | number }
   'service.queue.pauseChanged': undefined
   'service.queue.pauseNoFolder': undefined
   'service.repoOps.notOffered': { platform: string | number }

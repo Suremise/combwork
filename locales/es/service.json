@@ -292,6 +292,7 @@
   "service.providers.taskDone": "{task}: terminó correctamente",
   "service.providers.taskFailed": "{task}: terminó con el código {code}",
   "service.providers.unknownHost": "Ningún proyecto usa ahora ese host de GitHub para {cli}. Pulsa Volver a comprobar y luego inicia sesión.",
+  "service.queue.catchUpNoCommit": "{card} está fusionada y ya en el remoto de {target}: un commit aquí pondría en {target} uno que su remoto no tiene. Aparta los cambios en su lugar, y {target} se pone al día.",
   "service.queue.pauseChanged": "La pausa de la cola de fusión cambió mientras tanto: no se hizo commit ni se apartó nada. Vuelve a mirar.",
   "service.queue.pauseNoFolder": "Combwork no sabe en qué carpeta estaban estos cambios. Reanuda la cola: vuelve a mirar y dice dónde.",
   "service.repoOps.notOffered": "El control de versiones ({platform}) no ofrece eso aquí.",

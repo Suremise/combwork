@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} está lista para fusionarse en {target}, que está activa en una carpeta: espera tu aprobación en Para ti.",
   "board.queue.pause.byAssistant": "Pausada por el Asistente. La cola no fusiona nada hasta que se reanude.",
   "board.queue.pause.byYou": "Pausada por ti. La cola no fusiona nada hasta que la reanudes.",
+  "board.queue.pause.catchUpChanges": "{card} está fusionada y ya en el remoto de {target}, pero {files, select, none {archivos que cambia tienen cambios} other {{count, plural, one {{files} tiene cambios} many {{files} tienen cambios} other {{files} tienen cambios}}}} en la carpeta donde {target} está activa, así que la {target} local aún no está al día con ella. Apártalos y se pone al día.",
   "board.queue.pause.checkedOut": "{target} está activa en una carpeta. Ahora Combwork también fusiona allí: reanuda para continuar.",
   "board.queue.pause.commit": "Hacer commit",
   "board.queue.pause.commitTip": "Hacer commit de {files} tal como están ahora, en {target}, y dejar que la fusión continúe.",
