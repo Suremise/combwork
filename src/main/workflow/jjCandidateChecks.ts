@@ -196,12 +196,13 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
     let noInstall = false
     if (i.installAlways) {
       // Read again before the install (HI-2964): the lease and its journal write await, and the candidate or the workspace
-      // can end meanwhile; a command known obsolete never starts.
+      // can end meanwhile, the workspace during that read too (HR1's round 1): a command known obsolete never starts.
       if (deps.signal?.aborted) return { closed: true }
       if (!(await deps.valid())) {
         await give('invalid', true)
         return { invalid: true }
       }
+      if (deps.signal?.aborted) return { closed: true }
       const r = await watched(() => deps.install(l.folder, ctx, l.spawn))
       if (deps.signal?.aborted) return { closed: true }
       if (invalidated) return { invalid: true }
@@ -219,6 +220,8 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
         await give('invalid', true)
         return { invalid: true }
       }
+      // Closed during the hook or that read (its lease given back): the check never starts.
+      if (deps.signal?.aborted) return { closed: true }
       const command = i.commands[name] ?? name
       const entry: JournalledCheck = { name, command, phase: 'started' }
       j.checks = [...j.checks.filter((c) => c.name !== name), entry]

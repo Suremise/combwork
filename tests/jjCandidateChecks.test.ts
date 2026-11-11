@@ -187,6 +187,20 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     }
     expect(await runCandidateChecks({ ...q.deps, signal: life.signal }, input({ installAlways: true }))).toEqual({ closed: true })
     expect(q.log).toEqual(['lease L1', 'give L1 checksEnded'])
+    // The workspace closing during the validity read before the install, or before a check, which still says valid
+    // (HR1's round 1): nothing starts, the lease given back once.
+    // The second read: the one after the lease (before the install, or before the first check).
+    for (const installAlways of [true, false]) {
+      const life2 = new AbortController()
+      const r = parts()
+      let reads = 0
+      r.deps.valid = async () => {
+        if (++reads === 2) life2.abort()
+        return true
+      }
+      expect(await runCandidateChecks({ ...r.deps, signal: life2.signal }, input({ installAlways }))).toEqual({ closed: true })
+      expect(r.log).toEqual(['lease L1', 'give L1 closed end'])
+    }
   })
 
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
