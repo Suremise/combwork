@@ -757,8 +757,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // required below.
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
         // The slot's own work (HI-2995): a detach refused for it is `kept` (the card's, not a refusal to retry).
-        const kept = (r: WorkspaceStep): WorkspaceStep => (kind === 'detach' && !!j.prev?.card ? { ...r, kept: true } : r)
-        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return kept(await refuse(JJ_REFUSED.unintegrated))
+        const keptStep = (r: WorkspaceStep): WorkspaceStep => (kind === 'detach' && !!j.prev?.card ? { ...r, kept: true } : r)
+        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return keptStep(await refuse(JJ_REFUSED.unintegrated))
         if (j.prev?.submitted.length) {
           const prev = j.prev
           const contained = async (): Promise<boolean> => {
@@ -769,7 +769,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
             return !isUnknown(c) && !!c
           }
           // Not proved (HI-2924): the user's own Done on exactly that card cycle stands for it.
-          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return kept(await refuse(JJ_REFUSED.notIntegrated))
+          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return keptStep(await refuse(JJ_REFUSED.notIntegrated))
         }
         const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
         if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)
