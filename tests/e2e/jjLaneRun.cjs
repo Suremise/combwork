@@ -119,7 +119,9 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const tokenOf = async (aid) => {
       const launch = await until(async () => {
         const sessionId = (await live(aid))?.sessionId
-        return sessionId ? lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']) : null
+        // Its newest launch whose config is still there: a resumed session keeps its id, and the launch from before a
+        // restart named a config that went with it (HB3, HI-2925).
+        return sessionId ? lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])) : null
       }, HUNG_MS)
       if (!launch) throw new Error(`no launch of ${aid}`)
       const server = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork
@@ -143,8 +145,16 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
      * The card's slot prepared for it (HB5 on HI-2923): its working copy on the card's base, which only its preparation puts
      * it on (B1 can look ready from the last card before Combwork ends it for this card's preparation); then B1 ready.
      */
+    // A slot prepared for the card: Combwork's own record of it (a SlotPrepared on the card's line), then the slot's @- at
+    // the card's base. @- alone proves nothing for a card whose base is the last card's commit (HB3, HI-2925): the slot
+    // is there already, still bound to the last card's line, and work written then is in no card's slot.
     const prepared = async (n, folder, label) => {
-      const w0 = await inv('tasks:work', n)
+      const w0 = await until(async () => {
+        const w = await inv('tasks:work', n)
+        return w?.line && ((await inv('tasks:facts', n)) ?? []).some((f) => f.kind === 'SlotPrepared' && f.data?.line === w.line) ? w : null
+      }, HUNG_MS)
+      check(`${label}: Combwork prepared its slot for it (its line recorded there)`, !!w0, JSON.stringify({ work: await inv('tasks:work', n), prepared: ((await inv('tasks:facts', n)) ?? []).filter((f) => f.kind.startsWith('SlotPrepare')).map((f) => f.data) }))
+      if (!w0) throw new Error(`${label}: its slot was never prepared`)
       const at = () => {
         try {
           return id(folder, `${w0.workspace}@-`)
