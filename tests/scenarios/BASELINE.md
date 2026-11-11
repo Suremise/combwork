@@ -49,6 +49,26 @@ Codex run.
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
 <!-- old-name: begin baseline-run-records -->
+## A solo card's fewer round trips (HI-2854): fakes, Claude Code, Codex, fixtures v133, 11 November 2026
+
+Darren's decisions (11 Nov): a card's start task carries the whole card when it fits and says it is the agent's;
+cw_submit refuses an agent that hasn't seen a decision or a comment of the user's, in every ruleset, giving them; a
+card's start task is acked by the agent's start or submit of it. work-on-card no longer reads the card again before
+submitting. Two new scenarios measure the card's own A/B: **solo-ab-plain** (an Independent agent typed the task: model
+trials only) and **solo-ab-card** (the same task as a Solo card Combwork starts: no cw_read_task, no cw_start_card;
+fake Claude Code and model trials). card-decision accepts the refused submit, which gives the decision in full, as
+seeing it and as its notice.
+- **Before** (e8426638c, fixtures v130): fakes all pass (`hi2854-before-fake`, `-fake-codex`, `-fake-copilot`);
+  Claude Code 8 of 8 (`hi2854-before-claude`, $1.78); Codex 7 of 8 (`hi2854-before-codex`: inbox-act-then-ack acked
+  after acting, as before).
+- **After** (3b69ebf70 and 1386db6da): fakes all pass (`hi2854-after-fake`, `-fake-codex`, `-fake-copilot`; card-decision
+  and solo-ab-card again at 1386db6da); Codex 8 of 8 (`hi2854-after-codex`); Claude Code 8 of 8 with card-decision at
+  1386db6da (2 of 2, after its check took the refusal) and card-loop-rounds 2 of 2 (one miss on its wording at
+  62ea8de35: "paused until you decide").
+- **The A/B** (Claude Code, Opus 5.5, medium; `hi2854-ab-final`): plain 2 to 5 requests, $0.11 to $0.16; the card 8 or 9
+  requests, $0.21 to $0.22 (three runs). The card's own measurement before (tokentest, no version control) was 11
+  requests and $0.27; here the card also commits.
+
 ## Start the next version, the Assistant's cw_branch (HI-2811): fakes, Claude Code, Codex, fixtures v128, 9 November 2026
 
 HI-2807 gave the Assistant `cw_branch` (`nextVersion`) with no scenario. Three new ones, each a single turn (a scenario

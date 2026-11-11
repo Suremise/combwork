@@ -1116,8 +1116,9 @@ Measured with Claude Code (Opus 5.5, medium effort) on a small task (a CSV line 
 |---|---|---|---|
 | Plain, as from a terminal | 3 | 123k | $0.14 |
 | As a card, Combwork 1.3 | 11 | 528k | $0.27 |
+| As a card, this version | 8–9 | 370k–421k | $0.21–$0.22 |
 
-On a task that size, a card's coordination about doubled its cost; on a real card the work dominates, and it is a few percent. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card.
+The first two rows are Combwork 1.3 in a project with no version control; the last is this version measured the same way in Combwork's test harness, whose project uses Git, so the card also commits its work (a request or two the first rows don't have), and the plain run there took 2 to 5 requests ($0.11–$0.16). What the card still adds: reading its task from the inbox, loading the work-on-card skill and the submit tool, and submitting. On a real card the work dominates, and it is a few percent. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card.
 
 ### Long conversations <a id="long-conversations"></a>
 
