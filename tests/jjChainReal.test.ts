@@ -78,7 +78,9 @@ describe.skipIf(!jjExe)(`jj's component chain on the real jj (${TESTED_JJ.versio
     h.jj(slot, 'commit', '-m', 'HI-1: the card')
     const R = h.id(slot, `${name}@-`)
     const changeOf = (rev: string): string => h.jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', 'change_id').trim()
-    const control = join(root, '.cw-jj-control')
+    // The control workspace as its record has it (HI-2887: each making its own token folder, `.cw-jj-controls/<token>/ws`).
+    const control = (h.journals.rows.get(`jj_control:${repo.toLowerCase()}`) as { ws?: string } | undefined)?.ws
+    if (!control) throw new Error('no control recorded')
     const d = await jjContextOf(control, h.runner)
     if (!('jj' in d)) throw new Error(`control not detected: ${JSON.stringify(d)}`)
     const store = d.jj.store
