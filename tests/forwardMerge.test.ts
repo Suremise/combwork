@@ -390,14 +390,14 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
 
   it("HI-2927: a card in flight, a pause or a Combwork running it keeps an old target's queue live; unreadable targets mark none past", async () => {
     const { w, repo } = await versions()
-    const { past: _past, ...base } = (await inWorkspace(w, () => controls.queueViews(w, repo, '1.0.0')))[0]
+    const { past: _past, ...one } = (await inWorkspace(w, () => controls.queueViews(w, repo, '1.0.0')))[0]
     const paused = { reason: 'stuck' as const, card: null, files: [], by: 'user' as const, at: new Date().toISOString() }
-    const make = () => [
-      { ...base, target: '1.0.0' },
-      { ...base, target: 'old-flight', inFlight: [61] },
-      { ...base, target: 'old-paused', paused },
-      { ...base, target: 'old-run', runBy: 'Combwork-Dev' },
-      { ...base, target: '1.5.0' }
+    const make = (): Parameters<typeof controls.markPast>[0] => [
+      { ...one, target: '1.0.0' },
+      { ...one, target: 'old-flight', inFlight: [61] },
+      { ...one, target: 'old-paused', paused },
+      { ...one, target: 'old-run', runBy: 'Combwork-Dev' },
+      { ...one, target: '1.5.0' }
     ]
     const named = { default: '1.5.0', others: ['1.4.0'] }
     const views = make()
