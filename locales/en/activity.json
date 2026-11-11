@@ -208,8 +208,12 @@
     "description": "A station on the Activity map: where an agent's tool calls go. You: its prompts and questions to you; Read: reading and searching files; Edit: changing files; Shell: commands; Agents: subagents and background tasks; Tools: everything else (the web, skills, Combwork's tools, other tools). Keep each one short."
   },
   "activity.map.stationTip": {
-    "defaultMessage": "{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {last, select, none {none} other {{last}}}",
-    "description": "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool), none when there is none. Keep the select keys."
+    "defaultMessage": "{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {hasLast, select, yes {{last}} other {none}}",
+    "description": "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool); {hasLast} is yes when there is one, else no (then translate \"none\"). Keep the select keys."
+  },
+  "activity.map.stationTipPending": {
+    "defaultMessage": "{station}: {status, select, notReported {not reported} other {loading…}}",
+    "description": "Hover of a station on the Activity map before it has counts. {station} is its name; {status} is notReported when the agent's CLI doesn't report that kind of call (not an observed zero), else its calls are still being read. Keep the select keys."
   },
   "activity.map.stripLabel": {
     "defaultMessage": "Agents' context",

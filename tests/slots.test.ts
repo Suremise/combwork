@@ -459,6 +459,39 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(again.slot.target).toBe('1.0.0')
   })
 
+  it("HI-2936: after a switch from jj, a leftover jj slot neither fails a Git lending nor fills the pool; removed by its own port once it has one", async () => {
+    const w = world({ builders: 1 })
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(first.lease.id, 'done')
+    // slot-a as jj left it (HI-2906's busy detach): lent with no lease, its folder there; jj's port not registered here.
+    await w.store.conn.write((db) => void db.prepare("UPDATE slots SET platform = 'jj', state = 'lent' WHERE project = ? AND name = 'slot-a'").run(w.store.project))
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ platform: 'jj', state: 'lent' })
+    // A Git card starts in a new slot: the pool's size (1) counts Git's slots alone.
+    const second = await lent(w, { agent: 'a2', card: 2 })
+    expect(second.slot).toMatchObject({ name: 'slot-b' })
+    expect(w.store.slot('slot-b')?.platform ?? 'git').toBe('git')
+    // Idle, it is kept while it has no port; never a Git slot removed in its place.
+    w.clock.now += IDLE_MS
+    expect(await w.pool.tidy()).toEqual([])
+    expect(w.store.slot('slot-a')).toBeTruthy()
+    // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
+    // idle tidy removes it by that port; the Git slot stays.
+    const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
+    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
+    try {
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')?.state).toBe('ready')
+      expect(await w.pool.tidy()).toEqual(['slot-a'])
+      expect(w.store.slot('slot-a')).toBeNull()
+      expect(existsSync(first.slot.folder)).toBe(false)
+      expect(w.store.slot('slot-b')?.state).toBe('lent')
+    } finally {
+      registerWorkspacePort('jj', undefined as unknown as Parameters<typeof registerWorkspacePort>[1])
+    }
+  })
+
   it("HI-2928: a free slot whose own target was deleted is checked against the default target: freed when its head is there, kept unmerged when not", async () => {
     const w = world({ builders: 1 })
     line100(w)
