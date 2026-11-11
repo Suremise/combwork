@@ -19,7 +19,7 @@ export type ProgressCaller =
    * Combwork's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
    * `installAsWritten`, an install run as written (no clean form of it).
    */
-  | { source: 'combwork'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
+  | { source: 'combwork'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder; stoppable?: boolean }
 
 /** The agent whose lease held a review copy as Combwork's run in it started (HI-1710): the run is credited to it. */
 export interface CopyHolder {
@@ -399,6 +399,7 @@ export class ProgressStore {
       agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'combwork' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
       agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? (cwName as string) : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
       ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? cwRest : {}),
+      ...(caller.source === 'combwork' && caller.stoppable ? { stoppable: true } : {}),
       provider: caller.source === 'api' || caller.source === 'combwork' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,

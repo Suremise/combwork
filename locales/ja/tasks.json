@@ -128,7 +128,7 @@
   "tasks.history.fromOlder": "古いCombworkから追加（そこでは#{was}として作成）",
   "tasks.history.given": "{agent}に割り当て",
   "tasks.history.imported": "{project}とともに復帰（旧#{was}）",
-  "tasks.history.jjCandidateReturned": "{target}上の候補から差し戻されました：{reason, select, conflict {{target}と競合しています} other {{target}の最新に合っていません}}{files, select, none {} other {（{files}）}}。ビルダーがjjで{target}を取り込み、もう一度提出します。",
+  "tasks.history.jjCandidateReturned": "{target}上の候補から差し戻されました：{reason, select, conflict {{target}と競合しています} checks {マージチェック{check}が候補で失敗しました} other {{target}の最新に合っていません}}{files, select, none {} other {（{files}）}}。ビルダーが{reason, select, checks {それを直し} other {jjで{target}を取り込み}}、もう一度提出します。",
   "tasks.history.kind": "{how, select, made {コードなしとして作成} proposed {コードなしを提案} confirmed {コードなしを確定} kept {コードありのまま} other {種類を{kind, select, code {コードあり} other {コードなし}}に変更}}",
   "tasks.history.labels": "ラベル：{labels}",
   "tasks.history.labelsAdded": "ラベル：{labels}を追加",

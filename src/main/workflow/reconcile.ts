@@ -26,6 +26,7 @@ import { staleWake } from './queueState'
 import { inTargetNow } from '../../shared/workflow/workView'
 import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
+import { checksKeyOf } from './jjCandidateChecks'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -506,6 +507,25 @@ export interface JjReconcilePorts {
   offerCurrent?(target: string, offer: JjCandidateOffer): Promise<boolean>
   /** HI-2871: the cycle integrated: its candidates dropped (the one the target reaches kept). */
   candidatesDone?(card: CardRecord, cycle: number): Promise<void>
+  /** HI-2938: the project's merge checks for a candidate now: their names and key (checksKeyOf); none: none configured. */
+  checksNow?(card: CardRecord, s: CardState): Promise<{ key: string; names: string[] }>
+  /** HI-2938: a candidate waits for its checks: the project's checks runner asked to look. */
+  checksWanted?(): void
+}
+
+/**
+ * HI-2938: a candidate's merge checks as the window shows them, bound to the checks key they run under (s11 §2):
+ * running (`done` of `names`, `current` the one running), passed (adoptable), waiting for a check copy, stopped (Stop:
+ * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`).
+ */
+export interface JjCandidateChecksShown {
+  key: string
+  names: string[]
+  state: 'running' | 'passed' | 'waiting' | 'stopped' | 'failing'
+  done?: number
+  current?: string
+  why?: string
+  misses?: number
 }
 
 /**
@@ -518,6 +538,8 @@ export interface JjCandidateShown {
   fp: JjCandidateFingerprint
   state: 'ready' | 'signing' | 'unknown'
   offer?: JjCandidateOffer
+  /** HI-2938: its merge checks (absent: none configured, so it is offered after its conflict check alone). */
+  checks?: JjCandidateChecksShown
   why?: string
   misses?: number
   at: number
@@ -537,8 +559,12 @@ export function candidateFingerprint(wf: Workflow, card: CardRecord, s: CardStat
   const snap = approvalOf(card, s)
   if (!snap || snap.stage !== 'approved' || !s.approved || !snap.target) return null
   if (s.stale || (s.head && s.head !== snap.revision)) return null
+  // HI-2938/s11: the approval's own identity: the move into Approved it came from, in this cycle (the stage is Approved,
+  // so the latest such move is the one the card stands on), and the decision generation.
+  const approval = wf.store.facts(card.id).findLast((f) => f.kind === 'Moved' && f.seq > s.cycle && (f.data as FactData['Moved']).to === 'approved')?.seq
+  if (approval === undefined) return null
   const r = wf.rulesetOf(card, s)
-  return { cycle: snap.cycle, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, ruleset: r.id, style: r.options.style, strict: r.options.strict }
+  return { cycle: snap.cycle, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, ruleset: r.id, style: r.options.style, strict: r.options.strict, generation: s.generation, approval }
 }
 
 /**
@@ -546,7 +572,7 @@ export function candidateFingerprint(wf: Workflow, card: CardRecord, s: CardStat
  * a ready one only while `headNow` (the target's head as just read; undefined: not read) is the head it was built on
  * (HR3's round 1): a target that moved hides it at once, whatever its rebuild does, across restarts too.
  */
-export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string, headNow?: string | null): JjCandidateShown | null {
+export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string, headNow?: string | null, anyHead = false): JjCandidateShown | null {
   // The record first: a card with none (most) needs no fingerprint read.
   const raw = wf.store.boardMeta(candidateKey(project, card.key, s.cycle))
   const fp = raw ? candidateFingerprint(wf, card, s) : null
@@ -554,10 +580,85 @@ export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, pro
   try {
     const rec = JSON.parse(raw) as JjCandidateShown
     if (!sameFingerprint(rec.fp, fp)) return null
-    return rec.state !== 'ready' || (!!headNow && rec.offer?.expected === headNow) ? rec : null
+    return rec.state !== 'ready' || anyHead || (!!headNow && rec.offer?.expected === headNow) ? rec : null
   } catch {
     return null
   }
+}
+
+/** What a candidate's checks run came to, as the runner publishes it (HI-2938). */
+export type JjChecksUpdate =
+  | { progress: { done: number; current?: string } }
+  | { passed: string[] }
+  | { waiting: string }
+  | { stopped: string }
+  | { failing: string }
+  | { red: { check: string; output: string; logPath?: string; expected: string } }
+
+/**
+ * Publishes a candidate's checks' progress or outcome (HI-2938/s11 §2), only in a write that finds, in its own
+ * transaction, the card's fingerprint still `fp`, its record still this attempt's with checks under `key`, and `key` the
+ * one the card's options give now with the project's setup command (`setup`, read just before). `current`: the target
+ * still at the candidate's head and the candidate still its recorded commit (read just before; false fails closed).
+ * A red check returns the card to its builder (`IntegrationFailed`, as the queue's red check does). Whether it wrote.
+ */
+export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string }, u: JjChecksUpdate, current: boolean): Promise<boolean> {
+  if (!current) return false
+  const key = candidateKey(project, card.key, at.fp.cycle)
+  let wrote = false
+  await wf.write(card, 'red' in u ? wf.rulesetOf(card) : null, 'outside', (w) => {
+    const now = wf.store.card(card.id)
+    const st = w.state()
+    if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
+    if (checksKeyOf(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    let rec: JjCandidateShown | null = null
+    w.tx.sql((db) => {
+      const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+      try {
+        rec = had ? (JSON.parse(had.value) as JjCandidateShown) : null
+      } catch {
+        rec = null
+      }
+    })
+    const r = rec as JjCandidateShown | null
+    if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || r.checks?.key !== at.key) return
+    if ('red' in u) {
+      const failed: FactData['IntegrationFailed'] = { entry: jjCandidateEntry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
+      w.fact('IntegrationFailed', failed)
+      w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
+      wrote = true
+      if (!wf.cfg.reconcileActs) return
+      w.move('active', 'derived')
+      wf.wake(w, st.started?.builder, jjReturnedWake(card.key, failed))
+      w.action('comment', { ...jjReturnedComment(card.key, failed) })
+      return
+    }
+    const c = r.checks!
+    const next: JjCandidateChecksShown =
+      'progress' in u
+        ? { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}) }
+        : 'passed' in u
+          ? { key: c.key, names: c.names, state: 'passed', done: c.names.length }
+          : 'waiting' in u
+            ? { ...c, state: 'waiting', why: u.waiting }
+            : 'stopped' in u
+              ? { ...c, state: 'stopped', why: u.stopped }
+              : { ...c, state: 'failing', why: u.failing, misses: (c.state === 'failing' ? (c.misses ?? 1) : 0) + 1 }
+    const row: JjCandidateShown = { ...r, checks: next, at: Date.now() }
+    w.tx.sql((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify(row), key)) // i18n-ignore: SQL
+    wrote = true
+  })
+  return wrote
+}
+
+/** HI-2938's Run Checks Again: a stopped or failing candidate's checks running again, under the same validity (s11 §1). */
+export async function checksAgain(wf: Workflow, card: CardRecord, project: string, setup: string, current: boolean): Promise<boolean> {
+  const s = wf.state(card)
+  const rec = candidateShown(wf, card, s, project, undefined, true)
+  if (!rec?.offer || !rec.checks || (rec.checks.state !== 'stopped' && rec.checks.state !== 'failing')) return false
+  const fp = candidateFingerprint(wf, card, s)
+  if (!fp) return false
+  return publishCandidateChecks(wf, card, project, { fp, attempt: rec.offer.attempt, key: rec.checks.key, setup }, { progress: { done: 0 } }, current)
 }
 
 /**
@@ -627,7 +728,25 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   const expected = 'offer' in step ? step.offer.expected : step.returned.expected
   if (!ports.headIs || !(await ports.headIs(fp.target, expected))) return
   await hooks.afterRead?.()
-  if ('offer' in step) return put({ state: 'ready', offer: step.offer })()
+  if ('offer' in step) {
+    // HI-2938: with merge checks configured, offered only once they pass: until then running, its progress kept for
+    // exactly this attempt and checks key (a new attempt or key starts them anew).
+    const cn = ports.checksNow ? await ports.checksNow(card, s) : { key: '', names: [] }
+    const offer = step.offer
+    await wf.write(card, null, 'outside', (w) => {
+      if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+      w.tx.sql((db) => {
+        const was = prior(db)
+        if (was && was.gen >= gen) return
+        const kept = was?.offer?.attempt === offer.attempt && was.checks?.key === cn.key ? was.checks : undefined
+        const checks: JjCandidateChecksShown | undefined = cn.names.length ? (kept ?? { key: cn.key, names: cn.names, state: 'running', done: 0 }) : undefined
+        const row: JjCandidateShown = { gen, fp, state: 'ready', offer, ...(checks ? { checks } : {}), at: Date.now() }
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(row)) // i18n-ignore: SQL
+      })
+    })
+    if (cn.names.length) ports.checksWanted?.()
+    return
+  }
   const f = step.returned
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return

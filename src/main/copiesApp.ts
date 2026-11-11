@@ -166,6 +166,43 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   return { lease: r.lease, folder: r.copy.folder, copy: r.copy.name }
 }
 
+/**
+ * HI-2938: a check copy for a jj candidate's merge checks, Combwork's own (no agent): leased at the candidate's commit
+ * with its job open, as an isolated run's is, so every process of its checks is the lease's and Stop (its run, once its
+ * ref names it: `candidateRun`) ends them all. `wait` when none is free yet; `refused` when its setup or job failed.
+ */
+export async function candidateCheckLease(ws: WorkspaceService, projectPath: string, card: number, revision: string): Promise<{ lease: CopyLease; folder: string; copy: string; job: LeaseJob } | { wait: string } | { refused: string }> {
+  const r = await isolatedLease(ws, projectPath, { card, revision, agent: null })
+  if ('wait' in r) return r
+  if ('refused' in r) return { refused: r.refused.said }
+  const job = jobs.get(r.lease.id)
+  if (!job) {
+    await (await copiesFor(ws, projectPath)).returnCopy(r.lease.id, 'noJob')
+    return { refused: say(T.noSupervisor) }
+  }
+  return { ...r, job }
+}
+
+/** HI-2938: a candidate check's run is its lease's ref (Stop finds the lease's job by it). */
+export async function candidateRun(ws: WorkspaceService, projectPath: string, lease: string, run: string): Promise<void> {
+  await (await copiesFor(ws, projectPath)).setRef(lease, run)
+}
+
+/** HI-2938: a candidate check's lease given back (`end`: its job ended first); the pool frees it once quiet. */
+export async function candidateLeaseBack(ws: WorkspaceService, projectPath: string, lease: string, why: string, end: boolean): Promise<void> {
+  const job = jobs.get(lease)
+  if (end && job) await job.end().catch(() => false)
+  await (await copiesFor(ws, projectPath)).returnCopy(lease, why)
+}
+
+/** HI-2938: whether a lease is freed (or gone): the pool's barrier passed, so nothing of its tree can still write. */
+export async function copyLeaseFreed(ws: WorkspaceService, projectPath: string, lease: string): Promise<boolean> {
+  const pool = await copiesFor(ws, projectPath)
+  await pool.refresh().catch(() => undefined)
+  const l = pool.lease(lease)
+  return !l || !!l.freed
+}
+
 /** Isolated runs' copies being leased apart from the Agent API's requests (copies.ts' IsolatedRequests). */
 const requests = new IsolatedRequests<{ lease: CopyLease; folder: string; copy: string }>((project, lease) => {
   void Promise.all(openWorkspaces().map((ws) => copiesFor(ws, project).then((p) => p.returnCopy(lease.id, 'abandoned')).catch(() => false))).catch(() => undefined)

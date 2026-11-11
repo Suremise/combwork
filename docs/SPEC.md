@@ -3389,6 +3389,62 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
   `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
+##### The merge checks on a jj card's candidate (1.5.0, HI-2938)
+
+Darren's split of HI-2871 (11 Nov, r17's answer (b)): the project's merge checks (G9) run on the candidate before it is
+offered, as the merge queue runs them on its test merge. Decision A holds: the user integrates. Its design is HI-2938/s7
+and s11 (HR1's OK).
+- **The candidate's identity** (HI-2871's `JjCandidateFingerprint`, extended here for every use of it): also the card's
+  decision generation and the seq of the move into Approved the current approval came from, so a re-approval with
+  identical endpoints, or a decision, is another candidate whose checks start anew.
+- **The checks' key** (`checksKeyOf`): a hash of the checks' names in order, each one's command, `mergeInstall` and the
+  project's setup command. Results are bound to the candidate's fingerprint, attempt and commit and this key.
+- **Offered only once green:** with merge checks configured, the window's record of a candidate carries its checks
+  (`checks`: running, passed, waiting, stopped, failing) and its `jj bookmark set` command shows only once they passed.
+  No merge checks configured: offered after its conflict check alone, as HI-2871 left it.
+- **Where they run:** JjPlatform's checks runner (one look at a time per workflow, asked for by the reconciliation, by
+  `afterRun` after a restart, and by a timer while waiting), off the reconciliation. Each candidate's checks run in a
+  **check copy** of the project's copies pool (copies.ts) leased at exactly the candidate's commit, with its job opened
+  as an isolated check's is (`candidateCheckLease`): every process of its install and checks starts in that job
+  (`jobSpawn`, the queue runner's launcher handshake) and is the merge queue's runner's run (queueChecks.ts: its log, the
+  session environment, `cw.queue.checkMinutes`, `classifyCheckFailure`), placed in the copy and stoppable from the
+  Progress panel (`stoppable`; Stop ends the lease's job). The install runs only with `mergeInstall: 'always'` (the pool
+  installs again on a reset whose lock files changed). `CW_CHECK_BASE` is the head the candidate is built on.
+- **Credit:** jj's check bracket (J3's B1, run, B2) at the copy, counted only when its credit is exactly the candidate's
+  commit; each run a `CheckRan` of the candidate's commit under its attempt's entry (`jj:<attempt>`). Exit 0 uncounted is
+  never green (tried again).
+- **Journal** (`jj_candidate_checks:<project>:<card>:<cycle>:<attempt>`, `runCandidateChecks`): the fingerprint, attempt,
+  commit, head and key, the lease, and each check's phase written before its step (`started`, then `ended` with ok,
+  counted and revision). Another fingerprint, attempt, commit or key starts afresh: no green reused. A check `started`
+  with no end (Combwork stopped mid-run) is ended `interrupted` and runs again; one ended counted green at the candidate
+  stands.
+- **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
+  progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
+  card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at
+  the candidate's head and the candidate still its recorded commit (`offerCurrent`). Not valid: the lease is given back
+  with its job ended, and nothing is published.
+- **Restart and quiescence** (s11 §3): a lease is given back through the pool's barrier (no run in it, its job settled,
+  the folder renamed aside and back); the runner never leases again for a candidate while the journal's last lease isn't
+  freed (`copyLeaseFreed`), so a crashed run's tree that can still write is never overlapped or its copy reset; a lease
+  whose Combwork is gone is returned by the pool, as review and isolated leases are.
+- **Outcomes:** all green: offered. Red (not transient): `IntegrationFailed { reason: 'checks', check, logPath, log }`, the
+  card to Active, its builder woken (`jj.candidate.checks`) and the card's comment (`tasks.history.jjCandidateReturned`'s
+  checks branch). Transient (couldn't start, its time limit, killed, uncounted, no job): failing, tried again after
+  30 s doubling up to 15 min; the window says why from the third in a row. No copy free, or the last lease not freed:
+  waiting, tried again in 30 s. Stop: stopped, never retried by itself.
+- **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
+  candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
+  the runner to look. It never adopts or moves anything.
+- **Options:** jj's Checks group shows `mergeChecks` (*Checks pass on the candidate*) and `mergeInstall` (shown with merge
+  checks; its value *Before every candidate's checks*), by the descriptor. Focused tests (G20) stay the merge queue's.
+- **Tests:** `tests/jjCandidateChecks.test.ts` (the runner's decisions: journal phases, interrupted checks, no lease while
+  the last isn't freed, validity, each outcome, the checks key); `tests/jjCandidateChecksRuntime.test.ts` (the real jj,
+  real copies at the candidate and real check commands: green then offered and integrated via the candidate, red returning
+  the card, both modes; Stop then Run Checks Again; a re-approval with identical endpoints, a decision, changed check
+  options and the target moved, during a check and at the publication write; a restart whose previous lease's job still
+  runs a writing process: no lease until its tree is ended, then the interrupted check runs again); the e2e suites
+  `jjcandidatechecks` and `jjcandidatechecksnc`.
+
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
 What the window shows of jj cards and the user's acts on them; design HI-2869/s7 to s16 (HR2's). Behind

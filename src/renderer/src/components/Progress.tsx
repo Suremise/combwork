@@ -685,7 +685,7 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
         {look === 'waiting' && <Icon name="clock" className="progress-waiting-icon" />}
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
         {/* An isolated check (#1435): its processes are its copy's, so Combwork can end them all. */}
-        {r.copy && r.source === 'agent' && isOpenRun(r) && (
+        {r.copy && (r.source === 'agent' || r.stoppable) && isOpenRun(r) && (
           <IconButton
             icon="debug-stop"
             title={tr(msg({ id: 'board.progress.stopIsolated', defaultMessage: 'Stop this check and everything it started', description: "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Combwork ends its command and every process it started." }))}

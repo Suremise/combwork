@@ -23,8 +23,8 @@ export const queueLogDir = (): string => join(app.getPath('userData'), 'logs', '
  * The runner for a project's queue (`QueueConfig.runCheck` and `install`). `onRun`: told each run's id as it starts (null
  * when runs aren't kept), for the queue's model (#1353).
  */
-export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn, onRun?: (id: string | null) => void): ReturnType<typeof queueChecks> {
-  const runs = ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e)) : undefined
+export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn, onRun?: (id: string | null) => void, extra: { copy?: string; stoppable?: boolean } = {}): ReturnType<typeof queueChecks> {
+  const runs = ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e), extra) : undefined
   return queueChecks({
     ...(spawn ? { spawn } : {}),
     env: () => childEnv(),

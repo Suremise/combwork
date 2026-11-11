@@ -132,7 +132,7 @@ interface CombworkMessageValues {
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
   'tasks.history.imported': { project: string | number; was: string | number }
-  'tasks.history.jjCandidateReturned': { target: string | number; reason: string; files: string }
+  'tasks.history.jjCandidateReturned': { target: string | number; reason: string; check: string | number; files: string }
   'tasks.history.kind': { how: string; kind: string }
   'tasks.history.labels': { labels: string | number }
   'tasks.history.labelsAdded': { labels: string | number }

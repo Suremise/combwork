@@ -10,6 +10,8 @@ import type { JjLeftover, JjToCheckRow, JjWaitingCandidate, JjWaitingCard } from
 import { boardRead } from './boardStore'
 import { boardConn, jjPort } from './slotsApp'
 import { CANDIDATE_MISSES, candidateShown, containedKey, type JjContained } from './workflow/reconcile'
+import { checksKeyOf } from './workflow/jjCandidateChecks'
+import { JjPlatform } from './platform/jjPlatform'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -37,7 +39,11 @@ const commitOf = (platform: unknown, field: 'commitId' | 'changeId'): string | n
  */
 export async function jjWaiting(ws: WorkspaceService, projectPath: string): Promise<JjWaitingCard[]> {
   const wf = await workflowFor(ws, projectPath)
-  const rows = wf ? waitingOf(wf, projectIdOf(ws, projectPath), await targetHeads(wf)) : []
+  // The setup command (the checks' key, HI-2938); unreadable: none, so a candidate under another key isn't shown.
+  const setup = await Promise.resolve()
+    .then(() => ws.projectConfig(projectPath))
+    .then((c) => c?.worktreeSetup ?? '', () => '')
+  const rows = wf ? waitingOf(wf, projectIdOf(ws, projectPath), await targetHeads(wf), setup) : []
   // A card listed with no observation yet is reconciled soon, as a card's Work section read asks (HI-2896): an approval
   // changes no jj operation or ref, so in a repository not colocated with Git nothing else would run one until the next
   // jj command; what it records reaches the panel as a board change.
@@ -74,7 +80,7 @@ async function targetHeads(wf: Workflow): Promise<Map<string, string | null>> {
  * jjWaiting's reading of one workflow, by the project's canonical id (the records' scope). `heads`: the targets' heads as
  * just read (targetHeads): without them, no candidate ready is shown.
  */
-export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<string, string | null>): JjWaitingCard[] {
+export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<string, string | null>, setup?: string): JjWaitingCard[] {
   const out: JjWaitingCard[] = []
   for (const card of wf.store.cards()) {
     if (card.stage !== 'approved') continue
@@ -91,11 +97,13 @@ export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<str
     }
     const matches = !!rec && rec.submission === s.latest.id && rec.revision === s.approved.revision && rec.base === s.approved.base && rec.key === (s.latest.key ?? null) && rec.commit === commit && rec.target === target
     // HI-2871: its candidate, only as recorded for exactly its approval and rules now; an unknown only once repeated.
-    const c = candidateShown(wf, card, s, project, heads?.get(target))
+    const c0 = candidateShown(wf, card, s, project, heads?.get(target))
+    // HI-2938: checks shown only under the checks key the card's options and the setup command give now (s11 §2).
+    const c = c0?.checks && (setup === undefined || c0.checks.key !== checksKeyOf(wf.rulesetOf(card, s).options, setup)) ? null : c0
     const candidate: JjWaitingCandidate | null = !c
       ? null
       : c.state === 'ready' && c.offer
-        ? { state: 'ready', result: c.offer.result, change: c.offer.change, expected: c.offer.expected, style: c.offer.style, ...(c.offer.updated ? { updated: c.offer.updated } : {}), at: c.at }
+        ? { state: 'ready', result: c.offer.result, change: c.offer.change, expected: c.offer.expected, style: c.offer.style, ...(c.offer.updated ? { updated: c.offer.updated } : {}), ...(c.checks ? { checks: { state: c.checks.state, names: c.checks.names, done: c.checks.done ?? 0, ...(c.checks.current ? { current: c.checks.current } : {}), ...(c.checks.why ? { why: c.checks.why } : {}), ...(c.checks.misses ? { misses: c.checks.misses } : {}) } } : {}), at: c.at }
         : c.state === 'signing'
           ? { state: 'signing', at: c.at }
           : c.state === 'unknown' && (c.misses ?? 1) >= CANDIDATE_MISSES
@@ -104,6 +112,18 @@ export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<str
     out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null, candidate })
   }
   return out
+}
+
+/**
+ * HI-2938's Run Checks Again (s11 §1): the card's candidate's checks run again when they were stopped or keep failing,
+ * under the same validity as their publication; never adopting or moving anything. Whether it did.
+ */
+export async function jjChecksAgain(ws: WorkspaceService, projectPath: string, card: number): Promise<boolean> {
+  const wf = await workflowFor(ws, projectPath)
+  const c = wf?.store.cards().find((x) => x.id === card)
+  if (!wf || !c) return false
+  const p = wf.platformOf(c)
+  return p instanceof JjPlatform ? p.checksAgain(c) : false
 }
 
 /** The cursor of the to-check list: the last row's target, flag time and full obligation key (a unique, stable order). */

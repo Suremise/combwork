@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
-import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard } from '@shared/jjViews'
+import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard, type JjWaitingChecks } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
-import { msg, tr, type Msg } from '@shared/i18n'
+import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { cardLabelOf, confirm, notify, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
@@ -49,6 +49,13 @@ const M = {
   candidateHow: msg({ id: 'jj.integrate.candidateHow', defaultMessage: 'To integrate it, move {target} to the candidate:', description: 'Above the jj command that integrates a passed card’s candidate (HI-2871): it moves the target bookmark {target} to the candidate commit. Combwork never runs it.' }),
   candidateSigning: msg({ id: 'jj.integrate.candidateSigning', defaultMessage: 'No candidate: this repository signs its commits, and Combwork doesn’t make commits in it. Integrate it yourself, for example:', description: 'Under a passed jj card (HI-2871): Combwork didn’t build a candidate because the repository’s jj signs commits (signing.behavior). The user integrates it by hand; an example follows.' }),
   candidateUnknown: msg({ id: 'jj.integrate.candidateUnknown', defaultMessage: 'Combwork couldn’t build a candidate ({why}). It tries again with each change; meanwhile, integrate it yourself, for example:', description: 'Under a passed jj card (HI-2871): Combwork tried several times to build a candidate and couldn’t; {why} is a short code for the log (keep it as it is). The user can integrate it by hand; an example follows.' }),
+  candidatePassed: msg({ id: 'jj.integrate.candidatePassed', defaultMessage: 'Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts, and its merge checks passed: {checks}.', description: 'Under a passed jj card (HI-2938): the candidate Combwork built for the user to integrate (as jj.integrate.candidate) has no conflicts and passed the project’s merge checks ({checks}: their names, already joined as a list). Keep the select keys.' }),
+  candidateBuilt: msg({ id: 'jj.integrate.candidateBuilt', defaultMessage: 'Candidate built: commit {commit}, {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. It’s offered once its merge checks pass.', description: 'Under a passed jj card (HI-2938): Combwork built a candidate (a new commit, {commit} short) on the target bookmark {target} at its commit {expected}; it isn’t offered to integrate until the project’s merge checks pass on it. Keep the select keys.' }),
+  checksRunning: msg({ id: 'jj.integrate.checksRunning', defaultMessage: 'Running its merge checks: {check} ({position, number} of {total, number}).', description: 'Under a jj card’s candidate (HI-2938): Combwork is running the project’s merge checks on it; {check} is the one running (its name), {position} of {total}.' }),
+  checksWaiting: msg({ id: 'jj.integrate.checksWaiting', defaultMessage: 'Its merge checks wait for a free check copy.', description: 'Under a jj card’s candidate (HI-2938): its merge checks wait until one of the project’s check copies (working folders Combwork keeps for checks) is free.' }),
+  checksStopped: msg({ id: 'jj.integrate.checksStopped', defaultMessage: 'Its merge checks were stopped ({check}). Run them again to have it offered.', description: 'Under a jj card’s candidate (HI-2938): the user stopped its merge check {check} (its name) from the Progress panel; it isn’t offered until they run again and pass.' }),
+  checksFailing: msg({ id: 'jj.integrate.checksFailing', defaultMessage: 'Its merge checks couldn’t run ({why}). Combwork tries again by itself.', description: 'Under a jj card’s candidate (HI-2938): the project’s merge checks failed several times for a reason that isn’t the work’s (the machine, the network, a time limit); {why} is the check and what it said (keep it as it is). Combwork retries them.' }),
+  checksAgain: msg({ id: 'jj.integrate.checksAgain', defaultMessage: 'Run Checks Again', description: 'A button under a jj card’s candidate (HI-2938): runs the project’s merge checks on it again, after they were stopped or kept failing. It changes nothing in the repository.' }),
   changeId: msg({ id: 'jj.integrate.change', defaultMessage: 'change {change}', description: 'Beside a passed jj card’s reviewed commit (HI-2869): its jj change id (short). “change” is jj’s term.' }),
   toCheck: msg({ id: 'jj.toCheck.head', defaultMessage: 'Publish records to check', description: 'A heading of the jj Repository section (HI-2869): integrations whose recorded publish state (pushed to the remote, or no longer held) no longer matches what Combwork sees; the user checks each.' }),
   toCheckRow: msg({ id: 'jj.toCheck.row', defaultMessage: '{card}: {result} into {target} was recorded {was, select, published {as published to {remote}} other {as no longer in {target}}} ({when}).', description: 'A row under “Publish records to check” (HI-2869). {card} a card key; {result} a short commit id; {target} a bookmark; {remote} a remote’s name; {when} how long ago it was recorded (already translated). Keep the select keys.' }),
@@ -297,14 +304,22 @@ function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number 
                   {tr(M.integrateCard, { card: cardLabelOf({ tasks }, r.card), title: t?.title ?? '', commit: commitShort(r.revision), target })}
                   {r.change && <span className="faint mono"> · {tr(M.changeId, { change: r.change.slice(0, 12) })}</span>}
                 </div>
-                {r.target && r.candidate?.state === 'ready' && (
-                  <div data-jj-candidate="ready">
-                    <div>{tr(M.candidate, { commit: commitShort(r.candidate.result), change: r.candidate.change.slice(0, 12), style: r.candidate.style, target: r.target, expected: commitShort(r.candidate.expected) })}</div>
+                {r.target && r.candidate?.state === 'ready' && (!r.candidate.checks || r.candidate.checks.state === 'passed') && (
+                  <div data-jj-candidate="ready" data-jj-checks={r.candidate.checks ? 'passed' : 'none'}>
+                    <div>
+                      {r.candidate.checks
+                        ? tr(M.candidatePassed, { commit: commitShort(r.candidate.result), change: r.candidate.change.slice(0, 12), style: r.candidate.style, target: r.target, expected: commitShort(r.candidate.expected), checks: fmt.list(r.candidate.checks.names) })
+                        : tr(M.candidate, { commit: commitShort(r.candidate.result), change: r.candidate.change.slice(0, 12), style: r.candidate.style, target: r.target, expected: commitShort(r.candidate.expected) })}
+                    </div>
                     <div className="hint">{tr(M.candidateHow, { target: r.target })}</div>
                     <div><code className="mono jj-command" data-jj-command="candidate">{`jj bookmark set ${r.target} -r ${r.candidate.result}` /* i18n-ignore: a jj command, as typed */}</code></div>
                   </div>
                 )}
-                {r.target && r.candidate?.state !== 'ready' && (
+                {/* HI-2938: built, its merge checks not passed yet: never offered until they pass. */}
+                {r.target && r.candidate?.state === 'ready' && r.candidate.checks && r.candidate.checks.state !== 'passed' && (
+                  <CandidateChecks project={project} card={r.card} target={r.target} candidate={r.candidate} checks={r.candidate.checks} />
+                )}
+                {r.target && (!r.candidate || r.candidate.state !== 'ready') && (
                   <>
                     {r.candidate?.state === 'signing' && <div className="hint" data-jj-candidate="signing">{tr(M.candidateSigning)}</div>}
                     {r.candidate?.state === 'unknown' && <div className="hint" data-jj-candidate="unknown">{tr(M.candidateUnknown, { why: r.candidate.why })}</div>}
@@ -324,6 +339,47 @@ function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number 
     </section>
   )
 }
+
+/**
+ * HI-2938: a candidate whose merge checks haven't passed: running (which, of how many), waiting for a check copy, stopped
+ * or failing, with Run Checks Again for the last two. Its adoption command shows only once they pass.
+ */
+function CandidateChecks({ project, card, target, candidate, checks }: { project: ProjectInfo; card: number; target: string; candidate: { result: string; expected: string; style: 'merge' | 'squash' | 'rebase' }; checks: JjWaitingChecks }) {
+  const [busy, setBusy] = useState(false)
+  const built = tr(M.candidateBuilt, { commit: commitShort(candidate.result), style: candidate.style, target, expected: commitShort(candidate.expected) })
+  const failingShown = checks.state === 'failing' && (checks.misses ?? 1) >= CHECKS_MISSES_SHOWN
+  const line =
+    checks.state === 'running' || (checks.state === 'failing' && !failingShown)
+      ? tr(M.checksRunning, { check: checks.current ?? checks.names[Math.min(checks.done, checks.names.length - 1)] ?? '', position: Math.min(checks.done + 1, checks.names.length), total: checks.names.length })
+      : checks.state === 'waiting'
+        ? tr(M.checksWaiting)
+        : checks.state === 'stopped'
+          ? tr(M.checksStopped, { check: checks.why ?? '' })
+          : tr(M.checksFailing, { why: checks.why ?? '' })
+  const again = checks.state === 'stopped' || failingShown
+  return (
+    <div data-jj-candidate="checking" data-jj-checks={checks.state}>
+      <div>{built}</div>
+      <div className="hint">{line}</div>
+      {again && (
+        <button
+          className="btn"
+          data-action="jj-checks-again"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true)
+            void call('jj:candidateChecksAgain', project.path, card).finally(() => setBusy(false))
+          }}
+        >
+          {tr(M.checksAgain)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Transient failures in a row before the window says why (HI-2871's count, CANDIDATE_MISSES in reconcile.ts). */
+const CHECKS_MISSES_SHOWN = 3
 
 /** J5's refusal code at the start of an unknown's why, or other (the window words the known ones). */
 function unknownWhy(why: string | undefined): string {
