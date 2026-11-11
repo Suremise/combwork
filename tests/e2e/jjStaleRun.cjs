@@ -63,10 +63,10 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
  */
 function givings(n) {
   const log = path.join(userData, 'logs', 'combwork.log')
-  const lines = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').split(/\r?\n/)
+  const logLines = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').split(/\r?\n/)
   const tried = new RegExp(`\\[slots\\] Giving \\S{0,1}B1\\S{0,1} #${n} in `)
   const waited = new RegExp(`\\[slots\\] #${n} waits to resume `)
-  return lines.filter((l) => tried.test(l)).length - lines.filter((l) => waited.test(l)).length
+  return logLines.filter((l) => tried.test(l)).length - logLines.filter((l) => waited.test(l)).length
 }
 
 ;(async () => {
