@@ -253,7 +253,8 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
   it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {
     const r = await repo('hookspath')
     const clear = { clear: true }
-    const home = compatEnv.HOME!
+    // The isolated home both git runs here expand ~ to.
+    const home = env.HOME!
     const hook = (dir: string): void => {
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 'pre-commit'), '#!/bin/sh\nexit 1\n')
