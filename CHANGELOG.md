@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- **Switching to jj no longer misses signing turned on with a number** (HI-2942). Git signs when `commit.gpgSign` or `tag.gpgSign` is any number but 0 (`2`, say), but Combwork counted only `true`, `yes`, `on` and `1`, so it allowed the switch. It now reads the value as Git does, and a value Git can't read refuses the switch too.
 - **Switching to jj no longer misses Git hooks set with `~/`** (HI-2941). With `core.hooksPath` set to `~/hooks` (or another form Git expands), Combwork looked for a folder named `~` in the repository, found no hooks and allowed the switch, though jj then skips the hooks Git ran. It now looks where Git runs hooks from, and refuses the switch when hooks are there.
 - **Agents' signed commits run the signer exactly as git does** (HI-2934). With Combwork's signer in an agent's session, some commits failed or ran a different program where the same commit signed without Combwork:
   - **A `'`, `*`, `?` or `{` in an argument** (a key under `C:\Users\O'Brien`, say) reached Git's own ssh-keygen or gpg changed: it's now passed on as git passes it.
