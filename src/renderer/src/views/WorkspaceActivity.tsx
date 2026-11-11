@@ -11,7 +11,7 @@ import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type Me
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapMode, type MapContext } from '@shared/activityMap'
+import { mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
@@ -411,9 +411,10 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     })
     return mode === 'single' ? out.slice(0, 1) : out
   }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
-  const entriesKey = entries.map((e) => `${e.key}:${e.live?.sessionId ?? ''}`).join('|')
+  // Keyed by what each ring depends on, not only the session id (HI-2929: a setup ending, local limits set after the launch).
+  const forContexts = mapContextEntries(entries, (e) => e.live)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => setMapEntries(entries), [entriesKey])
+  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
   const map = useActivityMap({ active, animate: active && live && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at })
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])

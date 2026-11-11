@@ -5,7 +5,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import type { TranscriptItem } from '../src/shared/types'
 import { ConversationParser } from '../src/main/providers/claude/conversation'
@@ -372,5 +372,35 @@ describe("the context number, as the pane footer shows it", () => {
 
   it('turns amber at 70 % and red at 90 %', () => {
     expect([null, 0, 69, 70, 89, 90, 100].map(contextLevel)).toEqual(['none', 'ok', 'ok', 'amber', 'amber', 'red', 'red'])
+  })
+})
+
+describe('the context reads follow the live state under the same session (HI-2929)', () => {
+  const limits = { model: 'qwen3', connection: 'local', applied: true, context: { value: 32768, from: null } }
+  type Live = { sessionId: string; settingUp?: boolean; modelId?: string; localLimits?: typeof limits } | null
+  const entry = (live: Live): { key: string; live: Live } => ({ key: 'a1', live })
+
+  it('reads again when a setup ends', () => {
+    const setting = mapContextEntries([entry({ sessionId: 's1', settingUp: true })], (e) => e.live)
+    const set = mapContextEntries(setting.entries, (): Live => ({ sessionId: 's1' }))
+    expect(set.key).not.toBe(setting.key)
+    expect(set.entries[0].live).toEqual({ sessionId: 's1' })
+  })
+
+  it('reads again when local limits or the model arrive after the launch', () => {
+    const at = mapContextKey({ sessionId: 's1' })
+    expect(mapContextKey({ sessionId: 's1', localLimits: limits })).not.toBe(at)
+    expect(mapContextKey({ sessionId: 's1', modelId: 'qwen3' })).not.toBe(at)
+    // The window it then shows is the launch-declared one, as the footer has it.
+    expect(contextShown({ contextTokens: 8192 }, { localLimits: limits }).pct).toBe(25)
+  })
+
+  it('keeps the same key, and the same entries, while nothing it depends on changes', () => {
+    const e = entry({ sessionId: 's1', localLimits: limits })
+    const one = mapContextEntries([e], (x) => x.live)
+    const two = mapContextEntries([e], (): Live => ({ sessionId: 's1', localLimits: { ...limits } }))
+    expect(two.key).toBe(one.key)
+    expect(one.entries[0]).toBe(e)
+    expect(mapContextKey(null)).toBe('')
   })
 })
