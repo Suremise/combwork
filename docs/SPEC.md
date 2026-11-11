@@ -6234,7 +6234,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 
 **The queue's steps** (§16.9.1, changed only as follows):
 1. **Fetch first:** the snapshot's ref fetched into the sealed context and its head pinned in the project at
-   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). A failed fetch pauses
+   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). The sealed context offers the
+   remote the project's commits as haves (HI-2987: the previous pin, the remote's tracking refs and the local branches,
+   at most 256, read from the project's refs and written as the context's own `refs/have/<n>`), so only what is new
+   arrives; with none, the remote sent the branch's whole history at each fetch. A failed fetch pauses
    `fetchFailed` with git's words. The local target at the fetched head or behind it goes on; one with commits the
    remote lacks pauses `remoteDiverged` (never forced, never merged silently). An owed G18 push or catch-up is settled
    first, as today.

@@ -1,6 +1,13 @@
-// HI-1183: follow mode's transport helpers: what a record may show of a URL, and the redaction of git's words.
+// HI-1183: follow mode's transport helpers: what a record may show of a URL, and the redaction of git's words; HI-2987:
+// the sealed fetch's haves, on real repositories (a bare one as the remote).
 import { describe, expect, it } from 'vitest'
-import { displayUrl, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
+import { execFileSync } from 'child_process'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
+import { tempDir } from './tempDir'
+import { destinationOf, displayUrl, fetchHeadOf, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
+import { gitTree } from '../src/main/workflow/mergeQueue'
+import type { CandidateHost } from '../src/main/platform/integration'
 import { memoryTransportStore, snapshotDigest } from '../src/main/workflow/transportSnapshots'
 import type { TransportSnapshot } from '../src/main/platform/integration'
 
@@ -80,5 +87,55 @@ describe('follow mode’s transport helpers (HI-1183)', () => {
     expect(projectRelative('C:/work/proj', 'git@github.com:team/r.git')).toBe('git@github.com:team/r.git')
     expect(projectRelative('C:/work/proj', 'C:/other/r.git')).toBe('C:/other/r.git')
     expect(projectRelative('C:/work/proj', 'D:\\x\\r.git')).toBe('D:\\x\\r.git')
+  })
+})
+
+describe('the sealed fetch offers the project’s commits as haves (HI-2987)', () => {
+  const sh = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  const slash = (p: string): string => p.replace(/\\/g, '/')
+  /** The project's objects, loose and packed. */
+  const objects = (repo: string): number => {
+    const v = Object.fromEntries(sh(repo, 'count-objects', '-v').split(/\r?\n/).map((l) => l.split(': ')).map(([k, n]) => [k, Number(n)]))
+    return v.count + v['in-pack']
+  }
+
+  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: 120_000 }, async () => {
+    const root = tempDir('sealed-haves-')
+    const bare = slash(join(root, 'origin.git'))
+    const project = join(root, 'project')
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
+    execFileSync('git', ['init', '-q', '-b', 'main', project])
+    for (const [k, v] of [['user.email', 't@example.com'], ['user.name', 'T'], ['core.autocrlf', 'false']]) sh(project, 'config', k, v)
+    // 120 commits, three objects each (commit, tree, blob), made with fast-import (HG1's probe).
+    let stream = ''
+    for (let i = 1; i <= 120; i++) {
+      const data = `content ${i}\n`
+      stream += `commit refs/heads/main\nmark :${i}\ncommitter T <t@example.com> ${1700000000 + i} +0000\ndata 3\nc${String(i).padStart(2, '0').slice(-2)}\n${i > 1 ? `from :${i - 1}\n` : ''}M 100644 inline f${i}.txt\ndata ${data.length}\n${data}\n`
+    }
+    execFileSync('git', ['fast-import', '--quiet'], { cwd: project, input: stream })
+    sh(project, 'reset', '-q', '--hard', 'main')
+    sh(project, 'remote', 'add', 'origin', bare)
+    sh(project, 'push', '-q', '-u', 'origin', 'main')
+    sh(project, 'gc', '-q')
+    const other = join(root, 'other')
+    execFileSync('git', ['clone', '-q', bare, other])
+    for (const [k, v] of [['user.email', 'o@example.com'], ['user.name', 'O'], ['core.autocrlf', 'false']]) sh(other, 'config', k, v)
+    writeFileSync(join(other, 'theirs.txt'), 'theirs\n')
+    sh(other, 'add', 'theirs.txt')
+    sh(other, 'commit', '-q', '-m', 'theirs')
+    sh(other, 'push', '-q', 'origin', 'main')
+    const theirs = sh(other, 'rev-parse', 'HEAD')
+    const host: CandidateHost = { project, folder: project, signTimeoutMs: 0, identity: async () => null, reads: {}, run: (cwd, args, opts) => gitTree(cwd, args, opts ?? {}) }
+    const d = await destinationOf(host, 'main')
+    if (!('snapshot' in d)) throw new Error(JSON.stringify(d))
+    const before = objects(project)
+    expect(await fetchHeadOf(host, d.snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+    // The new commit is three objects (commit, tree, blob); the branch's history is 360.
+    expect(objects(project) - before).toBe(3)
+    expect(sh(project, 'rev-parse', 'refs/cw/queue/t-fetch')).toBe(theirs)
+    // Fetched again with nothing new: nothing arrives.
+    const again = objects(project)
+    expect(await fetchHeadOf(host, d.snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+    expect(objects(project)).toBe(again)
   })
 })
