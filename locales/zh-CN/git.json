@@ -504,6 +504,7 @@
   "git.vc.switch.jjToolBack": "{state, select, missing {未安装 jj（或不在 PATH 中）} old {此 jj 比 Combwork 测试过的版本更旧} untested {此 jj 比 Combwork 测试过的版本更新} other {无法检查 jj}}，因此 Combwork 无法检查此仓库是否已准备好切换回 Git。请安装 Combwork 测试过的 jj 版本，然后再切换。或者，如果你不再使用 jj，请删除 .jj 文件夹：之后此项目可以在没有它的情况下切换回 Git。",
   "git.vc.switch.jjUnknown": "jj 无法确认此仓库（{code}），因此此项目无法切换。",
   "git.vc.switch.noJj": "此处没有 jj 仓库。Combwork 不会创建：请用 jj 创建。",
+  "git.vc.switch.memberDrain": "此项目中仍有工作在运行。它的仓库曾在 Git 和 jj 之间切换过，因此只有在这些工作完成后，此项目才能切换为“无”。",
   "git.vc.switch.otherWorkspace": "此仓库也是已打开的工作区 {workspace} 的项目：请先在那里关闭它。",
   "git.vc.switch.switching": "正在切换此仓库的版本控制：请稍后再试。"
 }

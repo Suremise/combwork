@@ -136,6 +136,9 @@
       "code": "plain"
     }
   },
+  "git.vc.switch.memberDrain": {
+    "placeholders": {}
+  },
   "git.vc.switch.noGit": {
     "placeholders": {}
   },

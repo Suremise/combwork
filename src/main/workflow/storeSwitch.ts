@@ -46,7 +46,7 @@ import { assessJj, REPO_GATES } from '../platform/jjCompat'
 import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows, pinnedContextOf } from '../platform/jjViews'
 import { isJjUnknown, JjReads } from '../platform/jjReads'
 import { jjRunner, type JjRunner } from '../platform/jjRunner'
-import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
+import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, membershipOf, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
 import { metaOf, projectIdOf } from '../platform/fenceAdmit'
 
 const log = createLogger('workflow')
@@ -414,6 +414,99 @@ export async function recoverFences(ws: WorkspaceService): Promise<void> {
     const paths = Object.values(f.members).map((m) => m.path)
     await withFolderRepoLocks(paths, () => workflowWrite(() => recoverStore(ws, store)), { quiet: true }).catch((e) => log.warn(`recovering the platform switch of ${userText(store)}`, e))
   }
+}
+
+/**
+ * The fence store of a project that is a member of one (HI-2974), null when it is in none. An unreadable member row or
+ * fence refuses (`switching`: fail closed), never falls through to an unfenced switch.
+ */
+export function memberStoreOf(ws: WorkspaceService, id: string): string | null {
+  const m = boardRead(ws, (db) => membershipOf(metaOf(db), id))
+  if (m === 'unreadable') throw refusalError({ why: 'switching' }) // i18n-ignore: a code or SQL, never shown as text
+  return m?.store ?? null
+}
+
+/**
+ * A fence member's switch to a platform that needs no repository (None, HI-2974): its warning's refusal, read without
+ * changing anything. Null when the project is in no fence (its switch is its own, undrained, its cards on their old rules).
+ * Refused while anything runs in the project (`memberDrain`, its drain listed) or its store is switching.
+ */
+export async function checkMemberSwitch(ws: WorkspaceService, path: string, name: string, from: PlatformId): Promise<{ refused: SwitchRefusal | null; store?: StoreSwitch } | null> {
+  const cfg = await ws.projectConfig(path)
+  const id = projectIdOf(cfg, path)
+  let store: string | null
+  try {
+    store = memberStoreOf(ws, id)
+  } catch {
+    return { refused: { why: 'switching' } } // i18n-ignore: a code or SQL, never shown as text
+  }
+  if (!store) return null
+  const fence = boardRead(ws, (db) => readFence(metaOf(db), store))
+  if (fence === null || typeof fence !== 'object' || fence.state === 'switching') return { refused: { why: 'switching' } } // i18n-ignore: a code or SQL, never shown as text
+  const drain = await drainOf(ws, [{ id, path, name, from }])
+  if (drainEmpty(drain)) return { refused: null }
+  return { refused: { why: 'memberDrain' }, store: { group: [], token: '', drain } } // i18n-ignore: a code or SQL, never shown as text
+}
+
+/**
+ * A fence member's switch to None (HI-2974), through its fence as a group of one: begun (its admissions refused from
+ * here), drained (anything running in the project settles it back and refuses, `memberDrain`), written, settled. The
+ * other members take no part and keep their current choice. The caller holds the project's repository lock and the
+ * workflow writes (`setPlatform`); `check` re-reads the project's platform and the caller's authority under them.
+ */
+export async function memberSwitch(ws: WorkspaceService, path: string, name: string, store: string, to: PlatformId, check: (from: PlatformId) => void): Promise<{ from: PlatformId; to: PlatformId }> {
+  await recoverStore(ws, store)
+  const cfg = await ws.projectConfig(path)
+  const id = projectIdOf(cfg, path)
+  // Still this store's member, read again after recovery (a malformed row refuses).
+  if (memberStoreOf(ws, id) !== store) throw refusalError({ why: 'groupChanged' }) // i18n-ignore: a code or SQL, never shown as text
+  const now = projectPlatform(path, cfg.platform)
+  const from = now.id
+  check(from)
+  if (from === to) return { from, to }
+  const before = snapOf(cfg, path)
+  const after: Snap = { platform: to, platformFound: foundKey(now.detected), ...(cfg.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(setKept(cfg.workflow, to))) as unknown } : {}) }
+  const owner = { token: randomUUID(), pid: process.pid, profile: ws.path ?? '' }
+  ACTIVE.add(owner.token)
+  let fence: Fence | null = null
+  try {
+    fence = await fenceWrite(ws, (meta) => beginSwitch(meta, store, [{ id, path, before, after }], owner))
+    if (!fence) throw refusalError({ why: 'switching' }) // i18n-ignore: a code or SQL, never shown as text
+    await storeSwitchSeams.at?.('afterBegin', { members: [id], generation: fence.generation })
+    // Nothing more can be admitted for the project: what runs now is final. Anything still running: back, nothing written.
+    const drain = await drainOf(ws, [{ id, path, name, from }])
+    await storeSwitchSeams.at?.('afterDrain', { members: [id], generation: fence.generation })
+    if (!drainEmpty(drain)) {
+      await fenceWrite(ws, (meta) => settle(meta, store, fence!.generation, { [id]: before }))
+      fence = null
+      throw refusalError({ why: 'memberDrain' }) // i18n-ignore: a code or SQL, never shown as text
+    }
+    const partial: Partial<ProjectConfig> = { platform: after.platform, platformFound: after.platformFound, ...(after.workflow !== undefined ? { workflow: after.workflow as ProjectConfig['workflow'] } : {}) }
+    // The platform shown and the caller's authority checked again at the write itself (HR2's HI-2974 round 1): the
+    // begin and the drain awaited since, and the Assistant's Control may have been revoked meanwhile.
+    const recheck = (c: ProjectConfig): void => check(projectPlatform(path, c.platform).id)
+    if (storeSwitchSeams.write) {
+      recheck(await ws.projectConfig(path))
+      await storeSwitchSeams.write(path, partial)
+    } else
+      await ws.mutateProjectConfig(
+        path,
+        (c) => {
+          recheck(c)
+          return partial
+        },
+        { existing: true }
+      )
+    await storeSwitchSeams.at?.('afterWrite', { members: [id], generation: fence.generation })
+    await storeSwitchSeams.at?.('beforeSettle', { members: [id], generation: fence.generation })
+    const settled = await fenceWrite(ws, (meta) => settle(meta, store, fence!.generation, { [id]: after }))
+    if (!settled) throw new Error('the platform fence moved during its own switch') // i18n-ignore: an internal error, for the log
+    fence = null
+  } finally {
+    if (fence) await settleFromDisk(ws, store, fence.generation).catch((e) => log.warn(`settling the platform fence of ${userText(store)} after a failed switch`, e))
+    ACTIVE.delete(owner.token)
+  }
+  return { from, to }
 }
 
 /**

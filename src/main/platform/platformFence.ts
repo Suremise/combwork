@@ -129,6 +129,22 @@ function memberStore(meta: Meta, id: string): Read<string> {
   return isObj(v) && typeof v.store === 'string' ? v.store : MALFORMED
 }
 
+/**
+ * A project's membership of a fence (HI-2974): its store when that store's fence lists it, null when it has no member
+ * row, and `unreadable` when its row or its fence can't be read whole, or its fence is gone or doesn't list it (the
+ * caller fails closed).
+ */
+export function membershipOf(meta: Meta, id: string): { store: string } | null | 'unreadable' {
+  const store = memberStore(meta, id)
+  if (store === null) return null
+  if (store === MALFORMED) return 'unreadable'
+  const f = readFence(meta, store)
+  if (f === MALFORMED) return 'unreadable'
+  // A member row whose fence is gone or doesn't list it is inconsistent: never read as a project in no fence (HR2's
+  // HI-2974 round 1), as `admit` refuses it too.
+  return f?.members[id] ? { store } : 'unreadable'
+}
+
 function mappedStore(meta: Meta, id: string): Read<string> {
   const v = meta.get(STORE_KEY(id))
   if (v === null) return null
