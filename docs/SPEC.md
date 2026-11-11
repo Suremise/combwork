@@ -5987,9 +5987,14 @@ touched:
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
 - **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a
   lane's (`cw_lane start`) read the target's folder (the adapter's `targetChanges`; Git only) and, when it has
-  uncommitted changes, warn: a `Warning:` line in the reply (five paths, then how many more) and a notification in the
-  project's window with **Commit**, **Set Aside** (on all the files found) and **Show Changes**; once a minute for the
-  same folder and files (64 remembered). Never a refusal: git may merge over files the card doesn't touch.
+  uncommitted changes, warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
+  notification in the project's window (five paths, then how many more) with **Commit**, **Set Aside** (on all the
+  files found) and **Show Changes**; once a minute for the same folder and files (64 remembered). Never a refusal: git
+  may merge over files the card doesn't touch. **Only where a merge is to come** (HI-2984, `targetChangesApply`): the
+  rules merge into the target (any finish but Committed, whose target is just the line the work is committed on) and
+  that folder isn't where the work is built (the card's folder; a lane's, the project folder when cards are built
+  there). So Solo (Committed, the project folder) never warns: its "target's folder" is the agent's own, maybe with its
+  own half-done work; a pair or team whose target is checked out dirty in the project folder, cards in slots, does.
 - **The journal:** `IntegrationStarted` with the listed files and the folder, then `IntegrationPhase` `files`,
   `read-tree -m -u <expected> <result>`, `IntegrationPhase` `ref`, `update-ref`; each phase's fact is written through
   the runner's lease fence (#1360), and the lease is checked again just before each git step, so a runner that lost its
