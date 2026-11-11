@@ -47,12 +47,21 @@ const SOURCE = 'assistant-ask'
 const ASSISTANT = 'assistant'
 /** A request's delivery still on its way or unread (its mark stands). */
 const LIVE = new Set(['queued', 'offered', 'received', 'uncertain'])
-/** How long after a failed take-off its retry looks again. */
+/** How long after a failed take-off its retry looks again, doubled after each retry that fails, up to RETRY_MAX_MS. */
 let RETRY_MS = 30_000
-/** For tests: the retry's wait (null: 30 s). */
+const RETRY_MAX_MS = 5 * 60_000
+/** For tests: the first retry's wait (null: 30 s). */
 export const setAskRetryMsForTests = (ms: number | null): void => {
   RETRY_MS = ms ?? 30_000
 }
+/**
+ * Requests being made (HI-2915, HR1's round 1): their mark is written and their delivery not made yet, so a reconciliation
+ * meanwhile finds no delivery for them and must leave their marks. In memory: a Combwork that quits mid-request leaves a
+ * mark with no delivery, which the next open's reconciliation takes off.
+ */
+const making = new Set<string>()
+/** Per workspace: its one pending retry of take-offs that failed, the folder it was for, and the retries failed in a row. */
+const retries = new Map<WorkspaceService, { timer: ReturnType<typeof setTimeout> | null; path: string; failed: number }>()
 
 const M = {
   title: msg({ id: 'service.assistantAsk.title', defaultMessage: "{card}: the Assistant didn't get an agent's request", description: "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Combwork Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant." })
@@ -86,6 +95,16 @@ export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskA
   if (!self) throw new AskRefused(403, say(REFUSED.agentsOnly))
   // One ref for the card's mark, the delivery and their clean-up (HI-2915).
   const ref = `#${n}/${randomUUID().slice(0, 8)}`
+  making.add(ref)
+  try {
+    return await asked(ws, n, actor, self, text, ref)
+  } finally {
+    making.delete(ref)
+  }
+}
+
+/** askAssistant's request written and given, its ref in `making` throughout. */
+async function asked(ws: WorkspaceService, n: number, actor: TaskActor & { kind: 'agent' }, self: { project: string; agentId: string }, text: string, ref: string): Promise<Asked> {
   const card = await askAssistantOn(n, text, actor, (c) => {
     if (c.archived) throw new AskRefused(409, `${cardName(c)} is archived: nothing more is asked on it.`) // i18n-ignore: agent-facing (a refusal of cw_ask_assistant)
     if (c.column === 'done') throw new AskRefused(409, `${cardName(c)} is in Done: nothing more is asked on it. More work on it that the user asked for: move it back with cw_update_task (column: doing). Separate follow-up work goes on a new card (cw_create_task).`) // i18n-ignore: agent-facing (a refusal of cw_ask_assistant)
@@ -116,32 +135,85 @@ export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskA
   }
 }
 
-/** A request's waiting mark taken off (clearAskWait); a failure is retried by reconcileAskWaits after RETRY_MS. */
+/** A request's waiting mark taken off (clearAskWait); a failure leaves it to the workspace's retry (retryLater). */
 async function release(ws: WorkspaceService, n: number, ref: string): Promise<void> {
   try {
     await clearAskWait(n, ref, ws)
   } catch (e) {
     log.warn(`taking off the waiting mark of a request on #${n}`, e)
-    setTimeout(() => void reconcileAskWaits(ws).catch((err) => log.warn("reconciling requests' waiting marks", err)), RETRY_MS).unref?.()
+    retryLater(ws)
   }
 }
 
 /**
  * HI-2915: every card whose waiting mark is a request's whose delivery is no longer live (acked, ended, gone, never made)
- * has it taken off. The number of marks taken off. Run as each workspace opens and after a failed take-off.
+ * and that isn't being made now has it taken off. The number of marks taken off. Run as each workspace opens and by its
+ * retry. Never throws: what it couldn't read or take off is retried (retryLater) until a run succeeds.
  */
 export async function reconcileAskWaits(ws: WorkspaceService): Promise<number> {
   if (!ws.path) return 0
-  const marks = askWaitMarks(ws)
-  if (!marks.length) return 0
-  const live = new Set((await deliveriesOf(ws.assistantHome, ASSISTANT)).filter((r) => r.source === SOURCE && LIVE.has(r.state)).map((r) => r.ref))
   let n = 0
-  for (const m of marks) if (!live.has(m.ref) && (await clearAskWait(m.n, m.ref, ws))) n++
+  let failed = false
+  try {
+    const marks = askWaitMarks(ws).filter((m) => !making.has(m.ref))
+    if (marks.length) {
+      const live = new Set((await deliveriesOf(ws.assistantHome, ASSISTANT)).filter((r) => r.source === SOURCE && LIVE.has(r.state)).map((r) => r.ref))
+      for (const m of marks) {
+        if (live.has(m.ref) || making.has(m.ref)) continue
+        try {
+          if (await clearAskWait(m.n, m.ref, ws)) n++
+        } catch (e) {
+          failed = true
+          log.warn(`taking off the waiting mark of a request on #${m.n}`, e)
+        }
+      }
+    }
+  } catch (e) {
+    failed = true
+    log.warn("reading requests' waiting marks", e)
+  }
   if (n) log.info(`Took off ${n} waiting mark(s) of Assistant requests that had ended`)
+  const r = retries.get(ws)
+  if (failed) retryLater(ws)
+  else if (r && !r.timer) retries.delete(ws)
   return n
 }
 
-WorkspaceService.openedListeners.add((ws) => void reconcileAskWaits(ws).catch((e) => log.warn("reconciling requests' waiting marks", e)))
+/**
+ * The workspace's retry of take-offs that failed: one at a time (a retry already pending is kept), after RETRY_MS doubled
+ * for each retry in a row that failed, at most RETRY_MAX_MS, until one succeeds. It is dropped as the workspace closes,
+ * and does nothing once the service holds another folder.
+ */
+function retryLater(ws: WorkspaceService): void {
+  const path = ws.path
+  if (!path) return
+  const had = retries.get(ws)
+  if (had?.timer) return
+  const failed = had && had.path === path ? had.failed : 0
+  const entry: { timer: ReturnType<typeof setTimeout> | null; path: string; failed: number } = { timer: null, path, failed: failed + 1 }
+  entry.timer = setTimeout(() => {
+    entry.timer = null
+    if (retries.get(ws) !== entry || ws.path !== path) {
+      if (retries.get(ws) === entry) retries.delete(ws)
+      return
+    }
+    void reconcileAskWaits(ws)
+  }, Math.min(RETRY_MS * 2 ** failed, RETRY_MAX_MS))
+  entry.timer.unref?.()
+  retries.set(ws, entry)
+}
+
+/** For tests: whether a workspace has a take-off retry pending. */
+export const askRetryPending = (ws: WorkspaceService): boolean => !!retries.get(ws)?.timer
+
+WorkspaceService.openedListeners.add((ws) => void reconcileAskWaits(ws))
+WorkspaceService.closingListeners.add((path) => {
+  for (const [ws, r] of retries) {
+    if (r.path.toLowerCase() !== path.toLowerCase()) continue
+    if (r.timer) clearTimeout(r.timer)
+    retries.delete(ws)
+  }
+})
 
 /** A request refused before anything is written, with the Agent API's status for it. */
 export class AskRefused extends Error {

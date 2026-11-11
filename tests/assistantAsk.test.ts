@@ -20,7 +20,7 @@ const deliveries = await import('../src/main/deliveries')
 const store = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
-const { askAssistant, askLine, AskRefused, reconcileAskWaits, setAskRetryMsForTests } = await import('../src/main/assistantAsk')
+const { askAssistant, askLine, AskRefused, reconcileAskWaits, setAskRetryMsForTests, askRetryPending } = await import('../src/main/assistantAsk')
 const { nothingWaitsOn, idleWatchReason, IDLE_WATCH_STALL_MS } = await import('../src/shared/idleWatch')
 const { readDelivery } = await import('../src/shared/deliveries')
 
@@ -311,5 +311,101 @@ describe("a request's waiting mark when something fails (HI-2915)", () => {
     // The ack's own take-off failed; the retry's reconciliation takes it off.
     await vi.waitFor(() => expect(clear).toHaveBeenCalledTimes(2), { timeout: HUNG_MS })
     await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+})
+
+// HR1's round 1: a reconciliation while a request is being made (its mark written, its delivery not yet) leaves its mark;
+// take-offs that keep failing are retried, one retry at a time, until one succeeds, and dropped as the workspace closes.
+describe("a request's waiting mark: being made, and retried (HI-2915)", () => {
+  afterEach(() => setAskRetryMsForTests(null))
+  const waitingOf = async (w: WS, n: number) => (await read(w, n)).waitingFor
+  /** createDelivery held until `go` (then the real one runs) or `fail` (it throws): the request parked between its mark and its delivery. */
+  const parked = () => {
+    const real = deliveries.createDelivery
+    let go!: () => void
+    let fail!: (e: Error) => void
+    const gate = new Promise<void>((res, rej) => {
+      go = res
+      fail = rej
+    })
+    let reached!: () => void
+    const atGate = new Promise<void>((res) => (reached = res))
+    vi.spyOn(deliveries, 'createDelivery').mockImplementationOnce(async (...a: Parameters<typeof real>) => {
+      reached()
+      await gate
+      return real(...a)
+    })
+    return { atGate, go: () => go(), fail: (e: Error) => fail(e) }
+  }
+
+  it('a reconciliation while the request is being made leaves its mark; made, it stands until the request ends', async () => {
+    const { w, card } = await open()
+    const p = parked()
+    const asking = ask(w, card, 'May I have the Sandbox?')
+    await p.atGate
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    p.go()
+    const r = await asking
+    expect(r.waiting).toBe(true)
+    expect((await waitingOf(w, card))?.ask).toBe(deliveries.deliveryNow(w.assistantHome, r.id)?.ref)
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+
+  it('a request whose delivery fails after a reconciliation looked: its mark kept meanwhile, then gone', async () => {
+    const { w, card } = await open()
+    const p = parked()
+    const asking = ask(w, card, 'May I have the Sandbox?')
+    await p.atGate
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    p.fail(new Error('deliveries full'))
+    expect(await asking).toMatchObject({ id: '', waiting: false })
+    expect(await waitingOf(w, card)).toBeUndefined()
+    // And after it, a reconciliation finds nothing to do.
+    expect(await reconcileAskWaits(w)).toBe(0)
+  })
+
+  it('two take-offs failing in a row, then one that works: retried until it does, and no retry is left', async () => {
+    const { w, card } = await open()
+    setAskRetryMsForTests(20)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    const clear = vi.spyOn(tasks, 'clearAskWait').mockRejectedValueOnce(new Error('board busy')).mockRejectedValueOnce(new Error('board busy again'))
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    // The ack's take-off (1) and the first retry (2) fail; the second retry (3) takes it off.
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+    expect(clear).toHaveBeenCalledTimes(3)
+    expect(askRetryPending(w)).toBe(false)
+  })
+
+  it('a card that is gone is no failure (nothing to retry); a board read that fails is', async () => {
+    const { w, card } = await open()
+    expect(await inWorkspace(w, () => tasks.clearAskWait(card + 100, '#x/1', w))).toBe(false)
+    expect(askRetryPending(w)).toBe(false)
+    vi.spyOn(store, 'askWaitMarks').mockImplementationOnce(() => {
+      throw new Error('database is locked')
+    })
+    setAskRetryMsForTests(60_000)
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect(askRetryPending(w)).toBe(true)
+  })
+
+  it('a pending retry goes when the workspace closes', async () => {
+    const { w, card } = await open()
+    setAskRetryMsForTests(60_000)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    vi.spyOn(tasks, 'clearAskWait').mockRejectedValueOnce(new Error('board busy'))
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    await vi.waitFor(() => expect(askRetryPending(w)).toBe(true), { timeout: HUNG_MS })
+    await disposeWorkspaceService(w)
+    opened.splice(opened.indexOf(w), 1)
+    expect(askRetryPending(w)).toBe(false)
   })
 })

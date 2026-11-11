@@ -3130,16 +3130,13 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
 /**
  * HI-2915: the Assistant request `ref` on card `n` ended (the Assistant acked it, or it ended unread or was never given):
  * its waiting mark is taken off, under the board's lock, only while it is still that request's own (a mark set since, by
- * hand or by another request, is kept, whatever its words). True when it was taken off. A card gone: false.
+ * hand or by another request, is kept, whatever its words). True when it was taken off. A card gone: false; any other
+ * failure (the board unreadable now) throws, for its caller to retry.
  */
 export async function clearAskWait(n: number, ref: string, ws: WorkspaceService = workspace): Promise<boolean> {
   return boardLock(ws, async () => {
-    let c: TaskCard
-    try {
-      c = await getTask(n, ws)
-    } catch {
-      return false
-    }
+    if (!hasCard(ws, n)) return false
+    const c = await getTask(n, ws)
     if (c.waitingFor?.ask !== ref) return false
     delete c.waitingFor
     note(c, BY.combwork, storedText(HISTORY.notWaiting))
