@@ -537,7 +537,8 @@ export class SlotStore {
         const id = `l-${randomBytes(6).toString('hex')}`
         let name: string
         if (!slot) {
-          if (all.length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
+          // HI-2936: the size counts this platform's slots alone: another's left by a switch is never lent, so never fills it.
+          if (all.filter((s) => (s.platform ?? 'git') === (o.platform ?? 'git')).length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
           name = req.slot ?? nextSlotName(new Set([...all.map((s) => s.name.toLowerCase()), ...reserved]), o.root)
           db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at, op, op_kind, op_lease, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, ?, ?, 'warm', ?, ?, ?)").run(this.project, name, join(o.root, name), freePort(all), o.target, at, at, o.token, id, o.holder.pid, o.holder.started)
           // Another platform than Git's (HI-2795): its row says so from the write that reserves it, before anything is made.
@@ -1500,6 +1501,17 @@ export class SlotPool {
     return own
   }
 
+  /** Whether a slot has its port here (HI-2936: a leftover of a platform switched from, its port not registered). */
+  private hasPort(s: Pick<Slot, 'platform'>): boolean {
+    const p = s.platform ?? 'git'
+    return p === this.port.platform || (isPlatformId(p) && !!workspacePortOf(p))
+  }
+
+  /** Whether a slot is of the pool's platform: the only ones it lends, and those its size counts (HI-2936). */
+  private ownPlatform(s: Pick<Slot, 'platform'>): boolean {
+    return (s.platform ?? 'git') === this.port.platform
+  }
+
   /**
    * What's in a slot's folder, read by the holder of its operation (`token`): the port's explicit record where it has
    * one (jj: a snapshot, which only the holder may take, HI-2795), else `dirty` (Git, its git command unchanged).
@@ -1777,7 +1789,7 @@ export class SlotPool {
     const s = this.store.slot(name)
     if (!s || s.writer) return
     const last = this.store.lastLease(name)
-    if (last?.to && !last.endRev && (await folderThere(s.folder))) {
+    if (last?.to && !last.endRev && this.hasPort(s) && (await folderThere(s.folder))) {
       const rev = await this.portOf(s).head(s.folder)
       if (!isUnknown(rev)) await this.store.finalizeEndRev(last.id, rev)
     }
@@ -1794,6 +1806,8 @@ export class SlotPool {
     const seen = this.store.slot(name)
     if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return false
     if (seen.state === 'creating' || seen.state === 'removing') return false
+    // HI-2936: a slot whose platform has no port here is kept as it is, never looked at with another platform's commands.
+    if (!this.hasPort(seen)) return false
     // Set aside by a retarget (HI-2680): stays as it is, whatever its folder now looks like, until it is removed.
     if (this.store.asideOf(name)) return false
     const token = newToken()
@@ -1955,7 +1969,8 @@ export class SlotPool {
       if (this.closed) return
       // Decided right here, with no await since the pass's last settle: a slot still owed (busy again, or taken by another
       // settle meanwhile, whose own end asks too) asks for the next pass.
-      if (this.owedSlots().length) {
+      // HI-2936: one whose platform has no port here waits for a refresh once it has (its settle keeps it till then).
+      if (this.owedSlots().some((n) => { const s = this.store.slot(n); return !s || this.hasPort(s) })) {
         this.owedTries++
         this.wakeOwed()
       } else this.owedTries = 0
@@ -2077,6 +2092,7 @@ export class SlotPool {
   /** Whether a slot is there: its folder, and git lists it; null when git's listing fails (#734: never an empty one). */
   private async present(s: Slot): Promise<boolean | null> {
     if (!(await folderThere(s.folder))) return false
+    if (!this.hasPort(s)) return null
     const listed = await this.portOf(s).list(this.deps.project).catch(() => null)
     return listed ? listed.some((l) => samePlace(l.path, s.folder)) : null
   }
@@ -2948,8 +2964,13 @@ export class SlotPool {
     const removed: string[] = []
     const free = (s: Slot): boolean => !s.op && !s.job && !this.store.openLease(s.name)
     for (const s of all.filter((x) => x.state === 'creating' && x.warmError && free(x))) if (!(await this.remove(s.name))) removed.push(s.name)
-    let over = all.length - removed.length - size
-    const idle = all.filter((s) => s.state === 'ready' && free(s) && at - Date.parse(s.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))
+    // HI-2936: another platform's slots, left by a switch of the project's, are never lent again: each removed once idle
+    // (by its own port, the removal's guards kept), and none counted against this platform's size.
+    const other = all.filter((s) => !this.ownPlatform(s) && !removed.includes(s.name))
+    for (const s of other.filter((x) => (x.state === 'ready' || x.state === 'dirty' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS && this.hasPort(x))) if (!(await this.remove(s.name))) removed.push(s.name)
+    const own = all.filter((s) => this.ownPlatform(s))
+    let over = own.filter((s) => !removed.includes(s.name)).length - size
+    const idle = own.filter((s) => s.state === 'ready' && free(s) && at - Date.parse(s.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))
     for (const s of idle) {
       if (over <= 0) break
       if (!(await this.remove(s.name))) {
