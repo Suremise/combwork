@@ -273,6 +273,29 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       }
     })
 
+    it("start: the fingerprint unreadable when it is gathered (a jj operation landing then: Combwork's own slot made beside it): gathered again and started (HI-2972)", async () => {
+      const w = await world(colocated)
+      // The gather's own reads (its fingerprint, then its answer by content) unreadable; every read after as it is.
+      const real = JjPlatform.prototype.evidence
+      let nulls = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...a: Parameters<JjPlatform['evidence']>) {
+        if (nulls > 0) {
+          nulls--
+          return null
+        }
+        return real.apply(this, a)
+      })
+      try {
+        const card = w.wf.createCard({ title: 'heads mid-update at the gather' })
+        nulls = 2
+        moved(await w.wf.start(card.key, B1))
+        expect(nulls).toBe(0)
+        expect(w.wf.state(card).started).toMatchObject({ target: 'main', slot: 'slot-a' })
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
     it.each(['submit', 'move'] as const)("%s: the builder's writer leaving the slot between the plan and the write gathers it again; another agent's refuses (HI-2890)", async (how) => {
       const w = await world(colocated)
       const a = w.slots['slot-a']

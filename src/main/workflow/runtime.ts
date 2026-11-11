@@ -1097,7 +1097,7 @@ export class Workflow {
           return await this.regather(card, () => this.start(ref, actor, opts))
         }
       }
-      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : 'write', gathers)
+      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
@@ -1248,14 +1248,14 @@ export class Workflow {
   /**
    * Whether a start on a platform allowing several passes (`startGathers`) is gathered again (HI-2972), asked with passes
    * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
-   * can't be read at this instant (jj's operation heads while any jj operation lands, Combwork's own included: the new
-   * head is written before the old one goes); `steady`, the fingerprint is the gathered one; null, a real change (the
-   * cards waited for, or the content) or a gather that read nothing. Another pass reads everything afresh, and the write
+   * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
+   * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
+   * null, a real change (the cards waited for, or the content). Another pass reads everything afresh, and the write
    * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
    * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
    */
   private async startAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
-    if (before.value === null || before.content === null) return null
+    if (before.value === null || before.content === null) return 'unreadable'
     const a = this.evidenceNow(card, s, o, before.primed)
     if (a === null) return 'unreadable'
     if (a === before.value) return 'steady'
@@ -1271,8 +1271,13 @@ export class Workflow {
   }
 
   /** A start refused as `evidence.changed` (HI-2972): which check, on which pass, in the log (` not started: `, as the platform's). */
-  private startRefusedLog(card: CardRecord, check: string, passes: number): void {
-    log.info(`#${card.id} not started: evidence.changed at ${check}, pass ${this.gathering.depth(card.id) + 1} of ${passes}`)
+  private startRefusedLog(card: CardRecord, check: string, passes: number, why?: string): void {
+    log.info(`#${card.id} not started: evidence.changed at ${check}, pass ${this.gathering.depth(card.id) + 1} of ${passes}${why ? ` (${why})` : ''}`)
+  }
+
+  /** Why a start whose fingerprint moved at its write wasn't gathered again (HI-2972's log): its passes, or a real change. */
+  private noPassWhy(card: CardRecord, passes: number): string {
+    return passes <= 1 ? 'one pass' : this.gathering.depth(card.id) >= passes ? 'passes spent' : 'a change by content' // i18n-ignore: a log line's codes, never shown
   }
 
   /**
@@ -2747,7 +2752,7 @@ export class Workflow {
           this.startPassLog(card, 'write', again, gathers)
           return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         }
-        if (startMoved) this.startRefusedLog(card, 'write', gathers)
+        if (startMoved) this.startRefusedLog(card, 'write', gathers, this.noPassWhy(card, gathers))
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
