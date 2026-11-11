@@ -182,9 +182,16 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       w.wf.cfg.hooks = { beforeWrite: () => void (writes++, elsewhere()) }
       const other = w.wf.createCard({ title: 'continual' })
       refusedBy(await go(other.key, B2), 'evidence.changed')
-      w.wf.cfg.hooks = undefined
       expect(writes).toBe(4)
       expect(w.wf.state(other).started).toBeFalsy()
+      // Nothing of that refused start is left (HR1's round 1): the same card, tried again with an operation before its
+      // first three writes, has its whole budget and starts on the fourth gather.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++ < 3 && elsewhere()) }
+      moved(await go(other.key, B2))
+      w.wf.cfg.hooks = undefined
+      expect(writes).toBe(4)
+      expect(w.wf.state(other).started).toMatchObject({ slot: 'slot-b' })
     })
 
     it("start: the target made invalid by a jj operation between its gather and its write, the Git ref unchanged: gathered again and validated afresh, never started on the old plan (HI-2916)", async () => {
