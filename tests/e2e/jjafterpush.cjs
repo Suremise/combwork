@@ -167,22 +167,31 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     // no override. While no slot is free the window asks (`start.slotAvailable`, "waits for a slot") and the user waits
     // (a confirmed drag would start it in the project folder, SPEC's "a user's start across it works where the agent
     // is"), so it is asked again until it starts. jjwindow's bound for the slot: the settle's retries pause up to 30 s.
+    // Card 3's start and then its slot share one deadline, a minute from B1's stop (HR1 on HI-2919): each observed in its
+    // own branch, its time taken there, never after the old slot's (longer) wait.
     let started3 = null
-    const [slot1At, started3At] = await Promise.all([
+    let w3 = null
+    let started3At = null
+    const left = () => Math.max(0, t3 + HUNG_MS - Date.now())
+    const [slot1At, w3At] = await Promise.all([
       until(async () => back((await inv('slots:list', shop)).find((s) => s.name === slot1)), HUNG_MS * 2).then((ok) => (ok ? Date.now() - t3 : null)),
-      until(async () => {
-        started3 = await inv('tasks:move', n3, 'doing', { reason: 'jjafterpush: start after the builder stopped' }).catch((e) => ({ error: String(e) }))
-        return !!started3 && !started3.ask && !started3.refused && !started3.error
-      }, HUNG_MS).then((ok) => (ok ? Date.now() - t3 : null))
+      (async () => {
+        const ok = await until(async () => {
+          started3 = await inv('tasks:move', n3, 'doing', { reason: 'jjafterpush: start after the builder stopped' }).catch((e) => ({ error: String(e) }))
+          return !!started3 && !started3.ask && !started3.refused && !started3.error
+        }, left())
+        if (!ok) return null
+        started3At = Date.now() - t3
+        w3 = await until(async () => {
+          const v = await inv('tasks:work', n3)
+          return v?.folder && v.workspace && v.folder !== 'project' ? v : null
+        }, left())
+        return w3 ? Date.now() - t3 : null
+      })()
     ])
     const s1 = (await inv('slots:list', shop)).find((s) => s.name === slot1)
     check(`card 1's slot back after its builder left, within jjwindow's bound (${slot1At} ms)`, slot1At !== null, JSON.stringify({ slot: s1, why: !s1 ? 'gone' : s1.lease?.kind === 'carried' ? 'carried lease (HI-2920)' : s1.state === 'lent' && !s1.lease ? 'lent with no lease (HI-2912)' : s1.state }))
-    check(`card 3 for B1, asked right after B1 stopped: started within a minute (${started3At} ms)`, started3At !== null, JSON.stringify({ started3, slots: await inv('slots:list', shop) }))
-    const w3 = await until(async () => {
-      const v = await inv('tasks:work', n3)
-      return v?.folder && v.workspace ? v : null
-    }, HUNG_MS)
-    check(`…in a slot (${Date.now() - t3} ms after B1 stopped)`, !!w3 && w3.folder !== 'project', JSON.stringify({ w3, work: await inv('tasks:work', n3), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#3\b/.test(l)).slice(-40) }, null, 1))
+    check(`card 3 for B1, asked right after B1 stopped: started (${started3At} ms) and in a slot within a minute of B1's stop (${w3At} ms)`, w3At !== null && w3At <= HUNG_MS, JSON.stringify({ started3, started3At, w3, work: await inv('tasks:work', n3), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#3\b/.test(l)).slice(-40) }, null, 1))
   } finally {
     await h.app.close().catch(() => undefined)
   }
