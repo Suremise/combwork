@@ -11,9 +11,12 @@
 //   main as Waiting suggests (`jj duplicate -r … --onto main`, HI-2913), moves main there and pushes to a bare remote:
 //   Integrated (its change found applied again) and Done, and
 //   nothing to check in Publish records;
-// - a true conflict (card 3 and the user's main change the same line): the user resolves it by hand while integrating,
-//   which changes the card's change, so Combwork can't prove it is there and it stays waiting; the user moves it to Done;
-// - cleanup: the lane ended, its slot back in the pool, no review copy leased.
+// - card 3 in the same slot, copied onto main as Waiting suggests: Done; the lane ends with it, its slot back in the pool
+//   (ready), no review copy leased;
+// - card 4, on its own, a true conflict (it and the user's main change the same line), resolved by hand while
+//   integrating: that changes the card's change, so Combwork can't prove it is there and fails closed: it stays waiting,
+//   nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is recorded apart, and
+//   what its slot does then is logged for HI-2924, not asserted.
 // Screenshots of Waiting (card 2 not in main yet) and the Work section (card 2's route), both themes.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
@@ -138,6 +141,17 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     /** B1 records its work with jj in its slot (`edits`: file → text) and submits it; R1 reviews it in a copy and passes it. */
     const buildAndReview = async (n, key, folder, edits, label) => {
       // B1 ready in its slot: the card's start (its slot prepared on the target's head) is over before the work begins.
+      // Its slot prepared for it first (HB5 on HI-2923): the working copy on the card's base, which only its preparation puts
+      // it on. B1 can look ready from the last card before Combwork ends it for this card's preparation.
+      const w0 = await inv('tasks:work', n)
+      const at = () => {
+        try {
+          return id(folder, `${w0.workspace}@-`)
+        } catch {
+          return null
+        }
+      }
+      check(`${label}: its slot prepared on its base before the work begins`, !!w0?.base && !!(await until(() => at() === w0.base, HUNG_MS)), JSON.stringify({ base: w0?.base, at: at(), notReady: (await inv('tasks:work', n))?.notReady }))
       await ready(b1.id)
       for (const [f, t] of Object.entries(edits)) fs.writeFileSync(path.join(folder, f), t)
       jj(folder, 'commit', '-m', `${key}: ${label}`)
@@ -229,33 +243,14 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await h.page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
 
-    // --- Card 3: a true conflict with the user's main (the same line), resolved by hand while integrating.
+    // --- Card 3: built and reviewed in the same slot, integrated as Waiting suggests (a copy onto main): Done.
     const w3 = await workOf(n3)
     check('card 3 starts in the same slot', !!w3 && w3.folder.toLowerCase() === slotFolder.toLowerCase(), JSON.stringify(w3))
-    const R3 = await buildAndReview(n3, k3, slotFolder, { 'shared.txt': shared({ 0: 'one, by card three', 5: 'six, by card two' }) }, 'card 3')
-    jj(shop, 'new', 'main', '-m', 'the user again')
-    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by the user again', 5: 'six, by card two' }))
-    jj(shop, 'commit', '-m', 'the user again')
-    jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
-    const R3b = duplicateOnto(R3, `${k3}: card 3`)
-    check('the copy onto main stores a conflict', id(shop, R3b, 'if(conflict, "yes", "no")') === 'yes')
-    // The user resolves it: the commit's file as they want it, squashed into the copy.
-    jj(shop, 'new', R3b, '-m', 'resolve')
-    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by card three and the user', 5: 'six, by card two' }))
-    // Its own description kept (-u): with both described, jj would ask an editor to combine them (HB5 on HI-2923).
-    jj(shop, 'squash', '-u')
-    const R3c = id(shop, `change_id(${id(shop, R3b, 'change_id')})`)
-    check('…resolved: no conflict stored', id(shop, R3c, 'if(conflict, "yes", "no")') === 'no')
-    jj(shop, 'bookmark', 'set', 'main', '-r', R3c)
-    const waiting3 = await until(async () => {
-      const x = await waitingOf(n3)
-      return x?.contained?.state === 'notYet' && x.contained.at > 0 ? x : null
-    }, HUNG_MS)
-    check('a hand-resolved integration changes the card\'s change: Combwork can\'t prove it, so card 3 stays waiting', !!waiting3 && (await column(n3)) === 'passed', JSON.stringify({ waiting: await waitingOf(n3), column: await column(n3) }))
-    const done3 = await inv('tasks:move', n3, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
-    check('…the user moves it to Done', !!(await until(async () => (await column(n3)) === 'done', HUNG_MS)), JSON.stringify({ done3, column: await column(n3) }))
+    const R3 = await buildAndReview(n3, k3, slotFolder, { 'three.txt': 'card three\n' }, 'card 3')
+    jj(shop, 'bookmark', 'set', 'main', '-r', duplicateOnto(R3, `${k3}: card 3`))
+    check('the user copies card 3 onto main and moves main there: Done', !!(await until(async () => (await column(n3)) === 'done', HUNG_MS)), await column(n3))
 
-    // --- Cleanup: the lane ends, its slot back in the pool, no review copy leased.
+    // --- Cleanup: the lane ends with its last card, its slot back in the pool, no review copy leased.
     check('the lane ends with its last card', !!(await until(async () => ((await inv('lanes:list')) ?? []).every((l) => l.ended || !(l.cards ?? []).includes(n1)), HUNG_MS)), JSON.stringify(await inv('lanes:list')))
     for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
     const back = await until(async () => {
@@ -264,6 +259,56 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     }, HUNG_MS * 2)
     check('its slot back in the pool (ready)', !!back, JSON.stringify(await inv('slots:list', shop)))
     check('no review copy left leased', ((await inv('copies:list', shop)) ?? []).every((c) => c.state !== 'leased'), JSON.stringify(await inv('copies:list', shop)))
+
+    // --- Card 4, on its own: a true conflict (it and the user's main change the same line), resolved by hand while
+    // integrating. Combwork can't prove it (the resolution changes the card's change), so it fails closed: it stays
+    // waiting, nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is a
+    // separate route (HI-2924 decides what follows from it).
+    const n4 = (await inv('tasks:create', { title: 'Card four', project: 'shop', agent: b1.id })).number
+    const k4 = (await card(n4)).key
+    const started4 = await inv('tasks:move', n4, 'doing', { confirm: true, reason: 'jjlane: the conflict card' }).catch((e) => ({ error: String(e) }))
+    const w4 = await workOf(n4)
+    check('card 4 starts in a slot', !!w4, JSON.stringify({ started4, w4 }))
+    for (const a of [r1]) {
+      const up = await until(async () => !!(await live(a.id)) || (await inv('session:start', shop, { agentId: a.id }).then(() => true, () => false)), HUNG_MS)
+      check(`${a.name} running for card 4's review`, !!up, JSON.stringify(await live(a.id)))
+    }
+    const R4 = await buildAndReview(n4, k4, w4.folder, { 'shared.txt': shared({ 0: 'one, by card four', 5: 'six, by card two' }) }, 'card 4')
+    const change4 = id(shop, R4, 'change_id')
+    jj(shop, 'new', 'main', '-m', 'the user again')
+    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by the user again', 5: 'six, by card two' }))
+    jj(shop, 'commit', '-m', 'the user again')
+    jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
+    const remoteBefore = execFileSync('git', ['--git-dir', remote, 'rev-parse', 'refs/heads/main'], { env: toolEnv(), windowsHide: true, encoding: 'utf8' }).trim()
+    const R4b = duplicateOnto(R4, `${k4}: card 4`)
+    check('the copy onto main stores a conflict', id(shop, R4b, 'if(conflict, "yes", "no")') === 'yes')
+    // Before it is resolved: nothing Integrated, not Done.
+    check('…while the conflict stands: not Integrated, not Done', (await integrationOf(n4)) === null && (await column(n4)) === 'passed', JSON.stringify({ integration: await integrationOf(n4), column: await column(n4) }))
+    // The user resolves it: the copy's file as they want it, squashed into the copy.
+    jj(shop, 'new', R4b, '-m', 'resolve')
+    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by card four and the user', 5: 'six, by card two' }))
+    // Its own description kept (-u): with both described, jj would ask an editor to combine them (HB5 on HI-2923).
+    jj(shop, 'squash', '-u')
+    const R4c = id(shop, `change_id(${id(shop, R4b, 'change_id')})`)
+    check('…resolved: no conflict stored', id(shop, R4c, 'if(conflict, "yes", "no")') === 'no')
+    jj(shop, 'bookmark', 'set', 'main', '-r', R4c)
+    // Fail-closed: Combwork observes it isn't provably there and records nothing.
+    const waiting4 = await until(async () => {
+      const x = await waitingOf(n4)
+      return x?.contained?.state === 'notYet' && x.contained.at > 0 ? x : null
+    }, HUNG_MS)
+    check("a hand-resolved integration isn't proved: card 4 stays waiting, not in main as Combwork sees it", !!waiting4 && (await column(n4)) === 'passed', JSON.stringify({ waiting: await waitingOf(n4), column: await column(n4) }))
+    check('…nothing Integrated or attributed', (await integrationOf(n4)) === null, JSON.stringify(await integrationOf(n4)))
+    check('…main is the user\'s resolved copy, moved by no one else; nothing pushed', id(shop, 'main') === R4c && execFileSync('git', ['--git-dir', remote, 'rev-parse', 'refs/heads/main'], { env: toolEnv(), windowsHide: true, encoding: 'utf8' }).trim() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c }))
+    check('…nothing to check in Publish records for it', ((await inv('jj:toCheck', shop, null))?.rows ?? []).every((r) => r.card !== k4), JSON.stringify(await inv('jj:toCheck', shop, null)))
+    console.log(`INFO card 4: reviewed ${R4} (change ${change4}); the user's conflicted copy ${R4b}, resolved as ${R4c} (change ${id(shop, R4c, 'change_id')}) on main`)
+    // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
+    const done4 = await inv('tasks:move', n4, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
+    check('the user moves card 4 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n4)) === 'done', HUNG_MS)) && (await integrationOf(n4)) === null, JSON.stringify({ done4, column: await column(n4), integration: await integrationOf(n4) }))
+    // What its slot does after that is HI-2924's to decide: logged here as it stands, not asserted.
+    for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
+    await until(async () => (((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())?.state ?? '') === 'ready', 15000)
+    console.log(`INFO card 4's slot after the user's Done (HI-2924, as it stands): ${JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase()))}`)
   } finally {
     await h.app.close().catch(() => undefined)
   }
