@@ -99,6 +99,12 @@ export interface JjPortDeps {
    * work in its target before its slot is reused. Absent: such a slot is never reused (kept).
    */
   contains?: (store: string, target: string, change: { base: string; revision: string }, at: string) => Promise<Maybe<unknown | null>>
+  /**
+   * HI-2924 (Darren's decision): whether the user's own Done stands for a binding's card cycle whose containment isn't
+   * proved (`doneUnproved`: a hand-resolved integration). True: the slot is reused or detached as if contained; its chain
+   * must still be exactly the card's submitted work. Absent: never.
+   */
+  doneByUser?: (store: string, binding: JjBinding) => boolean | Promise<boolean>
   /** Test hooks, run between steps. */
   hooks?: { afterForget?: (folder: string) => void | Promise<void> }
 }
@@ -746,11 +752,16 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
         if (!onPrevBase && !chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
         if (j.prev?.submitted.length) {
-          if (!j.prev.target || !deps.contains) return refuse(JJ_REFUSED.notIntegrated)
-          const th = await bookmarkAt(folder, H, j.prev.target)
-          if (isUnknown(th) || !th) return refuse(JJ_REFUSED.notIntegrated)
-          const c = await deps.contains(store, j.prev.target, { base: j.prev.base, revision: j.prev.submitted[j.prev.submitted.length - 1] }, th)
-          if (isUnknown(c) || !c) return refuse(JJ_REFUSED.notIntegrated)
+          const prev = j.prev
+          const contained = async (): Promise<boolean> => {
+            if (!prev.target || !deps.contains) return false
+            const th = await bookmarkAt(folder, H, prev.target)
+            if (isUnknown(th) || !th) return false
+            const c = await deps.contains(store, prev.target, { base: prev.base, revision: prev.submitted[prev.submitted.length - 1] }, th)
+            return !isUnknown(c) && !!c
+          }
+          // Not proved (HI-2924): the user's own Done on exactly that card cycle stands for it.
+          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return refuse(JJ_REFUSED.notIntegrated)
         }
         const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
         if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)

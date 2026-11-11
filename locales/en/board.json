@@ -3995,6 +3995,10 @@
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
   },
+  "board.work.doneUnproved": {
+    "defaultMessage": "Done by you, integration not proved ({when}).",
+    "description": "The card dialog's Work section (HI-2924): the user moved this jj card to Done themselves, and Combwork couldn't prove its change is in its target (a conflict resolved by hand changes the change). Their Done counts as their word that it's integrated. {when}: a date and time."
+  },
   "board.work.failed": {
     "defaultMessage": "Couldn’t read the card’s work: {error}",
     "description": "The card dialog's Work section when its work couldn't be read (the repository or the board). {error} is why, in the words of the error."

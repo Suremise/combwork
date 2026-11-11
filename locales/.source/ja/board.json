@@ -998,6 +998,7 @@
   "board.work.carriedOver": "The pass for {from} carries over to {to}: the same change.",
   "board.work.change": "{commits, plural, one {change {change}} other {change {change}, # commits}}",
   "board.work.check": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
+  "board.work.doneUnproved": "Done by you, integration not proved ({when}).",
   "board.work.failed": "Couldn’t read the card’s work: {error}",
   "board.work.files": "{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}",
   "board.work.filesNotRead": "{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Combwork couldn't read {why}}}",
