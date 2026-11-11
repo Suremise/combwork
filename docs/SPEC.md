@@ -5996,7 +5996,8 @@ never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`
 - openpgp: `--batch --no-tty --pinentry-mode error --no-autostart --status-fd=2 -bsau <key>` on stdin, the key being
   `user.signingkey` or git's default, the committer's identity as that commit would have it (`git var
   GIT_COMMITTER_IDENT` with its overrides).
-- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal `key::` key written to a temp file as git does, a path's
+- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
+  written to a temp file as git does, a path's
   `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
 - Outcomes: `unattended`, `needsSomeone` (the signer's words), `couldNotComplete` (the bound: never taken as proof
   either way), `cantSign` (its words), `notChecked`, `off`, `unreadable` (never taken for off).
