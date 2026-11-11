@@ -43,7 +43,7 @@ const M = {
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
-  tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) apart from the other changes in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge): the files shown are only some of the folder's changes, and too many ({count}) for git stash to take apart from the rest (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
+  tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
 
@@ -213,15 +213,13 @@ async function stashTop(folder: string): Promise<string | null> {
 }
 
 /**
- * Sets `files` aside as a named stash (`git stash push --include-untracked`, the paths on its input; `whole`: the
- * files are every change in the folder, so no paths at all, which no command line limits, HI-2983): only those paths, other index
+ * Sets `files` aside as a named stash (`git stash push --include-untracked`, the paths on its input): only those paths, other index
  * entries as they were. The stash made is told by the stash ref moving to a new object (never by its message: an older
  * one can have the same). A failure after git made it is said with the stash, kept: never rolled back.
  */
-async function setAsidePaths(folder: string, files: string[], message: string, whole: boolean): Promise<string> {
+async function setAsidePaths(folder: string, files: string[], message: string): Promise<string> {
   const before = await stashTop(folder)
-  const args = ['stash', 'push', '--include-untracked', '--quiet', '-m', message]
-  const r = whole ? await git(folder, args, undefined, undefined, { env: quietEnv(), timeout: ACT_MS }) : await git(folder, [...args, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
+  const r = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
   const after = await stashTop(folder)
   const made = after && after !== before ? after : null
   if (!r.ok) {
@@ -271,11 +269,11 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         if (nested) throw combworkError(M.nestedRepo, { folder: nested })
         const kept = await keptDeleted(folder, files, now)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
-        // Set aside: every change in the folder shown (a start's warning lists them all), the whole folder's; else only
-        // as many as git's own commands can be given (HI-2983), refused before any stash is made.
-        const whole = [...now.keys()].every((p) => files.includes(p))
-        if (action === 'setAside' && !whole && files.reduce((n, p) => n + stashPathCost(p), 0) > STASH_PATHS_MAX) throw combworkError(M.tooManyToSetAside, { count: files.length, folder })
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message) : await setAsidePaths(folder, files, message, whole)
+        // Set aside: always exactly the paths shown, never the whole folder's (HR1's round 1: a change made after this
+        // read, never shown, would go into the stash and off the disk); only as many as git's own commands can be given
+        // (HI-2983), refused before any stash is made.
+        if (action === 'setAside' && files.reduce((n, p) => n + stashPathCost(p), 0) > STASH_PATHS_MAX) throw combworkError(M.tooManyToSetAside, { count: files.length, folder })
+        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message) : await setAsidePaths(folder, files, message)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
       }),

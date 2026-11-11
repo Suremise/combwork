@@ -5918,11 +5918,11 @@ touched:
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
   after it made one is said with that stash, kept. **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
-  32,767-character command line, and a start's warning lists every changed file). `stash push` passes its paths on to
-  git commands of its own as arguments, so when the files shown are every change in the folder (a start's warning)
-  it is the whole folder's stash, with no paths; when they are only some, more than about 30,000 characters of them
-  are refused before any stash is made (*Git can't set aside this many files (n) apart from the other changes in
-  …*). **Refused by name too:** an untracked repository of its own inside the folder (git lists it whole, `nested/`),
+  32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
+  push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
+  of paths (some 300 files) is refused before any stash is made (*Git can't set aside this many files (n) at once in
+  …*), even when they are every change in the folder: a stash with no paths would also take a change made after the
+  check, never shown (HR1, HI-2983), so Set aside always names exactly the paths shown. **Refused by name too:** an untracked repository of its own inside the folder (git lists it whole, `nested/`),
   never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
   submodule, yourself*). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
   file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one

@@ -13,6 +13,8 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** HI-2983: a file written just before the next `stash push` runs (after the changes shown were checked). */
+let lateFile: string | null = null
 /** HI-2982 (HR2's round 5): an lstat of a path ending so refused (EPERM), as Windows can, though git still reads it. */
 let failLstatOf: string | null = null
 vi.mock('original-fs/promises', async (original) => {
@@ -34,6 +36,11 @@ vi.mock('../src/main/git', async (original) => {
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
+      if (lateFile && args[0] === 'stash' && args[1] === 'push') {
+        // HI-2983 (HR1's round 1): a change made after the check, never shown, just before git stashes.
+        writeFileSync(join(cwd, lateFile), 'not shown\n')
+        lateFile = null
+      }
       const r = await real.git(cwd, args, max, input, opts)
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
@@ -106,6 +113,7 @@ beforeEach(() => {
   failTopIn = null
   failStashAfter = false
   failLstatOf = null
+  lateFile = null
 })
 
 describe('Commit', () => {
@@ -402,14 +410,32 @@ describe('many changed files', () => {
     expect(status()).toBe('M  b.txt')
   })
 
-  it("Set Aside of 1,000 files that are every change in the folder (a start's warning): one stash with all of them", async () => {
+  it("Set Aside of 1,000 files, every change in the folder (a start's warning): still by name, so refused, no stash made, nothing changed", async () => {
     const files = many(1000)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    const done = await settle('setAside', [...files, 'a.txt'])
-    expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
-    expect(sh(proj, 'show', '--name-only', '--format=', 'refs/stash^3').split('\n').filter(Boolean)).toHaveLength(1000)
+    const before = status()
+    await expect(settle('setAside', [...files, 'a.txt'])).rejects.toThrow(/Git can't set aside this many files \(1,001\) at once/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(status()).toBe(before)
+  })
+
+  it("a file changed after the check, never shown, stays out of the stash and on disk, even when the shown file was every change (HR1's round 1)", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    lateFile = 'late.txt'
+    await settle('setAside', ['a.txt'])
+    expect(lateFile).toBeNull()
     expect(sh(proj, 'diff', '--name-only', 'HEAD', 'refs/stash')).toBe('a.txt')
-    expect(status()).toBe('')
+    // Its untracked files' commit (when git made one) without the late file.
+    const untracked = ((): string => {
+      try {
+        return sh(proj, 'ls-tree', '-r', '--name-only', 'refs/stash^3')
+      } catch {
+        return ''
+      }
+    })()
+    expect(untracked).not.toContain('late.txt')
+    expect(read('late.txt')).toBe('not shown\n')
+    expect(status()).toBe('?? late.txt')
   })
 
   it('Set Aside of some of the changes, given on its input: 150 files beside a staged one not shown', async () => {
@@ -426,7 +452,7 @@ describe('many changed files', () => {
     writeFileSync(join(proj, 'b.txt'), 'staged\n')
     sh(proj, 'add', 'b.txt')
     const before = status()
-    await expect(settle('setAside', files)).rejects.toThrow(/Git can't set aside this many files \(1,000\) apart from the other changes/)
+    await expect(settle('setAside', files)).rejects.toThrow(/Git can't set aside this many files \(1,000\) at once/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
     expect(status()).toBe(before)
   })

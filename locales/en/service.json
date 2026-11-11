@@ -380,8 +380,8 @@
     "description": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command."
   },
   "service.folderChanges.tooManyToSetAside": {
-    "defaultMessage": "Git can't set aside this many files ({count, number}) apart from the other changes in {folder}. Commit them, or set them aside with git stash yourself.",
-    "description": "HI-2983: an error from Set aside (a paused merge): the files shown are only some of the folder's changes, and too many ({count}) for git stash to take apart from the rest (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command."
+    "defaultMessage": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
+    "description": "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command."
   },
   "service.folderChanges.unplaced": {
     "defaultMessage": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",

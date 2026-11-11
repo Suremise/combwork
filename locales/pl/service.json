@@ -83,7 +83,7 @@
   "service.folderChanges.readFailed": "Git nie mógł odczytać zmian w folderze: {why}",
   "service.folderChanges.stashFailed": "Git nie odłożył zmian: {why}",
   "service.folderChanges.stashPartial": "Git zgłosił problem podczas odkładania zmian, już po zachowaniu ich w stashu ({stash}). Sprawdź git stash list i pliki, zanim przejdziesz dalej. Komunikat Gita: {why}",
-  "service.folderChanges.tooManyToSetAside": "Git nie może odłożyć tak wielu plików ({count, number}) osobno od pozostałych zmian w folderze {folder}. Zrób ich commit albo odłóż je samodzielnie poleceniem git stash.",
+  "service.folderChanges.tooManyToSetAside": "Git nie może odłożyć naraz tak wielu plików ({count, number}) w folderze {folder}. Zrób ich commit albo odłóż je samodzielnie poleceniem git stash.",
   "service.folderChanges.unplaced": "Git nie podał, w którym repozytorium jest folder {folder}, więc Combwork nie robi commita .gitignore, dopóki nie może sprawdzić pracujących tam agentów. Spróbuj ponownie.",
   "service.folderChanges.wrongBranch": "Folder {folder} nie jest teraz na gałęzi {target}. Sprawdź ponownie.",
   "service.forward.byAssistant": "Asystenta",
