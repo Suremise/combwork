@@ -40,7 +40,7 @@ export interface WorkspaceIdentity {
 
 /** A database a fence's transaction hands its callback (the pool's workspace database, as board_meta's store reads it). */
 export interface FenceDb {
-  prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown }
+  prepare(sql: string): { get(...a: unknown[]): unknown; all(...a: unknown[]): unknown[]; run(...a: unknown[]): unknown }
 }
 
 /** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
@@ -231,6 +231,13 @@ export interface WorkspacePort {
    * them); Git ignores them, its git commands unchanged.
    */
   prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions & OwnedWrite): Promise<WorkspaceStep>
+  /**
+   * Whether preparing `line` from `base` carries the folder's current binding (HI-2981; jj: the same card started again
+   * in its own slot, on the same target and base, under a new key): its uncommitted edits are then that card's own, as
+   * on Git's same branch, so the pool doesn't refuse them. False whenever it can't tell. Git has none: its same line is
+   * the same name.
+   */
+  carries?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null; target?: string }): Promise<boolean>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 
@@ -266,6 +273,12 @@ export interface WorkspacePort {
    * compared before every change; null when it can't be read (then nothing is changed).
    */
   identity?(folder: string): Promise<WorkspaceIdentity | null>
+  /**
+   * Forgets, inside the pool's own write (`db`), what the platform keeps about a workspace by its name (HI-2979: jj's
+   * binding pointer and preparation journals): called as a slot's row is deleted, and as a workspace is made under a
+   * name, so a slot removed and made again under the same name never inherits its predecessor's records.
+   */
+  forgetIn?(db: FenceDb, identity: Pick<WorkspaceIdentity, 'store' | 'workspace'>): void
   /**
    * An explicit record of the folder's files (jj: a snapshot, a write), allowed only to the holder of the folder's
    * operation (`fence`), after its writers are proved ended: its changed files then, or unknown (stale, not the

@@ -159,6 +159,11 @@
     "note": "Why a project can’t be switched to or from jj (HI-2799): jj didn’t confirm what its files say. {code} is a short code for why (kept in English). Keep jj.",
     "audience": "both"
   },
+  "git.vc.switch.memberDrain": {
+    "text": "Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.",
+    "note": "Why a project can’t be switched to None now (HI-2974): its repository was once switched between Git and jj, and lanes, cards in flight, the merge queue, slots or review copies of this project are still in use (listed in the same dialog). Keep Git, jj and None (glossary 2.1).",
+    "audience": "both"
+  },
   "git.vc.switch.noGit": {
     "text": "No Git repository here: Initialise repository… first.",
     "note": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there.",

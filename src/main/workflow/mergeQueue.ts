@@ -321,6 +321,13 @@ export function catchUpOf(value: string | null): CatchUp | null {
   }
 }
 
+/**
+ * HI-2988: whether a pause is the owed catch-up's (a card already merged and published, the local target behind it): the
+ * catch-up owed for `target` names the paused card. Its changes are set aside, never committed on the local target,
+ * which would then have a commit its remote lacks.
+ */
+export const catchUpPaused = (catchUp: string | null, pause: { card: string } | null | undefined): boolean => !!pause?.card && catchUpOf(catchUp)?.card === pause.card
+
 /** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
 export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
 
@@ -791,7 +798,13 @@ export class MergeQueue {
     const on = await I.contains(this.project, onto, result)
     if (isUnknown(on)) return again(gitSaid(on))
     if (!on) return { pause: 'needsYou', message: `The test merge ${result.slice(0, 12)} doesn't contain ${onto.slice(0, 12)}, the remote's head it was tested on, so Combwork didn't publish it.` } // i18n-ignore: git's side of a pause, in English as git's are
-    const saved = await this.cfg.transport?.save(this.project, target, snap)
+    // The store unreadable now (HI-2993): nothing kept or published, tried again as a failed read is.
+    let saved: Awaited<ReturnType<TransportStore['save']>> | undefined
+    try {
+      saved = await this.cfg.transport?.save(this.project, target, snap)
+    } catch (e) {
+      return again(e instanceof Error ? e.message : String(e))
+    }
     if (!saved) return { pause: 'remoteUnsupported' }
     const publish: PublishFact = { remote: snap.remote, endpoint: snap.display, ref: snap.ref, onto, snapshot: saved.id, digest: saved.digest }
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: folder, publish })
@@ -1054,8 +1067,10 @@ export class MergeQueue {
     if (has) return done()
     const behind = await I.contains(this.project, local, c.to)
     if (isUnknown(behind)) return null
-    // Commits the remote lacks (the user's, since): left as they are; the next entry's fetch pauses `remoteDiverged`.
-    if (!behind) return done()
+    // Commits the remote lacks (the user's, since): left as they are, never forced or merged by Combwork, and the catch-up
+    // still owed (HI-2988: dropping it left the published merge out of the local target, all looking well): paused
+    // `remoteDiverged`, naming the published card, until the user brings the local target in line with its remote.
+    if (!behind) return this.catchUpPause(target, c, 'remoteDiverged', [target])
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null

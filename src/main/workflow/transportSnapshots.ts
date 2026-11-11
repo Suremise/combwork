@@ -8,6 +8,7 @@ import type { TransportSnapshot } from '../platform/integration'
 export interface TransportStore {
   /**
    * Keeps a snapshot of a project's target; its id and digest, or null when it can't be kept safely (never in plain text).
+   * Throws when the store is there but can't be read now (HI-2993): nothing written, never the other snapshots dropped.
    * Owned by that target (HR2's HI-1183 round 2): only its own queue's clean-up, which runs under its lease between its
    * entries, ever drops it, so another target's clean-up can't take one between its save and its IntegrationStarted.
    */

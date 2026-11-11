@@ -9,6 +9,7 @@ import * as electron from 'electron'
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
 import { detect, foundKey, projectPlatform } from '../src/main/platform/registry'
+import { jjOf } from '../src/main/vcsDetect'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
@@ -92,6 +93,25 @@ describe('detection, per case of §16.3.5', () => {
     // Colocated inside another Git repository: its own .git is nearer, so not inGit.
     gitInit(j)
     expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: true } })
+  })
+
+  it('a Git repository inside a non-colocated jj workspace is Git’s, the nearest marker: no jj offer (HI-2976)', () => {
+    const outer = tempDir('cw-platform-gitinjj-')
+    mkdirSync(join(outer, '.jj'), { recursive: true })
+    const inner = join(outer, 'inner')
+    mkdirSync(join(inner, 'deep'), { recursive: true })
+    gitInit(inner)
+    expect(jjOf(inner)).toBeNull()
+    expect(detect(inner)).toEqual({ platform: 'git', root: inner })
+    expect(detect(join(inner, 'deep'))).toEqual({ platform: 'git', root: inner, subfolder: true })
+    expect(projectPlatform(inner, 'git').offer).toBeUndefined()
+    expect(projectPlatform(inner, 'none').offer).toEqual({ offer: 'git', why: 'gitFound' })
+    // Outside the Git repository, still in the jj workspace: jj's.
+    expect(detect(outer)).toEqual({ platform: 'jj', root: outer, jj: { colocated: false } })
+    // Another system nearer than the .jj still decides as before (None, its name).
+    mkdirSync(join(outer, 'hg', '.hg'), { recursive: true })
+    expect(jjOf(join(outer, 'hg'))).toBeNull()
+    expect(detect(join(outer, 'hg'))).toEqual({ platform: 'none', other: 'Mercurial' })
   })
 })
 

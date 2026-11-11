@@ -33,7 +33,7 @@ import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
-import { MergeQueue } from './mergeQueue'
+import { catchUpKey, catchUpPaused, MergeQueue } from './mergeQueue'
 import { kickQueue, queueChanged, queueHostsStamp, queueLive } from './queueHost'
 import { queueOrder } from './queueState'
 import { entryTook, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from './queueLogs'
@@ -236,7 +236,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     project: basename(projectPath),
     projectPath,
     target,
-    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.message ? { message: p.message } : {}), ...(p.stuck ? { stuck: p.stuck } : {}) } : null,
+    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.message ? { message: p.message } : {}), ...(p.stuck ? { stuck: p.stuck } : {}), ...(catchUpPaused(store.meta(catchUpKey(target)), p) ? { catchUp: true as const } : {}) } : null,
     runBy: lease?.profile ?? null,
     runHere: live.running,
     testing,
@@ -392,6 +392,8 @@ const samePause = (p: QueuePause | null | undefined, ref: QueuePauseRef): boolea
 
 const PAUSE_NO_FOLDER = msg({ id: 'service.queue.pauseNoFolder', defaultMessage: "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.", description: 'HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.' })
 
+const PAUSE_CATCH_UP_COMMIT = msg({ id: 'service.queue.catchUpNoCommit', defaultMessage: '{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.', description: 'HI-2988: an error from Commit on a paused merge queue whose target follows its remote: the card ({card}: its key) is already merged and published, and the pause is the local branch ({target}) catching up with it; only Set Aside (a button’s name: as translated there) is offered.' })
+
 const PAUSE_CHANGED = msg({ id: 'service.queue.pauseChanged', defaultMessage: "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.", description: 'HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).' })
 
 /**
@@ -408,8 +410,11 @@ export async function settleQueueChanges(ws: WorkspaceService, projectPath: stri
   const seen = pause ? (stored?.folder ?? null) : shownFolder
   if (!seen) throw combworkError(PAUSE_NO_FOLDER)
   const current = wf && pause ? () => void (samePause(wf.store.queuePause(target), pause) || (() => { throw combworkError(PAUSE_CHANGED) })()) : undefined
+  // HI-2988: the owed catch-up's pause (the card merged and published): set aside only, never committed on the local target.
+  const catchUp = !!wf && catchUpPaused(wf.store.meta(catchUpKey(target)), stored)
+  if (catchUp && action === 'commit') throw combworkError(PAUSE_CATCH_UP_COMMIT, { card: pause!.card, target })
   // i18n-ignore: the commit's or stash's message (in the repository, English as Combwork's other commits)
-  const label = pause ? `before merging ${pause.card}` : `before starting work on ${target}`
+  const label = catchUp ? `before bringing ${target} up to date with ${pause!.card}` : pause ? `before merging ${pause.card}` : `before starting work on ${target}`
   const done = await ops.settleChanges(projectPath, target, seen, action, Array.isArray(shown) ? shown : [], label, current)
   if (!pause) return { done, resumed: false }
   return { done, resumed: (await resumeQueue(ws, projectPath, target, undefined, pause)).resumed }

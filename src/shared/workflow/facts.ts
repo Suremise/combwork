@@ -385,6 +385,8 @@ export interface FactData {
   InTarget: { revision: string; target: string; submission: number }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
+  /** HI-2988: a Done card marked `LeftTarget` whose result is in its target again: the mark cleared. */
+  BackInTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
   /** `why`: the agent's own reason, given with a put back (#1267). */
   /** `repair` (HI-1674): a card the board had in Done while its stage wasn't, brought into line when its workspace opens. */
@@ -832,6 +834,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       case 'InTarget':
         s.marks.inTarget = f.data as FactData['InTarget']
+        break
+      case 'BackInTarget':
+        delete s.marks.leftTarget
         break
       case 'LeftTarget':
         s.marks.leftTarget = f.data as FactData['LeftTarget']

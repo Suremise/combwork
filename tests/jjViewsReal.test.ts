@@ -6,7 +6,7 @@
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
@@ -274,6 +274,54 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(await signing()).toEqual({ clear: true })
     git(r.root, 'config', 'tag.gpgsign', 'maybe')
     expect(await signing()).toEqual({ uses: ['tag.gpgsign (local) = maybe'] })
+  })
+
+  it('Git’s legacy crlf attribute is a use (HI-2978): crlf, -crlf, crlf=input; Git converts by it; untracked and ignored files read too', async () => {
+    const r = await repo('crlf')
+    const attributes = async (): Promise<unknown> => (await assessJj(r.root, r.ctx.store, gitDeps)).attributes
+    git(r.root, 'config', 'core.autocrlf', 'false')
+    expect(await attributes()).toEqual({ clear: true })
+    // Tracked (recorded by jj, so in Git's index): each spelling, as the probe found it, is listed.
+    writeFileSync(join(r.root, 'a.txt'), 'one\ntwo\n')
+    writeFileSync(join(r.root, '.gitattributes'), '*.txt crlf\n')
+    jj(r.root, 'commit', '-m', 'attributes')
+    expect(git(r.root, 'ls-files', '.gitattributes')).toBe('.gitattributes')
+    // Git converts by it: a checkout of a.txt has CRLF.
+    rmSync(join(r.root, 'a.txt'))
+    git(r.root, 'checkout', '--', 'a.txt')
+    expect(readFileSync(join(r.root, 'a.txt'), 'utf8')).toBe('one\r\ntwo\r\n')
+    for (const line of ['*.txt crlf', '*.txt -crlf', '*.txt crlf=input']) {
+      writeFileSync(join(r.root, '.gitattributes'), `${line}\n`)
+      expect(await attributes()).toEqual({ uses: [`${join(r.root, '.gitattributes')}: ${line}`] })
+    }
+    writeFileSync(join(r.root, '.gitattributes'), '# nothing\n')
+    expect(await attributes()).toEqual({ clear: true })
+    // An untracked one in a subfolder, which Git applies: listed.
+    mkdirSync(join(r.root, 'sub'))
+    writeFileSync(join(r.root, 'sub', '.gitattributes'), '*.md crlf\n')
+    expect(git(r.root, 'ls-files', 'sub')).toBe('')
+    expect(await attributes()).toEqual({ uses: [`${join(r.root, 'sub', '.gitattributes')}: *.md crlf`] })
+    // An ignored one in a subfolder is never listed by Git's untracked files; the root's is read on disk even ignored.
+    const r2 = await repo('crlf-ignored')
+    writeFileSync(join(r2.root, '.gitignore'), '.gitattributes\n')
+    writeFileSync(join(r2.root, '.gitattributes'), '*.txt -crlf\n')
+    const a2 = (await assessJj(r2.root, r2.ctx.store, gitDeps)).attributes
+    expect(a2).toEqual({ uses: [`${join(r2.root, '.gitattributes')}: *.txt -crlf`] })
+    // HR1's round 1: an ignored .gitattributes beside a tracked file in a subfolder, which Git applies (it converts), is read.
+    const r3 = await repo('crlf-nested-ignored')
+    git(r3.root, 'config', 'core.autocrlf', 'false')
+    mkdirSync(join(r3.root, 'sub', 'deep'), { recursive: true })
+    writeFileSync(join(r3.root, 'sub', 'deep', 'a.txt'), 'one\ntwo\n')
+    writeFileSync(join(r3.root, '.gitignore'), '**/.gitattributes\n')
+    jj(r3.root, 'commit', '-m', 'nested')
+    expect(git(r3.root, 'ls-files', 'sub')).toBe('sub/deep/a.txt')
+    writeFileSync(join(r3.root, 'sub', '.gitattributes'), '*.txt crlf\n')
+    expect(git(r3.root, 'check-ignore', 'sub/.gitattributes')).toBe('sub/.gitattributes')
+    expect(git(r3.root, 'check-attr', 'crlf', '--', 'sub/deep/a.txt')).toBe('sub/deep/a.txt: crlf: set')
+    rmSync(join(r3.root, 'sub', 'deep', 'a.txt'))
+    git(r3.root, 'checkout', '--', 'sub/deep/a.txt')
+    expect(readFileSync(join(r3.root, 'sub', 'deep', 'a.txt'), 'utf8')).toBe('one\r\ntwo\r\n')
+    expect((await assessJj(r3.root, r3.ctx.store, gitDeps)).attributes).toEqual({ uses: [`${join(r3.root, 'sub', '.gitattributes')}: *.txt crlf`] })
   })
 
   it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {

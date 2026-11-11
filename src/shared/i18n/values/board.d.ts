@@ -715,6 +715,7 @@ interface CombworkMessageValues {
   'board.queue.pause.approval': { card: string | number; target: string | number }
   'board.queue.pause.byAssistant': undefined
   'board.queue.pause.byYou': undefined
+  'board.queue.pause.catchUpChanges': { card: string | number; target: string | number; files: string; count: number }
   'board.queue.pause.checkedOut': { target: string | number }
   'board.queue.pause.commit': undefined
   'board.queue.pause.commitTip': { files: string | number; target: string | number }

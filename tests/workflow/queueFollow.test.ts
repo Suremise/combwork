@@ -104,6 +104,26 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(started.publish).toMatchObject({ remote: 'origin', ref: 'refs/heads/main', endpoint: bare })
   })
 
+  it('the snapshot store unreadable at the save (HI-2993): nothing published or begun, tried again as a failed read, then merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, transport } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    let fails = 1
+    const saves: string[] = []
+    const flaky = { ...transport, save: async (...args: Parameters<typeof transport.save>) => {
+      saves.push(fails > 0 ? 'refused' : 'kept')
+      if (fails-- > 0) throw new Error("the transport store couldn't be read: EBUSY")
+      return transport.save(...args)
+    } }
+    const before = head(bare)
+    const out = await e.queue({ transport: flaky }).drain('main')
+    expect(saves).toEqual(['refused', 'kept'])
+    expect(out.map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).not.toBe(before)
+    // One begun publication only: the refused save began nothing.
+    expect(e.store.facts(a.id).filter((f) => f.kind === 'IntegrationStarted')).toHaveLength(1)
+  })
+
   it('a local target behind its remote: tested on the remote head, which the merge contains, and the local one fast-forwarded', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following()
     const theirsHead = theirs(bare)
@@ -434,5 +454,82 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     await restarted(e, transport).drain('main')
     expect(head(e.project)).toBe(head(bare))
     expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+  })
+})
+
+describe('a published card’s owed catch-up (HI-2988)', () => {
+  const contains = (repo: string, commitId: string, ref = 'main'): boolean => {
+    try {
+      sh(repo, 'merge-base', '--is-ancestor', commitId, ref)
+      return true
+    } catch {
+      return false
+    }
+  }
+  const del = (file: string): void => void execFileSync(process.platform === 'win32' ? 'cmd' : 'rm', process.platform === 'win32' ? ['/c', 'del', file] : [file])
+
+  /** A published, Done; its catch-up into the checked-out main paused on the user's own a.txt. */
+  async function caughtOnAFile() {
+    const f = following({}, { checkedOut: true })
+    const a = await queued(f.e, 'A', 'a.txt')
+    writeFileSync(join(f.e.project, 'a.txt'), 'mine\n')
+    await f.queue().drain('main')
+    expect(f.e.wf.state(a).stage).toBe('done')
+    expect(f.e.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', card: a.key })
+    expect(catchUpOf(f.e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    return { ...f, a }
+  }
+
+  it('a commit on the local target meanwhile (the user’s, by hand): the catch-up stays owed and pauses remoteDiverged naming the card; put right, it catches up', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    // What Commit did before HI-2988 (commitPaths' git), by hand now.
+    sh(e.project, 'add', '--intent-to-add', '--', ':(top,literal)a.txt')
+    sh(e.project, 'commit', '--only', '--quiet', '-m', 'mine', '--', ':(top,literal)a.txt')
+    queue().resume('main')
+    expect(await queue().drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'remoteDiverged', files: ['main'] }])
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    // Not dropped silently: resumed with the commit still there, still A's pause.
+    queue().resume('main')
+    expect(await queue().drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'remoteDiverged' }])
+    // The user takes their commit off main again: A's catch-up goes on.
+    sh(e.project, 'reset', '-q', '--hard', 'HEAD~1')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(contains(e.project, e.wf.state(a).integrated!.result)).toBe(true)
+    expect(head(e.project)).toBe(head(bare))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('set aside instead: caught up, local main holding the published merge, and the next card merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    sh(e.project, 'stash', 'push', '-q', '-u', '-m', 'set aside', '--', 'a.txt')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(head(e.project)).toBe(head(bare))
+    expect(contains(e.project, e.wf.state(a).integrated!.result)).toBe(true)
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    const b = await queued(e, 'B', 'b.txt')
+    await queue().drain('main')
+    expect(e.wf.state(b).stage).toBe('done')
+  })
+
+  it('reconciling the published card while its catch-up waits, or while main is merely behind it: never LeftTarget', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    del(join(e.project, 'a.txt'))
+    queue().resume('main')
+    await queue().drain('main')
+    expect(head(e.project)).toBe(head(bare))
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    // main moved back behind the published result (nothing owed now): behind, not left.
+    const before = sh(e.project, 'rev-parse', `${e.wf.state(a).integrated!.result}^1`)
+    sh(e.project, 'reset', '-q', '--hard', before)
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    expect(e.store.facts(a.id).some((f) => f.kind === 'LeftTarget')).toBe(false)
   })
 })

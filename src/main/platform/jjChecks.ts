@@ -16,6 +16,15 @@
 //  8. the final moment, after B2, still B2's: the same head, checkout record and Git state as E1. Nothing is awaited
 //     between this read and the decision.
 // Unknown anywhere fails closed: the run doesn't count.
+//
+// A run in a check copy of its own (HI-2991: a candidate's merge checks, `scope: 'workspace'`) is credited by that
+// copy's state, not the whole repository's operation head: another workspace's operation during the run (another lane's
+// `jj commit`, the user's own jj) leaves it counted. Steps 3, 6, 7 and 8 then compare this workspace's checkout record
+// (no jj command updated its working copy during the run) instead of the heads and Git's state; B2 takes no `expect`
+// (it may find a newer head), and must record nothing, find the workspace not stale and its @ B1's. What an operation
+// elsewhere could do to the copy shows there: jj rewriting its @ (the candidate or an ancestor rewritten) makes it stale
+// or another @, and a write to its files is in the record or the snapshot. The revision is a commit id: what was tested
+// can't change.
 
 import { stat } from 'original-fs/promises'
 import { join } from 'path'
@@ -38,6 +47,8 @@ export interface JjCheckFor {
   owner: Owner
   /** The store's repository lock the boundaries take. */
   lock: StoreLock
+  /** HI-2991: `workspace`, a run in a copy of its own credited by that copy's state (the module's comment); else the repository's. */
+  scope?: 'repository' | 'workspace'
 }
 
 /** What the start captured. */
@@ -62,6 +73,8 @@ export interface JjCheckRecord {
   beforeB2: ViewNow | null
   b2: Boundary | BoundaryRefused | null
   final: ViewNow | null
+  /** The run's scope (absent: the repository's). */
+  scope?: 'repository' | 'workspace'
 }
 
 /** What a jj run is credited with: CheckBracket's fields. */
@@ -148,17 +161,19 @@ export async function jjCheckStart(r: JjCheckFor, log: WriteLog, s: JjCheckSeams
 export async function jjCheckEnd(r: JjCheckFor, start: JjCheckStart, log: WriteLog, s: JjCheckSeams = {}): Promise<JjCheckRecord> {
   const runner = s.runner ?? jjRunner
   const now = s.now ?? Date.now
-  if (isRefused(start.b1) || start.b1.recorded || !start.e1) return { revision: r.revision, start, t1: now(), seen: { changed: false, paths: [] }, statsEnd: undefined, beforeB2: null, b2: null, final: null }
+  const scope = r.scope === 'workspace' ? { scope: 'workspace' as const } : {}
+  if (isRefused(start.b1) || start.b1.recorded || !start.e1) return { revision: r.revision, start, t1: now(), seen: { changed: false, paths: [] }, statsEnd: undefined, beforeB2: null, b2: null, final: null, ...scope }
   await s.hooks?.beforeEnd?.()
   // The run's writes reach the record after they happen: it settles first, and the window ends after that (nothing of
   // Combwork's writes in between: the end boundary comes after), so a write just before the command ended is in it.
   await log.settled(r.folder)
   const t1 = now()
-  const base = { revision: r.revision, start, t1 }
+  const base = { revision: r.revision, start, t1, ...scope }
   const seen = await log.changedBetween(r.folder, start.t0, t1, jjCounts)
   const statsEnd = isUnknown(seen) ? await jjStats(r.view.root, start.files) : undefined
   const beforeB2 = viewNow(r.view)
-  const b2 = await jjBoundary({ ...r.view, folder: r.folder }, r.owner, { ...s.boundary, lock: r.lock, hooks: s.boundary?.endHooks, expect: start.b1.op }, runner)
+  // A copy's run takes B2 at whatever head there is now (HI-2991); the repository's only at H1.
+  const b2 = await jjBoundary({ ...r.view, folder: r.folder }, r.owner, { ...s.boundary, lock: r.lock, hooks: s.boundary?.endHooks, ...(r.scope === 'workspace' ? {} : { expect: start.b1.op }) }, runner)
   await s.hooks?.beforeFinal?.()
   const final = viewNow(r.view)
   return { ...base, seen, statsEnd, beforeB2, b2, final }
@@ -166,6 +181,9 @@ export async function jjCheckEnd(r: JjCheckFor, start: JjCheckStart, log: WriteL
 
 /** The same moment, field by field: head, checkout record, Git state. */
 const sameMoment = (a: ViewNow | null, b: ViewNow | null): boolean => !!a && !!b && a.head === b.head && a.checkout.op === b.checkout.op && a.checkout.workspace === b.checkout.workspace && a.git === b.git
+
+/** HI-2991, a copy's run: the same checkout record of this workspace (its op and name), whatever the heads did. */
+const sameCheckout = (a: ViewNow | null, b: ViewNow | null): boolean => !!a && !!b && a.checkout.op === b.checkout.op && a.checkout.workspace === b.checkout.workspace
 
 /**
  * What tested the revision: B1's @ is it, or an empty @ whose one parent is it (the files on disk are its tree). Null
@@ -183,21 +201,28 @@ export function jjCredit(rec: JjCheckRecord): JjCredit {
   const { start } = rec
   const no = (whyNot: NonNullable<CheckRanData['whyNot']>, why: string, tested = '', changes?: string[]): JjCredit => ({ revision: rec.revision, tested, whyNot, why, ...(changes?.length ? { changes: [...new Set(changes)].slice(0, 5) } : {}) })
   const b1 = start.b1
+  // A new file jj left out for its size (HI-2973): on disk beside the revision's tree, so the run is `dirty`.
+  if (isRefused(b1) && b1.refused === 'tooLarge') return no('dirty', 'start:tooLarge', '', b1.files)
   if (isRefused(b1)) return no(b1.refused === 'moved' || b1.refused === 'stale' ? 'moved' : 'changed', `start:${b1.refused}`)
   if (b1.recorded) return no('dirty', 'start:recorded', b1.at.commit)
   const tested = testedFor(rec.revision, b1.at, start.rev)
   if (!tested) return no('notContained', 'tested', b1.at.commit)
   const H1 = b1.op
-  if (!start.files || start.stats === null || !sameMoment(b1.view, start.e1)) return no('changed', 'start:evidence', tested)
-  if (!sameMoment(start.e1, rec.beforeB2)) return no('moved', 'end:beforeBoundary', tested)
+  // The copy's own state (HI-2991), or the repository's moment.
+  const local = rec.scope === 'workspace'
+  const same = local ? sameCheckout : sameMoment
+  if (!start.files || start.stats === null || !same(b1.view, start.e1)) return no('changed', 'start:evidence', tested)
+  if (!same(start.e1, rec.beforeB2)) return no('moved', 'end:beforeBoundary', tested)
   const b2 = rec.b2
   if (!b2) return no('changed', 'end:noBoundary', tested)
-  if (isRefused(b2)) return no(b2.refused === 'moved' || b2.refused === 'stale' ? 'moved' : 'changed', `end:${b2.refused}`, tested)
-  if (b2.before !== H1) return no('moved', 'end:before', tested)
+  if (isRefused(b2)) return no(b2.refused === 'moved' || b2.refused === 'stale' ? 'moved' : 'changed', `end:${b2.refused}`, tested, b2.files)
+  if (!local && b2.before !== H1) return no('moved', 'end:before', tested)
   if (b2.recorded) return no('changed', 'end:recorded', tested)
-  if (b2.op !== H1) return no('moved', 'end:op', tested)
+  if (!local && b2.op !== H1) return no('moved', 'end:op', tested)
   if (b2.at.commit !== b1.at.commit) return no('changed', 'end:at', tested)
-  if (!sameMoment(start.e1, b2.view) || !sameMoment(b2.view, rec.final)) return no('moved', 'end:final', tested)
+  // A copy's B2 brings its checkout record to the head it found (an empty snapshot does): the same workspace, and the
+  // record unchanged from B2's to the final read.
+  if (local ? b2.checkout.workspace !== b1.checkout.workspace || !sameCheckout(b2.view, rec.final) : !sameMoment(start.e1, b2.view) || !sameMoment(b2.view, rec.final)) return no('moved', 'end:final', tested)
   if (isUnknown(rec.seen)) {
     if (rec.statsEnd === undefined || rec.statsEnd === null || rec.statsEnd !== start.stats) return no('changed', 'end:stats', tested)
   } else if (rec.seen.changed) return no('changed', 'end:written', tested, rec.seen.paths)

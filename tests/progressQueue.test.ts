@@ -255,6 +255,9 @@ describe('what a queue card says', () => {
     // HI-2944: a staged pause names its files (Commit and Set Aside act on them), or says changes when it has none.
     expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt and b.ts are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Changes are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    // HI-2988: a catch-up's pause (the card merged and published): Set Aside alone, the card said merged.
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts'], by: null, at: null, catchUp: true }, 'main', tr, list)).toBe('HI-61 is merged and on main’s remote already, but a.ts has changes in the folder main is checked out in, so the local main isn’t up to date with it yet. Set them aside, and it catches up.')
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null, catchUp: true }, 'main', tr, list)).toMatch(/^HI-61 is merged and on main’s remote already, but files it changes have changes in the folder/)
     // HI-2951: one file agrees as one, staged or not; more than five named, the count is all of them.
     expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt is staged in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')
     expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['.gitignore'], by: null, at: null }, 'main', tr, list)).toBe('.gitignore has uncommitted changes in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')

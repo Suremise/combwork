@@ -45,16 +45,24 @@ export function otherVcsOf(folder: string): { name: string; root: string } | nul
 }
 
 /**
- * The Jujutsu repository holding a folder (HI-2799), read from its files only: the nearest `.jj` at or above it, before
- * any other system's marker, and whether a `.git` sits beside it (colocated). A hint: jj itself confirms it before a switch
- * (`jjContextOf`). Null when the nearest marker isn't jj's.
+ * The Jujutsu repository holding a folder (HI-2799), read from its files only: the nearest `.jj` at or above it, and
+ * whether a `.git` sits beside it (colocated). A hint: jj itself confirms it before a switch (`jjContextOf`). Null when
+ * the nearest marker isn't jj's: another system's, or a `.git` nearer than any `.jj` (HI-2976: a Git repository inside a
+ * jj workspace is Git's, as its repository boundary says, `boundaryOf`).
  */
 export function jjOf(folder: string): { root: string; colocated: boolean; inGit?: string } | null {
-  const other = otherVcsOf(folder)
-  if (!other || other.name !== 'Jujutsu') return null // i18n-ignore: a product's name, the marker's
-  const colocated = existsSync(join(other.root, '.git'))
-  const inGit = colocated ? null : gitAbove(other.root)
-  return { root: other.root, colocated, ...(inGit ? { inGit } : {}) }
+  let dir = resolve(folder)
+  for (;;) {
+    if (existsSync(join(dir, '.jj'))) {
+      const colocated = existsSync(join(dir, '.git'))
+      const inGit = colocated ? null : gitAbove(dir)
+      return { root: dir, colocated, ...(inGit ? { inGit } : {}) }
+    }
+    if (existsSync(join(dir, '.git')) || OTHER_VCS.some(([marker]) => existsSync(join(dir, marker)))) return null
+    const up = dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
 }
 
 /**

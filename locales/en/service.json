@@ -335,6 +335,10 @@
     "defaultMessage": "Git did not commit: {why}",
     "description": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were."
   },
+  "service.folderChanges.deletedKept": {
+    "defaultMessage": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
+    "description": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves."
+  },
   "service.folderChanges.detached": {
     "defaultMessage": "{folder} isn't on a branch, so Combwork doesn't commit there.",
     "description": "HI-2944: an error from Commit it (Files) or Commit: the folder ({folder}, a path) has a detached HEAD (git's term), so nothing is committed."
@@ -1170,6 +1174,10 @@
   "service.providers.unknownHost": {
     "defaultMessage": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
     "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button."
+  },
+  "service.queue.catchUpNoCommit": {
+    "defaultMessage": "{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.",
+    "description": "HI-2988: an error from Commit on a paused merge queue whose target follows its remote: the card ({card}: its key) is already merged and published, and the pause is the local branch ({target}) catching up with it; only Set Aside (a button’s name: as translated there) is offered."
   },
   "service.queue.pauseChanged": {
     "defaultMessage": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",

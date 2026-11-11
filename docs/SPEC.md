@@ -1882,7 +1882,7 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 | A None project gets `git init` (by the user or an agent) | Combwork notices (the refresh that ensures `.combwork`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
 | The repository disappears (`.git` removed or moved) | Combwork says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
 | Mercurial or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." |
-| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`), colocated or not (HI-2896); a non-colocated one inside a Git working tree (`Detection.jj.inGit`) is shown and refused (`jjInGit`). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`); the switch back to Git then needs no jj (HI-2975: nothing for the fallback check to read). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
+| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker; a `.git` nearer than any `.jj`, a Git repository inside a jj workspace, makes the folder Git's, as its repository boundary says, with no jj offer: HI-2976) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`), colocated or not (HI-2896); a non-colocated one inside a Git working tree (`Detection.jj.inGit`) is shown and refused (`jjInGit`). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`); the switch back to Git then needs no jj (HI-2975: nothing for the fallback check to read). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
 | A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Combwork's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
@@ -2296,8 +2296,10 @@ the store's environment), jj's effective config (`jj config list`: user, reposit
 attribute source Git applies. Anything it can't read, list or resolve (an unreadable file, an include it can't follow,
 a configured path outside what it can read, a tool that doesn't answer) is "uses it": the gate stays closed.
 - **attributes:** any of Git's attribute sources (the system `gitattributes`, the file `core.attributesFile` names or
-  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, the store's `info/attributes`) setting
-  `text`, `eol`, `filter`, `diff`, `merge`, `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
+  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, every untracked one Git sees in a
+  colocated working tree, and any on disk in the root or a folder holding a tracked file, ignored or not (HI-2978), the store's `info/attributes`) setting
+  `text`, `eol`, `crlf` (`text`'s legacy spelling, which Git still converts by, HI-2978), `filter`, `diff`, `merge`,
+  `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
   `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
 - **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
   `.lfsconfig`.
@@ -2437,7 +2439,17 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   the workspace's @ and `snapshot.auto-track` (anything but `all()` refuses: an untracked file would escape it); then
   checks the moment is still the same before answering `{ before: H0, op: H1, recorded: H1 ≠ H0, at, view }`. It never
   retries onto a newer operation. Only the pinned jj writes. Refusals: `owner`, `heads`, `moved`, `stale`,
-  `cancelled`, `autoTrack`, `unknown`.
+  `cancelled`, `autoTrack`, `tooLarge`, `unknown`.
+- **jj's size limit for new files** (HI-2973). jj leaves a new file past `snapshot.max-new-file-size` (1 MiB by default)
+  out of every snapshot, saying so only in a warning (exit 0, repeated on each snapshot while the file is there). Such a
+  file is on disk and in no commit, so Combwork reads the warning wherever it snapshots (`platform/jjSnapshotRefused.ts`)
+  and never takes it for recorded or clean: the boundary refuses `tooLarge`, naming the files and the limit; a
+  submission is then refused (`platform.jjRefused`, `tooLarge`), naming them; a check's start is `dirty`, its end
+  `changed`; the pool's record lists them as uncommitted, so a slot isn't settled ready, lent, reset or removed with
+  them in it, and a check copy with one isn't intact (a reset refuses it); a recovery puts them back on disk as any
+  other edit, ignores them when deciding whether X is exactly the preserved delta, and names them. Combwork never raises
+  the limit itself: the agent or user commits the file with the limit raised (`jj config set --repo
+  snapshot.max-new-file-size <bytes>`) or leaves it out with `.gitignore`.
 - **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
   (`jjCredit`) from the captures, in order:
   1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
@@ -2628,7 +2640,9 @@ merges under jj.
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
-  `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
+  `.gitattributes`, untracked ones (colocated: `ls-files -o --exclude-standard`; in either mode, the one on disk in the root and in each
+  folder holding a tracked file, ignored or not, past 100,000 such folders unknown),
+  `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
   without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
   hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
   Windows' stock system settings (`filter.lfs.*`, `diff=astextplain`) don't count (HI-2872: `GFW_STOCK_CONFIG`,
@@ -2637,7 +2651,8 @@ merges under jj.
   local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
   `.jj` stays. With no `.jj` any more (the `jjGone` offer, HI-2975) nothing is checked: nothing can be unexported or
   conflicted, so it goes through, fenced and drained as any. jj missing or not the tested version refuses it as
-  `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
+  `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None (and Git → None) of a member is its own switch, drained through the fence as a group of one (HI-2974,
+  §16.6.5), so no jj card can be in flight once it is None.
 - **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
   `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
   and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
@@ -2771,7 +2786,8 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
-  Git branch).
+  Git branch); HI-2990: a squash onto a head that already holds the change, its restore making no operation, its step
+  cleared, then recovered and dropped with nothing left.
 
 ##### jj's integration evidence (1.5.0's J5, HI-2798)
 
@@ -3018,6 +3034,14 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   pinned); unreadable or mismatched is unknown, a detached binding (`key` null) and no binding are none, and an
   unfinished preparation is never shown. `submitted` (J9b records it at a submission, by compare and swap while the slot
   is still bound to that key and generation) is what a reuse of the slot allows over the base.
+- **What is kept by a workspace's name goes with it** (HI-2979). A workspace's name is the slot's
+  (`cw-<project hash>-<folder>`), so a slot removed and made again under the same name gets the same name with a new
+  generation, and an older generation's pointer would make every read of it unknown for good. The pool deletes the
+  pointer, every `slot_jjprep` journal of that workspace and the slot's `slot_jjrecover` journal in the same write
+  that deletes its row (a removal, or a removal resumed), through the port's `forgetIn`; and again in the write that
+  records a newly made workspace's identity (its folder made, or made again where it was gone), which also clears
+  rows left by a removal before this. Publishing a binding prunes the workspace's other preparations' journals that
+  are done, so they don't grow with each card cycle.
 - **`prepare` and `detach` are owned, journalled writes** (`WorkspacePort`'s new optional `OwnedWrite`: the row's
   identity, the holder's fence, the lease, a detach's `settles` and `target`; Git ignores them, its git commands
   unchanged). Each preparation has its own journal, `slot_jjprep:<store>:<workspace>:<prep>`, planned with a copy of the
@@ -3204,7 +3228,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   cycle, known at the plan, the cycle rechecked by the evidence in the Started write). `Started.platform.jj` records the
   slot's workspace, store and generation. **A restart** of the same card in the same slot (its binding this card's, one
   of its own keys, the same folder generation and target) **carries**: the start records the old base, and J9a's
-  preparation publishes the new key with the old base and submitted commits, no jj write. On another target it is
+  preparation publishes the new key with the old base and submitted commits, no jj write. What the card left in the
+  folder uncommitted is its own and stays (HI-2981): the pool's dirty refusal is skipped when the port's `carries`
+  says the preparation carries the slot's binding (`carriesBinding`, the same test the preparation makes), as Git's
+  same branch skips it; any other preparation over uncommitted edits is refused as before. On another target it is
   refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
   recovered.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
@@ -3335,6 +3362,10 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   slot's commit included) and every branch ref's change (a raw Git move) schedules a run; a change under a bundle's pins
   marks that bundle due, `packed-refs` or an armed watch (at the start, an open or reopen, too) marks every bundle due;
   disposed with the project's follow (which sets its requests' fences first).
+  Where the repository is, is asked of jj until it answers (HI-2977): an unknown answer at the start (jj busy, missing or
+  being replaced, several operation heads) is asked again at each minute's tick, one detection at a time, and the
+  watches open when it answers; once known, the tick reads the workspace's store pointer from its files (no process)
+  and, when the store changed (`jj git colocation enable` or `disable`), moves the refs watches to it.
 - **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
   unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
   published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,
@@ -3351,7 +3382,10 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
   (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
   `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
-  (J5's `jjTargetHead`); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  (J5's `jjTargetHead`); a head that already reaches a done candidate of the reviewed revision and base (the user
+  integrated it after the run's proof read the target) ends the step with nothing built, dropped or published (`none:
+  'reached'`), and the next run's proof credits it (HI-2989: a rebase built there failed `notUpToDate` and returned a card
+  the user had integrated); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
   answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
   keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
   Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
@@ -3393,7 +3427,9 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
   options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
   rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
-  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build; HI-2989,
+  each style in both modes: main set onto the candidate between a run's proof and its step, nothing built or returned,
+  Integrated via the candidate by the next run), and the e2e suites
   `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The merge checks on a jj card's candidate (1.5.0, HI-2938)
@@ -3423,7 +3459,12 @@ and s11 (HR1's OK).
   (its ref's run ended, a link's age) return it through its barrier. Each run is the lease's ref, so Stop finds its job.
 - **Credit:** jj's check bracket (J3's B1, run, B2) at the copy, counted only when its credit is exactly the candidate's
   commit; each run a `CheckRan` of the candidate's commit under its attempt's entry (`jj:<attempt>`). Exit 0 uncounted is
-  never green (tried again).
+  never green (tried again). The copy's run is credited by the copy's own state (HI-2991, `scope: 'workspace'`, jjChecks.ts):
+  this workspace's checkout record unchanged through the run (no jj command updated its working copy), B2 taken at
+  whatever head there is (no `expect`), recording nothing, not stale and at B1's @, and the write record clean; the
+  repository's operation head and Git's state aren't compared, so another lane's `jj commit` or the user's own jj during
+  a check leaves it counted (they made every multi-minute check uncounted). A builder's own check keeps the repository's
+  scope, as strict as before.
 - **Journal** (`jj_candidate_checks:<project>:<card>:<cycle>:<attempt>`, `runCandidateChecks`): the fingerprint, attempt,
   commit, head and key, the lease, and each check's phase written before its step (`started`, then `ended` with ok,
   counted and revision). Another fingerprint, attempt, commit or key starts afresh: no green reused. A check `started`
@@ -3431,7 +3472,10 @@ and s11 (HR1's OK).
   stands.
 - **While a command runs** (HR1's round 1), its validity is read again every 2 s (`WATCH_MS`): invalid (a re-approval,
   a decision, other options, a moved target or candidate), the lease's job is ended at once (the command's whole tree)
-  and the lease given back; the run answers invalid, never waiting for the command to finish.
+  and the lease given back; the run answers invalid, never waiting for the command to finish. The offer's state
+  (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
+  unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
+  current.
 - **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
   transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
   checks anew under the new key (`restart`).
@@ -3449,6 +3493,11 @@ and s11 (HR1's OK).
   checks branch). Transient (couldn't start, its time limit, killed, uncounted, no job): failing, tried again after
   30 s doubling up to 15 min; the window says why from the third in a row. No copy free, or the last lease not freed:
   waiting, tried again in 30 s. Stop (a check's run or the install's): stopped, never red and never retried by itself.
+  The retry time is kept with the record (`retryAt`, HI-2991): every look before it (each reconciliation asks for one)
+  leaves a waiting or failing set alone and sets the runner's timer for it; other checks or commands (a new checks key)
+  restart them at once. The misses in a row (`misses`) are kept while the set runs again (`progress`) and cleared only by a
+  pass or a restart, so they rise to the window's message and the retry doubles with each (after a restart the first
+  miss is the first again, its retry the first delay).
 - **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
   candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
   the runner to look. It never adopts or moves anything.
@@ -3462,7 +3511,11 @@ and s11 (HR1's OK).
   runs a writing process: no lease until its tree is ended, then the interrupted check runs again; on the real copies
   pool: a refresh between the install and a check and between two checks leaves the lease the attempt's; the setup
   command changed during the final check and at the publication write; in real jobs, Stop on a running install, then Run
-  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once); the
+  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once; HI-2991, both
+  modes: a check that keeps not counting run again only at its retry time, doubling, its misses rising to 3 and shown;
+  another slot's `jj commit` during a check: still counted, passed); `tests/jjHistory.test.ts` (HI-2991: a copy's
+  bracket counted through another workspace's operation at each barrier, never through its own checkout record moving, a
+  write, or its @ rewritten; the repository's scope as strict as before); the
   scenario `jj-checks-back` (a builder given the checks' wake fixes the card with jj and submits again); the e2e suites
   `jjchecks` and `jjchecksnc`.
 
@@ -3515,7 +3568,7 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
   strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
-  (its files, or its description alone) kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
+  (its files, or its description alone) kept, a squash attempt cut short by a crash, then the user's own merge, Integrated with the rules off and its drop crashed);
   `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
   `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
   while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward
@@ -3906,6 +3959,7 @@ that can't be written fails the change whole.
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `InTarget` (observed) | revision, target, submission (its `Submitted` fact) | A card in Review whose submitted change is in its target already: the **already in main** mark; it stays in Review (§16.4.4) [HI-2709]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
+| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again: the mark cleared (HI-2988). |
 | `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
 | `Refused` | intent or move, rule, message ids, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
@@ -4577,6 +4631,13 @@ The Version Control tab documents each preset's choices and why (P6, from this t
 it applies from the next card, and the running lanes and cards in flight it won't affect yet (they finish under their
 ruleset, marked "old rules"). Confirming saves the options; nothing running is changed. Switching Git → None (or
 back) works the same: cards in flight keep their platform's ruleset; a Git card can't finish under None's rules.
+**Except a fence member** (HI-2974): a project whose repository has been switched between Git and jj (a member of its
+platform fence) switches to None only once nothing runs in it: no running lane, card in flight, queued merge,
+slot or copy lease (`memberDrain`, its drain listed with Check Again). The switch goes through the fence as a group of
+one (`memberSwitch`: begun, drained, written, settled, recovered from the disk as any switch), so its in-flight work is
+never left on leases the fence would refuse, nor outside a later store switch's group and drain. The other members take
+no part and keep their choice; their admissions are told to try again while it runs, as for any switch of the store.
+An unreadable membership or fence refuses (`switching`). A never-switched project's switch to None is unchanged.
 
 **Built [#1419], switching the version control:**
 - **Where:** the header's None · Git choice (`VersionControlHeader.tsx`), the offers (§16.3.5), and the Assistant's
@@ -5882,8 +5943,15 @@ touched:
   and a staged pause's files as staged then, which the pause's text names), and, under the repository
   lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
   operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
-  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: `add --intent-to-add`
-  for untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Git does all the index work;
+  Combwork never writes the index. **Refused by name first** (HI-2982; Darren, 11 Nov 2026), before Commit or Set
+  aside runs, nothing committed or changed: a path whose removal from Git is staged (Files' Stop Tracking, `git rm
+  --cached`, or a rename's old side) while its file is still in the folder (absent only when the system says so: a
+  stat failing otherwise refuses too), *"<file> is staged for removal from Git:
+  commit it yourself in Git; Combwork won't add it back."* `commit --only` takes each path from the folder, so it put
+  the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
+  over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
+  untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
   intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked -- <paths>`, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
@@ -6208,7 +6276,9 @@ The URL is used literally, never the remote's name.
 fragment, the ref, the remote head tested on, and the snapshot's id and SHA-256 digest. The snapshot is in
 `queue-transport.json` in Combwork's profile, encrypted with safeStorage (DPAPI), keyStore.ts's pattern (one atomic
 write, no `.bak`), decrypted only to build a sealed context, never sent to a window, a reply, a log or diagnostics;
-removed once its entry has an outcome. Each is owned by its project's target, and only that target's queue host drops
+removed once its entry has an outcome. Its file there but unreadable (after three tries) is never read as empty
+(HI-2993): a save then refuses and writes nothing, so other targets' snapshots are never dropped, and the queue tries
+the advance again as a failed read; a load answers none, and a drop or clean-up writes nothing. Each is owned by its project's target, and only that target's queue host drops
 leftovers no begun publication of the target needs, between its entries under its lease, so another target's clean-up
 never takes one between its save and its `IntegrationStarted`. git's words kept
 for a pause or a log are redacted first (URL userinfo, any URL's query and fragment, authorization and bearer values,
@@ -6216,7 +6286,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 
 **The queue's steps** (§16.9.1, changed only as follows):
 1. **Fetch first:** the snapshot's ref fetched into the sealed context and its head pinned in the project at
-   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). A failed fetch pauses
+   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). The sealed context offers the
+   remote the project's commits as haves (HI-2987: the previous pin, the remote's tracking refs and the local branches,
+   at most 256, read from the project's refs and written as the context's own `refs/have/<n>`), so only what is new
+   arrives; with none, the remote sent the branch's whole history at each fetch. A failed fetch pauses
    `fetchFailed` with git's words. The local target at the fetched head or behind it goes on; one with commits the
    remote lacks pauses `remoteDiverged` (never forced, never merged silently). An owed G18 push or catch-up is settled
    first, as today.
@@ -6251,8 +6324,14 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    (another ancestor of the result gets its own journalled plan, never an earlier one's files). Not checked out: a
    compare-and-swap. Checked out: §16.9.2's conditions, files and ref (Ask each time was asked before publishing). A
    condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
-   A local target moved to something that doesn't lead to the result is left as it is (step 1 then pauses
-   `remoteDiverged`). Nothing here reopens, retests or publishes again.
+   A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
+   pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with
+   nothing said). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
+   (`QueuePauseInfo.catchUp`, `catchUpPaused`): its folder's changes are offered Set Aside only (stashed "before
+   bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
+   local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card
+   published to the remote (its `IntegrationStarted.publish`, or integrated by outside while following) `LeftTarget`
+   while its catch-up is owed or the local target is behind its result.
 
 **Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the

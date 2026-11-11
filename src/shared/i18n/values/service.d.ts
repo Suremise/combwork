@@ -85,6 +85,7 @@ interface CombworkMessageValues {
   'service.folderChanges.busy': { folder: string | number; what: string | number }
   'service.folderChanges.changed': { folder: string | number }
   'service.folderChanges.commitFailed': { why: string | number }
+  'service.folderChanges.deletedKept': { file: string | number }
   'service.folderChanges.detached': { folder: string | number }
   'service.folderChanges.indexBusy': undefined
   'service.folderChanges.midOperation': { state: string; folder: string | number }
@@ -294,6 +295,7 @@ interface CombworkMessageValues {
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.providers.unknownHost': { cli: string | number }
+  'service.queue.catchUpNoCommit': { card: string | number; target: string | number }
   'service.queue.pauseChanged': undefined
   'service.queue.pauseNoFolder': undefined
   'service.repoOps.notOffered': { platform: string | number }

@@ -26,7 +26,7 @@ const { SlotStore } = await import('../src/main/slots')
 const { CopyStore } = await import('../src/main/copies')
 const { boardConn } = await import('../src/main/slotsApp')
 const { metaOf } = await import('../src/main/platform/fenceAdmit')
-const { beginSwitch, MEMBER_KEY, readFence, storeKey } = await import('../src/main/platform/platformFence')
+const { beginSwitch, FENCE_KEY, MEMBER_KEY, readFence, storeKey } = await import('../src/main/platform/platformFence')
 const { commonGitDir, heldStoreKeys, storeKeyOf } = await import('../src/main/repoLock')
 const { withFolderRepoLocks } = await import('../src/main/platform/repoPorts')
 const { agentActor } = await import('../src/shared/workflow/facts')
@@ -301,6 +301,163 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await platformIn(w, p)).toBe('none')
     expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'platform.switching' })
     void q
+  })
+})
+
+describe("a fence member's switch to None is drained (HI-2974)", () => {
+  let k = 0
+  const lease = async (w: WS, dir: string, platform: 'git' | 'jj' = 'git') => new SlotStore(boardConn(w), await idOf(w, dir)).take({ agent: `b-m${++k}`, card: 800 + k }, { size: 4, root: join(base, `mslots-${k}`), target: 'main', token: `tm-${k}`, holder: { pid: process.pid, started: 1 }, platform })
+  const copy = async (w: WS, dir: string, platform: 'git' | 'jj' = 'git') => new CopyStore(boardConn(w), await idOf(w, dir)).take({ kind: 'review', card: 800 + ++k, revision: 'abc' }, { size: 4, dir: join(base, `mcopies-${k}`), token: `cm-${k}`, holder: { pid: process.pid, started: 1 }, profile: 'test', platform })
+  const leaseOk = async (w: WS, dir: string, platform: 'git' | 'jj' = 'git') => expect((await lease(w, dir, platform)).ok).toBe(true)
+  const copyOk = async (w: WS, dir: string, platform: 'git' | 'jj' = 'git') => expect((await copy(w, dir, platform)).ok).toBe(true)
+  const endAll = async (w: WS, dir: string) => {
+    const slots = new SlotStore(boardConn(w), await idOf(w, dir))
+    for (const l of slots.openLeases()) await slots.end(l.id, 'test')
+    const copies = new CopyStore(boardConn(w), await idOf(w, dir))
+    const unfreed = copies.unfreed()
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => unfreed.forEach((l) => copies.dropIn(db, l.id, 'test'))))
+    expect([slots.openLeases().length, copies.unfreed().length]).toEqual([0, 0])
+  }
+  /** P and Q through Git → jj (and back to Git when `back`): both members of their repository's fence. */
+  async function members(back: boolean) {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    if (back) await sw.setPlatform(w, p, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, p, 'git')).store!.token })
+    return { w, p, q }
+  }
+
+  it('Git → jj → Git, then Git → None with work running: refused up front, its leases still taken; once done, switched', async () => {
+    const { w, p, q } = await members(true)
+    await leaseOk(w, p)
+    await copyOk(w, p)
+    const check = await sw.checkPlatformSwitch(w, p, 'none')
+    expect(check.refused).toEqual({ why: 'memberDrain' })
+    expect(check.store?.group).toEqual([])
+    expect(check.store?.drain.slots.map((s) => s.project)).toEqual(['p'])
+    expect(check.store?.drain.copies.map((c) => c.project)).toEqual(['p'])
+    await expect(sw.setPlatform(w, p, 'none', { expected: 'git' })).rejects.toThrow(/Work is still running in this project/)
+    // Nothing changed: P is still Git, its fence settled, and its work goes on taking leases.
+    expect(await platformIn(w, p)).toBe('git')
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'git' } } } })
+    await leaseOk(w, p)
+    await copyOk(w, p)
+    // Once it has finished: switched, through the fence; Q took no part and keeps Git.
+    await endAll(w, p)
+    expect((await sw.checkPlatformSwitch(w, p, 'none')).refused).toBeNull()
+    expect(await sw.setPlatform(w, p, 'none', { expected: 'git' })).toEqual({ from: 'git', to: 'none' })
+    expect(await platformIn(w, p)).toBe('none')
+    expect(await platformIn(w, q)).toBe('git')
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'none' } }, [await idOf(w, q)]: { current: { platform: 'git' } } } })
+    await leaseOk(w, q)
+  })
+
+  it('jj → None with a jj card running: refused, both still jj, and a later switch of Q to Git drains P’s work too', async () => {
+    const { w, p, q } = await members(false)
+    await leaseOk(w, p, 'jj')
+    expect((await sw.checkPlatformSwitch(w, p, 'none')).refused).toEqual({ why: 'memberDrain' })
+    await expect(sw.setPlatform(w, p, 'none', { expected: 'jj' })).rejects.toThrow(/Work is still running in this project/)
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+    await leaseOk(w, p, 'jj')
+    await copyOk(w, q, 'jj')
+    // P stayed in the group, so Q's switch of the repository to Git waits for P's jj work.
+    const back = await sw.checkPlatformSwitch(w, q, 'git')
+    expect(back.refused).toEqual({ why: 'drain' })
+    expect(back.store?.group.map((g) => g.name).sort()).toEqual(['p', 'q'])
+    expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['p', 'p'])
+  })
+
+  it('paused after its begin, then after its drain: nothing of the project is admitted, the other member is told to try again', async () => {
+    const { w, p, q } = await members(true)
+    for (const point of ['afterBegin', 'afterDrain'] as const) {
+      const pause = pauseAt(point)
+      const switching = sw.setPlatform(w, p, 'none', { expected: 'git' })
+      await pause.at
+      try {
+        expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'platform.switching' })
+        await expect(lease(w, p)).rejects.toThrow(/being switched/)
+        await expect(copy(w, p)).rejects.toThrow(/being switched/)
+        await expect(lease(w, q)).rejects.toThrow(/being switched/)
+      } finally {
+        pause.go()
+      }
+      expect(await switching).toEqual({ from: 'git', to: 'none' })
+      expect(await platformIn(w, p)).toBe('none')
+      ss.storeSwitchSeams.at = undefined
+      // Back to Git for the next pause.
+      if (point === 'afterBegin') {
+        const c = await sw.checkPlatformSwitch(w, p, 'git')
+        expect(c.refused).toBeNull()
+        await sw.setPlatform(w, p, 'git', { expected: 'none', ...(c.store ? { token: c.store.token } : {}) })
+        expect(await platformIn(w, p)).toBe('git')
+      }
+    }
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled' })
+  })
+
+  it('a failed save rolls back to its before: the fence settled on Git, its admissions as before', async () => {
+    const { w, p } = await members(true)
+    ss.storeSwitchSeams.write = async () => {
+      throw new Error('disk full')
+    }
+    await expect(sw.setPlatform(w, p, 'none', { expected: 'git' })).rejects.toThrow(/disk full/)
+    ss.storeSwitchSeams.write = undefined
+    expect(await platformIn(w, p)).toBe('git')
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'git' } } } })
+    await leaseOk(w, p)
+  })
+
+  it('a fence unreadable, gone, or not listing the member: refused, never an unfenced switch; nothing changed (HR2 round 1)', async () => {
+    const corrupt: [string, (raw: string | null) => string | null][] = [
+      ['malformed', () => '{not json'],
+      ['gone', () => null],
+      ['without the member', (raw) => {
+        const f = JSON.parse(raw!) as { members: Record<string, unknown> }
+        for (const id of Object.keys(f.members)) if (id.startsWith('p')) delete f.members[id]
+        return JSON.stringify(f)
+      }]
+    ]
+    for (const [name, change] of corrupt) {
+      const { w, p } = await members(true)
+      const storeId = storeKey(await commonGitDir(p))
+      const before = await w.projectConfig(p)
+      await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => metaOf(db).set(FENCE_KEY(storeId), change(metaOf(db).get(FENCE_KEY(storeId))))))
+      expect((await sw.checkPlatformSwitch(w, p, 'none')).refused, name).toEqual({ why: 'switching' })
+      await expect(sw.setPlatform(w, p, 'none', { expected: 'git' }), name).rejects.toThrow(/being switched/)
+      expect(await w.projectConfig(p), name).toEqual(before)
+    }
+  })
+
+  it('authority revoked while it drains: refused at the write, nothing written, the fence settled back and admissions restored (HR2 round 1)', async () => {
+    const { w, p, q } = await members(true)
+    let revoked = false
+    let guarded = 0
+    ss.storeSwitchSeams.at = (pt) => {
+      if (pt === 'afterDrain') revoked = true
+    }
+    const guard = () => {
+      guarded++
+      if (revoked) throw new Error('Control was revoked')
+    }
+    await expect(sw.setPlatform(w, p, 'none', { expected: 'git', guard })).rejects.toThrow(/Control was revoked/)
+    ss.storeSwitchSeams.at = undefined
+    expect(guarded).toBe(2)
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'git'])
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'git' } }, [await idOf(w, q)]: { current: { platform: 'git' } } } })
+    await leaseOk(w, p)
+    await copyOk(w, p)
+    expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.switching' })
+  })
+
+  it('control: a project never switched goes to None with its work running, which keeps its leases (its old rules)', async () => {
+    const { w, p } = await workspace({ p: 'git', q: 'git' })
+    await leaseOk(w, p)
+    const check = await sw.checkPlatformSwitch(w, p, 'none')
+    expect(check.refused).toBeNull()
+    expect(check.store).toBeUndefined()
+    await sw.setPlatform(w, p, 'none', { expected: 'git' })
+    expect(await platformIn(w, p)).toBe('none')
+    await leaseOk(w, p)
+    await copyOk(w, p)
   })
 })
 

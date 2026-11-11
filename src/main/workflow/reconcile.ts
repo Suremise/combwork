@@ -23,6 +23,7 @@ import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
+import { catchUpKey, catchUpOf } from './mergeQueue'
 import { inTargetNow } from '../../shared/workflow/workView'
 import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
@@ -450,12 +451,45 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     // isn't is the change looked for, in the same head.
     const resultIn = await H.isAncestor(project, i.result, th)
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
-    if (resultIn) return
+    // In it again (HI-2988: caught up, or merged back): a mark it had cleared.
+    if (resultIn) {
+      if (s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
+      return
+    }
+    // HI-2988: published to its remote (follow mode, G21), the card's result is the remote's: a local target whose
+    // catch-up to it is still owed, or merely behind it, hasn't left it.
+    if (catchUpOf(wf.store.meta(catchUpKey(i.target)))?.card === card.key) return
+    if (published(wf, card, s)) {
+      const behind = await H.isAncestor(project, th, i.result)
+      if (isUnknown(behind)) return hooks.unknown?.(behind.what)
+      if (behind) return
+    }
     const sub = s.latest
     const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))
   }
+}
+
+/**
+ * HI-2988: a Done card's leaving its target and coming back, each observation keyed to the transition it follows (the
+ * latest fact of the opposite kind, read in its write): two Combworks observing one transition write one fact, and the
+ * same heads visited again (reset away and back, twice) make new ones. `LeftTarget` follows the integration or the last
+ * `BackInTarget`; `BackInTarget` follows the last `LeftTarget`.
+ */
+const LEFT: ReadonlySet<string> = new Set(['LeftTarget']) // i18n-ignore: fact kinds
+const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget']) // i18n-ignore: fact kinds
+const lastSeq = (w: Write, card: number, kinds: ReadonlySet<string>): number => w.tx.facts(card).findLast((f) => kinds.has(f.kind))?.seq ?? 0
+
+/**
+ * HI-2988: whether a Done card's integration was published to its target's remote (follow mode): its advance's
+ * `IntegrationStarted` recorded the publication, or the queue found it published by someone else while following.
+ */
+function published(wf: Workflow, card: CardRecord, s: CardState): boolean {
+  const i = s.integrated
+  if (!i?.entry) return false
+  if (wf.store.facts(card.id).some((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === i.entry && !!(f.data as FactData['IntegrationStarted']).publish)) return true
+  return i.by === 'outside' && wf.cfg.options().followRemote === true
 }
 
 async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
@@ -516,7 +550,8 @@ export interface JjReconcilePorts {
 /**
  * HI-2938: a candidate's merge checks as the window shows them, bound to the checks key they run under (s11 §2):
  * running (`done` of `names`, `current` the one running), passed (adoptable), waiting for a check copy, stopped (Stop:
- * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`).
+ * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`). HI-2991: `misses` is kept while they run
+ * again (only a pass or a restart under a new key clears it), and a waiting or failing set isn't run again before `retryAt`.
  */
 export interface JjCandidateChecksShown {
   key: string
@@ -526,6 +561,8 @@ export interface JjCandidateChecksShown {
   current?: string
   why?: string
   misses?: number
+  /** HI-2991: waiting or failing, when the checks runner may run them again (ms since the epoch). */
+  retryAt?: number
 }
 
 /**
@@ -625,9 +662,10 @@ export type JjChecksUpdate =
   /** The checks' key changed (other checks, commands, install or setup): they start anew under it (HR1's round 1 finding 3). */
   | { restart: string[] }
   | { passed: string[] }
-  | { waiting: string }
+  /** HI-2991: `retryMs`, how long until the checks runner tries again. */
+  | { waiting: string; retryMs: number }
   | { stopped: string }
-  | { failing: string }
+  | { failing: string; retryMs: number }
   | { red: { check: string; output: string; logPath?: string; expected: string } }
 
 /**
@@ -675,14 +713,15 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
       'restart' in u
         ? { key: at.key, names: u.restart, state: 'running', done: 0 }
         : 'progress' in u
-        ? { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}) }
+        ? // HI-2991: the misses in a row kept while they run again, so a failing set counts up to the window's message.
+          { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}), ...(c.misses ? { misses: c.misses } : {}) }
         : 'passed' in u
           ? { key: c.key, names: c.names, state: 'passed', done: c.names.length }
           : 'waiting' in u
-            ? { ...c, state: 'waiting', why: u.waiting }
+            ? { key: c.key, names: c.names, state: 'waiting', why: u.waiting, ...(c.misses ? { misses: c.misses } : {}), retryAt: Date.now() + u.retryMs }
             : 'stopped' in u
-              ? { ...c, state: 'stopped', why: u.stopped }
-              : { ...c, state: 'failing', why: u.failing, misses: (c.state === 'failing' ? (c.misses ?? 1) : 0) + 1 }
+              ? { ...c, state: 'stopped', why: u.stopped, retryAt: undefined }
+              : { key: c.key, names: c.names, state: 'failing', why: u.failing, misses: (c.misses ?? 0) + 1, retryAt: Date.now() + u.retryMs }
     const row: JjCandidateShown = { ...r, checks: next, at: Date.now() }
     w.tx.sql((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify(row), key)) // i18n-ignore: SQL
     wrote = true
@@ -762,7 +801,8 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
     await put({ state: 'unknown', why: step.unknown })()
     return hooks.unknown?.(`candidate: ${step.unknown}`)
   }
-  if ('none' in step) return put({ state: 'signing' })()
+  // HI-2989: the target already holds its candidate: nothing written (the offer stays as it was; the proof credits it).
+  if ('none' in step) return step.none === 'reached' ? undefined : put({ state: 'signing' })()
   // A candidate or a return is published only while the target is still at the head it was built on.
   const expected = 'offer' in step ? step.offer.expected : step.returned.expected
   if (!ports.headIs || !(await ports.headIs(fp.target, expected))) return

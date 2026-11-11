@@ -108,14 +108,19 @@ function configLines(pairs: [string, string][]): string[] {
   return out
 }
 
-/** The sealed context of one operation: made from the snapshot, removed once it ends (it holds the decrypted settings). */
-async function sealed<T>(snap: TransportSnapshot, fn: (ctx: string, env: NodeJS.ProcessEnv) => Promise<T>): Promise<T> {
+/**
+ * The sealed context of one operation: made from the snapshot, removed once it ends (it holds the decrypted settings).
+ * `haves` (HI-2987): commits of the project's, as refs of the context's own (`refs/have/<n>`), so a fetch tells the remote
+ * what it has and receives only what is new; with none, git offers nothing and the remote sends the branch's whole history.
+ */
+async function sealed<T>(snap: TransportSnapshot, fn: (ctx: string, env: NodeJS.ProcessEnv) => Promise<T>, haves: readonly string[] = []): Promise<T> {
   const ctx = join(tmpdir(), `combwork-transport-${randomUUID()}`)
   try {
     mkdirSync(join(ctx, 'refs'), { recursive: true })
     mkdirSync(join(ctx, 'objects'), { recursive: true })
     writeFileSync(join(ctx, 'HEAD'), 'ref: refs/heads/none\n')
     writeFileSync(join(ctx, 'empty'), '')
+    if (haves.length) writeFileSync(join(ctx, 'packed-refs'), haves.map((c, i) => `${c} refs/have/${i}\n`).join(''))
     const sha256 = snap.format === 'sha256'
     const head = ['[core]', `\trepositoryformatversion = ${sha256 ? 1 : 0}`, '\tbare = true', ...(sha256 ? ['[extensions]', '\tobjectformat = sha256'] : [])]
     writeFileSync(join(ctx, 'config'), [...head, ...configLines(snap.config), ...SEALED, ''].join('\n'))
@@ -182,8 +187,24 @@ export async function destinationOf(h: CandidateHost, target: string): Promise<A
   return { snapshot: { remote, url, display: displayUrl(url), ref: merge, config, objects, alternates, format: format.out.trim() || 'sha1' } }
 }
 
+/** At most this many of the project's commits are offered to the remote as haves (HI-2987). */
+export const HAVES_MAX = 256
+
+/**
+ * HI-2987: the project's commits a sealed fetch offers the remote as haves: its previous pin (`into`), what it tracks of
+ * that remote, and its local branches, read in the project (refs only: no transport setting). Unreadable: none, the fetch
+ * still correct, only larger.
+ */
+async function havesOf(h: CandidateHost, snap: TransportSnapshot, into: string): Promise<string[]> {
+  const r = await h.run(h.project, ['for-each-ref', `--count=${HAVES_MAX}`, '--format=%(objectname) %(objecttype)', into, `refs/remotes/${snap.remote}/`, 'refs/heads/'])
+  if (!r.ok) return []
+  const hex = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+  return [...new Set(r.out.split(/\r?\n/).map((l) => l.trim().split(' ')).filter(([id, type]) => type === 'commit' && hex.test(id)).map(([id]) => id))]
+}
+
 /** Fetches the snapshot's ref into the sealed context's own ref, reads that fetch's head there, and pins it in the project as `into`. */
-export function fetchHeadOf(h: CandidateHost, snap: TransportSnapshot, into: string, timeoutMs = TRANSPORT_MS): Promise<{ head: string } | { failed: string }> {
+export async function fetchHeadOf(h: CandidateHost, snap: TransportSnapshot, into: string, timeoutMs = TRANSPORT_MS): Promise<{ head: string } | { failed: string }> {
+  const haves = await havesOf(h, snap, into)
   return sealed(snap, async (ctx, env) => {
     const f = await h.run(ctx, ['fetch', '--no-tags', '--no-write-fetch-head', '--no-auto-gc', '--no-auto-maintenance', '--', snap.url, `+${snap.ref}:refs/cw/r`], { env, timeoutMs })
     if (!f.ok) return { failed: redactTransport(said(f), snap) }
@@ -192,7 +213,7 @@ export function fetchHeadOf(h: CandidateHost, snap: TransportSnapshot, into: str
     if (!head) return { failed: redactTransport(said(r), snap) }
     const pin = await h.run(h.project, ['update-ref', into, head])
     return pin.ok ? { head } : { failed: said(pin) }
-  })
+  }, haves)
 }
 
 /**

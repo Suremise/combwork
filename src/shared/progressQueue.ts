@@ -284,9 +284,24 @@ const PAUSES: Record<string, Msg> = {
 }
 
 /** Why a queue is paused, in a sentence (#1356 item 1): each pause reason a message, the user's and the Assistant's too. */
+/**
+ * HI-2988: a catch-up's pause on changes in the folder (follow mode): the card is merged and on the remote already, and only
+ * Set Aside is offered, as a commit on the local target would be one its remote lacks.
+ */
+const CATCH_UP_CHANGES = msg({
+  id: 'board.queue.pause.catchUpChanges',
+  defaultMessage:
+    '{card} is merged and on {target}’s remote already, but {files, select, none {files it changes have changes} other {{count, plural, one {{files} has changes} other {{files} have changes}}}} in the folder {target} is checked out in, so the local {target} isn’t up to date with it yet. Set them aside, and it catches up.',
+  description:
+    "Why a merge queue is paused, on its card in the Progress panel (HI-2988, “The target branch follows its remote”): the card ({card}: its key) was merged and pushed to the remote, and bringing the local branch ({target}) up to date with it waits for files with uncommitted or staged changes in the folder where it is checked out ({files}: a list of names, five at most, or none; {count}: how many in all). Set Aside is a button beside it (as translated there). Keep the select keys and the word none."
+})
+
+/** Whether a pause is on changes in the target's folder (staged or uncommitted), which Commit or Set Aside settle. */
+const FOLDER_CHANGES: ReadonlySet<string> = new Set(['staged', 'unstagedChanges'])
+
 export function pauseText(p: QueuePauseInfo, target: string, tr: Tr, list: (items: string[]) => string): string {
   if (p.reason === 'user') return p.by === 'assistant' ? tr(msg({ id: 'board.queue.pause.byAssistant', defaultMessage: 'Paused by the Assistant. The queue merges nothing until it is resumed.', description: "Why a merge queue is paused, on its card in the Progress panel: the Combwork Assistant paused it (Pause queue)." })) : tr(msg({ id: 'board.queue.pause.byYou', defaultMessage: 'Paused by you. The queue merges nothing until you resume it.', description: "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)." }))
-  const m = PAUSES[p.reason]
+  const m = p.catchUp && FOLDER_CHANGES.has(p.reason) ? CATCH_UP_CHANGES : PAUSES[p.reason]
   if (!m) return tr(msg({ id: 'board.queue.pause.other', defaultMessage: 'Paused ({reason}).', description: "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Combwork's code for it)." }), { reason: p.reason })
   // `count`: how many files in all (HI-2951: one file agrees as one; the list names five at most).
   const text = tr(m, { target, card: p.card ?? '', files: p.files.length ? list(p.files.slice(0, 5)) : 'none', count: p.files.length }) // i18n-ignore: a select key, never shown

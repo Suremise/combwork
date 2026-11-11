@@ -713,6 +713,7 @@
   "board.queue.pause.approval": "{card} ist bereit für den Merge in {target} (ausgecheckt): Die Karte wartet unter „Für dich“ auf deine Zustimmung.",
   "board.queue.pause.byAssistant": "Vom Assistenten angehalten. Die Warteschlange mergt nichts, bis sie fortgesetzt wird.",
   "board.queue.pause.byYou": "Von dir angehalten. Die Warteschlange mergt nichts, bis du sie fortsetzt.",
+  "board.queue.pause.catchUpChanges": "{card} ist gemergt und schon auf dem Remote von {target}, aber {files, select, none {Dateien, die er ändert, haben Änderungen} other {{count, plural, one {{files} hat Änderungen} other {{files} haben Änderungen}}}} im Ordner, in dem {target} ausgecheckt ist, daher ist das lokale {target} noch nicht auf dem Stand damit. Lege sie beiseite, dann holt es auf.",
   "board.queue.pause.checkedOut": "{target} ist in einem Ordner ausgecheckt. Combwork mergt jetzt auch dort hinein: Setze fort, um weiterzumachen.",
   "board.queue.pause.commit": "Committen",
   "board.queue.pause.commitTip": "{files} im jetzigen Stand auf {target} committen und den Merge weiterlaufen lassen.",

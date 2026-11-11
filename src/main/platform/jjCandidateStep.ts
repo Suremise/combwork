@@ -6,7 +6,8 @@
 // One step per reconciliation, in order:
 // 1. Every attempt the card's cycle journalled that isn't settled (a phase short of done, a step under way, uncertain
 //    commits) is recovered with J4's `recoverJjAttempt` and dropped with `dropJjAttempt`, before anything new is built.
-// 2. The target's head read (J5's `jjTargetHead`).
+// 2. The target's head read (J5's `jjTargetHead`); one that already reaches a candidate of the reviewed change ends the
+//    step with nothing to do (HI-2989: the user integrated it, for the proof).
 // 3. A done candidate for exactly this fingerprint (the approval, the rules' id, style, strict) and this head, still
 //    visible (`jjCandidateNow`), is offered again: nothing is built. A failure for exactly them is answered again.
 // 4. Every other done candidate or update (another fingerprint, another head) is superseded: dropped with J4's
@@ -103,6 +104,8 @@ export type JjCandidateStep =
   | { offer: JjCandidateOffer }
   | { returned: JjCandidateFailure & { attempt: string; expected: string } }
   | { none: 'signing' }
+  /** HI-2989: the target's head already holds a candidate of this reviewed change: nothing to do, the proof's. */
+  | { none: 'reached' }
   | { unknown: string }
 
 /** An unknown's code and its detail, bounded, for the log and the record. */
@@ -143,6 +146,17 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
   const th = await deps.targetHead(fp.target)
   if ('unknown' in th) return th
   const head = th.head
+
+  // HI-2989: the head already holds a candidate of this reviewed change (the user integrated it after this run's proof read
+  // the target): nothing built, dropped or answered. A build on that head would only fail (a rebase's copies onto commits
+  // that hold them aren't the same change) and return a card the user integrated; the next run's proof credits it. As the
+  // proof's own credit (jjIntegration's `boundCandidate`): a finished candidate of this revision and base.
+  for (const e of deps.entries()) {
+    const r = e.record
+    if (e.failure || e.state === 'dropped' || (r.kind ?? 'candidate') !== 'candidate' || r.outcome !== 'candidate' || r.phase !== 'done' || !r.result) continue
+    if (r.revision !== fp.revision || r.base !== fp.base) continue
+    if (await reaches(deps.j4.git, r.result, head)) return { none: 'reached' }
+  }
 
   // 3. The current answer for exactly this fingerprint and head, if there is one.
   const live = deps.entries().filter((e) => !e.state && !e.failure && e.record.phase === 'done')

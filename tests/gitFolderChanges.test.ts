@@ -13,6 +13,18 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** HI-2982 (HR2's round 5): an lstat of a path ending so refused (EPERM), as Windows can, though git still reads it. */
+let failLstatOf: string | null = null
+vi.mock('original-fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  return {
+    ...real,
+    lstat: (async (p: string, o?: unknown) => {
+      if (failLstatOf && String(p).replace(/\\/g, '/').endsWith(`/${failLstatOf}`)) throw Object.assign(new Error(`EPERM: operation not permitted, lstat '${p}'`), { code: 'EPERM' })
+      return real.lstat(p, o as Parameters<typeof real.lstat>[1])
+    }) as typeof real.lstat
+  }
+})
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -90,6 +102,7 @@ beforeEach(() => {
   fencedProbe = null
   failTopIn = null
   failStashAfter = false
+  failLstatOf = null
 })
 
 describe('Commit', () => {
@@ -200,6 +213,86 @@ describe('Set aside', () => {
     const err = await settle('setAside', ['a.txt']).catch((e: Error) => e)
     expect(String(err)).toMatch(/aren't the ones shown/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+  })
+})
+
+// HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the file's removal staged and the file in the folder. Commit
+// took each path from the folder (`commit --only`), so the file went back into Git with its local content. Darren's
+// decision (11 Nov 2026): git does all the index work; such a path is refused by name, nothing committed or changed.
+describe('a file the user stopped tracking (its removal staged, the file kept)', () => {
+  const stopTracking = (file: string, content: string, ignore: boolean): void => {
+    commit(proj, { [file]: '{}\n' }, 'tracked')
+    sh(proj, 'rm', '-q', '--cached', file)
+    if (ignore) writeFileSync(join(proj, '.gitignore'), `node_modules/\n${file}\n`)
+    writeFileSync(join(proj, file), content)
+  }
+  const inHead = (file: string): boolean => sh(proj, 'ls-tree', '--name-only', 'HEAD').split('\n').includes(file)
+  /** HEAD, every index entry (mode, object, stage), the status and the stashes: compared before and after a refusal. */
+  const state = (): string[] => [head(), sh(proj, 'ls-files', '--stage'), status(), sh(proj, 'stash', 'list')]
+  const refused = /is staged for removal from Git: commit it yourself in Git; Combwork won't add it back/
+
+  it('Commit with .gitignore (the start warning, H2): refused by name, nothing committed or changed, the secret in no commit', async () => {
+    stopTracking('settings.local.json', '{"token":"REAL-SECRET"}\n', true)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['D  settings.local.json', 'M .gitignore'])
+    const before = state()
+    await expect(settle('commit', ['.gitignore', 'settings.local.json'])).rejects.toThrow(/^settings\.local\.json is staged for removal from Git/)
+    expect(state()).toEqual(before)
+    expect(sh(proj, 'log', '--all', '-p', '--format=')).not.toContain('REAL-SECRET')
+    expect(read('settings.local.json')).toBe('{"token":"REAL-SECRET"}\n')
+    // The rest commits as before, the removal left staged for the user.
+    await settle('commit', ['.gitignore'])
+    expect(committed()).toEqual(['.gitignore'])
+    expect(status()).toBe('D  settings.local.json')
+    expect(inHead('settings.local.json')).toBe(true)
+  })
+
+  it("the kept file's stat failing (EPERM, not a missing file): Commit and Set Aside still refused by name, nothing changed", async () => {
+    stopTracking('secret.env', 'LOCAL-SECRET\n', true)
+    sh(proj, 'commit', '-q', '-m', 'ignore', '--only', '--', '.gitignore')
+    const before = state()
+    failLstatOf = 'secret.env'
+    for (const action of ['commit', 'setAside'] as const) {
+      await expect(settle(action, ['secret.env'])).rejects.toThrow(/^secret\.env is staged for removal from Git/)
+      expect(state()).toEqual(before)
+    }
+    expect(sh(proj, 'log', '--all', '-p', '--format=')).not.toContain('LOCAL-SECRET')
+  })
+
+  it('the removal alone (.gitignore committed before): Commit and Set Aside refused by name, neither looping nor leaving a stash', async () => {
+    stopTracking('secret.env', 'SECRET=1\n', true)
+    sh(proj, 'commit', '-q', '-m', 'ignore', '--only', '--', '.gitignore')
+    expect(status()).toBe('D  secret.env')
+    const before = state()
+    for (const action of ['commit', 'setAside', 'commit', 'setAside'] as const) {
+      await expect(settle(action, ['secret.env'])).rejects.toThrow(refused)
+      expect(state()).toEqual(before)
+    }
+    expect(read('secret.env')).toBe('SECRET=1\n')
+  })
+
+  it("no ignore line (listed removed and untracked): Commit and Set Aside refused, the staged removal never lost, the file's content kept", async () => {
+    stopTracking('a.txt', 'local only\n', false)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
+    const before = state()
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(refused)
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(refused)
+    expect(state()).toEqual(before)
+    expect(read('a.txt')).toBe('local only\n')
+  })
+
+  it('a staged rename whose old name is back on disk: refused by the old name, nothing done', async () => {
+    sh(proj, 'mv', 'b.txt', 'c.txt')
+    writeFileSync(join(proj, 'b.txt'), 'a new b\n')
+    const before = state()
+    await expect(settle('commit', ['c.txt'])).rejects.toThrow(/^b\.txt is staged for removal from Git/)
+    expect(state()).toEqual(before)
+  })
+
+  it("Files' Commit it with .gitignore itself staged for removal and still there: refused by name", async () => {
+    sh(proj, 'rm', '-q', '--cached', '.gitignore')
+    const before = state()
+    await expect(inWorkspace(w, () => changes.commitIgnore(proj))).rejects.toThrow(/^\.gitignore is staged for removal from Git/)
+    expect(state()).toEqual(before)
   })
 })
 

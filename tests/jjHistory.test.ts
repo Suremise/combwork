@@ -126,8 +126,8 @@ const owns = (): Owner & { lose(): void } => {
 const noLock = <T>(fn: () => Promise<T>): Promise<T> => fn()
 
 /** Runs a whole bracket on the fake: start, the command (`run`), end, credit. */
-async function bracket(f: FakeRepo, o: { owner?: Owner; log?: WriteLog; run?: () => void; seams?: JjCheckSeams } = {}) {
-  const r: JjCheckFor = { view: f.view, folder: f.root, revision: commit(1), owner: o.owner ?? owns(), lock: noLock }
+async function bracket(f: FakeRepo, o: { owner?: Owner; log?: WriteLog; run?: () => void; seams?: JjCheckSeams; scope?: 'workspace' } = {}) {
+  const r: JjCheckFor = { view: f.view, folder: f.root, revision: commit(1), owner: o.owner ?? owns(), lock: noLock, ...(o.scope ? { scope: o.scope } : {}) }
   const seams: JjCheckSeams = { runner: f.runner(), ...o.seams }
   const start = await jjCheckStart(r, o.log ?? QUIET, seams)
   o.run?.()
@@ -416,6 +416,34 @@ describe('jj check credit: the bracket with races at each barrier', () => {
     expect(await bracket(c, { seams: { boundary: { endHooks: { beforeRecheck: () => gitCommit(c) } } } })).toMatchObject({ whyNot: 'moved', why: 'end:moved' })
     const d = colocated()
     expect(await bracket(d, { seams: { hooks: { beforeFinal: () => gitCommit(d) } } })).toMatchObject({ whyNot: 'moved', why: 'end:final' })
+  })
+
+  describe("a check copy's run, credited by the copy's own state (HI-2991)", () => {
+    const local = { scope: 'workspace' as const }
+    it("another workspace's operation during the run, before the end snapshot or before the final read: still counted", async () => {
+      const a = new FakeRepo()
+      expect(await bracket(a, { ...local, run: () => a.otherOp() })).toEqual({ revision: commit(1), tested: commit(1) })
+      const b = new FakeRepo()
+      expect(await bracket(b, { ...local, seams: { boundary: { endHooks: { beforeSnapshot: () => b.otherOp() } } } })).toEqual({ revision: commit(1), tested: commit(1) })
+      const c = new FakeRepo()
+      expect(await bracket(c, { ...local, seams: { hooks: { beforeFinal: () => c.otherOp() } } })).toEqual({ revision: commit(1), tested: commit(1) })
+    })
+    it('a jj command that updated this copy (its checkout record moved), a write, or its @ rewritten: never counted', async () => {
+      const a = new FakeRepo()
+      expect(await bracket(a, { ...local, run: () => (a.otherOp(), a.setCheckout(a.head)) })).toMatchObject({ whyNot: 'moved', why: 'end:beforeBoundary' })
+      const b = new FakeRepo()
+      expect(await bracket(b, { ...local, run: () => void (b.dirty = true) })).toMatchObject({ whyNot: 'changed', why: 'end:recorded' })
+      const c = new FakeRepo()
+      expect(await bracket(c, { ...local, log: logSays({ changed: true, paths: ['a.txt'] }), run: () => c.otherOp() })).toMatchObject({ whyNot: 'changed', why: 'end:written' })
+      const d = new FakeRepo()
+      expect(await bracket(d, { ...local, run: () => void (d.at = { ...d.at, commit: commit(7) }) })).toMatchObject({ whyNot: 'changed', why: 'end:at' })
+      const e = new FakeRepo()
+      expect(await bracket(e, { ...local, seams: { hooks: { beforeFinal: () => e.setCheckout(op(99)) } } })).toMatchObject({ whyNot: 'moved', why: 'end:final' })
+    })
+    it("the repository's scope (a builder's check) is as strict as before: the same operation elsewhere is moved", async () => {
+      const f = new FakeRepo()
+      expect(await bracket(f, { run: () => f.otherOp() })).toMatchObject({ whyNot: 'moved' })
+    })
   })
 
   it("jj's and Git's own folders never count in the write record", () => {

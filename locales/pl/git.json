@@ -504,6 +504,7 @@
   "git.vc.switch.jjToolBack": "{state, select, missing {jj nie jest zainstalowany (lub nie ma go w PATH)} old {Ten jj jest starszy niż ten, z którym przetestowano Combwork} untested {Ten jj jest nowszy niż ten, z którym przetestowano Combwork} other {Nie udało się sprawdzić jj}}, więc Combwork nie może sprawdzić, czy to repozytorium jest gotowe na powrót do Gita. Zainstaluj jj, z którym przetestowano Combwork, a potem przełącz. Albo, jeśli skończyłeś z jj, usuń folder .jj: projekt będzie mógł wtedy wrócić do Gita bez niego.",
   "git.vc.switch.jjUnknown": "jj nie potwierdził tego repozytorium ({code}), więc ten projekt nie może się przełączyć.",
   "git.vc.switch.noJj": "Nie ma tu repozytorium jj. Combwork nigdy go nie tworzy: utwórz je za pomocą jj.",
+  "git.vc.switch.memberDrain": "W tym projekcie wciąż trwa praca. Jego repozytorium było już przełączane między Gitem a jj, więc projekt przełączy się na Brak dopiero po zakończeniu tej pracy.",
   "git.vc.switch.otherWorkspace": "To repozytorium jest też projektem otwartego obszaru roboczego {workspace}: najpierw zamknij je tam.",
   "git.vc.switch.switching": "Kontrola wersji tego repozytorium jest właśnie przełączana: spróbuj za chwilę."
 }

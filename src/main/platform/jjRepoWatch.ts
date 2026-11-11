@@ -11,14 +11,18 @@
 //   or a watch armed or re-armed, at the start too (whatever happened while unwatched or closed is checked), and `tick`
 //   each minute (the adapter decides whether a
 //   run is due, its retention page).
-// Several operation heads emit nothing until they are one again; the next single head is a change. No process, and on
-// main no more than the operation heads' folder is read.
+// Several operation heads emit nothing until they are one again; the next single head is a change. On main no more than
+// the operation heads' folder is read, and each minute the workspace's store pointer (asynchronously, no process).
+// Where the repository is, is asked of jj until it answers (HI-2977): an unknown answer at the start (jj busy, missing
+// or being replaced, two operation heads at that instant) is asked again at each minute's tick, never given up on; and
+// a store that changed since (`jj git colocation enable` or `disable`) has its refs watches re-armed on the new one.
 
 import { existsSync, watch as fsWatch } from 'original-fs'
 import { join } from 'path'
 import type { Disposable, ObserveEvent } from './history'
 import { jjContextOf } from './jjDetect'
 import { singleHead } from './jjView'
+import { jjStoreOf, samePath } from './repoBoundary'
 
 /** A subscription's handle (fs.watch's, or a test's). */
 export interface WatchHandle {
@@ -33,8 +37,29 @@ export interface JjRepoWatchOptions {
   watch?: WatchFn
   /** The rescan's period; 0: none (a test calls `tick`). */
   intervalMs?: number
-  /** Where the repository is (resolved from the project when not given). */
-  where?: { jjRepo: string; store: string }
+  /** Where the repository is (resolved from the project when not given); `root`, the workspace's, lets a tick see its store change. */
+  where?: Where
+  /** Where the repository is, asked of jj (a test's own); null while it can't say. */
+  locate?: (project: string) => Promise<Where | null>
+  /** The workspace root's repository and store from its files (a test's own); null when they can't be read. */
+  storeAt?: (root: string) => Promise<{ jjRepo: string; store: string } | null>
+}
+
+/** A jj project's repository: its shared repository, its Git store and its workspace root. */
+export interface Where {
+  jjRepo: string
+  store: string
+  root?: string
+}
+
+const defaultLocate = async (project: string): Promise<Where | null> => {
+  const d = await jjContextOf(project)
+  return 'jj' in d ? { jjRepo: d.jj.jjRepo, store: d.jj.store, root: d.jj.root } : null
+}
+
+const defaultStoreAt = async (root: string): Promise<{ jjRepo: string; store: string } | null> => {
+  const s = await jjStoreOf(root)
+  return 'unknown' in s ? null : { jjRepo: s.jjRepo, store: s.store }
 }
 
 export interface JjRepoWatch extends Disposable {
@@ -52,8 +77,12 @@ const defaultWatch: WatchFn = (dir, opts, fn) => {
 /** Watches a jj project's repository (see the module's comment). */
 export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void, o: JjRepoWatchOptions = {}): JjRepoWatch {
   const watch = o.watch ?? defaultWatch
+  const locate = o.locate ?? defaultLocate
+  const storeAt = o.storeAt ?? defaultStoreAt
   let closed = false
-  let where = o.where ?? null
+  let where: Where | null = o.where ?? null
+  /** A detection or store check under way: one at a time, the next tick asks again if it answered nothing. */
+  let asking = false
   let head: string | null = null
   const subs = new Map<'ops' | 'refs' | 'store', WatchHandle>()
   const emit = (e: ObserveEvent): void => {
@@ -106,27 +135,51 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
     }
     if (rearmed) invalidate('retained:*')
   }
-  const tick = (): void => {
-    if (closed) return
-    arm()
-    readHead()
-    invalidate('tick')
-  }
   const begin = (): void => {
     if (closed || !where) return
     head = singleHead(where.jjRepo)
     // Attached (an open, a reopen): its watches armed, which marks every retained bundle due once.
     arm()
   }
+  /** Closes the subscriptions on the old repository's folders and re-arms on `next` (its store or repository changed). */
+  const moveTo = (next: Where): void => {
+    const was = where!
+    where = next
+    const keys: ('ops' | 'refs' | 'store')[] = samePath(was.jjRepo, next.jjRepo) ? ['refs', 'store'] : ['ops', 'refs', 'store']
+    for (const k of keys) {
+      subs.get(k)?.close()
+      subs.delete(k)
+    }
+    if (keys.includes('ops')) head = singleHead(next.jjRepo)
+    arm()
+  }
+  /** Where the repository is, asked again while unknown; once known, its store checked against its files. */
+  const recheck = (): void => {
+    if (closed || asking) return
+    const at = where
+    if (at && !at.root) return
+    asking = true
+    const ask: Promise<void> = at
+      ? storeAt(at.root!).then((s) => {
+          if (closed || where !== at || !s) return
+          if (!samePath(s.store, at.store) || !samePath(s.jjRepo, at.jjRepo)) moveTo({ ...at, jjRepo: s.jjRepo, store: s.store })
+        })
+      : locate(project).then((w) => {
+          if (closed || where || !w) return
+          where = w
+          begin()
+        })
+    void ask.catch(() => undefined).finally(() => (asking = false))
+  }
+  const tick = (): void => {
+    if (closed) return
+    recheck()
+    arm()
+    readHead()
+    invalidate('tick')
+  }
   if (where) begin()
-  else
-    void jjContextOf(project)
-      .then((d) => {
-        if (closed || !('jj' in d)) return
-        where = { jjRepo: d.jj.jjRepo, store: d.jj.store }
-        begin()
-      })
-      .catch(() => undefined)
+  else recheck()
   const timer = o.intervalMs === 0 ? null : setInterval(tick, o.intervalMs ?? 60_000)
   timer?.unref?.()
   return {

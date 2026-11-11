@@ -807,11 +807,12 @@
     "placeholders": {
       "why": "select",
       "card": "plain",
+      "count": "plural",
+      "files": "plain",
       "base": "plain",
       "commit": "plain",
       "other": "plain",
-      "max": "number",
-      "files": "plain"
+      "max": "number"
     }
   },
   "workflow.refused.platform.jjRefused.next": {
