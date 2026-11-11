@@ -10,11 +10,12 @@ type Snap = { files: Record<string, string>; at: string; atEmpty: boolean; paren
 const require = createRequire(import.meta.url)
 type Tool = { name: string; input: string; cwd?: string }
 type View = { state: string; lease: { returned: boolean } | null }
-const { copySnapshot, firstLook, copyChanges, copyWrites } = require('./scenarios/jjReviewCopy.cjs') as {
+const { copySnapshot, firstLook, copyChanges, copyWrites, shellCommands } = require('./scenarios/jjReviewCopy.cjs') as {
   copySnapshot: (folder: string, jj: (...a: string[]) => string) => Snap
   firstLook: (view: View, snap: Snap, revision: string) => 'baseline' | 'seen' | null
   copyChanges: (a: Snap, b: Snap) => string[]
   copyWrites: (o: { tools: Tool[] }, copy: string) => string[]
+  shellCommands: (text: string) => { words: string[]; bare: string }[]
 }
 
 const REV = 'a'.repeat(40)
@@ -109,6 +110,36 @@ describe("what changed in a jj review copy while its reviewer had it", () => {
     expect(writes([{ name: 'Bash', input: 'jj commit -m x', cwd: 'C:\\ws\\alpha' }])).toEqual([])
     // Another copy whose name starts with this one's.
     expect(writes([{ name: 'Bash', input: 'jj new', cwd: `${COPY}0` }])).toEqual([])
+  })
+
+  it('read as the shell reads it (HI-2935): escaped quotes, a shell\'s own script, and a heredoc\'s apostrophe', () => {
+    const COPY = 'C:\\ws\\.copies\\alpha\\copy-1'
+    const writes = (tools: Tool[]): string[] => copyWrites({ tools }, COPY)
+    // Escaped quotes inside "…": one read-only script, never cut at the first \" (its `->` was taken for a redirection).
+    expect(writes([{ name: 'Bash', input: 'node -e "console.log(\\"undefined ->\\", e.message)"', cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'PowerShell', input: 'node -e "console.log(`"a -> b`")"', cwd: COPY }])).toEqual([])
+    // A shell's script is commands too: a jj record or a write inside `bash -c "…"` or `pwsh -Command "…"`.
+    expect(writes([{ name: 'Bash', input: 'bash -c "cd x; jj commit -m y"', cwd: COPY }])).toEqual(['jj commit -m y'])
+    expect(writes([{ name: 'PowerShell', input: 'pwsh -Command "Get-Content a.js; Set-Content greet.js x"', cwd: COPY }])).toEqual(['Set-Content greet.js x'])
+    expect(writes([{ name: 'Bash', input: "sh -c 'echo hi > out.txt'", cwd: COPY }])).toEqual(['echo hi > out.txt'])
+    expect(writes([{ name: 'Bash', input: 'bash -c "jj log -r @-; jj diff"', cwd: COPY }])).toEqual([])
+    // A heredoc's text is no command: its apostrophe pairs with nothing, so the jj describe after it still counts.
+    const notes = `cat <<'EOF'\nReviewer's notes: looks right\nEOF\njj describe -m 'done'`
+    expect(writes([{ name: 'Bash', input: notes, cwd: COPY }])).toEqual(['jj describe -m done'])
+    // A script over several lines in one quote stays one word (an arrow function's => is no redirection).
+    expect(writes([{ name: 'Bash', input: 'node -e "\nconst f = (x) => x + 1\nconsole.log(f(1))\n"', cwd: COPY }])).toEqual([])
+    // A quote that never closes ends at its line's end: the next line is read.
+    expect(writes([{ name: 'Bash', input: "echo it's fine\njj new", cwd: COPY }])).toEqual(['jj new'])
+  })
+
+  it('shellCommands: words and the bare command, quotes, separators, here-strings', () => {
+    const cmds = (t: string) => shellCommands(t).map((c) => c.words)
+    expect(cmds('jj log -r @- && jj diff | head; cat a || echo b')).toEqual([['jj', 'log', '-r', '@-'], ['jj', 'diff'], ['head'], ['cat', 'a'], ['echo', 'b']])
+    expect(shellCommands('jj commit -m "fix; the > greeting"')).toEqual([{ words: ['jj', 'commit', '-m', 'fix; the > greeting'], bare: 'jj commit -m ""' }])
+    expect(cmds('echo "a\\\\" b')).toEqual([['echo', 'a\\', 'b']])
+    expect(cmds("echo 'it''s'")).toEqual([['echo', 'its']])
+    expect(cmds("$x = @'\nline one; rm x\n'@\njj st")).toEqual([['$x', '=', 'line one; rm x'], ['jj', 'st']])
+    expect(cmds('cmd /c "jj new"')).toEqual([['cmd', '/c', 'jj new'], ['jj', 'new']])
   })
 
   it("a copy still being made (HI-2907): jj's @- on the revision before its files are written is no first look", () => {
