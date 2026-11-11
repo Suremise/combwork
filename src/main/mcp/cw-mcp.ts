@@ -131,7 +131,7 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
-  'queue.arg.past': agentMsg({ id: 'tool.queue.arg.past', text: "true: also past branches' queues (no longer targets).", note: 'HI-2893; HI-2960: shortened to keep the agent tool list within its total (toolLimits.cjs).' }),
+  'queue.arg.past': agentMsg({ id: 'tool.queue.arg.past', text: "true: also past branches' queues.", note: 'HI-2893; HI-2960: shortened to keep the agent tool list within its total (toolLimits.cjs).' }),
   'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys, lane names and slot names to move, from the preview named.' }),
   'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing." }),
   'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),

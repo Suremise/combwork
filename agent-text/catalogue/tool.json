@@ -458,7 +458,7 @@
     "note": "HI-2892; HI-2960: within 120 characters, the refusal says which direction is against it."
   },
   "tool.queue.arg.past": {
-    "text": "true: also past branches' queues (no longer targets).",
+    "text": "true: also past branches' queues.",
     "note": "HI-2893; HI-2960: shortened to keep the agent tool list within its total (toolLimits.cjs)."
   },
   "tool.queue.arg.preview": {
