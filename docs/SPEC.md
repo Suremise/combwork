@@ -2771,7 +2771,8 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
-  Git branch).
+  Git branch); HI-2990: a squash onto a head that already holds the change, its restore making no operation, its step
+  cleared, then recovered and dropped with nothing left.
 
 ##### jj's integration evidence (1.5.0's J5, HI-2798)
 
@@ -3520,7 +3521,7 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
   strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
-  (its files, or its description alone) kept, a squash attempt cut short by the user's integration, Integrated with the rules off and its drop crashed);
+  (its files, or its description alone) kept, a squash attempt cut short by a crash, then the user's own merge, Integrated with the rules off and its drop crashed);
   `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
   `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
   while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward

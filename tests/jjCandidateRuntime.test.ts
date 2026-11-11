@@ -663,29 +663,28 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       })
     }
 
-    it('squash: an attempt cut short by the user integrating the candidate mid-run is recovered and dropped after Integrated (its scratch commit included)', async () => {
+    it('squash: an attempt cut short (a crash after its scratch commit) when the user then integrates their own way: recovered and dropped after Integrated, its scratch commit included', async () => {
       const w = await world(colocated, { candidates: true })
-      const { card } = await approved(w)
+      const { card, P } = await approved(w)
       reapply(w, card, { style: 'squash' })
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(w.wf.store.card(card.id), {})
       const cycle = w.wf.state(card).cycle
       const c = shown(w, card, cycle)!.offer!
-      // The next run: its proof reads the target (not contained), then the user sets main onto the candidate, then its
-      // step builds on the new head: its restore has nothing to restore, so the attempt stops with its first commits made.
-      const real = w.deps.integration
-      let n = 0
-      w.deps.integration = async () => {
-        if (++n === 2) w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', c.result)
-        return real()
+      // The target moves; the rebuild on it crashes once its scratch merge is made (the process gone mid-attempt).
+      onTarget(w, 'theirs.txt', 'theirs\n')
+      w.deps.candidateHook = async (point) => {
+        if (point === 'afterWrite:scratch') throw new Error('crash')
       }
-      await jjp.reconcile(w.wf.store.card(card.id), {})
-      w.deps.integration = real
-      const cut = entries(w, card, cycle).find((e) => e.record.attempt !== c.attempt)
-      expect(cut?.record).toMatchObject({ phase: 'writing' })
-      expect(cut?.record.step).toBeUndefined()
-      expect(cut!.record.commits.some((x) => visible(w, x))).toBe(true)
-      // Integrated (Done) by the next run, which never runs the candidate step again: the sweep settles the attempt.
+      await jjp.reconcile(w.wf.store.card(card.id), {}).catch(() => undefined)
+      w.deps.candidateHook = undefined
+      const cut = entries(w, card, cycle).find((e) => e.record.attempt !== c.attempt && e.record.phase === 'writing')
+      expect(cut?.record.commits.some((x) => visible(w, x))).toBe(true)
+      // The user integrates the card their own way (a merge of it into main): the next run's proof makes it Integrated,
+      // Done, and never runs the candidate step again; the clean-up after Integrated and the sweep settle the attempt.
+      w.h.jj(w.repo, 'new', 'main', P, '-m', 'merge the card')
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@')
+      w.h.jj(w.repo, 'new')
       await jjp.reconcile(w.wf.store.card(card.id), {})
       expect(w.wf.state(card).stage).toBe('done')
       await jjp.afterRun()
