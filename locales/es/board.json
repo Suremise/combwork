@@ -1031,6 +1031,7 @@
   "board.work.verdict": "{reviewer}: {pass, select, yes {superada} other {no superada}}{current, select, no { (ya no cuenta)} other {}}",
   "board.work.via": "{via, select, ancestry {(encontrado en su historial)} replay {(su cambio encontrado aplicado de nuevo)} sameTree {(el destino ya lo tenía)} candidate {(de un candidato preparado)} other {}}",
   "board.work.workspace": "Espacio de trabajo",
+  "board.work.notReady": "Todavía no se ha iniciado en {slot}: {stale, select, yes {otro espacio de trabajo de jj reescribió su copia de trabajo, así que está desactualizado. Recupéralo en Control de versiones → Slots y copias, y la tarjeta se preparará allí de nuevo.} other {Combwork no pudo prepararlo ({why}).}}",
   "board.workQueue.advance": "Probada y lista: ¿actualizar {target} en su carpeta ahora?",
   "board.workQueue.advancing": "Fusionando en {target} ahora",
   "board.workQueue.answerFailed": "No se pudo responder",

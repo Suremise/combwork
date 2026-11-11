@@ -2592,7 +2592,9 @@ merges under jj.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
-  and a `jj rebase -r <commit> -d <target>` to start from, and its last containment observation for exactly that
+  and the commands to start from (HI-2913: `jj duplicate -r <commit> --onto <target>`, then `jj bookmark set <target> -r
+  <copy>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
+  slot stale and its lane's next card unprepared), and its last containment observation for exactly that
   approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
@@ -3069,6 +3071,32 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
+- **A held slot's recovery** (HI-2913): a slot a card's or lane's lease still holds is let through only while that
+  lease's card's current cycle has a `SlotPrepareFailed` for it and no `SlotPrepared` after (a preparation still owed is
+  refused `preparing`; a made one, or none failed, `busy`). slotCards' `recoverHeldSlot` admits that card and cycle;
+  `SlotStore.beginRecover` claims the slot in one write only while it is lent under exactly that open lease at its folder
+  with no operation, job or writer (a free slot's `beginSettle` is unchanged); the fence before each of J2's writes is the
+  folder's quiescence (no session, no process: a builder running there is `busy`), the lease still open and still the
+  operation's, and the same cycle still failed and unprepared. A preparation can't start under the claim, and one that
+  claimed first makes it `busy`. Only a recovery that succeeded forgets that cycle's failed try and asks for a pass,
+  which prepares the card and places its builder; a refused or cut-short one leaves both (its journal resumes it).
+- **A failed preparation** (HI-2913) is recorded as `SlotPrepareFailed { lease, slot, why, stale }`, written only while
+  the same cycle and lease are current and unprepared; the card's Work section then says it hasn't started in that slot
+  yet and why (a stale jj workspace: with Recover…), until a `SlotPrepared` for the lease. A stale jj workspace's refusal
+  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable.
+- **A jj lane's builder between cards** (HI-2913): jj's record needs no session in the slot and the folder's rename
+  probe quiet, and a lane's builder stays in its slot. Before a jj card's preparation, under the folder's fence
+  (`changingFolder`: nothing typed or started there), slotCards' `freeSlotOfBuilder` ends only the builder's own run in
+  that slot, quiet, not resuming, nothing owed to it, with no input held, with its CLI's exit command (`sessions.quit`,
+  cause `lane`: not a Stop of the user's, so a lane's start isn't refused), fenced to that run in that folder and to the
+  cycle at each key, and waits for the run to end; placement then resumes its conversation bound to the lease with the
+  card. Anything else (busy, held, a run replaced or moved, starting) lifts the fence and looks again. A busy or fenced
+  record, a lost fence or an uncertain write in the preparation is a retry, never a failure. Git is unchanged.
+- **The shape a rebase leaves** (HI-2913, HR1's s18 answer): jj's preparation also accepts a slot whose working copy is
+  empty, neither conflicted nor divergent, with exactly one parent that is the previous binding's base (a rebase of the
+  card's commit moved it off), besides exactly the binding's submitted commits (`chainIsBinding`, unchanged). An empty
+  range alone never authorizes it (a working copy on unrelated history has none); the previous card's work must still
+  be in its target (§16.3.2).
 - **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
   again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
   matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
@@ -3287,7 +3315,8 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
 - **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
   a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
-  `slots:recoverStale`, its refusal said (busy, no longer stale, not the recorded workspace, or jj's failure).
+  `slots:recoverStale`, its refusal said (busy, with stop its agent first; its card still being prepared; no longer
+  stale; not the recorded workspace; or jj's failure).
 - **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
   change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
   was proved (`via`: history, replay, the same tree, a prepared candidate).

@@ -1031,6 +1031,7 @@
   "board.work.verdict": "{reviewer}：{pass, select, yes {合格} other {不合格}}{current, select, no {（無効）} other {}}",
   "board.work.via": "{via, select, ancestry {（履歴で確認）} replay {（変更が再適用された形で確認）} sameTree {（ターゲットに既にありました）} candidate {（準備済みの候補から）} other {}}",
   "board.work.workspace": "ワークスペース",
+  "board.work.notReady": "{slot}ではまだ開始していません：{stale, select, yes {別のjjワークスペースが作業コピーを書き換えたため、古くなっています。「バージョン管理」→「スロットとコピー」で復旧すると、カードがそこで再び準備されます。} other {Combworkが準備できませんでした（{why}）。}}",
   "board.workQueue.advance": "テスト済みで準備完了：フォルダー内の{target}を今すぐ更新しますか？",
   "board.workQueue.advancing": "{target}へマージ中",
   "board.workQueue.answerFailed": "回答できませんでした",

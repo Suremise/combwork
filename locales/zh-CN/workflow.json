@@ -473,7 +473,7 @@
   "workflow.slots.levelNone": "在此设置：无",
   "workflow.slots.noSlots": "还没有槽位：卡片开始时会创建一个。",
   "workflow.slots.none": "无",
-  "workflow.slots.notRecovered": "{slot} 未恢复：{why, select, busy {其中有工作正在进行} notStale {它已不再过期} identity {它的文件夹不是 Combwork 创建的工作区} other {jj 无法完成}}。",
+  "workflow.slots.notRecovered": "{slot} 未恢复：{why, select, busy {其中有工作正在进行（有代理在其中工作：请先停止它）} preparing {它的卡片仍在其中准备} notStale {它已不再过期} identity {它的文件夹不是 Combwork 创建的工作区} other {jj 无法完成}}。",
   "workflow.slots.off": "关",
   "workflow.slots.on": "开",
   "workflow.slots.openAdvanced": "打开“高级”",

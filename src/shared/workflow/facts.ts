@@ -313,6 +313,13 @@ export interface FactData {
    * preparation is owed, and a pass of Combwork's (after a restart too) does it.
    */
   SlotPrepared: { lease: string; line: string; revision: string }
+  /**
+   * A card's slot couldn't be prepared for its start (HI-2913): `why` as Combwork told the builder (English), `stale` when
+   * the reason was a stale jj workspace (its Recover…). Written in a write that finds the card's start the same and not
+   * prepared; until a later `SlotPrepared` for the same lease, the card isn't started there (the window says not ready),
+   * and the user's Recover… of that slot is let through while its lease holds it.
+   */
+  SlotPrepareFailed: { lease: string; slot: string; why: string; stale: boolean }
   /** Its builder's placement in the slot claimed by a Combwork (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */

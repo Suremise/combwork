@@ -473,7 +473,7 @@
   "workflow.slots.levelNone": "ここで設定：なし",
   "workflow.slots.noSlots": "まだスロットはありません。カードが始まると作られます。",
   "workflow.slots.none": "なし",
-  "workflow.slots.notRecovered": "{slot}は復旧されませんでした：{why, select, busy {何かが作業中です} notStale {もう古くありません} identity {そのフォルダーはCombworkが作成したワークスペースではありません} other {jjが実行できませんでした}}。",
+  "workflow.slots.notRecovered": "{slot}は復旧されませんでした：{why, select, busy {何かが作業中です（そこで作業中のエージェントを先に停止してください）} preparing {そのカードはまだそこで準備中です} notStale {もう古くありません} identity {そのフォルダーはCombworkが作成したワークスペースではありません} other {jjが実行できませんでした}}。",
   "workflow.slots.off": "オフ",
   "workflow.slots.on": "オン",
   "workflow.slots.openAdvanced": "詳細を開く",

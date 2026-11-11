@@ -1940,8 +1940,8 @@
     "description": "A slot script that isn’t set: nothing runs."
   },
   "workflow.slots.notRecovered": {
-    "defaultMessage": "{slot} wasn’t recovered: {why, select, busy {something works in it} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
-    "description": "A notice after recovering a stale jj slot was refused (HI-2869). {why} picks the reason: keep the select keys."
+    "defaultMessage": "{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
+    "description": "A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys."
   },
   "workflow.slots.off": {
     "defaultMessage": "Off",
