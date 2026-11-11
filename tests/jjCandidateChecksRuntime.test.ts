@@ -22,6 +22,9 @@ import { queueChecks } from '../src/main/workflow/queueChecks'
 import { jobSpawn } from '../src/main/workflow/jobSpawn'
 import { journalPath, LeaseJob, leaseJobGone, queueHost } from '../src/main/workflow/queueJobs'
 import { checksJournalKey, writeChecksJournal, type ChecksJournal } from '../src/main/workflow/jjCandidateChecks'
+import { checkLeaseOver, holdCandidateLease, releaseCandidateLease } from '../src/main/workflow/candidateLeases'
+import { CopyPool, CopyStore } from '../src/main/copies'
+import type { OpHolder } from '../src/main/slots'
 import type { SqlDb } from '../src/main/platform/jjObligations'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import type { WorkflowOptions } from '../src/shared/workflow/options'
@@ -43,8 +46,9 @@ const PASS = `${NODE} -e "process.exit(0)"`
 const FAIL = `${NODE} -e "console.log('lint: 1 problem');process.exit(1)"`
 
 const ends: (() => void)[] = []
+const closersHere: (() => void)[] = []
 afterAll(() => {
-  for (const e of ends.splice(0)) e()
+  for (const e of [...closersHere.splice(0), ...ends.splice(0)]) e()
 })
 
 /** The checks configured on the project (its options, as a card starting now takes them). */
@@ -58,40 +62,91 @@ function reapply(w: World, card: { id: number }, checks: Record<string, string>)
 }
 
 /**
- * The app's checks host, stood in for: each lease a fresh jj workspace of the repository at the candidate's commit (a
- * check copy's state after its reset), the queue's runner with a session's environment, Stop by run id.
+ * The app's checks host (jjCards.ts), on the real copies pool (copies.ts, the jj port): each lease a check copy reset to
+ * the candidate's commit; the pool's `leaseOver` the production predicate (checkLeaseOver, with the runs' open state), each
+ * run's start the lease's ref as in the app (candidateRun), the lease held while the attempt runs (holdCandidateLease);
+ * `job`: every process in a real lease job. The project's setup command and its stamp are the test's (`setSetup`).
  */
 function host(w: World, o: { job?: { host: ReturnType<typeof queueHost> }; freed?: (id: string) => Promise<boolean> } = {}) {
   const root = tempDir('jjchecks-')
-  let n = 0
   const leases: { id: string; folder: string; given?: string }[] = []
   const stop = new Set<string>()
   const runs: string[] = []
+  const open = new Map<string, boolean>()
+  let current: string | null = null
+  const holder: OpHolder = { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set() }
+  const store = new CopyStore(w.conn, 'p-jj')
+  const warm = async (): Promise<{ ok: boolean; exitCode: number; logPath: null; settled: boolean }> => ({ ok: true, exitCode: 0, logPath: null, settled: true })
+  const pool = new CopyPool({ store, workspaces: w.port, project: w.repo, dir: join(root, 'copies'), options: async () => ({ setup: '', archive: '', copy: '' }), size: () => 2, runner: warm, settle: async () => true, holder, profile: 'profile-1', runIn: () => null, holderBusy: () => null, leaseOver: (l) => checkLeaseOver(l, (ref) => open.get(ref), 60_000), reviewOn: () => true, quietWaitMs: () => 60_000 })
+  closersHere.push(() => void pool.close().catch(() => undefined))
+  let setup = { setup: '', stamp: 's0' }
   const runner = (spawnIt: Parameters<typeof queueChecks>[0]['spawn']) =>
-    queueChecks({ ...(spawnIt ? { spawn: spawnIt } : {}), env: () => baseEnv() as Record<string, string>, logDir: join(root, 'logs'), timeoutMs: () => 60_000, setupCommand: () => '', runs: { start: (r) => (runs.push(r.title), `run${runs.length}`), finish: () => undefined, counts: () => undefined } })
+    queueChecks({
+      ...(spawnIt ? { spawn: spawnIt } : {}),
+      env: () => baseEnv() as Record<string, string>,
+      logDir: join(root, 'logs'),
+      timeoutMs: () => 60_000,
+      setupCommand: () => setup.setup,
+      runs: {
+        start: (r) => {
+          runs.push(r.title)
+          const id = `run${runs.length}`
+          open.set(id, true)
+          // As the app's candidateRun: each run the lease's ref.
+          if (current) void pool.setRef(current, id)
+          return id
+        },
+        finish: (id) => void open.set(id, false),
+        counts: () => undefined
+      }
+    })
   const h: JjChecksHost = {
-    setup: async () => '',
-    lease: async (_card, revision) => {
-      const id = `L${++n}-${Date.now()}`
-      const folder = join(root, `copy-${n}`)
-      w.h.jj(w.repo, 'workspace', 'add', folder, '--name', `copy-${n}`, '-r', revision, w.ctx.colocated ? '--colocate' : '--no-colocate')
-      leases.push({ id, folder })
+    setup: async () => ({ ...setup }),
+    setupStamp: () => setup.stamp,
+    lease: async (card, revision) => {
+      const r = await pool.leaseCopy({ kind: 'check', card, revision, agent: null })
+      if (!r.ok) return r.refusal.why === 'noCopy' ? { wait: 'noCopy' } : { refused: r.refusal.why }
+      const id = r.lease.id
+      holdCandidateLease(id)
+      current = id
+      leases.push({ id, folder: r.copy.folder })
       let spawnIt: ReturnType<typeof jobSpawn> | undefined
       if (o.job) {
         const job = await LeaseJob.open(o.job.host, id, await journalPath(root, id, join(root, '.journals')))
         if (!(job instanceof LeaseJob)) return { refused: 'no job' }
         spawnIt = jobSpawn(job)
+        jobs.set(id, job)
       }
-      return { id, folder, spawn: (spawnIt ?? spawn) as never, give: async (why) => void (leases.find((l) => l.id === id)!.given = why) }
+      return {
+        id,
+        folder: r.copy.folder,
+        spawn: (spawnIt ?? spawn) as never,
+        give: async (why, end) => {
+          if (end) await jobs.get(id)?.end()
+          releaseCandidateLease(id)
+          if (current === id) current = null
+          leases.find((l) => l.id === id)!.given = why
+          await pool.returnCopy(id, why)
+        }
+      }
     },
-    leaseFreed: o.freed ?? (async () => true),
+    leaseFreed:
+      o.freed ??
+      (async (id) => {
+        await pool.refresh()
+        const l = pool.lease(id)
+        return !l || !!l.freed
+      }),
     runCheck: (name, command, folder, ctx, spawnIt) => runner(spawnIt).runCheck(name, command, folder, ctx),
     install: (folder, ctx, spawnIt) => runner(spawnIt).install(folder, true, ctx),
     stopped: (run) => stop.delete(run),
-    againMs: () => 3_600_000
+    againMs: () => 3_600_000,
+    watchMs: 100
   }
+  const jobs = new Map<string, LeaseJob>()
   w.deps.candidateChecks = h
-  return { h, leases, stop, runs, root }
+  const setSetup = (v: string): void => void (setup = { setup: v, stamp: `s${Date.now()}-${Math.random()}` })
+  return { h, leases, stop, runs, root, pool, setSetup, open }
 }
 
 /** A card started, its work committed in its slot, submitted, pinned, reviewed and passed: Approved. */
@@ -217,6 +272,118 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
         expect(rec?.checks?.state ?? 'none').not.toBe('passed')
         expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
         expect(waiting(w, card.id)?.candidate?.state === 'ready' && waiting(w, card.id)?.candidate).not.toMatchObject({ checks: { state: 'passed' } })
+      })
+    }
+  })
+
+  describe("HR1's round 1 (colocated)", () => {
+    it('finding 1: the pool refreshed between the install and a check and between two checks: the lease stays the attempt’s', async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS }, { mergeInstall: 'always' })
+      x.setSetup(PASS)
+      const held: boolean[] = []
+      x.h.hook = async (p) => {
+        if (p !== 'afterInstall' && p !== 'afterCheck:typecheck') return
+        // The run just ended (its ref's run closed): a refresh now must not return the lease.
+        await x.pool.refresh()
+        const l = x.pool.lease(x.leases[0].id)
+        held.push(!!l && !l.returned)
+      }
+      const { card } = await approved(w)
+      await settle(w, card)
+      expect(held).toEqual([true, true])
+      expect(shown(w, card, w.wf.state(card).cycle)?.checks).toMatchObject({ state: 'passed' })
+      expect(x.leases.map((l) => l.given)).toEqual(['checksEnded'])
+    })
+
+    for (const at of ['beforeCheck:lint', 'afterCheck:lint'] as const) {
+      it(`finding 3: the setup command changed (${at === 'beforeCheck:lint' ? 'during the final check' : 'at the publication write'}): not passed under the old key; then run anew under the new one`, async () => {
+        const w = await world(true, { candidates: true })
+        const x = host(w)
+        withChecks(w, { typecheck: PASS, lint: PASS })
+        let once = true
+        x.h.hook = async (p) => {
+          if (p === at && once) {
+            once = false
+            x.setSetup('npm ci --ignore-scripts')
+          }
+        }
+        const { card } = await approved(w)
+        const jjp = await settle(w, card)
+        const cycle = w.wf.state(card).cycle
+        const before = shown(w, card, cycle)!.checks!
+        expect(before.state).not.toBe('passed')
+        // The next look: the key now differs, so the checks start anew under it and pass.
+        const runs = x.runs.length
+        jjp.checksWanted()
+        await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+        const after = shown(w, card, cycle)!.checks!
+        expect(after).toMatchObject({ state: 'passed' })
+        expect(after.key).not.toBe(before.key)
+        expect(x.runs.length - runs).toBe(2)
+      })
+    }
+  })
+
+  describe.runIf(process.platform === 'win32')("HR1's round 1, in real jobs (colocated)", () => {
+    /** A command that writes `marker` once it runs, then holds until `gate` exists. */
+    const held = (marker: string, gate: string) => `${NODE} -e "const f=require('fs');f.writeFileSync(${JSON.stringify(marker).replace(/"/g, "'")},'1');setInterval(()=>{if(f.existsSync(${JSON.stringify(gate).replace(/"/g, "'")}))process.exit(0)},50)"`
+
+    it('finding 2: Stop on a running install: stopped, not red or retried; Run Checks Again then passes', async () => {
+      const w = await world(true, { candidates: true })
+      const sup = queueHost()
+      ends.push(() => void sup.close())
+      const x = host(w, { job: { host: sup } })
+      const dir = tempDir('jjinstall-')
+      const marker = join(dir, 'install-started')
+      const gate = join(dir, 'install-go')
+      withChecks(w, { typecheck: PASS }, { mergeInstall: 'always' })
+      x.setSetup(held(marker, gate))
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      // The install is running (its marker written): Stop, as the Progress panel's (its run, then its lease's job ended).
+      await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: REAL_JJ_MS, interval: 50 })
+      x.stop.add('run1')
+      const lease = x.leases[0]
+      await (await import('../src/main/workflow/queueJobs')).endLeaseJob(sup, lease.id)
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'stopped', why: 'install' })
+      expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+      writeFileSync(gate, 'go')
+      expect(await jjp.checksAgain(w.wf.store.card(card.id))).toBe(true)
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
+    })
+
+    for (const what of ['a re-approval', 'the target moved', 'changed check options'] as const) {
+      it(`finding 4: ${what} while a check runs: its job ended at once, never waiting for the check to finish`, async () => {
+        const w = await world(true, { candidates: true })
+        const sup = queueHost()
+        ends.push(() => void sup.close())
+        const x = host(w, { job: { host: sup } })
+        const dir = tempDir('jjrunning-')
+        const marker = join(dir, 'check-started')
+        // Its gate is never opened: the check finishes only if its job is ended.
+        withChecks(w, { typecheck: held(marker, join(dir, 'never')) })
+        const { card } = await approved(w)
+        const jjp = new JjPlatform(w.wf)
+        await jjp.reconcile(card, {})
+        await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: REAL_JJ_MS, interval: 50 })
+        if (what === 'a re-approval') w.store.tx((tx) => tx.append(card.id, { kind: 'Moved', actor: 'user', source: 'recorded', data: { from: 'approved', to: 'approved', by: 'user' } } as never))
+        else if (what === 'changed check options') reapply(w, card, { typecheck: PASS })
+        else {
+          w.h.jj(w.repo, 'new', 'main', '-m', 'theirs')
+          writeFileSync(join(w.repo, 'theirs.txt'), 'theirs\n')
+          w.h.jj(w.repo, 'commit', '-m', 'theirs')
+          w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+        }
+        await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+        const cycle = w.wf.state(card).cycle
+        expect(shown(w, card, cycle)?.checks?.state ?? 'none').not.toBe('passed')
+        expect(x.leases[0].given).toBe('invalid')
       })
     }
   })

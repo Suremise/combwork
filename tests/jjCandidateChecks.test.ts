@@ -125,6 +125,46 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     expect(q.log).toEqual([])
   })
 
+  it("Stop on the install's run: stopped, never red or retried (HR1's round 1 finding 2)", async () => {
+    const p = parts({ stopped: ['run-install'] })
+    p.deps.install = async () => ({ ok: false, output: 'stopped', command: 'npm ci', run: 'run-install' })
+    expect(await runCandidateChecks(p.deps, input({ installAlways: true }))).toEqual({ stopped: { check: 'install' } })
+    expect(p.log).toEqual(['lease L1', 'give L1 checksEnded'])
+  })
+
+  it('invalid while a command runs: its job ended at once, never waiting for the command (finding 4)', async () => {
+    let valid = true
+    let release!: () => void
+    const running = new Promise<void>((r) => (release = r))
+    const p = parts({ valid: () => valid })
+    let started!: () => void
+    const inCommand = new Promise<void>((r) => (started = r))
+    // The command runs until its job is ended (the lease given back with `end`), as a real tree in a job would.
+    p.deps.runCheck = async (name) => {
+      p.log.push(`run ${name}`)
+      started()
+      await running
+      return { ok: false, transient: true, output: 'killed', command: name, run: `run-${name}` }
+    }
+    const lease = p.deps.lease
+    p.deps.lease = async (rev) => {
+      const l = await lease(rev)
+      if (!('id' in l)) return l
+      return {
+        ...l,
+        give: async (why, end) => {
+          if (end) release()
+          await l.give(why, end)
+        }
+      }
+    }
+    const out = runCandidateChecks({ ...p.deps, watchMs: 10 }, input())
+    await inCommand
+    valid = false
+    expect(await out).toEqual({ invalid: true })
+    expect(p.log).toEqual(['lease L1', 'run typecheck', 'give L1 invalid end'])
+  })
+
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
     const o = { mergeChecks: ['a', 'b'], commands: { a: 'x', b: 'y' }, mergeInstall: 'onManifestChange' as const }
     const k = checksKeyOf(o, 'npm ci')

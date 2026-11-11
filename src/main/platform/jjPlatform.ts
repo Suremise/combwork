@@ -172,13 +172,20 @@ const checksLog = createLogger('jj')
 
 /** HI-2938: what the app gives the candidate checks (jjCards.ts). */
 export interface JjChecksHost {
-  setup(): Promise<string>
+  /**
+   * The project's setup command, and a stamp of where it was read from (project.json's identity: its id, size and time),
+   * which `setupStamp` reads again synchronously in a publishing transaction (HR1's round 1 finding 3).
+   */
+  setup(): Promise<{ setup: string; stamp: string }>
+  setupStamp(): string
   lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
   leaseFreed(id: string): Promise<boolean>
   runCheck(name: string, command: string, folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult>
   install(folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult & { skipped?: boolean }>
   stopped(run: string): boolean
   hook?: CandidateChecksDeps['hook']
+  /** How often a running command's validity is read again (tests: shorter than the default). */
+  watchMs?: number
   /** How long the runner waits before looking again: a copy wait (0), the nth transient failure in a row. */
   againMs?: (misses: number) => number
   /** The workspace's life (s11 §3): closing it ends a running check's job and gives its lease back; nothing more runs. */
@@ -666,7 +673,7 @@ export class JjPlatform implements PlatformAdapter {
     const host = this.deps?.candidateChecks
     if (!this.wf || !host) return { key: '', names: [] }
     const o = this.wf.rulesetOf(card, s).options
-    return o.mergeChecks.length ? { key: checksKeyOf(o, await host.setup()), names: [...o.mergeChecks] } : { key: '', names: [] }
+    return o.mergeChecks.length ? { key: checksKeyOf(o, (await host.setup()).setup), names: [...o.mergeChecks] } : { key: '', names: [] }
   }
 
   /** HI-2938: asks the project's checks runner to look (one per workflow; a look asked for mid-look runs after it). */
@@ -706,7 +713,7 @@ export class JjPlatform implements PlatformAdapter {
     const shown = candidateShown(this.wf, card, s, project, undefined, true)
     const fp = candidateFingerprint(this.wf, card, s)
     if (!shown?.offer || !fp) return false
-    const ok = await checksAgain(this.wf, card, project, await host.setup(), await this.offerCurrent(fp.target, shown.offer))
+    const ok = await checksAgain(this.wf, card, project, (await host.setup()).setup, await this.offerCurrent(fp.target, shown.offer))
     if (ok) this.checksWanted()
     return ok
   }
@@ -733,17 +740,21 @@ export class JjPlatform implements PlatformAdapter {
       const fp = candidateFingerprint(wf, card0, s)
       if (!shown?.offer || !shown.checks || !fp || (shown.checks.state !== 'running' && shown.checks.state !== 'waiting' && shown.checks.state !== 'failing')) continue
       const offer = shown.offer
-      const setup = await host.setup()
+      const read = await host.setup()
+      const setup = read.setup
       const o = wf.rulesetOf(card0, s).options
       const key = checksKeyOf(o, setup)
-      if (key !== shown.checks.key) continue
-      const at = { fp, attempt: offer.attempt, key, setup }
+      const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
+      if (key !== shown.checks.key) {
+        if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer)))) continue
+      }
       const publish = async (u: JjChecksUpdate): Promise<boolean> => publishCandidateChecks(wf, wf.store.card(card0.id), project, at, u, await this.offerCurrent(fp.target, offer))
       const jkey = checksJournalKey(project, card0.key, fp.cycle, offer.attempt)
       const valid = async (): Promise<boolean> => {
         const c = wf.store.card(card0.id)
         const st = wf.state(c)
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, await host.setup()) === key && (await this.offerCurrent(fp.target, offer))
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerCurrent(fp.target, offer))
       }
       let done = 0
       const out = await runCandidateChecks(
@@ -765,12 +776,13 @@ export class JjPlatform implements PlatformAdapter {
           },
           stopped: (run) => host.stopped(run),
           ...(host.signal ? { signal: host.signal } : {}),
+          ...(host.watchMs ? { watchMs: host.watchMs } : {}),
           hook: async (p) => {
             if (p.startsWith('beforeCheck:')) await publish({ progress: { done, current: p.slice('beforeCheck:'.length) } })
             await host.hook?.(p)
           }
         },
-        { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: shown.checks.names, commands: o.commands, installAlways: o.mergeInstall === 'always' }
+        { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
       )
       const misses = shown.checks.state === 'failing' ? (shown.checks.misses ?? 1) : 0
       if ('green' in out) await publish({ passed: out.checks })

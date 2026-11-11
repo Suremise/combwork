@@ -26,6 +26,7 @@ import { slotLevelsOf, slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { COPY_TEXT, CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
 import { journalPath, LeaseJob } from './workflow/queueJobs'
+import { checkLeaseOver, holdCandidateLease, releaseCandidateLease } from './workflow/candidateLeases'
 import { LINK_TTL_MS } from './workflow/runLink'
 import { projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
@@ -121,10 +122,11 @@ export function setReviewCopyHooks(h: { over: typeof reviewOver; afterLook: type
  * Whether a check lease's run is over, as this Combwork knows: its run ended (or never started within a link's life).
  */
 function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
-  if (l.kind !== 'check') return null
-  const run = l.ref ? progress.list(workspacePath).find((r) => r.id === l.ref) : undefined
-  if (run) return !isOpenRun(run)
-  return Date.now() - Date.parse(l.from) > LINK_TTL_MS
+  // HI-2938: a candidate's checks hold their lease across all their runs (candidateLeases.ts).
+  return checkLeaseOver(l, (ref) => {
+    const run = progress.list(workspacePath).find((r) => r.id === ref)
+    return run ? isOpenRun(run) : undefined
+  }, LINK_TTL_MS)
 }
 
 /** An isolated check's agent text (dialects, HI-2447): cw-progress --isolated's waits and refusals. */
@@ -180,6 +182,8 @@ export async function candidateCheckLease(ws: WorkspaceService, projectPath: str
     await (await copiesFor(ws, projectPath)).returnCopy(r.lease.id, 'noJob')
     return { refused: say(T.noSupervisor) }
   }
+  // Held for the whole attempt (HR1's round 1 finding 1): never over between its runs until it is given back.
+  holdCandidateLease(r.lease.id)
   return { ...r, job }
 }
 
@@ -192,6 +196,7 @@ export async function candidateRun(ws: WorkspaceService, projectPath: string, le
 export async function candidateLeaseBack(ws: WorkspaceService, projectPath: string, lease: string, why: string, end: boolean): Promise<void> {
   const job = jobs.get(lease)
   if (end && job) await job.end().catch(() => false)
+  releaseCandidateLease(lease)
   await (await copiesFor(ws, projectPath)).returnCopy(lease, why)
 }
 

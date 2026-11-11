@@ -77,10 +77,18 @@ export interface CandidateChecksDeps {
   checkRan(c: { name: string; command: string; revision: string; tested: string; ok: boolean; run: string; durationMs: number; counted: boolean; whyNot?: CheckWhyNot }): Promise<void>
   /** Whether Stop (the Progress panel) ended this run (taken once). */
   stopped(run: string): boolean
-  hook?: (point: `beforeCheck:${string}` | `afterCheck:${string}` | 'leased') => Promise<void> | void
+  hook?: (point: `beforeCheck:${string}` | `afterCheck:${string}` | 'leased' | 'afterInstall') => Promise<void> | void
   /** The workspace's life (s11 §3): once aborted, a running check's job is ended and its lease given back; nothing more runs. */
   signal?: AbortSignal
+  /**
+   * How often validity is read again while a command runs (HR1's round 1 finding 4; default WATCH_MS): an invalidation
+   * mid-command ends the lease's job (its whole tree) at once, never waiting for the command to finish.
+   */
+  watchMs?: number
 }
+
+/** How often a running command's candidate is checked for validity (HR1's round 1 finding 4). */
+export const WATCH_MS = 2_000
 
 export interface CandidateChecksInput {
   card: { key: string; number: number }
@@ -157,14 +165,43 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
   // The workspace closing mid-run: its job ended (the running check's whole tree) and the lease given back at once.
   const onClose = (): void => void give('closed', true)
   deps.signal?.addEventListener('abort', onClose, { once: true })
+  // While a command runs, its candidate's validity read again (finding 4): invalid, its job ended at once.
+  let invalidated = false
+  const watched = async <T>(fn: () => Promise<T>): Promise<T> => {
+    let reading = false
+    const timer = setInterval(() => {
+      if (reading || invalidated || ended) return
+      reading = true
+      void deps
+        .valid()
+        .then(async (ok) => {
+          if (ok || invalidated || ended) return
+          invalidated = true
+          await give('invalid', true)
+        })
+        .catch(() => undefined)
+        .finally(() => (reading = false))
+    }, deps.watchMs ?? WATCH_MS)
+    timer.unref?.()
+    try {
+      return await fn()
+    } finally {
+      clearInterval(timer)
+    }
+  }
   try {
     await deps.hook?.('leased')
     const ctx: CheckContext = { card: i.card.key, number: i.card.number, revision: i.result, env: { CW_CHECK_BASE: i.expected } }
     let noInstall = false
     if (i.installAlways) {
-      const r = await deps.install(l.folder, ctx, l.spawn)
+      const r = await watched(() => deps.install(l.folder, ctx, l.spawn))
+      if (deps.signal?.aborted) return { closed: true }
+      if (invalidated) return { invalid: true }
+      // Stop pressed on the install's run (finding 2): stopped, never red or retried by itself.
+      if (r.run && deps.stopped(r.run)) return { stopped: { check: 'install' } }
       if (!r.ok) return r.transient ? { transient: { check: 'install', why: r.output.slice(-400), ...(r.cause ? { cause: r.cause } : {}) } } : { red: { check: 'install', output: r.output, ...(r.logPath ? { logPath: r.logPath } : {}) } }
       noInstall = !!r.skipped
+      await deps.hook?.('afterInstall')
     }
     for (const name of i.names) {
       if (stands(j, name)) continue
@@ -180,11 +217,12 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
       await deps.journal.write(j)
       const t0 = Date.now()
       const b = await deps.bracket(l.folder, i.result)
-      const r = await deps.runCheck(name, command, l.folder, { ...ctx, ...(noInstall ? { noInstall } : {}) }, l.spawn)
+      const r = await watched(() => deps.runCheck(name, command, l.folder, { ...ctx, ...(noInstall ? { noInstall } : {}) }, l.spawn))
       noInstall = false
       const end = await b.end()
       const run = r.run ?? ''
       if (deps.signal?.aborted) return { closed: true }
+      if (invalidated) return { invalid: true }
       const stopped = !!run && deps.stopped(run)
       Object.assign(entry, { phase: 'ended', run, ok: r.ok, counted: end.counted, revision: i.result, ...(end.whyNot ? { whyNot: end.whyNot } : {}), ...(r.transient || stopped ? { transient: true } : {}) })
       await deps.journal.write(j)

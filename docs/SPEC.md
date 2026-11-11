@@ -3410,6 +3410,10 @@ and s11 (HR1's OK).
   session environment, `cw.queue.checkMinutes`, `classifyCheckFailure`), placed in the copy and stoppable from the
   Progress panel (`stoppable`; Stop ends the lease's job). The install runs only with `mergeInstall: 'always'` (the pool
   installs again on a reset whose lock files changed). `CW_CHECK_BASE` is the head the candidate is built on.
+- **The lease is the attempt's** (HR1's round 1): held for the whole run, its install and every check
+  (`holdCandidateLease`, candidateLeases.ts), so the pool's `leaseOver` (`checkLeaseOver`) never calls it over between
+  its Progress runs; given back (released) only by the runner. After a crash nothing is held, and the pool's own rules
+  (its ref's run ended, a link's age) return it through its barrier. Each run is the lease's ref, so Stop finds its job.
 - **Credit:** jj's check bracket (J3's B1, run, B2) at the copy, counted only when its credit is exactly the candidate's
   commit; each run a `CheckRan` of the candidate's commit under its attempt's entry (`jj:<attempt>`). Exit 0 uncounted is
   never green (tried again).
@@ -3418,6 +3422,12 @@ and s11 (HR1's OK).
   counted and revision). Another fingerprint, attempt, commit or key starts afresh: no green reused. A check `started`
   with no end (Combwork stopped mid-run) is ended `interrupted` and runs again; one ended counted green at the candidate
   stands.
+- **While a command runs** (HR1's round 1), its validity is read again every 2 s (`WATCH_MS`): invalid (a re-approval,
+  a decision, other options, a moved target or candidate), the lease's job is ended at once (the command's whole tree)
+  and the lease given back; the run answers invalid, never waiting for the command to finish.
+- **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
+  transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
+  checks anew under the new key (`restart`).
 - **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
   progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
   card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at
@@ -3431,7 +3441,7 @@ and s11 (HR1's OK).
   card to Active, its builder woken (`jj.candidate.checks`) and the card's comment (`tasks.history.jjCandidateReturned`'s
   checks branch). Transient (couldn't start, its time limit, killed, uncounted, no job): failing, tried again after
   30 s doubling up to 15 min; the window says why from the third in a row. No copy free, or the last lease not freed:
-  waiting, tried again in 30 s. Stop: stopped, never retried by itself.
+  waiting, tried again in 30 s. Stop (a check's run or the install's): stopped, never red and never retried by itself.
 - **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
   candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
   the runner to look. It never adopts or moves anything.
@@ -3442,7 +3452,11 @@ and s11 (HR1's OK).
   real copies at the candidate and real check commands: green then offered and integrated via the candidate, red returning
   the card, both modes; Stop then Run Checks Again; a re-approval with identical endpoints, a decision, changed check
   options and the target moved, during a check and at the publication write; a restart whose previous lease's job still
-  runs a writing process: no lease until its tree is ended, then the interrupted check runs again); the e2e suites
+  runs a writing process: no lease until its tree is ended, then the interrupted check runs again; on the real copies
+  pool: a refresh between the install and a check and between two checks leaves the lease the attempt's; the setup
+  command changed during the final check and at the publication write; in real jobs, Stop on a running install, then Run
+  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once); the
+  scenario `jj-checks-back` (a builder given the checks' wake fixes the card with jj and submits again); the e2e suites
   `jjchecks` and `jjchecksnc`.
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)

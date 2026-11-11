@@ -589,6 +589,8 @@ export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, pro
 /** What a candidate's checks run came to, as the runner publishes it (HI-2938). */
 export type JjChecksUpdate =
   | { progress: { done: number; current?: string } }
+  /** The checks' key changed (other checks, commands, install or setup): they start anew under it (HR1's round 1 finding 3). */
+  | { restart: string[] }
   | { passed: string[] }
   | { waiting: string }
   | { stopped: string }
@@ -602,7 +604,7 @@ export type JjChecksUpdate =
  * still at the candidate's head and the candidate still its recorded commit (read just before; false fails closed).
  * A red check returns the card to its builder (`IntegrationFailed`, as the queue's red check does). Whether it wrote.
  */
-export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string }, u: JjChecksUpdate, current: boolean): Promise<boolean> {
+export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string; setupStill?: () => boolean }, u: JjChecksUpdate, current: boolean): Promise<boolean> {
   if (!current) return false
   const key = candidateKey(project, card.key, at.fp.cycle)
   let wrote = false
@@ -611,6 +613,8 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const st = w.state()
     if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
     if (checksKeyOf(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    // The setup command still the one the key was made with (finding 3): project.json unchanged since it was read.
+    if (at.setupStill && !at.setupStill()) return
     let rec: JjCandidateShown | null = null
     w.tx.sql((db) => {
       const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
@@ -621,7 +625,7 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
       }
     })
     const r = rec as JjCandidateShown | null
-    if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || r.checks?.key !== at.key) return
+    if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || !r.checks || (!('restart' in u) && r.checks.key !== at.key)) return
     if ('red' in u) {
       const failed: FactData['IntegrationFailed'] = { entry: jjCandidateEntry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
       w.fact('IntegrationFailed', failed)
@@ -635,7 +639,9 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     }
     const c = r.checks!
     const next: JjCandidateChecksShown =
-      'progress' in u
+      'restart' in u
+        ? { key: at.key, names: u.restart, state: 'running', done: 0 }
+        : 'progress' in u
         ? { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}) }
         : 'passed' in u
           ? { key: c.key, names: c.names, state: 'passed', done: c.names.length }

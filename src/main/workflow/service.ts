@@ -218,6 +218,13 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     },
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
+    // HI-2938: a card that passed is reconciled soon (a jj card's candidate is built then; its pass changes no jj
+    // operation or ref that would schedule it otherwise).
+    moved: (card, _from, to) => {
+      // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
+      // never a window's proxy of it, which this workflow may have been made from.
+      if (to === 'approved' && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+    },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
     reviewersPresent: async () => {
