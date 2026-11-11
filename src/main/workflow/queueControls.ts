@@ -142,7 +142,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
   for (const v of views) {
     if (!targets.includes(v.target)) continue
-    const f = await forwardOfTarget(projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
+    const f = await forwardOfTarget(wf, projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
     if (f.others.length) v.forward = f
   }
   return views
@@ -169,12 +169,31 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
   return out
 }
 
-/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources, HI-2892: in the release path's direction), and how far behind each it is. */
-async function forwardOfTarget(projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
+/**
+ * A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources, HI-2892: in
+ * the release path's direction), and how far behind each it is; HI-3000: and the card resolving that pair, while one is open.
+ */
+async function forwardOfTarget(wf: Workflow, projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
   const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
-  for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
+  for (const from of others) {
+    const r = openForPair(wf, from, to)
+    const resolving = r && wf.state(r).resolves ? { card: r.id, key: r.key } : null
+    behind.push({ from, commits: await commitsBehind(projectPath, from, to), ...(resolving ? { resolving } : {}) })
+  }
   return { others, behind }
+}
+
+/**
+ * The open work bringing `to` up to date with `from` (HI-2679, HI-3000): its forward card, or the card resolving it (Resolve
+ * on a builder: the forward Done, its resolution not yet), while that isn't Done.
+ */
+function openForPair(wf: Workflow, from: string, to: string): CardRecord | undefined {
+  return wf.store.cards().find((c) => {
+    const st = wf.state(c)
+    const pair = st.forward ?? st.resolves
+    return !!pair && pair.from === from && pair.to === to && st.stage !== 'done'
+  })
 }
 
 /** Counts kept by the two heads they were read at (HI-2679): at most BEHIND_KEPT, the oldest dropped. */
@@ -564,12 +583,9 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   // and started with its facts and entry, all in one transaction under the board's lock, which another Combwork on the
   // board takes too. Refused or stopped part way, none of it is kept: no card without its forward facts, none twice.
   const done = await cardBatch(ws, async (): Promise<ForwardDone> => {
-    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry).
-    const open = wf.store.cards().find((c) => {
-      const st = wf.state(c)
-      return !!st.forward && st.forward.from === from && st.forward.to === to && st.stage !== 'done'
-    })
-    if (open && override && !wf.state(open).forward?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
+    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry), or HI-3000 the card resolving it.
+    const open = openForPair(wf, from, to)
+    if (open && override && !(wf.state(open).forward ?? wf.state(open).resolves)?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
     if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
     guard?.()
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })

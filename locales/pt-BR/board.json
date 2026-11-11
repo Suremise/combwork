@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, one {mais #} other {mais #}}",
   "board.queue.forward": "Atualizar…",
   "board.queue.forwardAlready": "{to} já está sendo atualizado com {from}",
+  "board.queue.forwardResolving": "O cartão {card} está resolvendo isso: “Atualizar” espera por ele",
   "board.queue.forwardAskConfirm": "Pôr na fila",
   "board.queue.forwardAskMessage": "O merge de {from}, como está agora, é feito em {to} pela fila de merge de {to}, com as verificações de merge, como um commit de merge. O próprio {from} não muda. Se houver conflito ou uma verificação falhar, o cartão volta para você escolher Tentar o merge de novo ou Remover.",
   "board.queue.forwardAskTitle": "Atualizar {to} com {from}?",

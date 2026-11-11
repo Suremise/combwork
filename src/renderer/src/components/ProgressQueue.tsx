@@ -57,6 +57,7 @@ const FORWARD_T = {
   cancel: msg({ id: 'board.queue.forwardCancel', defaultMessage: 'Cancel', description: 'HI-2679: the choice that cancels the forward merge.' }),
   failed: msg({ id: 'board.queue.forwardFailed', defaultMessage: 'Couldn’t bring the branch up to date', description: 'HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why.' }),
   upToDate: msg({ id: 'board.queue.forwardUpToDate', defaultMessage: '{to} already has everything of {from}', description: 'HI-2679: a notification: nothing to bring in, so nothing was queued.' }),
+  resolving: msg({ id: 'board.queue.forwardResolving', defaultMessage: '{card} is resolving it: Bring Up to Date waits for it', description: 'HI-3000: on a merge queue’s card, after the line saying how far its branch is behind another: a card ({card}: its key, such as HI-12) made by Resolve on a builder is merging that branch in by hand, so Bring Up to Date (the button’s name: as translated there) isn’t offered for that branch until the card is Done.' }),
   already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
 }
 
@@ -91,7 +92,7 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
   // HI-2679: what this target lacks of the project's other targets, and the button that brings it up to date.
   const behind = (v.forward?.behind ?? []).filter((b) => b.commits !== 0)
   const forward = async (): Promise<void> => {
-    const offered = behind.filter((b) => b.commits !== null).map((b) => b.from)
+    const offered = behind.filter((b) => b.commits !== null && !b.resolving).map((b) => b.from)
     if (!offered.length) return
     const from =
       offered.length === 1
@@ -193,9 +194,18 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
               <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
             </span>
           </Tooltip>
+          {b.resolving && (
+            <>
+              <span className="faint" data-resolving={b.resolving.key}>
+                {' · '}
+                {tr(FORWARD_T.resolving, { card: b.resolving.key })}
+              </span>
+              <CardButton keyOf={b.resolving.key} />
+            </>
+          )}
         </div>
       ))}
-      {behind.some((b) => b.commits !== null) && (
+      {behind.some((b) => b.commits !== null && !b.resolving) && (
         <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
           <Icon name="git-merge" /> {tr(FORWARD_T.button)}
         </button>
