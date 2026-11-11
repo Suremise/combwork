@@ -135,6 +135,15 @@ function jjRepo(dir, o = {}) {
       await page.locator(`.git-sections [data-section="${name}"]`).click()
       return page.locator(`[data-jj-section="${name.replace(/^jj/, '').toLowerCase()}"]`)
     }
+    // HI-2971's races: the next call on a channel slowed (CW_TEST_SLOW_IPC, dev builds), and the calls main has answered.
+    const slowNext = (v) => app.evaluate((_e, x) => void (process.env.CW_TEST_SLOW_IPC = x), v)
+    const settled = (channel) => app.evaluate((_e, c) => globalThis.__cwSettledIpc?.[c] ?? 0, channel)
+    // Every answer main sent so far has reached the window and been drawn: a call answered after them (the same pipe, in
+    // order), then two frames.
+    const answered = async () => {
+      await inv('app:info')
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true)))))
+    }
 
     // --- shop as Git: Git's UI kept, jj found and offered.
     await toTab('shop')
@@ -282,6 +291,32 @@ function jjRepo(dir, o = {}) {
     check('…one whose bookmark moved again since: no command, the later work listed', !!(await until(async () => (await overlapPreview.count()) === 1 && (await overlapPreview.locator('[data-jj-op-command]').count()) === 0 && /moved/.test(await text(overlapPreview.locator('[data-jj-op-later]'))), HUNG_MS)), await text(ops))
     await shoot(page.locator('.vc-view'), 'operations-overlap')
     check('…and no preview wrote anything (the operation heads only the commands’ own)', JSON.stringify(heads(shop)) === afterMoved && before !== afterMoved && heads(shop).length === 1)
+    // A late preview never replaces a later one (HI-2971): the clean one's, slowed, answers after the overlapped one's.
+    const prev0 = await settled('jj:operationPreview')
+    await slowNext('jj:operationPreview=3000*1')
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    await ops.locator(`[data-jj-op="${overlapped}"] [data-action="jj-op-preview"]`).click()
+    check('two quick previews: the later one shows', !!(await until(async () => (await overlapPreview.count()) === 1, HUNG_MS)), await text(ops))
+    check('…the earlier one answers late', !!(await until(async () => (await settled('jj:operationPreview')) >= prev0 + 2, HUNG_MS)))
+    await answered()
+    check('…and the later one still shows', (await overlapPreview.count()) === 1 && (await ops.locator(`[data-jj-op-preview="${clean}"]`).count()) === 0, await text(ops))
+    // Nor does Copy's re-read (HR1's round 1): Copy, its check slowed, finds the head moved and reads the preview again;
+    // a Preview Undo of the same operation asked meanwhile answers first, and the re-read's late answer leaves it shown.
+    const anyClean = ops.locator(`[data-jj-op-preview="${clean}"]`)
+    const movedNote = ops.locator('[data-jj-moved-at-copy]')
+    await slowNext('')
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    check('the clean one previewed again', !!(await until(async () => (await anyClean.locator('[data-action="jj-op-copy"]').count()) === 1 && (await movedNote.count()) === 0, HUNG_MS)), await text(ops))
+    jj(shop, 'bookmark', 'create', 'meanwhile2', '-r', base)
+    const copy0 = await settled('jj:operationPreview')
+    await slowNext('jj:operationPreview=5000*1')
+    await anyClean.locator('[data-action="jj-op-copy"]').click()
+    await ops.locator(`[data-jj-op="${clean}"] [data-action="jj-op-preview"]`).click()
+    check('…Copy with the head moved, then Preview Undo of it again: the new preview shows', !!(await until(async () => (await settled('jj:operationPreview')) >= copy0 + 1 && (await anyClean.locator('[data-action="jj-op-copy"]').count()) === 1, HUNG_MS)), await text(ops))
+    check("…Copy's check and re-read answer after it", !!(await until(async () => (await settled('jj:operationPreview')) >= copy0 + 3, HUNG_MS)))
+    await answered()
+    check("…and the new preview still shows, not Copy's re-read (no moved-at-copy note)", (await anyClean.count()) === 1 && (await movedNote.count()) === 0, await text(ops))
+    await slowNext('')
 
     // --- Unsupported features: notes' .gitattributes refuses the switch, listed; its own core.autocrlf too, with the hint
     // to turn it off there alone (HI-2872), and the note that Git for Windows' stock settings don't count.
@@ -318,6 +353,25 @@ function jjRepo(dir, o = {}) {
     if (!tip) await page.screenshot({ path: path.join(shots, 'jjview-loose-tip.png') })
     check('…its tooltip says why and how (jj git colocation enable, or None)', /No Git working copy here/.test(tip ?? '') && /jj git colocation enable/.test(tip ?? ''), tip)
     await shoot(head, 'loose-git-refused')
+
+    // --- A read that answers after a switch to another jj project (HI-2971): shop's Refresh, slowed, answers after loose's
+    // own read, and loose's History still shows its history, its Refresh enabled (it stayed on Reading… for good).
+    const looseShows = async (h) => /main work/.test(await text(h)) && !/feature/.test(await text(h)) && !(await h.locator('[data-action="jj-refresh"]').isDisabled())
+    const looseHist = await section('jjHistory')
+    check('loose: History shows its own', !!(await until(() => looseShows(looseHist), HUNG_MS)), await text(looseHist))
+    await toTab('shop')
+    const shopHist = await section('jjHistory')
+    check('shop: History shows its own', !!(await until(async () => /feature/.test(await text(shopHist)) && !(await shopHist.locator('[data-action="jj-refresh"]').isDisabled()), HUNG_MS)), await text(shopHist))
+    const hist0 = await settled('jj:history')
+    await slowNext('jj:history=3000*1')
+    await shopHist.locator('[data-action="jj-refresh"]').click()
+    await page.getByText('loose', { exact: true }).first().click()
+    check("switched to loose during shop's Refresh: loose's History shows its own", !!(await until(async () => (await head.textContent())?.includes(loose) && (await looseShows(looseHist)), HUNG_MS)), await text(looseHist))
+    check("…shop's slowed read answers late", !!(await until(async () => (await settled('jj:history')) >= hist0 + 2, HUNG_MS)))
+    await answered()
+    check('…and loose still shows its history, Refresh enabled, not Reading…', (await looseShows(looseHist)) && !/Reading…/.test(await text(looseHist)), await text(looseHist))
+    await shoot(page.locator('.vc-view'), 'history-after-switch')
+    await slowNext('')
 
     // --- Back to Git: refused while jj's state can't go back, then made.
     await toTab('shop')
