@@ -2,6 +2,7 @@ import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, TaskWaiting, WorkflowForm } from '../shared/types'
 import { AGENT_FIELDS, BRANCH_TARGET, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import { reconcileAskWaits } from './assistantAsk'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
 import { config } from './config'
@@ -267,6 +268,9 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
     })
     return readBack(rest, (f) => cardValue(saved!, f as CardField))
   })
+  // A request's waiting mark put back (HI-2931) whose request ended meanwhile goes at once, as a workspace's open takes it
+  // off; one still open stays until that request ends. Never throws.
+  if (r.undone.includes('waitingFor') && (back.find((v) => v.field === 'waitingFor')?.old as { ask?: string } | null)?.ask) await reconcileAskWaits(ws)
   return { undone: [...undone, ...r.undone], skipped: [...skipped, ...r.skipped] }
 }
 

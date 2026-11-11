@@ -5139,7 +5139,8 @@ and a comment reaches no inbox: it sat an hour unseen):** `cw_ask_assistant` (`P
 in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
 Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
 the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
-("Asked the Assistant: …"), and a `control` delivery to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
+("Asked the Assistant: …"), and a message (`rebrief`, which the Assistant acks once it has dealt with it; a `control`
+notice before HI-2931, which needed no ack) to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
 the agent: sender kind `agent` with its project and id) quoting it whole as an agent's request, not the user's
 decision, with the card's key, offered at once: an idle or watching Assistant (its lane watch, which carries on) is
 woken by the doorbell, a busy one told at its next tool call. The Assistant acts on it only within its Control and what
@@ -5155,11 +5156,15 @@ by the card's own agent on its card in Doing with no waiting mark, the card is m
 mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
 `waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
 acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
-unread (`ended`), or never given. A take-off that fails is retried after 30 s, and each workspace's open
-(`reconcileAskWaits`) takes off every request mark whose delivery is no longer live (queued, offered, received or
-uncertain), so none stays for ever. A wait past the answer is the Assistant's own mark, set before it acks; its go is
-clearing it with the go as that change's comment, which wakes the builder's card watch. `ask` is Combwork's alone:
-never from the Agent API, and undo puts a mark back without it. A lane's row in the Progress panel says **waiting**
+without an ack (`ended`: unread, said as above; read and never acked for a week, expired with nothing said, HI-2931),
+or never given. A take-off that fails is retried after 30 s, and each workspace's open (`reconcileAskWaits`) takes off
+every request mark whose delivery is no longer live as the delivery service has it (`isLive`: queued, offered,
+uncertain, or received and not acked; an old `control` request once read is done), so none stays for ever. A wait past
+the answer is the Assistant's own mark, set before it acks; its go is clearing it with the go as that change's comment,
+which wakes the builder's card watch. `ask` is Combwork's alone: never from the Agent API (it takes a string), and kept
+only by undo (HI-2931): the Assistant's change snapshots the mark whole, `ask` with it, and undo puts it back so (a whole
+mark keeps its `ask`), so the request's end still takes it off; one whose request ended meanwhile goes as the undo
+ends (`reconcileAskWaits`). A lane's row in the Progress panel says **waiting**
 (what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
 for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
