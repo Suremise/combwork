@@ -4170,7 +4170,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
   slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
   any kind, not set aside), whose recorded target is only the last its lease served (HI-2928: once that branch is
-  deleted, a free Git slot's idle tidy and Remove check it against the default target instead, so work in it that isn't
+  deleted, a free slot's idle tidy and Remove check it against the default target instead (never for a jj preparation's
+  key, which has no head by design), so work in it that isn't
   there keeps it, `unmerged`, and a slot with none is freed, rather than kept as `cantCheck`); the slots read inside the save's board write, the
   pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
   every slot recording it, its clean-up checking against it),

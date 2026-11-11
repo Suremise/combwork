@@ -54,6 +54,7 @@ import { isUnknown, type Maybe } from './platform/types'
 import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { JJ_REFUSED } from './platform/jjWorkspacePort'
+import { isJjLineKey } from './platform/jjSlotPrep'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
@@ -2915,8 +2916,8 @@ export class SlotPool {
     let t = await port.lineHead(this.deps.project, target)
     // HI-2928: a free slot's own target deleted since it waited there (gone, not unreadable): it is checked against the
     // default target instead, so work in it that isn't there still keeps it (unmerged), and a slot with none is freed.
-    // Git's only: a jj slot's target can be a preparation's key, which has no head by design (HI-2866).
-    if (t === null && s.target && port.platform === 'git' && !this.store.openLease(s.name)) {
+    // Never for a preparation's key (a jj slot's), which has no head by design (HI-2866): only a deleted line.
+    if (t === null && s.target && !isJjLineKey(s.target) && !this.store.openLease(s.name)) {
       const def = await this.defaultTarget()
       if (def && def !== s.target) {
         target = def
