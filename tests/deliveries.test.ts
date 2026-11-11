@@ -356,6 +356,31 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual(['m1 acked', 'm2 acked', 'm3 received', 'm5 cancelled: cancelled by the user'])
   })
 
+  it("HI-2854: a card's start task is acked by its builder's start or submit of that card, only once received and only in its cycle; a whole card's task, received, tells its receipt", async () => {
+    const cycle = Date.parse('2026-11-11T10:00:00Z')
+    const card = { number: 12, history: [{ at: '2026-11-11T10:00:00.000Z', by: 'You', what: 'Moved to Doing' }] }
+    const received: unknown[] = []
+    deliveries.onCardTaskReceived((_host, agentId, number, seen) => received.push({ agentId, n: number, seen }))
+    const task = (o: Partial<Parameters<typeof deliveries.createDelivery>[1]> = {}) => make({ kind: 'task', from: combwork, card: 12, body: 'Work on task AM-12.', meta: { cardTask: true, cycle }, ...o })
+    await task({ meta: { cardTask: true, cycle, seenDecisions: 2, seenComments: 1, seenAt: 5 } })
+    // Not received yet: nothing acked.
+    expect(await deliveries.ackCardTask(alpha, 'b1', card)).toEqual([])
+    await deliveries.readInbox(alpha, 'b1')
+    expect(received).toEqual([{ agentId: 'b1', n: 12, seen: { decisions: 2, comments: 1, at: 5 } }])
+    // Another card's task, a later message about this card, another agent's, and another cycle's: all stay.
+    await task({ card: 13 })
+    await make({ card: 12, body: 'And one more thing.' })
+    await task({ agentId: 'b2', agentName: 'B2' })
+    await task({ meta: { cardTask: true, cycle: cycle - 1000 } })
+    await deliveries.readInbox(alpha, 'b1')
+    expect(await deliveries.ackCardTask(alpha, 'b1', card)).toEqual(['m1'])
+    expect(await states()).toEqual(['m1 acked: by its start or submit of the card', 'm2 received', 'm3 received', 'm5 received'])
+    // Only a task that carried the whole card tells a receipt.
+    expect(received).toHaveLength(1)
+    // A card not started (no move into Doing): nothing.
+    expect(await deliveries.ackCardTask(alpha, 'b1', { number: 12, history: [] })).toEqual([])
+  })
+
   it('cancel: only what still waits (a received one is the agent’s); by kind', async () => {
     await make()
     await make({ from: combwork, kind: 'card-event', card: 7, body: 'is in Review' })

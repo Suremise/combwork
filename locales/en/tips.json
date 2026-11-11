@@ -703,6 +703,14 @@
     "defaultMessage": "Skills for working with Combwork",
     "description": "A tip's title."
   },
+  "tips.combworkTokens.text": {
+    "defaultMessage": "Claude Code's /usage counts every request after one of Combwork's tool calls, each re-reading the whole conversation, so its combwork share is calls times context. A card's start now carries the whole card when it fits, so the agent reads it once.",
+    "description": "A tip (HI-2854). /usage is Claude Code's command and combwork the name of Combwork's MCP server: keep both as they are."
+  },
+  "tips.combworkTokens.title": {
+    "defaultMessage": "What \"combwork\" in /usage counts",
+    "description": "A tip's title (HI-2854). /usage is Claude Code's command and combwork the name of Combwork's MCP server: keep both as they are."
+  },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
     "description": "A command's name in a tip's text, where its shortcut would be when it has none. Use your language's quotation marks."

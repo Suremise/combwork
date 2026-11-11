@@ -1,0 +1,18 @@
+{
+  "freshness.unread.comment": {
+    "placeholders": {
+      "date": "plain",
+      "text": "plain"
+    }
+  },
+  "freshness.unread.decision": {
+    "placeholders": {
+      "date": "plain",
+      "by": "plain",
+      "text": "plain"
+    }
+  },
+  "freshness.unread.missing": {
+    "placeholders": {}
+  }
+}

@@ -27,6 +27,10 @@
   - **Names, never content**: a file by its last two folders, a web page by its host, a command only as its tool.
   - **Show** turns the map, its feed and the rings on and off. It is frozen when Activity is, draws nothing while hidden, and follows Windows' **Show animations** (Settings → Advanced → **The Activity map's moving pulses** to choose).
 
+### Changed
+
+- **A card costs fewer requests** (HI-2854). A card's start task now carries the whole card, its decisions and every comment, when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), and says when the card is already the agent's, so the agent neither reads it again nor starts it. Submitting no longer needs a fresh read either: a submit is refused while the card has a decision or a comment of yours the agent hasn't seen, in every workflow, Solo included, and the refusal gives them. The task a card was started with is acknowledged by the agent starting or submitting it. The user guide's **What Combwork adds to an agent's tokens** explains `/usage`'s "combwork" line, with the measurements.
+
 ### Fixed
 
 - **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:

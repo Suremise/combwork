@@ -266,6 +266,8 @@
   "tips.combworkMerges.title": "Niech Combwork scala zatwierdzone karty",
   "tips.combworkSkills.text": "Agenci i Asystent dostają własne umiejętności Combwork: work-on-card, review-agent-work, handover i inne. Combwork je aktualizuje; te, które edytujesz, pozostają Twoje.",
   "tips.combworkSkills.title": "Umiejętności do pracy z Combwork",
+  "tips.combworkTokens.text": "/usage w Claude Code liczy każde żądanie po wywołaniu narzędzia Combwork, a każde czyta całą rozmowę od nowa: udział combwork to więc wywołania razy kontekst. Start karty niesie teraz całą kartę, gdy się mieści, więc agent czyta ją tylko raz.",
+  "tips.combworkTokens.title": "Co liczy „combwork” w /usage",
   "tips.hooksMissing.text": "Jeśli aktualizacja CLI lub zasada sprawi, że hooki agenta nie docierają do Combwork, jego panel pokazuje Stan nieznany zamiast stanu, który może być błędny, nic nie jest do niego wpisywane, a jego tor się wstrzymuje. Baner nad jego panelem mówi dlaczego, gdy Combwork to wie.",
   "tips.hooksMissing.title": "Gdy hooki agenta przestają docierać",
   "tips.howDoYouWork.text": "Zakładka Kontrola wersji nowego projektu pyta „Jak pracujesz?”: Solo, Para czy Zespół, i sugeruje to, co pasuje do jego agentów. „Wybierz” konfiguruje je jednym kliknięciem; „Nie teraz” zachowuje Twoje ustawienia domyślne.",

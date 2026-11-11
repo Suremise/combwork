@@ -1165,13 +1165,13 @@
     "audience": "both"
   },
   "workflow.refused.submit.decisionsReceived.message": {
-    "text": "{card} has a decision you haven't read.",
-    "note": "A refused submit: the card has a newer decision than the builder has received.",
+    "text": "{card} has a decision or a comment from the user that you haven't seen.",
+    "note": "A refused submit (HI-2854): the card has a decision, or a comment the user wrote, newer than the builder has received.",
     "audience": "both"
   },
   "workflow.refused.submit.decisionsReceived.next": {
-    "text": "Read it, check your work against it, then submit.",
-    "note": "The next step after a refused submit for an unread decision.",
+    "text": "Check your work against each (listed below, or read the card), then submit again.",
+    "note": "The next step after a refused submit for an unseen decision or comment of the user's: the agent's reply lists them below when it can.",
     "audience": "both"
   },
   "workflow.refused.submit.empty.message": {
@@ -1405,8 +1405,8 @@
     "audience": "both"
   },
   "workflow.rule.submit.decisionsReceived": {
-    "text": "The builder has read every decision",
-    "note": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder).",
+    "text": "The builder has seen every decision and every comment of the user's",
+    "note": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has seen every decision on it, and every comment the user wrote (HI-2854; glossary 2.5: builder).",
     "audience": "both"
   },
   "workflow.rule.submit.focusedChosen": {

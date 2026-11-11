@@ -88,8 +88,8 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.submit.ownRunsStopped.change', defaultMessage: 'This rule is set in Version Control → Agents stop what they started before review.', description: 'Where the rule about stopping runs before review is changed.' })
   ),
   'submit.decisionsReceived': r(
-    msg({ id: 'workflow.refused.submit.decisionsReceived.message', defaultMessage: "{card} has a decision you haven't read.", description: 'A refused submit: the card has a newer decision than the builder has received.' }),
-    msg({ id: 'workflow.refused.submit.decisionsReceived.next', defaultMessage: 'Read it, check your work against it, then submit.', description: 'The next step after a refused submit for an unread decision.' })
+    msg({ id: 'workflow.refused.submit.decisionsReceived.message', defaultMessage: "{card} has a decision or a comment from the user that you haven't seen.", description: 'A refused submit (HI-2854): the card has a decision, or a comment the user wrote, newer than the builder has received.' }),
+    msg({ id: 'workflow.refused.submit.decisionsReceived.next', defaultMessage: 'Check your work against each (listed below, or read the card), then submit again.', description: 'The next step after a refused submit for an unseen decision or comment of the user\'s: the agent\'s reply lists them below when it can.' })
   ),
   'review.notAuthor': r(
     msg({ id: 'workflow.refused.review.notAuthor.message', defaultMessage: "You worked on {card}, so you can't review it.", description: 'A refused review: the reviewer is one of the agents who built the card.' }),
@@ -372,6 +372,11 @@ export interface Refusal {
   values: RefusalValues
   /** What else the agent should know, in English (HI-2339: the files a None submit's paths leave out). */
   warnings?: string[]
+  /**
+   * HI-2854: a refused submit's unseen decisions and comments of the user's, each in full with who and when (agent text):
+   * received with the refusal, so the next submit goes on unless more came meanwhile.
+   */
+  unread?: string[]
 }
 
 /** How a refusal's sentences are formatted: in English for agents, or in the window's language (`refusalLines`). */
@@ -460,7 +465,7 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
  */
 export function refusalBody(x: Refusal): Record<string, unknown> {
   const l = currentChain() ? refusalLines(x.rule, x.values, IN_AGENTS) : { message: x.message, next: x.next, change: x.change ?? null }
-  return { refused: true, rule: x.rule, message: l.message, next: l.next, ...(l.change ? { change: l.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}) }
+  return { refused: true, rule: x.rule, message: l.message, next: l.next, ...(l.change ? { change: l.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}), ...(x.unread?.length ? { unread: x.unread } : {}) }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */

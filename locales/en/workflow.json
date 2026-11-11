@@ -1588,12 +1588,12 @@
     "description": "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227, HI-2257): an agent doing the card commits its work; one asked only to submit it asks the user before committing; changes that aren't the card's are removed only once asked about."
   },
   "workflow.refused.submit.decisionsReceived.message": {
-    "defaultMessage": "{card} has a decision you haven't read.",
-    "description": "A refused submit: the card has a newer decision than the builder has received."
+    "defaultMessage": "{card} has a decision or a comment from the user that you haven't seen.",
+    "description": "A refused submit (HI-2854): the card has a decision, or a comment the user wrote, newer than the builder has received."
   },
   "workflow.refused.submit.decisionsReceived.next": {
-    "defaultMessage": "Read it, check your work against it, then submit.",
-    "description": "The next step after a refused submit for an unread decision."
+    "defaultMessage": "Check your work against each (listed below, or read the card), then submit again.",
+    "description": "The next step after a refused submit for an unseen decision or comment of the user's: the agent's reply lists them below when it can."
   },
   "workflow.refused.submit.empty.message": {
     "defaultMessage": "{card}: nothing committed to review.",
@@ -1808,8 +1808,8 @@
     "description": "A rule of the workflow, named where a move skips or can't check it."
   },
   "workflow.rule.submit.decisionsReceived": {
-    "defaultMessage": "The builder has read every decision",
-    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder)."
+    "defaultMessage": "The builder has seen every decision and every comment of the user's",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has seen every decision on it, and every comment the user wrote (HI-2854; glossary 2.5: builder)."
   },
   "workflow.rule.submit.focusedChosen": {
     "defaultMessage": "Each card’s focused tests are chosen before review",
