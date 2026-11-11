@@ -5914,9 +5914,18 @@ touched:
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
-  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked -- <paths>`, named
+  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
-  after it made one is said with that stash, kept. The pause shown (card, reason, time) must still be the current one
+  after it made one is said with that stash, kept. **Any number of files** (HI-2983): the paths go to git on its input
+  (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
+  32,767-character command line, and a start's warning lists every changed file). `stash push` passes its paths on to
+  git commands of its own as arguments, so when the files shown are every change in the folder (a start's warning)
+  it is the whole folder's stash, with no paths; when they are only some, more than about 30,000 characters of them
+  are refused before any stash is made (*Git can't set aside this many files (n) apart from the other changes in
+  …*). **Refused by name too:** an untracked repository of its own inside the folder (git lists it whole, `nested/`),
+  never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
+  submodule, yourself*). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
 - **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a

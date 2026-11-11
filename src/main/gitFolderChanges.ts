@@ -19,7 +19,7 @@ import { INDEX_BUSY, git, gitErrorLine } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
-import { checkouts, OPERATION_MARKERS, worktreeNow } from './platform/git'
+import { checkouts, worktreeNow } from './platform/git'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { workspace } from './workspace'
@@ -42,6 +42,8 @@ const M = {
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
+  nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
+  tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) apart from the other changes in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge): the files shown are only some of the folder's changes, and too many ({count}) for git stash to take apart from the rest (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
 
@@ -60,6 +62,23 @@ const quietEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_TERMINAL_PROMPT
 
 /** A repository-relative path as a pathspec that names exactly it, from the top whatever the folder. */
 const literal = (rel: string): string => `:(top,literal)${rel}`
+
+/**
+ * HI-2983: paths given to git on its standard input, NUL-separated, never on the command line: a few hundred paths
+ * passed Windows' 32,767-character limit (`spawn ENAMETOOLONG`), and a start's warning lists every changed file. The
+ * arguments that read them, and the input; git 2.26 or later (`stash push`'s; Combwork asks for 2.38).
+ */
+const PATHS_IN = ['--pathspec-from-file=-', '--pathspec-file-nul']
+const pathsIn = (paths: string[]): string => paths.map(literal).join('\0')
+
+/**
+ * HI-2983: `git stash push` with pathspecs passes them on to git commands of its own as arguments (`add`, `diff-index`,
+ * each as `':(top,literal,prefix:0)<path>'`), so their total, not Combwork's command line, meets Windows' 32,767
+ * characters; git then fails after it made the stash. The most they may take, with room for the rest of that command
+ * line (git's own path, the command), and what each path takes.
+ */
+const STASH_PATHS_MAX = 30_000
+const stashPathCost = (rel: string): number => rel.length + 28
 
 /** The markers worktreeNow lists for an operation under way, as the refusal names it. */
 const STATES: Record<string, string> = { '(MERGE_HEAD)': 'merge', '(rebase-merge)': 'rebase', '(rebase-apply)': 'rebase', '(CHERRY_PICK_HEAD)': 'cherryPick', '(REVERT_HEAD)': 'revert' }
@@ -102,11 +121,15 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
   return out
 }
 
-/** The window's list as repository-relative paths: strings, `/` separated, no `.` or `..`, each once. */
+/**
+ * The window's list as repository-relative paths: strings, `/` separated, no `.` or `..`, each once. A folder git lists
+ * whole (`nested/`, an untracked repository of its own) keeps its one trailing `/`, so it is refused by name rather than
+ * dropped (HI-2983).
+ */
 function cleanShown(shown: unknown): string[] {
   const list = Array.isArray(shown) ? shown : []
   const out = list.filter((p): p is string => typeof p === 'string').map((p) => p.replace(/\\/g, '/').replace(/^\/+/, ''))
-  return [...new Set(out.filter((p) => p && !p.split('/').some((s) => s === '..' || s === '.' || s === '') && !/^\.git(\/|$)/i.test(p)))]
+  return [...new Set(out.filter((p) => p && !p.replace(/\/$/, '').split('/').some((s) => s === '..' || s === '.' || s === '') && !/^\.git(\/|$)/i.test(p)))]
 }
 
 function failed(m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], err: string): Error {
@@ -127,7 +150,8 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   if (!now.line) throw combworkError(M.detached, { folder })
   if (branch !== null && now.line !== branch) throw combworkError(M.wrongBranch, { folder, target: branch })
-  const marker = now.dirty.find((f) => OPERATION_MARKERS.has(f))
+  // The operations under way, apart from the files (HI-2983: a changed file named `(MERGE_HEAD)` is a file).
+  const marker = now.operations?.[0]
   if (marker) throw combworkError(M.midOperation, { state: STATES[marker] ?? 'revert', folder })
   const { folderBuilders } = await import('./workflow/queueHost')
   const held = folderBuilders(workspace, folder)
@@ -147,13 +171,13 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
  */
 async function commitPaths(folder: string, files: string[], untracked: string[], message: string): Promise<string> {
   if (untracked.length) {
-    const add = await git(folder, ['add', '--intent-to-add', '--', ...untracked.map(literal)])
+    const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked))
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
-  const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, '--', ...files.map(literal)], undefined, undefined, { env: quietEnv(), timeout: ACT_MS })
+  const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
   if (!r.ok) {
     // The files as they were: the intent-to-add entries this call made taken out again (the working tree never touched).
-    if (untracked.length) await git(folder, ['reset', '--quiet', '--', ...untracked.map(literal)])
+    if (untracked.length) await git(folder, ['reset', '--quiet', ...PATHS_IN], undefined, pathsIn(untracked))
     throw failed(M.commitFailed, `${r.err}\n${r.out}`)
   }
   const head = await git(folder, ['rev-parse', 'HEAD'])
@@ -189,13 +213,15 @@ async function stashTop(folder: string): Promise<string | null> {
 }
 
 /**
- * Sets `files` aside as a named stash (`git stash push --include-untracked -- <paths>`): only those paths, other index
+ * Sets `files` aside as a named stash (`git stash push --include-untracked`, the paths on its input; `whole`: the
+ * files are every change in the folder, so no paths at all, which no command line limits, HI-2983): only those paths, other index
  * entries as they were. The stash made is told by the stash ref moving to a new object (never by its message: an older
  * one can have the same). A failure after git made it is said with the stash, kept: never rolled back.
  */
-async function setAsidePaths(folder: string, files: string[], message: string): Promise<string> {
+async function setAsidePaths(folder: string, files: string[], message: string, whole: boolean): Promise<string> {
   const before = await stashTop(folder)
-  const r = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, '--', ...files.map(literal)], undefined, undefined, { env: quietEnv(), timeout: ACT_MS })
+  const args = ['stash', 'push', '--include-untracked', '--quiet', '-m', message]
+  const r = whole ? await git(folder, args, undefined, undefined, { env: quietEnv(), timeout: ACT_MS }) : await git(folder, [...args, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
   const after = await stashTop(folder)
   const made = after && after !== before ? after : null
   if (!r.ok) {
@@ -240,9 +266,16 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A rename's other side goes with it: committed or set aside, the rename stays whole.
         const files = [...new Set(shown.flatMap((p) => [p, ...(now.get(p)?.from ? [now.get(p)!.from!] : [])]))]
         const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label}` // i18n-ignore: the commit's or stash's message, in the repository (English, as Combwork's other commits)
+        // A folder git lists whole: an untracked repository of its own, never committed or stashed as one (HI-2983).
+        const nested = files.find((p) => p.endsWith('/'))
+        if (nested) throw combworkError(M.nestedRepo, { folder: nested })
         const kept = await keptDeleted(folder, files, now)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message) : await setAsidePaths(folder, files, message)
+        // Set aside: every change in the folder shown (a start's warning lists them all), the whole folder's; else only
+        // as many as git's own commands can be given (HI-2983), refused before any stash is made.
+        const whole = [...now.keys()].every((p) => files.includes(p))
+        if (action === 'setAside' && !whole && files.reduce((n, p) => n + stashPathCost(p), 0) > STASH_PATHS_MAX) throw combworkError(M.tooManyToSetAside, { count: files.length, folder })
+        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message) : await setAsidePaths(folder, files, message, whole)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
       }),

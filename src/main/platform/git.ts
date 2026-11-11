@@ -379,9 +379,6 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
 
-/** HI-2944: the dirty list's operation markers, exactly as it writes them; a changed file named `(draft).md` is a file. */
-export const OPERATION_MARKERS: ReadonlySet<string> = new Set(MARKERS.map((m) => `(${m})`))
-
 /**
  * A worktree's branch, head and uncommitted state, and optionally a line's head and some git paths, in two gits run at
  * once (#1374: lanes read this several times a pass, and six gits each outran tests' bounds under load): `status
@@ -425,10 +422,8 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   if (out.length !== asked.length + (o.target && target === undefined ? 1 : 0)) return unknown(U.state, { folder })
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
-  MARKERS.forEach((marker, i) => {
-    if (there[i]) files.push(`(${marker})`)
-  })
-  return { line, head: oid, dirty: files, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
+  return { line, head: oid, dirty: [...files, ...operations], operations, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
 /**

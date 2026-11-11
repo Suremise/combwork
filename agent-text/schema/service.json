@@ -330,6 +330,11 @@
       "target": "plain"
     }
   },
+  "service.folderChanges.nestedRepo": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.noTarget": {
     "placeholders": {
       "target": "plain"
@@ -354,6 +359,12 @@
     "placeholders": {
       "stash": "plain",
       "why": "plain"
+    }
+  },
+  "service.folderChanges.tooManyToSetAside": {
+    "placeholders": {
+      "count": "number",
+      "folder": "plain"
     }
   },
   "service.folderChanges.unplaced": {
