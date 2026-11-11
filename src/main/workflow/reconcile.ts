@@ -477,8 +477,8 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
  * same heads visited again (reset away and back, twice) make new ones. `LeftTarget` follows the integration or the last
  * `BackInTarget`; `BackInTarget` follows the last `LeftTarget`.
  */
-const LEFT: ReadonlySet<string> = new Set(['LeftTarget'])
-const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget'])
+const LEFT: ReadonlySet<string> = new Set(['LeftTarget']) // i18n-ignore: fact kinds
+const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget']) // i18n-ignore: fact kinds
 const lastSeq = (w: Write, card: number, kinds: ReadonlySet<string>): number => w.tx.facts(card).findLast((f) => kinds.has(f.kind))?.seq ?? 0
 
 /**
