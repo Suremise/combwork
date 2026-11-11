@@ -14,6 +14,8 @@
 // - validity (`valid`): HI-2871's fingerprint still the card's, the checks key the options', the target at the
 //   candidate's head and the candidate still the recorded commit; read before the lease, before the install and before
 //   each check.
+// - the workspace's life (`signal`): once the copy is leased, every await up to a command's start is a step, checking it
+//   before and after (HI-2964): closed, nothing more starts, a bracket taken is ended and the lease given back once.
 // Its answer is the caller's to publish, in a write that checks the same again.
 
 import { stableHash } from '../../shared/workflow/compile'
@@ -190,46 +192,52 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
       clearInterval(timer)
     }
   }
+  // Every await from here up to a command's start goes through step (HI-2964, the Assistant's design after HR1's and HR2's
+  // rounds): the workspace closed before it or while it awaited, nothing more starts (Closed, caught below). What records a
+  // check that already ran (its bracket's end, its ended entry, CheckRan) isn't stepped: a check that ran is recorded whole.
+  const step = async <T>(fn: () => Promise<T> | T): Promise<T> => {
+    if (deps.signal?.aborted) throw CLOSED
+    const v = await fn()
+    if (deps.signal?.aborted) throw CLOSED
+    return v
+  }
+  // A bracket taken and not yet ended (ended by the finally when the run ends before its check).
+  let open: { end(): Promise<unknown> } | null = null
   try {
-    await deps.hook?.('leased')
+    await step(() => deps.hook?.('leased'))
     const ctx: CheckContext = { card: i.card.key, number: i.card.number, revision: i.result, env: { CW_CHECK_BASE: i.expected } }
     let noInstall = false
     if (i.installAlways) {
-      // Read again before the install (HI-2964): the lease and its journal write await, and the candidate or the workspace
-      // can end meanwhile, the workspace during that read too (HR1's round 1): a command known obsolete never starts.
-      if (deps.signal?.aborted) return { closed: true }
-      if (!(await deps.valid())) {
+      // Read again before the install (HI-2964): the candidate can end while the copy is leased; a command known obsolete
+      // never starts.
+      if (!(await step(() => deps.valid()))) {
         await give('invalid', true)
         return { invalid: true }
       }
-      if (deps.signal?.aborted) return { closed: true }
-      const r = await watched(() => deps.install(l.folder, ctx, l.spawn))
-      if (deps.signal?.aborted) return { closed: true }
+      const r = await step(() => watched(() => deps.install(l.folder, ctx, l.spawn)))
       if (invalidated) return { invalid: true }
       // Stop pressed on the install's run (finding 2): stopped, never red or retried by itself.
       if (r.run && deps.stopped(r.run)) return { stopped: { check: 'install' } }
       if (!r.ok) return r.transient ? { transient: { check: 'install', why: r.output.slice(-400), ...(r.cause ? { cause: r.cause } : {}) } } : { red: { check: 'install', output: r.output, ...(r.logPath ? { logPath: r.logPath } : {}) } }
       noInstall = !!r.skipped
-      await deps.hook?.('afterInstall')
+      await step(() => deps.hook?.('afterInstall'))
     }
     for (const name of i.names) {
       if (stands(j, name)) continue
-      if (deps.signal?.aborted) return { closed: true }
-      await deps.hook?.(`beforeCheck:${name}`)
-      if (!(await deps.valid())) {
+      await step(() => deps.hook?.(`beforeCheck:${name}`))
+      if (!(await step(() => deps.valid()))) {
         await give('invalid', true)
         return { invalid: true }
       }
-      // Closed during the hook or that read (its lease given back): the check never starts.
-      if (deps.signal?.aborted) return { closed: true }
       const command = i.commands[name] ?? name
       const entry: JournalledCheck = { name, command, phase: 'started' }
       j.checks = [...j.checks.filter((c) => c.name !== name), entry]
-      await deps.journal.write(j)
+      await step(() => deps.journal.write(j))
       const t0 = Date.now()
-      const b = await deps.bracket(l.folder, i.result)
-      const r = await watched(() => deps.runCheck(name, command, l.folder, { ...ctx, ...(noInstall ? { noInstall } : {}) }, l.spawn))
+      const b = await step(async () => (open = await deps.bracket(l.folder, i.result)))
+      const r = await step(() => watched(() => deps.runCheck(name, command, l.folder, { ...ctx, ...(noInstall ? { noInstall } : {}) }, l.spawn)))
       noInstall = false
+      open = null
       const end = await b.end()
       const run = r.run ?? ''
       if (deps.signal?.aborted) return { closed: true }
@@ -239,6 +247,7 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
       await deps.journal.write(j)
       await deps.checkRan({ name, command: r.command ?? command, revision: i.result, tested: end.tested, ok: r.ok, run, durationMs: Math.max(0, Date.now() - t0), counted: end.counted, ...(end.whyNot ? { whyNot: end.whyNot } : {}) })
       r.note?.({ name, counted: end.counted, ...(end.whyNot ? { whyNot: end.whyNot } : {}) })
+      // Not stepped: this check's outcome stands; a close now stops the next one at its first step.
       await deps.hook?.(`afterCheck:${name}`)
       if (stopped) return { stopped: { check: name } }
       if (!r.ok) return r.transient ? { transient: { check: name, why: r.output.slice(-400), ...(r.cause ? { cause: r.cause } : {}) } } : { red: { check: name, output: r.output, ...(r.logPath ? { logPath: r.logPath } : {}) } }
@@ -246,8 +255,16 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
       if (!end.counted) return { transient: { check: name, why: `uncounted:${end.whyNot ?? 'unknown'}` } } // i18n-ignore: a protocol code, for the log and the record
     }
     return { green: true, checks: [...i.names] }
+  } catch (e) {
+    if (e === CLOSED) return { closed: true }
+    throw e
   } finally {
     deps.signal?.removeEventListener('abort', onClose)
+    const b = open as { end(): Promise<unknown> } | null
+    if (b) await b.end().catch(() => undefined)
     await give('checksEnded')
   }
 }
+
+/** What step throws once the workspace has closed (caught in runCandidateChecks: never seen outside it). */
+const CLOSED = Symbol('closed')

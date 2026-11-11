@@ -201,6 +201,37 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
       expect(await runCandidateChecks({ ...r.deps, signal: life2.signal }, input({ installAlways }))).toEqual({ closed: true })
       expect(r.log).toEqual(['lease L1', 'give L1 closed end'])
     }
+    // Closed during the check's started journal write, or during its bracket (HR2's round 2): the check never runs, its
+    // bracket (if taken) is ended, the lease given back once.
+    for (const at of ['journal', 'bracket'] as const) {
+      const life3 = new AbortController()
+      const s = parts()
+      const write = s.deps.journal.write
+      s.deps.journal.write = async (j) => {
+        if (at === 'journal' && j.checks.some((c) => c.phase === 'started')) life3.abort()
+        await write(j)
+      }
+      s.deps.bracket = async (_f, revision) => {
+        s.log.push('bracket')
+        if (at === 'bracket') life3.abort()
+        return { end: async () => (s.log.push('bracket end'), { counted: true, tested: revision }) }
+      }
+      expect(await runCandidateChecks({ ...s.deps, signal: life3.signal }, input())).toEqual({ closed: true })
+      expect(s.log).toEqual(at === 'journal' ? ['lease L1', 'give L1 closed end'] : ['lease L1', 'bracket', 'give L1 closed end', 'bracket end'])
+    }
+    // Closed during a hook, or while the install runs: nothing after it starts.
+    for (const at of ['leased', 'beforeCheck:typecheck', 'install'] as const) {
+      const life4 = new AbortController()
+      const h = parts()
+      h.deps.hook = (p) => void (p === at && life4.abort())
+      const install = h.deps.install
+      h.deps.install = async (...a) => {
+        if (at === 'install') life4.abort()
+        return install(...a)
+      }
+      expect(await runCandidateChecks({ ...h.deps, signal: life4.signal }, input({ installAlways: true }))).toEqual({ closed: true })
+      expect(h.log).toEqual(at === 'install' ? ['lease L1', 'give L1 closed end', 'install'] : at === 'leased' ? ['lease L1', 'give L1 closed end'] : ['lease L1', 'install', 'give L1 closed end'])
+    }
   })
 
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
