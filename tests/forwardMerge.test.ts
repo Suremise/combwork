@@ -34,7 +34,7 @@ const agent = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b
 let n = 0
 
 /** A Pair project merging into main, listing 1.2.0 (made from main), main then `ahead` commits ahead. */
-async function project(ahead = 1): Promise<{ w: WS; repo: string }> {
+async function project(ahead = 1, targets: { target: string; otherTargets: string[] } = { target: 'main', otherTargets: ['1.2.0'] }): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
@@ -51,7 +51,7 @@ async function project(ahead = 1): Promise<{ w: WS; repo: string }> {
     git(repo, 'commit', '-qm', `fix ${i}`)
   }
   const { platform: _p, ...pair } = preset('git', 'pair')
-  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, target: 'main', otherTargets: ['1.2.0'] } } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, ...targets } } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -454,8 +454,8 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
 
 describe('HI-2959: Resolve on a builder, on the real board', () => {
   /** project(), with 1.2.0 changing main's fix too: the forward of main into 1.2.0 conflicts. */
-  async function conflicting(): Promise<{ w: WS; repo: string }> {
-    const p = await project()
+  async function conflicting(targets?: Parameters<typeof project>[1]): Promise<{ w: WS; repo: string }> {
+    const p = await project(1, targets)
     git(p.repo, 'checkout', '-q', '1.2.0')
     writeFileSync(join(p.repo, 'fix0.txt'), 'the 1.2.0 version\n')
     git(p.repo, 'add', '-A')
@@ -463,6 +463,38 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     git(p.repo, 'checkout', '-q', '--detach')
     return p
   }
+
+  it('HI-2985: its destination Work merges into, pinned there: kept when Work merges into moves on, refused elsewhere', async () => {
+    // main into 1.2.0, the project's own (HI-2885's common case): the card stores 1.2.0, not none.
+    const { w, repo } = await conflicting({ target: '1.2.0', otherTargets: [] })
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    const fwd = 'card' in made ? made.card : null
+    expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const r = await inWorkspace(w, () => controls.resolveForward(w, fwd!.number, user, 'by hand'))
+    const wf = (await workflowFor(w, repo))!
+    const rc = r.card.number
+    expect(wf.store.card(rc).target).toBe('1.2.0')
+    // Start the next version: Work merges into 1.3.0, 1.2.0 listed.
+    git(repo, 'branch', '1.3.0', '1.2.0')
+    await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, target: '1.3.0', otherTargets: ['1.2.0'] } } })))
+    const tasks = await import('../src/main/tasks')
+    const lanes = await import('../src/main/lanes')
+    const { retargetPreview } = await import('../src/main/workflow/retarget')
+    const { agentActor } = await import('../src/shared/workflow/facts')
+    // A version retarget leaves it where it is; its Merges into moves nowhere else, nor does a lane on 1.3.0 take it.
+    const preview = await inWorkspace(w, () => retargetPreview(w, repo, '1.2.0', '1.3.0', { ongoing: true }))
+    expect(preview.cards.move.map((c) => c.number)).not.toContain(rc)
+    expect(preview.cards.keep.find((c) => c.number === rc)?.why).toBe('refused')
+    await expect(inWorkspace(w, () => tasks.setTarget(rc, '1.3.0', user))).rejects.toThrow(/resolves the merge of main into 1\.2\.0, so it merges into 1\.2\.0 only/)
+    await expect(inWorkspace(w, () => tasks.setTarget(rc, null, assistant))).rejects.toThrow(/merges into 1\.2\.0 only/)
+    await inWorkspace(w, () => tasks.setTarget(rc, '1.2.0', user))
+    expect(wf.store.card(rc).target).toBe('1.2.0')
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [rc], by: 'You' })).rejects.toThrow(/merges into 1\.2\.0, and this lane into 1\.3\.0/)
+    // A lane on 1.2.0 takes it, and it starts from 1.2.0.
+    expect((await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [rc], by: 'You', target: '1.2.0' })).lane.target).toBe('1.2.0')
+    expect(await store.boardWrite(w, async () => wf.start(`#${rc}`, agentActor('b1')))).toMatchObject({ ok: true })
+    expect(wf.state(wf.store.card(rc)).started).toMatchObject({ target: '1.2.0', base: git(repo, 'rev-parse', '1.2.0') })
+  })
 
   it("is the user's or the Assistant's, only on a returned forward; one board change, never two cards", async () => {
     const { w, repo } = await conflicting()

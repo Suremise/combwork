@@ -355,6 +355,10 @@
     "defaultMessage": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}",
     "description": "HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys."
   },
+  "tasks.error.targetResolution": {
+    "defaultMessage": "{card} resolves the merge of {from} into {to}, so it merges into {to} only. To bring {from} into another branch, use Bring Up to Date there.",
+    "description": "HI-2985: an error setting the Merges into of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand) to another branch than {to}. {card} is its key (HI-12). Bring Up to Date is a command’s name in the window: as translated there."
+  },
   "tasks.error.tooLong": {
     "defaultMessage": "{what, select, title {The title is too long (at most {max, number} characters).} description {The description is too long (at most {max, number} characters).} comment {The comment is too long (at most {max, number} characters).} decision {The decision is too long (at most {max, number} characters).} other {The blocked reason is too long (at most {max, number} characters).}}",
     "description": "An error: a card's field is longer than it may be ({what}, select: its title, description, comment, decision or blocked reason; translate each sentence); {max} is the most characters it takes."

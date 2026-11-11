@@ -222,6 +222,42 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(w.wf.state(card).stage).toBe('active')
       expect(shown(w, card, w.wf.state(card).cycle)).toBeNull()
     })
+
+    it("HI-2990: the user's own fast-forward while a check runs in a copy at the candidate: Done; the candidate dropped by the sweep once the copy is freed, the copy off it", async () => {
+      const w = await world(colocated, { candidates: true })
+      const x = host(w)
+      // The check holds until its gate exists, so the copy is surely still leased when Integrated is recorded.
+      const gate = join(tempDir('jjff-'), 'go')
+      withChecks(w, { lint: `${NODE} -e "const f=require('fs');setInterval(()=>{if(f.existsSync(${JSON.stringify(gate).replace(/"/g, "'")}))process.exit(0)},50)"` })
+      const { card, P } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      await vi.waitFor(() => expect(x.runs.length).toBe(1), { timeout: REAL_JJ_MS, interval: 50 })
+      const c = shown(w, card, cycle)!.offer!
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      // Its drop at Integrated skipped: the copy still leased at the candidate.
+      const entry = () => (w.conn.read((db) => readAttempts(db as unknown as SqlDb, attemptsKey('p-jj', card.key, cycle))) as JjAttemptEntry[]).find((e) => e.record.attempt === c.attempt)!
+      expect(entry().state).toBeUndefined()
+      await jjp.afterRun()
+      expect(entry().state).toBeUndefined()
+      writeFileSync(gate, 'go')
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      // Once the pool has the copy back, a sweep (the platform's run) parks it and drops the candidate.
+      await vi.waitFor(
+        async () => {
+          await x.pool.refresh()
+          await jjp.afterRun()
+          expect(entry().state).toBe('dropped')
+        },
+        { timeout: REAL_JJ_MS, interval: 200 }
+      )
+      expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${c.result} & ::visible_heads()`, '-T', 'commit_id').trim()).toBe('')
+      expect(w.refAt(`refs/cw/jj/${card.key}/${c.attempt}/candidate`)).toBeNull()
+      expect(x.pool.copies().filter((k) => k.revision === c.result)).toEqual([])
+    })
   })
 
   describe('stop and validity (colocated)', () => {

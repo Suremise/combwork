@@ -5,7 +5,7 @@
 // own checks (its confirmation, the gates, the fallback) are stood in for here (`storeSwitchSeams.repo`): the real-jj
 // tests run them.
 import { execFileSync } from 'child_process'
-import { mkdirSync, realpathSync, writeFileSync } from 'fs'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -30,6 +30,7 @@ const { beginSwitch, MEMBER_KEY, readFence, storeKey } = await import('../src/ma
 const { commonGitDir, heldStoreKeys, storeKeyOf } = await import('../src/main/repoLock')
 const { withFolderRepoLocks } = await import('../src/main/platform/repoPorts')
 const { agentActor } = await import('../src/shared/workflow/facts')
+const { projectPlatform } = await import('../src/main/platform/registry')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -323,6 +324,61 @@ async function separateWorkspace(): Promise<{ w: WS; p: string; q: string; gitSt
   opened.push(w)
   return { w, p, q, gitStore: join(st, 'git') }
 }
+
+describe('back to Git from jj (HI-2975)', () => {
+  /** P and Q switched to jj (jj's checks stood in for), so the repository is theirs as jj's. */
+  async function onJj() {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+    return { w, p, q }
+  }
+
+  it('its .jj gone, Git still there: the offered switch back to Git goes through, its readiness read by the real fallback check', async () => {
+    const { w, p, q } = await onJj()
+    rmSync(join(w.path!, '.jj'), { recursive: true })
+    expect(projectPlatform(p, 'jj', 'jj').offer).toEqual({ offer: 'git', why: 'jjGone' })
+    const seams = ss.storeSwitchSeams.repo
+    ss.storeSwitchSeams.repo = { ...seams, fallback: undefined }
+    try {
+      // No jj repository: nothing to export, nothing that can conflict (fallbackOf itself, which runs no jj here).
+      expect(await ss.fallbackOf(p)).toEqual([])
+      const check = await sw.checkPlatformSwitch(w, p, 'git')
+      expect(check.refused).toBeNull()
+      expect(check.store?.fallback).toEqual([])
+      expect(check.store?.group.map((g) => g.name).sort()).toEqual(['p', 'q'])
+      await sw.setPlatform(w, p, 'git', { expected: 'jj', token: check.store!.token })
+    } finally {
+      ss.storeSwitchSeams.repo = seams
+    }
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'git'])
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled' })
+    expect(projectPlatform(p, 'git', 'git').offer ?? null).toBeNull()
+  })
+
+  it('jj missing or not the tested version: refused saying the way out, not as a list of unknowns; nothing changed', async () => {
+    const { w, p, q } = await onJj()
+    const seams = ss.storeSwitchSeams.repo
+    for (const detail of ['tool', 'tool: jj exited']) {
+      ss.storeSwitchSeams.repo = { ...seams, fallback: async () => [{ code: 'unknown', detail }] }
+      try {
+        const check = await sw.checkPlatformSwitch(w, p, 'git')
+        expect(check.refused).toMatchObject({ why: 'jjToolBack' })
+        await expect(sw.setPlatform(w, p, 'git', { expected: 'jj', token: check.store!.token })).rejects.toThrow(/ready to go back to Git\. Install the jj Combwork is tested with, then switch\. Or, if you’re done with jj, remove the \.jj folder/)
+      } finally {
+        ss.storeSwitchSeams.repo = seams
+      }
+    }
+    // Another unknown is still the fallback's list.
+    ss.storeSwitchSeams.repo = { ...seams, fallback: async () => [{ code: 'unknown', detail: 'gitRefs' }] }
+    try {
+      expect((await sw.checkPlatformSwitch(w, p, 'git')).refused).toEqual({ why: 'fallback' })
+    } finally {
+      ss.storeSwitchSeams.repo = seams
+    }
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+  })
+})
 
 describe('a non-colocated jj repository switches too (HI-2896)', () => {
   it('to jj: its group is its store inside .jj, the switch holds that store’s lock; back to Git refused (no Git working copy); None its own', async () => {

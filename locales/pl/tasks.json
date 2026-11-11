@@ -87,6 +87,7 @@
   "tasks.error.targetMoved": "Stara gałąź karty {card} zmieniła się podczas zmiany jej „Scalanie do”, więc pozostaje bez zmian. Najpierw sprawdź, co tam dotarło.",
   "tasks.error.targetNotAgents": "Tylko Ty lub Asystent możecie ustawić, do której gałęzi scalana jest karta.",
   "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} nie jest tu gałęzią, do której można scalać pracę: podaj {default}{hasOthers, select, yes { lub jedną z {others}} other {}} albo dodaj ją w „Inne gałęzie, do których można scalać pracę” (Kontrola wersji → Przepływ pracy).} other {Ten projekt nie scala pracy do żadnej gałęzi, którą Combwork może wybrać: „Scalanie do” karty jest dla projektów Git.}}",
+  "tasks.error.targetResolution": "Karta {card} rozwiązuje scalenie {from} do {to}, więc jest scalana tylko do {to}. Aby wnieść {from} do innej gałęzi, użyj tam „Zaktualizuj”.",
   "tasks.error.tooLong": "{what, select, title {Tytuł jest za długi (limit znaków: {max, number}).} description {Opis jest za długi (limit znaków: {max, number}).} comment {Komentarz jest za długi (limit znaków: {max, number}).} decision {Decyzja jest za długa (limit znaków: {max, number}).} other {Powód blokady jest za długi (limit znaków: {max, number}).}}",
   "tasks.error.tooManyContext": "Karta może mieć najwyżej {max} sekcji dokumentów do przeczytania najpierw.",
   "tasks.error.tooManyDecisions": "Limit decyzji na kartę: {max}.",

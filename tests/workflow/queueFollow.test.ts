@@ -14,7 +14,7 @@ import { FactStore } from '../../src/main/workflow/factStore'
 import { pushLogKey, pushLogOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { memoryTransportStore } from '../../src/main/workflow/transportSnapshots'
-import { QUEUE_PUBLISH_GATE } from '../../src/shared/workflow/facts'
+import { QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
 const extra: FactStore[] = []
@@ -385,6 +385,24 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(kept).not.toContain('SECRET-BEARER-123')
     expect(kept).not.toContain('SECRET-HELPER-456')
     expect(kept).toContain('***')
+  })
+
+  it('Ask each time, the target checked out: the Approve, taken by a new queue as the host makes one per run, publishes the result approved (HI-2986)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following({}, { checkedOut: true })
+    const ask: Partial<QueueConfig> = { checkedOutTarget: () => 'ask' }
+    const a = await queued(e, 'A', 'a.txt')
+    const request = () => e.wf.state(e.store.card(a.id)).requests.find((r) => r.gate === QUEUE_ADVANCE_GATE)
+    expect(await queue(ask).drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'approval' }])
+    const asked = request()!
+    expect(asked).toBeDefined()
+    const approved = asked.result
+    moved(await e.wf.answer(a.key, asked.request, 'approved'))
+    // The next run: another MergeQueue, which never tested it. It publishes what the user approved, not a new test merge.
+    expect(await queue(ask).drain('main')).toMatchObject([{ card: a.key, outcome: 'integrated' }])
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).toBe(approved)
+    expect(request()).toBeUndefined()
+    expect(head(e.project)).toBe(head(bare))
   })
 
   it('a checked-out target is caught up in its folder after the publication; an edit in its way pauses, naming the published card', { timeout: GIT_HEAVY_MS }, async () => {

@@ -525,6 +525,19 @@
   "workflow.refused.forward.notAgents.next": {
     "placeholders": {}
   },
+  "workflow.refused.forward.resolutionTarget.message": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.forward.resolutionTarget.next": {
+    "placeholders": {
+      "to": "plain"
+    }
+  },
   "workflow.refused.integrate.approved.message": {
     "placeholders": {
       "card": "plain",

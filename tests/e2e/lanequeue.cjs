@@ -155,6 +155,57 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('a card dragged above another goes there', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4].join(), HUNG_MS)), await listOf(la))
   check('…the list as it was: nothing left queued', !!(await until(async () => (await laneNow(la))?.queued === null && (await queuedLine.count()) === 0, HUNG_MS)))
 
+  // --- Dropped on the locked row (HI-2969): its top half is no place, so no line shows and the drop does nothing, never
+  // "after the last row" (the list's own handler took it so, and the card went last).
+  const box = async (n) => (await row(la, n).boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 }
+  await clearToasts()
+  const from = await box(a2)
+  const onto = await box(a1)
+  await page.mouse.move(from.x + 60, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(onto.x + 60, onto.y + 8, { steps: 6 })
+  await page.mouse.move(onto.x + 60, onto.y + 3, { steps: 2 })
+  const lines = () => lane(la).locator('.progress-lane-queue-row.drop-before, .progress-lane-queue-row.drop-after').count()
+  check('over the locked row, the card being dragged', !!(await until(async () => /\bdragging\b/.test((await row(la, a2).getAttribute('class')) ?? ''), HUNG_MS)))
+  await painted()
+  check('…no drop line shows', (await lines()) === 0, String(await lines()))
+  await page.screenshot({ path: path.join(shots, 'queue-drop-locked.png') })
+  await page.mouse.up()
+  check('…and once dropped, the drag ends', !!(await until(async () => !/\bdragging\b/.test((await row(la, a2).getAttribute('class')) ?? ''), HUNG_MS)))
+  // Nothing happened: a move made after it lands where it would from the list as it was (one place down, not stuck last).
+  await row(la, a2).focus()
+  await page.keyboard.press('Alt+ArrowDown')
+  check('…and nothing moved: A2 still second (one Alt+Down puts it third)', !!(await until(async () => (await listOf(la)) === [a1, a3, a2, a4].join(), HUNG_MS)), await listOf(la))
+  await row(la, a2).focus()
+  await page.keyboard.press('Alt+ArrowUp')
+  check('…and back', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4].join() && (await laneNow(la))?.queued === null, HUNG_MS)), await listOf(la))
+
+  // --- Alt+Up and Alt+Down inside the opened cards (HI-2970): from a waiting card's link or × they move that card, and
+  // from anything else there (the locked card's link, Add Card…) nothing; never the lane among the running lanes.
+  const laneOrder = () => tab.locator('.progress-lanes-list .progress-lane').evaluateAll((els) => els.map((e) => e.dataset.lane))
+  const order0 = (await laneOrder()).join()
+  check('both lanes are listed', order0.split(',').includes(la) && order0.split(',').includes(lb), order0)
+  await row(la, a2).locator('.progress-lane-queue-key').focus()
+  await page.keyboard.press('Alt+ArrowDown')
+  check("Alt+Down on a waiting card's link moves the card", !!(await until(async () => (await listOf(la)) === [a1, a3, a2, a4].join() && (await rows(la)).join() === [a1, a3, a2, a4].join(), HUNG_MS)), await listOf(la))
+  check('…not the lane', (await laneOrder()).join() === order0, (await laneOrder()).join())
+  check('…and the focus goes to its row', !!(await until(async () => (await page.evaluate(() => document.activeElement?.getAttribute('data-card'))) === String(a2), HUNG_MS)))
+  await clearToasts()
+  await painted()
+  await page.screenshot({ path: path.join(shots, 'queue-alt-on-link.png') })
+  for (const [what, el] of [["the locked card's link", row(la, a1).locator('.progress-lane-queue-key')], ['Add Card…', lane(la).locator('[data-action="lane-add-card"]')]]) {
+    await el.focus()
+    await page.keyboard.press('Alt+ArrowUp')
+    await page.keyboard.press('Alt+ArrowDown')
+    check(`Alt+Up and Alt+Down on ${what} keep the focus there`, await el.evaluate((x) => x === document.activeElement))
+  }
+  // Nothing happened meanwhile: a move made after them lands where it would from the list as it was, and the lanes
+  // are in their order (a lane moved and saved would show by then).
+  await row(la, a2).locator('.progress-lane-queue-remove').focus()
+  await page.keyboard.press('Alt+ArrowUp')
+  check("Alt+Up on a waiting card's × moves the card back", !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4].join() && (await laneNow(la))?.queued === null, HUNG_MS)), await listOf(la))
+  check('…and the lanes never moved', (await laneOrder()).join() === order0, (await laneOrder()).join())
+
   // --- Two quick moves (HI-2932): Alt+Down twice before the first is answered moves A2 two places, neither refused as
   // changed meanwhile; then Alt+Up twice puts it back.
   await row(la, a2).focus()

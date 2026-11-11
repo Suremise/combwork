@@ -473,6 +473,7 @@
   "git.vc.switch.jjNoGitCopy": "No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.",
   "git.vc.switch.jjSeparate": "This jj repository has no colocated Git repository, which Combwork doesn’t support yet.",
   "git.vc.switch.jjTool": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.",
+  "git.vc.switch.jjToolBack": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so Combwork can’t check that this repository is ready to go back to Git. Install the jj Combwork is tested with, then switch. Or, if you’re done with jj, remove the .jj folder: the project can then go back to Git without it.",
   "git.vc.switch.jjUnknown": "jj couldn’t confirm this repository ({code}), so this project can’t switch.",
   "git.vc.switch.lane": "Lane “{name}” (builder {builder})",
   "git.vc.switch.laneUnnamed": "Lane (builder {builder})",

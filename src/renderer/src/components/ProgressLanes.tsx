@@ -242,6 +242,9 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
         if (lane) moved(next, lane, false)
       },
       onKeyDown: (e) => {
+        // The lane's own row only (HI-2970): a key pressed inside its opened cards (a card's link or ×, Add Card…'s
+        // search) is theirs, never a move of the lane.
+        if (e.target !== e.currentTarget) return
         if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
         e.preventDefault()
         e.stopPropagation()
@@ -983,7 +986,12 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
       before = e.clientY < box.top + box.height / 2 ? n : (list[list.indexOf(n) + 1] ?? null)
     }
     // A card dragged from the board isn't known until the drop: placed as a new one.
-    if (droppedPlace(rows, own ? dragCard : null, before) === null) return setDropBefore(undefined)
+    if (droppedPlace(rows, own ? dragCard : null, before) === null) {
+      // Nowhere to drop over a row that keeps its place (HI-2969): stopped here, or the list and the lane's row would
+      // take it as "after the last row" and the card would go last, the opposite end from where it was dropped.
+      e.stopPropagation()
+      return setDropBefore(undefined)
+    }
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -1070,12 +1078,14 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                     },
                     onDragEnd: reset,
                     onKeyDown: (e: React.KeyboardEvent<HTMLLIElement>) => {
-                      if (typing(e.target) || e.target !== e.currentTarget) return
+                      if (typing(e.target)) return
+                      // Alt+Up and Alt+Down from the row's own link or × move its card too (HI-2970), as the row says;
+                      // Delete only from the row itself (on a button it is the button's).
                       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                         e.preventDefault()
                         e.stopPropagation()
                         nudge(c.number, e.key === 'ArrowUp' ? -1 : 1)
-                      } else if (e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                      } else if (e.target === e.currentTarget && e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault()
                         e.stopPropagation()
                         void edit.run(removing(c.number))

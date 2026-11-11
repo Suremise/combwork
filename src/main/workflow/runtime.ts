@@ -1028,6 +1028,9 @@ export class Workflow {
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     try {
+      // HI-2985: a forward's resolution starts only on the branch it resolves (one made unpinned, or Work merges into moved).
+      const res = from.resolves
+      if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
       // Its ruleset is stored by the write that names it (write()), under the store's lock.
       await this.cfg.hooks?.beforeWrite?.('start')
       // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves

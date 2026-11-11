@@ -446,6 +446,23 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
  */
 export const MAX_RETESTS = 3
 
+/** Follow mode's last test of an entry (its remote head, result and snapshot), for an approval of it (Ask each time). */
+interface FollowTested {
+  onto: string
+  result: string
+  snap: TransportSnapshot
+}
+
+/**
+ * HI-2986: follow mode's tests, by project and entry, for this Combwork's life: the host makes a new MergeQueue for each
+ * run, and a run ends at Ask each time's pause, so the Approve is taken by another queue than the one that tested. Kept
+ * until the entry's snapshot is dropped (its outcome written, or not published), at most `FOLLOW_TESTED_MAX`, the oldest
+ * dropped first (an entry then tested, and asked about, again, as after a restart).
+ */
+const followTested = new Map<string, FollowTested>()
+const FOLLOW_TESTED_MAX = 256
+const followKey = (project: string, entry: string): string => `${project}\u0000${entry}`
+
 /**
  * HI-2019: how many times an entry goes round again after a git read failed before anything was touched (a lock held
  * for a moment, git not starting on a loaded machine), each after READ_RETRY_MS × the try, before it pauses `needsYou`
@@ -725,7 +742,16 @@ export class MergeQueue {
   // that doesn't say plainly is verified, and stays unknown (For you asks) unless the remote shows the result.
 
   /** What each entry's last test in follow mode was made on (its remote head and snapshot), for an approval of it. */
-  private tested = new Map<string, { onto: string; result: string; snap: TransportSnapshot }>()
+  private readonly tested = {
+    get: (entry: string): FollowTested | undefined => followTested.get(followKey(this.project, entry)),
+    set: (entry: string, t: FollowTested): void => {
+      const k = followKey(this.project, entry)
+      followTested.delete(k)
+      followTested.set(k, t)
+      while (followTested.size > FOLLOW_TESTED_MAX) followTested.delete(followTested.keys().next().value!)
+    },
+    delete: (entry: string): void => void followTested.delete(followKey(this.project, entry))
+  }
 
   /** Whether the target follows its remote, as the project's options are now (G21 isn't a rule), on a platform that can. */
   private follows(card: CardRecord, s: CardState): boolean {
@@ -831,12 +857,13 @@ export class MergeQueue {
   /** Not published (nothing was written): the entry failed, transient, the card queued again, its snapshot dropped. */
   private async unpublished(card: CardRecord, entry: QueueEntry, target: string, reason: IntegrationFailReason): Promise<void> {
     await this.dropSnapshot(card, entry.id)
-    this.tested.delete(entry.id)
     await this.moved(card, entry, target, reason)
   }
 
   /** An entry's protected snapshot dropped, by its IntegrationStarted's record (none: nothing to drop). */
   private async dropSnapshot(card: CardRecord, entry: string): Promise<void> {
+    // Its test kept for an approval (HI-2986) goes with it: the entry's outcome is written, or it is tested again.
+    this.tested.delete(entry)
     const f = this.wf.store.facts(card.id).filter((x) => x.kind === 'IntegrationStarted' && (x.data as FactData['IntegrationStarted']).entry === entry).at(-1)
     const id = (f?.data as FactData['IntegrationStarted'] | undefined)?.publish?.snapshot
     if (id) await this.cfg.transport?.drop(id)
@@ -1268,7 +1295,7 @@ export class MergeQueue {
       let onto: string
       let snap: TransportSnapshot | undefined
       // Follow mode's approved test merge is only the one tested on a fetch this Combwork still has (its remote head and
-      // snapshot): after a restart, it is tested, and asked about, again.
+      // snapshot, kept across the host's queues: HI-2986): after a restart, it is tested, and asked about, again.
       const kept = ready && follow ? this.tested.get(entry.id) : undefined
       if (ready && follow && kept?.result !== ready.result) ready = undefined
       if (ready) {

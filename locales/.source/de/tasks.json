@@ -88,6 +88,7 @@
   "tasks.error.targetMoved": "{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.",
   "tasks.error.targetNotAgents": "Only the user or the Assistant sets which branch a card merges into.",
   "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}",
+  "tasks.error.targetResolution": "{card} resolves the merge of {from} into {to}, so it merges into {to} only. To bring {from} into another branch, use Bring Up to Date there.",
   "tasks.error.tooLong": "{what, select, title {The title is too long (at most {max, number} characters).} description {The description is too long (at most {max, number} characters).} comment {The comment is too long (at most {max, number} characters).} decision {The decision is too long (at most {max, number} characters).} other {The blocked reason is too long (at most {max, number} characters).}}",
   "tasks.error.tooManyContext": "A card can have up to {max} doc sections to read first.",
   "tasks.error.tooManyDecisions": "A card can have up to {max} decisions.",

@@ -1298,7 +1298,8 @@ export function refuseOtherTargets(ws: WorkspaceService, project: string, cards:
     } catch {
       continue
     }
-    if (own && own !== target) throw new LaneError(409, withCardNames(ws, () => withValues(M.targetCard, { card: cardRef(n), cardTarget: own, target: target ?? def ?? '' }), scope))
+    // Its own target may name the project's own as itself (HI-2985: a forward's resolution, pinned): the same branch.
+    if (own && own !== (target ?? def)) throw new LaneError(409, withCardNames(ws, () => withValues(M.targetCard, { card: cardRef(n), cardTarget: own, target: target ?? def ?? '' }), scope))
   }
 }
 
