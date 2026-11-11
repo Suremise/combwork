@@ -316,17 +316,22 @@ export function jjPort(): JjWorkspacePort {
 /**
  * A stale jj slot recovered, the user's explicit action (HI-2866; the window's Recover…, J9c): J2's `recoverStale` under
  * the pool's operation of the slot, the preserved bytes outside every workspace (the project's worktrees folder's
- * `.cw-recovery`). A protocol code when refused.
+ * `.cw-recovery`). A protocol code when refused. A slot a lease still holds (HI-2913) goes through slotCards' `recoverHeldSlot`:
+ * let through only for a card whose preparation there failed.
  */
 export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
   const pool = await poolFor(ws, projectPath)
-  return pool.recoverStale(name, async (s, fence, journal, quietNow) => {
+  const run: Parameters<SlotPool['recoverStale']>[1] = async (s, fence, journal, quietNow) => {
     const r = await recoverStale(
       { port: jjPort(), git: (cwd, args) => git(cwd, args), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
       { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
     )
     return r.ok ? { ok: true } : { ok: false, why: r.why }
-  })
+  }
+  const held = pool.openLease(name)
+  const out = held ? await (await import('./slotCards')).recoverHeldSlot(ws, projectPath, pool, name, held, run) : await pool.recoverStale(name, run)
+  if (!out.ok) log.info(`Slot ${userText(name)} wasn't recovered${held ? ` (held by lease ${held.id})` : ''}: ${userText(out.why)}`)
+  return out
 }
 
 /** Each project's platform as last read (HI-2866): which port its pools make new slots and copies with. */

@@ -29,7 +29,7 @@
   "jj.integrate.change": "change {change}",
   "jj.integrate.contained": "In {target}: can’t check yet.",
   "jj.integrate.head": "Waiting for you to integrate",
-  "jj.integrate.how": "For example, then move {target} to the rebased commit with jj bookmark set:",
+  "jj.integrate.how": "For example, copy it onto {target}, then move {target} to the copy jj prints with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commit would rewrite the slot’s working copy and leave it stale.",
   "jj.integrate.noMerge": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
   "jj.integrate.none": "No card is waiting.",
   "jj.integrate.notChecked": "Not checked yet whether it’s in {target}.",

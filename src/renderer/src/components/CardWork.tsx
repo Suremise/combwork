@@ -36,6 +36,7 @@ const M = {
   folder: msg({ id: 'board.work.folder', defaultMessage: 'Folder', description: "A label in the card dialog's Work section: the folder the card's work is done in follows (the project folder, or its own folder)." }),
   projectFolder: msg({ id: 'board.work.projectFolder', defaultMessage: 'The project folder', description: "The card dialog's Work section, after Folder: the card's work is done in the project's own folder (not a folder of its own)." }),
   workspace: msg({ id: 'board.work.workspace', defaultMessage: 'Workspace', description: "A label in the card dialog's Work section (HI-2869): the jj workspace (a slot) a jj card's work is in follows. “workspace” is jj's term." }),
+  notReady: msg({ id: 'board.work.notReady', defaultMessage: 'Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}', description: "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys." }),
   change: msg({ id: 'board.work.change', defaultMessage: '{commits, plural, one {change {change}} other {change {change}, # commits}}', description: "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term." }),
   via: msg({ id: 'board.work.via', defaultMessage: '{via, select, ancestry {(found in its history)} replay {(its change found applied again)} sameTree {(the target already had it)} candidate {(from a prepared candidate)} other {}}', description: "After how a jj card went into its target, in the card dialog's Work section (HI-2869): how jj proved it was there. Keep the select keys; other stays empty." }),
   target: msg({ id: 'board.work.target', defaultMessage: 'Target', description: "A label in the card dialog's Work section: where the card's work goes once approved follows (the target branch, main). Glossary: target branch." }),
@@ -176,6 +177,11 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
   return (
     <>
       {v.adopted && <div className="faint card-work-adopted">{tr(M.adopted, { column: columnName(v.adoptedFrom ?? 'doing', tr) })}</div>}
+      {v.notReady && (
+        <div className="card-work-note" data-work-not-ready={v.notReady.stale ? 'stale' : ''}>
+          <Icon name="warning" /> {tr(M.notReady, { slot: v.notReady.slot, why: v.notReady.why, stale: v.notReady.stale ? 'yes' : 'no' })}
+        </div>
+      )}
       {rows.length > 0 && (
         <dl className="card-work-facts">
           {rows.map(([label, value]) => (

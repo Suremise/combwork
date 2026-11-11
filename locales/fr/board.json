@@ -1029,6 +1029,7 @@
   "board.work.verdict": "{reviewer} : {pass, select, yes {validée} other {refusée}}{current, select, no { (ne compte plus)} other {}}",
   "board.work.via": "{via, select, ancestry {(trouvé dans son historique)} replay {(son changement retrouvé réappliqué)} sameTree {(la cible l’avait déjà)} candidate {(d’un candidat préparé)} other {}}",
   "board.work.workspace": "Espace de travail",
+  "board.work.notReady": "Pas encore démarrée dans {slot} : {stale, select, yes {un autre espace de travail jj a réécrit sa copie de travail, il est donc périmé. Récupère-le dans Gestion de versions → Emplacements et copies, et la carte y sera de nouveau préparée.} other {Combwork n’a pas pu le préparer ({why}).}}",
   "board.workQueue.advance": "Testée et prête : mettre à jour {target} dans son dossier maintenant ?",
   "board.workQueue.advancing": "Fusion dans {target} en cours",
   "board.workQueue.answerFailed": "Impossible de répondre",

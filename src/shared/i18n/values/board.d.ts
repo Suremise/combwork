@@ -1012,6 +1012,7 @@ interface CombworkMessageValues {
   'board.work.noRevision': undefined
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
+  'board.work.notReady': { slot: string | number; stale: string; why: string | number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }

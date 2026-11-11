@@ -28,7 +28,7 @@
   "jj.integrate.card": "{card} {title}: commit {commit} do {target}",
   "jj.integrate.change": "zmiana {change}",
   "jj.integrate.head": "Czeka na włączenie przez Ciebie",
-  "jj.integrate.how": "Na przykład, a potem przesuń {target} na przebazowany commit za pomocą jj bookmark set:",
+  "jj.integrate.how": "Na przykład skopiuj go na {target}, a potem przesuń {target} na kopię wypisaną przez jj za pomocą jj bookmark set. Kopia zostawia slot karty bez zmian; przebazowanie commita przepisałoby kopię roboczą slotu i zostawiło go nieaktualnym.",
   "jj.integrate.noMerge": "Combwork nie scala w jj: zrecenzowaną pracę włącz sam za pomocą jj.",
   "jj.integrate.none": "Żadna karta nie czeka.",
   "jj.integrate.notChecked": "Jeszcze nie sprawdzono, czy jest w {target}.",

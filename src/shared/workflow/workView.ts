@@ -277,6 +277,12 @@ export interface WorkView {
   line: string | null
   /** HI-2869: a jj card's slot workspace, which the window shows in its line's place. */
   workspace?: string
+  /**
+   * HI-2913: its slot couldn't be prepared for this cycle (a `SlotPrepareFailed` for its lease, no `SlotPrepared` after
+   * it): the slot, why (English, as its builder was told) and whether it was a stale jj workspace. The window shows the
+   * card not ready there rather than started.
+   */
+  notReady?: { slot: string; why: string; stale: boolean }
   /** Every line it has started on, over its whole history (HI-1823: an open card's earlier work, never a leftover). */
   lines: string[]
   /** The revision its change starts from. */
@@ -452,6 +458,15 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const accepted = s.accepted ? [...cycle].reverse().find((f) => f.kind === 'Accepted') : undefined
   const entry = s.entries.at(-1)
   const started = s.started
+  // HI-2913: this cycle's preparation failed under its lease, and nothing prepared it since.
+  const lease = started?.lease ?? null
+  let notReady: FactData['SlotPrepareFailed'] | null = null
+  if (lease) {
+    for (const f of cycle) {
+      if (f.kind === 'SlotPrepareFailed' && (f.data as FactData['SlotPrepareFailed']).lease === lease) notReady = f.data as FactData['SlotPrepareFailed']
+      else if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === lease) notReady = null
+    }
+  }
   // Since its work was last Done (an earlier cycle that ended there): a drag's Override comes before its Started.
   const doneAt = facts.findLast((f) => f.seq < s.cycle && f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.seq ?? 0
   const lastOverride = facts.findLast((f) => f.kind === 'Override' && f.seq > doneAt)
@@ -475,6 +490,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     folder: started?.folder ?? null,
     line: started?.line ?? null,
     ...(jjField(started?.platform, 'workspace') ? { workspace: jjField(started?.platform, 'workspace')! } : {}),
+    ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why, stale: notReady.stale } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
     target: started?.target ?? null,

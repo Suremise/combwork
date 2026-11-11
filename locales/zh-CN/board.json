@@ -1029,6 +1029,7 @@
   "board.work.verdict": "{reviewer}：{pass, select, yes {通过} other {未通过}}{current, select, no {（已不再有效）} other {}}",
   "board.work.via": "{via, select, ancestry {（在其历史中找到）} replay {（发现其变更被重新应用）} sameTree {（目标中已有）} candidate {（来自准备好的候选）} other {}}",
   "board.work.workspace": "工作区",
+  "board.work.notReady": "尚未在 {slot} 中开始：{stale, select, yes {另一个 jj 工作区重写了它的工作副本，因此它已过期。请在“版本控制”→“槽位和副本”中恢复它，之后卡片会在其中重新准备。} other {Combwork 无法让它就绪（{why}）。}}",
   "board.workQueue.advance": "已测试并准备就绪：现在更新其文件夹中的 {target} 吗？",
   "board.workQueue.advancing": "正在合并到 {target}",
   "board.workQueue.answerFailed": "无法回答",

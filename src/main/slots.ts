@@ -53,6 +53,7 @@ import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
 import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
+import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
@@ -114,6 +115,7 @@ const T = {
   prepareBusy: agentMsg({ id: 'slot.prepare.busy', text: '{slot} is busy: being set up, a command of its still running, or another session in it', note: "Why a slot's preparation for its card waits (#1438): something else has the slot now." }),
   branchUnread: agentMsg({ id: 'slot.prepare.branchUnread', text: "git couldn't read {slot}'s branch", note: "Why a slot couldn't be prepared for its card: git couldn't read the branch it is on." }),
   filesUnread: agentMsg({ id: 'slot.prepare.filesUnread', text: "git couldn't read {slot}'s files", note: "Why a slot couldn't be prepared for its card: git couldn't say whether it has changes." }),
+  stale: agentMsg({ id: 'slot.prepare.stale', text: '{slot} is stale: another jj workspace rewrote its working copy. The user can recover it with Recover… under Slots and copies', note: "Why a jj slot couldn't be prepared for its card (HI-2913): another workspace rewrote its working-copy commit (a rebase of the card's commit, say), so its files are behind; recovering it is the user's action." }),
   uncommitted: agentMsg({ id: 'slot.prepare.uncommitted', text: "{slot} has changes that aren't committed", note: "Why a slot couldn't be prepared for its card: switching its branch would lose changes." }),
   switchFailed: agentMsg({ id: 'slot.prepare.switchFailed', text: 'git switch: {error}', note: "Why a slot couldn't be prepared for its card: `git switch` failed. {error} is git's first line, else failed." }),
   prepareTakenOver: agentMsg({ id: 'slot.prepare.takenOver', text: "{slot}'s preparation was taken over", note: "Why a slot's preparation for its card waits: another operation took the slot over (#1429)." }),
@@ -241,7 +243,8 @@ export async function processHeld(slot: string, folder: string, brokerIn: ((fold
 export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: false; refusal: SlotRefusal }
 
 /** What a card's preparation came to (#1438): done at a revision, not now (tried again), or not possible (why). */
-export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null }
+/** `stale` (HI-2913): the error is a stale jj workspace's, which the user's Recover… mends. */
+export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null; stale?: true }
 
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
@@ -983,6 +986,23 @@ export class SlotStore {
    */
   async beginSettle(name: string, from: SlotState, folder: string, token: string, holder: Holder): Promise<boolean> {
     return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND folder = ? AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from, folder).changes) === 1)
+  }
+
+  /**
+   * A held slot's recovery begun (HI-2913): a warm-kind operation of `lease`, taken in one write only while the slot is
+   * lent under exactly that open lease at `folder`, with no operation, job or writer. A preparation can't start under it
+   * (startPrepare needs the slot free of operations), and one already running keeps it from being taken. Taken over from a
+   * holder that is gone, it is a lent slot's warming: its lease kept, the slot as it is. Whether it was taken.
+   */
+  async beginRecover(name: string, lease: string, folder: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write(
+      (db) =>
+        Number(
+          db
+            .prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = 'lent' AND folder = ? AND op IS NULL AND job IS NULL AND writer_run IS NULL AND EXISTS (SELECT 1 FROM slot_leases l WHERE l.id = ? AND l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)")
+            .run(token, lease, holder.pid, holder.started, this.project, name, folder, lease).changes
+        ) === 1
+    )
   }
 
   /**
@@ -1950,21 +1970,49 @@ export class SlotPool {
    * operation's quiescence as its fence and its own journal, so an interrupted recovery resumes on the next try. `run`
    * is the caller's (the app's: J2's recovery with its dependencies). A slot of another platform, busy, or not stale is
    * refused with why; a recovered slot rejoins the pool only through its next look and preparation's check.
+   *
+   * `held` (HI-2913): a slot its card's or lane's lease still holds, let through only for that lease (`lease`) while its
+   * card's cycle there failed its preparation (`still`, the caller's: asked after the claim and again before each of the
+   * recovery's writes, with the lease still open and still this operation's, and the folder quiet). Claimed with
+   * `beginRecover`, never by relaxing a free slot's settle; the lease ending, being replaced or the cycle moving on stops
+   * the recovery at its next write (its journal resumes it on the next Recover…).
    */
-  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>): Promise<{ ok: true } | { ok: false; why: string }> {
+  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>, held?: { lease: string; still: () => Promise<boolean> }): Promise<{ ok: true } | { ok: false; why: string }> {
     const seen = this.store.slot(name)
     if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
     if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
-    if (seen.op || seen.writer || this.store.openLease(name) || seen.state === 'creating' || seen.state === 'removing') return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    const open = this.store.openLease(name)
+    // What holds it, for the log (HI-2913: a refused Recover… says why there); the answer stays `busy`.
+    const holds = seen.op ? `operation ${seen.op.kind}` : seen.writer ? `writer ${seen.writer.run}` : (held ? open?.id !== held.lease : !!open) ? `lease ${open?.id ?? 'none'}` : seen.state === 'creating' || seen.state === 'removing' ? seen.state : null // agent-protocol: a log line's detail, never sent to an agent
+    if (holds) {
+      log.info(`Slot ${userText(name)}'s recovery refused: ${holds}`)
+      return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    }
     const token = newToken()
     let out: { ok: true } | { ok: false; why: string } = { ok: false, why: 'busy' } // i18n-ignore: a protocol code
     await this.op(token, async () => {
       const holder = await this.deps.holder.self()
-      if (this.closed || !(await this.store.beginSettle(name, seen.state, seen.folder, token, holder))) return
+      if (this.closed) return
+      if (!(await (held ? this.store.beginRecover(name, held.lease, seen.folder, token, holder) : this.store.beginSettle(name, seen.state, seen.folder, token, holder)))) return void log.info(`Slot ${userText(name)}'s recovery refused: it changed before it could be claimed`)
       try {
         const s = this.store.slot(name) ?? seen
-        const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
-        out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), () => this.quietFor(s, token))
+        // A held slot's: its lease still open and this operation's, and its cycle still failed (the caller's), each time.
+        const leaseHeld = async (): Promise<boolean> => {
+          if (!held) return true
+          const mine = await this.store.fenced(name, token, (db, now) => now.op?.lease === held.lease && this.store.openIn(db, held.lease)).catch(() => false)
+          return mine && (await held.still())
+        }
+        if (!(await leaseHeld())) return void log.info(`Slot ${userText(name)}'s recovery refused: its lease or its card's failed preparation changed`)
+        // Each refusal of the fence said in the log once (the recovery stops at it): what was in the folder, or what changed.
+        const still = async (): Promise<boolean> => {
+          const why = await this.notQuiet(s, token)
+          if (why) return void log.info(`Slot ${userText(name)}'s recovery stopped: ${why}`), false
+          if (await leaseHeld()) return true
+          log.info(`Slot ${userText(name)}'s recovery stopped: its lease or its card's failed preparation changed`)
+          return false
+        }
+        const fence: WorkspaceFence = { still }
+        out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), still)
       } finally {
         await this.store.fenced(name, token, (db) => this.store.setIn(db, name, seen.state, {}, { op: null })).catch((e) => {
           if (!(e instanceof OpLost)) throw e
@@ -2489,6 +2537,10 @@ export class SlotPool {
           const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {
             await end()
+            // A stale jj workspace (HI-2913) said as itself, with its way out; else Git's words as before.
+            if (isUnknown(d) && d.detail === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
+            // Something still in the folder when jj's record was asked (HI-2913: a session or process): not now, never a failure.
+            if (isUnknown(d) && (d.detail === 'busy' || d.detail === JJ_REFUSED.fence)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
             return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
@@ -2536,7 +2588,12 @@ export class SlotPool {
           }
           if (!r.ok) {
             await end()
-            return { error: sayStored(T.switchFailed, { error: r.err.trim().split(/\r?\n/)[0] || 'failed' }) }
+            // jj's (HI-2913): quiet lost during its owned write, or a result to decide on the next pass, is a wait; a stale
+            // workspace found there is said as itself.
+            const err = r.err.trim()
+            if (this.port.platform === 'jj' && (err === JJ_REFUSED.fence || err === JJ_REFUSED.uncertain)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
+            if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
+            return { error: sayStored(T.switchFailed, { error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}`)
           files = await filesNeed()

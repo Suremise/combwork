@@ -54,7 +54,7 @@ const T = {
   recoverTitle: msg({ id: 'workflow.slots.recoverTitle', defaultMessage: 'Recover {slot}?', description: 'The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name.' }),
   recoverMessage: msg({ id: 'workflow.slots.recoverMessage', defaultMessage: 'Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.', description: 'The confirmation before recovering a stale jj slot (HI-2869); the folder edits are copied into is listed under it.' }),
   recovered: msg({ id: 'workflow.slots.recovered', defaultMessage: '{slot} is recovered.', description: 'A notice after a stale jj slot was recovered (HI-2869).' }),
-  notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869). {why} picks the reason: keep the select keys.' }),
+  notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
@@ -423,6 +423,7 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
 
 /** The select key of a refused recovery's reason (the port's refusal text, English, never shown). */
 function recoverWhy(why: string): string {
+  if (/^preparing$/.test(why)) return 'preparing' // i18n-ignore: a select key
   if (/busy|in use|quiet/i.test(why)) return 'busy' // i18n-ignore: a select key
   if (/stale/i.test(why)) return 'notStale' // i18n-ignore: a select key
   if (/identity|recorded/i.test(why)) return 'identity' // i18n-ignore: a select key

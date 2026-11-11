@@ -4043,6 +4043,10 @@
     "defaultMessage": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Combwork couldn't read {why}}}",
     "description": "In the card dialog's Work section, in place of a branch, base or target Combwork couldn't read when the card's work started. {note} picks why: Combwork read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Combwork couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
   },
+  "board.work.notReady": {
+    "defaultMessage": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
+    "description": "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys."
+  },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
     "description": "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path."

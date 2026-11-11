@@ -1029,6 +1029,7 @@
   "board.work.verdict": "{reviewer}: {pass, select, yes {bestanden} other {nicht bestanden}}{current, select, no { (zählt nicht mehr)} other {}}",
   "board.work.via": "{via, select, ancestry {(in seiner Historie gefunden)} replay {(seine Änderung erneut angewendet gefunden)} sameTree {(das Ziel hatte es schon)} candidate {(aus einem vorbereiteten Kandidaten)} other {}}",
   "board.work.workspace": "Workspace",
+  "board.work.notReady": "Noch nicht in {slot} gestartet: {stale, select, yes {ein anderer jj-Workspace hat seine Arbeitskopie umgeschrieben, daher ist er veraltet. Stelle ihn unter Versionsverwaltung → Slots und Kopien wieder her, dann wird die Karte dort erneut vorbereitet.} other {Combwork konnte ihn nicht bereitstellen ({why}).}}",
   "board.workQueue.advance": "Getestet und bereit: {target} jetzt in seinem Ordner aktualisieren?",
   "board.workQueue.advancing": "Wird jetzt in {target} gemergt",
   "board.workQueue.answerFailed": "Antwort fehlgeschlagen",
