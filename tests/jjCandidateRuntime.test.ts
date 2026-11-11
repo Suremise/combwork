@@ -169,7 +169,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   })
 
   describe('ended cycles: the rest (colocated, HI-2950)', () => {
-    it("the sweep's selection is bounded (HR1's round 1): SWEEP_SCAN journals a run, after its cursor, wrapping; no whole-board card load", async () => {
+    it("the sweep's selection is bounded (HR1's rounds 1 and 2): SWEEP_SCAN journals a run after its cursor; a pass ends at the last (no continuation loop); no whole-board card load", async () => {
       const w = await world(true, { candidates: true })
       const jjp = new JjPlatform(w.wf)
       // 40 journals of cards gone, each with nothing left to do.
@@ -182,9 +182,12 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       const keys = Array.from({ length: 40 }, (_, i) => attemptsKey('p-jj', `ZZ-${String(i).padStart(2, '0')}`, 1)).sort()
       expect(await jjp.sweepEnded()).toEqual({ more: true })
       expect(cursor()).toBe(keys[SWEEP_SCAN - 1])
-      // The next run: the 8 left after the cursor, then from the start again (wrapping), still SWEEP_SCAN at most.
+      // The rest of the pass (8): it ends there (HR1's round 2): the cursor back at the start, no more continuation runs.
+      expect(await jjp.sweepEnded()).toEqual({ more: false })
+      expect(cursor()).toBe('')
+      // A later pass (a move, the tick, a start) begins from the start again, as bounded.
       expect(await jjp.sweepEnded()).toEqual({ more: true })
-      expect(cursor()).toBe(keys[(2 * SWEEP_SCAN - 1) % 40])
+      expect(cursor()).toBe(keys[SWEEP_SCAN - 1])
       expect(cards).not.toHaveBeenCalled()
       cards.mockRestore()
     })

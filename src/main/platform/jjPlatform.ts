@@ -1011,14 +1011,15 @@ export class JjPlatform implements PlatformAdapter {
     const prefix = `jj_attempts:${project}:`
     const cursorKey = `jj_sweep_cursor:${project}`
     // Bounded on main (HR1's round 1, finding 2): at most SWEEP_SCAN journals read a run, by the key's index after the
-    // durable cursor (from the start again once past the last), whatever they hold; each card looked up by its key.
+    // durable cursor, whatever they hold; each card looked up by its key. A pass runs from the start to the last key and
+    // ends there (HR1's round 2): its cursor goes back to the start and `more` is false, so a quiet project's next pass
+    // waits for a reason (a move, the tick while something was left unresolved, a start), never a continuation loop.
     const cursor = rec.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(cursorKey) as { value: string } | undefined)?.value ?? '') // i18n-ignore: SQL
     const after = cursor > prefix ? cursor : prefix
     const scan = (from: string, to: string, n: number): { key: string; value: string }[] =>
       n > 0 ? (rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ? ORDER BY key LIMIT ?').all(from, to, n)) as { key: string; value: string }[]) : [] // i18n-ignore: SQL
-    const first = scan(after, `${prefix}\uffff`, SWEEP_SCAN)
-    const wrapped = first.length < SWEEP_SCAN && after !== prefix ? scan(prefix, `${after}\u0000`, SWEEP_SCAN - first.length) : []
-    const all = [...first, ...wrapped]
+    const all = scan(after, `${prefix}\uffff`, SWEEP_SCAN)
+    const passEnds = all.length < SWEEP_SCAN
     const byKey = (k: string): CardRecord | null => wf.store.cardByKey(k)
     type Due = { key: string; cardKey: string; cycle: number }
     const due: Due[] = []
@@ -1034,9 +1035,10 @@ export class JjPlatform implements PlatformAdapter {
       if (!cycleLive(entries) && !rows) continue
       due.push({ key: row.key, cardKey, cycle })
     }
-    // Fair: in scan order (after the cursor, then from the start), the cursor past each row scanned, due or not.
+    // Fair: in key order after the cursor, the cursor past each row scanned, due or not (a page short of the due rows
+    // stops at its last one, so the rest come first next run).
     const page = due.slice(0, SWEEP_PAGE)
-    const lastScanned = (page.length === due.length ? all.at(-1)?.key : page.at(-1)?.key) ?? null
+    const cut = page.length < due.length
     let unresolved = false
     for (const x of page) {
       if (signal?.aborted) break
@@ -1081,10 +1083,11 @@ export class JjPlatform implements PlatformAdapter {
         checksLog.warn(`cleaning up #${userText(x.cardKey)}'s ended cycle ${x.cycle}`, e) // i18n-ignore: a log line, English
       }
     }
-    // The cursor past what this run took on: every row scanned when the page took them all, else its last page row.
-    if (lastScanned) await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, lastScanned)) // i18n-ignore: SQL
+    // The cursor past what this run took on (its page's last row when cut short), or back to the start once a pass ends.
+    const next = cut ? page.at(-1)!.key : passEnds ? '' : (all.at(-1)?.key ?? '')
+    await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, next)) // i18n-ignore: SQL
     sweeps.set(wf, { unresolved })
-    return { more: due.length > page.length || all.length >= SWEEP_SCAN }
+    return { more: cut || !passEnds }
   }
 
   /**
