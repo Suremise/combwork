@@ -28,7 +28,7 @@
   "jj.integrate.card": "{card} {title}：将提交 {commit} 整合到 {target}",
   "jj.integrate.change": "变更 {change}",
   "jj.integrate.head": "等你整合",
-  "jj.integrate.how": "例如，然后用 jj bookmark set 把 {target} 移到变基后的提交：",
+  "jj.integrate.how": "例如，先把它复制到 {target} 上，再用 jj bookmark set 把 {target} 移到 jj 输出的副本。复制不会改动卡片的槽位；变基该提交会重写槽位的工作副本，使槽位过期。",
   "jj.integrate.noMerge": "Combwork 不会在 jj 下合并：请自己用 jj 整合已评审的工作。",
   "jj.integrate.none": "没有卡片在等待。",
   "jj.integrate.notChecked": "尚未检查它是否已进入 {target}。",

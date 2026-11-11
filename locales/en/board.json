@@ -2311,9 +2311,17 @@
     "defaultMessage": "It was already waiting when Combwork first saw it: it has waited at least this long.",
     "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Combwork didn't see the wait begin."
   },
+  "board.lanes.waiting": {
+    "defaultMessage": "waiting",
+    "description": "HI-2915: a lane's mark in its header (Progress panel), lower case: one of its cards in Active is marked as waiting on purpose (for the Assistant's answer, a quiet window), so Combwork doesn't report it as stalled; its tooltip says what for."
+  },
   "board.lanes.waitingForYou": {
     "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
     "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
+  },
+  "board.lanes.waitingTip": {
+    "defaultMessage": "{assistant, select, yes {{card} waits for the Assistant’s answer to its request: {reason}} other {{card} waits: {reason}}}",
+    "description": "HI-2915: tooltip and accessible name of a lane header's waiting mark (Progress panel). {card} is the card's key (HI-12); assistant is yes when its agent asked the Combwork Assistant and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys."
   },
   "board.lanes.waits": {
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
@@ -4042,6 +4050,10 @@
   "board.work.notRead": {
     "defaultMessage": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Combwork couldn't read {why}}}",
     "description": "In the card dialog's Work section, in place of a branch, base or target Combwork couldn't read when the card's work started. {note} picks why: Combwork read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Combwork couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
+  },
+  "board.work.notReady": {
+    "defaultMessage": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
+    "description": "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",

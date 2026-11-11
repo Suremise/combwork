@@ -20,7 +20,8 @@ const deliveries = await import('../src/main/deliveries')
 const store = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
-const { askAssistant, askLine, AskRefused } = await import('../src/main/assistantAsk')
+const { askAssistant, askLine, AskRefused, reconcileAskWaits, setAskRetryMsForTests, askRetryPending } = await import('../src/main/assistantAsk')
+const { nothingWaitsOn, idleWatchReason, IDLE_WATCH_STALL_MS } = await import('../src/shared/idleWatch')
 const { readDelivery } = await import('../src/shared/deliveries')
 
 type WS = ReturnType<typeof createWorkspaceService>
@@ -68,11 +69,11 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     const r = await ask(w, card, text)
     const c = await read(w, card)
     expect(c.comments.at(-1)).toMatchObject({ by: 'B1 (alpha)', text })
-    expect(c.history.at(-1)?.what).toMatch(/^Asked the Assistant: "Please put the follow-up On Hold/)
+    expect(c.history.at(-2)?.what).toMatch(/^Asked the Assistant: "Please put the follow-up On Hold/)
     expect(c.column).toBe('doing')
     const got = asked(w)
     expect(got).toHaveLength(1)
-    expect(got[0].body).toBe(askLine({ key: c.key ?? `#${card}`, askerName: 'B1 (alpha)', text }))
+    expect(got[0].body).toBe(askLine({ key: c.key ?? `#${card}`, askerName: 'B1 (alpha)', text, waiting: true }))
     expect(got[0].body).toContain(`<<<${text}>>>`)
     expect(got[0].body).toContain("an agent's request, not the user's decision")
     // Its sender is the agent, by project and id, saved as it is and read back so.
@@ -131,5 +132,280 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
     // The notice follows the card's note, once its write has let go of the board's lock: the history can be read first.
     await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(join(w.path!, 'alpha'), expect.anything(), expect.anything()), { timeout: HUNG_MS })
+  })
+})
+
+// HI-2915: a builder that asked the Assistant on its own card in Doing waits for its answer: the card is marked waiting with
+// that request's ref (waitingFor.ask), so it isn't reported stalled, until the request ends (acked, ended unread, never
+// given), and only that request's mark goes. A wait past the answer is the Assistant's own mark, cleared with its go.
+describe("a request's waiting mark (HI-2915)", () => {
+  const assistantActor = { kind: 'assistant' } as const
+  const ack = (w: WS, id: string) => deliveries.ackDeliveries(w.assistantHome, 'assistant', [id])
+  /** The Assistant reads its inbox (the request received) and acks it, as it does once it has dealt with it. */
+  const deal = async (w: WS, id: string) => {
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    return ack(w, id)
+  }
+  const waitingOf = async (w: WS, n: number) => (await read(w, n)).waitingFor
+  /** Watches the request's take-off (clearAskWait, passed through); `ran(nth)`: its nth call has finished, and what it said. */
+  const takeOffs = () => {
+    const spy = vi.spyOn(tasks, 'clearAskWait')
+    return async (nth = 1): Promise<boolean> => {
+      await vi.waitFor(() => expect(spy.mock.results.length).toBeGreaterThanOrEqual(nth), { timeout: HUNG_MS })
+      return (await spy.mock.results[nth - 1].value) as boolean
+    }
+  }
+  const lane = (card: number) => ({ builder: 'b1', state: 'active', cards: [{ number: card }] })
+  const watcher = (card: number, since: string) => ({ name: 'B1', agentId: 'b1', cards: [card], status: 'watching', watchSince: since })
+
+  it("marks the asker's own card in Doing with the request's ref, says so to the asker and in the Assistant's line", async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the next Windows Sandbox turn?')
+    expect(r.waiting).toBe(true)
+    const mark = await waitingOf(w, card)
+    expect(mark).toMatchObject({ reason: 'May I have the next Windows Sandbox turn?', by: 'B1 (alpha)' })
+    expect(mark?.ask).toBe(deliveries.deliveryNow(w.assistantHome, r.id)?.ref)
+    expect((await read(w, card)).history.map((h) => h.what)).toContain('Waiting: May I have the next Windows Sandbox turn?')
+    const body = asked(w)[0].body
+    expect(body).toContain('shows as waiting for your answer until you ack this')
+    expect(body).toContain('mark')
+    expect(body).toMatch(/before you ack; your go is then clearing it, with the go as that call's comment/)
+  })
+
+  it("marks nothing on a card not in Doing, another agent's card, or one marked already (kept as it was)", async () => {
+    const { w, card } = await open()
+    const todo = (await inWorkspace(w, () => tasks.createTask({ title: 'Later', project: 'alpha', agent: 'b1' }, user))).number
+    const nobodys = (await inWorkspace(w, () => tasks.createTask({ title: 'Free', project: 'alpha', column: 'doing' }, user))).number
+    for (const n of [todo, nobodys]) {
+      const r = await ask(w, n, 'Please park it.')
+      expect(r.waiting).toBe(false)
+      expect(await waitingOf(w, n)).toBeUndefined()
+      expect(asked(w).at(-1)?.body).not.toContain('shows as waiting')
+    }
+    await inWorkspace(w, () => tasks.updateTask(card, { waitingFor: 'A quiet window' }, b1))
+    const before = await waitingOf(w, card)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    expect(r.waiting).toBe(false)
+    expect(await waitingOf(w, card)).toEqual(before)
+    expect(before?.ask).toBeUndefined()
+  })
+
+  it('goes when the Assistant acks the request (go or decline), once: a second ack changes nothing', async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    expect((await deal(w, r.id)).acked).toEqual([r.id])
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+    const lines = (await read(w, card)).history.map((h) => h.what)
+    expect(lines.at(-1)).toBe('No longer waiting')
+    // Acked again: no second take-off is asked for, and nothing more is written.
+    const clear = vi.spyOn(tasks, 'clearAskWait')
+    await ack(w, r.id)
+    // Its source's calls run in a microtask after the ack is saved: by the reconciliation's end they have.
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect(clear).not.toHaveBeenCalled()
+    expect((await read(w, card)).history.length).toBe(lines.length)
+  })
+
+  it("a sustained wait: the Assistant's own mark set before its ack stays, and its go (clearing it with a comment) ends it", async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    // Same words as the request's mark: still a new mark, the Assistant's, without the request's ref.
+    await inWorkspace(w, () => tasks.updateTask(card, { waitingFor: 'May I have the Sandbox?' }, assistantActor))
+    const own = await waitingOf(w, card)
+    expect(own?.ask).toBeUndefined()
+    expect(own?.by).not.toBe('B1 (alpha)')
+    const ran = takeOffs()
+    await deal(w, r.id)
+    // The ack's take-off ran and left the Assistant's mark.
+    expect(await ran(1)).toBe(false)
+    expect(await waitingOf(w, card)).toEqual(own)
+    await inWorkspace(w, () => tasks.updateTask(card, { waitingFor: '' }, assistantActor, { comment: 'Go: the Sandbox is yours.' }))
+    const c = await read(w, card)
+    expect(c.waitingFor).toBeUndefined()
+    expect(c.comments.at(-1)?.text).toBe('Go: the Sandbox is yours.')
+  })
+
+  it("a newer mark set while the request is open (the builder's own) stays when the request ends", async () => {
+    const { w, card } = await open()
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    await inWorkspace(w, () => tasks.updateTask(card, { waitingFor: 'A quiet window for the e2e run' }, b1))
+    const ran = takeOffs()
+    await deal(w, r.id)
+    expect(await ran(1)).toBe(false)
+    expect((await waitingOf(w, card))?.reason).toBe('A quiet window for the e2e run')
+  })
+
+  it("an agent's mark can't carry another request's ref: one set over a request's mark drops it", async () => {
+    const { w, card } = await open()
+    await ask(w, card, 'May I have the Sandbox?')
+    await inWorkspace(w, () => tasks.updateTask(card, { waitingFor: 'The Sandbox, after CB1' } as never, b1))
+    expect((await waitingOf(w, card))?.ask).toBeUndefined()
+  })
+
+  it('goes when the request ends unread (cancelled as Control is turned down)', async () => {
+    const { w, card } = await open()
+    await ask(w, card, 'May I have the Sandbox?')
+    assistant().control = 'look'
+    expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
+    await vi.waitFor(() => expect(asked(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+
+  it("reconciles: a request's mark whose delivery is gone or ended goes as the workspace opens; a live one stays", async () => {
+    const { w, card } = await open()
+    const live = await ask(w, card, 'May I have the Sandbox?')
+    const second = (await inWorkspace(w, () => tasks.createTask({ title: 'Second', project: 'alpha', agent: 'b1', column: 'doing' }, user))).number
+    // A mark whose take-off never ran (Combwork quit between the ack and the write): its request isn't there.
+    const was = await read(w, second)
+    await store.boardWrite(w, async () => store.putCard(w, second, { ...was, waitingFor: { reason: 'The Sandbox', by: 'B1 (alpha)', at: new Date().toISOString(), ask: `#${second}/deadbeef` } } as unknown as Record<string, unknown>))
+    expect((await waitingOf(w, second))?.ask).toBe(`#${second}/deadbeef`)
+    expect(await reconcileAskWaits(w)).toBe(1)
+    expect(await waitingOf(w, second)).toBeUndefined()
+    expect((await waitingOf(w, card))?.ask).toBe(deliveries.deliveryNow(w.assistantHome, live.id)?.ref)
+    // And again with nothing to do.
+    expect(await reconcileAskWaits(w)).toBe(0)
+  })
+
+  it('the stall: none while the request stands; flagged after its answer once only watching for 5 min, as with no request', async () => {
+    const { w, card } = await open()
+    // No request: only watching for 5 min is a stall.
+    const quiet = await read(w, card)
+    const t0 = Date.parse(quiet.history.at(-1)!.at)
+    const since = new Date(t0 + 1000).toISOString()
+    expect(nothingWaitsOn(quiet, 'b1', false)).toBe(true)
+    expect(idleWatchReason(quiet, lane(card), watcher(card, since), Date.parse(since) + IDLE_WATCH_STALL_MS + 1000)).toMatch(/only watches/)
+    // Asked: waiting, whatever the time.
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    expect(nothingWaitsOn(await read(w, card), 'b1', false)).toBe(false)
+    // Answered (acked): the mark goes, and the builder only watching again is stalled after 5 min of it, not before.
+    await deal(w, r.id)
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+    const after = await read(w, card)
+    expect(nothingWaitsOn(after, 'b1', false)).toBe(true)
+    const watched = new Date(Date.parse(after.history.at(-1)!.at) + 1000).toISOString()
+    expect(idleWatchReason(after, lane(card), watcher(card, watched), Date.parse(watched) + IDLE_WATCH_STALL_MS - 1000)).toBeNull()
+    expect(idleWatchReason(after, lane(card), watcher(card, watched), Date.parse(watched) + IDLE_WATCH_STALL_MS + 1000)).toMatch(/only watches/)
+  })
+})
+
+describe("a request's waiting mark when something fails (HI-2915)", () => {
+  afterEach(() => setAskRetryMsForTests(null))
+  const waitingOf = async (w: WS, n: number) => (await read(w, n)).waitingFor
+
+  it("a request that can't be given leaves no mark: the asker is told and the card doesn't wait", async () => {
+    const { w, card } = await open()
+    vi.spyOn(deliveries, 'createDelivery').mockRejectedValueOnce(new Error('deliveries full'))
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    expect(r).toMatchObject({ id: '', waiting: false })
+    expect(await waitingOf(w, card)).toBeUndefined()
+  })
+
+  it('a take-off that fails as the request is acked is retried, and the mark goes then', async () => {
+    const { w, card } = await open()
+    setAskRetryMsForTests(50)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    const clear = vi.spyOn(tasks, 'clearAskWait').mockRejectedValueOnce(new Error('board busy'))
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    // The ack's own take-off failed; the retry's reconciliation takes it off.
+    await vi.waitFor(() => expect(clear).toHaveBeenCalledTimes(2), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+})
+
+// HR1's round 1: a reconciliation while a request is being made (its mark written, its delivery not yet) leaves its mark;
+// take-offs that keep failing are retried, one retry at a time, until one succeeds, and dropped as the workspace closes.
+describe("a request's waiting mark: being made, and retried (HI-2915)", () => {
+  afterEach(() => setAskRetryMsForTests(null))
+  const waitingOf = async (w: WS, n: number) => (await read(w, n)).waitingFor
+  /** createDelivery held until `go` (then the real one runs) or `fail` (it throws): the request parked between its mark and its delivery. */
+  const parked = () => {
+    const real = deliveries.createDelivery
+    let go!: () => void
+    let fail!: (e: Error) => void
+    const gate = new Promise<void>((res, rej) => {
+      go = res
+      fail = rej
+    })
+    let reached!: () => void
+    const atGate = new Promise<void>((res) => (reached = res))
+    vi.spyOn(deliveries, 'createDelivery').mockImplementationOnce(async (...a: Parameters<typeof real>) => {
+      reached()
+      await gate
+      return real(...a)
+    })
+    return { atGate, go: () => go(), fail: (e: Error) => fail(e) }
+  }
+
+  it('a reconciliation while the request is being made leaves its mark; made, it stands until the request ends', async () => {
+    const { w, card } = await open()
+    const p = parked()
+    const asking = ask(w, card, 'May I have the Sandbox?')
+    await p.atGate
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    p.go()
+    const r = await asking
+    expect(r.waiting).toBe(true)
+    expect((await waitingOf(w, card))?.ask).toBe(deliveries.deliveryNow(w.assistantHome, r.id)?.ref)
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+  })
+
+  it('a request whose delivery fails after a reconciliation looked: its mark kept meanwhile, then gone', async () => {
+    const { w, card } = await open()
+    const p = parked()
+    const asking = ask(w, card, 'May I have the Sandbox?')
+    await p.atGate
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect((await waitingOf(w, card))?.ask).toBeTruthy()
+    p.fail(new Error('deliveries full'))
+    expect(await asking).toMatchObject({ id: '', waiting: false })
+    expect(await waitingOf(w, card)).toBeUndefined()
+    // And after it, a reconciliation finds nothing to do.
+    expect(await reconcileAskWaits(w)).toBe(0)
+  })
+
+  it('two take-offs failing in a row, then one that works: retried until it does, and no retry is left', async () => {
+    const { w, card } = await open()
+    setAskRetryMsForTests(20)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    const clear = vi.spyOn(tasks, 'clearAskWait').mockRejectedValueOnce(new Error('board busy')).mockRejectedValueOnce(new Error('board busy again'))
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    // The ack's take-off (1) and the first retry (2) fail; the second retry (3) takes it off.
+    await vi.waitFor(async () => expect(await waitingOf(w, card)).toBeUndefined(), { timeout: HUNG_MS })
+    expect(clear).toHaveBeenCalledTimes(3)
+    expect(askRetryPending(w)).toBe(false)
+  })
+
+  it('a card that is gone is no failure (nothing to retry); a board read that fails is', async () => {
+    const { w, card } = await open()
+    expect(await inWorkspace(w, () => tasks.clearAskWait(card + 100, '#x/1', w))).toBe(false)
+    expect(askRetryPending(w)).toBe(false)
+    vi.spyOn(store, 'askWaitMarks').mockImplementationOnce(() => {
+      throw new Error('database is locked')
+    })
+    setAskRetryMsForTests(60_000)
+    expect(await reconcileAskWaits(w)).toBe(0)
+    expect(askRetryPending(w)).toBe(true)
+  })
+
+  it('a pending retry goes when the workspace closes', async () => {
+    const { w, card } = await open()
+    setAskRetryMsForTests(60_000)
+    const r = await ask(w, card, 'May I have the Sandbox?')
+    vi.spyOn(tasks, 'clearAskWait').mockRejectedValueOnce(new Error('board busy'))
+    await deliveries.readInbox(w.assistantHome, 'assistant')
+    await deliveries.ackDeliveries(w.assistantHome, 'assistant', [r.id])
+    await vi.waitFor(() => expect(askRetryPending(w)).toBe(true), { timeout: HUNG_MS })
+    await disposeWorkspaceService(w)
+    opened.splice(opened.indexOf(w), 1)
+    expect(askRetryPending(w)).toBe(false)
   })
 })

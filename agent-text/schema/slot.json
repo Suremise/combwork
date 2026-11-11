@@ -181,6 +181,11 @@
   "slot.prepare.leaseEnded": {
     "placeholders": {}
   },
+  "slot.prepare.stale": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
   "slot.prepare.switchFailed": {
     "placeholders": {
       "error": "plain"

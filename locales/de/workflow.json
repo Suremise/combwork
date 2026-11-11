@@ -473,7 +473,7 @@
   "workflow.slots.levelNone": "Hier festgelegt: keins",
   "workflow.slots.noSlots": "Noch keine Slots: Einer wird angelegt, wenn eine Karte beginnt.",
   "workflow.slots.none": "Keins",
-  "workflow.slots.notRecovered": "{slot} wurde nicht wiederhergestellt: {why, select, busy {etwas arbeitet darin} notStale {er ist nicht mehr veraltet} identity {sein Ordner ist nicht der Workspace, den Combwork angelegt hat} other {jj konnte es nicht}}.",
+  "workflow.slots.notRecovered": "{slot} wurde nicht wiederhergestellt: {why, select, busy {etwas arbeitet darin (ein Agent arbeitet dort: beende ihn zuerst)} preparing {seine Karte wird dort noch vorbereitet} notStale {er ist nicht mehr veraltet} identity {sein Ordner ist nicht der Workspace, den Combwork angelegt hat} other {jj konnte es nicht}}.",
   "workflow.slots.off": "Aus",
   "workflow.slots.on": "An",
   "workflow.slots.openAdvanced": "Erweitert öffnen",

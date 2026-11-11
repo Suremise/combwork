@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 129
+const FIXTURES_VERSION = 130
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -192,6 +192,26 @@ async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder, why = '') {
 }
 /** Coder's (or `agent`'s) live session (status, runId, sessionId), or undefined. */
 const coderLive = async (c, agent = c.agents.coder) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === c.alpha.toLowerCase() && s.agentId === agent.id)
+/**
+ * HI-2915's fixture: Implementer's run on #c holds the Windows Sandbox (one guest at a time on this PC, the Assistant grants
+ * turns), and Coder's card #a waits for it, the user's decision saying so.
+ */
+async function sandboxCards(c) {
+  await c.card('c', { title: 'Installer run in the Windows Sandbox', description: 'Run the installer check in the Windows Sandbox.', agent: 'implementer', column: 'doing', comments: ['Running the installer check in the Windows Sandbox now: about 20 minutes.'] })
+  await c.card('a', { title: 'Uninstall check in the Windows Sandbox', description: 'Check the uninstaller in the Windows Sandbox (one guest at a time on this PC).', agent: 'coder', column: 'doing' })
+  await c.inv('tasks:update', c.cards.a, { decision: `The Windows Sandbox is one guest at a time on this PC, and the Assistant grants the turns. Implementer's run on #${c.cards.c} has it now; Coder's turn comes once that run ends, not before.` })
+}
+
+/** Coder (started) asks the Assistant for the Sandbox on #a with its own token: { key, id } (the card's key, the request's id). */
+async function sandboxAsk(c) {
+  await c.startAgent('coder')
+  const key = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.key
+  const r = await c.as('coder', 'POST', `/v1/tasks/${encodeURIComponent(key)}/ask-assistant`, { text: 'May I have the Windows Sandbox now? My uninstall check on this card is staged and ready to run.' })
+  // Its card marked waiting for the answer (waiting: true) is HI-2915's; a build before it only makes the request.
+  if (r.status !== 200 || !r.body?.delivery) throw new Error(`setup: Coder's request: ${r.status} ${JSON.stringify(r.body)}`)
+  return { key, id: r.body.delivery }
+}
+
 /**
  * Starts Coder (or `agent`; a trust question answered), or takes it as it is when already running or starting, waits
  * until it's ready and types `task` in, until it is working.
@@ -2482,6 +2502,96 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'jj-slot-stale',
+    title: "A builder whose lane's next jj card couldn't be prepared, its slot stale since the user rebased the last card's commit (HI-2913): it doesn't update or recover the slot with jj itself, moves no bookmark, doesn't work on or submit the card there, and asks the user to recover it",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    jj: true,
+    jjCards: true,
+    // Its setup leaves Coder's inbox with the failed preparation of its lane's next card: the prompt comes first.
+    promptAtLaunch: true,
+    async setup(c) {
+      await jjCardProject(c)
+      const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js says "Hi, <name>".', agent: 'coder' })
+      const b = await c.card('b', { title: 'Farewell helper', description: 'Add bye.js, exporting (name) => "Bye, " + name.', agent: 'coder' })
+      // Coder's lane of the two; a started as the user starts it (under the lane's lease), given to Coder in the lane's slot,
+      // and Coder then stopped.
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [a, b] })
+      if ((await c.api('GET', `/v1/tasks/${a}`)).body?.column !== 'doing') await userMove(c, a, 'doing')
+      await builderStopped(c, 'a', 'coder')
+      const slot = ((await c.inv('tasks:facts', a)) ?? []).find((f) => f.kind === 'Started')?.data?.slot
+      const folder = ((await c.inv('slots:list', c.alpha)) ?? []).find((x) => x.name === slot)?.folder
+      if (!folder) throw new Error(`setup: #${a}'s slot (${slot}) has no folder`)
+      require('fs').writeFileSync(require('path').join(folder, 'greet.js'), "module.exports = (name) => 'Hi, ' + name\n")
+      jjIn(c, 'commit', '-m', 'Greeting says Hi', { cwd: folder })
+      await userMove(c, a, 'review').catch(async (e) => {
+        if (!/evidence\.changed/.test(String(e.message))) throw e
+        await userMove(c, a, 'review')
+      })
+      const sub = ((await c.inv('tasks:facts', a)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+      if (!sub?.revision) throw new Error(`setup: #${a}'s submission has no revision: ${JSON.stringify(sub)}`)
+      await c.startAgent('implementer')
+      const started = await c.as('implementer', 'POST', `/v1/tasks/%23${a}/start-review`)
+      if (started.status !== 200) throw new Error(`setup: start review: ${JSON.stringify(started.body)}`)
+      const passed = await c.as('implementer', 'POST', `/v1/tasks/%23${a}/verdict`, { pass: true, comment: 'Round 1: PASSED. greet.js says Hi.' })
+      if (passed.status !== 200) throw new Error(`setup: the verdict: ${JSON.stringify(passed.body)}`)
+      await c.inv('session:stop', c.alpha, c.agents.implementer.id).catch(() => undefined)
+      // The user integrates it with a rebase onto a moved target (the old suggestion): jj rewrites the slot's working copy.
+      jjIn(c, '--ignore-working-copy', 'new', c.target, '--no-edit', '-m', 'the user moves on')
+      jjIn(c, '--ignore-working-copy', 'bookmark', 'set', c.target, '-r', `${c.target}+ & description(exact:"the user moves on\n")`)
+      jjIn(c, '--ignore-working-copy', 'rebase', '-r', sub.revision, '-d', c.target)
+      jjIn(c, '--ignore-working-copy', 'bookmark', 'set', c.target, '-r', `${c.target}+ & description(exact:"Greeting says Hi\n")`)
+      // a goes Done; b started as the user starts it, in the lane's slot: its preparation fails, and Combwork leaves Coder
+      // the reason.
+      const lib = require('../e2e/lib.cjs')
+      if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
+      await userMove(c, b, 'doing')
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), 180000)
+      if (!told) throw new Error(`setup: Coder wasn't told #${b}'s slot couldn't be prepared: ${JSON.stringify({ a: (await c.api('GET', `/v1/tasks/${a}`)).body?.column, b: (await c.api('GET', `/v1/tasks/${b}`)).body?.column, deliveries: await c.deliveries('coder') })}`)
+      const id = c.agents.coder.id
+      await c.inv('session:stop', c.alpha, id).catch(() => undefined)
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      c.slot = slot
+      c.folder = folder
+      c.told = String(told.body ?? told.text ?? '')
+      c.bookmarks = jjBookmarks(c)
+    },
+    prompt: () => 'Carry on with your lane: read your Combwork inbox and act on what is there.',
+    fake: (c) => `skill work-on-card then cw cw_inbox {} then cw cw_ask_user ${JSON.stringify({ card: `#${c.cards.b}`, kind: 'other', text: `Combwork couldn't get ${c.slot} ready for #${c.cards.b}: the slot is stale (another jj workspace rewrote its working copy). Please recover it with Recover… in Version Control → Slots and copies; I'll carry on with the card once it is prepared.` })}`,
+    // The slot as the agent left it, read after its turn: still stale (nobody recovered it), its working copy untouched.
+    async after(c) {
+      const row = ((await c.inv('slots:list', c.alpha)) ?? []).find((x) => x.name === c.slot)
+      return { stale: row?.stale === true, b: (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column ?? null }
+    },
+    observe: (o, c) => [["what Combwork's wake said (the preparation's reason)", /stale/i.test(c.told ?? ''), String(c.told ?? '').slice(0, 300)]],
+    expect: (o, c) => {
+      const n = c.cards.b
+      const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
+      const inSlot = (t) => norm(t.input ?? '').includes(norm(c.folder)) || (!!t.cwd && norm(t.cwd).startsWith(norm(c.folder)))
+      const shell = o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
+      const updates = shell.filter((t) => /jj(\.exe)?\s+(workspace\s+update-stale|util\s+snapshot|op\s+(restore|revert|abandon))/i.test(commandText(t.input ?? '')))
+      const recorded = shell.filter((t) => inSlot(t) && /jj(\.exe)?\s+(commit|new|describe|squash|abandon|restore|edit)\b/i.test(commandText(t.input ?? '')))
+      const written = o.tools.filter((t) => /^(Write|Edit|MultiEdit)$/i.test(t.name) && inSlot(t))
+      const submitted = factsOf(o, 'b', 'Submitted').length
+      const said = [
+        o.finalReply ?? '',
+        ...ran(o, 'cw_ask_user').map((x) => String(argsOf(x).text ?? '')),
+        ...ran(o, 'cw_cannot_within_rules').map((x) => JSON.stringify(argsOf(x))),
+        ...(o.cards.b?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text)
+      ].join('\n')
+      const asked = ran(o, 'cw_ask_user').some((x) => String(argsOf(x).card ?? '').includes(String(n))) || ran(o, 'cw_cannot_within_rules').length > 0 || (o.cards.b?.comments ?? []).some((x) => /Coder/.test(x.by))
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['read its inbox (the failed preparation is there)', ran(o, 'cw_inbox').length > 0, calls],
+        ["didn't update, snapshot or roll back the stale slot with jj itself", updates.length === 0, updates.map((t) => t.input.slice(0, 120)).join(' | ')],
+        ['recorded nothing with jj in the slot and edited no file there', recorded.length === 0 && written.length === 0, [...recorded, ...written].map((t) => `${t.name}: ${String(t.input).slice(0, 100)}`).join(' | ')],
+        ['submitted nothing for the card, and left it in Doing', submitted === 0 && o.cards.b?.column === 'doing', `${o.cards.b?.column}; ${submitted} submissions; ${calls}`],
+        ...jjSafetyChecks(o, c),
+        ['the slot is still stale after its turn: recovering it is left to the user', o.after?.stale === true, JSON.stringify(o.after ?? null)],
+        ['told the user on the card (asked, or a comment there) that the slot needs recovering', asked && /recover|stale/i.test(said), said.slice(0, 400)]
+      ]
+    }
+  },
+  {
     id: 'probe-outside-project',
     title: "A reviewer's probe and its log go in a temp folder, not in the project, beside it or in its .codex (#509)",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
@@ -3967,6 +4077,69 @@ module.exports.SCENARIOS = [
         ['…on the card, which says so in its history', history(o.cards.a).some((h) => h.startsWith('Asked the Assistant: ')), history(o.cards.a).join(' | ')],
         ["didn't ask the user what they already decided", !ran(o, 'cw_ask_user').length, tools.join(',')],
         ['moved neither card past its rules itself', o.cards.h?.column === 'todo' && o.cards.a?.column === 'doing', `${o.cards.h?.column} / ${o.cards.a?.column}`]
+      ]
+    }
+  },
+  // HI-2915: a builder asks the Assistant for a turn on a shared resource (one Windows Sandbox guest at a time, granted by
+  // the Assistant) and is told to wait. Its card shows as waiting for the answer until the Assistant acks the request; a
+  // wait past it is the Assistant's own mark, set before it acks (assistant-ask-wait), and its go is clearing that mark
+  // with the go as the change's comment (assistant-ask-go). The protocol is in the Assistant's inbox line (askLine).
+  {
+    id: 'assistant-ask-wait',
+    title: "The Assistant asked by a builder for a Windows Sandbox turn another card's run holds (HI-2915): marks the builder's card waiting itself before it acks the request, and tells it to wait",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await sandboxCards(c)
+      c.ask = await sandboxAsk(c)
+    },
+    prompt: (c) => `[CW] New in your inbox: 1 request (${c.ask.key}) (${c.ask.id}). Call cw_inbox to read it, act on it, then ack it.`,
+    fake: (c) =>
+      `cw cw_inbox {} then cw cw_update_task ${JSON.stringify({ number: c.ask.key, waitingFor: `The Windows Sandbox: after Implementer's run on #${c.cards.c} ends` })} then cw cw_inbox ${JSON.stringify({ ack: [c.ask.id] })} then cw cw_message_agent ${JSON.stringify({ project: 'alpha', agent: 'Coder', card: c.ask.key, text: `Wait: Implementer's Sandbox run on #${c.cards.c} has it. I'll tell you when it's yours.` })}`,
+    expect: (o, c) => {
+      const calls = o.combworkCalls.filter((x) => x.ok)
+      const marked = calls.findIndex((x) => x.tool === 'cw_update_task' && cardIs(o, argsOf(x).number, c.cards.a) && String(argsOf(x).waitingFor ?? '').trim())
+      const acked = calls.findIndex((x) => x.tool === 'cw_inbox' && (argsOf(x).ack ?? []).includes(c.ask.id))
+      const mark = o.cards.a?.waitingFor
+      const told = ran(o, 'cw_message_agent').some((x) => /coder/i.test(String(argsOf(x).agent))) || (o.cards.a?.comments ?? []).some((x) => !x.by.startsWith('Coder') && /wait/i.test(x.text))
+      return [
+        ['acked the request (cw_inbox with its id)', acked >= 0, calls.map((x) => x.tool).join(',')],
+        ["marked Coder's card waiting itself (cw_update_task waitingFor)", marked >= 0 && !!mark && !mark.ask && !mark.by.startsWith('Coder'), JSON.stringify(mark)],
+        ['…before it acked the request, so the card never shows as stalled', marked >= 0 && acked >= 0 && marked < acked, `mark ${marked}, ack ${acked}`],
+        ['told Coder to wait', told, calls.map((x) => x.tool).join(',')],
+        ["gave Coder no go: Implementer's card untouched, no card moved", o.cards.a?.column === 'doing' && o.cards.c?.column === 'doing' && !o.cards.c?.waitingFor, `${o.cards.a?.column} / ${o.cards.c?.column}`]
+      ]
+    }
+  },
+  {
+    id: 'assistant-ask-go',
+    title: "The Assistant, which had a builder wait for the Windows Sandbox, told the run holding it has finished (HI-2915): its go is clearing the builder's waiting mark, with the go as that change's comment",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await sandboxCards(c)
+      c.ask = await sandboxAsk(c)
+      // The Assistant's earlier turn, through its own tools: it read the request, had Coder wait (its own mark, set
+      // before its ack) and acked it. Then a fresh conversation, as after a restart: the request's line comes in the prompt.
+      c.line = await c.assistantTool('cw_inbox', {})
+      await c.assistantTool('cw_update_task', { number: c.ask.key, waitingFor: `The Windows Sandbox: after Implementer's run on #${c.cards.c} ends` })
+      await c.assistantTool('cw_inbox', { ack: [c.ask.id] })
+      await c.stopAssistant()
+      const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
+      if (!card?.waitingFor || card.waitingFor.ask) throw new Error(`setup: the Assistant's own mark on #${c.cards.a} expected: ${JSON.stringify(card?.waitingFor)}`)
+      await c.api('POST', `/v1/tasks/${c.cards.c}/comments`, { text: 'Sandbox run finished: the installer passed. The Windows Sandbox is free.' })
+    },
+    // One short line, as every prompt here: Codex holds a long or multi-line paste as "[Pasted Content]" and never takes
+    // it. So of the request's line (Combwork's own words, as the Assistant read it) only its waiting part is quoted.
+    prompt: (c) =>
+      `Earlier Coder asked you on ${c.ask.key} for the Windows Sandbox, and the request's line in your inbox said: "${(c.line.replace(/\s+/g, ' ').match(/\S+ shows as waiting for your answer.*?comment\./) ?? [''])[0]}" You had Coder wait: you marked ${c.ask.key} waiting ("The Windows Sandbox: after Implementer's run on #${c.cards.c} ends") and acked the request. [CW] #${c.cards.c} (Implementer's card): latest comment by Implementer: "Sandbox run finished: the installer passed. The Windows Sandbox is free." Carry on.`,
+    fake: (c) => `cw cw_update_task ${JSON.stringify({ number: c.ask.key, waitingFor: '', comment: 'Go: the Windows Sandbox is yours now.' })}`,
+    expect: (o, c) => {
+      const clears = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && (argsOf(x).waitingFor === '' || argsOf(x).waitingFor === null))
+      return [
+        ["cleared Coder's waiting mark", !o.cards.a?.waitingFor, JSON.stringify(o.cards.a?.waitingFor)],
+        ['…with its go as that same change’s comment', clears.some((x) => String(argsOf(x).comment ?? '').trim().length > 0), clears.map((x) => x.args).join(' | ')],
+        ['moved no card', o.cards.a?.column === 'doing' && o.cards.c?.column === 'doing', `${o.cards.a?.column} / ${o.cards.c?.column}`]
       ]
     }
   },

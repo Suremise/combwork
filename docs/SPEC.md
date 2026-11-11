@@ -2592,7 +2592,9 @@ merges under jj.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
-  and a `jj rebase -r <commit> -d <target>` to start from, and its last containment observation for exactly that
+  and the commands to start from (HI-2913: `jj duplicate -r <commit> --onto <target>`, then `jj bookmark set <target> -r
+  <copy>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
+  slot stale and its lane's next card unprepared), and its last containment observation for exactly that
   approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
@@ -3053,9 +3055,48 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   pool's start and by `refresh()`. A wake owns nothing: cancelled, or finding a slot taken, it loses nothing. The pool's
   close cancels the wake and awaits the running pass and settles. A refusal for good and known dirty files aren't owed:
   the next refresh or event looks again, with no periodic jj loop. Git's detach takes no fence, so Git is unchanged.
+- **The slot listing doesn't compete with the pool** (HI-2912): quiet is a rename probe, and Windows refuses to rename a
+  folder that is a process's working folder or has a file open in it. The listing's staleness (`slotViews`) runs jj in
+  the slot and reads its `.jj/working_copy/checkout`. Polled (jjwindow's waits, the window's Slots and copies while
+  shown), it kept the probe failing, so an owed settle found the slot busy for minutes after its builder had gone (a
+  real Claude Code session leaves nothing there: no process names the folder, no leftovers). Now, while the slot has an
+  operation or a job, or owes a settle, the listing reads nothing of the folder and shows the answer it last read for
+  that path (`SlotStaleView`, slotStaleView.ts). The decision is made from the slot's state right before the read would
+  start, nothing awaited between. Each read checks the folder's creation generation first, so another folder's answer
+  is never shown once the slot can be read again. At most one read runs per folder. An answer that couldn't be read
+  never replaces a known one, so a stale slot keeps its Stale and Recover…. One entry per slot, per pool lifetime. **Not
+  an ordering of Combwork's reads against its writes:** the probe samples quiet and another reader can start after it.
+  Node opens files without `FILE_SHARE_DELETE`, so a Combwork read of a file jj replaces can fail jj's write ("Access
+  is denied"); that is HI-2918.
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
+- **A held slot's recovery** (HI-2913): a slot a card's or lane's lease still holds is let through only while that
+  lease's card's current cycle has a `SlotPrepareFailed` for it and no `SlotPrepared` after (a preparation still owed is
+  refused `preparing`; a made one, or none failed, `busy`). slotCards' `recoverHeldSlot` admits that card and cycle;
+  `SlotStore.beginRecover` claims the slot in one write only while it is lent under exactly that open lease at its folder
+  with no operation, job or writer (a free slot's `beginSettle` is unchanged); the fence before each of J2's writes is the
+  folder's quiescence (no session, no process: a builder running there is `busy`), the lease still open and still the
+  operation's, and the same cycle still failed and unprepared. A preparation can't start under the claim, and one that
+  claimed first makes it `busy`. Only a recovery that succeeded forgets that cycle's failed try and asks for a pass,
+  which prepares the card and places its builder; a refused or cut-short one leaves both (its journal resumes it).
+- **A failed preparation** (HI-2913) is recorded as `SlotPrepareFailed { lease, slot, why, stale }`, written only while
+  the same cycle and lease are current and unprepared; the card's Work section then says it hasn't started in that slot
+  yet and why (a stale jj workspace: with Recover…), until a `SlotPrepared` for the lease. A stale jj workspace's refusal
+  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable.
+- **A jj lane's builder between cards** (HI-2913): jj's record needs no session in the slot and the folder's rename
+  probe quiet, and a lane's builder stays in its slot. Before a jj card's preparation, under the folder's fence
+  (`changingFolder`: nothing typed or started there), slotCards' `freeSlotOfBuilder` ends only the builder's own run in
+  that slot, quiet, not resuming, nothing owed to it, with no input held, with its CLI's exit command (`sessions.quit`,
+  cause `lane`: not a Stop of the user's, so a lane's start isn't refused), fenced to that run in that folder and to the
+  cycle at each key, and waits for the run to end; placement then resumes its conversation bound to the lease with the
+  card. Anything else (busy, held, a run replaced or moved, starting) lifts the fence and looks again. A busy or fenced
+  record, a lost fence or an uncertain write in the preparation is a retry, never a failure. Git is unchanged.
+- **The shape a rebase leaves** (HI-2913, HR1's s18 answer): jj's preparation also accepts a slot whose working copy is
+  empty, neither conflicted nor divergent, with exactly one parent that is the previous binding's base (a rebase of the
+  card's commit moved it off), besides exactly the binding's submitted commits (`chainIsBinding`, unchanged). An empty
+  range alone never authorizes it (a working copy on unrelated history has none); the previous card's work must still
+  be in its target (§16.3.2).
 - **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
   again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
   matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
@@ -3274,7 +3315,8 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
 - **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
   a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
-  `slots:recoverStale`, its refusal said (busy, no longer stale, not the recorded workspace, or jj's failure).
+  `slots:recoverStale`, its refusal said (busy, with stop its agent first; its card still being prepared; no longer
+  stale; not the recorded workspace; or jj's failure).
 - **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
   change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
   was proved (`via`: history, replay, the same tree, a prepared candidate).
@@ -5049,7 +5091,22 @@ woken by the doorbell, a busy one told at its next tool call. The Assistant acts
 the user decided or answered on the card, and tells the agent with `cw_message_agent`. Refused before anything is
 written (409, saying to ask the user with `cw_ask_user`) while the Assistant can't act on it (the same check as the
 relay's); one that ends unread (cancelled when Control is turned down before it is handed out, expired) says so on the
-card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). The card-loop skill says when to
+card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). **The request's wait (HI-2915; on
+11 Nov CB1 and CB2 asked the Assistant for a Windows Sandbox turn, were told to wait, and were reported stalled):** asked
+by the card's own agent on its card in Doing with no waiting mark, the card is marked waiting (§ HI-2618's
+`waitingFor`) in the request's own locked write, the request's words (cut to 200 characters) its reason, the asker its
+`by`, and the request's ref (`#n/<id>`, made first and the same for the mark, the delivery and their clean-up) its
+`ask`. The reply says so (`waiting: true`), and so does the Assistant's line, with how to keep the agent waiting. The
+mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
+`waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
+acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
+unread (`ended`), or never given. A take-off that fails is retried after 30 s, and each workspace's open
+(`reconcileAskWaits`) takes off every request mark whose delivery is no longer live (queued, offered, received or
+uncertain), so none stays for ever. A wait past the answer is the Assistant's own mark, set before it acks; its go is
+clearing it with the go as that change's comment, which wakes the builder's card watch. `ask` is Combwork's alone:
+never from the Agent API, and undo puts a mark back without it. A lane's row in the Progress panel says **waiting**
+(what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
+for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
 how the Assistant answers. **No code, proposed:** a code
 card that passes review with its change already in its target (nothing to merge) is proposed no code by Combwork
@@ -6391,6 +6448,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
   Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
 - **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
   "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A switch's resume is automatic too** (HI-2920): a connection switch, a usage move or a restart for its tools resumes
+  only where `canResumeNow` allows, never taking a free slot by hand. Its run's lease ended meanwhile (its card Done), it
+  is refused and the slot stays in the pool; a stop while its start waits for the old run's writer claims nothing.
 - **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Combwork lets its turn finish (not in a
   turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
   gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes

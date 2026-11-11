@@ -28,7 +28,7 @@
   "jj.integrate.card": "{card} {title} : commit {commit} dans {target}",
   "jj.integrate.change": "changement {change}",
   "jj.integrate.head": "En attente de ton intégration",
-  "jj.integrate.how": "Par exemple, puis déplace {target} vers le commit rebasé avec jj bookmark set :",
+  "jj.integrate.how": "Par exemple, copie-le sur {target}, puis déplace {target} vers la copie qu’affiche jj avec jj bookmark set. Une copie laisse l’emplacement de la carte tel quel ; rebaser le commit réécrirait la copie de travail de l’emplacement et le laisserait périmé.",
   "jj.integrate.noMerge": "Combwork ne fusionne pas sous jj : intègre toi-même le travail relu avec jj.",
   "jj.integrate.none": "Aucune carte n’attend.",
   "jj.integrate.notChecked": "Pas encore vérifié s’il est dans {target}.",

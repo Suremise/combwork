@@ -521,6 +521,8 @@ const LEGEND = {
 
 const LANE_TARGET = msg({ id: 'board.lanes.target', defaultMessage: 'into {branch}', description: 'HI-2556: a lane’s mark in its header (Progress panel), lower case: its cards merge into {branch} (a branch name), not the project’s Work merges into.' })
 const LANE_TARGET_TIP = msg({ id: 'board.lanes.targetTip', defaultMessage: 'This lane’s cards are made from {branch} and merge into it, not the project’s Work merges into, until the lane ends.', description: 'HI-2556: tooltip and accessible name of a lane header’s Merges into mark (Progress panel). {branch} is a branch name.' })
+const LANE_WAITING = msg({ id: 'board.lanes.waiting', defaultMessage: 'waiting', description: "HI-2915: a lane's mark in its header (Progress panel), lower case: one of its cards in Active is marked as waiting on purpose (for the Assistant's answer, a quiet window), so Combwork doesn't report it as stalled; its tooltip says what for." })
+const LANE_WAITING_TIP = msg({ id: 'board.lanes.waitingTip', defaultMessage: '{assistant, select, yes {{card} waits for the Assistant’s answer to its request: {reason}} other {{card} waits: {reason}}}', description: "HI-2915: tooltip and accessible name of a lane header's waiting mark (Progress panel). {card} is the card's key (HI-12); assistant is yes when its agent asked the Combwork Assistant and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys." })
 const OLD_RULES = msg({ id: 'board.lanes.oldRules', defaultMessage: 'old rules', description: "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options." })
 
 const PROJECT_LINK = msg({ id: 'board.lanes.projectLink', defaultMessage: '{project}: open its workflow in Version Control', description: "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name." })
@@ -640,6 +642,9 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
       break
     }
   }
+  // HI-2915: a card of its waiting on purpose (HI-2618), said in its header with what for, while none is stalled.
+  const waitingCard = stalled || l.frozen ? undefined : l.cards.map((n) => tasks.find((t) => t.number === n)).find((c) => c?.column === 'doing' && c.waitingFor)
+  const waitingTip = waitingCard?.waitingFor ? tr(LANE_WAITING_TIP, { card: cardLabelOf({ tasks }, waitingCard.number), assistant: waitingCard.waitingFor.ask ? 'yes' : 'no', reason: waitingCard.waitingFor.reason }) : null
   const { finished, total, current } = laneSummary(cards)
   // A lane that ended without a record of its cards doesn't know how many were finished (#512).
   const unknown = cards.some((c) => c.state === 'unrecorded')
@@ -815,6 +820,13 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
+            </Tooltip>
+          )}
+          {waitingTip && (
+            <Tooltip content={waitingTip} focus>
+              <span className="progress-lane-state waiting" data-mark="waiting" tabIndex={0} role="note" aria-label={waitingTip}>
+                {tr(LANE_WAITING)}
+              </span>
             </Tooltip>
           )}
           {oldRules && (

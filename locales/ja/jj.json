@@ -28,7 +28,7 @@
   "jj.integrate.card": "{card} {title}：コミット{commit}を{target}へ",
   "jj.integrate.change": "変更 {change}",
   "jj.integrate.head": "統合待ち",
-  "jj.integrate.how": "たとえば、リベースしてから、jj bookmark setで{target}をそのコミットへ移動します：",
+  "jj.integrate.how": "たとえば、{target}の上にコピーしてから、jj bookmark setで{target}をjjが表示したコピーへ移動します。コピーならカードのスロットはそのままです。コミットをリベースすると、スロットの作業コピーが書き換えられ、スロットが古くなります。",
   "jj.integrate.noMerge": "Combworkはjjではマージしません。レビュー済みの作業はjjでご自身で統合してください。",
   "jj.integrate.none": "待っているカードはありません。",
   "jj.integrate.notChecked": "{target}に入っているかはまだ確認していません。",

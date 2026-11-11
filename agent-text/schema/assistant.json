@@ -1,4 +1,12 @@
 {
+  "assistant.ask.line": {
+    "placeholders": {
+      "asker": "plain",
+      "card": "plain",
+      "text": "plain",
+      "waiting": "select"
+    }
+  },
   "assistant.template.agentNoName": {
     "placeholders": {
       "n": "plain"

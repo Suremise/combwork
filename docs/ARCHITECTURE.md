@@ -647,8 +647,8 @@ The return comes before applying a stale pass's effects, so a pass that holds ag
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
-reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
-runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
+reconciles the project a short wait after the first of them (`RECONCILE_DEBOUNCE_MS`, which later asks never restart:
+asks every 200 ms used to keep any run from starting, HI-2914; one run at a time, a run asked for meanwhile runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
 when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run takes the project's
 runtime from `workflowFor` (above): `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
 MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone), and the table's moves, queue cancellations,

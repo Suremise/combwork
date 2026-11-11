@@ -1331,6 +1331,14 @@ export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown
   })
 }
 
+/** HI-2915: the cards whose waiting mark is an Assistant request's (`waitingFor.ask`, kept in a card's extra): each number and ref. */
+export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[] {
+  return readSnapshot(ws, (b, db) => {
+    const ask = `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.waitingFor.ask')` // i18n-ignore: SQL
+    return db.prepare(`SELECT number AS n, ${ask} AS ref FROM cards WHERE ${ask} IS NOT NULL`).all() as { n: number; ref: string }[] // i18n-ignore: SQL
+  })
+}
+
 /** Whether there is a card of that number. */
 export function hasCard(ws: WorkspaceService, n: number): boolean {
   const { db } = readConn(ws)

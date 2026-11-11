@@ -579,7 +579,9 @@ interface CombworkMessageValues {
   'board.lanes.usualOrderSaid': undefined
   'board.lanes.waitedAtLeast': { time: string | number }
   'board.lanes.waitedAtLeastTip': undefined
+  'board.lanes.waiting': undefined
   'board.lanes.waitingForYou': { n: number }
+  'board.lanes.waitingTip': { assistant: string; card: string | number; reason: string | number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
   'board.lanes.waitsDependency': { card: string | number; dependency: string | number }
   'board.lanes.waitsFresh': { agent: string | number }
@@ -1012,6 +1014,7 @@ interface CombworkMessageValues {
   'board.work.noRevision': undefined
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
+  'board.work.notReady': { slot: string | number; stale: string; why: string | number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }

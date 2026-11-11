@@ -30,11 +30,13 @@ const FAKE_CLAUDE_ONLY = [
   'card-loop-already-in-review', 'card-loop-two-cards', 'card-loop-disputed', 'card-loop-design-first', 'card-loop-follow-up', 'card-loop-follow-up-check', 'card-loop-ask-assistant', 'card-loop-released', 'card-loop-loop-wake',
   // Wakes are the fake Claude Code's alone (harness.cjs: fakeWakes): on the others these check only their fixture.
   'card-loop-blocked', 'coordinator-lanes-to-end',
+  // A stuck lane's wake waiting in the inbox, read with cw_inbox; the board, facts and slot after the server (HI-2913).
+  'jj-slot-stale',
   // Overrides, intents, old moves, presets.
   'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'preset-pair-lane',
   // The Assistant's board work.
   'assistant-dispatch', 'assistant-reply-decision', 'assistant-doing-nobody', 'assistant-decision-answers', 'assistant-decision-answers-one', 'assistant-card-question', 'assistant-look-lanes', 'assistant-lane-reorder-now', 'assistant-bulk-move', 'assistant-retarget-release',
-  'assistant-next-version-ask', 'assistant-next-version', 'assistant-next-version-retarget',
+  'assistant-next-version-ask', 'assistant-next-version', 'assistant-next-version-retarget', 'assistant-ask-wait', 'assistant-ask-go',
   // The coordinator and fresh starts.
   'coordinator-wake-failed', 'coordinator-recurring-finding', 'coordinator-wake-question', 'coordinator-build-beside-lanes', 'coordinator-reassign', 'coordinator-follow-up', 'coordinator-one-card-lane', 'coordinator-start-reviewer',
   'coordinator-lanes-only-watch', 'coordinator-ten-rounds', 'coordinator-no-code-done', 'coordinator-merge-due', 'coordinator-fact-before-asking', 'coordinator-look-before-asking', 'fresh-start-lane-running', 'fresh-start-question-waits',

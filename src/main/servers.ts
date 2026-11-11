@@ -4133,8 +4133,8 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   // An agent's plain number is refused, naming the card's key (S48), as for the intents.
   if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
   try {
-    const { card, id } = await askAssistant(ws, ref.n, actor, text)
-    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
+    const { card, id, waiting } = await askAssistant(ws, ref.n, actor, text)
+    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id, ...(waiting ? { waiting: true } : {}) }
   } catch (e) {
     if (e instanceof AskRefused) throw httpFrom(e.status, e)
     throw e
