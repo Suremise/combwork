@@ -162,6 +162,9 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
   const keep = new Set(current ? [current.record.attempt, ...(current.record.updated ? [current.record.updated.attempt] : [])] : [])
   for (const e of live) {
     if (keep.has(e.record.attempt) || e.failure || (e.record.outcome !== 'candidate' && e.record.outcome !== 'updated')) continue
+    // A candidate the target's head already reaches is the user's integration, not superseded (HI-2950: a run that read
+    // the target just before the user moved it onto the candidate): left as it is, for the proof that credits it.
+    if (e.record.result && (await reaches(deps.j4.git, e.record.result, head))) continue
     if (e.record.result) await deps.park?.(e.record.result, e.record.expected)
     const d = await dropJjAttempt(cleanUp, e.record, e.fp.target)
     if (isInterrupted(d)) return { unknown: `drop:${d.interrupted.why}` }
@@ -196,6 +199,13 @@ async function failure(deps: JjCandidateStepDeps, fp: JjCandidateFingerprint, re
 }
 
 const changeOf = (e: JjAttemptEntry): string | null => e.change ?? null
+
+/** Whether `a` is an ancestor of (or is) `b` in the Git store (exit 0); anything else, a read that fails included, is no. */
+async function reaches(git: JjCandidateDeps['git'], a: string, b: string): Promise<boolean> {
+  if (a === b) return true
+  const r = await git(['merge-base', '--is-ancestor', a, b]).catch(() => null)
+  return !!r && r.ok
+}
 
 function offerOf(e: JjAttemptEntry, head: string): JjCandidateOffer {
   return { attempt: e.record.attempt, result: e.record.result!, change: changeOf(e)!, target: e.fp.target, expected: head, style: e.fp.style, ...(e.record.updated ? { updated: e.record.updated.result } : {}) }

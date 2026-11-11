@@ -1040,7 +1040,7 @@ export class JjPlatform implements PlatformAdapter {
         const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false, ...(d.candidateHook ? { hook: d.candidateHook } : {}) }
         const keyOf = card?.key ?? x.cardKey
         const park = d.candidateChecks?.parkCopies
-        const out = await cleanCycle({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, ...(park ? { park } : {}), log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) })
+        const out = await cleanCycle({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, ...(park ? { park } : {}), log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) }) // i18n-ignore: a log line, English
         if (out.unresolved) unresolved = true
         // Its checks journals: each deleted only once its lease is freed (its tree can't still write; HR1's gap 2).
         const checks = rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ?').all(`jj_candidate_checks:${project}:${x.cardKey}:${x.cycle}:`, `jj_candidate_checks:${project}:${x.cardKey}:${x.cycle}:\uffff`) as { key: string; value: string }[]) // i18n-ignore: SQL
@@ -1068,7 +1068,7 @@ export class JjPlatform implements PlatformAdapter {
         else await clean()
       } catch (e) {
         unresolved = true
-        checksLog.warn(`cleaning up #${userText(x.cardKey)}'s ended cycle ${x.cycle}`, e)
+        checksLog.warn(`cleaning up #${userText(x.cardKey)}'s ended cycle ${x.cycle}`, e) // i18n-ignore: a log line, English
       }
       await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, x.key)) // i18n-ignore: SQL
     }

@@ -18,7 +18,7 @@ import { jjIntegratedOf } from '../src/main/platform/jjFacts'
 import { attemptsKey, readAttempts, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
 import type { SqlDb } from '../src/main/platform/jjObligations'
 import { waitingOf } from '../src/main/jjWindow'
-import { candidateKey, type JjCandidateShown } from '../src/main/workflow/reconcile'
+import { candidateFingerprint, candidateKey, type JjCandidateShown } from '../src/main/workflow/reconcile'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import type { WorkflowOptions } from '../src/shared/workflow/options'
 import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
@@ -169,6 +169,28 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   })
 
   describe('ended cycles: the rest (colocated, HI-2950)', () => {
+    it("a step run just after the user moved the target onto the candidate (it read the target before): the candidate left for the proof, credited via it", async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', c.result)
+      // The racing run's step (its proof made before the move): the head now the candidate, which it must not supersede.
+      const k = w.wf.store.card(card.id)
+      const s = w.wf.state(k)
+      const fp = candidateFingerprint(w.wf, k, s)!
+      expect(fp).not.toBeNull()
+      await (jjp as unknown as { candidateStep: (c: unknown, s: unknown, fp: unknown, still: () => boolean) => Promise<unknown> }).candidateStep(k, s, fp, () => true)
+      const e = entries(w, card, cycle).find((x) => x.record.attempt === c.attempt)!
+      expect(e.state).toBeUndefined()
+      expect(e.record.phase).toBe('done')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const f = w.store.facts(card.id).find((x) => x.kind === 'Integrated')!
+      expect(jjIntegratedOf((f.data as { platform?: unknown }).platform)).toMatchObject({ via: 'candidate' })
+    })
+
     it('put back with no restart: dropped; Integrated by the candidate then Done: the reached candidate kept', async () => {
       const w = await world(true, { candidates: true })
       const { card } = await approved(w)
