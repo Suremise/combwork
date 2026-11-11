@@ -87,6 +87,8 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     await lib.waitForProvider(inv)
     const opts = await inv('workflow:setOptions', shop, { preset: null, options: { review: 'you', noSelfReview: false, folder: 'slots', finish: 'userIntegrates', target: 'main' } })
     check('shop: you review, cards in slots, you integrate into main', !!opts && !opts.error, JSON.stringify(opts))
+    // The project shown, so its agent's terminal is laid out at the window's size (Claude Code's menus redraw for it).
+    await page.getByText('shop', { exact: true }).first().click()
     b1 = await lib.addAgent(inv, shop, { name: 'B1', workflowRole: 'builder', model: 'haiku', permissionMode: 'bypassPermissions' })
     const key = lib.ptyKey(shop, b1.id)
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === shop.toLowerCase() && s.agentId === b1.id)
@@ -108,12 +110,11 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     const slot = path.basename(w1.folder)
     const marker = path.join(w1.folder, 'jj-ran.txt')
     await lib.cliStep('B1 runs jj in its slot', { session: key }, async () => {
-      // The slot's trust question, answered once it shows (the session starts with the card, after the slot is made).
+      // The slot's trust question, answered once, when it shows (the session starts with the card, after the slot is made):
+      // answering again would press Down again and could move the choice back to No.
       const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-1500)
-      const trusted = await until(async () => {
-        if (/trust this folder/i.test(await screen())) await lib.acceptClaudeTrust(inv, shop, b1.id, 15000)
-        return lib.combworkToolsConnected(userData, b1.id, launchMark) && !/trust this folder/i.test(await screen())
-      }, 90000)
+      if (await until(async () => /trust this folder/i.test(await screen()) || lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)) await lib.acceptClaudeTrust(inv, shop, b1.id, 30000)
+      const trusted = await until(() => lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)
       check('Claude Code starts in the slot, its Combwork tools connected', !!trusted, await screen())
       check('B1 ran jj there, as its card asks (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), 180000)), await screen())
       check('…and its turn ended', !!(await until(async () => ['ready', 'finished'].includes((await live())?.status), 120000)), JSON.stringify(await live()))
