@@ -6196,7 +6196,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 2. **Test on the remote's head** (`onto`): strict's update, the test merge, the merge checks (`CW_CHECK_BASE`) and "already
    in the target" use it; the local head stays the advance's `expected`. A card found in that head (published by someone
    else) is recorded from it (`Integrated` by outside, the blocker rule applying), never from the local target, and the
-   local catch-up is owed.
+   local catch-up is owed. Ask each time on a checked-out target asks after the test (OP-40); its Approve publishes the
+   test merge asked about, on the remote head and snapshot it was tested on, which this Combwork keeps by project and
+   entry across its queue runs (HI-2986: the host makes a queue per run, and a run ends at the ask) until the entry's
+   snapshot goes, at most 256; after a restart, or one dropped, it is tested, and asked about, again.
 3. **Publish** (the advance): the result proved to contain `onto` (else nothing is published), the snapshot kept,
    `IntegrationStarted` with its record, then two journal phases:
    - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
