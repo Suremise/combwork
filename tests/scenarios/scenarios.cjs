@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 133
+const FIXTURES_VERSION = 134
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -378,6 +378,16 @@ const AB_TASK =
 const AB_FAKE_WORK =
   `shell: node -e "require('fs').writeFileSync('csv.js', 'module.exports.parseLine = (l) => l.split(String.fromCharCode(44))' + String.fromCharCode(10))" then ` +
   `shell: node -e "const t = []; for (let i = 0; i < 8; i++) t.push('test(' + JSON.stringify('case ' + i) + ', () => {})'); require('fs').writeFileSync('csv.test.js', 'const test = require(' + JSON.stringify('node:test') + ')' + String.fromCharCode(10) + t.join(String.fromCharCode(10)) + String.fromCharCode(10))"`
+/**
+ * alpha with no version control, as tokentest: Combwork's platform switched to None (as Version Control's switch does,
+ * checked first), then its .git removed, so the agent has nothing to commit either.
+ */
+async function abNoVcs(c) {
+  const check = await c.inv('workflow:checkPlatform', c.alpha, 'none')
+  if (check?.refused) throw new Error(`setup: the switch to None is refused: ${JSON.stringify(check.refused)}`)
+  await c.inv('workflow:setPlatform', c.alpha, 'none', { expected: 'git', token: check?.store?.token })
+  require('fs').rmSync(require('path').join(c.alpha, '.git'), { recursive: true, force: true })
+}
 /** node --test in alpha: its output's pass and fail counts. */
 const abTests = (c) => {
   const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
@@ -4305,14 +4315,14 @@ module.exports.SCENARIOS = [
       ]
     }
   },
-  // HI-2854's A/B: the same small task done plainly (an Independent agent, no Combwork tools, typed as from a terminal) and
-  // as a Solo card Combwork starts (its start task carrying the whole card), for their requests and cost side by side
-  // (summary.md's Combwork's cost column). Alpha is a Git project, so the card commits where tokentest (no version
-  // control) only accepted: one step more than the card's own measurement had.
+  // HI-2854's A/B, as the card measured it in its tokentest project: no version control, no review, accept to finish (Solo
+  // under None). The same small task done plainly (an Independent agent, no Combwork tools, typed as from a terminal) and
+  // as a Solo card Combwork starts (its start task carrying the whole card), for their requests and cost side by side.
   {
     id: 'solo-ab-plain',
     title: "HI-2854's A: a small task typed into an Independent agent (no Combwork tools, skills or guidance), as from a terminal: the parser and its tests, green",
     async setup(c) {
+      await abNoVcs(c)
       await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'independent' })
     },
     prompt: AB_TASK,
@@ -4324,20 +4334,19 @@ module.exports.SCENARIOS = [
     title: "HI-2854's B: the same task as a Solo card Combwork starts on the agent: its start task carries the whole card and says it is the agent's, so it neither reads nor starts it, and its submit acks the task",
     startedByCombwork: true,
     async setup(c) {
-      c.git('config', 'user.email', 'agent@example.com')
-      c.git('config', 'user.name', 'Agent')
-      await setWorkflow(c, SOLO, 'solo')
+      await abNoVcs(c)
+      await setWorkflow(c, { finish: 'accept', folder: 'project', dependenciesDone: true }, 'solo')
       const n = await c.card('s', { title: 'CSV line parser', description: AB_TASK })
       const r = await c.inv('tasks:start', n, { kind: 'agent', agentId: c.agents.coder.id }, { confirm: true })
       if (!r?.agentId) throw new Error(`setup: the card didn't start: ${JSON.stringify(r)}`)
     },
     prompt: (c) => `Work on task #${c.cards.s}.`,
-    fake: (c) => `cw cw_inbox {} then ${AB_FAKE_WORK} then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "CSV line parser" then cw cw_submit {"card":"#${c.cards.s}","summary":"csv.js parses a CSV line; 8 tests pass."}`,
+    fake: (c) => `cw cw_inbox {} then ${AB_FAKE_WORK} then cw cw_submit {"card":"#${c.cards.s}","summary":"csv.js parses a CSV line; 8 tests pass.","paths":["csv.js","csv.test.js"]}`,
     expect: (o, c) => {
       const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['the parser and its 8 tests, passing (node --test)', abGreen(c), JSON.stringify(abTests(c))],
-        ['the card is Done (Solo: committed is done)', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
+        ['the card is Done (Solo under None: accepted is done)', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
         ['read nothing of the card again: its task had it whole (no cw_read_task)', !ran(o, 'cw_read_task').length, calls],
         ["didn't start it again: its task said it was its own (no cw_start_card)", !ran(o, 'cw_start_card').length, calls]
       ]

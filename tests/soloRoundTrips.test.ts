@@ -63,6 +63,37 @@ describe('a start task with the whole card (HI-2854)', () => {
   })
 })
 
+describe("a refused submit's unseen items, from one snapshot (HI-2854, HR2's round 1)", async () => {
+  const { unseenIn } = await import('../src/main/cardFreshness')
+  const f = (kind: string, data: unknown): Fact => ({ seq: 0, at: '2026-11-11T10:00:00Z', card: 7, kind, actor: agentActor('a1'), source: 'recorded', data }) as unknown as Fact
+  const decided = { id: 'd1', at: '2026-11-11T10:05:00Z', recordedBy: 'You' }
+
+  it("a decision changed since: the words of its newest fact, at that fact's generation, whatever the card says", () => {
+    const facts = [f('Decision', { decision: 'd1', generation: 1, text: 'Old words' }), f('Decision', { decision: 'd1', generation: 2, text: 'New words' })]
+    const u = unseenIn({ card: { decisions: [decided], comments: [] }, facts, archived: [] }, 'a1')
+    expect(u).toEqual({ lines: [expect.stringMatching(/: New words$/)], generation: 2, comments: 0 })
+    // Read before its change: the card's newer text is never shown at the older generation.
+    const older = unseenIn({ card: { decisions: [decided], comments: [] }, facts: facts.slice(0, 1), archived: [] }, 'a1')
+    expect(older).toEqual({ lines: [expect.stringMatching(/: Old words$/)], generation: 1, comments: 0 })
+  })
+
+  it("a comment of the user's archived since: given from the archive; one found nowhere stops the receipt before it, and says where to read it", () => {
+    const facts = [f('UserComment', { comment: 'c1', generation: 1 }), f('UserComment', { comment: 'c2', generation: 2 }), f('UserComment', { comment: 'c3', generation: 3 })]
+    const c = (id: string, text: string) => ({ id, text, by: 'You', at: '2026-11-11T10:10:00Z' })
+    const all = unseenIn({ card: { comments: [c('c3', 'Third')] }, facts, archived: [c('c1', 'First'), c('c2', 'Second')] }, 'a1')
+    expect(all.lines.map((l) => l.replace(/^.*: /, ''))).toEqual(['First', 'Second', 'Third'])
+    expect(all.comments).toBe(3)
+    const lost = unseenIn({ card: { comments: [c('c3', 'Third')] }, facts, archived: [c('c1', 'First')] }, 'a1')
+    expect(lost.comments).toBe(1)
+    expect(lost.lines).toEqual([expect.stringMatching(/First$/), expect.stringMatching(/in the card's archive/)])
+  })
+
+  it('a comment or decision with no fact in the snapshot (written after it) is neither listed nor received', () => {
+    const u = unseenIn({ card: { decisions: [decided], comments: [{ id: 'c9', text: 'Later', by: 'You', at: '2026-11-11T11:00:00Z' }] }, facts: [], archived: [] }, 'a1')
+    expect(u).toEqual({ lines: [], generation: 0, comments: 0 })
+  })
+})
+
 let seq = 0
 const fact = (kind: string, data: unknown): Fact => ({ seq: ++seq, at: '2026-11-11T10:00:00Z', card: 7, kind, actor: agentActor('a1'), source: 'recorded', data }) as unknown as Fact
 

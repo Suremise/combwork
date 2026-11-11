@@ -22,12 +22,12 @@ import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { actorOf, changeByRuntime, commentGenerations, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { actorOf, cardFacts, changeByRuntime, commentGenerations, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import { loopReviewerOf } from './loopReviewer'
 import { readStep } from './platform/historyPorts'
-import type { CardKind } from '../shared/workflow/facts'
+import type { CardKind, Fact } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
@@ -570,6 +570,26 @@ export async function cardSnapshot(ws: WorkspaceService, n: number): Promise<{ c
   // Comments it archived, or may have lost before archiving existed: either way, not all of them are on the card.
   const a = commentArchiveOf(ws, n)
   return { card, generation, comments, archived: a.archived + (a.mayHaveBeenLost ? 1 : 0), at: Date.now() }
+}
+
+/** How many of a card's newest archived comments cardWithFacts reads (HI-2641 archives past the 500 a card keeps). */
+const UNSEEN_ARCHIVE_MAX = 500
+
+/**
+ * A card, its facts and its newest archived comments, all read in one snapshot (HI-2854, HR2's round 1): what a refused
+ * submit gives an agent of its unseen decisions and comments, and the receipt of exactly those, come from the same
+ * board state, so nothing written between two reads is counted as given. Null when it isn't there.
+ */
+export async function cardWithFacts(ws: WorkspaceService, n: number): Promise<{ card: TaskCard; facts: Fact[]; archived: TaskComment[] } | null> {
+  if (!Number.isInteger(n) || n < 1 || !ws.path) return null
+  const ids = await ws.projectIds()
+  if (!ws.path) return null
+  const got = boardRead(ws, () => {
+    const total = commentArchiveOf(ws, n).archived
+    return { raw: cardDoc(ws, n), key: cardKeys(ws, [n]).get(n), facts: cardFacts(ws, n), archived: total ? (archivedComments(ws, n, Math.max(0, total - UNSEEN_ARCHIVE_MAX), UNSEEN_ARCHIVE_MAX).comments as TaskComment[]) : [] }
+  })
+  if (!got.raw) return null
+  return { card: withoutGone(clean(got.raw, n, ids, got.key), (x) => hasCard(ws, x)), facts: got.facts, archived: got.archived }
 }
 
 export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number }> {

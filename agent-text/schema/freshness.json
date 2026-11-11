@@ -1,4 +1,7 @@
 {
+  "freshness.unread.archived": {
+    "placeholders": {}
+  },
   "freshness.unread.comment": {
     "placeholders": {
       "date": "plain",

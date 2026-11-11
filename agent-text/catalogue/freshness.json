@@ -1,4 +1,8 @@
 {
+  "freshness.unread.archived": {
+    "text": "More comments of the user's are in the card's archive: read them (cw_read_task with archived), then the card in full.",
+    "note": "HI-2854: a refused submit's last line when a comment of the user's it hasn't seen was archived past what the refusal reads (HI-2641's archive), so it couldn't be given."
+  },
   "freshness.unread.comment": {
     "text": "Comment from the user ({date}): {text}",
     "note": "HI-2854: a refused submit's unseen comment the user wrote, on a line of its own below the refusal. date: YYYY-MM-DD; text: the comment in full."

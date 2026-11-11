@@ -3977,9 +3977,8 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
     const { done: ran, card } = await runCardIntent(ref, actor, intent).catch(async (e: unknown) => {
       // HI-2854: a submit refused for what its builder hasn't seen gives it those, in full, received with the refusal.
       if (self && intent.kind === 'submit' && e instanceof tasks.WorkflowRefusedError && e.refusal.rule === 'submit.decisionsReceived') {
-        const ws = requireWorkspace()
-        const now = await tasks.readTask(ref.n, actor).catch(() => null)
-        const unread = now ? await giveUnseen(ws, self.agentId, now).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [])) : []
+        // The card, its facts and archive in one snapshot (HR2's round 1): its own project's card, which the intent already read.
+        const unread = await giveUnseen(requireWorkspace(), self.agentId, ref.n).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [] as string[]))
         // Given in full: the reply flag's baseline moves too, so its next reply doesn't flag them again.
         const me = agentCaller()
         if (unread.length && me) noteCardRead(me, ref.n)

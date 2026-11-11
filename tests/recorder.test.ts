@@ -198,14 +198,13 @@ describe('recording facts from the board’s moves (#1216)', () => {
     await inWorkspace(w, () => tasks.editDecision(card, gone.id, null, user))
     await inWorkspace(w, () => tasks.commentTask(card, 'Keep the JSON identical.', user))
     await inWorkspace(w, () => tasks.commentTask(card, 'Round 1 ready.', builder))
-    const now = await inWorkspace(w, () => tasks.getTask(card))
-    const lines = await giveUnseen(w, 'a1', now)
+    const lines = await giveUnseen(w, 'a1', card)
     expect(lines).toEqual([expect.stringMatching(/^Decision \(\d{4}-\d\d-\d\d, recorded by Assistant\): Use SQLite$/), expect.stringMatching(/^Comment from the user \(\d{4}-\d\d-\d\d\): Keep the JSON identical\.$/)])
     expect(foldCard(factsOf(w, card))).toMatchObject({ received: { a1: 3 }, receivedComments: { a1: 1 } })
     // Received: nothing more to give, until the user writes again.
-    expect(await giveUnseen(w, 'a1', now)).toEqual([])
+    expect(await giveUnseen(w, 'a1', card)).toEqual([])
     await inWorkspace(w, () => tasks.commentTask(card, 'One more.', user))
-    expect(await giveUnseen(w, 'a1', await inWorkspace(w, () => tasks.getTask(card)))).toEqual([expect.stringMatching(/One more\.$/)])
+    expect(await giveUnseen(w, 'a1', card)).toEqual([expect.stringMatching(/One more\.$/)])
   })
 
   it("HI-2854: a full read receives the user's comments as far as it saw them, never back, and never one written after it", async () => {
