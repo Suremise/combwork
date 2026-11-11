@@ -26,13 +26,13 @@ describe('the export matrix (s14 §1′)', () => {
     expect(exportProblem(true, A, A, null)).not.toBeNull()
     expect(exportProblem(true, A, null, A)).not.toBeNull()
   })
-  it('not colocated: no row and no ref agree (a fresh store); a row needs the ref; a ref alone must equal T', () => {
+  it('not colocated (HI-2896): the local bookmark alone; a past export (row and ref, stale or not) never disagrees', () => {
     expect(exportProblem(false, A, null, null)).toBeNull()
     expect(exportProblem(false, A, null, A)).toBeNull()
-    expect(exportProblem(false, A, null, B)).not.toBeNull()
+    expect(exportProblem(false, A, null, B)).toBeNull()
     expect(exportProblem(false, A, A, A)).toBeNull()
-    expect(exportProblem(false, A, A, null)).not.toBeNull()
-    expect(exportProblem(false, A, B, B)).not.toBeNull()
+    expect(exportProblem(false, A, A, null)).toBeNull()
+    expect(exportProblem(false, A, B, B)).toBeNull()
   })
 })
 

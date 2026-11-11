@@ -954,7 +954,7 @@ async function jjCardProject(c, { builder = 'coder', reviewer = 'implementer' } 
   // The test git config converts line endings (core.autocrlf), which jj doesn't: off in this repository, as a jj user's is.
   c.git('config', 'core.autocrlf', 'false')
   c.target = c.git('branch', '--show-current').trim()
-  jjIn(c, 'git', 'init', '--colocate')
+  jjInit(c)
   const check = await c.inv('workflow:checkPlatform', c.alpha, 'jj')
   const used = (check?.store?.gates ?? []).filter((g) => !g.clear)
   if (used.length || check?.refused) throw new Error(`setup: the switch to jj is refused: ${JSON.stringify({ refused: check?.refused, gates: used })}`)
@@ -962,6 +962,26 @@ async function jjCardProject(c, { builder = 'coder', reviewer = 'implementer' } 
   await setWorkflow(c, { ...JJ_PAIR, target: c.target }, 'pair')
   await c.inv('agents:update', c.alpha, c.agents[builder].id, { workflowRole: 'builder' })
   await c.inv('agents:update', c.alpha, c.agents[reviewer].id, { workflowRole: 'reviewer' })
+}
+/**
+ * alpha's repository made a jj one: colocated (`jj git init --colocate`, its Git history jj's), or, for a scenario's
+ * non-colocated variant (`c.separate`, HI-2896), its `.git` removed and a jj repository made with Git's data inside `.jj`:
+ * `.combwork` kept out first in its store's info/exclude (as Combwork's keep-out does; `jj git init` records nothing),
+ * the files committed as `base`, and the target bookmark (the branch's name) set on it.
+ */
+function jjInit(c) {
+  if (!c.separate) return void jjIn(c, 'git', 'init', '--colocate')
+  const fs = require('fs')
+  const path = require('path')
+  const target = c.target ?? c.git('branch', '--show-current').trim()
+  fs.rmSync(path.join(c.alpha, '.git'), { recursive: true, force: true })
+  jjIn(c, 'git', 'init', '--no-colocate')
+  const info = path.join(c.alpha, '.jj', 'repo', 'store', 'git', 'info')
+  fs.mkdirSync(info, { recursive: true })
+  fs.appendFileSync(path.join(info, 'exclude'), '/.combwork/\n')
+  jjIn(c, 'commit', '-m', 'base')
+  jjIn(c, 'bookmark', 'create', target, '-r', '@-')
+  if (fs.existsSync(path.join(c.alpha, '.git'))) throw new Error('setup: the non-colocated repository has a .git')
 }
 /** Card `key`'s latest submission's jj record (Submitted.platform: `jj` its ids and chain, `jjSlot` the slot it came from), or null. */
 const jjSubmitted = (o, key) => {
@@ -2266,7 +2286,7 @@ module.exports.SCENARIOS = [
       // The project's repository made a colocated jj one, then the project switched to jj through Combwork, as the window does.
       // The test git config converts line endings (core.autocrlf), which jj doesn't: off in this repository, as a jj user's is.
       c.git('config', 'core.autocrlf', 'false')
-      jjIn(c, 'git', 'init', '--colocate')
+      jjInit(c)
       const check = await c.inv('workflow:checkPlatform', c.alpha, 'jj')
       const used = (check?.store?.gates ?? []).filter((g) => !g.clear)
       if (used.length || check?.refused) throw new Error(`setup: the switch to jj is refused: ${JSON.stringify({ refused: check?.refused, gates: used })}`)
@@ -2284,7 +2304,7 @@ module.exports.SCENARIOS = [
       const fixed = made.filter((l) => l.split(' ').slice(1).join(' ').trim() && /a \+ b/.test(jjIn(c, '--ignore-working-copy', 'file', 'show', '-r', l.split(' ')[0], 'math.js', { allowFail: true })))
       const bad = heads === 1 ? jjIn(c, '--ignore-working-copy', 'log', '--no-graph', '-r', 'conflicts() | divergent()', '-T', 'commit_id ++ "\\n"').trim() : 'several heads'
       return [
-        ['its launch carried the jj rule (HI-2800)', (o.measures?.customChars ?? 0) >= platformRule('jj').length, String(o.measures?.customChars)],
+        ['its launch carried the jj rule (HI-2800)', (o.measures?.customChars ?? 0) >= platformRule(c.separate ? 'jj-separate' : 'jj').length, String(o.measures?.customChars)],
         ['recorded the fix in a described jj commit', fixed.length > 0, made.join(' | ')],
         ['ran no git command that changes HEAD, the index, a branch or a ref', mutations.length === 0, mutations.join(' | ')],
         ['ran no jj git init', inits.length === 0, inits.map((t) => t.input).join(' | ')],
@@ -2424,10 +2444,26 @@ module.exports.SCENARIOS = [
       c.column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
       if (c.column !== 'passed') throw new Error(`setup: the passed jj card is in ${c.column}, not Passed (waiting for the user to integrate)`)
       c.bookmarks = jjBookmarks(c)
+      c.bookmarksBefore = c.bookmarks
     },
     prompt: (c) => `[CW] #${c.cards.p} passed review (Implementer). Carry on with it as your skills say.`,
     fake: (c) => `skill work-on-card then cw cw_read_task {"number":${c.cards.p}} then say #${c.cards.p} passed review. Nothing for me to merge: it waits in Approved for you to integrate it, its work kept in its slot.`,
     observe: (o) => [['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')]],
+    // The user integrates, after the run (HI-2896's done-when, both modes): the target bookmark set on the reviewed commit
+    // with jj, as the user would; Combwork records Integrated and moves the card to Done (J9b2's reconcile, its observer).
+    // The bookmarks as the agent left them are read first (the safety check's), then this move is the expected one.
+    async after(c) {
+      const left = jjBookmarks(c)
+      jjIn(c, 'bookmark', 'set', c.target, '-r', c.sub.revision)
+      c.bookmarks = jjBookmarks(c)
+      let card = null
+      for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {
+        card = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body
+        if (card?.column === 'done') break
+      }
+      const integrated = ((await c.inv('tasks:facts', c.cards.p)) ?? []).filter((f) => f.kind === 'Integrated').map((f) => f.data)
+      return { leftBookmarks: left, column: card?.column ?? null, integrated }
+    },
     expect: (o, c) => {
       const n = c.cards.p
       const ownMoves = movesOf(o, n).filter((x) => x.ok)
@@ -2439,7 +2475,9 @@ module.exports.SCENARIOS = [
         ['ran no merge, rebase or squash to integrate it', merges.length === 0, merges.map((t) => t.input.slice(0, 120)).join(' | ')],
         ...jjSafetyChecks(o, c),
         ["kept the reviewed work in its slot: the working copy empty on the submitted commit", empty === 'true' && parents.length === 1 && parents[0] === c.sub.revision, JSON.stringify({ empty, parents, revision: c.sub.revision })],
-        ['said the card waits for the user to integrate it', /integrat/i.test(said), said.slice(0, 300)]
+        ['said the card waits for the user to integrate it', /integrat/i.test(said), said.slice(0, 300)],
+        ["left the project's bookmarks as they were (read before the user's integration)", o.after?.leftBookmarks !== undefined && o.after.leftBookmarks === c.bookmarksBefore, String(o.after?.leftBookmarks)],
+        ["once the user set the target on the reviewed commit, Combwork recorded it Integrated (by the user) and the card went Done", o.after?.column === 'done' && (o.after?.integrated ?? []).length === 1, JSON.stringify(o.after ?? null).slice(0, 400)]
       ]
     }
   },
@@ -4830,6 +4868,22 @@ const launchedIn = (c, name) => {
   }
   const rollout = find(require('path').join(c.session.codexHome, 'sessions'), 0)
   return !!rollout && fs.readFileSync(rollout, 'utf8').split('\n').some((l) => /"role":"developer"/.test(l) && l.includes(`# Your mode: ${name}`))
+}
+// jj's scenarios on a repository not colocated with Git (HI-2896, J9f; HR2's non-colocated review fixture from HI-2870):
+// the same scenario, its project's repository made non-colocated (`c.separate`, jjInit), and no Git status read after
+// (there is no `.git`). Their checks are the colocated ones'.
+for (const id of ['jj-plain-git', 'jj-card-submit', 'jj-card-review', 'jj-card-passed']) {
+  const sc = module.exports.SCENARIOS.find((x) => x.id === id)
+  module.exports.SCENARIOS.push({
+    ...sc,
+    id: `${id}-nc`,
+    title: `${sc.title.replace(' (colocated with Git)', '')}; its repository not colocated with Git (HI-2896)`,
+    separate: true,
+    async setup(c) {
+      c.separate = true
+      return sc.setup(c)
+    }
+  })
 }
 // A bulk move (#417): a whole column in one call, not a call per card (cw_update_tasks).
 module.exports.SCENARIOS.push({

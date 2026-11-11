@@ -2312,8 +2312,8 @@
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
   },
   "tips.versionControlJj.text": {
-    "defaultMessage": "In a jj repository colocated with Git, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
-    "description": "A tip (HI-2799). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and Git."
+    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
+    "description": "A tip (HI-2799, HI-2896: colocated with Git or not). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
   },
   "tips.versionControlJj.title": {
     "defaultMessage": "See a jj repository",

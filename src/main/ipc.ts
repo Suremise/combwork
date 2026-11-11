@@ -150,7 +150,7 @@ import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './pl
 import { jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
 import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
@@ -1053,7 +1053,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
-    'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
+    // Never asked of Git in a non-colocated jj project (HI-2896): git there finds no repository, or one above it.
+    'slots:gitFiles': async (p) => {
+      const at = workspace.assertProject(p)
+      return (await gitCantRead(at)) ? null : ((await slotWorkspaces().files?.status(at)) ?? null)
+    },
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
     'github:set': async (p, change) => {

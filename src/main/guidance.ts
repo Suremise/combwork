@@ -30,6 +30,7 @@ function guidanceHash(): string {
       combworkInstructions('{project}', 'agent', false),
       combworkInstructions('', 'assistant'),
       platformRule('jj'),
+      platformRule('jj-separate'),
       controlRules('look'),
       controlRules('agents'),
       controlRules('projects'),

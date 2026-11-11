@@ -77,6 +77,11 @@ const A = {
     text: "This project uses jj (Jujutsu) with Git beside it. Record your work with jj (`jj describe`, `jj commit`, `jj new`). Don't run git commands that change HEAD, the index, branches or refs (commit, add, reset, restore --staged, rebase, merge, cherry-pick, checkout, switch, stash, branch, tag, update-ref, worktree, pull), nor `jj git init`: `git status` and `git log` may show changes jj has already recorded. The user integrates finished work: nothing you do moves a bookmark or pushes.",
     note: "HI-2800 (J7): only in a jj project's sessions (platformRule). HI-2781 probed plain git in a jj workspace: jj imports a git commit on detached HEAD, but reset, rebase, merge and the index aren't validated, and git status can look dirty after jj snapshotted. Decision A (HI-2794): the user integrates, and Combwork moves no bookmark. HI-2870 (J9d): its last sentence says that rather than 'no card starts', which J9e makes untrue; agents never move a bookmark or push (Combwork's own slot operations aren't theirs)."
   }),
+  jjSeparate: agentMsg({
+    id: 'contract.agent.jjSeparate',
+    text: "This project uses jj (Jujutsu) with no Git working copy: Git's data is inside .jj, so git commands don't work here, and one could reach another repository above this folder. Use jj for everything: record your work with `jj describe`, `jj commit` and `jj new`, and read history with `jj log` and `jj diff --from <base> --to <revision>`. Don't run `jj git init` or `jj git colocation`. The user integrates finished work: nothing you do moves a bookmark or pushes.",
+    note: "HI-2896 (J9f): contract.agent.jj's variant for a jj repository not colocated with Git (platformRule's 'jj-separate'): there is no .git in the folder, so git commands fail or reach a Git repository above it, and a colocation change moves the store under Combwork's slots. Decision A (HI-2794): the user integrates, and Combwork moves no bookmark."
+  }),
   scratch: agentMsg({
     id: 'contract.agent.scratch',
     text: "Put scratch, probes and logs in a temp folder (as the project's notes say, or your scratchpad), never in or beside a project or worktree, nor in its .codex, .claude or .agents (a stray .codex stops Codex's commands).",
@@ -301,10 +306,18 @@ export function journalRule(scope: readonly string[]): string {
  * (like the latest handover's pointer, it is the project's part of what a launch tells a session): in the project
  * folder (the user's own jj workspace) and in a card's slot (HI-2870, J9d), a plain git command that moves HEAD, the
  * index or a branch confuses jj (HI-2781's probes). Under decision A (HI-2794) the user integrates. How a jj card's work
- * is committed, submitted and reviewed is the bundled skills' (work-on-card, card-loop, review-agent-work).
+ * is committed, submitted and reviewed is the bundled skills' (work-on-card, card-loop, review-agent-work). A jj
+ * repository with no Git working copy (HI-2896) gets its own variant (`jj-separate`: platformRuleKey).
  * Empty for every other platform.
  */
-export const platformRule = (platform: string | null | undefined): string => (platform === 'jj' ? say(A.jj) : '')
+export const platformRule = (platform: string | null | undefined): string => (platform === 'jj' ? say(A.jj) : platform === 'jj-separate' ? say(A.jjSeparate) : '')
+
+/**
+ * The key platformRule takes for a project (HI-2896): its platform, and for jj whether its repository has a Git working
+ * copy beside it (`jj`, colocated) or none (`jj-separate`), from what detection found in its folder.
+ */
+export const platformRuleKey = (platform: string | null | undefined, detected?: { jj?: { colocated: boolean } } | null): string | null =>
+  platform === 'jj' && detected?.jj && !detected.jj.colocated ? 'jj-separate' : (platform ?? null)
 
 /** The instructions with the project's version control rule after them, when it has one (platformRule). */
 export function withPlatformRule(instructions: string, platform: string | null | undefined): string {

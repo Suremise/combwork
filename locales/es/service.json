@@ -330,6 +330,6 @@
   "service.workspace.stillClosing": "{name} todavía se está cerrando: espera a que termine y vuelve a intentarlo.",
   "service.workspace.stillOpening": "{name} todavía se está abriendo: espera a que termine y vuelve a intentarlo.",
   "service.workspace.twoCalled": "Hay dos agentes llamados {name}",
-  "service.workspace.platformJjFound": "{project} es un repositorio jj colocalizado con Git. Combwork sigue con su control de versiones actual hasta que lo cambies a jj en su pestaña Control de versiones.",
+  "service.workspace.platformJjFound": "{project} es un repositorio jj. Combwork sigue con su control de versiones actual hasta que lo cambies a jj en su pestaña Control de versiones.",
   "service.workspace.platformJjGone": "El repositorio jj de {project} ya no está. Cámbialo a Git o a Ninguno en su pestaña Control de versiones."
 }

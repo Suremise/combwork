@@ -158,8 +158,11 @@ export interface Detection {
   platform: PlatformId
   /** The repository's root: Git's, or the jj workspace's. */
   root?: string
-  /** jj's (HI-2799), read from its files as hints (J0's detection confirms them before a switch). */
-  jj?: { colocated: boolean }
+  /**
+   * jj's (HI-2799), read from its files as hints (J0's detection confirms them before a switch). `inGit` (HI-2896): a
+   * non-colocated repository inside a Git working tree, that tree's root (a git command in the project would reach it).
+   */
+  jj?: { colocated: boolean; inGit?: string }
   /** Another system found (Mercurial, Subversion…): not supported, so None. */
   other?: string
   /** The project is a subfolder of a larger repository: its actions affect that whole repository. */

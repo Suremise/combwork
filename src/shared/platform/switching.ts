@@ -2,7 +2,7 @@
 // its reasons, the same in the window (the choice atop the Version Control tab) and in main (the switch, under the
 // project's lock, and the Assistant's settings tool). Choosing None is never refused for what is detected (#1122: you
 // pick the version control): Git only where a Git repository is found and no other version control is; jj (HI-2799)
-// only where a jj repository colocated with Git is found. A switch between Git and jj is the repository's (every project
+// only where a jj repository is found, colocated with Git or not (HI-2896), and not inside a Git working tree. A switch between Git and jj is the repository's (every project
 // on it switches together, after a drain and, to jj, a compatibility assessment): main's checks, said here as reasons.
 
 import { msg, type Msg } from '../i18n/msg'
@@ -16,8 +16,9 @@ export const PLATFORM_NAME: Record<PlatformId, Msg> = {
 }
 
 /**
- * Why a switch can't be made now: no Git repository, another version control found; for jj (HI-2799), no jj repository,
- * one without a colocated Git repository, jj itself (missing, not the tested version, or its answer disagreeing with its
+ * Why a switch can't be made now: no Git repository, another version control found, a jj repository with no Git working
+ * copy to go back to (`jjNoGitCopy`, HI-2896); for jj (HI-2799), no jj repository, one not colocated inside a Git working
+ * tree (`jjInGit`, HI-2896), jj itself (missing, not the tested version, or its answer disagreeing with its
  * files), what the repository uses that jj doesn't support (`gates`), what keeps it from going back to Git (`fallback`),
  * work still running on the repository (`drain`), the repository also a project of another open workspace, or its
  * projects changed since the warning (`groupChanged`).
@@ -26,7 +27,8 @@ export type SwitchRefusal =
   | { why: 'noGit' }
   | { why: 'otherFound'; vcs: string }
   | { why: 'noJj' }
-  | { why: 'jjSeparate' }
+  | { why: 'jjInGit'; root: string }
+  | { why: 'jjNoGitCopy' }
   | { why: 'jjTool'; state: string }
   | { why: 'jjUnknown'; code: string }
   | { why: 'gates' }
@@ -40,8 +42,9 @@ export const SWITCH_REFUSED = {
   noGit: msg({ id: 'git.vc.switch.noGit', defaultMessage: 'No Git repository here: Initialise repository… first.', description: 'Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there.' }),
   otherFound: msg({ id: 'git.vc.switch.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Subversion) was found in its folder. None: glossary 2.1.' }),
   changed: msg({ id: 'git.vc.switch.changed', defaultMessage: 'Changed meanwhile: this project uses {platform} now. Look again before switching.', description: 'Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj.' }),
-  noJj: msg({ id: 'git.vc.switch.noJj', defaultMessage: 'No jj repository here. Combwork never makes one: create it with jj, colocated with Git.', description: 'Why a project can’t be switched to jj (Jujutsu, HI-2799): its folder has no jj repository. Keep jj and Git.' }),
-  jjSeparate: msg({ id: 'git.vc.switch.jjSeparate', defaultMessage: 'This jj repository has no colocated Git repository, which Combwork doesn’t support yet.', description: 'Why a project can’t be switched to jj (HI-2799): its jj repository keeps Git’s data inside .jj rather than beside it (not colocated). Keep jj and Git.' }),
+  noJj: msg({ id: 'git.vc.switch.noJj', defaultMessage: 'No jj repository here. Combwork never makes one: create it with jj.', description: 'Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj.' }),
+  jjInGit: msg({ id: 'git.vc.switch.jjInGit', defaultMessage: 'This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.', description: 'Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git.' }),
+  jjNoGitCopy: msg({ id: 'git.vc.switch.jjNoGitCopy', defaultMessage: 'No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.', description: 'Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is.' }),
   jjTool: msg({ id: 'git.vc.switch.jjTool', defaultMessage: '{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.', description: 'Why a project can’t be switched to jj (HI-2799): the jj tool Combwork found. Keep jj.' }),
   jjUnknown: msg({ id: 'git.vc.switch.jjUnknown', defaultMessage: 'jj couldn’t confirm this repository ({code}), so this project can’t switch.', description: 'Why a project can’t be switched to or from jj (HI-2799): jj didn’t confirm what its files say. {code} is a short code for why (kept in English). Keep jj.' }),
   gates: msg({ id: 'git.vc.switch.gates', defaultMessage: 'This repository uses what jj doesn’t support: see the list.', description: 'Why a project can’t be switched to jj (HI-2799): the compatibility check found Git features jj doesn’t support (listed in the same dialog). Keep jj.' }),
@@ -64,11 +67,13 @@ export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal |
   if (!needsRepository(to)) return null
   if (to === 'jj') {
     if (found.platform !== 'jj') return { why: 'noJj' } // i18n-ignore: a reason's key, not text
-    return found.jj?.colocated ? null : { why: 'jjSeparate' } // i18n-ignore: a reason's key, not text
+    // Not colocated inside a Git working tree (HI-2896): a git command run in the project would reach that repository.
+    return found.jj?.inGit ? { why: 'jjInGit', root: found.jj.inGit } : null // i18n-ignore: a reason's key, not text
   }
   if (found.other) return { why: 'otherFound', vcs: found.other } // i18n-ignore: a reason's key, not text
-  // A colocated jj repository has Git beside it: back to Git (main checks it is ready, `fallback`).
-  if (found.platform === 'jj') return found.jj?.colocated ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
+  // A colocated jj repository has Git beside it: back to Git (main checks it is ready, `fallback`). A non-colocated one
+  // has no Git working copy (HI-2896): the user makes it colocated first (Combwork never changes colocation), or picks None.
+  if (found.platform === 'jj') return found.jj?.colocated ? null : { why: 'jjNoGitCopy' } // i18n-ignore: a reason's key, not text
   return found.platform === to ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
 }
 
@@ -81,6 +86,8 @@ export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<s
       return { m: SWITCH_REFUSED.jjTool, values: { state: r.state } }
     case 'jjUnknown':
       return { m: SWITCH_REFUSED.jjUnknown, values: { code: r.code } }
+    case 'jjInGit':
+      return { m: SWITCH_REFUSED.jjInGit, values: { root: r.root } }
     case 'otherWorkspace':
       return { m: SWITCH_REFUSED.otherWorkspace, values: { workspace: r.workspace } }
     default:

@@ -595,7 +595,7 @@
   "tips.opencode.title": "Uruchamiaj agentów w OpenCode",
   "tips.opencodeHistory.text": "Rozmowa agenta OpenCode jest widoczna na karcie Sesje, a jego tokeny i koszt w Przeglądzie i stopce jego panelu, tak jak podaje je OpenCode. Koszt $0 nie mierzy limitu Twojego planu; limity są widoczne tylko dla OpenCode Go lub Console.",
   "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode",
-  "tips.versionControlJj.text": "W repozytorium jj współistniejącym z Gitem wybierz jj u góry zakładki Kontrola wersji: Historia pokazuje każdy identyfikator zmiany obok identyfikatora commita, a Porównanie, Zakładki i Konflikty odczytują repozytorium bez jego zmieniania. Zrecenzowaną pracę włączasz sam.",
+  "tips.versionControlJj.text": "W repozytorium jj wybierz jj u góry zakładki Kontrola wersji: Historia pokazuje każdy identyfikator zmiany obok identyfikatora commita, a Porównanie, Zakładki i Konflikty odczytują repozytorium bez jego zmieniania. Zrecenzowaną pracę włączasz sam.",
   "tips.versionControlJj.title": "Zobacz repozytorium jj",
   "tips.activityMap.text": "Aktywność rysuje swoich agentów jako plaster miodu: każde wywołanie narzędzia trafia do swojej stacji (Odczyt, Edycja, Powłoka, Agenci, Narzędzia, Ty), z pierścieniem kontekstu dla każdego agenta. Wybierz jednego agenta w Agenci ▾, aby zobaczyć jego własną mapę; Pokaż wyłącza mapę, jej listę i pierścienie.",
   "tips.activityMap.title": "Mapa tego, co robią Twoi agenci"

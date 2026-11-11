@@ -1091,7 +1091,7 @@
     "note": "The version control found in a project folder."
   },
   "api.project.vcsJj": {
-    "text": "jj at {root}{colocated, select, yes { (colocated with git)} other { (no colocated git: not supported)}}",
+    "text": "jj at {root}{colocated, select, yes { (colocated with git)} other { (not colocated: no git working copy)}}",
     "note": "HI-2799: a jj repository found in a project folder."
   },
   "api.project.vcsUnsupported": {

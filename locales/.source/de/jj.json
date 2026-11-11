@@ -81,6 +81,7 @@
   "jj.ops.refused.stale": "the project folder’s workspace is stale. jj workspace update-stale updates it, but edits jj hasn’t recorded can end up in a separate commit.",
   "jj.ops.refused.tool": "jj isn’t the version Combwork is tested with.",
   "jj.ops.refused.unimported": "Git has changes jj hasn’t recorded yet (a branch, a tag or HEAD moved with git): your jj command would take them in first. Run any jj command, then preview again.",
+  "jj.ops.refused.unimportedStore": "Git’s store inside .jj was changed with git (a ref moved), which jj hasn’t recorded. jj git import takes it in; then preview again.",
   "jj.ops.refused.workingCopy": "it changed a workspace’s working copy: undoing it would update files there, which a preview can’t check.",
   "jj.ops.snapshot": "snapshot",
   "jj.ops.tracked": "{commit}, {state, select, Tracked {tracked} other {not tracked}}",

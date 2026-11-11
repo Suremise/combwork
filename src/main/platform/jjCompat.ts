@@ -4,8 +4,11 @@
 // repository), every attribute source Git applies (the system's, the global one, every tracked `.gitattributes`, the
 // store's `info/attributes`), jj's effective config (`jj config list`), and the repository's files. Anything it can't
 // read, list or resolve is "uses it" (unknown): the gate stays closed. Read-only: never a write, a snapshot or an import.
-// J7 completes it (non-colocated paths, trust roots, file lists). Git for Windows' stock system settings, as its installer
-// writes them, aren't a use (HI-2872): only those values, at system scope, from its own etc files.
+// Git for Windows' stock system settings, as its installer writes them, aren't a use (HI-2872): only those values, at
+// system scope, from its own etc files. A non-colocated repository (HI-2896) has no Git working copy, so nothing runs git
+// in its folder (where git would find no repository, or one above it): Git's config and vars are asked of its store
+// (`--git-dir`), and its tracked files are the single head's working-copy commit's tree in the store (`ls-tree`), plus
+// the root's own .gitattributes on disk that jj hasn't recorded yet.
 
 import { join, resolve, isAbsolute } from 'path'
 import { GIT_MINGW_DIRS } from '../../shared/gitLayout'
@@ -14,6 +17,7 @@ import type { Gate } from '../../shared/platform/descriptors'
 import type { RunResult } from './repoContext'
 import { git } from '../git'
 import { jjRunner, type JjRunner } from './jjRunner'
+import { readOpHeads } from './jjView'
 
 /** The gates a repository's own use decides (the rest are jj's own limits, closed whatever the repository uses). */
 export type RepoGate = Extract<Gate, 'attributes' | 'lfs' | 'submodules' | 'hooks' | 'signing'>
@@ -156,11 +160,27 @@ async function hooksIn(dir: string): Promise<string[] | null> {
 }
 
 /**
+ * A non-colocated repository's tracked files (HI-2896), as `git ls-files -s` would list them were there a Git working copy:
+ * the tree of the workspace's working-copy commit at the single operation head (read pinned, never snapshotting), listed
+ * from the store (`ls-tree -r -z --full-tree`: `<mode> <type> <object>\t<path>`, whose mode and tab the callers read).
+ */
+async function trackedTree(root: string, jjRepo: string, deps: CompatDeps): Promise<Pick<RunResult, 'ok' | 'out' | 'err'>> {
+  const heads = readOpHeads(jjRepo)
+  if (!heads || heads.length !== 1) return { ok: false, out: '', err: `jj operation heads: ${heads ? heads.length : 'unreadable'}` } // i18n-ignore: what was found, shown as data beside its message
+  const c = await deps.jj.run(root, ['--ignore-working-copy', '--at-op', heads[0], 'log', '--no-graph', '-r', '@', '-T', 'commit_id'])
+  const commit = c.ok ? c.out.trim() : ''
+  if (!/^[0-9a-f]{40}$/.test(commit)) return { ok: false, out: '', err: `jj log @: ${c.err || c.out}`.slice(0, 300) } // i18n-ignore: what was found, shown as data beside its message
+  return deps.git(root, ['ls-tree', '-r', '-z', '--full-tree', commit])
+}
+
+/**
  * Assesses the repository at `root` (its working tree's top) with Git store `store`: each repository gate clear, used
  * (with what uses it) or unknown. A switch to jj is refused unless every one is clear.
  */
-export async function assessJj(root: string, store: string, deps: CompatDeps = DEFAULTS): Promise<Assessment> {
+export async function assessJj(root: string, store: string, deps0: CompatDeps = DEFAULTS, o: { separate?: { jjRepo: string } } = {}): Promise<Assessment> {
   const a: Assessment = { attributes: { clear: true }, lfs: { clear: true }, submodules: { clear: true }, hooks: { clear: true }, signing: { clear: true } }
+  // Not colocated (HI-2896): every git command asks the store, never the folder.
+  const deps: CompatDeps = o.separate ? { ...deps0, git: (cwd, args) => deps0.git(cwd, ['--git-dir', store, ...args]) } : deps0
   // Git's effective config, every level and include, as Git reads it here.
   const cfg = await deps.git(root, ['config', '--list', '--show-origin', '--show-scope', '--includes', '-z'])
   const entries = cfg.ok ? parseConfig(cfg.out) : null
@@ -204,7 +224,7 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   }
   if (attributesFile) sources.push(isAbsolute(attributesFile) ? attributesFile : resolve(root, attributesFile))
   sources.push(join(store, 'info', 'attributes'))
-  const listed = await deps.git(root, ['ls-files', '-z', '-s'])
+  const listed = o.separate ? await trackedTree(root, o.separate.jjRepo, deps) : await deps.git(root, ['ls-files', '-z', '-s'])
   if (!listed.ok) {
     unknownAt(a, 'attributes', `git ls-files: ${listed.err}`) // i18n-ignore: what was found, shown as data beside its message
     unknownAt(a, 'submodules', `git ls-files: ${listed.err}`) // i18n-ignore: what was found, shown as data beside its message
@@ -214,6 +234,8 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
     const attrFiles = rows.map((r) => r.split('\t')).filter(([, p]) => p === '.gitattributes' || p?.endsWith('/.gitattributes'))
     if (attrFiles.length > ATTR_FILES_MAX) unknownAt(a, 'attributes', `${attrFiles.length} .gitattributes files`) // i18n-ignore: what was found, shown as data beside its message
     else for (const [, p] of attrFiles) sources.push(join(root, p))
+    // Not colocated: the root's own .gitattributes on disk counts too, recorded by jj or not yet.
+    if (o.separate && !attrFiles.some(([, p]) => p === '.gitattributes') && (await stat(join(root, '.gitattributes')).catch(() => null))) sources.push(join(root, '.gitattributes'))
     for (const r of rows) if (r.startsWith('160000 ')) add(a, 'submodules', `gitlink ${r.split('\t')[1] ?? ''}`)
   }
   for (const src of sources) {

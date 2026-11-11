@@ -35,6 +35,8 @@ import { workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { commonGitDir } from '../repoLock'
+import { boundaryOf } from '../platform/repoBoundary'
+import { gitAbove } from '../vcsDetect'
 import { readKeptJson } from '../fsutil'
 import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { SlotStore } from '../slots'
@@ -52,10 +54,19 @@ const log = createLogger('workflow')
 /** The switches this process is making now, by owner token: recovery never settles one of them. */
 const ACTIVE = new Set<string>()
 
-/** The repository a project's detection names (its Git store, colocated jj's the same), or none. */
+/**
+ * The repository a project's detection names, or none: a Git project's store (its common git dir); a jj project's, colocated
+ * or not (HI-2896), the Git store its `.jj` names, read from its files as J0 reads them (a colocated pair's is the same
+ * `.git`, so both name one store). A jj repository inside a Git working tree, or one whose files can't be read, is none.
+ */
 async function storeOf(path: string): Promise<string | 'none'> {
   const d = projectPlatform(path, 'none').detected
-  const root = d.platform === 'git' || (d.platform === 'jj' && d.jj?.colocated) ? d.root : null
+  if (d.platform === 'jj' && d.root && !d.jj?.colocated) {
+    if (d.jj?.inGit) return 'none'
+    const b = await boundaryOf(d.root)
+    return 'jj' in b ? storeKey(b.jj.store) : 'none'
+  }
+  const root = d.platform === 'git' || d.platform === 'jj' ? d.root : null
   if (!root) return 'none'
   return commonGitDir(root).then(
     (s) => storeKey(s),
@@ -147,21 +158,34 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promis
   return d
 }
 
-/** jj itself confirms a colocated repository on exactly this store, with the tested jj (s11 §3c). */
+/** jj itself confirms the repository on exactly this store, colocated or not (HI-2896), with the tested jj (s11 §3c). */
 async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
   // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
   const d = await pinnedContextOf(path)
   if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code, never shown as text
   if ('jjUnknown' in d) return d.jjUnknown === 'tool' ? { why: 'jjTool', state: jjRunner.readinessNow().state } : { why: 'jjUnknown', code: d.jjUnknown } // i18n-ignore: a code, never shown as text
-  if (!d.ctx.colocated) return { why: 'jjSeparate' } // i18n-ignore: a code, never shown as text
   if (storeKey(d.ctx.store) !== store) return { why: 'jjUnknown', code: 'disagrees' } // i18n-ignore: a code, never shown as text
   return null
+}
+
+/**
+ * A non-colocated repository's slots folder (`<workspace>.worktrees\<project>`) inside a Git working tree (HI-2896): its
+ * slots and copies would be too, and a git command run in one would reach that tree. Null when it isn't (or colocated).
+ */
+function slotsInGit(ws: WorkspaceService, path: string): SwitchRefusal | null {
+  const d = projectPlatform(path, 'none').detected
+  if (d.platform !== 'jj' || d.jj?.colocated || !ws.path) return null
+  const git = gitAbove(join(ws.worktreesRoot, basename(path), 'slot'))
+  return git ? { why: 'jjInGit', root: git } : null // i18n-ignore: a code, never shown as text
 }
 
 /** To jj: each repository gate's finding, and jj's own limits (always). */
 async function gatesOf(path: string, store: string): Promise<GateCheck[]> {
   const root = projectPlatform(path, 'none').detected.root ?? path
-  const a = await assessJj(root, store)
+  // Not colocated (HI-2896): Git is asked of the store inside .jj, and the tracked files are jj's (assessJj's `separate`).
+  const b = await boundaryOf(root)
+  if ('unknown' in b) return REPO_GATES.map((g): GateCheck => ({ gate: g, unknown: `jj: ${b.unknown}` })) // i18n-ignore: what was found, shown as data beside its message
+  const a = 'jj' in b ? await assessJj(root, b.jj.store, undefined, { separate: { jjRepo: b.jj.jjRepo } }) : await assessJj(root, store)
   return REPO_GATES.map((g): GateCheck => {
     const f = a[g]
     return 'clear' in f ? { gate: g, clear: true } : 'uses' in f ? { gate: g, uses: f.uses, ...(f.autocrlf ? { autocrlf: true as const } : {}) } : { gate: g, unknown: f.unknown }
@@ -214,6 +238,7 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
   if (to === 'jj') {
+    refused ??= slotsInGit(ws, path)
     refused ??= await (storeSwitchSeams.repo?.ready ?? jjReady)(path, g.store)
     store.gates = await (storeSwitchSeams.repo?.gates ?? gatesOf)(path, g.store)
     store.unsupported = UNSUPPORTED

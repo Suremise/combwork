@@ -76,6 +76,21 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       expect(w.wf.state(card).stage).toBe('approved')
     })
 
+    if (!colocated)
+      it('not colocated (HI-2896): a Git working tree made above its slots after the switch refuses the start, nothing prepared', async () => {
+        const w = await world(colocated)
+        const slots = join(w.slots['slot-a'].folder, '..')
+        execFileSync('git', ['init', '-q'], { cwd: slots, env: w.h.env, windowsHide: true })
+        const card = w.wf.createCard({ title: 'in git' })
+        // Refused as unreadable (the log names the Git repository), nothing started.
+        expect(await w.wf.start(card.key, B1)).toMatchObject({ refused: true, rule: 'platform.unknown', values: { what: { id: 'workflow.unreadable.worktrees' } } })
+        expect(w.wf.state(card).started).toBeFalsy()
+        // The Git working tree gone: the same card starts in the same slot.
+        rmSync(join(slots, '.git'), { recursive: true, force: true })
+        moved(await w.wf.start(card.key, B1))
+        expect(w.wf.state(card).started).toMatchObject({ slot: 'slot-a' })
+      })
+
     it("refuses what isn't committed work of this card: an uncommitted edit, a merge working copy, a change id named; the lease ended or an operation installed before the write", async () => {
       const w = await world(colocated)
       const a = w.slots['slot-a']

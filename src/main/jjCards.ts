@@ -16,6 +16,8 @@ import { git } from './git'
 import { jjRunner } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
 import { jjContextOf } from './platform/jjDetect'
+import { boundaryOf, canonicalStore } from './platform/repoBoundary'
+import { JjStoreChanged } from './platform/jjWorkspacePort'
 import type { JjCardDeps, JjPinRecord } from './platform/jjPlatform'
 import type { JjBundle, JjIntegrationDeps } from './platform/jjIntegration'
 import { boardConn, jjPort, storeLock } from './slotsApp'
@@ -46,7 +48,15 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         folder: projectPath,
         git: (args) => gitOn(ctx.store, args),
         gitContains: (store, target, c, at) => historyFor('git').contains(store, target, c, at),
-        lock: (fn) => storeLock(ctx.store, fn),
+        // The store checked again inside its lock (HI-2896, s13 §3): a colocation change since this context was read
+        // refuses before any pin or journal write.
+        lock: (fn) =>
+          storeLock(ctx.store, async () => {
+            const b = await boundaryOf(ctx.root)
+            const now = 'jj' in b && !ctx.colocated ? b.jj.store : 'colocated' in b && ctx.colocated ? b.colocated.store : null
+            if (!now || (await canonicalStore(now)) !== (await canonicalStore(ctx.store))) throw new JjStoreChanged(ctx.root)
+            return fn()
+          }),
         // Merged in one write with what is journalled (HR1's round 1): an observer's older snapshot never erases a bundle
         // another observer's proof journalled.
         journal: (card: string, cycle: number, bundles: JjBundle[]) =>

@@ -320,7 +320,7 @@
   "service.workspace.platformGitFound": "{project} is a Git repository now. Combwork goes on treating it as a project without version control until you switch it in its Version Control tab.",
   "service.workspace.platformInvalid": "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.",
   "service.workspace.platformInvalidTitle": "Unknown version control setting in {project}",
-  "service.workspace.platformJjFound": "{project} is a jj repository colocated with Git. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.",
+  "service.workspace.platformJjFound": "{project} is a jj repository. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.",
   "service.workspace.platformJjGone": "{project}'s jj repository is gone. Switch it to Git or None in its Version Control tab.",
   "service.workspace.platformOpen": "Open Version Control",
   "service.workspace.platformOtherFound": "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",

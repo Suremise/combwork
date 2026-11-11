@@ -90,6 +90,20 @@ describe('setKept (#1419)', () => {
   })
 })
 
+describe('switchRefused for jj (HI-2799, HI-2896)', () => {
+  it('to jj: a jj repository colocated or not; one not colocated inside a Git working tree refused jjInGit; none noJj', () => {
+    expect(switchRefused('jj', { platform: 'jj', root: 'C:/r', jj: { colocated: true } })).toBeNull()
+    expect(switchRefused('jj', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toBeNull()
+    expect(switchRefused('jj', { platform: 'jj', root: 'C:/o/r', jj: { colocated: false, inGit: 'C:/o' } })).toEqual({ why: 'jjInGit', root: 'C:/o' })
+    expect(switchRefused('jj', { platform: 'git', root: 'C:/r' })).toEqual({ why: 'noJj' })
+  })
+  it('back to Git: colocated is main’s to check; not colocated has no Git working copy (jjNoGitCopy); None always', () => {
+    expect(switchRefused('git', { platform: 'jj', root: 'C:/r', jj: { colocated: true } })).toBeNull()
+    expect(switchRefused('git', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toEqual({ why: 'jjNoGitCopy' })
+    expect(switchRefused('none', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toBeNull()
+  })
+})
+
 describe('switchRefused (#1419)', () => {
   it('Git only where a Git repository is found and nothing else is; None always', () => {
     expect(switchRefused('git', { platform: 'git', root: 'C:/r' })).toBeNull()

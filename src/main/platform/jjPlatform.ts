@@ -14,6 +14,8 @@
 // - Checks: J3's bracket (B1, the run, B2, the credit) in one call. No check copies (`checkCopies`): `--isolated` refused.
 // - Containment: typed unknown in J9b1 (J9b2's proof decides); reconciliation and observation are J9b2's.
 
+import { boundaryOf } from './repoBoundary'
+import { gitAbove } from '../vcsDetect'
 import { statSync } from 'original-fs'
 import { join } from 'path'
 import type { CardState } from '../../shared/workflow/facts'
@@ -58,6 +60,7 @@ const START_TEXT = {
   target: agentMsg({ id: 'workflow.jj.start.target', text: 'a jj project needs a target bookmark (Work merges into)', note: 'HI-2868: why a jj card could not start: no target bookmark is set. Work merges into is a name in the window.' }),
   noSlot: agentMsg({ id: 'workflow.jj.start.noSlot', text: 'no slot for its builder', note: 'HI-2868: why a jj card could not start: its builder was lent no slot.' }),
   notWorkspace: agentMsg({ id: 'workflow.jj.start.notWorkspace', text: 'the slot is not a jj workspace Combwork made', note: 'HI-2868: why a jj card could not start: its slot folder is not a workspace Combwork made.' }),
+  inGit: agentMsg({ id: 'workflow.jj.start.inGit', text: 'the slot is inside the Git repository at {root}, which git commands in it would reach', note: 'HI-2896: why a jj card could not start: its slot of a jj repository not colocated with Git is inside a Git working tree ({root}, made or moved there after the switch).' }),
   carryTarget: agentMsg({ id: 'workflow.jj.start.carryTarget', text: 'its earlier work is in slot {slot} on {target}', note: 'HI-2868: why a restarted jj card could not start: its earlier work is still in its slot, on another target bookmark. {slot} is the slot name, {target} the bookmark.' })
 }
 
@@ -258,6 +261,10 @@ export class JjPlatform implements PlatformAdapter {
     const port = d.port()
     const identity = port ? await port.identity!(got.folder) : null
     if (!port || !identity) return withDetail(unknown(UNREADABLE.worktrees, { folder: got.folder }), say(START_TEXT.notWorkspace))
+    // Not colocated (HI-2896): a Git working tree above the slot, made or moved there after the switch, refuses the start.
+    const bound = await boundaryOf(got.folder)
+    const outer = 'jj' in bound ? gitAbove(got.folder) : null
+    if (outer || 'unknown' in bound) return withDetail(unknown(UNREADABLE.worktrees, { folder: got.folder }), outer ? say(START_TEXT.inGit, { root: outer }) : say(START_TEXT.notWorkspace))
     const integ = await d.integration()
     if (!integ) return notYet()
     const th = await jjTargetHead(integ, target)

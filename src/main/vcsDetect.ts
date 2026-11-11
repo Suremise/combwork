@@ -49,8 +49,24 @@ export function otherVcsOf(folder: string): { name: string; root: string } | nul
  * any other system's marker, and whether a `.git` sits beside it (colocated). A hint: jj itself confirms it before a switch
  * (`jjContextOf`). Null when the nearest marker isn't jj's.
  */
-export function jjOf(folder: string): { root: string; colocated: boolean } | null {
+export function jjOf(folder: string): { root: string; colocated: boolean; inGit?: string } | null {
   const other = otherVcsOf(folder)
   if (!other || other.name !== 'Jujutsu') return null // i18n-ignore: a product's name, the marker's
-  return { root: other.root, colocated: existsSync(join(other.root, '.git')) }
+  const colocated = existsSync(join(other.root, '.git'))
+  const inGit = colocated ? null : gitAbove(other.root)
+  return { root: other.root, colocated, ...(inGit ? { inGit } : {}) }
+}
+
+/**
+ * The nearest Git working tree above a folder (not the folder itself): the first `.git` met going up from its parent, or
+ * null (HI-2896: a non-colocated jj repository inside one, where a git command in the project would reach that tree).
+ */
+export function gitAbove(folder: string): string | null {
+  let dir = dirname(resolve(folder))
+  for (;;) {
+    if (existsSync(join(dir, '.git'))) return dir
+    const up = dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
 }

@@ -205,10 +205,13 @@ export const BOOKMARK_TEMPLATE = [
 ].join(` ++ "${SEP}" ++ `) + ' ++ "\\n"'
 
 /**
- * Each local bookmark against Git (colocated): its `@git` remote-tracking target as jj last saw it, and the branch Git
+ * Each local bookmark against Git (colocated only): its `@git` remote-tracking target as jj last saw it, and the branch Git
  * has now (`refs/heads/<name>`, read from the files: loose or packed). A difference is shown, never resolved.
  */
 async function markGit(c: JjContext, rows: JjBookmarkRow[]): Promise<void> {
+  // Not colocated (HI-2896): no Git working copy sees the store's refs, and nothing exports without colocation, so an
+  // unexported or stale `@git` is no difference anyone sees: nothing is marked (J5 decides by the local bookmark alone).
+  if (!c.colocated) return
   const tracked = new Map(rows.filter((r) => r.remote === 'git').map((r) => [r.name, r.commit]))
   const refs = c.colocated ? await gitBranches(c.store) : null
   for (const r of rows) {

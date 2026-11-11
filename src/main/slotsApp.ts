@@ -41,10 +41,9 @@ import { recoverStale } from './platform/jjRecovery'
 import { git } from './git'
 import { boardPrepStore } from './platform/jjSlotPrep'
 import { historyFor } from './platform/historyPorts'
-import { withRepoLock } from './repoLock'
+import { takeStores } from './repoLock'
 import { trash } from './trash'
 import { holdLaunches } from './launchHolds'
-import { AsyncLocalStorage } from 'async_hooks'
 import type { PlatformId } from '../shared/platform/descriptors'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -273,15 +272,12 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
 }
 
 /**
- * The stores whose repository lock this async context holds (HI-2866): jj's port takes its store's lock around each
- * write, and the lock isn't re-entrant, so a take inside one already held runs straight through.
+ * A store's repository lock (HI-2866), as jj's port takes it around each write: the one owner every platform's takes go
+ * through (repoLock.ts `takeStores`, HI-2896), so a take inside one this context holds (live) runs straight through,
+ * whichever platform named the store.
  */
-const heldStores = new AsyncLocalStorage<ReadonlySet<string>>()
 export function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
-  const key = store.toLowerCase()
-  const held = heldStores.getStore()
-  if (held?.has(key)) return fn()
-  return withRepoLock(store, () => heldStores.run(new Set([...(held ?? []), key]), fn), { quiet: true })
+  return takeStores([{ store, folder: store }], fn, { quiet: true })
 }
 
 /**

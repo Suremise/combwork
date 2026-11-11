@@ -4,6 +4,11 @@
 
 ### Added
 
+- **jj repositories that aren't colocated with Git** (HI-2896). A jj repository that keeps Git's data inside `.jj` (no `.git` in the folder) can now use **jj** as its version control too, as a colocated one does: the same views and switch, and the same slots and review copies once jj cards run. Combwork never runs git in such a folder, never exports, imports or changes colocation, and agents there are told to use jj for everything.
+  - **Back to Git** needs a Git working copy: make the repository colocated yourself (`jj git colocation enable`), then switch; **None** is always offered.
+  - **Inside a Git repository**: a repository that isn't colocated and sits inside a Git working tree can't use jj, since git commands run in it would change that other repository.
+  - **A past `jj git export` no longer counts against a target**: without colocation nothing exports by itself, so the target is your local bookmark.
+  - **Changing colocation while a project uses jj** stops what was waiting with nothing written; earlier slots aren't lent, and nothing is deleted.
 - **Edit a lane's cards yourself** (HI-2898). In Progress → Lanes, open a running lane and drag its waiting cards into another order (or Alt+Up and Alt+Down), take one off with × or Delete (it stays on the board), or add one with **Add Card…** or by dragging it from the board onto the lane.
   - **As the Assistant's changes are:** a change made while a card is being worked waits until that card is Done, shown under the lane with **Cancel Change**; between cards it applies at once. The card being worked and the cards before it keep their places.
   - **Refused in place, with why**, nothing changed: a card that's Done, not in Todo, of another project, keeping earlier work or placed before a card it depends on, or a lane that changed meanwhile. A card on another lane offers **Move Here**, which moves it in one step.
