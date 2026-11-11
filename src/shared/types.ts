@@ -1446,6 +1446,12 @@ export interface TaskWaiting {
   /** Who marked it (the user, the Assistant, an agent's name). */
   by: string
   at: string
+  /**
+   * HI-2915: set only by Combwork when the card's agent asked the Assistant (`cw_ask_assistant`) on it: that request's ref
+   * (its delivery's), so the mark goes when that request ends and only then (a later mark has none). Never from the
+   * Agent API.
+   */
+  ask?: string
 }
 
 /** An agent reviewing a card (TaskCard.review). */

@@ -335,6 +335,8 @@ export interface DeliverySource {
   holds?: (r: DeliveryRecord, host: string, by: HandOut) => boolean
   received?: (r: DeliveryRecord, host: string) => void
   ended?: (r: DeliveryRecord, host: string) => void
+  /** HI-2915: its agent acked it (dealt with it), once, as saved; `ended` stays for one that ended unread. */
+  acked?: (r: DeliveryRecord, host: string) => void
 }
 const sources = new Map<string, DeliverySource>()
 /** What a source says of a delivery made again: its text and context as they are now (one version), or why it is cancelled. */
@@ -762,9 +764,9 @@ function put(d: Draft, from: DeliveryRecord, to: DeliveryRecord): void {
 }
 
 /** Tells a delivery's source what became of it, once published and outside the lock. */
-function tell(store: Store, d: Draft, r: DeliveryRecord, what: 'received' | 'ended'): void {
+function tell(store: Store, d: Draft, r: DeliveryRecord, what: 'received' | 'ended' | 'acked'): void {
   const fn = r.source ? sources.get(r.source)?.[what] : undefined
-  const hook = store.hooks.get(r.id)?.[what]
+  const hook = what === 'acked' ? undefined : store.hooks.get(r.id)?.[what]
   if (!fn && !hook) return
   d.after.push(() =>
     queueMicrotask(() => {
@@ -804,6 +806,7 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
     d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // agent-protocol: for the log
   }
   else if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'stale') tell(store, d, out, 'ended')
+  if (to === 'acked') tell(store, d, out, 'acked')
   return true
 }
 

@@ -92,6 +92,7 @@ interface CombworkMessageValues {
   'activity.task': { type: string }
   'activity.thinking': undefined
   'activity.toolFor': { summary: string | number; time: string | number }
+  'activity.waiting': { assistant: string; reason: string | number }
   'activity.workspace.agentIn': { project: string | number; agent: string | number }
   'activity.workspace.assistant': undefined
   'activity.workspace.cardNobody': { card: string | number }
