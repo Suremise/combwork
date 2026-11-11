@@ -2346,7 +2346,8 @@ changes. Git's runner and worker are untouched.
     `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
     its command's the same way: listed with start times, children first, each ended only while its pid still names
     the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
-    that teardown. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
+    that teardown. The teardown is awaited (`endTreeAsync`, never `spawnSync`, HI-2997): a write runs on main's thread,
+    where a synchronous listing and ending held it about 2.4 s; the result still waits for it to finish. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
   - **Shutdown** (`shutdown(ms)`): ends every command under way, each one's tree, then jj's worker, within its bound;
     a command asked after it starts nothing. The J card that first runs jj for a project calls it as Combwork quits.
   - The bounds become Advanced settings with that card too.

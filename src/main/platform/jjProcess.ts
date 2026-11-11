@@ -2,11 +2,12 @@
 // ending the process. What it gives back is what happened, typed: the tool's own exit, or why it didn't run to one (never
 // taken for jj's answer, rule 3). Runs where it is called: jj's worker thread (jjWorker.ts) in Combwork, here in unit
 // tests. A cap, a time limit or a cancel ends jj's whole process tree by identity (processTree.ts, as cw-progress
-// ends its command's). No Electron, no Git module: jj's runner is its own and changes nothing of Git's (§16.3.6, Port 1).
+// ends its command's), without blocking the thread (HI-2997: a write runs here on main's), and the outcome is given only
+// once that teardown has finished. No Electron, no Git module: jj's runner is its own and changes nothing of Git's (§16.3.6, Port 1).
 
 import { spawn } from 'child_process'
 import { existsSync } from 'original-fs'
-import { endTree } from '../processTree'
+import { endTreeAsync } from '../processTree'
 
 /** A jj command to run: the whole argument list (the runner's prefix included), its folder, environment and bounds. */
 export interface JjRequest {
@@ -51,13 +52,17 @@ export function runJj(m: JjRequest, signal?: AbortSignal, quietMs = JJ_EXITED_QU
     let exitCode: number | null = null
     let quiet: ReturnType<typeof setTimeout> | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
+    // The tree's teardown once one began: the outcome waits for it, so a caller (a write's admission) ends only after it.
+    let teardown: Promise<void> | null = null
     const finish = (end: JjEnd): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       clearTimeout(quiet)
       signal?.removeEventListener('abort', onAbort)
-      done({ stdout: Buffer.concat(out), stderr: Buffer.concat(err), end })
+      const outcome = { stdout: Buffer.concat(out), stderr: Buffer.concat(err), end }
+      if (teardown) void teardown.then(() => done(outcome))
+      else done(outcome)
     }
     // Hoisted: finish takes it off the signal, whenever it settles.
     function onAbort(): void {
@@ -74,8 +79,9 @@ export function runJj(m: JjRequest, signal?: AbortSignal, quietMs = JJ_EXITED_QU
       if (ending || settled) return
       ending = why
       // jj and everything it started, each by its identity (processTree.ts: never a process whose pid was only reused,
-      // #655), children first; the outcome settles once the output closes, after that teardown.
-      endTree(child)
+      // #655), children first; the outcome settles once the output closes and that teardown has finished. Awaited, never
+      // spawnSync (HI-2997): PowerShell's listing and ending took about 2.4 s, all of it main's thread for a write.
+      teardown = endTreeAsync(child).catch(() => undefined)
     }
     signal?.addEventListener('abort', onAbort, { once: true })
     timer = setTimeout(() => end({ notRun: 'timedOut' }), m.timeout)
