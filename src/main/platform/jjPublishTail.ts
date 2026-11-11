@@ -7,6 +7,7 @@
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
 import { rawSourcesPrint } from './jjSourcesPrint'
+import { jjFileGate, pathKeySync, storeKey } from './jjFileGate'
 import { readOpHeads } from './jjView'
 import type { ConfigSources, JjObligation, ObligationKey, ObligationStore, PublishDiffer, PublishObserved, RecheckPlan } from './jjIntegration'
 import type { JjReadUnknown } from './jjReads'
@@ -19,6 +20,13 @@ const moved = (detail: string): JjReadUnknown => ({ jjUnknown: 'moved', detail }
  * write after it): the loose ref, else its packed line; null when it is in neither; undefined when it can't be read.
  */
 export function refFromFiles(store: string, ref: string): string | null | undefined {
+  // Never while a jj write of Combwork's holds or waits on the store (HI-2918): can't be read then.
+  const key = pathKeySync(store)
+  if (!key) return undefined
+  return jjFileGate.readSync([storeKey(key)], () => refFromStore(store, ref), undefined)
+}
+
+function refFromStore(store: string, ref: string): string | null | undefined {
   const read = (f: string): string | null | undefined => {
     try {
       return readFileSync(join(store, f), 'utf8')
@@ -52,11 +60,15 @@ export function refFromFiles(store: string, ref: string): string | null | undefi
  */
 export function sourcesPrint(store: string, jjRepo: string, target: string, sources: ConfigSources): string | undefined {
   // The verified capture's print, shared with the Operations preview (jjSourcesPrint.ts, HI-2800): these sources, as before.
-  return rawSourcesPrint({
+  // Read on main's thread at once, never while a jj write of Combwork's holds or waits on the store (HI-2918: its export
+  // would meet these open files): unreadable then, as a read error is. A store whose key can't be read isn't read.
+  const key = pathKeySync(store)
+  if (!key) return undefined
+  return jjFileGate.readSync([storeKey(key)], () => rawSourcesPrint({
     jjRepo,
     env: sources.env,
     files: [{ label: 'HEAD', path: join(store, 'HEAD') }, { label: 'ref', path: join(store, 'refs', 'heads', ...target.split('/')) }, { label: 'packed', path: join(store, 'packed-refs') }, ...sources.files.map((f) => ({ label: `config:${f.toLowerCase()}`, path: f }))] // i18n-ignore: a print's labels, hashed, never shown
-  })
+  }), undefined)
 }
 
 /**

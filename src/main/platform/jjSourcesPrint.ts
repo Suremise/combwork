@@ -33,6 +33,11 @@ export interface PrintSources {
   trees?: readonly { label: string; path: string }[]
   /** Text that steers the sources (an environment), printed as it is. */
   env?: string
+  /**
+   * The Git store whose files it reads (HI-2918): the reader takes Combwork's file gate for it shared, so a jj write's
+   * export there never meets one of its open handles (jjFileGate.ts). Not hashed.
+   */
+  store?: string
 }
 
 /** A file's bytes, null when absent, undefined when it can't be read. */

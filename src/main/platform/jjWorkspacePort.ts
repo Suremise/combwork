@@ -28,6 +28,7 @@ import { jjContextOf, type JjContext } from './jjDetect'
 import { boundaryOf } from './repoBoundary'
 import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
+import { jjFileGate, pathKey, rootKey } from './jjFileGate'
 import type { OwnedWrite, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
@@ -133,8 +134,11 @@ export interface JjWorkspacePort extends WorkspacePort {
    * the single head; the head, the absences and the record checked again synchronously right before the write. How many.
    */
   pruneResidues(repo: string): Promise<number>
-  /** Runs jj (the port's runner) in a folder, pinned at `op` (a read) or writing. For recovery and tests. */
-  jj(folder: string, args: readonly string[], o?: { op?: string; write?: boolean }): Promise<JjRunResult>
+  /**
+   * Runs jj (the port's runner) in a folder, pinned at `op` (a read) or writing; a write's `recheck` runs under the file
+   * gate's admission right before jj starts (HI-2918). For recovery and tests.
+   */
+  jj(folder: string, args: readonly string[], o?: { op?: string; write?: boolean; recheck?: () => Promise<string | null> | string | null }): Promise<JjRunResult>
 }
 
 const SEPARATOR = '\u001f'
@@ -163,7 +167,10 @@ export async function generationOf(folder: string): Promise<string | null> {
  * it isn't readable or isn't that shape.
  */
 export async function checkoutOf(folder: string): Promise<{ op: string; name: string } | null> {
-  const buf = await readFile(join(folder, '.jj', 'working_copy', 'checkout')).catch(() => null)
+  // Read under Combwork's file gate (HI-2918): never while a jj write of Combwork's replaces it (or waits to).
+  const key = await pathKey(folder)
+  if (!key) return null
+  const buf = await jjFileGate.read([rootKey(key)], () => readFile(join(folder, '.jj', 'working_copy', 'checkout')).catch(() => null))
   if (!buf || buf.length > 4096) return null
   let i = 0
   let op: string | null = null
@@ -234,8 +241,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       return fn()
     })
 
-  const jj = (folder: string, args: readonly string[], o: { op?: string; write?: boolean } = {}): Promise<JjRunResult> =>
-    runner.run(folder, o.op ? ['--at-op', o.op, ...args] : args, o.write ? { write: true } : {})
+  /** A write's `recheck` runs under the file gate's admission, right before jj starts; `also`: other workspaces it writes (HI-2918). */
+  const jj = (folder: string, args: readonly string[], o: { op?: string; write?: boolean; recheck?: () => Promise<string | null> | string | null; also?: readonly string[] } = {}): Promise<JjRunResult> =>
+    runner.run(folder, o.op ? ['--at-op', o.op, ...args] : args, o.write ? { write: true, ...(o.recheck ? { recheck: o.recheck } : {}), ...(o.also ? { also: o.also } : {}) } : {})
 
   /** The one operation head of a folder's repository, confirmed by jj; unknown with none, several or no answer. */
   const pinned = async (folder: string): Promise<Maybe<string>> => {
@@ -401,18 +409,28 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     if (!path) return null
     const pointer = join(path, '.jj', 'repo')
     const checkout = join(path, '.jj', 'working_copy', 'checkout')
-    // The bytes first, then the proof (its checkout name read after them): the final check compares these bytes.
-    const bytes = await Promise.all([readFile(pointer).catch(() => null), readFile(checkout).catch(() => null)])
+    // The bytes first, then the proof (its checkout name read after them): the final check compares these bytes. Both
+    // under Combwork's file gate for the control's working copy (HI-2918); the final check's sync reads get nothing (a
+    // failed check) while a write holds or waits on it, unless they are that write's own recheck.
+    const key = await pathKey(path)
+    if (!key) return null
+    const gate = [rootKey(key)]
+    const bytes = await jjFileGate.read(gate, () => Promise.all([readFile(pointer).catch(() => null), readFile(checkout).catch(() => null)]))
     if (!bytes[0] || !bytes[1]) return null
     if ((await r.usable(rec)) !== path) return null
     const snap = JSON.stringify(rec)
-    const sameBytes = (file: string, was: Buffer): boolean => {
-      try {
-        return readFileSync(file).equals(was)
-      } catch {
-        return false
-      }
-    }
+    const sameBytes = (file: string, was: Buffer): boolean =>
+      jjFileGate.readSync(
+        gate,
+        () => {
+          try {
+            return readFileSync(file).equals(was)
+          } catch {
+            return false
+          }
+        },
+        false
+      )
     const gen = (p: string, withJj: boolean): string | null => {
       try {
         const a = statSync(p, { bigint: true })
@@ -515,7 +533,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         await c.journal.write({ phase: 'folder', ...base, tokenGeneration })
         // The explicit owned record of the project folder: the one snapshot of it this attempt takes, under the lock and
         // the hold (no Combwork agent in the project folder).
-        const add = await jj(repo, ['workspace', 'add', ws, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true })
+        // Its destination gated with it (HI-2918): nothing of Combwork's reads the new workspace's files while jj writes them.
+        const add = await jj(repo, ['workspace', 'add', ws, '--name', name, '--sparse-patterns', 'empty', '--no-colocate'], { write: true, also: [ws] })
         if (!add.ok) return null
         const wsGeneration = await generationOf(ws)
         if (!wsGeneration) return null
@@ -738,10 +757,12 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const g1 = await guard(H)
         if (g1) return refuseFor(g1)
         await save({ phase: 'writing', mark: run })
-        // Right before the write, after the journal's await: everything again.
+        // Right before the write, after the journal's await: everything again; and again under the file gate's admission,
+        // right before jj starts (HI-2918: its wait mustn't leave this proof stale).
         const g2 = await guard(H)
         if (g2) return refuseFor(g2)
-        const nu = await jj(folder, [`--config=cw.prep=${run}`, 'new', bound.base], { write: true })
+        const nu = await jj(folder, [`--config=cw.prep=${run}`, 'new', bound.base], { write: true, recheck: () => guard(H) })
+        if (nu.refused) return refuseFor(nu.refused)
         const l = await landed()
         if (l === 'uncertain') return step(false, JJ_REFUSED.uncertain)
         if (l === 'none') return refuse(nu.ok ? JJ_REFUSED.uncertain : nu.err)
@@ -753,7 +774,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           if (!isUnknown(kept) && lines(kept).length) {
             const g3 = await guard(l.op)
             if (g3) return stopAfterWrite(g3)
-            await jj(folder, ['abandon', wc.commit], { write: true })
+            const ab = await jj(folder, ['abandon', wc.commit], { write: true, recheck: () => guard(l.op) })
+            if (ab.refused) return stopAfterWrite(ab.refused)
           }
         }
       }
@@ -858,8 +880,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // The control proved for this add, inside the lock; its synchronous check right before the add starts (HI-2887).
         const proof = await controlProof(repo, ctx)
         if (!proof || proof.path !== from || !proof.check()) return step(false, JJ_REFUSED.control)
-        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's.
-        const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true })
+        // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's. Its
+        // destination gated with it, and the control's synchronous check again under the file gate's admission, right
+        // before jj starts (HI-2918; HI-2887's "nothing awaited between the check and the add" kept across the wait).
+        const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true, also: [folder], recheck: () => (proof.check() ? null : JJ_REFUSED.control) })
+        if (r.refused) return step(false, r.refused)
         if (!r.ok) return step(false, r.err)
         // Read back (rule 3): listed at that root, its working copy an empty child of exactly `at`, same store.
         const op = await pinned(folder)
@@ -904,7 +929,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           // The control proved for each forget; its synchronous check right before the forget starts (HI-2887).
           const proof = await controlProof(repo, ctx)
           if (!proof || proof.path !== from || !proof.check()) return
-          await jj(from, ['workspace', 'forget', '--', w.name], { write: true })
+          // The check again under the file gate's admission, right before jj starts (HI-2918).
+          const f = await jj(from, ['workspace', 'forget', '--', w.name], { write: true, recheck: () => (proof.check() ? null : JJ_REFUSED.control) })
+          if (f.refused) return
         }
       })
     },
@@ -999,11 +1026,14 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const stale = await staleAt(folder, op)
       if (isUnknown(stale)) return stale
       if (stale) return withDetail(u, JJ_REFUSED.stale)
-      // Right before the write: still its holder's, still the recorded workspace.
-      if (!(await fence.still())) return withDetail(u, JJ_REFUSED.fence)
-      if (!(await owns(folder, identity))) return withDetail(u, JJ_REFUSED.identity)
+      // Right before the write: still its holder's, still the recorded workspace; both again under the file gate's
+      // admission, right before jj starts (HI-2918).
+      const still = async (): Promise<string | null> => (!(await fence.still()) ? JJ_REFUSED.fence : !(await owns(folder, identity)) ? JJ_REFUSED.identity : null)
+      const before = await still()
+      if (before) return withDetail(u, before)
       // The explicit snapshot: `status` writing, never updating a stale copy (the runner's prefix keeps auto-update off).
-      const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true })
+      const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true, recheck: still })
+      if (snap.refused) return withDetail(u, snap.refused)
       if (!snap.ok) return withDetail(u, snap.err)
       const after = await pinned(folder)
       if (isUnknown(after)) return after
@@ -1039,14 +1069,17 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       // Stray files into the copy's own change, then a new empty change at exactly the revision.
       let why = await mine()
       if (why) return refused('checkout', why)
-      const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true })
+      // Each write's check again under the file gate's admission, right before jj starts (HI-2918).
+      const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true, recheck: mine })
+      if (snap.refused) return refused('checkout', snap.refused)
       if (!snap.ok) return refused('clean', snap.err)
       const mid = await state(folder)
       if (isUnknown(mid)) return refused('clean', mid.detail ?? mid.what)
       const old = mid.wc.commit
       why = await mine()
       if (why) return refused('checkout', why)
-      const nu = await jj(folder, ['new', revision], { write: true })
+      const nu = await jj(folder, ['new', revision], { write: true, recheck: mine })
+      if (nu.refused) return refused('checkout', nu.refused)
       if (!nu.ok) return refused('checkout', nu.err)
       const after = await state(folder)
       if (isUnknown(after)) return refused('checkout', after.detail ?? after.what)
@@ -1056,7 +1089,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (lines(kept).length) {
         why = await mine()
         if (why) return refused('clean', why)
-        const ab = await jj(folder, ['abandon', old], { write: true })
+        const ab = await jj(folder, ['abandon', old], { write: true, recheck: mine })
+        if (ab.refused) return refused('clean', ab.refused)
         if (!ab.ok) return refused('clean', ab.err)
       }
       const end = await state(folder)
@@ -1103,7 +1137,13 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           if (!proof || proof.path !== from) return 'control' as const
           if (phase === 'start') await journal.write({ phase: 'forgetting', workspace: identity.workspace, folder, generation: identity.generation, store: identity.store })
           if (!proof.check()) return 'control' as const
-          return jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true })
+          // All of it again under the file gate's admission, right before jj starts (HI-2918): still the holder's, still
+          // the recorded workspace, the control's check (inside the store's lock, which this context already holds).
+          const again = async (): Promise<string | null> => (!(await fenced()) ? 'fence' : existsSync(folder) && !(await owns(folder, identity)) ? 'identity' : !proof.check() ? 'control' : null)
+          const f = await jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true, recheck: again })
+          if (f.refused === 'fence') return null
+          if (f.refused === 'identity' || f.refused === 'control') return f.refused
+          return f
         })
         if (forgot === null) return step(false, JJ_REFUSED.fence)
         if (forgot === 'identity') return step(false, JJ_REFUSED.identity)

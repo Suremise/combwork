@@ -20,7 +20,7 @@ import { createHash } from 'crypto'
 import { join } from 'path'
 import { git as gitRun } from '../git'
 import { isJjViewUnknown, JJ_OPERATIONS_MAX, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjView } from '../../shared/jjViews'
-import { jjRunner, type JjRunner } from './jjRunner'
+import { jjRunner, storeGitGated, type JjRunner } from './jjRunner'
 import { isJjUnknown, jjUnknown, type JjMaybe, type JjReads } from './jjReads'
 import { contextOf, readsOf, staleAt, unknownOf } from './jjViews'
 import { readCheckout, workspaceGitDir } from './jjView'
@@ -84,7 +84,8 @@ export async function jjOperations(folder: string, from?: string | null, runner:
 /** A read-only git command in a folder (main's runner, `--no-optional-locks`); tests inject their own. */
 export type GitRead = (cwd: string, args: string[]) => Promise<{ ok: boolean; out: string; code?: number | null }>
 const defaultGit: GitRead = async (cwd, args) => {
-  const r = await gitRun(cwd, args)
+  // Under Combwork's file gate for its store (HI-2918).
+  const r = await storeGitGated(cwd, args, () => gitRun(cwd, args))
   return { ok: r.ok, out: r.out, code: r.code }
 }
 
@@ -127,6 +128,7 @@ function printSources(c: JjContext): PrintSources {
   const own = c.colocated ? workspaceGitDir(c.root) : null
   return {
     jjRepo: c.jjRepo,
+    store: c.store,
     files: [{ label: 'HEAD', path: join(c.store, 'HEAD') }, ...(own && own !== c.store ? [{ label: 'workspace HEAD', path: join(own, 'HEAD') }] : []), { label: 'packed', path: join(c.store, 'packed-refs') }, { label: 'config', path: join(c.store, 'config') }], // i18n-ignore: a print's labels, hashed, never shown
     trees: ['heads', 'tags', 'remotes'].map((t) => ({ label: `refs/${t}`, path: join(c.store, 'refs', t) })).concat([{ label: 'reftable', path: join(c.store, 'reftable') }]) // i18n-ignore: a print's labels, hashed, never shown
   }

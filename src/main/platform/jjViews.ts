@@ -10,6 +10,7 @@ import { PLATFORMS } from '../../shared/platform/descriptors'
 import { isJjViewUnknown, JJ_CONFLICTS_MAX, JJ_DIFF_MAX, JJ_HISTORY_MAX, jjRevisionInput, type JjBookmarkRow, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown, type JjWorkspaceRow } from '../../shared/jjViews'
 import { jjContextOf, type JjContext } from './jjDetect'
 import { jjRunner, type JjRunner } from './jjRunner'
+import { jjFileGate, pathKey, storeKey } from './jjFileGate'
 import { isJjUnknown, jjUnknown, JjReads, type JjMaybe } from './jjReads'
 import { CHANGE_ID, COMMIT_ID, readCheckout, readOpHeads } from './jjView'
 
@@ -224,6 +225,13 @@ async function markGit(c: JjContext, rows: JjBookmarkRow[]): Promise<void> {
 
 /** Git's local branches, read from the store's files (no process): loose refs win over packed ones. Null if unreadable. */
 export async function gitBranches(store: string): Promise<Map<string, string> | null> {
+  // Under Combwork's file gate for the store (HI-2918): never while a jj write of Combwork's exports there.
+  const key = await pathKey(store)
+  if (!key) return null
+  return jjFileGate.read([storeKey(key)], () => gitBranchesNow(store))
+}
+
+async function gitBranchesNow(store: string): Promise<Map<string, string> | null> {
   const { readFile, readdir } = await import('original-fs/promises')
   const out = new Map<string, string>()
   const packed = await readFile(join(store, 'packed-refs'), 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? '' : null))

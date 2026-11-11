@@ -40,6 +40,7 @@ import { createJjWorkspacePort, generationOf, type JjWorkspacePort } from './pla
 import { isUnknown } from './platform/types'
 import { SlotStaleView } from './slotStaleView'
 import { recoverStale } from './platform/jjRecovery'
+import { storeGitGated } from './platform/jjRunner'
 import { git } from './git'
 import { boardPrepStore } from './platform/jjSlotPrep'
 import { historyFor } from './platform/historyPorts'
@@ -324,7 +325,7 @@ export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string
   const pool = await poolFor(ws, projectPath)
   return pool.recoverStale(name, async (s, fence, journal, quietNow) => {
     const r = await recoverStale(
-      { port: jjPort(), git: (cwd, args) => git(cwd, args), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
+      { port: jjPort(), git: (cwd, args) => storeGitGated(cwd, args, () => git(cwd, args)), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
       { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
     )
     return r.ok ? { ok: true } : { ok: false, why: r.why }

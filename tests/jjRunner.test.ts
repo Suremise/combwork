@@ -3,12 +3,13 @@
 // missing tool, and that none of those is ever taken for jj's answer (SPEC §16.3.6 rule 3). The real jj's cases are
 // jjReal.test.ts's.
 import { spawn } from 'child_process'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compareJjVersions, jjRunnable, jjSupported, jjToolOf, parseJjVersion, TESTED_JJ } from '../src/shared/jjTool'
-import { createJjRunner, JJ_NO_EDITOR, JJ_PREFIX, JJ_READ, jjOnPath } from '../src/main/platform/jjRunner'
+import { createJjRunner, JJ_NO_EDITOR, JJ_PREFIX, JJ_READ, jjOnPath, workspaceGateKeys } from '../src/main/platform/jjRunner'
+import { jjFileGate } from '../src/main/platform/jjFileGate'
 import { runJj } from '../src/main/platform/jjProcess'
 import testedVcs from '../resources/tested-vcs.json'
 import { tempDir } from './tempDir'
@@ -39,6 +40,16 @@ else { process.stdout.write(JSON.stringify({ args, editor: process.env.JJ_EDITOR
 `
 )
 const env = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({ SYSTEMROOT: process.env.SYSTEMROOT, PATH: '', ...extra })
+/** A folder laid out as a jj workspace (not colocated) as far as the gate's keys read it: `.jj/repo/store` naming a Git store. */
+const workspace = (): string => {
+  const ws = tempDir('jj-runner-ws-')
+  const store = join(ws, '.jj', 'repo', 'store')
+  mkdirSync(join(store, 'git'), { recursive: true })
+  writeFileSync(join(store, 'type'), 'git')
+  writeFileSync(join(store, 'git_target'), 'git')
+  writeFileSync(join(store, 'git', 'HEAD'), 'ref: refs/heads/main\n')
+  return ws
+}
 const runner = (extra: Record<string, string> = {}) => createJjRunner({ exe: process.execPath, before: [fake], env: env(extra), here: true })
 const alive = (pid: number): boolean => {
   try {
@@ -87,8 +98,69 @@ describe("jj's runner", () => {
     expect(said.editor).toBe(JJ_NO_EDITOR)
     expect(said.prompt).toBe('0')
     expect(said.cwd.toLowerCase()).toBe(dir.toLowerCase())
-    // A write is asked for by name; J0 has none.
-    expect(JSON.parse((await r.run(dir, ['describe'], { write: true })).out).args).toEqual([...JJ_PREFIX, 'describe'])
+    // A write is asked for by name, in a jj workspace (its gate's keys come from its files, HI-2918).
+    const said2 = JSON.parse((await r.run(workspace(), ['describe'], { write: true })).out)
+    expect(said2.args).toEqual([...JJ_PREFIX, 'describe'])
+  })
+
+  it("a write takes the gate over its workspace's files: it waits for a reader holding it, runs its recheck under it, refuses with no keys (HI-2918)", async () => {
+    const ws = workspace()
+    const keys = (await workspaceGateKeys(ws))!
+    expect(keys.root.startsWith('root:') && keys.store.startsWith('store:')).toBe(true)
+    const pid = join(tempDir('jj-runner-gate-'), 'pid')
+    const r = runner({ FAKE_JJ_PID: pid })
+    // A reader of its checkout holds the gate: the write waits, nothing started.
+    const reader = await jjFileGate.acquire([keys.root], 'shared')
+    let ran = false
+    const write = r.run(ws, ['new'], { write: true }).then((x) => ((ran = true), x))
+    // Its admission asked for once its keys are read: then it waits behind the reader.
+    await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 20_000 }).toBe(true)
+    expect([ran, existsSync(pid)]).toEqual([false, false])
+    reader.release()
+    expect((await write).ok).toBe(true)
+    expect(jjFileGate.size).toBe(0)
+    // A recheck that refuses: nothing runs; one that reads the workspace's checkout reads through its ticket.
+    rmSync(pid, { force: true })
+    const no = await r.run(ws, ['new'], { write: true, recheck: () => 'lost its lease' })
+    expect(no).toMatchObject({ ok: false, code: -1, refused: 'lost its lease' })
+    expect(existsSync(pid)).toBe(false)
+    const yes = await r.run(ws, ['new'], { write: true, recheck: () => jjFileGate.read([keys.root], async () => null) })
+    expect(yes.ok).toBe(true)
+    expect((await r.run(ws, ['new'], { write: true, recheck: () => Promise.reject(new Error('boom')) })).refused).toMatch(/boom/)
+    // Not in a jj workspace: no keys, so nothing runs.
+    expect((await r.run(tempDir('jj-runner-nows-'), ['new'], { write: true })).refused).toMatch(/keys/)
+    expect(jjFileGate.size).toBe(0)
+  })
+
+  it('a write cancelled while it runs keeps its admission until its process has gone; one cancelled while queued never runs (HI-2918)', async () => {
+    const ws = workspace()
+    const keys = (await workspaceGateKeys(ws))!
+    const pid = join(tempDir('jj-runner-gate-'), 'pid')
+    const ac = new AbortController()
+    const running = runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(ws, ['new'], { write: true, signal: ac.signal, timeout: 60_000 })
+    await expect.poll(() => existsSync(pid), { timeout: 20_000 }).toBe(true)
+    const proc = Number(readFileSync(pid, 'utf8'))
+    let readerIn = false
+    const reader = jjFileGate.read([keys.root], async () => {
+      readerIn = true
+      // Its process has gone by the time a reader gets in.
+      return alive(proc)
+    })
+    ac.abort()
+    expect(await running).toMatchObject({ notRun: 'cancelled' })
+    expect(await reader).toBe(false)
+    expect(readerIn).toBe(true)
+    // Queued behind a reader, then cancelled: never runs.
+    const pid2 = join(tempDir('jj-runner-gate-'), 'pid')
+    const held = await jjFileGate.acquire([keys.root], 'shared')
+    const ac2 = new AbortController()
+    const queued = runner({ FAKE_JJ_PID: pid2 }).run(ws, ['new'], { write: true, signal: ac2.signal })
+    await new Promise((res) => setImmediate(res))
+    ac2.abort()
+    expect(await queued).toMatchObject({ notRun: 'cancelled' })
+    held.release()
+    expect(existsSync(pid2)).toBe(false)
+    expect(jjFileGate.size).toBe(0)
   })
 
   it("gives jj's own exit code as its answer, and its standard input closed after what it is given", async () => {
