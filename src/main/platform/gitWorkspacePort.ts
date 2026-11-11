@@ -67,7 +67,8 @@ export const gitWorkspacePort: WorkspacePort = {
   // (no start point: a commit meanwhile is on it, and no file changes).
   branchHere: async (folder, line, base) => {
     const past = await git(folder, ['merge-base', '--is-ancestor', base, 'HEAD'])
-    if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // agent-protocol: a log line's detail, never sent to an agent
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // i18n-ignore: a log line's detail, never shown
     return step(git(folder, ['switch', '--no-guess', '-c', line]))
   },
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
