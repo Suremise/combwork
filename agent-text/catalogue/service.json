@@ -384,6 +384,11 @@
     "note": "HI-2944: an error from Commit or Set aside: the folder the branch {target} is checked out in changed while Combwork waited to act; nothing was done.",
     "audience": "both"
   },
+  "service.folderChanges.nestedRepo": {
+    "text": "{folder} is a Git repository of its own inside this one, so Combwork doesn't commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.",
+    "note": "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name.",
+    "audience": "both"
+  },
   "service.folderChanges.noTarget": {
     "text": "{target} isn't checked out in a folder of this project now: nothing to commit or set aside there.",
     "note": "HI-2944: an error from Commit or Set aside (a paused merge, a start's warning): the branch {target} isn't checked out anywhere now.",
@@ -407,6 +412,11 @@
   "service.folderChanges.stashPartial": {
     "text": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
     "note": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command.",
+    "audience": "both"
+  },
+  "service.folderChanges.tooManyToSetAside": {
+    "text": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
+    "note": "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command.",
     "audience": "both"
   },
   "service.folderChanges.unplaced": {

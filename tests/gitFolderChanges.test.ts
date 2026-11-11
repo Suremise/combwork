@@ -13,6 +13,8 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** HI-2983: a file written just before the next `stash push` runs (after the changes shown were checked). */
+let lateFile: string | null = null
 /** HI-2982 (HR2's round 5): an lstat of a path ending so refused (EPERM), as Windows can, though git still reads it. */
 let failLstatOf: string | null = null
 vi.mock('original-fs/promises', async (original) => {
@@ -34,6 +36,11 @@ vi.mock('../src/main/git', async (original) => {
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
+      if (lateFile && args[0] === 'stash' && args[1] === 'push') {
+        // HI-2983 (HR1's round 1): a change made after the check, never shown, just before git stashes.
+        writeFileSync(join(cwd, lateFile), 'not shown\n')
+        lateFile = null
+      }
       const r = await real.git(cwd, args, max, input, opts)
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
@@ -69,6 +76,9 @@ vi.setConfig({ testTimeout: 60_000 })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
+const { worktreeNow } = await import('../src/main/platform/git')
+const { GitPlatform } = await import('../src/main/platform/gitPlatform')
+const { isUnknown } = await import('../src/main/platform/types')
 
 const base = tempDir('cw-folderchanges-')
 const ws = join(base, 'ws')
@@ -103,6 +113,7 @@ beforeEach(() => {
   failTopIn = null
   failStashAfter = false
   failLstatOf = null
+  lateFile = null
 })
 
 describe('Commit', () => {
@@ -358,6 +369,123 @@ describe('the folder and its state, checked under the lock', () => {
     // The bracketed ones are changes like any other: committed when shown.
     await settle('commit', ['(draft).md', '(notes)/a.md'])
     expect(committed()).toEqual(['(draft).md', '(notes)/a.md'])
+  })
+
+  it('HI-2983: a changed file named exactly as a marker, (MERGE_HEAD), is a file: Commit goes on, and a start lists it', async () => {
+    writeFileSync(join(proj, '(MERGE_HEAD)'), 'not a merge\n')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const now = await worktreeNow(proj)
+    expect(isUnknown(now) ? null : now.operations).toEqual([])
+    // The start warning's list (port 5's targetChanges): only the project is read from the workflow.
+    const listed = await inWorkspace(w, () => new GitPlatform({ cfg: { project: proj } } as unknown as ConstructorParameters<typeof GitPlatform>[0]).targetChanges('main'))
+    expect(listed?.files.sort()).toEqual(['(MERGE_HEAD)', 'a.txt'])
+    await settle('commit', ['a.txt', '(MERGE_HEAD)'])
+    expect(committed()).toEqual(['(MERGE_HEAD)', 'a.txt'])
+  })
+})
+
+// HI-2983: each path was its own argument, so a few hundred passed Windows' 32,767-character command line (spawn
+// ENAMETOOLONG) and both buttons failed with nothing done. The paths now go to git on its input.
+describe('many changed files', () => {
+  const many = (count: number): string[] => {
+    const out: string[] = []
+    mkdirSync(join(proj, 'build', 'a fairly long generated folder name'), { recursive: true })
+    for (let i = 0; i < count; i++) {
+      const rel = `build/a fairly long generated folder name/generated output file number ${String(i).padStart(4, '0')}.txt`
+      writeFileSync(join(proj, rel), `${i}\n`)
+      out.push(rel)
+    }
+    return out
+  }
+
+  it('Commit of 1,000 untracked files (about 100,000 characters of paths), with a tracked edit: all committed, nothing else', async () => {
+    const files = many(1000)
+    expect(files.join(' ').length).toBeGreaterThan(32_767)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'b.txt'), 'staged\n')
+    sh(proj, 'add', 'b.txt')
+    const done = await settle('commit', [...files, 'a.txt'])
+    expect(done.files).toHaveLength(1001)
+    expect(committed()).toEqual([...files, 'a.txt'].sort())
+    expect(status()).toBe('M  b.txt')
+  })
+
+  it("Set Aside of 1,000 files, every change in the folder (a start's warning): still by name, so refused, no stash made, nothing changed", async () => {
+    const files = many(1000)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const before = status()
+    await expect(settle('setAside', [...files, 'a.txt'])).rejects.toThrow(/Git can't set aside this many files \(1,001\) at once/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(status()).toBe(before)
+  })
+
+  it("a file changed after the check, never shown, stays out of the stash and on disk, even when the shown file was every change (HR1's round 1)", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    lateFile = 'late.txt'
+    await settle('setAside', ['a.txt'])
+    expect(lateFile).toBeNull()
+    expect(sh(proj, 'diff', '--name-only', 'HEAD', 'refs/stash')).toBe('a.txt')
+    // Its untracked files' commit (when git made one) without the late file.
+    const untracked = ((): string => {
+      try {
+        return sh(proj, 'ls-tree', '-r', '--name-only', 'refs/stash^3')
+      } catch {
+        return ''
+      }
+    })()
+    expect(untracked).not.toContain('late.txt')
+    expect(read('late.txt')).toBe('not shown\n')
+    expect(status()).toBe('?? late.txt')
+  })
+
+  it('Set Aside of some of the changes, given on its input: 150 files beside a staged one not shown', async () => {
+    const files = many(150)
+    writeFileSync(join(proj, 'b.txt'), 'staged\n')
+    sh(proj, 'add', 'b.txt')
+    await settle('setAside', files)
+    expect(sh(proj, 'show', '--name-only', '--format=', 'refs/stash^3').split('\n').filter(Boolean)).toHaveLength(150)
+    expect(status()).toBe('M  b.txt')
+  })
+
+  it("Set Aside of 1,000 of the changes but not all (more than git's stash can be given apart): refused, no stash made, nothing changed", async () => {
+    const files = many(1000)
+    writeFileSync(join(proj, 'b.txt'), 'staged\n')
+    sh(proj, 'add', 'b.txt')
+    const before = status()
+    await expect(settle('setAside', files)).rejects.toThrow(/Git can't set aside this many files \(1,000\) at once/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(status()).toBe(before)
+  })
+
+  it('a refusing hook with 1,000 untracked files: the intent-to-add entries taken out again, nothing lost', async () => {
+    const files = many(1000)
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
+    const before = head()
+    await expect(settle('commit', files)).rejects.toThrow(/Git did not commit/)
+    expect(head()).toBe(before)
+    expect(sh(proj, 'ls-files', '--stage')).not.toContain('generated')
+    expect(status().split('\n')).toHaveLength(1000)
+  })
+})
+
+// HI-2983: an untracked repository inside this one is listed whole (`nested/`); the trailing `/` made the window's list
+// look stale, and beside other files it was left out with nothing said.
+describe('an untracked repository of its own inside the folder', () => {
+  const nested = (): void => {
+    mkdirSync(join(proj, 'nested'), { recursive: true })
+    gitRepo(join(proj, 'nested'))
+    commit(join(proj, 'nested'), { 'x.txt': 'x\n' }, 'inner')
+  }
+
+  it('alone or beside other files: Commit and Set Aside refused by name, nothing done', async () => {
+    nested()
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? nested/', 'M a.txt'])
+    const before = [head(), status(), sh(proj, 'stash', 'list')]
+    for (const shown of [['nested/'], ['a.txt', 'nested/']])
+      for (const action of ['commit', 'setAside'] as const) await expect(settle(action, shown)).rejects.toThrow(/^nested\/ is a Git repository of its own inside this one/)
+    expect([head(), status(), sh(proj, 'stash', 'list')]).toEqual(before)
   })
 })
 

@@ -90,11 +90,13 @@ interface CombworkMessageValues {
   'service.folderChanges.indexBusy': undefined
   'service.folderChanges.midOperation': { state: string; folder: string | number }
   'service.folderChanges.moved': { target: string | number }
+  'service.folderChanges.nestedRepo': { folder: string | number }
   'service.folderChanges.noTarget': { target: string | number }
   'service.folderChanges.nothing': { file: string | number }
   'service.folderChanges.readFailed': { why: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
   'service.folderChanges.unplaced': { folder: string | number }
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined
