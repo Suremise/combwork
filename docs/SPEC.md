@@ -8098,7 +8098,12 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       started on them if they aren't running, as an update by the user or the Assistant does.
     - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
       one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
-      a lane gone, ended or at another revision is refused, nothing saved. Every check is made again at the write, under
+      a lane gone, ended or at another revision is refused, nothing saved. **Quick edits in turn** (HI-2932): the window
+      asks each lane's edits one at a time (`editLaneInTurn`), each made when its turn comes from the lanes read again
+      after the last (a card's place from the rows then), naming the revision main's reply said the window's own last edit
+      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
+      Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
       facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
       before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:
