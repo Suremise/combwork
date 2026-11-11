@@ -218,6 +218,8 @@ export interface ActivityCard {
   column: string
   builder: string | null
   reviewer: string | null
+  /** HI-2915: in Doing and marked waiting on purpose (HI-2618): why, and whether it waits for the Assistant's answer. */
+  waiting?: { reason: string; assistant: boolean }
 }
 
 export interface ActivityInput {

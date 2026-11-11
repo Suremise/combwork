@@ -90,6 +90,7 @@
   "activity.task": "{type, select, subagent {后台子智能体} command {后台命令} monitor {监视器} workflow {工作流程} other {后台任务}}",
   "activity.thinking": "正在思考…",
   "activity.toolFor": "{summary} · {time}",
+  "activity.waiting": "{assistant, select, yes {正在等待助手的答复：{reason}} other {等待中：{reason}}}",
   "activity.workspace.agentIn": "{project} · {agent}",
   "activity.workspace.assistant": "助手",
   "activity.workspace.cardNobody": "现在没有人在处理 {card}。历史记录在卡片上。",

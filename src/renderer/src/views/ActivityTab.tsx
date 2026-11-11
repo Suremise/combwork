@@ -197,7 +197,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     () =>
       tasks
         .filter((c) => !c.archived && c.project.toLowerCase() === project.name.toLowerCase())
-        .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, builder: c.agent, reviewer: c.review?.agent ?? null })),
+        .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, builder: c.agent, reviewer: c.review?.agent ?? null, ...(c.column === 'doing' && c.waitingFor ? { waiting: { reason: c.waitingFor.reason, assistant: !!c.waitingFor.ask } } : {}) })),
     [tasks, project.name]
   )
   // The map (HI-2903): its toggles (one for every view), and its agents' context, read only while it shows them.
@@ -457,7 +457,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
                 </span>
                 <span className="faint activity-card-column">· {tr(M.column, { column: card.column })}</span>
               </div>
-            ) : solo ? (
+            ) : null}
+            {/* Waiting on purpose (HI-2915, HI-2618): what for, under its card's line, cut short with the whole in its title. */}
+            {card?.waiting && (
+              <div className="activity-card-waiting faint" data-mark="waiting" title={tr(M.waiting, { assistant: card.waiting.assistant ? 'yes' : 'no', reason: card.waiting.reason })}>
+                {tr(M.waiting, { assistant: card.waiting.assistant ? 'yes' : 'no', reason: card.waiting.reason })}
+              </div>
+            )}
+            {card ? null : solo ? (
               <div className="activity-card-head">
                 <span className="activity-card-title" title={solo.title || solo.name || solo.id.slice(0, 8)}>
                   {solo.title || solo.name || solo.id.slice(0, 8)}
@@ -795,6 +802,7 @@ const M = {
   pillTip: msg({ id: 'activity.pillTip', defaultMessage: 'Take a new snapshot with what came since. It stays frozen.', description: "Tooltip of the Activity tab's updates pill." }),
   refresh: msg({ id: 'activity.refresh', defaultMessage: 'Refresh', description: "Tooltip of the Activity tab's refresh button: takes a new snapshot of what runs now." }),
   endedNode: msg({ id: 'activity.endedNode', defaultMessage: 'Ended', description: "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves." }),
+  waiting: msg({ id: 'activity.waiting', defaultMessage: '{assistant, select, yes {Waiting for the Assistant’s answer: {reason}} other {Waiting: {reason}}}', description: "A line under the card an agent works on in the Activity tab (HI-2915): the card, in Active, is marked as waiting on purpose, so Combwork doesn't report it as stalled. assistant is yes when its agent asked the Combwork Assistant for something and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys." }),
   column: msg({ id: 'activity.column', defaultMessage: '{column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A card node's second line in the Activity tree: its board column. Use the board's column names." }),
   state: msg({ id: 'activity.state', defaultMessage: '{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}', description: 'A node\'s state in the Activity tree: working, waiting for you, failed (or stalled), done, idle.' }),
   noPrompt: msg({ id: 'activity.noPrompt', defaultMessage: '(no prompt text)', description: 'A turn node in the Activity tree whose prompt has no text (only images, say).' }),
