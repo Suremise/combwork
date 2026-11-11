@@ -23,6 +23,7 @@ const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -138,11 +139,11 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const reviewLease = async (n) => ((await inv('copies:list', shop)) ?? []).find((c) => c.state === 'leased' && c.lease?.kind === 'review' && c.lease.card === n && !c.lease.returned)
     const waitingOf = async (n) => ((await inv('jj:waiting', shop)) ?? []).find((x) => x.card === n) ?? null
 
-    /** B1 records its work with jj in its slot (`edits`: file → text) and submits it; R1 reviews it in a copy and passes it. */
-    const buildAndReview = async (n, key, folder, edits, label) => {
-      // B1 ready in its slot: the card's start (its slot prepared on the target's head) is over before the work begins.
-      // Its slot prepared for it first (HB5 on HI-2923): the working copy on the card's base, which only its preparation puts
-      // it on. B1 can look ready from the last card before Combwork ends it for this card's preparation.
+    /**
+     * The card's slot prepared for it (HB5 on HI-2923): its working copy on the card's base, which only its preparation puts
+     * it on (B1 can look ready from the last card before Combwork ends it for this card's preparation); then B1 ready.
+     */
+    const prepared = async (n, folder, label) => {
       const w0 = await inv('tasks:work', n)
       const at = () => {
         try {
@@ -153,20 +154,80 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
       }
       check(`${label}: its slot prepared on its base before the work begins`, !!w0?.base && !!(await until(() => at() === w0.base, HUNG_MS)), JSON.stringify({ base: w0?.base, at: at(), notReady: (await inv('tasks:work', n))?.notReady }))
       await ready(b1.id)
-      for (const [f, t] of Object.entries(edits)) fs.writeFileSync(path.join(folder, f), t)
+      return w0
+    }
+    /**
+     * B1 records its work with jj in its slot (`edits`: file → text, written here unless `prewritten`) and submits it; R1
+     * reviews it in a copy and passes it. Each identity checked end to end (HR2 on HI-2801): the submission's revision and
+     * change id, the review copy's checkout, the passing verdict's revision; and before the user acts, nothing Integrated or
+     * Done, main and the remote as they were.
+     */
+    const buildAndReview = async (n, key, folder, edits, label, o = {}) => {
+      if (!o.prewritten) {
+        await prepared(n, folder, label)
+        for (const [f, t] of Object.entries(edits)) fs.writeFileSync(path.join(folder, f), t)
+      }
       jj(folder, 'commit', '-m', `${key}: ${label}`)
       const ws0 = (await inv('tasks:work', n)).workspace
       const R = id(folder, `${ws0}@-`)
+      const change = id(folder, R, 'change_id')
+      const mainBefore = id(shop, 'main')
+      const remoteBefore = remoteMain()
       const sub = await call(await tokenOf(b1.id), 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: 'Done.' })
       check(`${label}: B1 submits it, in Review`, sub.status === 200 && !!(await until(async () => (await column(n)) === 'review', HUNG_MS)), JSON.stringify({ sub: sub.body, column: await column(n) }))
+      const submitted = (await inv('tasks:work', n))?.revisions?.at(-1)
+      check(`${label}: the submission is its commit and change`, submitted?.revision === R && submitted?.change === change, JSON.stringify({ submitted, R, change }))
       await ready(r1.id)
       const rv = await call(await tokenOf(r1.id), 'POST', `/v1/tasks/${encodeURIComponent(key)}/start-review`, {})
       const copy = await until(() => reviewLease(n), HUNG_MS)
-      check(`${label}: R1 reviews it in a review copy of its own`, rv.status === 200 && !!copy, JSON.stringify({ rv: rv.body, copies: await inv('copies:list', shop) }))
+      const copyAt = copy ? id(copy.folder, '@-') : null
+      check(`${label}: R1 reviews it in a review copy of its own, checked out at its commit`, rv.status === 200 && !!copy && copyAt === R, JSON.stringify({ rv: rv.body, copy, copyAt, R }))
       const pass = await call(await tokenOf(r1.id), 'POST', `/v1/tasks/${encodeURIComponent(key)}/verdict`, { pass: true, comment: 'Good.' })
       check(`${label}: R1 passes it, waiting for your integration`, pass.status === 200 && !!(await until(async () => (await column(n)) === 'passed', HUNG_MS)), JSON.stringify({ pass: pass.body, column: await column(n) }))
-      return R
+      const verdict = (await inv('tasks:work', n))?.verdicts?.at(-1)
+      check(`${label}: the pass is for its commit`, verdict?.pass === true && verdict?.revision === R, JSON.stringify({ verdict, R }))
+      check(`${label}: before the user acts, nothing Integrated or Done; main and the remote as they were`, (await integrationOf(n)) === null && (await column(n)) === 'passed' && id(shop, 'main') === mainBefore && remoteMain() === remoteBefore, JSON.stringify({ integration: await integrationOf(n), column: await column(n), main: id(shop, 'main'), mainBefore }))
+      return { R, change }
     }
+    /** The bare remote's main (null before the first push). */
+    const remoteMain = () => {
+      try {
+        return execFileSync('git', ['--git-dir', remote, 'rev-parse', '--verify', '-q', 'refs/heads/main'], { env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null
+      } catch {
+        return null
+      }
+    }
+    /** The recorded integration of a card, checked against the commits it should name (revision, result, target, route). */
+    const integratedAs = async (n, label, want) => {
+      const i = await integrationOf(n)
+      check(`${label}: Integrated by the user, naming its commit and the target's commit with it (${want.via})`, !!i && i.revision === want.revision && i.result === want.result && i.target === 'main' && i.by === 'outside' && i.via === want.via, JSON.stringify({ integration: i, want }))
+    }
+    // The containment observations of a card (J9c's records), read from the workspace database: an observation barrier.
+    // Each reserves its generation from the project's counter before reading the repository (HI-2869/s16), so one whose
+    // generation is above the counter read just after a repository change was made after that change.
+    const pid = JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).id
+    const dbFile = path.join(ws, '.combwork', 'combwork.db')
+    const metaRead = (sql, ...a) => {
+      const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+      try {
+        return db.prepare(sql).all(...a)
+      } finally {
+        db.close()
+      }
+    }
+    const genNow = () => Number(metaRead('SELECT value FROM board_meta WHERE key = ?', `jj_contained_gen:${pid.toLowerCase()}`)[0]?.value ?? 0)
+    const observationOf = (key) => {
+      const prefix = `jj_contained:${pid.toLowerCase()}:${key.toLowerCase()}:`
+      const rows = metaRead('SELECT value FROM board_meta WHERE substr(key, 1, ?) = ?', prefix.length, prefix).map((r) => JSON.parse(r.value))
+      return rows.sort((a, b) => b.gen - a.gen)[0] ?? null
+    }
+    /** An observation of the card made after `g` (the counter just after a change), the card's Work read to ask for one. */
+    const observedAfter = (n, key, g) =>
+      until(async () => {
+        await inv('tasks:work', n)
+        const o = observationOf(key)
+        return o && o.gen > g ? o : null
+      }, HUNG_MS)
     /** The user's copy of a card's commit onto main, as Waiting suggests (HI-2913): its commit id, found by its description. */
     const duplicateOnto = (R, description) => {
       jj(shop, '--ignore-working-copy', 'duplicate', '-r', R, '--onto', 'main')
@@ -187,24 +248,37 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const slotFolder = w1.folder
 
     // --- Card 1: built, reviewed, integrated by the user; Combwork moves no bookmark itself.
-    const R1 = await buildAndReview(n1, k1, slotFolder, { 'one.txt': 'card one\n' }, 'card 1')
+    const { R: R1 } = await buildAndReview(n1, k1, slotFolder, { 'one.txt': 'card one\n' }, 'card 1')
     const marks = bookmarksBefore()
     check('Combwork moved no bookmark while building and reviewing it', /^main /m.test(marks) && marks.includes(id(shop, 'description(exact:"base\n")')), marks)
     jj(shop, 'bookmark', 'set', 'main', '-r', R1)
     check('the user moves main onto it: Done', !!(await until(async () => (await column(n1)) === 'done', HUNG_MS)), await column(n1))
-    check('…Integrated by the user, proved in its history', (await integrationOf(n1))?.via === 'ancestry' && (await integrationOf(n1))?.by === 'outside', JSON.stringify(await integrationOf(n1)))
+    await integratedAs(n1, 'card 1', { revision: R1, result: R1, via: 'ancestry' })
 
     // --- The lane goes on: card 2 in the same slot.
     const w2 = await workOf(n2)
     check('card 2 starts in the same slot', !!w2 && w2.folder.toLowerCase() === slotFolder.toLowerCase(), JSON.stringify(w2))
 
-    // --- Interruption: Combwork quits with card 2 in Doing, and opens again on the same profile.
+    // --- Interruption: Combwork quits with card 2 in Doing and its work in progress (HR2: work to keep), and opens again.
+    // Its edit in the slot, and a note never recorded by jj, before the restart; their bytes, the working copy's change,
+    // the binding's base and workspace and the lane's record compared after it.
+    await prepared(n2, slotFolder, 'card 2')
+    const edits2 = { 'shared.txt': shared({ 5: 'six, by card two' }), 'two-notes.txt': 'in progress, never recorded\n' }
+    for (const [f, t] of Object.entries(edits2)) fs.writeFileSync(path.join(slotFolder, f), t)
+    const wcChange2 = id(slotFolder, `${w2.workspace}@`, 'change_id')
+    const laneOf = async (n) => ((await inv('lanes:list')) ?? []).find((l) => (l.cards ?? []).includes(n)) ?? null
+    const lane2 = await laneOf(n2)
+    console.log(`INFO card 2 before the restart: line ${w2.line}, base ${w2.base}, workspace ${w2.workspace}, working copy change ${wcChange2}, lane ${lane2?.id}`)
     await h.app.close()
     h = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
     watch()
     await lib.openWorkspace(inv, h.page, ws)
     const w2b = await workOf(n2)
-    check('after a restart: card 2 still in Doing, in its slot, its workspace kept', (await column(n2)) === 'doing' && !!w2b && w2b.folder.toLowerCase() === slotFolder.toLowerCase() && w2b.workspace === w2.workspace, JSON.stringify({ column: await column(n2), w2b }))
+    check('after a restart: card 2 still in Doing, in its slot, its workspace and base kept', (await column(n2)) === 'doing' && !!w2b && w2b.folder.toLowerCase() === slotFolder.toLowerCase() && w2b.workspace === w2.workspace && w2b.base === w2.base, JSON.stringify({ column: await column(n2), w2, w2b }))
+    check('…its in-progress work kept, byte for byte, the working copy the same change', Object.entries(edits2).every(([f, t]) => fs.readFileSync(path.join(slotFolder, f), 'utf8') === t) && id(slotFolder, `${w2.workspace}@`, 'change_id') === wcChange2, JSON.stringify({ wc: id(slotFolder, `${w2.workspace}@`, 'change_id'), wcChange2 }))
+    const lane2b = await laneOf(n2)
+    check('…and its lane, the same one with the same cards', !!lane2 && lane2b?.id === lane2.id && JSON.stringify(lane2b.cards) === JSON.stringify(lane2.cards), JSON.stringify({ lane2, lane2b }))
+    console.log(`INFO card 2 after the restart: line ${w2b.line}, base ${w2b.base}, workspace ${w2b.workspace}`)
     // Its agents again: resumed by Combwork, or started once the slot's own look after the restart is over (a start refused
     // meanwhile says the slot is still being set up).
     for (const a of [b1, r1]) {
@@ -213,7 +287,8 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     }
 
     // --- Card 2 touches line 6 of shared.txt; the user's own commit on main changes line 1 meanwhile.
-    const R2 = await buildAndReview(n2, k2, slotFolder, { 'shared.txt': shared({ 5: 'six, by card two' }) }, 'card 2')
+    // Its kept work recorded and submitted as it is (nothing written again over it).
+    const { R: R2, change: change2 } = await buildAndReview(n2, k2, slotFolder, edits2, 'card 2', { prewritten: true })
     jj(shop, 'new', 'main', '-m', 'the user moves on')
     fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by the user' }))
     jj(shop, 'commit', '-m', 'the user moves on')
@@ -229,13 +304,14 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     jj(shop, 'bookmark', 'set', 'main', '-r', R2b)
     jj(shop, 'git', 'push', '--bookmark', 'main')
     check('the user copies it onto main, moves main and pushes: Done', !!(await until(async () => (await column(n2)) === 'done', HUNG_MS)), await column(n2))
-    check('…Integrated by the user, its change found applied again', (await integrationOf(n2))?.via === 'replay', JSON.stringify(await integrationOf(n2)))
+    await integratedAs(n2, 'card 2', { revision: R2, result: R2b, via: 'replay' })
+    check('…the remote has the pushed copy', remoteMain() === R2b, JSON.stringify({ remote: remoteMain(), R2b }))
     check('…nothing to check in Publish records', !!(await until(async () => ((await inv('jj:toCheck', shop, null))?.rows ?? []).length === 0, HUNG_MS)), JSON.stringify(await inv('jj:toCheck', shop, null)))
     // Card 2's Work section, both themes.
     await showBoard(h.page)
     await openByTitle(h.page, n2)
     const workSection = h.page.locator('.card-work[data-work="recorded"]')
-    check('card 2\'s Work section: its workspace, change id and route', !!(await until(async () => /found applied again|applied again/.test(await text(workSection)) && (await text(workSection)).includes(w2.workspace), HUNG_MS)), await text(workSection))
+    check('card 2\'s Work section: its workspace, its change id and the route', !!(await until(async () => /found applied again|applied again/.test(await text(workSection)) && (await text(workSection)).includes(w2.workspace) && (await text(workSection)).includes(change2.slice(0, 12)), HUNG_MS)), await text(workSection))
     for (const theme of ['dark', 'light']) {
       await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await workSection.screenshot({ path: path.join(shots, `${SUITE}-work-replay-${theme}.png`) })
@@ -246,9 +322,11 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // --- Card 3: built and reviewed in the same slot, integrated as Waiting suggests (a copy onto main): Done.
     const w3 = await workOf(n3)
     check('card 3 starts in the same slot', !!w3 && w3.folder.toLowerCase() === slotFolder.toLowerCase(), JSON.stringify(w3))
-    const R3 = await buildAndReview(n3, k3, slotFolder, { 'three.txt': 'card three\n' }, 'card 3')
-    jj(shop, 'bookmark', 'set', 'main', '-r', duplicateOnto(R3, `${k3}: card 3`))
+    const { R: R3 } = await buildAndReview(n3, k3, slotFolder, { 'three.txt': 'card three\n' }, 'card 3')
+    const R3b = duplicateOnto(R3, `${k3}: card 3`)
+    jj(shop, 'bookmark', 'set', 'main', '-r', R3b)
     check('the user copies card 3 onto main and moves main there: Done', !!(await until(async () => (await column(n3)) === 'done', HUNG_MS)), await column(n3))
+    await integratedAs(n3, 'card 3', { revision: R3, result: R3b, via: 'replay' })
 
     // --- Cleanup: the lane ends with its last card, its slot back in the pool, no review copy leased.
     check('the lane ends with its last card', !!(await until(async () => ((await inv('lanes:list')) ?? []).every((l) => l.ended || !(l.cards ?? []).includes(n1)), HUNG_MS)), JSON.stringify(await inv('lanes:list')))
@@ -273,17 +351,19 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
       const up = await until(async () => !!(await live(a.id)) || (await inv('session:start', shop, { agentId: a.id }).then(() => true, () => false)), HUNG_MS)
       check(`${a.name} running for card 4's review`, !!up, JSON.stringify(await live(a.id)))
     }
-    const R4 = await buildAndReview(n4, k4, w4.folder, { 'shared.txt': shared({ 0: 'one, by card four', 5: 'six, by card two' }) }, 'card 4')
-    const change4 = id(shop, R4, 'change_id')
+    const { R: R4, change: change4 } = await buildAndReview(n4, k4, w4.folder, { 'shared.txt': shared({ 0: 'one, by card four', 5: 'six, by card two' }) }, 'card 4')
     jj(shop, 'new', 'main', '-m', 'the user again')
     fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by the user again', 5: 'six, by card two' }))
     jj(shop, 'commit', '-m', 'the user again')
     jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
-    const remoteBefore = execFileSync('git', ['--git-dir', remote, 'rev-parse', 'refs/heads/main'], { env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8' }).trim()
+    const remoteBefore = remoteMain()
     const R4b = duplicateOnto(R4, `${k4}: card 4`)
     check('the copy onto main stores a conflict', id(shop, R4b, 'if(conflict, "yes", "no")') === 'yes')
-    // Before it is resolved: nothing Integrated, not Done.
-    check('…while the conflict stands: not Integrated, not Done', (await integrationOf(n4)) === null && (await column(n4)) === 'passed', JSON.stringify({ integration: await integrationOf(n4), column: await column(n4) }))
+    // While the conflict stands: an observation made after the conflicted copy exists (the barrier), and nothing recorded.
+    const g1 = genNow()
+    const seen1 = await observedAfter(n4, k4, g1)
+    console.log(`INFO card 4, the conflict standing: observation ${JSON.stringify(seen1)} (after generation ${g1})`)
+    check('…while the conflict stands (an observation made after it): not in main, not Integrated, not Done', seen1?.state === 'notYet' && seen1.revision === R4 && (await integrationOf(n4)) === null && (await column(n4)) === 'passed', JSON.stringify({ seen1, integration: await integrationOf(n4), column: await column(n4) }))
     // The user resolves it: the copy's file as they want it, squashed into the copy.
     jj(shop, 'new', R4b, '-m', 'resolve')
     fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by card four and the user', 5: 'six, by card two' }))
@@ -292,14 +372,14 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const R4c = id(shop, `change_id(${id(shop, R4b, 'change_id')})`)
     check('…resolved: no conflict stored', id(shop, R4c, 'if(conflict, "yes", "no")') === 'no')
     jj(shop, 'bookmark', 'set', 'main', '-r', R4c)
-    // Fail-closed: Combwork observes it isn't provably there and records nothing.
-    const waiting4 = await until(async () => {
-      const x = await waitingOf(n4)
-      return x?.contained?.state === 'notYet' && x.contained.at > 0 ? x : null
-    }, HUNG_MS)
-    check("a hand-resolved integration isn't proved: card 4 stays waiting, not in main as Combwork sees it", !!waiting4 && (await column(n4)) === 'passed', JSON.stringify({ waiting: await waitingOf(n4), column: await column(n4) }))
+    // Fail-closed: an observation made after main moved to the resolved copy (the barrier: its generation reserved after the
+    // move, so its proof read the repository with main at R4c) says it isn't provably there, and nothing is recorded.
+    const g2 = genNow()
+    const seen2 = await observedAfter(n4, k4, g2)
+    console.log(`INFO card 4, after the user's resolution: observation ${JSON.stringify(seen2)} (after generation ${g2})`)
+    check("a hand-resolved integration isn't proved (an observation made after main moved to it): card 4 stays waiting", seen2?.state === 'notYet' && seen2.revision === R4 && seen2.target === 'main' && (await column(n4)) === 'passed', JSON.stringify({ seen2, column: await column(n4) }))
     check('…nothing Integrated or attributed', (await integrationOf(n4)) === null, JSON.stringify(await integrationOf(n4)))
-    check('…main is the user\'s resolved copy, moved by no one else; nothing pushed', id(shop, 'main') === R4c && execFileSync('git', ['--git-dir', remote, 'rev-parse', 'refs/heads/main'], { env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8' }).trim() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c }))
+    check('…main is the user\'s resolved copy, moved by no one else; nothing pushed', id(shop, 'main') === R4c && remoteMain() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c, remote: remoteMain(), remoteBefore }))
     check('…nothing to check in Publish records for it', ((await inv('jj:toCheck', shop, null))?.rows ?? []).every((r) => r.card !== k4), JSON.stringify(await inv('jj:toCheck', shop, null)))
     console.log(`INFO card 4: reviewed ${R4} (change ${change4}); the user's conflicted copy ${R4b}, resolved as ${R4c} (change ${id(shop, R4c, 'change_id')}) on main`)
     // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
