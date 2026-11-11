@@ -183,6 +183,8 @@ export function jjCredit(rec: JjCheckRecord): JjCredit {
   const { start } = rec
   const no = (whyNot: NonNullable<CheckRanData['whyNot']>, why: string, tested = '', changes?: string[]): JjCredit => ({ revision: rec.revision, tested, whyNot, why, ...(changes?.length ? { changes: [...new Set(changes)].slice(0, 5) } : {}) })
   const b1 = start.b1
+  // A new file jj left out for its size (HI-2973): on disk beside the revision's tree, so the run is `dirty`.
+  if (isRefused(b1) && b1.refused === 'tooLarge') return no('dirty', 'start:tooLarge', '', b1.files)
   if (isRefused(b1)) return no(b1.refused === 'moved' || b1.refused === 'stale' ? 'moved' : 'changed', `start:${b1.refused}`)
   if (b1.recorded) return no('dirty', 'start:recorded', b1.at.commit)
   const tested = testedFor(rec.revision, b1.at, start.rev)
@@ -192,7 +194,7 @@ export function jjCredit(rec: JjCheckRecord): JjCredit {
   if (!sameMoment(start.e1, rec.beforeB2)) return no('moved', 'end:beforeBoundary', tested)
   const b2 = rec.b2
   if (!b2) return no('changed', 'end:noBoundary', tested)
-  if (isRefused(b2)) return no(b2.refused === 'moved' || b2.refused === 'stale' ? 'moved' : 'changed', `end:${b2.refused}`, tested)
+  if (isRefused(b2)) return no(b2.refused === 'moved' || b2.refused === 'stale' ? 'moved' : 'changed', `end:${b2.refused}`, tested, b2.files)
   if (b2.before !== H1) return no('moved', 'end:before', tested)
   if (b2.recorded) return no('changed', 'end:recorded', tested)
   if (b2.op !== H1) return no('moved', 'end:op', tested)

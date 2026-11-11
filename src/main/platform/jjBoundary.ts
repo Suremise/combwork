@@ -14,6 +14,7 @@ import type { JjRunner } from './jjRunner'
 import { jjRunner } from './jjRunner'
 import { isJjUnknown, JjReads, type JjCommit, type JjReadUnknown } from './jjReads'
 import { sameView, singleHead, viewNow, type Checkout, type ViewNow, type ViewOf } from './jjView'
+import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 
 /** Runs `fn` holding the store's repository lock (port 1's `withRepoLock` for the workspace's context). */
 export type StoreLock = <T>(fn: () => Promise<T>) => Promise<T>
@@ -26,13 +27,19 @@ export interface Owner {
 /**
  * Why a boundary refused: the owner lost the workspace (`owner`), the heads not one (`heads`), the heads not the expected
  * operation or moving under it (`moved`), a stale workspace (`stale`), cancelled (`cancelled`), jj not tracking every new
- * file (`autoTrack`: an untracked file would escape the snapshot), or anything else it couldn't read (`unknown`).
+ * file (`autoTrack`: an untracked file would escape the snapshot), jj leaving new files out of the snapshot for its size
+ * limit (`tooLarge`, HI-2973: `files` names them, `max` is `snapshot.max-new-file-size` in bytes), or anything else it
+ * couldn't read (`unknown`).
  */
-export type BoundaryWhy = 'owner' | 'heads' | 'moved' | 'stale' | 'cancelled' | 'autoTrack' | 'unknown'
+export type BoundaryWhy = 'owner' | 'heads' | 'moved' | 'stale' | 'cancelled' | 'autoTrack' | 'tooLarge' | 'unknown'
 
 export interface BoundaryRefused {
   refused: BoundaryWhy
   detail?: string
+  /** `tooLarge`: the files jj left out, as it named them. */
+  files?: string[]
+  /** `tooLarge`: the limit jj gave, in bytes, when it gave one. */
+  max?: number
 }
 
 /** A boundary taken: the head before the snapshot, the head after it, and the workspace's checkout and @ at that head. */
@@ -100,6 +107,10 @@ export async function jjBoundary(w: BoundaryOf, owner: Owner, o: BoundaryOptions
     if (!owner.still() || r.refused) return refused('owner')
     if (r.cancelled) return refused('cancelled')
     if (!r.ok) return refused(/stale/i.test(r.err) ? 'stale' : 'unknown', r.err)
+    // A new file past jj's size limit (HI-2973): left out with only a warning and exit 0, so the snapshot isn't
+    // everything on disk. Never "recorded" then: the files are named for the caller to refuse with.
+    const left = snapshotRefused(r.err)
+    if (left) return { ...refused('tooLarge', refusedDetail(left)), files: left.files, ...(left.max !== null ? { max: left.max } : {}) }
     await o.hooks?.afterSnapshot?.()
     if (!owner.still()) return refused('owner')
     const view = viewNow(w)

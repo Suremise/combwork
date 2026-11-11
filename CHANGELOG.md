@@ -35,6 +35,7 @@
 
 ### Fixed
 
+- **A large new file in a jj card is no longer left out of its work unnoticed** (HI-2973). jj leaves a new file over its size limit for new files (`snapshot.max-new-file-size`, 1 MiB by default) out of its commits with only a warning, so a card could be submitted, reviewed and integrated without it, and its slot reused or removed with the file still in it. Combwork now treats such a file as uncommitted work: the submission is refused, naming the file and the setting, a check run doesn't count, and the slot is kept until the file is committed (with the limit raised) or ignored.
 - **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:
   - The paused merge (Merges, Version Control → Merge queue, the card's Work section) has **Commit** and **Set Aside** for the files it names, and the merge goes on.
   - When a card or lane starts and that folder has uncommitted changes, Combwork says so before work begins, with the same buttons.

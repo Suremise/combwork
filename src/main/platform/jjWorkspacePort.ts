@@ -29,7 +29,8 @@ import { boundaryOf } from './repoBoundary'
 import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey } from './jjFileGate'
-import type { OwnedWrite, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
+import type { OwnedWrite, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
 /** Why a jj workspace step was refused (a protocol code: the pool words what it shows). */
@@ -115,6 +116,11 @@ export interface JjWorkspacePort extends WorkspacePort {
   nameFor(repo: string, folder: string): string
   /** Whether a folder's workspace is stale (unknown when that can't be read). */
   stale(folder: string): Promise<Maybe<boolean>>
+  /**
+   * `record`, with the new files jj left out of the snapshot for its size limit (HI-2973) apart as well: `files` is
+   * `record`'s answer (they are in it), `leftOut` those files alone, as jj named them.
+   */
+  recordLeftOut(folder: string, fence: WorkspaceFence, identity?: WorkspaceIdentity | null): Promise<Maybe<{ files: string[]; leftOut: string[] }>>
   /** Whether a folder is still the recorded workspace (generation, name, store), read with no jj process: every write's precondition. */
   owns(folder: string, identity: WorkspaceIdentity | null | undefined): Promise<boolean>
   /** The pinned operation for a folder's repository: the one op head, confirmed by jj; unknown with several. */
@@ -1051,6 +1057,10 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     },
 
     record: async (folder, fence, identity) => {
+      const r = await port.recordLeftOut(folder, fence, identity)
+      return isUnknown(r) ? r : r.files
+    },
+    recordLeftOut: async (folder, fence, identity) => {
       const u = unknown(UNREADABLE.uncommitted, { folder })
       const op = await pinned(folder)
       if (isUnknown(op)) return op
@@ -1073,7 +1083,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (isUnknown(name)) return name
       const out = await read(folder, after, ['diff', '--summary', '-r', `${revsetName(name)}@`], u)
       if (isUnknown(out)) return out
-      return lines(out).map((l) => l.replace(/^[A-Z] /, ''))
+      // A new file jj left out for its size (HI-2973) is on disk and in no commit: listed with the rest, so a release,
+      // a reuse, a removal or a copy's check sees it as an uncommitted edit, as Git's would an untracked file.
+      const leftOut = snapshotRefused(snap.err)?.files ?? []
+      const files = lines(out).map((l) => l.replace(/^[A-Z] /, ''))
+      return { files: [...files, ...leftOut.filter((f) => !files.includes(f))], leftOut }
     },
     copyIntact: async (folder, revision, fence, identity) => {
       const files = await port.record!(folder, fence, identity)
@@ -1105,6 +1119,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true, recheck: mine })
       if (snap.refused) return refused('checkout', snap.refused)
       if (!snap.ok) return refused('clean', snap.err)
+      // A stray file jj left out for its size (HI-2973) would stay on disk past the reset: not the revision's files.
+      const left = snapshotRefused(snap.err)
+      if (left) return refused('clean', refusedDetail(left))
       const mid = await state(folder)
       if (isUnknown(mid)) return refused('clean', mid.detail ?? mid.what)
       const old = mid.wc.commit

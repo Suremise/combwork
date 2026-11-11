@@ -2437,7 +2437,17 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   the workspace's @ and `snapshot.auto-track` (anything but `all()` refuses: an untracked file would escape it); then
   checks the moment is still the same before answering `{ before: H0, op: H1, recorded: H1 ≠ H0, at, view }`. It never
   retries onto a newer operation. Only the pinned jj writes. Refusals: `owner`, `heads`, `moved`, `stale`,
-  `cancelled`, `autoTrack`, `unknown`.
+  `cancelled`, `autoTrack`, `tooLarge`, `unknown`.
+- **jj's size limit for new files** (HI-2973). jj leaves a new file past `snapshot.max-new-file-size` (1 MiB by default)
+  out of every snapshot, saying so only in a warning (exit 0, repeated on each snapshot while the file is there). Such a
+  file is on disk and in no commit, so Combwork reads the warning wherever it snapshots (`platform/jjSnapshotRefused.ts`)
+  and never takes it for recorded or clean: the boundary refuses `tooLarge`, naming the files and the limit; a
+  submission is then refused (`platform.jjRefused`, `tooLarge`), naming them; a check's start is `dirty`, its end
+  `changed`; the pool's record lists them as uncommitted, so a slot isn't settled ready, lent, reset or removed with
+  them in it, and a check copy with one isn't intact (a reset refuses it); a recovery puts them back on disk as any
+  other edit, ignores them when deciding whether X is exactly the preserved delta, and names them. Combwork never raises
+  the limit itself: the agent or user commits the file with the limit raised (`jj config set --repo
+  snapshot.max-new-file-size <bytes>`) or leaves it out with `.gitignore`.
 - **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
   (`jjCredit`) from the captures, in order:
   1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
