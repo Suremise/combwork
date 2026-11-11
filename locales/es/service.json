@@ -81,6 +81,7 @@
   "service.folderChanges.readFailed": "Git no pudo leer los cambios de la carpeta: {why}",
   "service.folderChanges.stashFailed": "Git no apartó los cambios: {why}",
   "service.folderChanges.stashPartial": "Git informó de un problema al apartar los cambios, después de guardarlos en un stash ({stash}). Revisa git stash list y los archivos antes de continuar. Git dijo: {why}",
+  "service.folderChanges.unplaced": "Git no indicó en qué repositorio está {folder}, así que Combwork no hace commit de .gitignore mientras no pueda comprobar los agentes que trabajan allí. Inténtalo de nuevo.",
   "service.folderChanges.wrongBranch": "{folder} ya no está en {target}. Vuelve a mirar.",
   "service.forward.byAssistant": "el Asistente",
   "service.forward.byUser": "ti",

@@ -165,6 +165,86 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     expect(p.log).toEqual(['lease L1', 'run typecheck', 'give L1 invalid end'])
   })
 
+  it('invalid or closed while the copy is leased: the install never starts, the lease given back (HI-2964)', async () => {
+    let valid = true
+    const p = parts({ valid: () => valid })
+    const lease = p.deps.lease
+    p.deps.lease = async (rev) => {
+      const l = await lease(rev)
+      valid = false
+      return l
+    }
+    expect(await runCandidateChecks(p.deps, input({ installAlways: true }))).toEqual({ invalid: true })
+    expect(p.log).toEqual(['lease L1', 'give L1 invalid end'])
+    // The workspace closing during the lease: closed, nothing run, the copy given back.
+    const life = new AbortController()
+    const q = parts()
+    const qLease = q.deps.lease
+    q.deps.lease = async (rev) => {
+      const l = await qLease(rev)
+      life.abort()
+      return l
+    }
+    expect(await runCandidateChecks({ ...q.deps, signal: life.signal }, input({ installAlways: true }))).toEqual({ closed: true })
+    expect(q.log).toEqual(['lease L1', 'give L1 checksEnded'])
+    // The workspace closing during the validity read before the install, or before a check, which still says valid
+    // (HR1's round 1): nothing starts, the lease given back once.
+    // The second read: the one after the lease (before the install, or before the first check).
+    for (const installAlways of [true, false]) {
+      const life2 = new AbortController()
+      const r = parts()
+      let reads = 0
+      r.deps.valid = async () => {
+        if (++reads === 2) life2.abort()
+        return true
+      }
+      expect(await runCandidateChecks({ ...r.deps, signal: life2.signal }, input({ installAlways }))).toEqual({ closed: true })
+      expect(r.log).toEqual(['lease L1', 'give L1 closed end'])
+    }
+    // Closed during the check's started journal write, or during its bracket (HR2's round 2): the check never runs, its
+    // bracket (if taken) is ended, the lease given back once.
+    for (const at of ['journal', 'bracket'] as const) {
+      const life3 = new AbortController()
+      const s = parts()
+      const write = s.deps.journal.write
+      s.deps.journal.write = async (j) => {
+        if (at === 'journal' && j.checks.some((c) => c.phase === 'started')) life3.abort()
+        await write(j)
+      }
+      s.deps.bracket = async (_f, revision) => {
+        s.log.push('bracket')
+        if (at === 'bracket') life3.abort()
+        return { end: async () => (s.log.push('bracket end'), { counted: true, tested: revision }) }
+      }
+      expect(await runCandidateChecks({ ...s.deps, signal: life3.signal }, input())).toEqual({ closed: true })
+      expect(s.log).toEqual(at === 'journal' ? ['lease L1', 'give L1 closed end'] : ['lease L1', 'bracket', 'give L1 closed end', 'bracket end'])
+    }
+    // Closed during a hook, or while the install runs: nothing after it starts.
+    for (const at of ['leased', 'beforeCheck:typecheck', 'install'] as const) {
+      const life4 = new AbortController()
+      const h = parts()
+      h.deps.hook = (point) => void (point === at && life4.abort())
+      const install = h.deps.install
+      h.deps.install = async (...a) => {
+        if (at === 'install') life4.abort()
+        return install(...a)
+      }
+      expect(await runCandidateChecks({ ...h.deps, signal: life4.signal }, input({ installAlways: true }))).toEqual({ closed: true })
+      expect(h.log).toEqual(at === 'install' ? ['lease L1', 'give L1 closed end', 'install'] : at === 'leased' ? ['lease L1', 'give L1 closed end'] : ['lease L1', 'install', 'give L1 closed end'])
+    }
+  })
+
+  it("saving the lease's id fails: the copy given back, the error thrown on, nothing run (HI-2963)", async () => {
+    const p = parts()
+    const write = p.deps.journal.write
+    p.deps.journal.write = async (j) => {
+      if (j.lease) throw new Error('journal write failed')
+      await write(j)
+    }
+    await expect(runCandidateChecks(p.deps, input({ installAlways: true }))).rejects.toThrow('journal write failed')
+    expect(p.log).toEqual(['lease L1', 'give L1 checksEnded'])
+  })
+
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
     const o = { mergeChecks: ['a', 'b'], commands: { a: 'x', b: 'y' }, mergeInstall: 'onManifestChange' as const }
     const k = checksKeyOf(o, 'npm ci')

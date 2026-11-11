@@ -81,6 +81,7 @@
   "service.folderChanges.readFailed": "O Git não conseguiu ler as alterações da pasta: {why}",
   "service.folderChanges.stashFailed": "O Git não deixou as alterações de lado: {why}",
   "service.folderChanges.stashPartial": "O Git relatou um problema ao deixar as alterações de lado, depois de guardá-las em um stash ({stash}). Confira git stash list e os arquivos antes de continuar. O Git disse: {why}",
+  "service.folderChanges.unplaced": "O Git não informou em qual repositório {folder} está, então o Combwork não faz commit do .gitignore enquanto não puder verificar os agentes que trabalham ali. Tente novamente.",
   "service.folderChanges.wrongBranch": "{folder} não está mais em {target}. Confira de novo.",
   "service.forward.byAssistant": "o Assistente",
   "service.forward.byUser": "você",

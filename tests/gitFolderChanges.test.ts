@@ -13,11 +13,15 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
+let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
   const real = await original<typeof import('../src/main/git')>()
   return {
     ...real,
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
+      if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
+        return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
       const r = await real.git(cwd, args, max, input, opts)
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
@@ -27,12 +31,27 @@ vi.mock('../src/main/git', async (original) => {
     }
   }
 })
-/** What the queue counts as building in a folder: none, unless a test says. */
+const norm = (p: string): string => resolve(p).toLowerCase()
+const within = (p: string, folder: string): boolean => norm(p) === norm(folder) || norm(p).startsWith(norm(folder) + '\\') || norm(p).startsWith(norm(folder) + '/')
+/** What the queue counts as building in a folder: none, unless a test says; as the real one, only what is in the folder asked about. */
 let held: string[] | null = null
-vi.mock('../src/main/workflow/queueHost', () => ({ folderBuilders: () => held }))
-/** An agent working in the folder: none, unless a test says. */
+vi.mock('../src/main/workflow/queueHost', () => ({ folderBuilders: (_ws: unknown, folder: string) => (held?.some((h) => within(h, folder)) ? held.filter((h) => within(h, folder)) : null) }))
+/** An agent working in the folder: none, unless a test says; `agentAt` set, only in that folder. */
 let agent: string | null = null
-vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof import('../src/main/gitRepo')>()), busyAgentIn: async () => agent }))
+let agentAt: string | null = null
+/** Each agent check's project and folder, and the fence on a folder then (HI-2962). */
+let agentChecks: { project: string; folder: string; fenced: string | null }[] = []
+let fencedProbe: string | null = null
+vi.mock('../src/main/gitRepo', async (original) => {
+  const { folderChanging } = await import('../src/main/folderFence')
+  return {
+    ...(await original<typeof import('../src/main/gitRepo')>()),
+    busyAgentIn: async (project: string, folder: string) => {
+      agentChecks.push({ project, folder, fenced: folderChanging(fencedProbe) })
+      return agentAt === null || norm(agentAt) === norm(folder) ? agent : null
+    }
+  }
+})
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -66,6 +85,10 @@ beforeEach(() => {
   commit(proj, { 'a.txt': 'a\n', 'b.txt': 'b\n', '.gitignore': 'node_modules/\n' }, 'files')
   held = null
   agent = null
+  agentAt = null
+  agentChecks = []
+  fencedProbe = null
+  failTopIn = null
   failStashAfter = false
 })
 
@@ -266,5 +289,77 @@ describe("Files' Commit it", () => {
     writeFileSync(join(proj, '.gitignore'), 'x\n')
     sh(proj, 'checkout', '-q', '--detach')
     await expect(inWorkspace(w, () => changes.commitIgnore(proj))).rejects.toThrow(/isn't on a branch/)
+  })
+})
+
+describe("Files' Commit it from a project in a larger repository (HI-2962)", () => {
+  // The workspace is the repository: its project folders `nested` and `other` are folders in it, `own` a repository of its own.
+  let nested = ''
+  const inRepoWorkspace = async <T>(fn: () => Promise<T>): Promise<T> => {
+    w.path = proj
+    try {
+      return await inWorkspace(w, fn)
+    } finally {
+      w.path = ws
+    }
+  }
+  beforeEach(() => {
+    nested = join(proj, 'nested')
+    for (const d of ['nested', 'other', 'own']) mkdirSync(join(proj, d))
+    gitRepo(join(proj, 'own'))
+    writeFileSync(join(proj, '.gitignore'), 'node_modules/\n/new/\n')
+  })
+
+  it('a run in the repository root, or in another project in it, refuses it: nothing committed', async () => {
+    const before = head()
+    for (const run of [join(proj, '.gitignore'), join(proj, 'other', 'out.log')]) {
+      held = [run]
+      await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(/An agent or a run is working in/)
+      expect(head()).toBe(before)
+    }
+    expect(status()).toContain('.gitignore')
+  })
+
+  it("an agent of another project in the same tree refuses it; one in a repository of its own doesn't", async () => {
+    agent = 'HB9'
+    agentAt = join(proj, 'other')
+    const before = head()
+    await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(/HB9 is working in/)
+    expect(head()).toBe(before)
+    agentAt = join(proj, 'own')
+    agentChecks = []
+    const done = await inRepoWorkspace(() => changes.commitIgnore(nested))
+    expect(done).toMatchObject({ files: ['.gitignore'], branch: 'main', made: head() })
+    expect(norm(done.folder)).toBe(norm(proj))
+    expect(committed()).toEqual(['.gitignore'])
+    // The nested project's own agents first, the other project's too; never the separate repository's.
+    const checked = agentChecks.map((c) => norm(c.project))
+    expect(checked[0]).toBe(norm(nested))
+    expect(checked).toContain(norm(join(proj, 'other')))
+    expect(checked).not.toContain(norm(join(proj, 'own')))
+  })
+
+  it("another project git can't place (its read failed, or answered nothing) refuses it: nothing committed, the index as it was", async () => {
+    writeFileSync(join(proj, 'b.txt'), 'staged b\n')
+    sh(proj, 'add', 'b.txt')
+    const before = head()
+    const cases = [
+      { fail: { folder: join(proj, 'other') }, said: /Git could not read the folder's changes: fatal: unable to read the repository/ },
+      { fail: { folder: join(proj, 'other'), empty: true }, said: /Git didn't say which repository .*other is in/ }
+    ]
+    for (const { fail, said } of cases) {
+      failTopIn = fail
+      await expect(inRepoWorkspace(() => changes.commitIgnore(nested))).rejects.toThrow(said)
+      expect(head()).toBe(before)
+      expect(sh(proj, 'diff', '--cached', '--name-only')).toBe('b.txt')
+      expect(sh(proj, 'diff', '--name-only')).toBe('.gitignore')
+    }
+  })
+
+  it('the whole tree is fenced while it commits, not only the project folder', async () => {
+    fencedProbe = join(proj, 'other')
+    await inRepoWorkspace(() => changes.commitIgnore(nested))
+    expect(agentChecks.length).toBeGreaterThan(0)
+    expect(agentChecks.every((c) => c.fenced !== null)).toBe(true)
   })
 })

@@ -166,6 +166,22 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     expect(e.kinds(card.id)).toContain('Started')
   })
 
+  it('HI-2960: the start warning names three files at most, then how many more; the window is told them all', async () => {
+    const e = pair()
+    const told: { files?: string[] }[] = []
+    const cfg = e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }
+    cfg.targetChanges = (c) => told.push(c as { files?: string[] })
+    for (const n of [1, 2, 3, 4, 5, 6]) writeFileSync(join(e.project, `log-${n}.txt`), `${n}\n`)
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    const card = e.wf.createCard({ title: 'many' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const warning = (s.warnings ?? []).find((w) => w.includes('has uncommitted changes')) ?? ''
+    const named = /has uncommitted changes \((.+?)\): /.exec(warning)?.[1] ?? ''
+    expect(named).toMatch(/^[^,]+, [^,]+, [^,]+ and 4 more$/)
+    expect(told[0]?.files).toHaveLength(7)
+  })
+
   it('the conditions are checked inside the lock and the fence, and the fence names the folder', async () => {
     const e = pair()
     await queued(e)

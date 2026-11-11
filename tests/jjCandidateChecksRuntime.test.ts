@@ -22,7 +22,7 @@ import { queueChecks } from '../src/main/workflow/queueChecks'
 import { jobSpawn } from '../src/main/workflow/jobSpawn'
 import { journalPath, LeaseJob, leaseJobGone, queueHost } from '../src/main/workflow/queueJobs'
 import { checksJournalKey, writeChecksJournal, type ChecksJournal } from '../src/main/workflow/jjCandidateChecks'
-import { checkLeaseOver, holdCandidateLease, releaseCandidateLease } from '../src/main/workflow/candidateLeases'
+import { candidateLeaseHeld, checkLeaseOver, holdCandidateLease, releaseCandidateLease } from '../src/main/workflow/candidateLeases'
 import { CopyPool, CopyStore } from '../src/main/copies'
 import type { OpHolder } from '../src/main/slots'
 import type { SqlDb } from '../src/main/platform/jjObligations'
@@ -436,6 +436,46 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(x.leases.length).toBe(1)
       // The old tree ended before the new run leased its copy (no overlap): its process is gone.
       await vi.waitFor(() => expect(child.exitCode !== null || child.signalCode !== null).toBe(true), { timeout: 30_000, interval: 50 })
+    })
+  })
+
+  describe('HI-2963 (colocated)', () => {
+    it("saving the lease's id fails: the copy goes back to the real pool, no longer held; the next look passes", async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS })
+      // The board write right after the lease (its id journalled) fails once.
+      const records = w.deps.records!
+      const write = records.write
+      let failNext = false
+      records.write = async (fn) => {
+        if (failNext) {
+          failNext = false
+          throw new Error('journal write failed')
+        }
+        return write(fn)
+      }
+      const lease = x.h.lease
+      x.h.lease = async (card, revision) => {
+        const l = await lease(card, revision)
+        if ('id' in l && x.leases.length === 1) failNext = true
+        return l
+      }
+      const { card } = await approved(w)
+      const jjp = await settle(w, card)
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks?.state).not.toBe('passed')
+      // The copy given back and released: the pool's, not this Combwork's hold.
+      const first = x.leases[0]
+      expect(first.given).toBe('checksEnded')
+      expect(candidateLeaseHeld(first.id)).toBe(false)
+      await x.pool.refresh()
+      expect(x.pool.lease(first.id)?.returned ?? true).toBeTruthy()
+      // The next look leases again and passes.
+      jjp.checksWanted()
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
+      expect(x.leases.map((l) => l.given)).toEqual(['checksEnded', 'checksEnded'])
     })
   })
 })

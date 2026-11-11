@@ -351,6 +351,11 @@
       "why": "plain"
     }
   },
+  "service.folderChanges.unplaced": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.wrongBranch": {
     "placeholders": {
       "folder": "plain",
