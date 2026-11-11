@@ -159,7 +159,10 @@ const TARGET = 'integration'
     // --- HI-2959: a forward that conflicts (main and integration change clash.txt): it waits for the user, its Work section
     // says so and offers Resolve on a Builder…, which ends it and makes an ordinary card for a builder; an agent can't.
     q.steer(fx, 'pass')
-    q.commitOn(fx, 'main', { 'clash.txt': 'main\n' }, 'main changes clash.txt')
+    // main is checked out in the project folder: committed there.
+    fs.writeFileSync(path.join(fx.alpha, 'clash.txt'), 'main\n')
+    lib.git(fx.alpha, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', 'clash.txt'])
+    lib.git(fx.alpha, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'main changes clash.txt'])
     q.commitOn(fx, 'integration', { 'clash.txt': 'integration\n' }, 'integration changes clash.txt')
     const clash = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: 'main', to: TARGET, override: true })
     const clashCard = clash.body?.card
