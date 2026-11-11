@@ -128,6 +128,7 @@
   "tasks.history.fromOlder": "Agregada desde una versión anterior de Combwork, donde se creó como #{was}",
   "tasks.history.given": "Dada al agente {agent}",
   "tasks.history.imported": "Devuelta con el proyecto {project} (era la #{was})",
+  "tasks.history.jjCandidateReturned": "Devuelta desde su candidato sobre {target}: {reason, select, conflict {tiene un conflicto con {target}} other {no está al día con {target}}}{files, select, none {} other { (en {files})}}. Su constructor incorpora {target} con jj y la vuelve a enviar.",
   "tasks.history.kind": "{how, select, made {Creada sin código} proposed {Propuesta sin código} confirmed {Confirmada sin código} kept {Mantenida con código} other {Tipo cambiado a {kind, select, code {con código} other {sin código}}}}",
   "tasks.history.labels": "Etiquetas: {labels}",
   "tasks.history.labelsAdded": "Etiquetas: agregó {labels}",

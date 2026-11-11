@@ -1,0 +1,11 @@
+{
+  "jj.candidate.returned": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "why": "select",
+      "files": "select",
+      "log": "select"
+    }
+  }
+}

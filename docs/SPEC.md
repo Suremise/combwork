@@ -2275,7 +2275,7 @@ works.
 | Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
-| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`), built for an approved card by J9b2's reconciliation since HI-2871 | J4, HI-2871 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
@@ -2684,7 +2684,7 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   then a fresh child of the target given the merge's tree (`jj restore --from <scratch> --into <it>`), the scratch
   abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
   later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
-  never moves. Strict's update (G8) isn't built for jj.
+  never moves. Strict's update (G8) came with HI-2853 (`prepareJjUpdate`); HI-2871 runs both for approved cards.
 - **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
   under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
   operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
@@ -3293,7 +3293,7 @@ Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). 
 Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
 - **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
   the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
-  journalled bundles, every bundle an Integrated fact already names as consumed, no J4 candidates: the user's own merge,
+  journalled bundles, every bundle an Integrated fact already names as consumed, and since HI-2871 the cycle's J4 attempt records, so a move onto J4's candidate is proved `via: 'candidate'`; the user's own merge,
   fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
   result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
   proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
@@ -3334,6 +3334,60 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### jj's pre-integration candidate (1.5.0, HI-2871)
+
+Darren's decision (11 Nov): J4's candidates run for jj cards as a pre-integration check, as strict's update and the test
+merge do for Git, in J9b2's runtime; the user still integrates (decision A: Combwork never moves a bookmark or pushes).
+Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its design is HI-2871/s13 and s21 (HR3's OK).
+- **When** (`reconcileJj`, workflow/reconcile.ts): a card in Approved that J5's proof finds not yet contained, its pass
+  holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
+  (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
+  `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
+  (J5's `jjTargetHead`); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
+  keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
+  Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
+  lock, Git's replay on the store for sameness (a replay that can't be read: unknown, never "not the same").
+- **The fingerprint** (`JjCandidateFingerprint`): the approval (`approvalOf`: cycle, approved submission, revision, base,
+  key, recorded jj commit, target; the stage Approved, its pass holding: no Stale recorded and the slot's observed head
+  the approved revision, HR3's round 1), the effective ruleset's id (its options' hash: an Override that
+  applies other options changes it) and the style and strict used. Each attempt is journalled with it (board_meta
+  `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
+  owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
+  options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
+- **Withdrawn first** (HR3's rounds 1 and 2): a ready offer that isn't current any more (its head not the target's, or
+  its candidate superseded or gone by `jjCandidateNow`, the target unmoved; or either unreadable: `offerCurrent`) is
+  deleted (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never
+  leaves it.
+- **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
+  the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
+  `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
+  containment record), shown only while its fingerprint is the card's now and, a ready one, while the target's head as
+  the window just read it (`jjWaiting`'s `targetHeads`) is the head it was built on (`candidateShown`): a moved target
+  hides it at once, before any reconciliation and across restarts. A conflict, or not up to
+  date (a merge in a rebase's suffix, not on top, or strict's update not the same change): `IntegrationFailed` (entry
+  `jj:<attempt>`; jj has no merge queue) with its files, hunks and log, the card to Active, its builder woken in jj's words
+  (`jjReturnedWake`) and the card's comment (`tasks.history.jjCandidateReturned`). A repository that signs
+  (`signing.behavior` own or force): a record saying so, nothing built. Unknown: nothing offered or returned; counted in
+  the record, shown from the third in a row.
+- **The credit:** J5's proof gets the cycle's attempt records (`candidates`): the user's `jj bookmark set` onto the
+  candidate is Integrated `via: 'candidate'`, its update validated again as J5 already does.
+- **Descriptions on one line:** J4 reads its writes back from jj's operation log a line each, and a newline in `-m`'s
+  argument makes that read malformed (0.47.1), so a candidate's and an update's descriptions are the first line of
+  Combwork's (`mergeMessage`, `updateMessage`): the card's key and title.
+- **Options:** jj's Merging group shows `style` (*Candidate style*) and `strict` (*The candidate brings work up to date
+  first*), each with its own words where the user integrates (`OptionText.integrates`, `optionTitle`, `optionDesc`: by the
+  descriptor, never the platform's id).
+- **The window:** Waiting for you to integrate shows *Candidate ready* (commit, change id, style, the head built on; no
+  conflicts, no merge checks) with `jj bookmark set <target> -r <candidate>` in place of the duplicate's commands; *No
+  candidate* for a signing repository and *couldn't build a candidate* (after three tries) keep the manual commands.
+- **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
+  Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
+  options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
+  rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
+  `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
@@ -4277,10 +4331,10 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Combwork merges (queue) · The agent merges, Combwork checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Combwork merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G7b | **Other branches work can merge into** (`otherTargets`, HI-2556) | Branch names, none by default | The branches besides G7 a lane's or card's **Merges into** may name. Not a rule: left out of every ruleset (`ruleOptions`), never set by a preset, never Custom, so a change applies at once. A pick is checked against it as it is made. |
-| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
+| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate`. In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Combwork merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |

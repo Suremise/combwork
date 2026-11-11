@@ -195,13 +195,16 @@ const onDb = (fn) => {
     check('Waiting: the card, its change id, not in main yet', !!(await until(async () => (await waiting.locator('[data-jj-contained="notYet"]').count()) === 1 && (await text(waiting)).includes(change.slice(0, 12)) && /Not in main as of/.test(await text(waiting)), HUNG_MS)), await text(repo.locator('[data-jj-integrate]')))
     await shoot(repo.locator('[data-jj-integrate]'), 'waiting')
     await inEach(repo.locator('[data-jj-integrate]'), 'waiting', (cat) => cat['jj.integrate.head'])
-    // The record changes (an observation that couldn't say): Refresh shows it, the panel still mounted.
+    // The record changes (an observation that couldn't say): Refresh shows it, the panel still mounted. The candidate
+    // (HI-2871) is built first, and its own jj operations schedule further reconciliations, each recording a newer
+    // observation: the changed one is written once it is shown, as the newest by far, so none of theirs replaces it.
+    check('…its candidate built (HI-2871)', !!(await until(async () => (await waiting.locator('[data-jj-candidate="ready"]').count()) === 1, HUNG_MS)), await text(waiting))
     const pid = JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).id
     const ckey = `jj_contained:${pid.toLowerCase()}:${key.toLowerCase()}:1`
     onDb((db) => {
       const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(ckey)
       const v = JSON.parse(r.value)
-      db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify({ ...v, gen: v.gen + 1, state: 'unknown', why: 'refused: notFetched' }), ckey)
+      db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify({ ...v, gen: v.gen + 1000000, state: 'unknown', why: 'refused: notFetched' }), ckey)
     })
     check('…a changed observation shown with no Refresh (the board changed: couldn’t check, why)', !!(await until(async () => (await waiting.locator('[data-jj-contained="unknown"]').count()) === 1 && /hasn.t fetched/.test(await text(waiting)), HUNG_MS)), await text(waiting))
     await shoot(repo.locator('[data-jj-integrate]'), 'waiting-unknown')
