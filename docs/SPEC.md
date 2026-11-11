@@ -3560,8 +3560,8 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   by its full path), each moved-aside file it had to leave (`asides`: its path created again meanwhile), how many files it
   put back, the deletions it kept (`deletedLocally`, `kept`) and the commit it kept
   (X, divergent). A copy (`*.cw-recovered-*`, or a file left moved aside, `*.cw-before-recovery-*`) is recorded by jj
-  like any file, so a jj submission any of whose chain's commits adds or changes one (`git log base..P`, not only the net
-  change: a later deletion leaves it in the history the integration takes) is refused (`platform.jjRefused`,
+  like any file, so a jj submission any of whose chain's commits adds or changes one (`git log base..P`, a merge against each of its
+  parents, not only the net change: a later deletion leaves it in the history the integration takes) is refused (`platform.jjRefused`,
   `recovered`, naming the files) until no commit holds it: never part of a card's work unasked.
 - **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
   change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
