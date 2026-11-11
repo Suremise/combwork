@@ -5847,10 +5847,17 @@ touched:
   and a staged pause's files as staged then, which the pause's text names), and, under the repository
   lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
   operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
-  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: `add --intent-to-add`
-  for untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
-  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
-  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked -- <paths>`, named
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: those paths alone, as
+  `commit --only` would (their working-tree content; every other index entry kept; a rename's both sides), except that
+  a path whose index entry is gone (a staged deletion, Files' Stop Tracking, or a rename's old side) is committed as
+  that deletion, the file on disk left untracked, never added back (HI-2982: `commit --only` took the kept file, so a
+  secret just taken out of Git went back in). Built in an index of its own (HEAD's tree over a copy of the folder's
+  index, each path from the folder by `update-index --add --remove`, each deletion `--force-remove`), committed from
+  it (hooks and signing as any commit), then the folder's index brought to the commit for those paths (`reset --
+  <paths>`); message *Commit changes before merging HI-12*; a failure (a hook, signing) leaves the folder's index and
+  files untouched. Set aside refuses, naming it, a path whose deletion is staged while its file is still in the
+  folder: a stash would put the committed copy over it (git refuses that, after making the stash, for an ignored one),
+  so Commit is the way on. Set aside: `stash push --include-untracked -- <paths>`, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
   after it made one is said with that stash, kept. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its

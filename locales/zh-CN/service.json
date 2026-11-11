@@ -72,6 +72,7 @@
   "service.folderChanges.busy": "有智能体或运行正在 {folder} 中工作（{what}）。请在其完成后重试。",
   "service.folderChanges.changed": "{folder} 中的更改已不再是显示的那些。请重新查看。",
   "service.folderChanges.commitFailed": "Git 未提交：{why}",
+  "service.folderChanges.deletedKept": "{file} 已从 Git 中移出，但仍在文件夹中：搁置它会用最后提交的版本替换它。请改为提交：这样它会留在 Git 之外，文件也保持原样。",
   "service.folderChanges.detached": "{folder} 不在任何分支上，因此 Combwork 不会在那里提交。",
   "service.folderChanges.indexBusy": "另一个 git 命令正在使用该仓库。请稍后重试。",
   "service.folderChanges.midOperation": "Git 正在 {folder} 中进行{state, select, merge {合并} rebase {变基} cherryPick {拣选（cherry-pick）} other {还原（revert）}}。请先完成或中止该操作。",

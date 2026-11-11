@@ -85,6 +85,7 @@ interface CombworkMessageValues {
   'service.folderChanges.busy': { folder: string | number; what: string | number }
   'service.folderChanges.changed': { folder: string | number }
   'service.folderChanges.commitFailed': { why: string | number }
+  'service.folderChanges.deletedKept': { file: string | number }
   'service.folderChanges.detached': { folder: string | number }
   'service.folderChanges.indexBusy': undefined
   'service.folderChanges.midOperation': { state: string; folder: string | number }

@@ -72,6 +72,7 @@
   "service.folderChanges.busy": "Agent lub uruchomienie pracuje w folderze {folder} ({what}). Spróbuj ponownie, gdy skończy.",
   "service.folderChanges.changed": "Zmiany w folderze {folder} nie są już tymi pokazanymi. Sprawdź ponownie.",
   "service.folderChanges.commitFailed": "Git nie zrobił commita: {why}",
+  "service.folderChanges.deletedKept": "Plik {file} został wyjęty z Gita, ale wciąż jest w folderze: odłożenie go zastąpiłoby go ostatnią wersją z commita. Zamiast tego zrób commit: plik zostanie poza Gitem i pozostanie bez zmian.",
   "service.folderChanges.detached": "Folder {folder} nie jest na żadnej gałęzi, więc Combwork nie robi tam commita.",
   "service.folderChanges.indexBusy": "Inne polecenie git używa repozytorium. Spróbuj ponownie za chwilę.",
   "service.folderChanges.midOperation": "Git jest w folderze {folder} w trakcie {state, select, merge {scalania} rebase {rebase’u} cherryPick {cherry-picka} other {revertu}}. Najpierw dokończ lub przerwij tę operację.",

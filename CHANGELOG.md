@@ -64,6 +64,7 @@
 
 ### Fixed
 
+- **Commit no longer puts a file you stopped tracking back into Git** (HI-2982). After **Stop Tracking** and **Exclude from Git**, the **Commit** offered when a card started or a merge paused committed the file again, with its local content (a token in `settings.local.json`, say), and called it done. It now commits the file as taken out: it stays in your folder, untracked, and its content goes into no commit. With only that file left, Commit no longer fails every time, and **Set Aside** refuses it by name rather than leaving a new stash on each click. A commit a hook refuses leaves the deletion staged, as it was.
 - **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:
   - The paused merge (Merges, Version Control → Merge queue, the card's Work section) has **Commit** and **Set Aside** for the files it names, and the merge goes on.
   - When a card or lane starts and that folder has uncommitted changes, Combwork says so before work begins, with the same buttons.

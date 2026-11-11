@@ -136,7 +136,7 @@ describe('Commit', () => {
     expect(status()).toBe('M a.txt')
   })
 
-  it('a refusing pre-commit hook loses nothing: the files and the index as they were, the intent-to-add undone', async () => {
+  it('a refusing pre-commit hook loses nothing: the files and the index as they were, an untracked file still untracked', async () => {
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\necho "no commits today" >&2\nexit 1\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
@@ -200,6 +200,82 @@ describe('Set aside', () => {
     const err = await settle('setAside', ['a.txt']).catch((e: Error) => e)
     expect(String(err)).toMatch(/aren't the ones shown/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+  })
+})
+
+// HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the deletion staged and the file in the folder. Commit took
+// each path from the folder (`commit --only`), so the file went back into Git with its local content.
+describe('a file the user stopped tracking (its deletion staged, the file kept)', () => {
+  const stopTracking = (file: string, content: string, ignore: boolean): void => {
+    commit(proj, { [file]: '{}\n' }, 'tracked')
+    sh(proj, 'rm', '-q', '--cached', file)
+    if (ignore) writeFileSync(join(proj, '.gitignore'), `node_modules/\n${file}\n`)
+    writeFileSync(join(proj, file), content)
+  }
+  const inHead = (file: string): boolean => sh(proj, 'ls-tree', '--name-only', 'HEAD').split('\n').includes(file)
+  const stashes = (): string => sh(proj, 'stash', 'list')
+
+  it("Commit with .gitignore commits the deletion: the file stays out of Git, its content in no commit, kept as it is", async () => {
+    stopTracking('settings.local.json', '{"token":"REAL-SECRET"}\n', true)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['D  settings.local.json', 'M .gitignore'])
+    const done = await settle('commit', ['.gitignore', 'settings.local.json'])
+    expect(done.files.sort()).toEqual(['.gitignore', 'settings.local.json'])
+    expect(committed()).toEqual(['.gitignore', 'settings.local.json'])
+    expect(inHead('settings.local.json')).toBe(false)
+    expect(sh(proj, 'log', '--all', '-p', '--format=')).not.toContain('REAL-SECRET')
+    expect(read('settings.local.json')).toBe('{"token":"REAL-SECRET"}\n')
+    expect(status()).toBe('')
+    expect(sh(proj, 'ls-files', '--', 'settings.local.json')).toBe('')
+  })
+
+  it('the deletion alone (.gitignore committed before): Commit commits it; Set Aside refuses it by name, no stash made', async () => {
+    stopTracking('secret.env', 'SECRET=1\n', true)
+    sh(proj, 'commit', '-q', '-m', 'ignore', '--only', '--', '.gitignore')
+    expect(status()).toBe('D  secret.env')
+    const err = await settle('setAside', ['secret.env']).catch((e: Error) => e)
+    expect(String(err)).toMatch(/secret\.env is taken out of Git but still in the folder/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(status()).toBe('D  secret.env')
+    await settle('commit', ['secret.env'])
+    expect(committed()).toEqual(['secret.env'])
+    expect(inHead('secret.env')).toBe(false)
+    expect(read('secret.env')).toBe('SECRET=1\n')
+    expect(status()).toBe('')
+  })
+
+  it('no ignore line (listed deleted and untracked): Commit commits the deletion, the file left untracked with its content', async () => {
+    stopTracking('a.txt', 'local only\n', false)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
+    await settle('commit', ['a.txt'])
+    expect(committed()).toEqual(['a.txt'])
+    expect(inHead('a.txt')).toBe(false)
+    expect(status()).toBe('?? a.txt')
+    expect(read('a.txt')).toBe('local only\n')
+  })
+
+  it('a refused commit keeps the staged deletion (never put back from HEAD); Set Aside refuses it too, no stash made', async () => {
+    stopTracking('a.txt', 'local only\n', false)
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
+    const before = head()
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Git did not commit/)
+    expect(head()).toBe(before)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
+    expect(read('a.txt')).toBe('local only\n')
+    // A stash would put the committed copy over the user's file (kept only in a stash that can't pop over it): refused.
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/a\.txt is taken out of Git but still in the folder/)
+    expect(stashes()).toBe('')
+    expect(read('a.txt')).toBe('local only\n')
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
+  })
+
+  it('a staged rename whose old name is back on disk: the rename committed, the old file left untracked', async () => {
+    sh(proj, 'mv', 'b.txt', 'c.txt')
+    writeFileSync(join(proj, 'b.txt'), 'a new b\n')
+    await settle('commit', ['c.txt'])
+    expect(committed()).toEqual(['b.txt', 'c.txt'])
+    expect(inHead('b.txt')).toBe(false)
+    expect(status()).toBe('?? b.txt')
   })
 })
 

@@ -72,6 +72,7 @@
   "service.folderChanges.busy": "エージェントまたは実行が{folder}で作業中です（{what}）。終わってからもう一度お試しください。",
   "service.folderChanges.changed": "{folder}の変更は、表示されているものと違っています。もう一度確認してください。",
   "service.folderChanges.commitFailed": "Gitはコミットしませんでした: {why}",
+  "service.folderChanges.deletedKept": "{file}はGitの追跡から外されていますが、フォルダーにはまだあります。退避すると、最後にコミットされた版で置き換わります。代わりにコミットしてください。Gitの外に置いたまま、ファイルはそのまま残ります。",
   "service.folderChanges.detached": "{folder}はブランチ上にないため、Combworkはそこでコミットしません。",
   "service.folderChanges.indexBusy": "別のgitコマンドがリポジトリを使用中です。少し待ってからもう一度お試しください。",
   "service.folderChanges.midOperation": "{folder}でGitが{state, select, merge {マージ} rebase {リベース} cherryPick {チェリーピック} other {リバート}}の途中です。先に完了するか中止してください。",
