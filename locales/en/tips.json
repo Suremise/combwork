@@ -1131,6 +1131,14 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjCandidates.text": {
+    "defaultMessage": "Once a jj card passes, Combwork builds a candidate from it on the target bookmark and checks it for conflicts. Version Control → Repository shows it with the jj bookmark set command that integrates it: you run it; Combwork never moves the bookmark.",
+    "description": "A tip (HI-2871). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and jj bookmark set (a command). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj's name for a branch."
+  },
+  "tips.jjCandidates.title": {
+    "defaultMessage": "Integrate a jj card’s candidate",
+    "description": "A tip's title (HI-2871). Keep jj. A candidate is the commit Combwork builds for the user to integrate."
+  },
   "tips.jjCards.text": {
     "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, you integrate it yourself: Version Control → Repository lists what waits for you, and Combwork moves the card to Done once its work is in the target.",
     "description": "A tip (HI-2874). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."

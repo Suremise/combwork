@@ -18,6 +18,7 @@ import { mergeBundles, type SqlDb } from '../src/main/platform/jjObligations'
 import { boardPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { commitPublishOff } from '../src/main/jjPublish'
+import { attemptsKey, readAttempts, saveAttemptIn, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
 import { preset } from '../src/shared/workflow/options'
 import { agentOf } from '../src/shared/workflow/facts'
 import { admitted } from './admitted'
@@ -36,7 +37,8 @@ export const ENDED = (slot: string) => ({ held: false, print: `lease:ended:${slo
 export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}:op-1:-:-` })
 
 /** A jj project with a workspace database, two slots, J9a's port on its bindings, and a Workflow composed with jj's deps. */
-export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void } = {}) {
+/** `candidates`: HI-2871's candidate step on (its attempts journalled in the database, as the app's). */
+export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean } = {}) {
   const h = harness()
   const { repo, root } = h.repo(`cards${colocated ? 'c' : 'n'}`, colocated)
   const home = tempDir('jjcards-')
@@ -93,7 +95,13 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
       read: (fn) => conn.read((db) => fn(db as unknown as SqlDb)),
       write: async (fn) => void (await conn.write((db) => fn(db as unknown as SqlDb))),
       bundles: (card, cycle) => structuredClone(bundles.get(`${card}:${cycle}`) ?? []),
-      publish: (req) => commitPublishOff(req)
+      publish: (req) => commitPublishOff(req),
+      ...(o.candidates
+        ? {
+            attempts: (card: string, cycle: number) => conn.read((db) => readAttempts(db as unknown as SqlDb, attemptsKey('p-jj', card, cycle))),
+            saveAttempt: async (card: string, cycle: number, e: JjAttemptEntry) => void (await conn.write((db) => saveAttemptIn(db as unknown as SqlDb, attemptsKey('p-jj', card, cycle), e)))
+          }
+        : {})
     },
     slotHold: (lease) => holds.get(lease) ?? null,
     pins: { read: (ref) => pins.get(ref) ?? null, write: async (ref, rec) => void pins.set(ref, rec) }

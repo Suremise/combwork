@@ -280,6 +280,8 @@
   "tips.inboxNotices.title": "Mensagens chegam a um agente ocupado entre os passos",
   "tips.isolatedChecks.text": "Numa pasta compartilhada, uma verificação não conta se outro agente editar algo enquanto ela roda. cw-progress --check typecheck --isolated a roda numa cópia só dela, na versão do cartão, onde nada mais escreve. Parar, no painel Progresso, encerra a verificação e tudo o que ela iniciou.",
   "tips.isolatedChecks.title": "Uma verificação que ninguém estraga",
+  "tips.jjCandidates.text": "Quando um cartão jj é aprovado, o Combwork cria um candidato a partir dele sobre o bookmark de destino e verifica se há conflitos. Controle de versão → Repositório o mostra com o comando jj bookmark set que o integra: você o executa; o Combwork nunca move o bookmark.",
+  "tips.jjCandidates.title": "Integre o candidato de um cartão jj",
   "tips.jjCards.text": "Em um projeto jj, cada cartão trabalha em um slot próprio. Quando um passa na revisão, você mesmo o integra: Controle de versão → Repositório lista o que espera por você, e o Combwork move o cartão para Concluído assim que o trabalho dele estiver no destino.",
   "tips.jjCards.title": "Cartões em um projeto jj",
   "tips.jjOperations.text": "Em um projeto jj, Controle de versão → Operações lista as operações do jj pelo nome. Prévia de desfazer mostra o que desfazer uma delas mudaria, e dá o comando para executar quando nada mais mudaria. O Combwork nunca o executa.",

@@ -27,6 +27,10 @@ interface CombworkMessageValues {
   'jj.conflicts.none': undefined
   'jj.history.capped': { n: number }
   'jj.ids.tip': { change: string | number; commit: string | number }
+  'jj.integrate.candidate': { commit: string | number; change: string | number; style: string; target: string | number; expected: string | number }
+  'jj.integrate.candidateHow': { target: string | number }
+  'jj.integrate.candidateSigning': undefined
+  'jj.integrate.candidateUnknown': { why: string | number }
   'jj.integrate.card': { card: string | number; title: string | number; commit: string | number; target: string | number }
   'jj.integrate.change': { change: string | number }
   'jj.integrate.head': undefined

@@ -130,6 +130,7 @@
   "tasks.history.fromOlder": "Added from an older Combwork, where it was made as #{was}",
   "tasks.history.given": "Given to {agent}",
   "tasks.history.imported": "Brought back with {project} (it was #{was})",
+  "tasks.history.jjCandidateReturned": "Came back from its candidate on {target}: {reason, select, conflict {it conflicts with {target}} other {it isn't up to date with {target}}}{files, select, none {} other { (in {files})}}. Its builder brings {target} in with jj and submits it again.",
   "tasks.history.kind": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
   "tasks.history.labels": "Labels: {labels}",
   "tasks.history.labelsAdded": "Labels: added {labels}",

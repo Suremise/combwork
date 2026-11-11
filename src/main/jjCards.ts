@@ -24,6 +24,7 @@ import { boardFile } from './boardStore'
 import { commitPublishOff } from './jjPublish'
 import { mergeBundles, type SqlDb } from './platform/jjObligations'
 import { SlotStore } from './slots'
+import { attemptsKey, readAttempts, saveAttemptIn } from './platform/jjCandidateStep'
 import type { WorkspaceService } from './workspace'
 
 /** A project's jj card dependencies in a workspace. `projectId`: the slot tables' id of the project (as poolFor keys it). */
@@ -97,7 +98,17 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         const v = journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).read()
         return Array.isArray(v) ? (v as JjBundle[]) : []
       },
-      publish: (req) => commitPublishOff(req)
+      publish: (req) => commitPublishOff(req),
+      // HI-2871: a card and cycle's candidate attempts (J4's records with their fingerprints), one board_meta row merged
+      // by attempt in one write: a later phase of one attempt never erases another's entry.
+      attempts: (card, cycle) => {
+        const key = attemptsKey(projectId() || basename(projectPath), card, cycle)
+        return boardConn(ws).read((db) => readAttempts(db as unknown as SqlDb, key))
+      },
+      saveAttempt: async (card, cycle, e) => {
+        const key = attemptsKey(projectId() || basename(projectPath), card, cycle)
+        await boardConn(ws).write((db) => saveAttemptIn(db as unknown as SqlDb, key, e))
+      }
     },
     pins: {
       read: (ref) => {

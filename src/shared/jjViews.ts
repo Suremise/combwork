@@ -212,7 +212,18 @@ export interface JjWaitingCard {
   target: string
   /** The last observation for exactly this approval and target (null: not checked yet), `at` an observation's time. */
   contained: { state: 'notYet' | 'unknown'; why?: string; at: number } | null
+  /**
+   * HI-2871: the candidate Combwork built for exactly this approval and its rules (null: none yet): ready (its commit and
+   * change, built on `expected` with `style`, conflict-free, no merge checks run), none because the repository signs, or
+   * why it couldn't be built (after several tries in a row).
+   */
+  candidate: JjWaitingCandidate | null
 }
+
+export type JjWaitingCandidate =
+  | { state: 'ready'; result: string; change: string; expected: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; at: number }
+  | { state: 'signing'; at: number }
+  | { state: 'unknown'; why: string; at: number }
 
 /** A publish record the user is asked to check (J9b2's checkThis), with what differs. */
 export interface JjToCheckRow {

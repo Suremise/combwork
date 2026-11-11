@@ -606,6 +606,13 @@
       "was": "plain"
     }
   },
+  "tasks.history.jjCandidateReturned": {
+    "placeholders": {
+      "target": "plain",
+      "reason": "select",
+      "files": "select"
+    }
+  },
   "tasks.history.kind": {
     "placeholders": {
       "how": "select",

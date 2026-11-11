@@ -24,6 +24,8 @@ import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
 import { inTargetNow } from '../../shared/workflow/workView'
+import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
+import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -490,6 +492,119 @@ export interface JjReconcilePorts {
   record(w: Write, row: { card: string; cycle: number; bundle: string; target: string; result: string; since: number }): void
   /** The project's canonical id: the containment record's scope (HI-2869). */
   projectId(): string
+  /**
+   * HI-2871: J4's pre-integration candidate for the approval its fingerprint names (built, answered again, or why not);
+   * `still`: whether that fingerprint is the card's now, read from the board (the attempt's owner). Absent: none is built.
+   */
+  candidate?(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep>
+  /** HI-2871: whether the target's head is still `expected`, read just before a candidate's answer is published. */
+  headIs?(target: string, expected: string): Promise<boolean>
+  /** HI-2871: the cycle integrated: its candidates dropped (the one the target reaches kept). */
+  candidatesDone?(card: CardRecord, cycle: number): Promise<void>
+}
+
+/**
+ * The window's record of a jj card's candidate (HI-2871/s21), board_meta, by the project's canonical id: the fingerprint
+ * it was made for (shown only while that is the card's), and what it is: a candidate ready, none (the repository signs),
+ * or why it couldn't be built (`misses` in a row: shown from CANDIDATE_MISSES on).
+ */
+export interface JjCandidateShown {
+  gen: number
+  fp: JjCandidateFingerprint
+  state: 'ready' | 'signing' | 'unknown'
+  offer?: JjCandidateOffer
+  why?: string
+  misses?: number
+  at: number
+}
+
+/** Unknown candidate steps in a row before the window says why (s13 §3). */
+export const CANDIDATE_MISSES = 3
+
+export const candidateKey = (project: string, card: string, cycle: number): string => `jj_candidate:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`
+
+/** A jj card's candidate fingerprint now (null: not an approval a candidate is built for). */
+export function candidateFingerprint(wf: Workflow, card: CardRecord, s: CardState): JjCandidateFingerprint | null {
+  const snap = approvalOf(card, s)
+  if (!snap || snap.stage !== 'approved' || !s.approved || !snap.target) return null
+  const r = wf.rulesetOf(card, s)
+  return { cycle: snap.cycle, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, ruleset: r.id, style: r.options.style, strict: r.options.strict }
+}
+
+/** The card's candidate record, only while it was made for its fingerprint now (a stale row, a crash's, shows nothing). */
+export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string): JjCandidateShown | null {
+  // The record first: a card with none (most) needs no fingerprint read.
+  const raw = wf.store.boardMeta(candidateKey(project, card.key, s.cycle))
+  const fp = raw ? candidateFingerprint(wf, card, s) : null
+  if (!fp || !raw) return null
+  try {
+    const rec = JSON.parse(raw) as JjCandidateShown
+    return sameFingerprint(rec.fp, fp) ? rec : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-2871's step (design HI-2871/s21): J4's candidate for the card's exact approval, answered only while the card is
+ * still that approval under the same rules and its target still at the head it was built on, each checked in the write
+ * that publishes it. A candidate: its record for the window. A conflict or not up to date: the card back to its
+ * builder (`IntegrationFailed`, as the queue returns one). The repository signs: a record saying so. Unknown: nothing
+ * offered or returned; counted, and said once it has happened CANDIDATE_MISSES times in a row.
+ */
+async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports: JjReconcilePorts, hooks: ReconcileHooks): Promise<void> {
+  const fp = candidateFingerprint(wf, card, s)
+  if (!fp || !ports.candidate) return
+  const project = ports.projectId()
+  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp)
+  const still = (): boolean => {
+    const c = wf.store.card(card.id)
+    return stillIn(c, wf.state(c))
+  }
+  const gen = await reserveContained(wf, project)
+  const step = await ports.candidate(card, s, fp, still)
+  const key = candidateKey(project, card.key, fp.cycle)
+  const prior = (db: { prepare(sql: string): { get(...a: string[]): unknown } }): JjCandidateShown | null => {
+    const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+    try {
+      return had ? (JSON.parse(had.value) as JjCandidateShown) : null
+    } catch {
+      return null
+    }
+  }
+  const put = (rec: Omit<JjCandidateShown, 'gen' | 'fp' | 'at'>) => async (): Promise<void> => {
+    await wf.write(card, null, 'outside', (w) => {
+      if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+      w.tx.sql((db) => {
+        const was = prior(db)
+        if (was && was.gen >= gen) return
+        const misses = rec.state === 'unknown' ? (was?.state === 'unknown' && sameFingerprint(was.fp, fp) ? (was.misses ?? 1) + 1 : 1) : undefined
+        const row: JjCandidateShown = { gen, fp, ...rec, ...(misses ? { misses } : {}), at: Date.now() }
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(row)) // i18n-ignore: SQL
+      })
+    })
+  }
+  if ('unknown' in step) {
+    await put({ state: 'unknown', why: step.unknown })()
+    return hooks.unknown?.(`candidate: ${step.unknown}`)
+  }
+  if ('none' in step) return put({ state: 'signing' })()
+  // A candidate or a return is published only while the target is still at the head it was built on.
+  const expected = 'offer' in step ? step.offer.expected : step.returned.expected
+  if (!ports.headIs || !(await ports.headIs(fp.target, expected))) return
+  await hooks.afterRead?.()
+  if ('offer' in step) return put({ state: 'ready', offer: step.offer })()
+  const f = step.returned
+  await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
+    if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+    const failed: FactData['IntegrationFailed'] = { entry: jjCandidateEntry(f.attempt), revision: fp.revision, target: fp.target, reason: f.reason === 'conflict' ? 'conflict' : 'notUpToDate', transient: false, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log.slice(-4000) } : {}), ...(f.conflicts?.files.length ? { conflicts: f.conflicts } : {}) } // i18n-ignore: a failure's code, not text
+    w.fact('IntegrationFailed', failed)
+    w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
+    if (!wf.cfg.reconcileActs) return
+    w.move('active', 'derived')
+    wf.wake(w, w.state().started?.builder, jjReturnedWake(card.key, failed))
+    w.action('comment', { ...jjReturnedComment(card.key, failed) })
+  })
 }
 
 /** J5's answer for an approved submission: contained (with what to record), not contained, or why it couldn't say. */
@@ -628,6 +743,9 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
       return hooks.unknown?.(p.unknown)
     }
     if (!p.contained) await noteContained(wf, card, s, snap, ports.projectId(), gen, { state: 'notYet' })
+    // HI-2871: not in its target yet, its pass holding at its slot's head: J4's candidate before the user integrates it
+    // (with the rules enforced: a candidate may return the card).
+    if (!p.contained && wf.cfg.reconcileActs && !s.stale && (!s.head || s.head === approved.revision)) await candidateFor(wf, card, s, ports, hooks)
     if (p.contained) {
       await hooks.afterRead?.()
       await wf.write(card, r, 'outside', (w) => {
@@ -641,8 +759,13 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
         ports.record(w, { card: card.key, cycle: s.cycle, bundle: p.bundle, target: snap.target, result: p.result, since: Date.now() })
         // Integrated: its containment record goes with it (the card leaves "Waiting for you to integrate").
         w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(containedKey(ports.projectId(), card.key, s.cycle))) // i18n-ignore: SQL
+        // HI-2871: and its candidate record: nothing waits to be integrated any more.
+        w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(candidateKey(ports.projectId(), card.key, s.cycle))) // i18n-ignore: SQL
         if (wf.cfg.reconcileActs && w.current !== 'done') w.move('done', 'derived')
       })
+      // HI-2871: integrated (by its candidate or the user's own way): the cycle's other candidates dropped from the
+      // user's log, the one the target reaches kept.
+      if (wf.state(wf.store.card(card.id)).integrated) await ports.candidatesDone?.(card, s.cycle)
       return
     }
   }

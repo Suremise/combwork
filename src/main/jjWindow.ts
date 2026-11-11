@@ -6,10 +6,10 @@
 
 import { reconcileCard } from './workflow/reconciler'
 import { basename, resolve as resolvePath } from 'path'
-import type { JjLeftover, JjToCheckRow, JjWaitingCard } from '../shared/jjViews'
+import type { JjLeftover, JjToCheckRow, JjWaitingCandidate, JjWaitingCard } from '../shared/jjViews'
 import { boardRead } from './boardStore'
 import { boardConn, jjPort } from './slotsApp'
-import { containedKey, type JjContained } from './workflow/reconcile'
+import { CANDIDATE_MISSES, candidateShown, containedKey, type JjContained } from './workflow/reconcile'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -65,7 +65,18 @@ export function waitingOf(wf: Workflow, project: string): JjWaitingCard[] {
       rec = null
     }
     const matches = !!rec && rec.submission === s.latest.id && rec.revision === s.approved.revision && rec.base === s.approved.base && rec.key === (s.latest.key ?? null) && rec.commit === commit && rec.target === target
-    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null })
+    // HI-2871: its candidate, only as recorded for exactly its approval and rules now; an unknown only once repeated.
+    const c = candidateShown(wf, card, s, project)
+    const candidate: JjWaitingCandidate | null = !c
+      ? null
+      : c.state === 'ready' && c.offer
+        ? { state: 'ready', result: c.offer.result, change: c.offer.change, expected: c.offer.expected, style: c.offer.style, ...(c.offer.updated ? { updated: c.offer.updated } : {}), at: c.at }
+        : c.state === 'signing'
+          ? { state: 'signing', at: c.at }
+          : c.state === 'unknown' && (c.misses ?? 1) >= CANDIDATE_MISSES
+            ? { state: 'unknown', why: c.why ?? '', at: c.at }
+            : null
+    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null, candidate })
   }
   return out
 }
