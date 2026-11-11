@@ -26,7 +26,7 @@ if (!exe) {
 }
 
 const SUITE = 'jjreopen'
-const PORT = Number(lib.port(47939))
+const PORT = Number(lib.port(47718))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')

@@ -19,7 +19,7 @@ if (!exe) {
 }
 
 const SUITE = 'jjafterpush'
-const PORT = Number(lib.port(47940))
+const PORT = Number(lib.port(47719))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')
