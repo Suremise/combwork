@@ -488,8 +488,9 @@ touched). Even then the guards' inputs read in between may have seen another sta
 clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
 from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. A start (an
 agent's, or the start in a drag) may go further where its platform says so (`startGathers`; jj's 3, HI-2916: Combwork's own jj operations move the head its
-fingerprint keeps): gathered again while only the fingerprint moved, before the transaction or in it (the content asked
-again after the write refused), until its passes are spent, then refused. Anything else (an edit, a staged change, a checkout, an operation,
+fingerprint keeps): gathered again while only the fingerprint moved, or while it can't be read at that instant (HI-2972,
+`startAgain`: jj's operation heads mid-update), before the transaction or in it (the content asked again after the write
+refused), until its passes are spent, then refused. Anything else (an edit, a staged change, a checkout, an operation,
 an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
 each lane's look in a branch-update pass, and each merge-queue entry's way through (#1386), is one `gitStep`
 (`platform/git.ts`, #1376): what it asks about fixed commits (an ancestor, a merge base, a tree, the queue's containment

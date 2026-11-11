@@ -3242,8 +3242,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   so another card's submission meanwhile gathers the intent again once instead of refusing it. A Todo card's evidence
   keeps the single operation head beside its target's ref (the head witnesses jj's whole view of the target, not only
   its export), so a start beside Combwork's own jj operations (a slot made, another detached) is gathered again up to
-  three times while only that moved, each pass read afresh, and refused once they're spent (HI-2916). The target's read
-  itself is made again whole when the head moves under it, at most three reads.
+  three times while only that moved, each pass read afresh, and refused once they're spent (HI-2916). A fingerprint
+  that can't be read at the instant it is asked (the operation heads while any jj operation lands: jj writes the new
+  head before it removes the old one) also gathers it again while passes are left, rather than refusing (HI-2972); the
+  write still needs exactly the fingerprint it gathered. A start refused as `evidence.changed` logs which check refused
+  it (the plan, the write, the lane, the baseline) and on which pass, and each pass gathered again logs why. The
+  target's read itself is made again whole when the head moves under it, at most three reads.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
   transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
 - **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
