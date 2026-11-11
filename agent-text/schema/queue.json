@@ -61,6 +61,13 @@
       "target": "plain"
     }
   },
+  "queue.failure.directionResolution": {
+    "placeholders": {
+      "forward": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "queue.failure.focused.newProof": {
     "placeholders": {
       "tests": "plain"
@@ -206,6 +213,12 @@
   },
   "queue.next.direction": {
     "placeholders": {}
+  },
+  "queue.next.directionResolution": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
   },
   "queue.next.fix": {
     "placeholders": {}

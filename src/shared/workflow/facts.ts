@@ -417,9 +417,10 @@ export interface FactData {
    * HI-2959: this card resolves a forward merge the queue returned (`forward`: its key), made for a builder by Resolve on
    * a builder (the user's or the Assistant's): its work merges `from` at `source` (the returned attempt's frozen commit)
    * into `to`. Written while it is in Todo, before its start, and kept over every cycle: its rules always merge it as a
-   * merge commit (`mergeCommitOf`), so the destination keeps the source's history.
+   * merge commit (`mergeCommitOf`), so the destination keeps the source's history. `override` (HI-2998): the forward's
+   * own request's (HI-2892), carried so the queue checks the resolution's direction at each attempt as the forward's.
    */
-  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant' }
+  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant'; override?: ForwardOverride }
   /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its

@@ -55,6 +55,8 @@ const Q = {
   pushRefused: agentMsg({ id: 'queue.failure.pushRefused', text: 'publishing it to {target}’s remote was refused (a pre-push hook or the remote); it is tested again after Resume', note: 'What came back (HI-1183, follow mode): the project’s pre-push hook or the remote refused the push of the merge; nothing was published.' }),
   direction: agentMsg({ id: 'queue.failure.direction', text: 'a forward merge into {target} against the release path’s direction (into an older version or the default branch, or two branches Combwork can’t order), its request with no override; nothing merged', note: 'What came back (HI-2892): a forward merge card the queue refused to merge, against the release path’s direction.' }),
   nextDirection: agentMsg({ id: 'queue.next.direction', text: 'Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.', note: 'The next step after a forward merge came back against the release path’s direction (HI-2892).' }),
+  directionResolution: agentMsg({ id: 'queue.failure.directionResolution', text: 'the resolution of {forward}, bringing {to} up to date with {from}, is against the release path’s direction now (the default branch or the branches changed since Resolve), and {forward}’s request recorded no override; nothing merged', note: 'What came back (HI-2998): a card made by Resolve on a builder to merge branch {from} into branch {to} by hand, refused at its merge: that direction no longer reads forward. {forward}: the forward merge card it resolves (a key like HI-12).' }),
+  nextDirectionResolution: agentMsg({ id: 'queue.next.directionResolution', text: 'Don’t submit it again: it comes back the same way. Say so on the card and leave it to the user; only a new forward request with their explicit override merges {from} into {to}.', note: 'The next step, for its builder, after a resolution of a forward merge came back against the release path’s direction (HI-2998).' }),
   notPublished: agentMsg({ id: 'queue.failure.notPublished', text: 'the user said its publication to {target}’s remote didn’t happen; it is tested again', note: 'What came back (HI-1183, follow mode): an unknown publication the user said wasn’t published.' }),
   folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
   notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
@@ -87,7 +89,7 @@ export type QueueState =
   /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
   | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true }
   /** Back from the queue to its builder: a conflict, red checks, a hook (`failure`: what came back, as recorded). */
-  | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed'] }
+  | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed']; about?: ReturnedForward }
   /** Left the queue: it isn't approved any more (its pass stale, or a decision since). */
   | { state: 'left'; why: 'stale' | 'decision' }
   /** Approved, but its pass is stale (HI-1763): its line moved on since (`approved` what was passed, `current` its line). */
@@ -115,7 +117,10 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
   // Approved with a stale pass, never queued (HI-1763: HI-1737 sat so, its lane paused, nobody told): said, with what to do.
   if (s.stage === 'approved' && s.stale) return { state: 'stale', approved: s.stale.approved, current: s.stale.current }
   const last = s.entries.at(-1)
-  if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure }
+  if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) {
+    const about = returnedAbout(s)
+    return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure, ...(about ? { about } : {}) }
+  }
   if (last?.state === 'cancelled' && (last.cancelled === 'stale' || last.cancelled === 'decision') && s.stage !== 'merging') return { state: 'left', why: last.cancelled }
   return { state: 'notYet' }
 }
@@ -270,7 +275,7 @@ export function queueLine(q: QueueState, enforced = true): string {
     case 'paused':
       return say(Q.paused, { who, target: q.target, reason: q.reason, card: q.card, waits: pausedWaits(q) })
     case 'returned':
-      return say(Q.returned, { who, returned: returnedText(say(Q.subjectIt), q.failure, READ_MAX, READ_LINES) })
+      return say(Q.returned, { who, returned: returnedText(say(Q.subjectIt), q.failure, READ_MAX, READ_LINES, q.about) })
     case 'left':
       return say(Q.left, { who, why: q.why })
     case 'stale':
@@ -329,7 +334,7 @@ function placedFiles(f: FactData['IntegrationFailed'], room: number): string {
 }
 
 /** What came back, in a few words: the reason, and the files (in `room` characters) or the check. Names already clipped. */
-function failureText(f: FactData['IntegrationFailed'], room: number): string {
+function failureText(f: FactData['IntegrationFailed'], room: number, about?: ReturnedForward): string {
   switch (f.reason) {
     case 'conflict': {
       const head = say(Q.conflict, { target: f.target })
@@ -348,6 +353,7 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
     case 'notPublished':
       return say(Q.notPublished, { target: f.target })
     case 'direction':
+      if (about?.resolution) return say(Q.directionResolution, { forward: clip(about.resolution, NAME_MAX), from: clip(about.from, NAME_MAX), to: clip(about.to, NAME_MAX) })
       return say(Q.direction, { target: f.target })
     case 'folderBusy':
       return say(Q.folderBusy, { target: f.target })
@@ -370,14 +376,30 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
   }
 }
 
-/** HI-2959: a forward merge's branches, for what its return says to do next. */
+/**
+ * HI-2959: a forward merge's branches, for what its return says to do next. HI-2998: `resolution`, the forward's key when
+ * the card is its resolution (Resolve on a builder: its builder's card), not the forward itself.
+ */
 export interface ReturnedForward {
   from: string
   to: string
+  resolution?: string
+}
+
+/** What a card's return is about (HI-2959, HI-2998): its forward merge, or the forward it resolves; else none. */
+export function returnedAbout(s: CardState): ReturnedForward | undefined {
+  if (s.forward) return { from: s.forward.from, to: s.forward.to }
+  if (s.resolves) return { from: s.resolves.from, to: s.resolves.to, resolution: s.resolves.forward }
+  return undefined
 }
 
 /** What to do next: a transient failure is the same revision submitted again; anything else a fix. */
 function nextStep(f: FactData['IntegrationFailed'], forward?: ReturnedForward): string {
+  // HI-2998: a resolution returned for its direction: its builder can't change that, the user decides.
+  if (forward?.resolution) {
+    if (f.reason === 'direction') return say(Q.nextDirectionResolution, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
+    forward = undefined
+  }
   // HI-2959: a forward merge's choices are the user's or the Assistant's, never a builder's (it has none).
   if (forward && f.reason !== 'direction') return say(Q.nextForward, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
   if (f.reason === 'focused') {
@@ -413,7 +435,7 @@ export function returnedText(subject: string, f: FactData['IntegrationFailed'], 
   const next = ` ${nextStep(named, forward)}`
   // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
   const fixed = frame(Q.lead, lead, 'failure') + next.length
-  const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN) })
+  const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN, forward) })
   let room = max - head.length - next.length
   let path = ''
   if (f.logPath) {
@@ -448,10 +470,10 @@ const RESUBMITTED_ROOM = 200
  * came back (the files of a conflict, in RESUBMITTED_ROOM characters: the wake line's bytes keep its end whole, in any
  * script), who submitted it again and what to review. One sentence (agent-facing, English).
  */
-export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string): string {
+export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string, about?: ReturnedForward): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
   const conflict = f.reason === 'conflict' || (f.reason === 'notUpToDate' && !!f.files?.length)
-  return say(Q.resubmitted, { card: clip(key, NAME_MAX), failure: failureText(named, RESUBMITTED_ROOM), builder: clip(builder, NAME_MAX), conflict: conflict ? 'yes' : 'no' })
+  return say(Q.resubmitted, { card: clip(key, NAME_MAX), failure: failureText(named, RESUBMITTED_ROOM, about), builder: clip(builder, NAME_MAX), conflict: conflict ? 'yes' : 'no' })
 }
 
 /** How long the queue's comment on a returned card is, and how many of its output's last lines it quotes (HI-2087). */
@@ -472,7 +494,7 @@ export function returnedComment(key: string, f: FactData['IntegrationFailed'], f
   // when it is read (storedForAgents, HI-2440).
   // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
   const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
-  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to } } : {}) } }
+  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}) } } : {}) } }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
 }
 
@@ -483,8 +505,8 @@ export const RETURNED_COMMENT = 'queue.returned'
 export function returnedCommentFrom(data: unknown): string | null {
   const d = data as { key?: unknown; failure?: unknown; forward?: unknown } | null
   if (!d || typeof d.key !== 'string' || !d.failure || typeof d.failure !== 'object') return null
-  const fw = d.forward as { from?: unknown; to?: unknown } | null | undefined
-  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to } : undefined
+  const fw = d.forward as { from?: unknown; to?: unknown; resolution?: unknown } | null | undefined
+  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to, ...(typeof fw.resolution === 'string' ? { resolution: fw.resolution } : {}) } : undefined
   try {
     return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES, forward)
   } catch {

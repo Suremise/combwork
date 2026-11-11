@@ -35,7 +35,7 @@ import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
-import { leftWake, returnedComment, returnedWake } from './queueState'
+import { leftWake, returnedAbout, returnedComment, returnedWake } from './queueState'
 import { mergeMessage, updateMessage } from './mergeMessage'
 import { again, isAgain } from '../platform/again'
 import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, PublishReply, QueueGitOptions, QueueGitResult, TransportSnapshot } from '../platform/integration'
@@ -1290,8 +1290,9 @@ export class MergeQueue {
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
       // HI-2892: a forward merge against the release path's direction, its request with no override, is never merged: it
-      // comes back with why, whatever let it be queued (one from before, or the default branch changed since).
-      if (s.forward && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
+      // comes back with why, whatever let it be queued (one from before, or the default branch changed since). HI-2998: and
+      // so does a forward's resolution (Resolve on a builder), checked at Resolve, with its forward's override.
+      if ((s.forward || s.resolves) && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
       // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
       const blockers = this.wf.queueWaitingOn(card.id)
       if (blockers.length) return this.waiting(card, entry, blockers)
@@ -1540,9 +1541,10 @@ export class MergeQueue {
   /**
    * HI-2892: whether a forward merge may go, as its direction reads now (the default branch as the card's own port names
    * it; one it can't name or that is gone counts as none, so it makes no direction) or with its request's override.
+   * HI-2998: a forward's resolution as its forward, with the override its forward's request recorded.
    */
   private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean> {
-    const f = s.forward
+    const f = s.forward ?? s.resolves
     if (!f) return true
     const H = this.history(card, s)
     const d = await H.defaultTarget(this.project).catch(() => null)
@@ -2076,10 +2078,11 @@ export class MergeQueue {
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded. A forward
       // merge (HI-2679) has no builder: its card says it, for the user or the Assistant to Retry merge or Remove.
-      if (!w.state().forward) this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
+      // HI-2998: a forward's resolution says so, for what its builder does next.
+      const about = returnedAbout(w.state())
+      if (!w.state().forward) this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed, about))
       // HI-2087: and on the card, for whoever reads it (its latest comment was the review's pass).
-      const fw = w.state().forward
-      w.action('comment', { ...returnedComment(card.key, failed, fw ? { from: fw.from, to: fw.to } : undefined) })
+      w.action('comment', { ...returnedComment(card.key, failed, about) })
       return true
     })
     if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' } // i18n-ignore: a reason's key, not text

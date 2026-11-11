@@ -5786,7 +5786,7 @@ direction is never handed over (Remove from queue alone ends it), so a builder's
 rules refuse. One board change
 (`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
 the forward's destination (its Merges into, stored even when it is Work merges into then, HI-2985), linked to it, its description the files in conflict, the returned attempt's
-frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by}, written before its start
+frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by, override?: the forward's request's, HI-2998}, written before its start
 and kept over every cycle; and the forward ended as Remove from queue ends it (Done, an override, never an `Integrated`),
 its comment naming the new card. The forward's intent is refused unless its last entry is still the one read, so a Retry,
 a Remove or another Resolve meanwhile leaves no card. `source` is that attempt's entry `revision`, not the source's head
@@ -5800,6 +5800,12 @@ there. Its Merges into set to any other branch is refused (`tasks.setTarget`), a
 (`refused`), a lane merging elsewhere refuses it (`refuseOtherTargets` comparing a card's own target with the lane's,
 the project's default resolved), and its start is refused (`forward.resolutionTarget`) when it would start from another
 branch, as a card made before HI-2985 stored none: setting its Merges into to `to` then starts it there.
+
+Its direction is checked at each queue attempt as a forward's is (HI-2998, `forwardAllowed`: `from` into `to` with the
+default branch as it reads then, or the override its forward's request recorded, carried on its `ForwardResolution`):
+the default branch or the branches changed since Resolve so that it no longer reads forward, it is returned to its
+builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
+only a new forward request with the user's override merges that pair.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
