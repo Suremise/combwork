@@ -4,7 +4,7 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -13,6 +13,8 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** HI-2982: the reset that makes the folder's new index after a commit answered as failed. */
+let failIndexSync = false
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -23,6 +25,8 @@ vi.mock('../src/main/git', async (original) => {
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
       const r = await real.git(cwd, args, max, input, opts)
+      // HI-2982: the folder's new index not made, after the commit (its reset into a side index).
+      if (failIndexSync && args[0] === 'reset' && opts?.env?.GIT_INDEX_FILE) return { ok: false, code: 128, out: '', err: 'fatal: could not write the new index', buf: Buffer.alloc(0) }
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
         return { ...r, ok: false, code: 1, err: 'error: could not write index' }
@@ -90,6 +94,7 @@ beforeEach(() => {
   fencedProbe = null
   failTopIn = null
   failStashAfter = false
+  failIndexSync = false
 })
 
 describe('Commit', () => {
@@ -267,6 +272,46 @@ describe('a file the user stopped tracking (its deletion staged, the file kept)'
     expect(stashes()).toBe('')
     expect(read('a.txt')).toBe('local only\n')
     expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
+  })
+
+  // HR1's round 1: the commit is built in an index of its own, so the folder's index is held as git's own commit holds it.
+  it('another git holding the index lock: refused, nothing done (HEAD, the index and the files as they were)', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    const before = head()
+    writeFileSync(join(proj, '.git', 'index.lock'), '')
+    try {
+      await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Another git command is using the repository/)
+      expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(true)
+    } finally {
+      rmSync(join(proj, '.git', 'index.lock'))
+    }
+    expect(head()).toBe(before)
+    expect(status()).toBe('M a.txt')
+    expect(read('a.txt')).toBe('new\n')
+  })
+
+  it('another git writing the index while the commit runs (a hook staging into the real index) is refused, its file left as it was', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    writeFileSync(join(proj, 'b.txt'), 'b, edited\n')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    // Git hands the hook the commit's own index (GIT_INDEX_FILE): unset, its add writes the folder's index, which is held.
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nunset GIT_INDEX_FILE\ngit add b.txt 2>/dev/null\necho $? > .git/hook-add\nexit 0\n')
+    await settle('commit', ['a.txt'])
+    expect(readFileSync(join(proj, '.git', 'hook-add'), 'utf8').trim()).not.toBe('0')
+    expect(committed()).toEqual(['a.txt'])
+    expect(status()).toBe('M b.txt')
+    expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
+  })
+
+  it("the folder's index not written after the commit: the commit taken back and refused, never a success with them apart", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    const before = head()
+    failIndexSync = true
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Git did not commit: fatal: could not write the new index/)
+    expect(head()).toBe(before)
+    expect(status()).toBe('M a.txt')
+    expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
+    expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
   })
 
   it('a staged rename whose old name is back on disk: the rename committed, the old file left untracked', async () => {

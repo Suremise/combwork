@@ -6,7 +6,7 @@
 // changed. Nothing Git would allow is refused otherwise. A failure loses nothing: a refused commit leaves the files and
 // the index as they were, and a stash git made before it failed is kept and named. A deletion the user staged (Files'
 // Stop Tracking, `git rm --cached`) is committed as that deletion, never the file added back (HI-2982).
-import { copyFile, lstat, rm } from 'original-fs/promises'
+import { copyFile, lstat, open, rename, rm } from 'original-fs/promises'
 import { join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { agentMsg, say } from '../shared/agentText'
@@ -137,15 +137,25 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   return now.line
 }
 
+/** How often, and how far apart, the folder's new index is tried as it is published (Windows refuses a rename while
+ * another process has the file open for a moment). */
+const PUBLISH_TRIES = 5
+const PUBLISH_RETRY_MS = 100
+
 /**
  * Commits `files` (repository-relative, as status reports them) in `folder` (a working tree's top), those paths only,
  * as `commit --only` would but keeping a staged deletion (HI-2982): `commit --only` takes each path from the folder, so a
- * file the user stopped tracking (its deletion staged, the file kept) went back into Git with its local content. Built
- * in an index of its own, never the folder's: HEAD's tree (read over a copy of the index, so unchanged files keep their
- * stat data), each path taken as the folder has it (`update-index --add --remove`: added, changed, or gone from disk),
- * except a path whose index entry is gone, which is committed as gone. Committed from that index (hooks and signing as
- * any commit), then the folder's index brought to the commit for those paths alone. A refused commit leaves the folder's
- * index and files as they were: nothing touched them.
+ * file the user stopped tracking (its deletion staged, the file kept) went back into Git with its local content.
+ *
+ * Under the folder's own index lock throughout, as git's own commit holds it (HR1's round 1): `index.lock` taken first
+ * (held by another git: refused, nothing done), so no other git writes the index from the snapshot to the end. The
+ * commit is built in an index of its own: HEAD's tree (read over a copy of the index, so unchanged files keep their stat
+ * data), each path taken as the folder has it (`update-index --add --remove`: added, changed, or gone from disk), except
+ * a path whose index entry is gone, which is committed as gone; committed from it (hooks and signing as any commit). The
+ * folder's new index (a copy with those paths brought to the commit, `reset -- <paths>`) is written into the lock and
+ * renamed over the index, as git publishes one. A refused commit leaves the index and files untouched; a failure after
+ * the commit puts the branch back where it was (only if still at the new commit) and refuses, never a success with the
+ * index and HEAD apart.
  */
 async function commitPaths(folder: string, files: string[], now: Map<string, Changed>, message: string): Promise<string> {
   const gone = files.filter((p) => now.get(p)?.deleted)
@@ -153,16 +163,23 @@ async function commitPaths(folder: string, files: string[], now: Map<string, Cha
   const at = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
   if (!at.ok || !at.out.trim()) throw failed(M.commitFailed, at.err || 'git did not name its index') // i18n-ignore: stands in for git's own (English) words
   const index = at.out.trim()
-  const next = `${index}.cw-commit-${process.pid}-${Date.now().toString(36)}`
-  const env = { ...quietEnv(), GIT_INDEX_FILE: next }
+  const lock = `${index}.lock`
+  const stamp = `${process.pid}-${Date.now().toString(36)}`
+  const building = `${index}.cw-commit-${stamp}`
+  const next = `${index}.cw-next-${stamp}`
   // update-index takes paths as they are (no pathspec magic), from the top; a nested repository is listed with a `/`.
   const plain = (p: string): string => p.replace(/\/+$/, '')
+  let held = await open(lock, 'wx').catch(() => null)
+  if (!held) throw combworkError(M.indexBusy)
+  let published = false
   try {
-    const born = (await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])).ok
-    if (born) await copyFile(index, next).catch(() => undefined)
-    let base = await git(folder, born ? ['read-tree', '-m', 'HEAD'] : ['read-tree', '--empty'], undefined, undefined, { env })
+    const before = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
+    const was = before.ok ? before.out.trim() : null
+    const env = { ...quietEnv(), GIT_INDEX_FILE: building }
+    if (was) await copyFile(index, building).catch(() => undefined)
+    let base = await git(folder, was ? ['read-tree', '-m', 'HEAD'] : ['read-tree', '--empty'], undefined, undefined, { env })
     // A copied index git can't merge from (an unmerged entry): HEAD's tree alone.
-    if (!base.ok && born) base = await git(folder, ['read-tree', 'HEAD'], undefined, undefined, { env })
+    if (!base.ok && was) base = await git(folder, ['read-tree', 'HEAD'], undefined, undefined, { env })
     if (!base.ok) throw failed(M.commitFailed, base.err)
     if (taken.length) {
       const add = await git(folder, ['update-index', '--add', '--remove', '--', ...taken.map(plain)], undefined, undefined, { env })
@@ -174,16 +191,43 @@ async function commitPaths(folder: string, files: string[], now: Map<string, Cha
     }
     const r = await git(folder, ['commit', '--quiet', '-m', message], undefined, undefined, { env, timeout: ACT_MS })
     if (!r.ok) throw failed(M.commitFailed, `${r.err}\n${r.out}`)
+    const after = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
+    const made = after.ok ? after.out.trim() : ''
+    try {
+      // The folder's index as the commit has those paths (a deletion's entry is gone already), from the index as it was
+      // under the lock: what `commit --only` leaves.
+      await copyFile(index, next).catch(() => undefined)
+      if (taken.length) {
+        const sync = await git(folder, ['reset', '--quiet', '--', ...taken.map(literal)], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
+        if (!sync.ok) throw new Error(sync.err.trim() || 'git reset failed') // i18n-ignore: git's own words, or the command
+      }
+      await held.close()
+      held = null
+      await rename(next, lock)
+      let last: Error | null = null
+      for (let tries = 0; tries < PUBLISH_TRIES && !published; tries++) {
+        try {
+          await rename(lock, index)
+          published = true
+        } catch (e) {
+          last = e as Error
+          await new Promise((res) => setTimeout(res, PUBLISH_RETRY_MS))
+        }
+      }
+      if (!published) throw last ?? new Error('the index could not be written') // i18n-ignore: a reason, log- and git-facing
+    } catch (e) {
+      // HEAD back where it was, only if still at this commit (compare and swap), the index never written: as before.
+      const back = was ? await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', 'HEAD', was, made]) : await git(folder, ['update-ref', '-d', 'HEAD', made])
+      log.warn(`Committed in ${userText(folder)} but couldn't write its index (${userText((e as Error).message)}); ${back.ok ? 'the commit was taken back' : `the commit couldn't be taken back: ${userText(back.err.trim())}`}`)
+      throw failed(M.commitFailed, (e as Error).message)
+    }
+    return made
   } finally {
+    await held?.close().catch(() => undefined)
+    await rm(building, { force: true }).catch(() => undefined)
     await rm(next, { force: true }).catch(() => undefined)
+    if (!published) await rm(lock, { force: true }).catch(() => undefined)
   }
-  // The folder's index as the commit has those paths (a deletion's entry is gone already): what `commit --only` leaves.
-  if (taken.length) {
-    const sync = await git(folder, ['reset', '--quiet', '--', ...taken.map(literal)])
-    if (!sync.ok) log.warn(`Committed in ${userText(folder)}, but its index wasn't brought to the commit: ${userText(sync.err.trim())}`)
-  }
-  const head = await git(folder, ['rev-parse', 'HEAD'])
-  return head.out.trim()
 }
 
 /**

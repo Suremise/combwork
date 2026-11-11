@@ -5851,11 +5851,14 @@ touched:
   `commit --only` would (their working-tree content; every other index entry kept; a rename's both sides), except that
   a path whose index entry is gone (a staged deletion, Files' Stop Tracking, or a rename's old side) is committed as
   that deletion, the file on disk left untracked, never added back (HI-2982: `commit --only` took the kept file, so a
-  secret just taken out of Git went back in). Built in an index of its own (HEAD's tree over a copy of the folder's
-  index, each path from the folder by `update-index --add --remove`, each deletion `--force-remove`), committed from
-  it (hooks and signing as any commit), then the folder's index brought to the commit for those paths (`reset --
-  <paths>`); message *Commit changes before merging HI-12*; a failure (a hook, signing) leaves the folder's index and
-  files untouched. Set aside refuses, naming it, a path whose deletion is staged while its file is still in the
+  secret just taken out of Git went back in). The folder's `index.lock` is taken first and held to the end, as git's own
+  commit holds it (another git holding it: refused, nothing done). The commit is built in an index of its own (HEAD's
+  tree over a copy of the folder's index, each path from the folder by `update-index --add --remove`, each deletion
+  `--force-remove`) and committed from it (hooks and signing as any commit); the folder's new index (those paths
+  brought to the commit, `reset -- <paths>` in a copy) is written into the lock and renamed over the index, as git
+  publishes one. Message *Commit changes before merging HI-12*; a failure (a hook, signing) leaves the folder's index
+  and files untouched, and one after the commit puts the branch back (only if still at that commit) and refuses, never a
+  success with HEAD and the index apart. Set aside refuses, naming it, a path whose deletion is staged while its file is still in the
   folder: a stash would put the committed copy over it (git refuses that, after making the stash, for an ignored one),
   so Commit is the way on. Set aside: `stash push --include-untracked -- <paths>`, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
