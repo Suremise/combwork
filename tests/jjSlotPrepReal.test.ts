@@ -290,6 +290,23 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect(jjFileGate.size).toBe(0)
     })
 
+    it("removal's forget, granted with a slot writer queued behind it: its guard reads the removed slot through its ticket, no deadlock (HI-2918, HR2's round 1)", async () => {
+      const w = await world(colocated)
+      const keys = (await workspaceGateKeys(w.slot))!
+      // A reader of the store holds both writes back until they are queued in this order: the removal's forget, then a
+      // write in the slot (its root and the store, both in the forget's admission).
+      const reader = await jjFileGate.acquire([keys.store], 'shared')
+      const removal = w.port.remove(w.repo, w.slot, { identity: w.identity, journal: h.journals.of(`remove-${colocated}`), fence: yes })
+      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(1)
+      const slotWrite = h.runner.run(w.slot, ['status'], { write: true })
+      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(2)
+      reader.release()
+      // The forget's recheck (fence, owns → the removed slot's checkout, the control's check) finishes; it runs and lets go.
+      expect(await removal).toMatchObject({ ok: true })
+      await slotWrite
+      expect(jjFileGate.size).toBe(0)
+    })
+
     it("a detach after Done: back on the target's head; the target moving first refuses it, nothing written", async () => {
       const w = await world(colocated)
       await prepareFor(w, 1, 5)

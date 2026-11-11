@@ -5,14 +5,15 @@
 // Copy Diagnostics' row and detection's tests. Git's runner is untouched (§16.3.6: a later platform adds its own).
 
 import { existsSync } from 'original-fs'
+import { stat } from 'original-fs/promises'
 import { delimiter, join, resolve } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { jjRunnable, jjToolOf, parseJjVersion, TESTED_JJ, type JjTool } from '../../shared/jjTool'
 import { createLogger, userText } from '../logger'
 import { bundledScriptExists, workerHere, workerStarted } from '../workerThreads'
 import { runJj, type JjOutcome, type JjRequest } from './jjProcess'
-import { jjFileGate, pathKey, pathKeySync, rootKey, storeKey } from './jjFileGate'
-import { boundaryOf } from './repoBoundary'
+import { GateRefused, jjFileGate, pathKey, pathKeySync, rootKey, storeKey } from './jjFileGate'
+import { boundaryOf, commonOf } from './repoBoundary'
 import type { RunOptions, RunResult } from './repoContext'
 import type { JjWorkerMessage, JjWorkerReply } from './jjWorker'
 import { previewOf, type OpPreviewInput } from './jjOpView'
@@ -93,14 +94,27 @@ export async function workspaceGateKeys(folder: string): Promise<{ root: string;
  */
 export async function storeGitGated(cwd: string, args: readonly string[], run: () => Promise<RunResult>): Promise<RunResult> {
   const dir = gitDirArg(args)
-  let key: string | null = null
-  if (dir !== null) {
-    const k = await pathKey(resolve(cwd, dir))
-    // log: a protocol detail, as git's own messages are (English)
-    if (!k) return { out: '', ok: false, buf: Buffer.alloc(0), err: "the Git store's key couldn't be read", code: -1, notRun: 'failed' } // i18n-ignore: a protocol detail
-    key = storeKey(k)
-  } else key = (await workspaceGateKeys(cwd))?.store ?? null
+  const key = await storeKeyOf(dir !== null ? resolve(cwd, dir) : cwd)
+  // log: a protocol detail, as git's own messages are (English)
+  if (key === 'refuse') return { out: '', ok: false, buf: Buffer.alloc(0), err: "the Git store's key couldn't be read", code: -1, notRun: 'failed' } // i18n-ignore: a protocol detail
   return key ? jjFileGate.read([key], run) : run()
+}
+
+/**
+ * The gate key of the Git store a path names (HR2's HI-2918 round 1): a Git dir (its `HEAD` a file: a store, or a
+ * worktree's folder naming its common store) is keyed by its common store, wherever it is (a store outside every jj
+ * workspace included); any other folder by the store of the jj workspace it is in. null: neither (nothing of jj's can
+ * write there, so no gate); 'refuse': a Git dir whose common store can't be read.
+ */
+export async function storeKeyOf(p: string): Promise<string | null | 'refuse'> {
+  const at = resolve(p)
+  const head = await stat(join(at, 'HEAD')).then((s) => s.isFile(), () => false)
+  if (head) {
+    const common = await commonOf(at)
+    const k = common ? await pathKey(common) : null
+    return k ? storeKey(k) : 'refuse'
+  }
+  return (await workspaceGateKeys(at))?.store ?? null
 }
 
 /**
@@ -120,7 +134,8 @@ export function storeGatedHistory<T extends object>(h: T, sync: readonly string[
           return k ? jjFileGate.readSync([storeKey(k)], () => call(a), null) : call(a)
         }
       return async (...a: unknown[]) => {
-        const key = typeof a[0] === 'string' ? ((await workspaceGateKeys(a[0]))?.store ?? null) : null
+        const key = typeof a[0] === 'string' ? await storeKeyOf(a[0]) : null
+        if (key === 'refuse') throw new Error("the Git store's key couldn't be read") // i18n-ignore: a protocol detail, for the log
         return key ? jjFileGate.read([key], async () => call(a)) : call(a)
       }
     }
@@ -139,8 +154,8 @@ function gitDirArg(args: readonly string[]): string | null {
 /** A print's gate keys: its store's, shared (none named: none needed, a test's own sources); null when its key can't be read. */
 async function sourceKeys(s: PrintSources): Promise<string[] | null> {
   if (!s.store) return []
-  const k = await pathKey(s.store)
-  return k ? [storeKey(k)] : null
+  const k = await storeKeyOf(s.store)
+  return k === 'refuse' || k === null ? null : [k]
 }
 
 /** A write's keys: its workspace's root and store, and the root of each other workspace it writes; null when any can't be read. */
@@ -389,6 +404,26 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
   /** A result for a command that never started because the runner was shut down, or its run was cancelled first. */
   const stopped = (what: string, why: 'failed' | 'cancelled'): JjRunResult => resultOf({ stdout: new Uint8Array(), stderr: new Uint8Array(), end: why === 'failed' ? { notRun: 'failed', detail: 'shut down' } : { notRun: 'cancelled' } }, what) // i18n-ignore: a protocol detail, for the log
 
+  /**
+   * A print or preview under the store's gate (HI-2918), tracked as the runner's from its key lookup (HR2's round 1):
+   * refused once shut down; a wait for the gate leaves on shutdown (refused); one granted after shutdown doesn't read;
+   * one reading keeps its admission until its answer (or its worker's exit, which shutdown brings). Refused: `notRead()`.
+   */
+  const gatedRead = <T>(sources: PrintSources, notRead: () => T, read: () => Promise<T>): Promise<T> => {
+    if (closed) return Promise.resolve(notRead())
+    const ac = new AbortController()
+    const work = (async (): Promise<T> => {
+      const keys = await sourceKeys(sources)
+      if (!keys || closed) return notRead()
+      if (!keys.length) return read()
+      return jjFileGate.read(keys, () => (closed ? Promise.resolve(notRead()) : read()), ac.signal).catch((e: unknown) => {
+        if (e instanceof GateRefused) return notRead()
+        throw e
+      })
+    })()
+    return own(ac, work)
+  }
+
   const readiness = (): Promise<JjTool> => {
     // Shut down: no check starts; the tool as last checked.
     if (closed) return Promise.resolve(current)
@@ -426,16 +461,11 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
     // Each holds the store's gate shared for the whole request (HI-2918): until the worker answers, or has exited (a
     // worker that died has no file open), never only until its caller stops waiting. A store whose key can't be read
     // isn't read: unreadable.
-    preview: async (input, fence) => {
-      const keys = await sourceKeys(fence.sources)
-      if (!keys) return { core: previewOf(input), fence: 'unreadable' }
-      return jjFileGate.read(keys, () => (o.here ? Promise.resolve(previewTask(input, fence)) : ownThread.preview(input, fence)))
+    preview: (input, fence) => {
+      const unreadable = (): OpPreviewAnswer => ({ core: previewOf(input), fence: 'unreadable' })
+      return gatedRead(fence.sources, unreadable, () => (o.here ? Promise.resolve(previewTask(input, fence)) : ownThread.preview(input, fence)))
     },
-    print: async (sources) => {
-      const keys = await sourceKeys(sources)
-      if (!keys) return null
-      return jjFileGate.read(keys, () => (o.here ? Promise.resolve(printTask(sources) ?? null) : ownThread.print(sources)))
-    },
+    print: (sources) => gatedRead(sources, () => null, () => (o.here ? Promise.resolve(printTask(sources) ?? null) : ownThread.print(sources))),
     async shutdown(ms = 5000) {
       closed = true
       for (const r of running) r.ac.abort()

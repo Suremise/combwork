@@ -20,7 +20,9 @@
 // - A write's recheck runs after admission and before its process starts, with a ticket for exactly its keys: a reader
 //   in that recheck's own call tree, while it runs, reads without taking the gate (it would wait behind the write).
 //   Every such read is awaited before the recheck counts as done; after it, the ticket is revoked, and a read started
-//   from the same async context then takes the gate as any other.
+//   from the same async context then takes the gate as any other. A read in a live recheck of a key the write doesn't
+//   hold never waits (a writer queued on that key could be waiting for this write's keys): it gets it at once or is
+//   refused, so no recheck can deadlock. A recheck that reads another workspace names it in the write's keys (`also`).
 // - A sync reader can't wait: it reads at once unless one of its keys is held or waited on exclusively (then it gets
 //   its fallback, read as unreadable); a write can't start meanwhile, its admission being on the same thread.
 
@@ -106,6 +108,19 @@ export class JjFileGate {
       t.borrows.add(p)
       return p
     }
+    // In a live recheck, a key its write doesn't hold is never waited for (HR2's HI-2918 round 1): a writer queued on it
+    // could be waiting for this write's own keys. Granted now, or refused (the recheck's read fails, so it refuses).
+    if (t?.live) {
+      const now = this.tryShared(keys)
+      if (!now) throw new GateRefused("a key its write doesn't hold, not free now")
+      try {
+        const p = fn()
+        t.borrows.add(p)
+        return await p
+      } finally {
+        now.release()
+      }
+    }
     const g = await this.acquire(keys, 'shared', signal)
     try {
       return await fn()
@@ -141,6 +156,18 @@ export class JjFileGate {
     }
   }
 
+  /** The keys shared at once when nothing holds or waits on them exclusively; null otherwise (nothing queued). */
+  private tryShared(keys: readonly string[]): Grant | null {
+    const ks = [...new Set(keys)].sort()
+    if (ks.some((k) => this.writing(k))) return null
+    let grant: Grant | null = null
+    const r: Request = { keys: ks, mode: 'shared', grant: (g) => (grant = g), fail: () => undefined }
+    this.queue.push(r)
+    for (const k of ks) this.state(k).waiting.push(r)
+    this.pump()
+    return grant
+  }
+
   /** Whether a key is held or waited on exclusively (a sync reader's question). */
   writing(key: string): boolean {
     const s = this.keys.get(key)
@@ -150,6 +177,11 @@ export class JjFileGate {
   /** How many keys it tracks now (tests: none once idle). */
   get size(): number {
     return this.keys.size
+  }
+
+  /** How many requests wait now (tests: an ordering set up before its next step). */
+  get queued(): number {
+    return this.queue.length
   }
 
   private state(k: string): KeyState {

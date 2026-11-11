@@ -166,6 +166,24 @@ describe("the gate over jj's replaced files (HI-2918)", () => {
     expect(g.size).toBe(0)
   })
 
+  it("a read in a live recheck of a key its write doesn't hold: granted at once when free, refused (never waited for) when a write holds or waits on it (HR2's round 1)", async () => {
+    const g = new JjFileGate()
+    const w = await g.acquire(['root:a'], 'exclusive')
+    expect(await g.recheck(w, () => g.read(['root:b'], async () => 'b'))).toBe('b')
+    // A writer waiting on b (and on a, which this write holds): this recheck's read of b would wait behind it forever.
+    const reader = await g.acquire(['root:b'], 'shared')
+    const w2 = track(g.acquire(['root:b', 'root:a'], 'exclusive'))
+    await flush()
+    expect(g.queued).toBe(1)
+    await expect(g.recheck(w, () => g.read(['root:b'], async () => 'b'))).rejects.toBeInstanceOf(GateRefused)
+    w.release()
+    reader.release()
+    await flush()
+    expect(!!w2.grant).toBe(true)
+    w2.grant!.release()
+    expect(g.size).toBe(0)
+  })
+
   it('a recheck needs an exclusive grant', async () => {
     const g = new JjFileGate()
     const r = await g.acquire(['root:a'], 'shared')

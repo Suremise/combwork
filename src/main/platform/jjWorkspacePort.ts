@@ -1140,7 +1140,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           // All of it again under the file gate's admission, right before jj starts (HI-2918): still the holder's, still
           // the recorded workspace, the control's check (inside the store's lock, which this context already holds).
           const again = async (): Promise<string | null> => (!(await fenced()) ? 'fence' : existsSync(folder) && !(await owns(folder, identity)) ? 'identity' : !proof.check() ? 'control' : null)
-          const f = await jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true, recheck: again })
+          // The removed workspace's root in its admission too (HR2's HI-2918 round 1): its recheck reads that checkout.
+          const f = await jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true, recheck: again, also: [folder] })
           if (f.refused === 'fence') return null
           if (f.refused === 'identity' || f.refused === 'control') return f.refused
           return f

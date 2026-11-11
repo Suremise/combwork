@@ -8,7 +8,7 @@ import { join } from 'path'
 import { build } from 'esbuild'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compareJjVersions, jjRunnable, jjSupported, jjToolOf, parseJjVersion, TESTED_JJ } from '../src/shared/jjTool'
-import { createJjRunner, JJ_NO_EDITOR, JJ_PREFIX, JJ_READ, jjOnPath, workspaceGateKeys } from '../src/main/platform/jjRunner'
+import { createJjRunner, JJ_NO_EDITOR, JJ_PREFIX, JJ_READ, jjOnPath, storeGatedHistory, storeGitGated, storeKeyOf, workspaceGateKeys } from '../src/main/platform/jjRunner'
 import { jjFileGate } from '../src/main/platform/jjFileGate'
 import { runJj } from '../src/main/platform/jjProcess'
 import testedVcs from '../resources/tested-vcs.json'
@@ -275,6 +275,86 @@ async function shutdownWhileChecking(make: (extra: Record<string, string>) => Re
   expect(await r.run(dir, ['log'])).toMatchObject({ ok: false, code: -1, notRun: 'failed' })
   expect(existsSync(pid)).toBe(false)
 }
+
+describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)", () => {
+  /** A Git store outside every jj workspace (its HEAD a file), a worktree's folder naming it, and one naming nothing. */
+  const stores = () => {
+    const top = tempDir('jj-runner-store-')
+    const store = join(top, 'shared.git')
+    mkdirSync(join(store, 'objects'), { recursive: true })
+    writeFileSync(join(store, 'HEAD'), 'ref: refs/heads/main\n')
+    const worktree = join(store, 'worktrees', 'w')
+    mkdirSync(worktree, { recursive: true })
+    writeFileSync(join(worktree, 'HEAD'), 'ref: refs/heads/w\n')
+    writeFileSync(join(worktree, 'commondir'), '../..\n')
+    const broken = join(top, 'broken')
+    mkdirSync(broken)
+    writeFileSync(join(broken, 'HEAD'), 'ref: refs/heads/main\n')
+    writeFileSync(join(broken, 'commondir'), '../nowhere\n')
+    return { top, store, worktree, broken }
+  }
+
+  it("keys a Git dir by its common store, wherever it is; a worktree's folder by the store it names; a broken one refuses", async () => {
+    const s = stores()
+    const key = await storeKeyOf(s.store)
+    expect(key).toMatch(/^store:/)
+    expect(await storeKeyOf(s.worktree)).toBe(key)
+    expect(await storeKeyOf(s.broken)).toBe('refuse')
+    // A folder in no jj workspace and no Git dir: nothing of jj's writes there.
+    expect(await storeKeyOf(tempDir('jj-runner-none-'))).toBeNull()
+  })
+
+  it("Git's history port and git on a store outside every jj workspace wait for a write holding that store", async () => {
+    const s = stores()
+    const key = (await storeKeyOf(s.store)) as string
+    const held = await jjFileGate.acquire([key], 'exclusive')
+    const ran: string[] = []
+    const port = storeGatedHistory({
+      contains: async (store: string) => (ran.push(`contains ${store === s.store}`), true),
+      refSync: (store: string) => (ran.push(`refSync ${store === s.store}`), 'abc')
+    })
+    const contains = port.contains(s.store)
+    const git = storeGitGated(s.top, ['--git-dir', s.worktree, 'rev-parse', 'HEAD'], async () => (ran.push('git'), { ok: true, out: '', err: '', buf: Buffer.alloc(0), code: 0 }))
+    // The sync read gets nothing while the write holds its store.
+    expect(port.refSync(s.store)).toBeNull()
+    await new Promise((res) => setImmediate(res))
+    expect(ran).toEqual([])
+    held.release()
+    expect(await contains).toBe(true)
+    expect((await git).ok).toBe(true)
+    expect(ran.sort()).toEqual(['contains true', 'git'])
+    expect(port.refSync(s.store)).toBe('abc')
+    // A store whose key can't be read isn't run against: refused.
+    expect(await storeGitGated(s.top, ['--git-dir', s.broken, 'log'], async () => ({ ok: true, out: 'ran', err: '', buf: Buffer.alloc(0), code: 0 }))).toMatchObject({ ok: false, code: -1 })
+    await expect(storeGatedHistory({ contains: async () => true }).contains(s.broken)).rejects.toThrow(/key/)
+    expect(jjFileGate.size).toBe(0)
+  })
+
+  it('a print waiting for its store when the runner shuts down is refused without reading; a new one after is refused; one granted reads', async () => {
+    const s = stores()
+    const key = (await storeKeyOf(s.store)) as string
+    const jjRepo = join(s.top, 'repo')
+    mkdirSync(join(jjRepo, 'op_heads', 'heads'), { recursive: true })
+    writeFileSync(join(jjRepo, 'op_heads', 'heads', 'a'.repeat(128)), '')
+    const sources = { jjRepo, store: s.store, files: [{ label: 'HEAD', path: join(s.store, 'HEAD') }] }
+    // Granted at once: it reads (a print, not refused).
+    const free = runner()
+    expect(typeof (await free.print!(sources))).toBe('string')
+    await free.shutdown(1000)
+    // Queued behind a write holding its store, then shut down: refused, never read; and nothing after.
+    const r = runner()
+    const held = await jjFileGate.acquire([key], 'exclusive')
+    const queued = r.print!(sources)
+    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(1)
+    await r.shutdown(1000)
+    expect(await queued).toBeNull()
+    expect(jjFileGate.queued).toBe(0)
+    held.release()
+    // (A preview takes the same path, gatedRead: refused, its fence is unreadable.)
+    expect(await r.print!(sources)).toBeNull()
+    expect(jjFileGate.size).toBe(0)
+  })
+})
 
 describe("jj's shutdown while a run waits on the tool's check", () => {
   it('in this thread: owns the check, ends it, and starts nothing after', () => shutdownWhileChecking((extra) => runner(extra)))
