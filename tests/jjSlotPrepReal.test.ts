@@ -25,6 +25,10 @@ import { gitHistory } from '../src/main/platform/gitHistory'
 import { readOpHeads } from '../src/main/platform/jjView'
 import { boardPrepStore, jjLineKey, type JjBinding, type JjPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceFence, WorkspaceIdentity } from '../src/main/platform/workspacePort'
+import { generationOf } from '../src/main/platform/jjWorkspacePort'
+import { isUnknown } from '../src/main/platform/types'
+import { quiet } from '../src/main/slots'
+import { SlotStaleView, type StaleViewRow } from '../src/main/slotStaleView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 
 if (!jjExe) console.warn(`jjSlotPrepReal.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
@@ -170,6 +174,49 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect(r.ok).toBe(false)
       expect(w2.wc()).toBe(at)
       expect(w2.pointer()).toMatchObject({ key: w2.key(9, 9) })
+    })
+
+    it("the slot listing's polls don't keep an owed detach from running, and never leave the slot stale (HI-2912)", async () => {
+      const w = await world(colocated)
+      // The listing's view as slotViews has it, of a row the test keeps as the pool would: an operation while a settle
+      // attempt runs, owed after one that found the folder busy, until a settle decides.
+      const row: StaleViewRow = { folder: w.slot, state: 'lent', op: null, job: null }
+      let owes = false
+      const view = new SlotStaleView({ row: () => row, owes: () => owes, read: async (f) => { const r = await w.port.stale(f); return isUnknown(r) ? null : r }, generation: generationOf })
+      const tries: number[] = []
+      for (let c = 1; c <= 4; c++) {
+        expect((await prepareFor(w, 1, c)).ok).toBe(true)
+        const R = w.work(`a${c}.txt`)
+        await w.port.submitted(w.slot, w.key(1, c), [R], w.identity, 1)
+        w.integrate(R)
+        // Two listings polling, as jjwindow's wait and the window's Slots and copies do.
+        const poll = { on: true }
+        const loop = async (): Promise<void> => {
+          while (poll.on) {
+            await view.staleOf('slot-a')
+            // A turn of the event loop between polls (a busy slot's answer needs no await), not a pause.
+            await new Promise((res) => setImmediate(res))
+          }
+        }
+        const loops = [loop(), loop()]
+        // The settle and its owed retries (each attempt fenced by the folder's quiet, as the pool's is), at most 5.
+        let n = 0
+        let r = { ok: false, err: '' }
+        while (!r.ok && n < 5) {
+          n++
+          row.op = { token: `settle-${c}-${n}` }
+          r = await w.port.detach(w.slot, w.main(), { identity: w.identity, fence: { still: () => quiet(w.slot) }, settles: w.key(1, c), target: 'main' })
+          row.op = null
+          if (!r.ok) owes = true
+        }
+        owes = false
+        poll.on = false
+        await Promise.all(loops)
+        tries.push(r.ok ? n : -1)
+        expect(await w.port.stale(w.slot)).toBe(false)
+      }
+      // Before (the listing reading whatever the slot's state): every attempt refused, the folder in use (HI-2912).
+      expect(tries.every((t) => t > 0), `attempts per detach: ${JSON.stringify(tries)}`).toBe(true)
     })
 
     it("a detach after Done: back on the target's head; the target moving first refuses it, nothing written", async () => {
