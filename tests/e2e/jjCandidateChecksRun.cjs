@@ -1,7 +1,7 @@
 // The merge checks on a jj card's candidate (HI-2938, SPEC "The merge checks on a jj card's candidate"): the real app, the
 // pinned jj (npm run jj:fetch) on its PATH, a fake Claude Code builder (B1), a throwaway profile and workspace, merge checks
-// that are real commands (Node). Colocated here; `jjcandidatechecksnc` runs the same steps on a repository not colocated
-// with Git (CW_JJCHECKS_NONCOLOCATED=1), its screenshots `jjcandidatechecksnc-…`. jjCandidateRun.cjs's set-up, then:
+// that are real commands (Node). Colocated here; `jjchecksnc` runs the same steps on a repository not colocated
+// with Git (CW_JJCHECKS_NONCOLOCATED=1), its screenshots `jjchecksnc-…`. jjCandidateRun.cjs's set-up, then:
 // - card 1 passes review: its candidate is built and its checks run in a check copy (the first holds until the test lets
 //   it go): Waiting says Candidate built and which check runs, with no command; then both pass: Candidate ready, its checks
 //   named, with the jj bookmark set command; the user runs it: Done, from a prepared candidate;
@@ -19,12 +19,12 @@ const { jjDir, portableJj } = require('../jjPortable.cjs')
 const HUNG_MS = 90000
 const exe = portableJj()
 if (!exe) {
-  console.log("SKIP jjcandidatechecks: the pinned jj isn't fetched (npm run jj:fetch)")
+  console.log("SKIP jjchecks: the pinned jj isn't fetched (npm run jj:fetch)")
   process.exit(process.env.CW_JJ_REAL === '1' ? 1 : 0)
 }
 
 const NC = process.env.CW_JJCHECKS_NONCOLOCATED === '1'
-const SUITE = NC ? 'jjcandidatechecksnc' : 'jjcandidatechecks'
+const SUITE = NC ? 'jjchecksnc' : 'jjchecks'
 const PORT = Number(lib.port(NC ? 47944 : 47943))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')

@@ -3443,7 +3443,7 @@ and s11 (HR1's OK).
   the card, both modes; Stop then Run Checks Again; a re-approval with identical endpoints, a decision, changed check
   options and the target moved, during a check and at the publication write; a restart whose previous lease's job still
   runs a writing process: no lease until its tree is ended, then the interrupted check runs again); the e2e suites
-  `jjcandidatechecks` and `jjcandidatechecksnc`.
+  `jjchecks` and `jjchecksnc`.
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
