@@ -69,6 +69,7 @@ const Q = {
   nextRepick: agentMsg({ id: 'queue.next.repick', text: 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on cw_submit), for review.', note: "The next step when its focused tests couldn't be chosen (G20, HI-1367)." }),
   nextTransient: agentMsg({ id: 'queue.next.transient', text: 'Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.', note: 'The next step after a failure of the environment, not the work.' }),
   nextConflict: agentMsg({ id: 'queue.next.conflict', text: 'Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).', note: 'The next step after a conflict with {target}, the branch.' }),
+  nextForward: agentMsg({ id: 'queue.next.forward', text: 'A forward merge has no builder, and no agent works on it: the user or the Assistant decides. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} and resolve this there; Remove from queue ends it, nothing merged.', note: "HI-2959: the next step on a forward merge card (Combwork merging branch {from} into {to}) the merge queue returned: no agent may act on it. Retry merge, Resolve on a builder and Remove from queue are the window's commands." }),
   nextFix: agentMsg({ id: 'queue.next.fix', text: 'Fix it in your worktree, commit and submit again (cw_submit).', note: 'The next step after anything else that came back.' }),
   staleWake: agentMsg({ id: 'queue.wake.stale', text: '{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (cw_submit).', note: "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)." }),
   resubmitted: agentMsg({ id: 'queue.wake.resubmitted', text: '{card} is back in Review after the merge queue returned it ({failure}); {builder} {conflict, select, yes {resolved it} other {changed it}} and submitted it again: review {conflict, select, yes {the resolution} other {what changed}}', note: "HI-2143: a card submitted again after the queue returned it, its reviewer's wake. {failure}: what came back (queue.failure.*). {conflict}: yes when it came back with a conflict." }),
@@ -369,8 +370,16 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
   }
 }
 
+/** HI-2959: a forward merge's branches, for what its return says to do next. */
+export interface ReturnedForward {
+  from: string
+  to: string
+}
+
 /** What to do next: a transient failure is the same revision submitted again; anything else a fix. */
-function nextStep(f: FactData['IntegrationFailed']): string {
+function nextStep(f: FactData['IntegrationFailed'], forward?: ReturnedForward): string {
+  // HI-2959: a forward merge's choices are the user's or the Assistant's, never a builder's (it has none).
+  if (forward && f.reason !== 'direction') return say(Q.nextForward, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
   if (f.reason === 'focused') {
     if (f.focused?.why === 'noProof' || f.focused?.why === 'newProof') return say(Q.nextProof)
     if (f.focused?.why === 'noRunner') return say(Q.nextRunner)
@@ -398,10 +407,10 @@ function lastLines(log: string, n: number): string {
  * fit, "and n more"), its log's path (whole, or a pointer to the card), and the output's last lines (cut from their
  * start so the end shows, "…").
  */
-export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES): string {
+export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES, forward?: ReturnedForward): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
   const lead = { subject: clip(subject, NAME_MAX), cameBack: CAME_BACK }
-  const next = ` ${nextStep(named)}`
+  const next = ` ${nextStep(named, forward)}`
   // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
   const fixed = frame(Q.lead, lead, 'failure') + next.length
   const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN) })
@@ -429,7 +438,7 @@ const shortRev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 
 export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string => say(Q.staleWake, { card: key, approved: shortRev(approved), current: shortRev(current) })
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
-export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)
+export const returnedWake = (key: string, f: FactData['IntegrationFailed'], forward?: ReturnedForward): string => returnedText(key, f, WAKE_NOTE_MAX, WAKE_LINES, forward)
 
 /** How many characters a resubmitted card's wake gives what came back (its files): see resubmittedText. */
 const RESUBMITTED_ROOM = 200
@@ -456,14 +465,14 @@ const COMMENT_FILES = 10
  * back and what to do next, as its wake says it, with more room), and as a message for the window (`shown`): why, and
  * the files.
  */
-export function returnedComment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText } {
+export function returnedComment(key: string, f: FactData['IntegrationFailed'], forward?: ReturnedForward): { text: string; shown: StoredText } {
   const reason = f.reason === 'checks' ? (f.check === 'install' ? 'install' : f.transient ? 'checksEnv' : f.check ? 'checks' : 'checksSome') : f.reason
   const files = f.files?.length ? `${f.files.slice(0, COMMENT_FILES).join(', ')}${f.files.length > COMMENT_FILES ? ', …' : ''}` : 'none'
   // Stored in the Default, for any reader; what it is said from is kept beside it, so a reader's dialect says it again
   // when it is read (storedForAgents, HI-2440).
   // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
   const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
-  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept } }
+  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to } } : {}) } }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
 }
 
@@ -472,10 +481,12 @@ export const RETURNED_COMMENT = 'queue.returned'
 
 /** A return comment's English from its stored data, in the current chain; null for data that isn't one. */
 export function returnedCommentFrom(data: unknown): string | null {
-  const d = data as { key?: unknown; failure?: unknown } | null
+  const d = data as { key?: unknown; failure?: unknown; forward?: unknown } | null
   if (!d || typeof d.key !== 'string' || !d.failure || typeof d.failure !== 'object') return null
+  const fw = d.forward as { from?: unknown; to?: unknown } | null | undefined
+  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to } : undefined
   try {
-    return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES)
+    return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES, forward)
   } catch {
     return null
   }

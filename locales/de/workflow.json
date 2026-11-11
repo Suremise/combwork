@@ -162,6 +162,7 @@
   "workflow.move.putBack": "Zurücklegen",
   "workflow.move.removeFromQueue": "Aus der Warteschlange entfernen",
   "workflow.move.reportMerge": "Merge melden",
+  "workflow.move.resolveOnBuilder": "Von einem Bearbeiter lösen lassen",
   "workflow.move.retryMerge": "Merge wiederholen",
   "workflow.move.start": "Starten",
   "workflow.move.startReview": "Review starten",

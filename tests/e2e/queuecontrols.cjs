@@ -156,6 +156,46 @@ const TARGET = 'integration'
     await h.inv('queue:resume', fx.alpha, '1.0.0')
     // Taken out again, unless merged already: only the override was checked.
     if (fwdCard) await h.inv('queue:remove', fwdCard, 'only the override was checked').catch(() => null)
+    // --- HI-2959: a forward that conflicts (main and integration change clash.txt): it waits for the user, its Work section
+    // says so and offers Resolve on a Builder…, which ends it and makes an ordinary card for a builder; an agent can't.
+    q.steer(fx, 'pass')
+    // main is checked out in the project folder: committed there.
+    fs.writeFileSync(path.join(fx.alpha, 'clash.txt'), 'main\n')
+    lib.git(fx.alpha, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', 'clash.txt'])
+    lib.git(fx.alpha, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'main changes clash.txt'])
+    q.commitOn(fx, 'integration', { 'clash.txt': 'integration\n' }, 'integration changes clash.txt')
+    const clash = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: 'main', to: TARGET, override: true })
+    const clashCard = clash.body?.card
+    const backFwd = await until(async () => ((await column(clashCard)) === 'doing' && (await h.kinds(clashCard)).includes('IntegrationFailed') ? true : null), HUNG_MS)
+    check('HI-2959: a forward that conflicts comes back to Active, no agent on it', clash.status === 200 && !!backFwd && !(await h.card(clashCard))?.agent, JSON.stringify(clash.body))
+    const byAgent = await api(reviewer.token, 'POST', '/v1/queue/resolve', { card: `#${clashCard}`, reason: 'x' })
+    check('…an agent\'s Resolve on a builder is refused (403)', byAgent.status === 403, JSON.stringify(byAgent.body))
+    await h.page.keyboard.press('Control+Alt+I')
+    const cardDialog = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
+    await q.showBoard(h.page)
+    // The board's warning says it waits for you, never "no agent has it".
+    const tile = h.page.locator(`.task-card[data-task="${clashCard}"]`)
+    const warned = await until(async () => {
+      const t = (await tile.innerText().catch(() => '')).replace(/\s+/g, ' ')
+      return /it waits for you\. Open it for Retry merge, Resolve on a Builder… or Remove from queue\./.test(t) && !/no agent has it/.test(t) ? t : null
+    }, HUNG_MS)
+    check('…its card on the board says it waits for you, with your choices', !!warned, (await tile.innerText().catch(() => '')).replace(/\s+/g, ' '))
+    await q.openByTitle(h.page, clashCard)
+    await until(async () => (await cardDialog.count()) === 1, HUNG_MS)
+    const part = cardDialog.locator('.card-work-queue')
+    const offered = await until(async () => ((await part.locator('[data-forward-next]').count()) === 1 && (await part.locator('[data-action="resolve-forward"]').count()) === 1 && (await part.locator('[data-action="retry"]').count()) === 1 ? true : null), HUNG_MS)
+    check('…its Work section says it waits for you, with Retry merge and Resolve on a Builder…', !!offered, (await part.innerText().catch(() => '')).replace(/\s+/g, ' '))
+    await q.folderHelpers(fx).themes(h.page, cardDialog.locator('.card-work'), 'queuecontrols-forward-returned')
+    await part.locator('[data-action="resolve-forward"]').click()
+    const ask = h.page.locator('.dialog').filter({ hasText: 'a new card is made on integration for a builder' })
+    check('…it asks first, saying what happens', !!(await until(async () => (await ask.count()) === 1, HUNG_MS)))
+    await ask.getByRole('button', { name: 'Resolve on a Builder', exact: true }).click()
+    check('…the forward ends in Done, nothing merged', await done(clashCard) && !(await h.kinds(clashCard)).includes('Integrated'), JSON.stringify(await h.kinds(clashCard)))
+    await h.page.keyboard.press('Escape')
+    const made = (await h.inv('tasks:list')).find((c) => c.links?.includes(clashCard) && c.title.startsWith('Resolve: bring integration up to date with main'))
+    check('…an ordinary card for a builder, in Todo, linked, saying what to merge', !!made && made.column === 'todo' && !made.agent && made.description.includes('git merge ') && made.description.includes('clash.txt') && (await h.facts(made.number)).some((f) => f.kind === 'ForwardResolution' && f.data.from === 'main' && f.data.to === TARGET), JSON.stringify(made && { column: made.column, title: made.title }))
+    const again = await api(assistant, 'POST', '/v1/queue/resolve', { card: `#${clashCard}`, reason: 'again' })
+    check('…the Assistant\'s Resolve of it again is refused (409), nothing made', again.status === 409 && (await h.inv('tasks:list')).filter((c) => c.links?.includes(clashCard)).length === 1, JSON.stringify(again.body))
     // --- HI-2893: main taken out of Other branches, its queue holding nothing, is a past branch's: left out of
     // GET /v1/queue and listed with past=true, marked; named, it is listed as it is.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })

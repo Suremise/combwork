@@ -325,6 +325,10 @@ export interface WorkView {
   loopStep: LoopAsk | null
   /** Retry merge was used since its latest submission: after a return, it isn't allowed again for it (HI-1667). */
   retried: boolean
+  /** HI-2679: a forward merge's branches (no agent works on it: Retry merge, Resolve on a builder, Remove); null for any other card. */
+  forward: { from: string; to: string } | null
+  /** HI-2959: the forward merge this card resolves (made by Resolve on a builder); null for any other card. */
+  resolves: { forward: string; from: string; to: string; source: string } | null
   /** The newest fact's seq: a view is newer than another when this is higher. */
   lastSeq: number
   /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
@@ -541,6 +545,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
       .slice(0, RESOLVED_SHOWN),
     loopStep: s.step?.step ?? null,
     retried: s.entries.some((x) => x.seq > (latest ?? 0) && x.requeue === 'retry'),
+    forward: s.forward ? { from: s.forward.from, to: s.forward.to } : null,
+    resolves: s.resolves ? { forward: s.resolves.forward, from: s.resolves.from, to: s.resolves.to, source: s.resolves.source } : null,
     lastSeq: s.lastSeq,
     ruleset: ownRuleset(facts, s),
     startedAt: s.cycle ? (at.get(s.cycle) ?? null) : null
@@ -634,7 +640,25 @@ export interface WorkBadge {
   startedAt: string | null
   /** When this cycle's change was integrated (its merge), else accepted (no merge); null while neither (HI-1926). */
   endedAt: string | null
+  /** HI-2959: a forward merge the queue returned, waiting for the user (forwardWait); absent for any other card. */
+  forwardWait?: ForwardWait
   lastSeq: number
+}
+
+/**
+ * HI-2959: a forward merge the queue returned, in Active with no agent by design: its branches, and whether only Remove
+ * from queue ends it (`removeOnly`: returned against the release path's direction, where Retry and Resolve are refused).
+ */
+export interface ForwardWait {
+  from: string
+  to: string
+  removeOnly: boolean
+}
+
+/** A card's forward wait (ForwardWait) from its work: a forward merge in Active, its last attempt failed or declined. */
+export function forwardWaitOf(v: Pick<WorkView, 'forward' | 'stage' | 'queue'>): ForwardWait | null {
+  if (!v.forward || v.stage !== 'active' || (v.queue?.state !== 'failed' && v.queue?.state !== 'cancelled')) return null
+  return { from: v.forward.from, to: v.forward.to, removeOnly: v.queue.failure === 'direction' }
 }
 
 /** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
@@ -665,6 +689,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
   const runs = [...newest.values()]
   const verdict = v.verdicts.at(-1)
   const latest = v.revisions.at(-1)
+  const forwardWait = forwardWaitOf(v)
   return {
     card: v.card,
     stage: v.stage,
@@ -699,6 +724,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
     endedAt: v.integration?.at ?? v.accepted?.at ?? null,
+    ...(forwardWait ? { forwardWait } : {}),
     lastSeq: v.lastSeq
   }
 }

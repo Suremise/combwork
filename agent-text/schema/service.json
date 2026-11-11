@@ -351,6 +351,11 @@
       "why": "plain"
     }
   },
+  "service.folderChanges.unplaced": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.wrongBranch": {
     "placeholders": {
       "folder": "plain",
@@ -385,6 +390,11 @@
   "service.forward.notAgents": {
     "placeholders": {}
   },
+  "service.forward.notReturned": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "service.forward.notTargets": {
     "placeholders": {
       "from": "plain",
@@ -402,6 +412,11 @@
   },
   "service.forward.raced": {
     "placeholders": {}
+  },
+  "service.forward.resolveRaced": {
+    "placeholders": {
+      "card": "plain"
+    }
   },
   "service.fsutil.keptBusy": {
     "placeholders": {

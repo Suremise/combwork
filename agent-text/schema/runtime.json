@@ -23,6 +23,14 @@
   "runtime.choice.takeOver": {
     "placeholders": {}
   },
+  "runtime.forward.resolving": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain"
+    }
+  },
   "runtime.move.doneByOverride": {
     "placeholders": {
       "cards": "plain",

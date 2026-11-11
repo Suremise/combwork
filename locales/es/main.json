@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "Reanudados: {names}.",
   "main.restart.why.expired": "esperó más de un día",
   "main.restart.why.held": "su carpeta de trabajo está reservada para otro trabajo (reanúdalo a mano)",
+  "main.restart.why.idle": "estaba inactivo, sin ninguna tarjeta ni carril esperándolo",
   "main.restart.why.movedOn": "tiene una conversación más reciente",
   "main.restart.why.notReady": "no estuvo listo a tiempo, así que se detuvo",
   "main.restart.why.notStopped": "no estuvo listo a tiempo y todavía no se ha detenido; los demás se reanudan cuando lo haga",

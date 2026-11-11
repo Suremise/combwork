@@ -94,6 +94,7 @@ interface CombworkMessageValues {
   'service.folderChanges.readFailed': { why: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.unplaced': { folder: string | number }
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
@@ -103,9 +104,13 @@ interface CombworkMessageValues {
   'service.forward.missing': { unknown: string; branch: string | number }
   'service.forward.noGit': undefined
   'service.forward.notAgents': undefined
+  'service.forward.notReturned': { card: string | number }
   'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number; sources: string | number }
   'service.forward.openNoOverride': { card: string | number; to: string | number; from: string | number }
   'service.forward.raced': undefined
+  'service.forward.resolveDescription': { forward: string | number; from: string | number; source: string | number; to: string | number; files: string }
+  'service.forward.resolveRaced': { card: string | number }
+  'service.forward.resolveTitle': { to: string | number; from: string | number }
   'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.keptUnreadable': { file: string | number }

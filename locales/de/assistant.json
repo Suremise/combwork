@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "Die zuerst zu lesenden Dokumentabschnitte bleiben, wie sie gesetzt wurden.",
   "assistant.undo.why.decision": "Eine festgehaltene Entscheidung bleibt: Nur du änderst oder entfernst Entscheidungen.",
   "assistant.undo.why.declarePaths": "Die angegebenen Pfade bleiben bei der Karte.",
+  "assistant.undo.why.forwardResolved": "Ein Forward-Merge, den es einem Bearbeiter übergeben hat, bleibt beendet, und die für den Bearbeiter erstellte Karte bleibt: Setze diese Karte auf Halt oder entferne sie, wenn sie nicht gewünscht ist.",
   "assistant.undo.why.freshRetried": "Eine erneut versuchte neue Unterhaltung eines Lane-Agenten wird durch Rückgängig nicht gestoppt: Beende die Lane, wenn sie nicht gewollt ist.",
   "assistant.undo.why.handOver": "Eine Übergabe lässt sich nicht rückgängig machen: Die Arbeit ging an den anderen Agenten.",
   "assistant.undo.why.laneEnded": "Eine beendete Lane bleibt beendet: Starte sie neu, wenn sie weitergehen soll.",

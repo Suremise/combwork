@@ -210,6 +210,12 @@
   "queue.next.fix": {
     "placeholders": {}
   },
+  "queue.next.forward": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "queue.next.proof": {
     "placeholders": {}
   },

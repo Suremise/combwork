@@ -35,6 +35,10 @@
     "text": "{minutes} min",
     "note": "A stall's duration under an hour: \"40 min\"."
   },
+  "stall.forward.waits": {
+    "text": "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for the user or the Assistant: {removeOnly, select, yes {it went against the release path's direction, so only Remove from queue ends it.} other {Retry merge, Resolve on a builder (a card for a builder to resolve it) or Remove from queue.}}",
+    "note": "HI-2959: the stalled reason of a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) that came back from the merge queue. removeOnly yes: it was refused for the release path's direction (HI-2892). Retry merge, Resolve on a builder and Remove from queue are the window's commands."
+  },
   "stall.lane.orderWait": {
     "text": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
     "note": "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."

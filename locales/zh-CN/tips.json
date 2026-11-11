@@ -450,6 +450,8 @@
   "tips.recentWorkspaces.title": "整理最近的工作区",
   "tips.removeAll.text": "项目标题栏中的“全部删除”会在确认一次后删除项目的所有智能体。工作树会保留，除非你勾选复选框，而勾选后也只会删除已合并且干净的工作树。",
   "tips.removeAll.title": "一次删除所有智能体",
+  "tips.resolveOnBuilder.text": "“更新到最新…”因冲突而退回？在其卡片上点“交给构建者解决…”，会创建一张普通卡片，由构建者手动合并并解决冲突；它会像其他卡片一样被审查，并以合并提交合并。",
+  "tips.resolveOnBuilder.title": "有冲突的更新合并",
   "tips.resumeAfterUpdate.text": "安装新版本时会通知正在工作或处于卡片循环中的智能体；Combwork 再次启动后，会在各自的对话中逐个恢复它们，并告知各自的卡片、轮次和通道。退出后，下次启动时会询问是否恢复它们。",
   "tips.resumeAfterUpdate.title": "更新后智能体会接着之前的进度",
   "tips.resumeAll.text": "重启后，项目标题栏中的“恢复所有智能体”会一次恢复每个已停止智能体的上一个会话。",

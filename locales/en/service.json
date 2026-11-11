@@ -371,6 +371,10 @@
     "defaultMessage": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
     "description": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command."
   },
+  "service.folderChanges.unplaced": {
+    "defaultMessage": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",
+    "description": "HI-2962: an error from Files' Commit it after Exclude from Git: a project folder ({folder}, a path) inside the same repository couldn't be placed by git (it answered nothing), so nothing was committed. Keep .gitignore: a file name."
+  },
   "service.folderChanges.wrongBranch": {
     "defaultMessage": "{folder} isn't on {target} now. Look again.",
     "description": "HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done."
@@ -407,6 +411,10 @@
     "defaultMessage": "Only the user or the Assistant brings one branch up to date with another.",
     "description": "HI-2679: a forward merge refused: asked by a project agent or a script."
   },
+  "service.forward.notReturned": {
+    "defaultMessage": "{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.",
+    "description": "HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card)."
+  },
   "service.forward.notTargets": {
     "defaultMessage": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
     "description": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch."
@@ -418,6 +426,18 @@
   "service.forward.raced": {
     "defaultMessage": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
     "description": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare."
+  },
+  "service.forward.resolveDescription": {
+    "defaultMessage": "{forward} tried to merge {from} ({source}) into {to} and came back{files, select, none {.} other {: a conflict in {files}.}} Resolve on a builder ended it and made this card, so a builder does that merge.\n\nIn this card’s branch (made from {to}): `git merge {source}`, resolve the conflict, commit the merge and submit it for review. It merges into {to} as a merge commit, whatever the project’s merge style, so {to} keeps {from}’s history.",
+    "description": "HI-2959: the description of the card Resolve on a builder makes. {forward}: the forward merge card’s key (HI-12); {from}, {to}: branch names; {source}: the commit id to merge (keep it); {files}: the files in conflict, a list (none: leave that part out; keep the select keys). Keep the git command in backticks as it is."
+  },
+  "service.forward.resolveRaced": {
+    "defaultMessage": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
+    "description": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept."
+  },
+  "service.forward.resolveTitle": {
+    "defaultMessage": "Resolve: bring {to} up to date with {from}",
+    "description": "HI-2959: the title of the card Resolve on a builder makes from a forward merge that came back with a conflict: an agent merges branch {from} into branch {to} by hand and resolves the conflict. Branch names."
   },
   "service.forward.title": {
     "defaultMessage": "Bring {to} up to date with {from}",

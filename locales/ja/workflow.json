@@ -162,6 +162,7 @@
   "workflow.move.putBack": "戻す",
   "workflow.move.removeFromQueue": "キューから外す",
   "workflow.move.reportMerge": "マージを報告",
+  "workflow.move.resolveOnBuilder": "ビルダーで解決",
   "workflow.move.retryMerge": "マージを再試行",
   "workflow.move.start": "開始",
   "workflow.move.startReview": "レビューを開始",

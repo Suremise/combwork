@@ -463,6 +463,13 @@
     "text": "put {total} {count, plural, one {card} other {cards}} in order in {column}",
     "note": "count: the number, for its plural; total: the same number as written."
   },
+  "api.change.resolveForward": {
+    "text": "hand {card} to a builder to resolve",
+    "note": "HI-2959: Resolve on a builder on a forward merge card the queue returned."
+  },
+  "api.change.resolveForwardAny": {
+    "text": "hand a returned forward merge to a builder"
+  },
   "api.change.resumeAQueue": {
     "text": "resume a merge queue"
   },
@@ -703,6 +710,10 @@
   "api.done.forwardQueued": {
     "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{card} is bringing {to} up to date with {from} already}}",
     "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card."
+  },
+  "api.done.forwardResolved": {
+    "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged",
+    "note": "HI-2959: Resolve on a builder’s reply. {card}: the new card; {forward}: the forward merge card it ended; {source}: a short commit id."
   },
   "api.done.forwardUpToDate": {
     "text": "{to} has everything of {from} already: nothing queued"

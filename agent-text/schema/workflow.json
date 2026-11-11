@@ -213,6 +213,9 @@
   "workflow.move.reportMerge": {
     "placeholders": {}
   },
+  "workflow.move.resolveOnBuilder": {
+    "placeholders": {}
+  },
   "workflow.move.retryMerge": {
     "placeholders": {}
   },

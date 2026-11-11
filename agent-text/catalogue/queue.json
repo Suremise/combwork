@@ -163,6 +163,10 @@
     "text": "Fix it in your worktree, commit and submit again (cw_submit).",
     "note": "The next step after anything else that came back."
   },
+  "queue.next.forward": {
+    "text": "A forward merge has no builder, and no agent works on it: the user or the Assistant decides. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} and resolve this there; Remove from queue ends it, nothing merged.",
+    "note": "HI-2959: the next step on a forward merge card (Combwork merging branch {from} into {to}) the merge queue returned: no agent may act on it. Retry merge, Resolve on a builder and Remove from queue are the window's commands."
+  },
   "queue.next.proof": {
     "text": "Have its reviewer run those tests at the revision submitted (cw-progress --check \"focused:<test>\"), then submit the same revision again (cw_submit).",
     "note": "The next step when its focused tests that the queue doesn't run need a counted run (G20, HI-1367)."

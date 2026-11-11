@@ -162,6 +162,7 @@
   "workflow.move.putBack": "Odłóż",
   "workflow.move.removeFromQueue": "Usuń z kolejki",
   "workflow.move.reportMerge": "Zgłoś scalenie",
+  "workflow.move.resolveOnBuilder": "Rozwiąż przez wykonawcę",
   "workflow.move.retryMerge": "Ponów scalanie",
   "workflow.move.start": "Rozpocznij",
   "workflow.move.startReview": "Rozpocznij recenzję",

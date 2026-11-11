@@ -667,6 +667,10 @@
     "defaultMessage": "Report the merge",
     "description": "A move on a card, named in a refused move: the agent saying it merged the work."
   },
+  "workflow.move.resolveOnBuilder": {
+    "defaultMessage": "Resolve on a builder",
+    "description": "A move on a card, named in a refused move (HI-2959): the user's Resolve on a builder on a forward merge the merge queue returned (Combwork's card bringing one branch up to date with another): it ends, and a new card is made for a builder to resolve its conflict."
+  },
   "workflow.move.retryMerge": {
     "defaultMessage": "Retry merge",
     "description": "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card."

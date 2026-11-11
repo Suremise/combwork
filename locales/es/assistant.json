@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "Las secciones de documentos para leer primero se quedan como se fijaron.",
   "assistant.undo.why.decision": "Una decisión que registró se queda: solo tú cambias o quitas decisiones.",
   "assistant.undo.why.declarePaths": "Las rutas que declaró se quedan con la tarjeta.",
+  "assistant.undo.why.forwardResolved": "Una fusión de actualización que entregó a un autor sigue terminada, y la tarjeta creada para el autor se queda: ponla en espera o quítala si no hace falta.",
   "assistant.undo.why.freshRetried": "Deshacer no detiene la conversación nueva de un agente del carril que se reintentó: termina el carril si no se quiere.",
   "assistant.undo.why.handOver": "Un traspaso no se puede deshacer: el trabajo pasó al otro agente.",
   "assistant.undo.why.laneEnded": "Un carril terminado sigue terminado: vuelve a iniciarlo si debe continuar.",

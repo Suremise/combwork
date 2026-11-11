@@ -404,6 +404,11 @@
     "note": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command.",
     "audience": "both"
   },
+  "service.folderChanges.unplaced": {
+    "text": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",
+    "note": "HI-2962: an error from Files' Commit it after Exclude from Git: a project folder ({folder}, a path) inside the same repository couldn't be placed by git (it answered nothing), so nothing was committed. Keep .gitignore: a file name.",
+    "audience": "both"
+  },
   "service.folderChanges.wrongBranch": {
     "text": "{folder} isn't on {target} now. Look again.",
     "note": "HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done.",
@@ -434,6 +439,11 @@
     "note": "HI-2679: a forward merge refused: asked by a project agent or a script.",
     "audience": "both"
   },
+  "service.forward.notReturned": {
+    "text": "{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.",
+    "note": "HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card).",
+    "audience": "both"
+  },
   "service.forward.notTargets": {
     "text": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
     "note": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.",
@@ -447,6 +457,11 @@
   "service.forward.raced": {
     "text": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
     "note": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.",
+    "audience": "both"
+  },
+  "service.forward.resolveRaced": {
+    "text": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
+    "note": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.",
     "audience": "both"
   },
   "service.fsutil.keptBusy": {

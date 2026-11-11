@@ -609,6 +609,11 @@
     "note": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is).",
     "audience": "both"
   },
+  "tasks.history.forwardResolving": {
+    "text": "Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.",
+    "note": "A comment Combwork writes on a forward merge card (HI-2959: Combwork’s own card merging branch {from} into branch {to} through the merge queue) after the user or the Assistant chose Resolve on a builder on it, when it came back with a conflict: it ends without merging, and a new card {card} (its key, such as HI-12) was made for an agent to do the merge by hand. {source} is a short commit id. Resolve on a builder is a button: as translated there.",
+    "audience": "both"
+  },
   "tasks.history.fromOlder": {
     "text": "Added from an older Combwork, where it was made as #{was}",
     "note": "A line in a card's history, by Repair: the card was made in an older version of Combwork (which saved it after the board moved to its database), set aside, and the user added it to the board from Review…; {was} is the number it had there (it keeps it when no card here has it).",

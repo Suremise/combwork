@@ -183,8 +183,13 @@ async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
 const HUNG_MS = 45_000
 // The HI-2906 tests' own bound: the jj runs of their several settles, under a loaded run (their wakes are the test's own).
 const RETRY_TEST_MS = 90_000
+// Every other test's bound, for a hung test, not a time budget (HI-2965): each prepares, settles or recovers a real slot
+// through the port's guarded steps, tens to ~150 jj runs (HI-2924's lane test: 20 to lend, 42 to prepare and integrate by
+// hand, 20, 18 and 8 for its three refusals, 42 for the next card). At ~40 ms a jj run (a quiet whole-file run, jj 0.47.1)
+// they take 4–10 s; with the machine busy a run takes 60–160 ms and the same tests took 14–23 s, past Vitest's 20 s.
+const REAL_JJ_MS = 60_000
 
-describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED_JJ.version}), HI-2866`, () => {
+describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED_JJ.version}), HI-2866`, { timeout: REAL_JJ_MS }, () => {
   for (const colocated of [true, false]) {
     describe(colocated ? 'colocated' : 'non-colocated', () => {
       it("prepares a lent slot for a card cycle (the pool's owned write); released once the card's work is in the target, settled and ready", async () => {

@@ -75,6 +75,12 @@ const prose = (seed, n) => {
 
   // Agents: two in alpha (one running a few turns), one in beta.
   const alpha = path.join(ws, 'alpha')
+  // The suite's own untracked files in alpha (attachments, a long doc) are left out of git from the start (HI-2960):
+  // untracked, they'd make every start and lane start warn that master's folder has uncommitted changes (HI-2944), and
+  // a card's clean check refuse.
+  const exclude = path.join(alpha, '.git', 'info', 'exclude')
+  fs.mkdirSync(path.dirname(exclude), { recursive: true })
+  fs.appendFileSync(exclude, '\nattach-src/\ndocs/\n')
   // Each builds and reviews the other's lanes (HI-2664: a lane part only for a role that does it).
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either' })
   await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
@@ -1038,11 +1044,6 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
     lib.git(builtFolder, ['add', file])
     lib.git(builtFolder, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `${K(builtCard)}: ${file}`, '--trailer', `Combwork-Card: ${K(builtCard)}`])
   }
-  // The suite's own untracked files in alpha (attachments, a long doc) kept out of the card's clean check meanwhile.
-  const exclude = path.join(alpha, '.git', 'info', 'exclude')
-  const excluded = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : null
-  fs.mkdirSync(path.dirname(exclude), { recursive: true })
-  fs.writeFileSync(exclude, `${excluded ?? ''}\nattach-src/\ndocs/\n`)
   builtCommit('built.txt')
   const builtSubmitted = intent('cw_submit', { card: `#${builtCard}`, summary: 'Built.' }).text
   check('…submitted for review', / → review\b/.test(builtSubmitted), builtSubmitted)
@@ -1056,8 +1057,6 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('…and only its builder is told', /^Waiting for [A-Z]+-\d+\. End your turn now: /.test(otherWatch), otherWatch)
   tool('cw_wait_for_tasks', { cancel: true }, 'own')
   intent('cw_wait_for_tasks', { cancel: true })
-  if (excluded === null) fs.rmSync(exclude)
-  else fs.writeFileSync(exclude, excluded)
   const plainRefused = intent('cw_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card by its key", plainRefused.isError && plainRefused.text.includes(`Name the card by its key: ${K(todo[40])}.`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))

@@ -472,6 +472,8 @@ interface CombworkMessageValues {
   'tips.recentWorkspaces.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.resolveOnBuilder.text': undefined
+  'tips.resolveOnBuilder.title': undefined
   'tips.resumeAfterUpdate.text': undefined
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined

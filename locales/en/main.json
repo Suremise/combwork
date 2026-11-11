@@ -1351,6 +1351,10 @@
     "defaultMessage": "its working folder is held for other work (resume it by hand)",
     "description": "Why an agent was not resumed after Combwork restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it."
   },
+  "main.restart.why.idle": {
+    "defaultMessage": "it was idle, with no card or lane waiting for it",
+    "description": "HI-2909: why an agent was not resumed after Combwork restarted: as Combwork closed it was idle (not working or watching), and no running card loop (lane), reviewer pool or review in progress needed it."
+  },
   "main.restart.why.movedOn": {
     "defaultMessage": "it has a newer conversation",
     "description": "Why an agent was not resumed after Combwork restarted: it was started in another conversation since."

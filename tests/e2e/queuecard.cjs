@@ -80,7 +80,14 @@ const f = q.folderHelpers(fx)
       return /Returned .*checks failed: quick/.test(t) ? t : null
     }, HUNG_MS)
     check('Work section: returned, the check by name, its output\'s last lines', !!redText && /red: unit broke on line 12/.test(redText), redText ?? (await text(part)))
-    check('…with Show log and Retry merge…', (await part.locator('[data-action="show-log"]').count()) === 1 && (await part.locator('[data-action="retry"]').count()) === 1)
+    // HI-2960: waited for, not counted once: Show log appears when the check's run (its log) has reached the window, which
+    // can be after the returned text above.
+    const buttons = async () => ({ showLog: await part.locator('[data-action="show-log"]').count(), retry: await part.locator('[data-action="retry"]').count() })
+    const redButtons = (await until(async () => {
+      const b = await buttons()
+      return b.showLog === 1 && b.retry === 1 ? b : null
+    }, HUNG_MS)) ?? (await buttons())
+    check('…with Show log and Retry merge…', redButtons.showLog === 1 && redButtons.retry === 1, `${JSON.stringify(redButtons)}: ${await text(part)}`)
     await part.locator('[data-action="show-log"]').click()
     check('…Show log opens its check\'s log', !!(await until(async () => ((await opened()) ?? []).some((p) => /\.log$/i.test(p)), HUNG_MS)), JSON.stringify(await opened()))
     await shoot(dialog.locator('.card-work'), 'returned-checks')

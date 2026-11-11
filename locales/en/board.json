@@ -3603,6 +3603,10 @@
     "defaultMessage": "Its builder waits for its reviewer to check the follow-up it posted. Show the reviewer and ask it to answer it.",
     "description": "Tooltip on a card stalled in Review or Passed (#1467): in a card loop, the builder posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and nobody answered."
   },
+  "board.stall.hintForward": {
+    "defaultMessage": "Combwork’s own card, which no agent works on: open it and choose in its Work section.",
+    "description": "HI-2959: tooltip on a forward merge card (Combwork's own card bringing one branch up to date with another) back from the merge queue in the Active column: no agent works on it, so the user chooses what to do in the card dialog's Work section."
+  },
   "board.stall.hintLaneOrder": {
     "defaultMessage": "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.",
     "description": "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive."
@@ -3638,6 +3642,10 @@
   "board.stalled.followUpWait": {
     "defaultMessage": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it.",
     "description": "Why a card in Review or Passed is stalled (#1467): in a card loop, its builder ({builder}, an agent's name) posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and is only waiting; no reviewer answered. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")."
+  },
+  "board.stalled.forwardWaits": {
+    "defaultMessage": "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for you. {removeOnly, select, yes {It went against the release path's direction: Remove from queue ends it.} other {Open it for Retry merge, Resolve on a Builder… or Remove from queue.}}",
+    "description": "HI-2959: why a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) in the Active column has no agent, on the card: it came back from the merge queue and waits for the user. removeOnly yes: refused for the release path's direction (only Remove from queue). Keep the select keys; the commands as translated in the card's Work section."
   },
   "board.stalled.laneOrderWait": {
     "defaultMessage": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
@@ -4227,6 +4235,10 @@
     "defaultMessage": "{n, plural, one {# file, and where it is} other {# files, and where each is}}",
     "description": "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither."
   },
+  "board.workQueue.forwardNext": {
+    "defaultMessage": "No agent works on a forward merge: it waits for you. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} by hand; Remove from queue ends it, nothing merged.",
+    "description": "HI-2959: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned with a conflict or a red check: no agent may act on it, so the user (or the Assistant) chooses. Retry merge, Resolve on a builder and Remove from queue are commands: as translated there."
+  },
   "board.workQueue.heading": {
     "defaultMessage": "Merge queue",
     "description": "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue."
@@ -4258,6 +4270,30 @@
   "board.workQueue.queuedNoPlace": {
     "defaultMessage": "Queued for {target}",
     "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)."
+  },
+  "board.workQueue.resolve": {
+    "defaultMessage": "Resolve on a Builder…",
+    "description": "HI-2959: a button in the card dialog's Work section on a forward merge card the merge queue returned: ends it and makes an ordinary card for an agent (a builder) to do the merge by hand and resolve its conflict (asks first). Title case, as the window's buttons."
+  },
+  "board.workQueue.resolveConfirm": {
+    "defaultMessage": "Resolve on a Builder",
+    "description": "HI-2959: the button confirming Resolve on a builder. Keep it short."
+  },
+  "board.workQueue.resolveFailed": {
+    "defaultMessage": "Couldn't hand the forward merge to a builder",
+    "description": "HI-2959: an error's title: Resolve on a builder failed (the card dialog); its message says why."
+  },
+  "board.workQueue.resolveMessage": {
+    "defaultMessage": "{card} ends, nothing merged, and a new card is made on {to} for a builder: it merges {from} at {revision} into its branch, resolves the conflict and goes through review and the merge queue like any card, as a merge commit. Give the new card to a builder or a lane.",
+    "description": "HI-2959: the confirmation before Resolve on a builder. {card}: the forward merge card's key; {from}, {to}: branch names; {revision}: a short commit id (the attempt that came back)."
+  },
+  "board.workQueue.resolveTitle": {
+    "defaultMessage": "Resolve {card} on a builder?",
+    "description": "HI-2959: title of the confirmation before Resolve on a builder ({card}: the forward merge card's key)."
+  },
+  "board.workQueue.resolved": {
+    "defaultMessage": "Made {card} for a builder to resolve it.",
+    "description": "HI-2959: a notification after Resolve on a builder: the new card ({card}: its key) was made; give it to a builder."
   },
   "board.workQueue.result": {
     "defaultMessage": "The merge",

@@ -2907,6 +2907,10 @@
     "defaultMessage": "The paths it declared stay with the card.",
     "description": "What of the Assistant declaring a card's paths stays when it is undone."
   },
+  "assistant.undo.why.forwardResolved": {
+    "defaultMessage": "A forward merge it handed to a builder stays ended, and the card made for the builder stays: put that card on hold or remove it if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2959): it used Resolve on a builder on a forward merge the merge queue returned, which ended it and made a card for an agent to do the merge by hand."
+  },
   "assistant.undo.why.freshRetried": {
     "defaultMessage": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
     "description": "Why a change of the Assistant's can't be undone (HI-2034): it retried a lane agent's new conversation, which Combwork had stopped trying to start. Glossary: lane, conversation."

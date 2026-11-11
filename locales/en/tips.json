@@ -1883,6 +1883,14 @@
     "defaultMessage": "Remove every agent at once",
     "description": "A tip's title."
   },
+  "tips.resolveOnBuilder.text": {
+    "defaultMessage": "Bring Up to Date… came back with a conflict? Its card’s Resolve on a Builder… makes an ordinary card for a builder to merge it by hand and resolve the conflict; it is reviewed and merged as a merge commit, like any card.",
+    "description": "A tip (HI-2959). Bring Up to Date… and Resolve on a Builder… are buttons: keep them as Combwork shows them."
+  },
+  "tips.resolveOnBuilder.title": {
+    "defaultMessage": "A forward merge that conflicts",
+    "description": "A tip's title (HI-2959): a Bring Up to Date merge that came back from the merge queue with a conflict."
+  },
   "tips.resumeAfterUpdate.text": {
     "defaultMessage": "Installing a new version tells the agents that were working or in a card loop, and when Combwork restarts it resumes them in their conversations, one at a time, each told its card, round and lane. After you quit, the next start offers to resume them instead.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
