@@ -7012,7 +7012,10 @@ Whether a conversation may resume there is its **hold** (none: it may):
     again before an install). A slot already on its line is prepared as it is. **In place first** (HI-3010): a Git slot
     detached at the card's base or a commit past it (as a lane's slot waits between cards) gets the card's new line at
     once, whatever its builder is doing, since that changes no file (`branchHere`: `merge-base --is-ancestor` with the
-    base, then `git switch -c` with no start point, so a commit made meanwhile is on the line); only the cycle and the
+    base, then `git switch -c` with no start point, so a commit made meanwhile is on the line; no hook runs, since a
+    post-checkout or reference-transaction hook could change files beside the builder: for that command alone
+    `core.hooksPath` names a folder that can't exist and `core.fsmonitor` is off, the repository's settings never
+    written); only the cycle and the
     rules are checked at that boundary. What is left (a line made before, another line there, submodules and LFS files, an
     install) waits for its builder as above. Before, a builder told of its lane's next card another way (a wake, the
     Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its

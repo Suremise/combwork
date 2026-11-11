@@ -1441,6 +1441,11 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work')
     const work = sh(r.slot.folder, 'rev-parse', 'HEAD')
     writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
+    // A repository's hook that changes files (HR1's round 1): never run beside a busy builder, wherever hooks are set.
+    const hooks = join(w.project, 'my-hooks')
+    mkdirSync(hooks, { recursive: true })
+    for (const dir of [join(w.project, '.git', 'hooks'), hooks]) writeFileSync(join(dir, 'post-checkout'), '#!/bin/sh\necho hook > wip.txt\n')
+    sh(w.project, 'config', 'core.hooksPath', hooks)
     const busy = vi.fn(async () => 'its builder is busy')
     const inPlace = vi.fn(async () => null)
     expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
