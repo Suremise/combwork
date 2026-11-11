@@ -810,7 +810,8 @@
       "base": "plain",
       "commit": "plain",
       "other": "plain",
-      "max": "number"
+      "max": "number",
+      "files": "plain"
     }
   },
   "workflow.refused.platform.jjRefused.next": {
