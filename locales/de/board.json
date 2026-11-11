@@ -998,6 +998,7 @@
   "board.work.carriedOver": "Das bestandene Review für {from} bleibt für {to} gültig: dieselbe Änderung.",
   "board.work.change": "{commits, plural, one {Change {change}} other {Change {change}, # Commits}}",
   "board.work.check": "{name}: {result, select, passed {bestanden} failed {fehlgeschlagen} other {gestoppt}}{counted, select, no { (nicht gezählt)} other {}}",
+  "board.work.doneUnproved": "Von dir erledigt, Integration nicht nachgewiesen ({when}).",
   "board.work.failed": "Die Arbeit der Karte konnte nicht gelesen werden: {error}",
   "board.work.files": "{n, plural, =0 {Keine Dateien geändert} one {# Datei geändert} other {# Dateien geändert}}",
   "board.work.filesNotRead": "{note, select, beforeChange {Dateien nicht gelesen} noBaseOrHead {Dateien nicht gelesen: Es gab keine Basis und keine Revision zum Vergleichen} other {Dateien nicht gelesen: Combwork konnte {why} nicht lesen}}",

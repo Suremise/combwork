@@ -998,6 +998,7 @@
   "board.work.carriedOver": "{from}の合格は{to}に引き継がれます：同じ変更です。",
   "board.work.change": "{commits, plural, =1 {変更 {change}} other {変更 {change}（コミット#件）}}",
   "board.work.check": "{name}：{result, select, passed {成功} failed {失敗} other {停止}}{counted, select, no {（対象外）} other {}}",
+  "board.work.doneUnproved": "あなたが完了にしました。統合は確認できていません（{when}）。",
   "board.work.failed": "カードの作業を読み込めませんでした：{error}",
   "board.work.files": "{n, plural, =0 {変更されたファイルはありません} other {#件のファイルを変更}}",
   "board.work.filesNotRead": "{note, select, beforeChange {ファイルを読み取っていません} noBaseOrHead {ファイルを読み取れませんでした：比較するベースもリビジョンもありませんでした} other {ファイルは読み取っていません：Combworkは{why}を読み取れませんでした}}",

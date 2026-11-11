@@ -998,6 +998,7 @@
   "board.work.carriedOver": "A revisão bem-sucedida de {from} continua valendo para {to}: a mesma alteração.",
   "board.work.change": "{commits, plural, one {change {change}} many {change {change}, # commits} other {change {change}, # commits}}",
   "board.work.check": "{name}: {result, select, passed {passou} failed {falhou} other {parou}}{counted, select, no { (não conta)} other {}}",
+  "board.work.doneUnproved": "Concluído por você, integração não comprovada ({when}).",
   "board.work.failed": "Não foi possível ler o trabalho do cartão: {error}",
   "board.work.files": "{n, plural, =0 {Nenhum arquivo alterado} one {# arquivo alterado} other {# arquivos alterados}}",
   "board.work.filesNotRead": "{note, select, beforeChange {Arquivos não lidos} noBaseOrHead {Arquivos não lidos: não havia base nem versão para comparar} other {Arquivos não lidos: o Combwork não conseguiu ler {why}}}",

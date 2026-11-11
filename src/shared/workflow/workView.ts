@@ -305,6 +305,8 @@ export interface WorkView {
   integration: WorkIntegration | null
   /** Its acceptance this cycle, where there is no merge (None, a no-code card). */
   accepted: WorkAcceptance | null
+  /** HI-2924: Done by the user's own move, its integration not proved (a jj card; `doneUnproved`): when. */
+  doneUnproved: { at: string } | null
   queue: WorkQueueEntry | null
   /** Its latest refused request since its last move (#1279): cleared by the card's next move. */
   refused: WorkRefusal | null
@@ -415,6 +417,24 @@ export function inTargetNow(s: CardState): FactData['InTarget'] | null {
   return m && m.submission === s.latest?.id && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
 }
 
+/**
+ * HI-2924 (Darren's decision, 11 Nov): a jj card the user moved to Done themselves while its integration wasn't proved
+ * (a hand-resolved conflict changes the change's diff, so J5's proofs don't hold). Their Done is their word that it's
+ * integrated: shown as "Done by you, integration not proved", and its slot's binding may be released without
+ * containment (jjWorkspacePort's reuse and detach). Only the user's own move into Done this cycle (never the Assistant's,
+ * a repair or Combwork's), on a jj line, with neither `Integrated` nor `Accepted` this cycle. `line`, given: only that
+ * cycle's (its jj line key). Null otherwise.
+ */
+export function doneUnproved(facts: readonly Fact[], s: Pick<CardState, 'stage' | 'cycle' | 'started' | 'integrated' | 'accepted'>, line?: string): { at: string; line: string } | null {
+  const own = s.started?.line
+  if (s.stage !== 'done' || !s.started || s.integrated || s.accepted || !own || !own.startsWith('jj:')) return null
+  if (line !== undefined && own !== line) return null
+  const moved = facts.findLast((f) => f.kind === 'Moved' && f.seq >= s.cycle && (f.data as FactData['Moved']).to === 'done')
+  if (!moved || moved.actor !== 'user') return null
+  const cause = (moved.data as FactData['Moved']).cause
+  return cause === 'user' || cause === 'override' ? { at: moved.at, line: own } : null
+}
+
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
   const u = platform?.unknown
   if (!u || typeof u !== 'object') return {}
@@ -505,6 +525,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, inTarget: inTargetNow(s), leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at, ...(jjField((integrated.data as { platform?: unknown }).platform, 'via') ? { via: jjField((integrated.data as { platform?: unknown }).platform, 'via')! } : {}) } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
+    doneUnproved: ((d) => (d ? { at: d.at } : null))(doneUnproved(facts, s)),
     refused,
     queue: entry ? queueEntryOf(entry, facts) : null,
     decisions: { generation: s.generation, received: s.received },

@@ -998,6 +998,7 @@
   "board.work.carriedOver": "{from} 的通过结论对 {to} 继续有效：属于相同的变更。",
   "board.work.change": "{commits, plural, =1 {变更 {change}} other {变更 {change}（# 个提交）}}",
   "board.work.check": "{name}：{result, select, passed {通过} failed {失败} other {已停止}}{counted, select, no {（不计入）} other {}}",
+  "board.work.doneUnproved": "由你标为完成，集成未经证实（{when}）。",
   "board.work.failed": "无法读取卡片的工作记录：{error}",
   "board.work.files": "{n, plural, =0 {没有更改文件} other {更改了 # 个文件}}",
   "board.work.filesNotRead": "{note, select, beforeChange {未读取文件} noBaseOrHead {未读取文件：没有可比较的基准或修订版本} other {未读取文件：Combwork 无法读取{why}}}",

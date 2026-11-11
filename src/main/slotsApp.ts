@@ -54,6 +54,7 @@ import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
 import { agentMax } from './projectAgents'
 import { openEntry } from '../shared/workflow/facts'
+import { doneUnproved } from '../shared/workflow/workView'
 import { LANES_END_WAIT_MINUTES, LANES_GENTLE_END, SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
 
@@ -310,7 +311,19 @@ export function jjPort(): JjWorkspacePort {
       const ws = workspaceFor(store)
       return ws ? boardPrepStore(boardConn(ws)) : null
     },
-    contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at)
+    contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at),
+    // HI-2924 (Darren's decision): the user's own Done on exactly that card cycle, its integration not proved.
+    doneByUser: async (store, b) => {
+      const ws = workspaceFor(store)
+      if (!ws || b.card === null || !b.key) return false
+      try {
+        const projectPath = (await import('./slotCards')).projectOfCard(ws, b.card)
+        const wf = projectPath ? await workflowFor(ws, projectPath) : null
+        return !!wf && !!doneUnproved(wf.store.facts(b.card), wf.state(b.card), b.key)
+      } catch {
+        return false
+      }
+    }
   })
   registerWorkspacePort('jj', port)
   return port

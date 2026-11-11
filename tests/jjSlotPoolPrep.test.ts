@@ -13,7 +13,7 @@
 //   write waits for the database: published in the pool's fenced transaction, so nothing is; the journal stays `written`.
 // Skipped without the fetched jj; with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -74,7 +74,9 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
       return v
     }
   }
-  const port = h.portWith({ prep: () => prep, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
+  // HI-2924: the card cycles (their line keys) the user moved to Done themselves, integration not proved.
+  const doneByUser = new Set<string>()
+  const port = h.portWith({ prep: () => prep, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at), doneByUser: (_s, b) => !!b.key && doneByUser.has(b.key) })
   // HI-2906's seams: a session seen only while the next detach runs (gone before it returns), and a hook on each look
   // at the sessions (a close started during a settle).
   const hooks: { busyInNextDetach: boolean; detaching: boolean; onSession: (() => void) | null; recordGate: Promise<void> | null; inRecord: (() => void) | null } = { busyInNextDetach: false, detaching: false, onSession: null, recordGate: null, inRecord: null }
@@ -147,7 +149,7 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
   const armNextWrite = (fn: (db: Db) => void): void => {
     before = fn
   }
-  return { h, repo, root, base, port, pool, store, git, prep, armAfterWritten, armNextWrite, stealOp, sessions, hooks, clock, makePool, main: () => h.id(repo, 'main') }
+  return { h, repo, root, base, port, pool, store, git, prep, doneByUser, armAfterWritten, armNextWrite, stealOp, sessions, hooks, clock, makePool, main: () => h.id(repo, 'main') }
 }
 
 /** A card's slot lent, prepared, its work committed and submitted, and the user's integration of it (HI-2906's cases). */
@@ -506,6 +508,64 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         const r2 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
         expect(r2, JSON.stringify(r2)).toMatchObject({ ok: true })
         expect(await w.port.line(row.folder)).toBe(key2)
+      })
+
+      /** A card's work committed in its slot, then the user's own conflicting commit on main and their hand resolution there (HI-2924). */
+      async function handResolved(w: ReturnType<typeof world>, lease: string, row: NonNullable<ReturnType<typeof w.store.slot>>, key: string): Promise<void> {
+        expect(await w.pool.prepare(lease, { line: key, base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+        writeFileSync(join(row.folder, 'one.txt'), 'one\n')
+        w.h.jj(row.folder, 'commit', '-m', 'card 1')
+        const R = w.h.id(row.folder, `${row.identity!.workspace}@-`)
+        await w.port.submitted(row.folder, key, [R], row.identity, 1)
+        // The user's own commit on main changed the same file; the resolution, by hand, is a change of its own there.
+        w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'the user')
+        const U = w.h.id(w.repo, 'description(exact:"the user\n")')
+        w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', U)
+        w.h.jj(w.repo, '--ignore-working-copy', 'new', U, '--no-edit', '-m', 'card 1, resolved by hand')
+        const C = w.h.id(w.repo, 'description(exact:"card 1, resolved by hand\n")')
+        w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', C)
+      }
+
+      it("HI-2924: a lane's card integrated by a hand resolution (not provable): refused until the user's own Done on that card cycle, then the next card is prepared in the slot", async () => {
+        const w = world(colocated)
+        const lent = await w.pool.lend({ lane: 'L6', agent: 'a-l' }, { target: 'main' })
+        if (!lent.ok) throw new Error('not lent')
+        const row = w.store.slot(lent.slot.name)!
+        const key1 = jjLineKey(row.identity!.workspace, 1, 1)
+        await handResolved(w, lent.lease.id, row, key1)
+        const key2 = jjLineKey(row.identity!.workspace, 2, 2)
+        const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
+        expect(JSON.stringify(r1)).toMatch(/isn't in its target yet/)
+        // Another cycle's Done is not this one's.
+        w.doneByUser.add(jjLineKey(row.identity!.workspace, 1, 2))
+        expect(JSON.stringify(await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' }))).toMatch(/isn't in its target yet/)
+        w.doneByUser.add(key1)
+        // An edit in the slot is still refused: the Done stands for the card's submitted work, nothing more.
+        writeFileSync(join(row.folder, 'draft.txt'), 'mine\n')
+        expect(await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })).not.toMatchObject({ ok: true })
+        expect(readFileSync(join(row.folder, 'draft.txt'), 'utf8')).toBe('mine\n')
+        rmSync(join(row.folder, 'draft.txt'))
+        const r2 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
+        expect(r2, JSON.stringify(r2)).toMatchObject({ ok: true })
+        expect(await w.port.line(row.folder)).toBe(key2)
+        expect(w.h.id(row.folder, `${row.identity!.workspace}@-`)).toBe(w.main())
+      })
+
+      it("HI-2924: released after a hand-resolved integration: kept until the user's own Done, then detached and ready", async () => {
+        const w = world(colocated)
+        const lent = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+        if (!lent.ok) throw new Error('not lent')
+        const row = w.store.slot(lent.slot.name)!
+        const key = jjLineKey(row.identity!.workspace, 1, 1)
+        await handResolved(w, lent.lease.id, row, key)
+        await w.pool.release(lent.lease.id, 'done')
+        await w.pool.refresh()
+        expect(w.store.slot(row.name)?.state).not.toBe('ready')
+        expect(await w.port.line(row.folder)).toBe(key)
+        w.doneByUser.add(key)
+        await w.pool.refresh()
+        expect(w.store.slot(row.name)?.state).toBe('ready')
+        expect(await w.port.line(row.folder)).toBeNull()
       })
 
       it("HI-2923: the lane's next card's work committed in its slot before the slot is prepared (on the last card's original, its copy in a moved main): refused, the work kept, nothing moved; once it's gone the slot is prepared on main's head", async () => {

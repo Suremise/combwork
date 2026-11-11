@@ -55,6 +55,7 @@ const M = {
   integrated: msg({ id: 'board.work.integrated', defaultMessage: '{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}', description: "The card dialog's Work section: how the card's work went into its target ({target}, a branch such as main) and the target's revision with it ({result}, a short commit id). Keep the select keys." }),
   outsideCombwork: msg({ id: 'board.work.outsideCombwork', defaultMessage: 'Merged outside Combwork.', description: "The card dialog's Work section, under how the card was merged: the merge was made outside Combwork (in a terminal or another tool). Glossary: outside Combwork." }),
   accepted: msg({ id: 'board.work.accepted', defaultMessage: 'Accepted {when}.', description: "The card dialog's Work section: the card's work was accepted (a project without version control, or a no-code card) at {when}, a date and time." }),
+  doneUnproved: msg({ id: 'board.work.doneUnproved', defaultMessage: 'Done by you, integration not proved ({when}).', description: "The card dialog's Work section (HI-2924): the user moved this jj card to Done themselves, and Combwork couldn't prove its change is in its target (a conflict resolved by hand changes the change). Their Done counts as their word that it's integrated. {when}: a date and time." }),
   staleChange: msg({ id: 'board.work.staleChange', defaultMessage: 'Stale: the pass was for {approved}; the card is now at {current}.', description: "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass." }),
   staleDecision: msg({ id: 'board.work.staleDecision', defaultMessage: 'Stale: a decision was recorded since the pass.', description: "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass." }),
   staleNext: msg({ id: 'board.work.staleNext', defaultMessage: 'To move it on, its builder submits it again, or puts its branch back at {approved}: until then it isn’t merged.', description: "A mark in the card dialog's Work section under a stale pass, in Approved (Passed): what moves the card on. Its builder submits its work again (for a new review), or puts its branch back at the revision that passed ({approved}, a short commit id), which makes the pass count again. Glossary: stale, pass." }),
@@ -212,6 +213,11 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
       {v.accepted && (
         <div className="card-work-merged">
           <Icon name="pass" /> {tr(M.accepted, { when: formatDateTime(v.accepted.at) })}
+        </div>
+      )}
+      {v.doneUnproved && (
+        <div className="card-work-merged">
+          <Icon name="warning" /> {tr(M.doneUnproved, { when: formatDateTime(v.doneUnproved.at) })}
         </div>
       )}
       {v.revisions.length === 0 ? (
