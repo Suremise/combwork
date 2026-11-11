@@ -6266,7 +6266,9 @@ The URL is used literally, never the remote's name.
 fragment, the ref, the remote head tested on, and the snapshot's id and SHA-256 digest. The snapshot is in
 `queue-transport.json` in Combwork's profile, encrypted with safeStorage (DPAPI), keyStore.ts's pattern (one atomic
 write, no `.bak`), decrypted only to build a sealed context, never sent to a window, a reply, a log or diagnostics;
-removed once its entry has an outcome. Each is owned by its project's target, and only that target's queue host drops
+removed once its entry has an outcome. Its file there but unreadable (after three tries) is never read as empty
+(HI-2993): a save then refuses and writes nothing, so other targets' snapshots are never dropped, and the queue tries
+the advance again as a failed read; a load answers none, and a drop or clean-up writes nothing. Each is owned by its project's target, and only that target's queue host drops
 leftovers no begun publication of the target needs, between its entries under its lease, so another target's clean-up
 never takes one between its save and its `IntegrationStarted`. git's words kept
 for a pause or a log are redacted first (URL userinfo, any URL's query and fragment, authorization and bearer values,

@@ -798,7 +798,13 @@ export class MergeQueue {
     const on = await I.contains(this.project, onto, result)
     if (isUnknown(on)) return again(gitSaid(on))
     if (!on) return { pause: 'needsYou', message: `The test merge ${result.slice(0, 12)} doesn't contain ${onto.slice(0, 12)}, the remote's head it was tested on, so Combwork didn't publish it.` } // i18n-ignore: git's side of a pause, in English as git's are
-    const saved = await this.cfg.transport?.save(this.project, target, snap)
+    // The store unreadable now (HI-2993): nothing kept or published, tried again as a failed read is.
+    let saved: Awaited<ReturnType<TransportStore['save']>> | undefined
+    try {
+      saved = await this.cfg.transport?.save(this.project, target, snap)
+    } catch (e) {
+      return again(e instanceof Error ? e.message : String(e))
+    }
     if (!saved) return { pause: 'remoteUnsupported' }
     const publish: PublishFact = { remote: snap.remote, endpoint: snap.display, ref: snap.ref, onto, snapshot: saved.id, digest: saved.digest }
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: folder, publish })
