@@ -57,12 +57,20 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
       .join('<base>')
       .replace(/\b[0-9a-f]{40}\b/g, '<id>')
       .replace(/\b[0-9a-f]{7,12}\b/g, '<short>')
-  let running = 0
+  // HI-2954: only the commands this step saw start are waited for. A plain count went below zero when one started before
+  // the step (a refresh of the workspace's) ended inside it, and the wait below never ended (CI, 11 Nov).
+  const running = new Map<string, number>()
+  const key = (cwd: string, args: readonly string[]): string => `${resolve(cwd)}\0${args.join('\0')}`
   gitTestHooks.started = (cwd, args) => {
-    running++
+    running.set(key(cwd, args), (running.get(key(cwd, args)) ?? 0) + 1)
     ran.push(stable(`${resolve(cwd)} :: ${args.join(' ')}`))
   }
-  gitTestHooks.ended = () => void running--
+  gitTestHooks.ended = (cwd, args) => {
+    const n = running.get(key(cwd, args))
+    if (n === undefined) return
+    if (n > 1) running.set(key(cwd, args), n - 1)
+    else running.delete(key(cwd, args))
+  }
   let end = ''
   try {
     const v = await fn()
@@ -72,7 +80,7 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
   } finally {
     // A command still running when the call ended (one of two read together, after the other's refusal) is this step's:
     // waited for, so it never lands in the next step's trace.
-    await until(() => running === 0)
+    await until(() => running.size === 0)
     gitTestHooks.started = undefined
     gitTestHooks.ended = undefined
   }
@@ -133,7 +141,12 @@ describe("the window's repository reads (HI-2785)", { timeout: 120_000 }, () => 
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
-    const run = (fn: () => Promise<unknown>): Promise<string[]> => traced(base, () => inWorkspace(w, fn))
+    // HI-2954: the workspace's own refreshes settled first. Opening leaves one scheduled (its writes of project.json schedule
+    // it, 250 ms on): its git, re-asked once the index or info/exclude changes, would otherwise land in a step's trace.
+    const run = async (fn: () => Promise<unknown>): Promise<string[]> => {
+      await w.refreshesSettled()
+      return traced(base, () => inWorkspace(w, fn))
+    }
 
     same('summary', await run(() => reads.summary(repo)))
     same('work target', await run(() => reads.workTarget(repo)))
