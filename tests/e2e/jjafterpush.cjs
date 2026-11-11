@@ -3,7 +3,10 @@
 // remote.
 // - card 1 built by B1, passed by the user and integrated (main moved onto it, pushed): Done;
 // - card 2 started for B2 at once by the user (a drag into Doing), beside Combwork's own jj operations after card 1's
-//   Done (its slot detached, another made): started first time, in a slot within a minute.
+//   Done (its slot detached, another made): started first time, in a slot within a minute;
+// - B1 stopped, and card 3 started for B1 at once (HI-2919, HI-2916's shapes 1 and 2): card 3 in a slot within a minute,
+//   and card 1's slot back within jjwindow's bound (ready, or lent to a card; never `lent` with no lease, HI-2912's, or
+//   held by a carried lease, HI-2920's).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -149,6 +152,37 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     }, HUNG_MS)
     // A slot of its own, or card 1's once that one is back in the pool: either is the pool's to pick.
     check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2, JSON.stringify({ w2, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#2\b/.test(l)).slice(-40) }, null, 1))
+
+    // --- HI-2919 (HI-2916's shapes 1 and 2), after HI-2912's fix: B1 stopped, and card 3 started for B1 at once.
+    // Shape 2: card 3 gets a slot within a minute. Shape 1: card 1's slot, its builder gone, is back within jjwindow's
+    // bound: ready, or lent to a card; never left `lent` with no lease (the settle held off, HI-2912's) or held by a
+    // carried lease (HI-2920's).
+    await inv('session:stop', shop, b1.id)
+    check('B1 stopped', !!(await until(async () => !(await live(b1.id)) || (await live(b1.id))?.status === 'exited', HUNG_MS)), JSON.stringify(await live(b1.id)))
+    const t3 = Date.now()
+    const n3 = (await inv('tasks:create', { title: 'Card three', project: 'shop', agent: b1.id })).number
+    const slot1 = path.basename(c1.w.folder)
+    const back = (s) => !!s && (s.state === 'ready' || (s.state === 'lent' && !!s.lease && s.lease.kind !== 'carried' && (s.lease.card !== null || !!s.lease.lane)))
+    // At once and side by side: card 1's slot watched for its return, and card 3 started as the window starts it, with
+    // no override. While no slot is free the window asks (`start.slotAvailable`, "waits for a slot") and the user waits
+    // (a confirmed drag would start it in the project folder, SPEC's "a user's start across it works where the agent
+    // is"), so it is asked again until it starts. jjwindow's bound for the slot: the settle's retries pause up to 30 s.
+    let started3 = null
+    const [slot1At, started3At] = await Promise.all([
+      until(async () => back((await inv('slots:list', shop)).find((s) => s.name === slot1)), HUNG_MS * 2).then((ok) => (ok ? Date.now() - t3 : null)),
+      until(async () => {
+        started3 = await inv('tasks:move', n3, 'doing', { reason: 'jjafterpush: start after the builder stopped' }).catch((e) => ({ error: String(e) }))
+        return !!started3 && !started3.ask && !started3.refused && !started3.error
+      }, HUNG_MS).then((ok) => (ok ? Date.now() - t3 : null))
+    ])
+    const s1 = (await inv('slots:list', shop)).find((s) => s.name === slot1)
+    check(`card 1's slot back after its builder left, within jjwindow's bound (${slot1At} ms)`, slot1At !== null, JSON.stringify({ slot: s1, why: !s1 ? 'gone' : s1.lease?.kind === 'carried' ? 'carried lease (HI-2920)' : s1.state === 'lent' && !s1.lease ? 'lent with no lease (HI-2912)' : s1.state }))
+    check(`card 3 for B1, asked right after B1 stopped: started within a minute (${started3At} ms)`, started3At !== null, JSON.stringify({ started3, slots: await inv('slots:list', shop) }))
+    const w3 = await until(async () => {
+      const v = await inv('tasks:work', n3)
+      return v?.folder && v.workspace ? v : null
+    }, HUNG_MS)
+    check(`…in a slot (${Date.now() - t3} ms after B1 stopped)`, !!w3 && w3.folder !== 'project', JSON.stringify({ w3, work: await inv('tasks:work', n3), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#3\b/.test(l)).slice(-40) }, null, 1))
   } finally {
     await h.app.close().catch(() => undefined)
   }

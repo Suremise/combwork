@@ -140,6 +140,8 @@ export const AREAS = [
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
+  // HI-2919: a jj slot its builder has left after Done comes back, and the next card's start gets a slot.
+  { paths: ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/slotsApp.ts'], suites: ['jjafterpush'] },
   // HI-2916: a jj card started right after another's integration, beside Combwork's own jj operations.
   { paths: ['src/main/platform/jjPlatform.ts', 'src/main/platform/jjIntegration.ts', 'src/main/platform/adapter.ts'], suites: ['jjafterpush'] },
   // HI-2914: a jj card's observation after a restart, and the reconciler's debounce under Waiting's repeated reads.
