@@ -899,6 +899,7 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  { test: 'tests/changelog.test.ts', paths: ['CHANGELOG.md'] }, // HI-2968: a version's section once, in order
   // Every jj file that reads the files a jj write replaces calls Combwork's file gate, or says where (HI-2918).
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], adds: true },
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], lines: ['working_copy', 'packed-refs', "'refs'", '--git-dir', "'HEAD'", 'jjFileGate', 'storeGitGated', 'storeGatedHistory'] },
