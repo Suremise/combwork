@@ -4,7 +4,7 @@
 // tool name), the agents' live state, their processes and background tasks, and the pane footer's context number.
 // Names only, never content (mapLabel): a summary is shown only where it is recognised as a path or a URL's host.
 import type { ActivityState, ActivityTurns } from './activity'
-import type { BackgroundTaskType } from './types'
+import type { BackgroundTaskType, LaunchedLimits } from './types'
 
 export type MapStation = 'you' | 'read' | 'edit' | 'shell' | 'agents' | 'tools'
 /** The stations, clockwise from the top: the order the map draws them in. */
@@ -126,6 +126,37 @@ export interface MapContext {
 export function contextLevel(pct: number | null | undefined): 'none' | 'ok' | 'amber' | 'red' {
   if (pct === null || pct === undefined) return 'none'
   return pct >= CONTEXT_RED ? 'red' : pct >= CONTEXT_AMBER ? 'amber' : 'ok'
+}
+
+/**
+ * What of an agent's live state its context ring depends on (HI-2929): its session, whether it is still being set up
+ * (no context read until it isn't), and the model and launch-declared limits contextShown reads. A change to any of them
+ * reads its context again, under the same session id too (a setup ending, local limits set after the launch).
+ */
+export function mapContextKey(live: { sessionId: string; settingUp?: boolean; modelId?: string | null; localLimits?: LaunchedLimits } | null | undefined): string {
+  if (!live) return ''
+  return JSON.stringify([live.sessionId, !!live.settingUp, live.modelId ?? null, live.localLimits ?? null])
+}
+
+/**
+ * An agent's live state as the hosts have it now, by its host's path (any case) and its id (HI-2929, HR1's round 1): the
+ * workspace view's entries are taken in only when a status or session changes, so they can hold an older live state.
+ */
+export function liveIn<L>(hosts: readonly { path: string; agents: readonly { id: string; live?: L | null }[] }[], path: string, agentId: string): L | null {
+  const p = path.toLowerCase()
+  return hosts.find((h) => h.path.toLowerCase() === p)?.agents.find((a) => a.id === agentId)?.live ?? null
+}
+
+/**
+ * The entries the map's context reads take (HI-2929): each with its live state as `liveOf` has it now, and their key,
+ * which changes with what the ring depends on (mapContextKey), not only with the session id.
+ */
+export function mapContextEntries<L extends Parameters<typeof mapContextKey>[0], E extends { key: string; live: L }>(entries: readonly E[], liveOf: (e: E) => L): { key: string; entries: E[] } {
+  const now = entries.map((e) => {
+    const live = liveOf(e)
+    return live === e.live ? e : { ...e, live }
+  })
+  return { key: now.map((e) => `${e.key}:${mapContextKey(e.live)}`).join('|'), entries: now }
 }
 
 /**

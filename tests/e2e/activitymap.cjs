@@ -5,8 +5,9 @@
 // pulsed or read by the map (its counters). All agents: one shared map with an agent ring each, and a click on a ring
 // shows that agent alone. A prompt counts at You, by the word only. The map follows Hide finished, in the project's tab
 // and the workspace's view; a turns read only the map wanted, held in main while the map is turned off, applies nothing
-// once released. The Show toggles are kept. Both themes, wide and narrow. Fake Claude Code only (no sign-in, no
-// tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
+// once released. An agent set up while the shared map shows gets its context ring once it starts (HI-2929; a 0.9 worktree
+// agent: NOT RUN on a packaged build, CW_EXE, where the rest runs). The Show toggles are kept. Both themes, wide and
+// narrow. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -228,6 +229,32 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await gated('the workspace view', '.activity-workspace')
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await lib.until(async () => (await head.count()) === 1, HUNG_MS, 250)
+
+    // --- An agent set up while the shared map shows (HI-2929): its worktree's setup command waits for a gate, so the map
+    // first has it setting up; started (the same session id), its ring shows its context as its footer does, never "—".
+    // Its agent is a 0.9 worktree agent (the test copies' channel): a packaged build (CW_EXE) skips it, saying so.
+    if (process.env.CW_EXE) console.log('NOT RUN an agent set up while the map shows (HI-2929) needs an unpackaged build: not run with CW_EXE')
+    else {
+      const gate = path.join(shots, 'setup-gate')
+      const setupScript = path.join(shots, 'setup.cjs')
+      fs.writeFileSync(setupScript, `const fs = require('fs')\nconst t = setInterval(() => { if (fs.existsSync(${JSON.stringify(gate)})) { clearInterval(t); console.log('CW-SETUP-DONE') } }, 100)\n`)
+      await inv('project:updateConfig', alpha, { worktreeSetup: `"${process.execPath}" "${setupScript}"` })
+      const hb3 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'HB3' })
+      if ((await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1) await head.getByRole('button', { name: 'Play', exact: true }).click()
+      await inv('session:start', alpha, { agentId: hb3.id })
+      const ring3 = page.locator(`.activity-map-ring[data-agent="${hb3.id}"]`)
+      check('HB3 is set up while the shared map shows it', !!(await lib.until(async () => (await liveOf(hb3.id))?.settingUp === true && (await ring3.count()) === 1, HUNG_MS, 250)))
+      const setUpAs = (await liveOf(hb3.id))?.sessionId
+      fs.writeFileSync(gate, '')
+      await lib.acceptClaudeTrust(inv, alpha, hb3.id)
+      await lib.until(() => idle(hb3.id), HUNG_MS)
+      check('…then starts under the session id it was set up with', !!setUpAs && (await liveOf(hb3.id))?.sessionId === setUpAs, JSON.stringify([setUpAs, (await liveOf(hb3.id))?.sessionId]))
+      await turn(hb3.id, 'window 100000 then context 50000 then tool Read src/alpha/i.ts')
+      const ring3Text = () => ring3.locator('.faint').innerText().catch(() => '')
+      check("…and its ring shows its context (50 %), not '—'", !!(await lib.until(async () => /50/.test(await ring3Text()), HUNG_MS, 250)), await ring3Text())
+      await shoot('7-set-up-while-shown-dark')
+      await inv('session:stop', alpha, hb3.id).catch(() => undefined)
+    }
 
     // --- Light theme, and a narrow window: the map above the list.
     await head.locator('.activity-pick').first().click()

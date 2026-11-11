@@ -12,7 +12,7 @@ import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '..
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapMode, type MapContext } from '@shared/activityMap'
+import { mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -323,9 +323,11 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
-  const entriesKey = entries.map((e) => `${e.key}:${e.live?.sessionId ?? ''}`).join('|')
+  // The context reads take each agent's live state as the project has it now (HI-2929: a setup ending, local limits set
+  // after the launch, under the same session id).
+  const forContexts = mapContextEntries(entries, (e) => project.agents.find((a) => a.id === e.agentId)?.live ?? null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => setMapEntries(entries), [entriesKey])
+  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
   const map = useActivityMap({ active, animate: active && live && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at: input.at })
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.

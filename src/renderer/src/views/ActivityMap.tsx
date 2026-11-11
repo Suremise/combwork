@@ -3,7 +3,7 @@
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -107,7 +107,7 @@ export function useMapContexts(on: boolean, entries: readonly MapEntry[]): Reado
   const versions = useStore((s) => s.usageVersion)
   const [got, setGot] = useState<ReadonlyMap<string, { at: string; ctx: MapContext | null }>>(new Map())
   const queue = useRef(boundedQueue(2))
-  const wanted = entries.slice(0, MAP_AGENTS).flatMap((e) => (e.live && !e.live.settingUp ? [{ key: e.key, path: e.path, live: e.live, at: `${e.live.sessionId}:${versions[e.path] ?? 0}` }] : []))
+  const wanted = entries.slice(0, MAP_AGENTS).flatMap((e) => (e.live && !e.live.settingUp ? [{ key: e.key, path: e.path, live: e.live, at: `${mapContextKey(e.live)}:${versions[e.path] ?? 0}` }] : []))
   const wantKey = wanted.map((w) => `${w.key}=${w.at}`).join('|')
   const wantedRef = useRef(wanted)
   wantedRef.current = wanted
