@@ -258,12 +258,18 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     if (st === 'unreadable') unknownAt(a, gate, file)
     else if (st) add(a, gate, file)
   }
-  // Hooks: core.hooksPath (resolved as Git resolves it, from the working tree's top) holding any file, else the store's
-  // hooks folder holding any file but the samples.
-  const hooksDir = hooksPath ? (isAbsolute(hooksPath) ? hooksPath : resolve(root, hooksPath)) : join(store, 'hooks')
-  const held = await hooksIn(hooksDir)
-  if (held === null) unknownAt(a, 'hooks', hooksDir)
-  else for (const h of held.slice(0, 5)) add(a, 'hooks', join(hooksDir, h))
+  // Hooks: the folder Git runs them from, as Git names it (HI-2941: `rev-parse --git-path hooks` applies core.hooksPath
+  // with Git's own expansion, `~/` and `%(prefix)/` included, else the store's hooks), relative to the working tree's top
+  // where Git runs hooks; holding any hook but the samples. Git unable to say is unknown, never clear.
+  const gp = await deps.git(root, ['rev-parse', '--git-path', 'hooks'])
+  const said = gp.ok ? gp.out.trim() : ''
+  if (!said) unknownAt(a, 'hooks', `git rev-parse --git-path hooks: ${gp.err || 'nothing'}${hooksPath ? ` (core.hooksPath ${hooksPath})` : ''}`) // i18n-ignore: what was found, shown as data beside its message
+  else {
+    const hooksDir = isAbsolute(said) ? said : resolve(root, said)
+    const held = await hooksIn(hooksDir)
+    if (held === null) unknownAt(a, 'hooks', hooksDir)
+    else for (const h of held.slice(0, 5)) add(a, 'hooks', join(hooksDir, h))
+  }
   // jj's own signing, at every level it reads.
   const jc = await deps.jj.run(root, ['config', 'list', 'signing.behavior'])
   if (!jc.ok && jc.code === -1) unknownAt(a, 'signing', `jj config list: ${jc.err}`) // i18n-ignore: what was found, shown as data beside its message

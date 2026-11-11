@@ -2197,7 +2197,7 @@ A jj project's agents are its cards' builders and reviewers, each in its own slo
 Each is listed in **Repository** and in the switch's dialog. The first five refuse a switch to jj when the repository, or your Git settings, use them:
 
 - <!-- gate:attributes --> **Git attributes and filters**: jj doesn't apply line endings (`eol`, `text`, `core.autocrlf`), clean and smudge filters, or diff and merge drivers.
-- <!-- gate:hooks --> **Git hooks**: jj doesn't run them.
+- <!-- gate:hooks --> **Git hooks**: jj doesn't run them. Combwork looks for them where Git runs them from, whatever form your `core.hooksPath` takes (`~/hooks`, a path relative to the repository, or a full one).
 - <!-- gate:lfs --> **Git LFS**: jj doesn't support large file storage.
 - <!-- gate:submodules --> **Submodules**: jj doesn't support them.
 - <!-- gate:signing --> **Commit signing**: not verified with jj in Combwork yet.

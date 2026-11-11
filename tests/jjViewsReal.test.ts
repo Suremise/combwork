@@ -250,6 +250,40 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(broken.attributes).toMatchObject({ unknown: expect.stringContaining('boom') })
   })
 
+  it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {
+    const r = await repo('hookspath')
+    const clear = { clear: true }
+    // The isolated home both git runs here expand ~ to.
+    const home = env.HOME!
+    const hook = (dir: string): void => {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'pre-commit'), '#!/bin/sh\nexit 1\n')
+    }
+    // ~/ is the home Git expands it to, never a folder named ~ in the repository.
+    git(r.root, 'config', 'core.hooksPath', '~/hooks-tilde')
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toEqual(clear)
+    hook(join(home, 'hooks-tilde'))
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toMatchObject({ uses: [expect.stringContaining('pre-commit')] })
+    // Git's answer, checked: the folder it names is the one found.
+    expect(resolve(git(r.root, '-c', `core.hooksPath=~/hooks-tilde`, 'rev-parse', '--git-path', 'hooks'))).toBe(resolve(home, 'hooks-tilde'))
+    // Relative: from the working tree's top, where Git runs hooks (a subfolder's run included).
+    git(r.root, 'config', 'core.hooksPath', 'tools/hooks')
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toEqual(clear)
+    hook(join(r.root, 'tools', 'hooks'))
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toMatchObject({ uses: [expect.stringContaining('pre-commit')] })
+    // Absolute.
+    const abs = join(tempDir('jjv-hooks-abs-'), 'h')
+    git(r.root, 'config', 'core.hooksPath', abs.replace(/\\/g, '/'))
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toEqual(clear)
+    hook(abs)
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toMatchObject({ uses: [expect.stringContaining('pre-commit')] })
+    // Unset: the store's hooks, as before; Git unable to say is unknown, never clear.
+    git(r.root, 'config', '--unset', 'core.hooksPath')
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).hooks).toEqual(clear)
+    const failing = { ...gitDeps, git: async (cwd: string, args: string[]) => (args[0] === 'rev-parse' ? { ok: false, out: '', err: 'boom' } : gitDeps.git(cwd, args)) }
+    expect((await assessJj(r.root, r.ctx.store, failing)).hooks).toMatchObject({ unknown: expect.stringContaining('boom') })
+  })
+
   it('not colocated (HI-2896): the views read through jj’s store; no bookmark is marked as differing from Git, exported or not', async () => {
     const r = await repo('sep', false)
     expect(r.ctx.colocated).toBe(false)
