@@ -8,7 +8,7 @@
 // - interruption: Combwork quits with card 2 in Doing and opens again: the lane, the card and its slot are as they were;
 //   B1 submits it and R1 passes it;
 // - the user's own commit on main touches card 2's file elsewhere: Waiting says not in main yet; the user copies it onto
-//   main (`jj duplicate`: a rebase would leave the slot stale, HI-2913), moves main there and pushes to a bare remote:
+//   main as Waiting suggests (`jj duplicate -r … --onto main`, HI-2913), moves main there and pushes to a bare remote:
 //   Integrated (its change found applied again) and Done, and
 //   nothing to check in Publish records;
 // - a true conflict (card 3 and the user's main change the same line): the user resolves it by hand while integrating,
@@ -152,9 +152,9 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
       check(`${label}: R1 passes it, waiting for your integration`, pass.status === 200 && !!(await until(async () => (await column(n)) === 'passed', HUNG_MS)), JSON.stringify({ pass: pass.body, column: await column(n) }))
       return R
     }
-    /** The user's copy of a card's commit onto main (`jj duplicate`), found by its description: its commit id. */
+    /** The user's copy of a card's commit onto main, as Waiting suggests (HI-2913): its commit id, found by its description. */
     const duplicateOnto = (R, description) => {
-      jj(shop, '--ignore-working-copy', 'duplicate', R, '-d', 'main')
+      jj(shop, '--ignore-working-copy', 'duplicate', '-r', R, '--onto', 'main')
       return id(shop, `description(exact:${JSON.stringify(description + '\n')}) & ~${R} & main+`)
     }
     const bookmarksBefore = () => jj(shop, '--ignore-working-copy', 'bookmark', 'list', '-T', 'name ++ " " ++ normal_target.commit_id() ++ "\\n"')
@@ -208,8 +208,8 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
       return x?.contained?.state === 'notYet' ? x : null
     }, HUNG_MS)
     check('Waiting: card 2 not in main yet', !!waiting2, JSON.stringify(await inv('jj:waiting', shop)))
-    // The user copies it onto main (`jj duplicate`: the slot's own commits untouched; a rebase would rewrite the slot's
-    // working-copy commit too, HI-2913), moves main there and pushes.
+    // The user integrates it as Waiting suggests (HI-2913): a copy onto main (`jj duplicate -r … --onto main`, the slot's own
+    // commits untouched), main moved to the copy, then pushed.
     const R2b = duplicateOnto(R2, `${k2}: card 2`)
     jj(shop, 'bookmark', 'set', 'main', '-r', R2b)
     jj(shop, 'git', 'push', '--bookmark', 'main')
