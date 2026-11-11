@@ -3347,6 +3347,10 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   slot's commit included) and every branch ref's change (a raw Git move) schedules a run; a change under a bundle's pins
   marks that bundle due, `packed-refs` or an armed watch (at the start, an open or reopen, too) marks every bundle due;
   disposed with the project's follow (which sets its requests' fences first).
+  Where the repository is, is asked of jj until it answers (HI-2977): an unknown answer at the start (jj busy, missing or
+  being replaced, several operation heads) is asked again at each minute's tick, one detection at a time, and the
+  watches open when it answers; once known, the tick reads the workspace's store pointer from its files (no process)
+  and, when the store changed (`jj git colocation enable` or `disable`), moves the refs watches to it.
 - **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
   unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
   published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,
