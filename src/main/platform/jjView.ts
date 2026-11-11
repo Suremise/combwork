@@ -10,8 +10,9 @@
 // more than one it reads nothing through jj.
 
 import { closeSync, opendirSync, openSync, readSync, statSync } from 'original-fs'
-import { isAbsolute, join, resolve } from 'path'
+import { dirname, isAbsolute, join, resolve } from 'path'
 import { snapshotLine } from './snapshotLine'
+import { jjFileGate, pathKeySync, rootKey, storeKey } from './jjFileGate'
 
 /** At most this many operation heads are listed; more is unknown (a repository that busy is never settled). */
 export const OP_HEADS_MAX = 64
@@ -134,8 +135,17 @@ export function parseCheckout(b: Buffer): Checkout | null {
 
 /** A workspace's checkout record (`<workspace .jj>/working_copy/checkout`), or null when unreadable or malformed. */
 export function readCheckout(workspaceJj: string): Checkout | null {
-  const b = readBounded(join(workspaceJj, 'working_copy', 'checkout'))
-  return b ? parseCheckout(b) : null
+  // Never while a jj write of Combwork's replaces it or waits to (HI-2918): unreadable then. Its root's key read too.
+  const key = pathKeySync(dirname(workspaceJj))
+  if (!key) return null
+  return jjFileGate.readSync(
+    [rootKey(key)],
+    () => {
+      const b = readBounded(join(workspaceJj, 'working_copy', 'checkout'))
+      return b ? parseCheckout(b) : null
+    },
+    null
+  )
 }
 
 /** A small text file's first line (a Git marker), or null. */
@@ -229,6 +239,13 @@ function refsTree(dir: string, out: string[]): boolean {
  * hasn't imported yet moves this while the operation heads stay where they were (HI-2796's probe).
  */
 export function gitState(gitDir: string, store: string): string | null {
+  // Never while a jj write of Combwork's exports to the store or waits to (HI-2918): unreadable then.
+  const key = pathKeySync(store)
+  if (!key) return null
+  return jjFileGate.readSync([storeKey(key)], () => gitStateNow(gitDir, store), null)
+}
+
+function gitStateNow(gitDir: string, store: string): string | null {
   const head = firstLine(join(gitDir, 'HEAD'))
   if (head === null) return null
   // Each may legitimately be absent (a fresh repository has no packed refs or reflogs yet); unreadable is unknown.

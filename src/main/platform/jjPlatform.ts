@@ -43,7 +43,7 @@ import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } f
 import { reconcileJj } from '../workflow/reconcile'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
-import { jjRunner, type JjRunner } from './jjRunner'
+import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
 import { jjLineKey } from './jjSlotPrep'
 import { readCheckout, singleHead, viewNow } from './jjView'
 import type { JjWorkspacePort } from './jjWorkspacePort'
@@ -186,7 +186,7 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   private get H(): HistoryPort {
-    return this.deps?.history ?? historyFor('git')
+    return this.deps?.history ?? storeGatedHistory(historyFor('git'))
   }
 
   private runner(): JjRunner {

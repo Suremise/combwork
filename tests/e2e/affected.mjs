@@ -203,7 +203,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
   // jj in the Version Control tab and the switch (HI-2799).
-  { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts'], suites: ['jjslot-claude', 'jjwindow', 'jjwindownc', 'slotpool'] },
+  { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts', 'src/main/platform/jjFileGate.ts'], suites: ['jjslot-claude', 'jjwindow', 'jjwindownc', 'slotpool', 'slotrelease', 'jjview'] },
   { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts', 'src/main/jjWindow.ts'], suites: ['jjview', 'jjwindow', 'jjwindownc', 'jjstale', 'jjstalenc', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
@@ -895,6 +895,9 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // Every jj file that reads the files a jj write replaces calls Combwork's file gate, or says where (HI-2918).
+  { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], adds: true },
+  { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], lines: ['working_copy', 'packed-refs', "'refs'", '--git-dir', "'HEAD'", 'jjFileGate', 'storeGitGated', 'storeGatedHistory'] },
   // The Activity map's stations over each provider's recorded fixtures (HI-2903), whatever files they hold.
   { test: 'tests/activityMap.test.ts', paths: ['tests/fixtures/copilot/', 'tests/fixtures/antigravity/', 'tests/fixtures/opencode/', 'tests/fixtures/turns/'] },
   // The upgrade's code and the test area's: no existsSync, no handler swallowing an I/O failure (HI-2617).
