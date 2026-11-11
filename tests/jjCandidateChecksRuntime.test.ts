@@ -176,6 +176,12 @@ const shown = (w: World, card: { key: string }, cycle: number): JjCandidateShown
   return raw ? (JSON.parse(raw) as JjCandidateShown) : null
 }
 const waiting = (w: World, card: number) => waitingOf(w.wf, 'p-jj', new Map([['main', w.main()]]), '').find((c) => c.card === card)
+/** A failing or waiting set's retry time come (HI-2991), as the runner's timer would find it: its record's `retryAt` set to now. */
+async function due(w: World, card: { key: string }, cycle: number): Promise<void> {
+  const k = candidateKey('p-jj', card.key, cycle)
+  const rec = shown(w, card, cycle)!
+  await w.conn.write((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify({ ...rec, checks: { ...rec.checks!, retryAt: Date.now() } }), k))
+}
 
 /** Reconciled, then the checks runner's looks until it is idle. */
 async function settle(w: World, card: { id: number }): Promise<JjPlatform> {
@@ -257,6 +263,61 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${c.result} & ::visible_heads()`, '-T', 'commit_id').trim()).toBe('')
       expect(w.refAt(`refs/cw/jj/${card.key}/${c.attempt}/candidate`)).toBeNull()
       expect(x.pool.copies().filter((k) => k.revision === c.result)).toEqual([])
+    })
+
+    it("HI-2991: a check that keeps not counting runs again only at its retry time, doubling, its misses rising to the window's message", async () => {
+      const w = await world(colocated, { candidates: true })
+      const x = host(w)
+      x.h.againMs = (n) => n * 3_600_000
+      // Exits 0 but writes in the copy: never counted (uncounted:changed), a transient miss each time.
+      withChecks(w, { lint: `${NODE} -e "require('fs').writeFileSync('junk.txt', String(Date.now()))"` })
+      const { card } = await approved(w)
+      const jjp = await settle(w, card)
+      const cycle = w.wf.state(card).cycle
+      const checks = () => shown(w, card, cycle)!.checks!
+      expect(checks()).toMatchObject({ state: 'failing', misses: 1, why: 'lint: uncounted:changed' })
+      expect(x.runs).toHaveLength(1)
+      expect(checks().retryAt! - Date.now()).toBeGreaterThan(3_000_000)
+      // Reconciliations and platform runs before the retry time: nothing runs again.
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      await jjp.afterRun()
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(x.runs).toHaveLength(1)
+      for (const n of [2, 3]) {
+        // Its retry time come (as the timer's look would find it): run again once, the miss counted on.
+        await due(w, card, cycle)
+        await jjp.afterRun()
+        await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+        expect(x.runs).toHaveLength(n)
+        expect(checks()).toMatchObject({ state: 'failing', misses: n })
+        expect(checks().retryAt! - Date.now()).toBeGreaterThan((n - 0.2) * 3_600_000)
+      }
+      const shownNow = waiting(w, card.id)?.candidate
+      expect(shownNow?.state === 'ready' && shownNow.checks).toMatchObject({ state: 'failing', misses: 3 })
+    })
+
+    it("HI-2991: another slot's jj commit while a check runs in its copy: the check still counts; passed, offered", async () => {
+      const w = await world(colocated, { candidates: true })
+      const x = host(w)
+      const dir = tempDir('jjother-')
+      const [marker, gate] = [join(dir, 'started'), join(dir, 'go')]
+      const q = (p: string): string => JSON.stringify(p).replace(/"/g, "'")
+      withChecks(w, { lint: `${NODE} -e "const f=require('fs');f.writeFileSync(${q(marker)},'1');setInterval(()=>{if(f.existsSync(${q(gate)}))process.exit(0)},50)"` })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: REAL_JJ_MS, interval: 50 })
+      // Another agent, in another slot, commits its own work while the check runs.
+      const b = w.slots['slot-b']
+      writeFileSync(join(b.folder, 'other.txt'), 'other agent\n')
+      w.h.jj(b.folder, 'commit', '-m', 'another card, another slot')
+      writeFileSync(gate, 'go')
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
+      expect(x.runs).toHaveLength(1)
+      const ran = w.store.facts(card.id).filter((f) => f.kind === 'CheckRan').map((f) => f.data as { counted: boolean; whyNot?: string })
+      expect(ran).toEqual([expect.objectContaining({ counted: true })])
     })
   })
 

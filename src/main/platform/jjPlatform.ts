@@ -204,6 +204,8 @@ const cardLocks = new WeakMap<Workflow, Map<number, Promise<unknown>>>()
  * (all its pages, reset as a new pass begins); `last`, what the last finished pass left (kept for the tick's retries).
  */
 const sweeps = new WeakMap<Workflow, { pass: boolean; last: boolean }>()
+/** How many times an offer's state is read while it reads unknown (HI-2991). */
+const OFFER_READS = 3
 /** Ended cycles cleaned up per sweep, at most. */
 export const SWEEP_PAGE = 8
 /** Journals read per sweep, at most (HR1's round 1, finding 2): the selection bounded, not only the clean-up. */
@@ -768,13 +770,23 @@ export class JjPlatform implements PlatformAdapter {
       // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
       if (key !== shown.checks.key) {
         if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer)))) continue
+      } else {
+        // HI-2991: a waiting or failing set under the same key runs again only at its retry time (SPEC's 30 s doubling to
+        // 15 min), whatever asks for a look meanwhile (every reconciliation does); the look then is the timer's.
+        const retryAt = shown.checks.state === 'running' ? undefined : shown.checks.retryAt
+        if (retryAt !== undefined && retryAt > Date.now()) {
+          later = Math.min(later ?? Infinity, retryAt - Date.now())
+          continue
+        }
       }
       const publish = async (u: JjChecksUpdate): Promise<boolean> => publishCandidateChecks(wf, wf.store.card(card0.id), project, at, u, await this.offerCurrent(fp.target, offer))
       const jkey = checksJournalKey(project, card0.key, fp.cycle, offer.attempt)
       const valid = async (): Promise<boolean> => {
         const c = wf.store.card(card0.id)
         const st = wf.state(c)
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerCurrent(fp.target, offer))
+        // The offer's state read unknown (an operation during its read) isn't invalid (HI-2991): only a definite answer ends
+        // a check; what it comes to is published only while the offer is read current.
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerState(fp.target, offer)) !== 'not'
       }
       let done = 0
       const out = await runCandidateChecks(
@@ -804,16 +816,19 @@ export class JjPlatform implements PlatformAdapter {
         },
         { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
       )
-      const misses = shown.checks.state === 'failing' ? (shown.checks.misses ?? 1) : 0
+      // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each.
+      const misses = shown.checks.misses ?? 0
       if ('green' in out) await publish({ passed: out.checks })
       else if ('red' in out) await publish({ red: { ...out.red, expected: offer.expected } })
       else if ('stopped' in out) await publish({ stopped: out.stopped.check })
       else if ('wait' in out) {
-        await publish({ waiting: out.wait })
-        later = Math.min(later ?? Infinity, host.againMs?.(0) ?? 30_000)
+        const retryMs = host.againMs?.(0) ?? 30_000
+        await publish({ waiting: out.wait, retryMs })
+        later = Math.min(later ?? Infinity, retryMs)
       } else if ('transient' in out) {
-        await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500) })
-        later = Math.min(later ?? Infinity, host.againMs?.(misses + 1) ?? Math.min(15 * 60_000, 30_000 * 2 ** misses))
+        const retryMs = host.againMs?.(misses + 1) ?? Math.min(15 * 60_000, 30_000 * 2 ** misses)
+        await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500), retryMs })
+        later = Math.min(later ?? Infinity, retryMs)
       }
     }
     if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
@@ -831,7 +846,8 @@ export class JjPlatform implements PlatformAdapter {
     const ctx = await this.ctxOf(folder)
     const d = this.deps!
     if (!ctx) return { end: async () => ({ counted: false, tested: '', whyNot: 'changed' as const }) }
-    const r = { view: ctx, folder, revision, owner: { still: () => true }, lock: d.lock(ctx.store) }
+    // Credited by the copy's own state (HI-2991): another workspace's operation during the check leaves it counted.
+    const r = { view: ctx, folder, revision, owner: { still: () => true }, lock: d.lock(ctx.store), scope: 'workspace' as const }
     const start = await jjCheckStart(r, observePort, { runner: this.runner() })
     return {
       end: async () => {
@@ -844,11 +860,28 @@ export class JjPlatform implements PlatformAdapter {
 
   /** HI-2871 (HR3's round 2): an offer still current: its target at its head, its candidate the visible commit recorded. */
   private async offerCurrent(target: string, offer: JjCandidateOffer): Promise<boolean> {
-    if (!(await this.headIs(target, offer.expected))) return false
+    return (await this.offerState(target, offer)) === 'current'
+  }
+
+  /**
+   * Where an offer stands (HI-2991): `current`, `not` (its target moved, its candidate superseded or gone), or `unknown`
+   * when a read still can't say after OFFER_READS tries (an operation landing during a pinned read makes it unknown;
+   * read again, never taken as an answer). Publication takes only `current`; a running check's validity only `not`.
+   */
+  private async offerState(target: string, offer: JjCandidateOffer): Promise<'current' | 'not' | 'unknown'> {
     const integ = await this.deps?.integration()
-    if (!integ) return false
-    const now = await jjCandidateNow({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder }, { result: offer.result, change: offer.change }).catch(() => null)
-    return now === 'current'
+    if (!integ) return 'unknown'
+    for (let i = 0; i < OFFER_READS; i++) {
+      const th = await jjTargetHead(integ, target).catch(() => undefined)
+      // No such target any more: a definite answer.
+      if (th === null) return 'not'
+      if (th === undefined || isJjUnknown(th) || integrationRefused(th)) continue
+      if (th.head !== offer.expected) return 'not'
+      const now = await jjCandidateNow({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder }, { result: offer.result, change: offer.change }).catch(() => null)
+      if (now === null || isJjUnknown(now)) continue
+      return now === 'current' ? 'current' : 'not'
+    }
+    return 'unknown'
   }
 
   /**

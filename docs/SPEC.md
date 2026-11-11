@@ -3440,7 +3440,12 @@ and s11 (HR1's OK).
   (its ref's run ended, a link's age) return it through its barrier. Each run is the lease's ref, so Stop finds its job.
 - **Credit:** jj's check bracket (J3's B1, run, B2) at the copy, counted only when its credit is exactly the candidate's
   commit; each run a `CheckRan` of the candidate's commit under its attempt's entry (`jj:<attempt>`). Exit 0 uncounted is
-  never green (tried again).
+  never green (tried again). The copy's run is credited by the copy's own state (HI-2991, `scope: 'workspace'`, jjChecks.ts):
+  this workspace's checkout record unchanged through the run (no jj command updated its working copy), B2 taken at
+  whatever head there is (no `expect`), recording nothing, not stale and at B1's @, and the write record clean; the
+  repository's operation head and Git's state aren't compared, so another lane's `jj commit` or the user's own jj during
+  a check leaves it counted (they made every multi-minute check uncounted). A builder's own check keeps the repository's
+  scope, as strict as before.
 - **Journal** (`jj_candidate_checks:<project>:<card>:<cycle>:<attempt>`, `runCandidateChecks`): the fingerprint, attempt,
   commit, head and key, the lease, and each check's phase written before its step (`started`, then `ended` with ok,
   counted and revision). Another fingerprint, attempt, commit or key starts afresh: no green reused. A check `started`
@@ -3448,7 +3453,10 @@ and s11 (HR1's OK).
   stands.
 - **While a command runs** (HR1's round 1), its validity is read again every 2 s (`WATCH_MS`): invalid (a re-approval,
   a decision, other options, a moved target or candidate), the lease's job is ended at once (the command's whole tree)
-  and the lease given back; the run answers invalid, never waiting for the command to finish.
+  and the lease given back; the run answers invalid, never waiting for the command to finish. The offer's state
+  (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
+  unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
+  current.
 - **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
   transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
   checks anew under the new key (`restart`).
@@ -3466,6 +3474,10 @@ and s11 (HR1's OK).
   checks branch). Transient (couldn't start, its time limit, killed, uncounted, no job): failing, tried again after
   30 s doubling up to 15 min; the window says why from the third in a row. No copy free, or the last lease not freed:
   waiting, tried again in 30 s. Stop (a check's run or the install's): stopped, never red and never retried by itself.
+  The retry time is kept with the record (`retryAt`, HI-2991): every look before it (each reconciliation asks for one)
+  leaves a waiting or failing set alone and sets the runner's timer for it; other checks or commands (a new checks key)
+  restart them at once. The misses in a row (`misses`) are kept while the set runs again (`progress`) and cleared only by a
+  pass or a restart, so they rise to the window's message and the retry doubles with each.
 - **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
   candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
   the runner to look. It never adopts or moves anything.
@@ -3479,7 +3491,11 @@ and s11 (HR1's OK).
   runs a writing process: no lease until its tree is ended, then the interrupted check runs again; on the real copies
   pool: a refresh between the install and a check and between two checks leaves the lease the attempt's; the setup
   command changed during the final check and at the publication write; in real jobs, Stop on a running install, then Run
-  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once); the
+  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once; HI-2991, both
+  modes: a check that keeps not counting run again only at its retry time, doubling, its misses rising to 3 and shown;
+  another slot's `jj commit` during a check: still counted, passed); `tests/jjHistory.test.ts` (HI-2991: a copy's
+  bracket counted through another workspace's operation at each barrier, never through its own checkout record moving, a
+  write, or its @ rewritten; the repository's scope as strict as before); the
   scenario `jj-checks-back` (a builder given the checks' wake fixes the card with jj and submits again); the e2e suites
   `jjchecks` and `jjchecksnc`.
 
