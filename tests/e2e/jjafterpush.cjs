@@ -57,7 +57,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
   fs.writeFileSync(path.join(shop, 'base.txt'), 'base\n')
   jj(shop, 'commit', '-m', 'base')
   jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
-  execFileSync('git', ['init', '--bare', '-q', remote], { env: toolEnv(), windowsHide: true })
+  lib.git(work, ['init', '--bare', '-q', remote])
   jj(shop, 'git', 'remote', 'add', 'origin', remote)
   fs.mkdirSync(path.join(shop, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(shop, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: 'jj', workflow: { platform: 'jj', preset: 'solo', options: { target: 'main' }, presetAsked: 'chosen' } }))
