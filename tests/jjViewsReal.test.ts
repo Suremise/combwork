@@ -250,6 +250,22 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(broken.attributes).toMatchObject({ unknown: expect.stringContaining('boom') })
   })
 
+  it('signing on as Git reads it (HI-2942): a nonzero number refuses, for either key; false stays clear; a value Git refuses fails closed', async () => {
+    const r = await repo('numsign')
+    const signing = async (): Promise<unknown> => (await assessJj(r.root, r.ctx.store, gitDeps)).signing
+    git(r.root, 'config', 'commit.gpgsign', '2')
+    expect(git(r.root, 'config', '--type=bool', '--get', 'commit.gpgsign')).toBe('true')
+    expect(await signing()).toEqual({ uses: ['commit.gpgsign (local)'] })
+    git(r.root, 'config', 'commit.gpgsign', '0')
+    expect(await signing()).toEqual({ clear: true })
+    git(r.root, 'config', 'tag.gpgsign', '0x10')
+    expect(await signing()).toEqual({ uses: ['tag.gpgsign (local)'] })
+    git(r.root, 'config', 'tag.gpgsign', 'off')
+    expect(await signing()).toEqual({ clear: true })
+    git(r.root, 'config', 'tag.gpgsign', 'maybe')
+    expect(await signing()).toEqual({ uses: ['tag.gpgsign (local) = maybe'] })
+  })
+
   it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {
     const r = await repo('hookspath')
     const clear = { clear: true }

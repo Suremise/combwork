@@ -2200,7 +2200,7 @@ Each is listed in **Repository** and in the switch's dialog. The first five refu
 - <!-- gate:hooks --> **Git hooks**: jj doesn't run them. Combwork looks for them where Git runs them from, whatever form your `core.hooksPath` takes (`~/hooks`, a path relative to the repository, or a full one).
 - <!-- gate:lfs --> **Git LFS**: jj doesn't support large file storage.
 - <!-- gate:submodules --> **Submodules**: jj doesn't support them.
-- <!-- gate:signing --> **Commit signing**: not verified with jj in Combwork yet.
+- <!-- gate:signing --> **Commit signing**: not verified with jj in Combwork yet. `commit.gpgSign` or `tag.gpgSign` counts whenever Git would sign, a number such as `2` included.
 - <!-- gate:relocation --> **Moving the workspace or project**: no move of a jj workspace has been validated. After a move, **Repair** leaves jj's workspaces as they are (git's half of a jj workspace would be repaired, its jj half not), so move a jj project back rather than relying on Repair.
 - <!-- gate:plainGit --> **Plain git commands by agents**: agents are told to use jj (above); a git command that moves HEAD, the index or a branch can still confuse jj's view.
 - <!-- gate:advance --> **Combwork merging**: you integrate reviewed work yourself.

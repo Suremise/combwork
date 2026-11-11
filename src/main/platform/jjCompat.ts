@@ -68,8 +68,29 @@ export function parseConfig(out: string): ConfigEntry[] | null {
   return out2
 }
 
-/** A Git boolean that is true (`true`, `yes`, `on`, `1`; a key with no value). */
-const gitTrue = (v: string | null): boolean => v === null || /^(true|yes|on|1)$/i.test(v.trim())
+/** The largest int git's config reads (git_parse_int's bound). */
+const INT_MAX = 2n ** 31n - 1n
+
+/**
+ * A Git boolean as git_config_bool reads it (HI-2942): no value, `true`, `yes`, `on` (any case) true; empty, `false`,
+ * `no`, `off` false; else an int as git_parse_int reads it (strtoimax in base 0: decimal, `0x` hex or `0` octal, leading
+ * whitespace and a sign allowed, then an optional k, m or g unit, within an int), true unless 0. Null for anything Git
+ * refuses ("bad boolean config value": what reads it fails).
+ */
+export function gitBool(v: string | null): boolean | null {
+  if (v === null) return true
+  if (v === '') return false
+  if (/^(true|yes|on)$/i.test(v)) return true
+  if (/^(false|no|off)$/i.test(v)) return false
+  const m = /^[ \t\n\v\f\r]*([+-]?)(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9][0-9]*)([kKmMgG]?)$/.exec(v)
+  if (!m) return null
+  const digits = m[2]
+  const n = /^0[xX]/.test(digits) ? BigInt(digits) : digits.length > 1 && digits[0] === '0' ? BigInt(`0o${digits.slice(1)}`) : BigInt(digits)
+  const factor = { '': 1n, k: 1024n, m: 1024n ** 2n, g: 1024n ** 3n }[m[3].toLowerCase() as '' | 'k' | 'm' | 'g']
+  // An int's range, as git_parse_signed checks it: down to -INT_MAX - 1.
+  if (n * factor > INT_MAX + (m[1] === '-' ? 1n : 0n)) return null
+  return n !== 0n
+}
 /** A Git boolean that is false (`false`, `no`, `off`, `0`, an empty value). */
 const gitFalse = (v: string | null): boolean => v !== null && /^(false|no|off|0|)$/i.test(v.trim())
 
@@ -205,7 +226,12 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     else if (e.key === 'core.eol' || /^filter\.[^.]+\.(clean|smudge|process|required)$/.test(e.key)) add(a, 'attributes', at)
     if (e.key.startsWith('lfs.')) add(a, 'lfs', at)
     if (e.key.startsWith('submodule.')) add(a, 'submodules', at)
-    if ((e.key === 'commit.gpgsign' || e.key === 'tag.gpgsign') && gitTrue(e.value)) add(a, 'signing', at)
+    // Signing on at any level, as Git reads the value (HI-2942: any nonzero int too); a value Git refuses fails closed.
+    if (e.key === 'commit.gpgsign' || e.key === 'tag.gpgsign') {
+      const on = gitBool(e.value)
+      // A refused value is named with its value (data, as core.autocrlf's is: no words of Combwork's, HR1's round 1).
+      if (on !== false) add(a, 'signing', on === null ? `${at} = ${e.value}` : at) // i18n-ignore: what was found, shown as data beside its message
+    }
     if (e.key === 'core.hookspath') hooksPath = e.value
     if (e.key === 'core.attributesfile') attributesFile = e.value
   }

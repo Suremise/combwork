@@ -2312,7 +2312,9 @@ a configured path outside what it can read, a tool that doesn't answer) is "uses
 - **hooks:** a hook in the folder Git runs hooks from, as Git itself names it (`git rev-parse --git-path hooks`, HI-2941:
   `core.hooksPath` at any level with Git's own expansion, `~/` and `%(prefix)/` included, a relative one from the working
   tree's top; else the store's `hooks/`), never a `*.sample`. Git unable to name it is unknown, never clear.
-- **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` on at any level, read as Git reads a boolean (HI-2942: any nonzero
+  number too, `2`, `0x10` or `1k`; a value Git refuses counts, failing closed), or jj's `signing.behavior` set to `own`
+  or `force`.
 
 ##### jj's runner and detection (1.5.0's J0, HI-2793)
 
