@@ -271,6 +271,23 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
         expect(readFileSync(join(slot, 'valuable.txt'), 'utf8')).toBe('unrecorded work\n')
         rmSync(join(slot, 'valuable.txt'))
       }
+      // Its name forgotten and added again at another, live folder between the fresh listing and the forget's admission
+      // (HR1's round 1): the operation head moved, so nothing is forgotten; the new registration and its file are kept.
+      const slotR = join(root, 'slot-r')
+      expect((await port.create(repo, slotR, base)).ok).toBe(true)
+      const nameR = /^(\S+): /m.exec(list().split('\n').find((l) => l.includes('slot-r')) ?? '')?.[1]
+      renameSync(slotR, `${slotR}-parked`)
+      const moved = join(root, 'slot-moved')
+      onLock = () =>
+        void (onProved = () => {
+          h.jj(repo, 'workspace', 'forget', '--', nameR!)
+          h.jj(repo, 'workspace', 'add', moved, '--name', nameR!, '-r', base)
+          writeFileSync(join(moved, 'valuable.txt'), 'unrecorded work\n')
+        })
+      await port.prune(repo)
+      expect(list()).toContain(`${nameR}:`)
+      expect(resolve(h.jj(moved, '--ignore-working-copy', 'workspace', 'root').trim())).toBe(resolve(moved))
+      expect(readFileSync(join(moved, 'valuable.txt'), 'utf8')).toBe('unrecorded work\n')
       // Forgotten by someone else meanwhile: nothing to do, no failure.
       renameSync(slot, parked)
       onLock = () => void h.jj(repo, 'workspace', 'forget', '--', name!)

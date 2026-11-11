@@ -953,9 +953,15 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           // The control proved for each forget; its synchronous check right before the forget starts (HI-2887).
           const proof = await controlProof(repo, ctx)
           if (!proof || proof.path !== from || !proof.check()) return
-          // …and its folder still absent, checked with the control's proof under the file gate's admission, right before
-          // jj starts (HI-2918): a folder back by then is a live workspace, kept registered with everything in it.
-          const f = await jj(from, ['workspace', 'forget', '--', w.name], { write: true, recheck: () => (!proof.check() ? JJ_REFUSED.control : existsSync(cur.root) ? JJ_REFUSED.exists : null) })
+          // …and, with the control's proof, under the file gate's admission right before jj starts (HI-2918), nothing
+          // awaited: the operation head still the one that listing read (HR1's round 1 on HI-2946: any registration
+          // changed since, such as the name forgotten and added again at another, live root, moves it: not forgotten,
+          // decided on the next prune), and its folder still absent (a folder back by then is a live workspace, kept
+          // registered with everything in it).
+          const f = await jj(from, ['workspace', 'forget', '--', w.name], {
+            write: true,
+            recheck: () => (!proof.check() ? JJ_REFUSED.control : readOpHeads(ctx.jjRepo)?.join() !== now ? JJ_REFUSED.moved : existsSync(cur.root) ? JJ_REFUSED.exists : null)
+          })
           if (f.refused === JJ_REFUSED.exists) continue
           if (f.refused) return
         }
