@@ -12,7 +12,8 @@
 //   whose lock files changed), then each check in order, skipping one ended counted-green at this candidate under the
 //   same key, each bracketed (jj's check bracket at the copy) and recorded (`CheckRan`).
 // - validity (`valid`): HI-2871's fingerprint still the card's, the checks key the options', the target at the
-//   candidate's head and the candidate still the recorded commit; read before the lease and before each check.
+//   candidate's head and the candidate still the recorded commit; read before the lease, before the install and before
+//   each check.
 // Its answer is the caller's to publish, in a write that checks the same again.
 
 import { stableHash } from '../../shared/workflow/compile'
@@ -194,6 +195,13 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
     const ctx: CheckContext = { card: i.card.key, number: i.card.number, revision: i.result, env: { CW_CHECK_BASE: i.expected } }
     let noInstall = false
     if (i.installAlways) {
+      // Read again before the install (HI-2964): the lease and its journal write await, and the candidate or the workspace
+      // can end meanwhile; a command known obsolete never starts.
+      if (deps.signal?.aborted) return { closed: true }
+      if (!(await deps.valid())) {
+        await give('invalid', true)
+        return { invalid: true }
+      }
       const r = await watched(() => deps.install(l.folder, ctx, l.spawn))
       if (deps.signal?.aborted) return { closed: true }
       if (invalidated) return { invalid: true }

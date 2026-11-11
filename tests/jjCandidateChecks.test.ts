@@ -165,6 +165,30 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     expect(p.log).toEqual(['lease L1', 'run typecheck', 'give L1 invalid end'])
   })
 
+  it('invalid or closed while the copy is leased: the install never starts, the lease given back (HI-2964)', async () => {
+    let valid = true
+    const p = parts({ valid: () => valid })
+    const lease = p.deps.lease
+    p.deps.lease = async (rev) => {
+      const l = await lease(rev)
+      valid = false
+      return l
+    }
+    expect(await runCandidateChecks(p.deps, input({ installAlways: true }))).toEqual({ invalid: true })
+    expect(p.log).toEqual(['lease L1', 'give L1 invalid end'])
+    // The workspace closing during the lease: closed, nothing run, the copy given back.
+    const life = new AbortController()
+    const q = parts()
+    const qLease = q.deps.lease
+    q.deps.lease = async (rev) => {
+      const l = await qLease(rev)
+      life.abort()
+      return l
+    }
+    expect(await runCandidateChecks({ ...q.deps, signal: life.signal }, input({ installAlways: true }))).toEqual({ closed: true })
+    expect(q.log).toEqual(['lease L1', 'give L1 checksEnded'])
+  })
+
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
     const o = { mergeChecks: ['a', 'b'], commands: { a: 'x', b: 'y' }, mergeInstall: 'onManifestChange' as const }
     const k = checksKeyOf(o, 'npm ci')
