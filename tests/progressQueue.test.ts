@@ -248,10 +248,17 @@ describe('what a queue card says', () => {
   it("each pause in a sentence: the user's, the Assistant's, Combwork's own with the files and git's message, an unknown one", () => {
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'user', at: null }, 'main', tr, list)).toBe('Paused by you. The queue merges nothing until you resume it.')
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'assistant', at: null }, 'main', tr, list)).toMatch(/^Paused by the Assistant/)
-    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('a.ts and b.ts have changes in the folder main is checked out in. Commit or undo them, then resume.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('a.ts and b.ts have uncommitted changes in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     expect(pauseText({ reason: 'signing', card: 'HI-61', files: [], by: null, at: null, message: 'gpg: no secret key' }, 'main', tr, list)).toBe('Signing the merge commit failed.\ngpg: no secret key')
     expect(pauseText({ reason: 'approval', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toMatch(/^HI-61 is ready to merge into main/)
     expect(pauseText({ reason: 'somethingNew', card: null, files: [], by: null, at: null }, 'main', tr, list)).toBe('Paused (somethingNew).')
+    // HI-2944: a staged pause names its files (Commit and Set Aside act on them), or says changes when it has none.
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt and b.ts are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Changes are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    // HI-2951: one file agrees as one, staged or not; more than five named, the count is all of them.
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt is staged in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['.gitignore'], by: null, at: null }, 'main', tr, list)).toBe('.gitignore has uncommitted changes in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Files the merge changes have uncommitted changes in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     for (const reason of ['targetMovesFast', 'folderBusy', 'wrongBranch', 'staged', 'identity', 'needsYou', 'uncounted', 'checkedOut', 'rulesOff', 'signingWaits', 'hookTimedOut']) expect(pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).not.toMatch(/^Paused \(/)
   })
 

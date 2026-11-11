@@ -1,0 +1,9 @@
+{
+  "folderChanges.commitFailed": "No se pudo hacer commit",
+  "folderChanges.committed": "{count, plural, one {Commit de # archivo} many {Commit de # archivos} other {Commit de # archivos}} en {branch}.",
+  "folderChanges.resumed": "La fusión continúa.",
+  "folderChanges.setAside": "{count, plural, one {# archivo apartado} many {# archivos apartados} other {# archivos apartados}} en {branch}.",
+  "folderChanges.setAsideDetail": "Git los guarda en un stash llamado “{name}”: git stash pop los recupera.",
+  "folderChanges.setAsideFailed": "No se pudieron apartar los cambios",
+  "folderChanges.stillPaused": "La fusión sigue en pausa: el motivo se muestra en ella."
+}

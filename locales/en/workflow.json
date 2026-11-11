@@ -1011,6 +1011,14 @@
     "defaultMessage": "When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.",
     "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
   },
+  "workflow.option.strict.jjDesc": {
+    "defaultMessage": "When the target bookmark has moved on since the review, Combwork first brings the work up to date with it (merged in, or rebased with Squash), then builds the candidate on that, and returns the card if that conflicts or makes a different change. Rebase builds its candidate on the bookmark anyway.",
+    "description": "What the workflow option “The candidate brings work up to date first” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch; Squash and Rebase are the candidate style’s values."
+  },
+  "workflow.option.strict.jjTitle": {
+    "defaultMessage": "The candidate brings work up to date first",
+    "description": "The workflow option “Work is up to date with its target branch before it merges” (G8, strict) for a project using jj (HI-2871): before building the candidate the user integrates, Combwork brings the card’s work up to date with the target bookmark."
+  },
   "workflow.option.strict.title": {
     "defaultMessage": "Work is up to date with its target branch before it merges",
     "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Combwork’s merge queue brings it up to date itself."
@@ -1018,6 +1026,14 @@
   "workflow.option.style.desc": {
     "defaultMessage": "How a card’s work is merged into the target branch.",
     "description": "What the workflow option “Merge style” does."
+  },
+  "workflow.option.style.jjDesc": {
+    "defaultMessage": "Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. You move the bookmark to the candidate yourself; Combwork never does.",
+    "description": "What the workflow option “Candidate style” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch: keep it as jj’s term."
+  },
+  "workflow.option.style.jjTitle": {
+    "defaultMessage": "Candidate style",
+    "description": "The workflow option “Merge style” (G6) for a project using jj (HI-2871): how the candidate commit Combwork builds for the user to integrate is made (merge commit, squash or rebase). Candidate: the commit Combwork builds."
   },
   "workflow.option.style.title": {
     "defaultMessage": "Merge style",

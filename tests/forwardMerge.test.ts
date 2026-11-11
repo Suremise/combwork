@@ -375,12 +375,38 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     await oldForward(w, repo, 'main', '1.1.0')
     const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
     const past = (t: string) => views.find((v) => v.target === t)?.past
-    expect(past('1.0.0')).toBe(true)
+    // HI-2927: the pause keeps 1.0.0's queue live (its card and Resume), not a past branch's.
+    expect(views.find((v) => v.target === '1.0.0')?.paused).toBeTruthy()
+    expect(past('1.0.0')).toBeUndefined()
     expect(past('1.1.0')).toBeUndefined()
     for (const t of ['1.5.0', '1.4.0', 'next']) expect(past(t)).toBeUndefined()
-    // The Agent API's listing too (not the window's): the same flag.
+    // 1.1.0's entry settled, its queue holds nothing: a past branch's, in the Agent API's listing (not the window's) too.
+    expect(await drain(w, repo, '1.1.0')).toHaveLength(1)
+    const after = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    expect(after.filter((v) => v.past).map((v) => v.target)).toEqual(['1.1.0'])
     const api = await inWorkspace(w, () => controls.queueViews(w, repo))
-    expect(api.filter((v) => v.past).map((v) => v.target)).toEqual(['1.0.0'])
+    expect(api.filter((v) => v.past).map((v) => v.target)).toEqual(['1.1.0'])
+  })
+
+  it("HI-2927: a card in flight, a pause or a Combwork running it keeps an old target's queue live; unreadable targets mark none past", async () => {
+    const { w, repo } = await versions()
+    const { past: _past, ...one } = (await inWorkspace(w, () => controls.queueViews(w, repo, '1.0.0')))[0]
+    const paused = { reason: 'stuck' as const, card: null, files: [], by: 'user' as const, at: new Date().toISOString() }
+    const make = (): Parameters<typeof controls.markPast>[0] => [
+      { ...one, target: '1.0.0' },
+      { ...one, target: 'old-flight', inFlight: [61] },
+      { ...one, target: 'old-paused', paused },
+      { ...one, target: 'old-run', runBy: 'Combwork-Dev' },
+      { ...one, target: '1.5.0' }
+    ]
+    const named = { default: '1.5.0', others: ['1.4.0'] }
+    const views = make()
+    controls.markPast(views, named)
+    expect(views.filter((v) => v.past).map((v) => v.target)).toEqual(['1.0.0'])
+    // Git → None, or git's default unreadable for a moment: the targets are unknown, and no queue is a past branch's.
+    const unknown = make()
+    controls.markPast(unknown, null)
+    expect(unknown.filter((v) => v.past)).toEqual([])
   })
 
   it('a card with its override recorded keeps it through Retry: the source frozen again, queued, merged', async () => {

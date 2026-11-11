@@ -128,6 +128,7 @@
   "tasks.history.fromOlder": "Ajoutée depuis une ancienne version de Combwork, où elle avait été créée comme #{was}",
   "tasks.history.given": "Confiée à l’agent {agent}",
   "tasks.history.imported": "Restaurée avec le projet {project} (c’était la carte #{was})",
+  "tasks.history.jjCandidateReturned": "Revenue de son candidat sur {target} : {reason, select, conflict {elle est en conflit avec {target}} other {elle n’est pas à jour avec {target}}}{files, select, none {} other { (dans {files})}}. Son constructeur intègre {target} avec jj et la soumet à nouveau.",
   "tasks.history.kind": "{how, select, made {Créée sans code} proposed {Proposée sans code} confirmed {Confirmée sans code} kept {Gardée avec code} other {Type changé en {kind, select, code {avec code} other {sans code}}}}",
   "tasks.history.labels": "Étiquettes : {labels}",
   "tasks.history.labelsAdded": "Étiquettes : ajout de {labels}",

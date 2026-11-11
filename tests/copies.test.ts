@@ -403,6 +403,31 @@ describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
     expect(existsSync(a.folder)).toBe(false)
     expect(w.pool.copies().map((c) => c.name)).toEqual(['copy-2'])
   })
+
+  it("HI-2936: after a switch from jj, a leftover jj copy never fills the pool, and is removed by its own port once idle", async () => {
+    const w = world({ size: 1 })
+    const a = await leased(w)
+    await w.pool.returnCopy(a.lease.id, 'runEnded')
+    await w.pool.refresh()
+    // copy-1 as jj left it: free, its folder there; jj's port not registered here.
+    await w.store.conn.write((db) => void db.prepare("UPDATE copies SET platform = 'jj' WHERE project = ? AND name = 'copy-1'").run(w.store.project))
+    const b = await leased(w, { card: 2 })
+    expect(b.name).toBe('copy-2')
+    await w.pool.returnCopy(b.lease.id, 'runEnded')
+    const later = Date.now() + 25 * 60 * 60 * 1000
+    // Without its port it is kept; copy-2, the pool's only Git copy, isn't over the size.
+    expect(await w.pool.tidy(later)).toEqual([])
+    const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
+    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
+    try {
+      expect(await w.pool.tidy(later)).toEqual(['copy-1'])
+      expect(existsSync(a.folder)).toBe(false)
+      expect(w.pool.copies().map((c) => c.name)).toEqual(['copy-2'])
+    } finally {
+      registerWorkspacePort('jj', undefined as unknown as Parameters<typeof registerWorkspacePort>[1])
+    }
+  })
 })
 
 describe("copies: HR1's round 1", { timeout: 90_000 }, () => {

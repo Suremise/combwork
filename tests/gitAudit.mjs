@@ -27,6 +27,8 @@ const GIT_FILES = new Set([
   'src/main/branchWatch',
   'src/main/branchMerge',
   'src/main/filesGit',
+  // HI-2944: Commit and Set aside of a target folder's changes (port 5's folderChanges, Git's implementation).
+  'src/main/gitFolderChanges',
   'src/main/worktrees',
   'src/main/unusedWorktrees',
   'src/main/repoLock',

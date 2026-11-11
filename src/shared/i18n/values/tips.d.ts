@@ -286,6 +286,8 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
+  'tips.jjCandidates.text': undefined
+  'tips.jjCandidates.title': undefined
   'tips.jjCards.text': undefined
   'tips.jjCards.title': undefined
   'tips.jjOperations.text': undefined
@@ -356,6 +358,8 @@ interface CombworkMessageValues {
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
   'tips.mergePush.title': undefined
+  'tips.mergeQueueCommit.text': undefined
+  'tips.mergeQueueCommit.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined

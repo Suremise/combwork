@@ -81,6 +81,10 @@ import type {
   FileContent,
   FileEntry,
   FileGitDone,
+  FolderChangeAction,
+  FolderChangesDone,
+  QueueChangesSettled,
+  QueuePauseRef,
   FileGitInfo,
   FileGitRuleText,
   GitDiff,
@@ -480,6 +484,13 @@ export interface CombworkRequests {
   'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean }
   /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
+  /**
+   * HI-2944: Commit or Set aside exactly `shown`, the uncommitted changes in the folder `target` is checked out in (main
+   * finds it), only while that is still the folder they were seen in: a paused merge's own record (`pause` as shown:
+   * refused unless that pause is still current, and the queue resumed only if it still is and its condition is gone), or
+   * a start's warning's (`folder`, with `pause` null).
+   */
+  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null) => QueueChangesSettled
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
@@ -1070,6 +1081,8 @@ export interface CombworkRequests {
   'files:gitUntrack': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
   /** Include again: removes the plain line that ignores the item. */
   'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** HI-2944: Commit it, after a shared exclude: the top .gitignore as it is now, committed alone on the project folder's branch. */
+  'files:gitCommitIgnore': (projectPath: string) => FolderChangesDone
   /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
   'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 

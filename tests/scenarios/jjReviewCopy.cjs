@@ -72,6 +72,163 @@ const JJ_RECORDS_IN = { op: new Set(['restore', 'revert', 'undo', 'abandon']), f
 /** A shell command that writes, moves or removes files (its first word), and a redirection into a file. */
 const WRITES = /^(set-content|add-content|out-file|new-item|remove-item|move-item|copy-item|rename-item|rm|del|erase|mv|move|cp|copy|ren|rename|tee|touch|truncate)$/i
 const REDIRECT = /(^|[^0-9&])>{1,2}\s*[^&\s]/
+/** Shells whose script argument is read as commands too: `bash -c "…"`, `pwsh -Command "…"`, `cmd /c …`. */
+const SHELLS = /^(bash|sh|zsh|dash|pwsh|powershell|cmd)(\.exe)?$/i
+
+/**
+ * A shell call's commands (HI-2935), each its words (quoted text one word, its quotes gone) and `bare`, the command with
+ * its quoted text emptied (`""`), where a redirection is looked for: a script's or a message's `;`, `|` or `>` is no
+ * command or redirection. As the shell reads them:
+ * - a command ends at a line's end, `;`, `&&`, `||` or `|`, outside quotes;
+ * - outside quotes, a backslash before a quote, a backslash, a space or one of `;|&<>()` makes it a plain character
+ *   (`it\'s`, `a\;b`); before anything else it stays (a Windows path);
+ * - in "…", `\"` and PowerShell's `` `" `` are no end (nor `\\`, `` `` ``); '…' has no escapes;
+ * - a quote spans lines until it closes, as in a shell (a script given to `node -e` over several lines); one that never
+ *   does ends at its line's end;
+ * - a heredoc's body (`<<EOF`, `<<'EOF'`, to a line that is exactly its tag; `<<-EOF`, its tag after leading tabs) and a
+ *   PowerShell here-string (`@'…'@`, `@"…"@`) are text, never commands (a note with "Reviewer's notes" pairs no quote);
+ * - the script of `bash -c`, `sh -c`, `pwsh -Command`, `cmd /c` is read as commands too: the one word after it, or the
+ *   rest of the command as written (its quotes kept, HR2's round 1).
+ */
+function shellCommands(text, depth = 0) {
+  const src = String(text)
+  const out = []
+  /** Each command's words' starts in `src`, and its end there: a shell's script is taken as written. */
+  const spans = []
+  let words = []
+  let starts = []
+  let bare = ''
+  let word = null
+  let heredocs = []
+  const add = (s, at) => {
+    if (word === null) {
+      word = ''
+      starts.push(at)
+    }
+    word += s
+  }
+  const endWord = () => {
+    if (word !== null) words.push(word)
+    word = null
+  }
+  const endCommand = (at) => {
+    endWord()
+    if (words.length) {
+      out.push({ words, bare: bare.trim() })
+      spans.push({ starts, end: at })
+    }
+    words = []
+    starts = []
+    bare = ''
+  }
+  /** Where a quote opened before `from` closes, its escapes honoured; -1 when it never does. */
+  const closing = (q, from) => {
+    for (let j = from; j < src.length; j++) {
+      if (q === '"' && (src[j] === '\\' || src[j] === '`') && /["\\`]/.test(src[j + 1] ?? '')) j++
+      else if (src[j] === q) return j
+    }
+    return -1
+  }
+  let i = 0
+  while (i < src.length) {
+    const c = src[i]
+    if (c === '\r') {
+      i++
+      continue
+    }
+    if (c === '\n') {
+      endCommand(i)
+      i++
+      // The bodies of heredocs started on that line, each to its tag's line: text, never commands.
+      for (const h of heredocs) {
+        while (i < src.length) {
+          const eol = src.indexOf('\n', i)
+          const line = src.slice(i, eol < 0 ? src.length : eol).replace(/\r$/, '')
+          i = eol < 0 ? src.length : eol + 1
+          if ((h.strip ? line.replace(/^\t+/, '') : line) === h.tag) break
+        }
+      }
+      heredocs = []
+      continue
+    }
+    // Outside quotes, an escaped quote, backslash, space or operator is a plain character.
+    if (c === '\\' && /['"\\ \t;|&<>()]/.test(src[i + 1] ?? '')) {
+      add(src[i + 1], i)
+      bare += '_'
+      i += 2
+      continue
+    }
+    // A PowerShell here-string: one quoted word, to its closing line.
+    if (c === '@' && (src[i + 1] === "'" || src[i + 1] === '"') && /^\r?\n/.test(src.slice(i + 2))) {
+      const m = new RegExp(`\n${src[i + 1]}@`).exec(src.slice(i + 2))
+      const end = m ? i + 2 + m.index : src.length
+      add(src.slice(i + 2, end).replace(/^\r?\n/, '').replace(/\r$/, ''), i)
+      bare += '""'
+      i = m ? end + m[0].length : src.length
+      continue
+    }
+    if (c === "'" || c === '"') {
+      let end = closing(c, i + 1)
+      const closed = end >= 0
+      if (!closed) {
+        const eol = src.indexOf('\n', i)
+        end = eol < 0 ? src.length : eol
+      }
+      const inner = src.slice(i + 1, end).replace(/\r$/, '')
+      add(c === '"' ? inner.replace(/[\\`](["\\`])/g, '$1') : inner, i)
+      bare += '""'
+      i = closed ? end + 1 : end
+      continue
+    }
+    // A heredoc's start (not a `<<<` here-string): kept in the command, its body skipped after this line.
+    const hd = c === '<' && src[i + 1] === '<' && src[i + 2] !== '<' ? /^<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/.exec(src.slice(i)) : null
+    if (hd) {
+      endWord()
+      add(hd[0], i)
+      endWord()
+      bare += ` ${hd[0]} `
+      heredocs.push({ tag: hd[3], strip: hd[1] === '-' })
+      i += hd[0].length
+      continue
+    }
+    const two = src.slice(i, i + 2)
+    if (two === '&&' || two === '||') {
+      endCommand(i)
+      i += 2
+      continue
+    }
+    if (c === ';' || c === '|') {
+      endCommand(i)
+      i++
+      continue
+    }
+    if (c === ' ' || c === '\t') {
+      endWord()
+      bare += c
+      i++
+      continue
+    }
+    add(c, i)
+    bare += c
+    i++
+  }
+  endCommand(src.length)
+  // A shell's script: its commands too. `bash -c` takes the word after -c; `pwsh -Command` and `cmd /c` the rest of the
+  // command as written, its quotes kept (one quoted word: its text).
+  if (depth < 3) {
+    for (const [n, cmd] of [...out].entries()) {
+      const w = cmd.words
+      const name = (w[0] ?? '').replace(/^[&(]+/, '').replace(/^.*[\\/]/, '')
+      if (!SHELLS.test(name)) continue
+      const k = w.findIndex((x, j) => j > 0 && (/^cmd/i.test(name) ? /^\/[ck]$/i.test(x) : /^-(c|command)$/i.test(x)))
+      if (k < 0 || k + 1 >= w.length) continue
+      const rest = /^(pwsh|powershell|cmd)/i.test(name) && k + 2 < w.length
+      const script = rest ? src.slice(spans[n].starts[k + 1], spans[n].end).replace(/\r/g, '') : w[k + 1]
+      out.push(...shellCommands(script, depth + 1))
+    }
+  }
+  return out
+}
 
 /**
  * What a reviewer's tool calls did to its review copy (`copy`, its folder), a line each, however quick the reviewer was:
@@ -81,7 +238,7 @@ const REDIRECT = /(^|[^0-9&])>{1,2}\s*[^&\s]/
  */
 function copyWrites(o, copy) {
   if (!copy) return []
-  const { commands, commandText, SHELL_TOOL } = require('./gitMutations.cjs')
+  const { commandText, SHELL_TOOL } = require('./gitMutations.cjs')
   const { jjCall } = require('./jjPublishes.cjs')
   const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/').replace(/\/+$/, '')
   const top = norm(copy)
@@ -95,16 +252,15 @@ function copyWrites(o, copy) {
       continue
     }
     if (!SHELL_TOOL.test(t.name) || !(names || inCopy(t.cwd))) continue
-    // Quoted text emptied first: a script's or a message's `;`, `|` or `>` is no command or redirection (an argument it
-    // stands for, `-R "<copy>"`'s path, still counts as one; the copy is found in the input above).
-    const text = commandText(input).replace(/"[^"]*"|'[^']*'/g, '""')
-    for (const words of commands(text)) {
+    // Read as the shell reads it (shellCommands, HI-2935): a script's or a message's `;`, `|` or `>` is no command or
+    // redirection, and a shell's own script (`bash -c "…"`) is commands too.
+    for (const { words, bare } of shellCommands(commandText(input))) {
       const jj = jjCall(words)
-      const writes = jj ? JJ_RECORDS.has(jj[0]) || !!JJ_RECORDS_IN[jj[0]]?.has(jj[1]) : WRITES.test(words[0]?.replace(/^[&(]+/, '') ?? '') || (words[0] === 'sed' && words.some((w) => w.startsWith('-i'))) || REDIRECT.test(words.join(' ').replace(/2>\s*\S+|>\s*(\$null|nul|\/dev\/null)\b/gi, ''))
+      const writes = jj ? JJ_RECORDS.has(jj[0]) || !!JJ_RECORDS_IN[jj[0]]?.has(jj[1]) : WRITES.test(words[0]?.replace(/^[&(]+/, '') ?? '') || (words[0] === 'sed' && words.some((w) => w.startsWith('-i'))) || REDIRECT.test(bare.replace(/2>\s*\S+|>\s*(\$null|nul|\/dev\/null)\b/gi, ''))
       if (writes) out.push(words.join(' '))
     }
   }
   return out
 }
 
-module.exports = { copySnapshot, firstLook, copyChanges, copyWrites, filesOf }
+module.exports = { copySnapshot, firstLook, copyChanges, copyWrites, filesOf, shellCommands }

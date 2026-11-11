@@ -36,6 +36,8 @@ export type Operation =
   | 'setIdentity'
   | 'init'
   | 'ignoreRules'
+  /** HI-2944: the uncommitted changes in a folder the merge queue merges into, committed or set aside (Files' Commit it too). */
+  | 'folderChanges'
 
 /**
  * A compatibility gate (SPEC §16.3.6's matrix, HI-2793's J0): a capability or operation a platform refuses until its J
@@ -49,7 +51,7 @@ export type Gate = 'attributes' | 'hooks' | 'lfs' | 'submodules' | 'signing' | '
 export const GATES: readonly Gate[] = ['attributes', 'hooks', 'lfs', 'submodules', 'signing', 'relocation', 'plainGit', 'advance', 'publish', 'sharedFolder']
 
 /** Every operation, in one place: Git lists them all (it has each today). */
-export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules']
+export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges']
 
 /**
  * How a platform's integration combines approved work (SPEC §16.3.1, HI-2822): merged from the card's line into a target

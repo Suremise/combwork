@@ -41,6 +41,9 @@ import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
 import { reconcileJj } from '../workflow/reconcile'
+import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
+import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
+import { dropCandidates, jjCandidateStep, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -120,6 +123,8 @@ export interface JjCardDeps {
   pins: { read(ref: string): JjPinRecord | null; write(ref: string, rec: JjPinRecord): Promise<void> }
   /** The Git store's history (Git's port, asked on the store's own folder). */
   history?: HistoryPort
+  /** HI-2871, tests only: where a candidate attempt pauses (J4's points), so a race can be placed exactly there. */
+  candidateHook?: JjCandidateDeps['hook']
   /**
    * J9b2's (HI-2882): the project's canonical id (its rows' scope), the workspace database's file, a synchronous read and
    * an async write on it (the board's connections), a card and cycle's journalled bundles, and a publish commit sent to
@@ -132,8 +137,22 @@ export interface JjCardDeps {
     write: (fn: (db: SqlDb) => void) => Promise<void>
     bundles: (card: string, cycle: number) => JjBundle[]
     publish: (req: PublishCommitRequest) => { answer: Promise<PublishCommitAnswer>; cancel(): void }
+    /** HI-2871: a card and cycle's journalled candidate attempts, as stored now. Absent: no candidate is built. */
+    attempts?: (card: string, cycle: number) => JjAttemptEntry[]
+    /** HI-2871: an attempt's entry stored (merged by its attempt, in one write), durable before it resolves. */
+    saveAttempt?: (card: string, cycle: number, e: JjAttemptEntry) => Promise<void>
   }
 }
+
+/**
+ * A candidate's description on one line, its first (HI-2871): J4 reads its writes back from jj's operation log a line
+ * each, and a description's newline in the command's arguments makes that read malformed (probed on 0.47.1). Which card
+ * a candidate was is its attempt's record and the Integrated fact, never its message.
+ */
+const oneLine = (m: string): string => m.split(/\r?\n/)[0].trim()
+
+/** A replay on the store that couldn't be read, mid-attempt (HI-2871): the step's answer is unknown, never "not the same". */
+class SamenessUnread extends Error {}
 
 /** The retention pass's page and how often each retained bundle is verified again (HI-2882/s13 §2). */
 export const RETAIN_PAGE = 8
@@ -577,15 +596,100 @@ export class JjPlatform implements PlatformAdapter {
         if (!integ || !s.started?.target) return { unknown: 'notComposed' }
         const project = rec.projectId()
         const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
-        const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
+        // HI-2871: the cycle's J4 records, so the user's move onto a candidate is credited as one (J5's bound candidate).
+        const candidates = (rec.attempts?.(card.key, s.cycle) ?? []).map((e) => e.record)
+        const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, candidates, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
         if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
         if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
         if (!p.containment || !p.provenance) return { contained: false }
         return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
       },
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
-      projectId: () => rec.projectId()
+      projectId: () => rec.projectId(),
+      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle) } : {})
     })
+  }
+
+  /** Whether a target's head is still `expected` (J5's read): false when it moved or can't be read. */
+  private async headIs(target: string, expected: string): Promise<boolean> {
+    const integ = await this.deps?.integration()
+    const th = integ ? await jjTargetHead(integ, target) : null
+    return !!th && !isJjUnknown(th) && !integrationRefused(th) && th.head === expected
+  }
+
+  /**
+   * HI-2871's candidate step for a card's approval (jjCandidateStep.ts): J4 composed from J5's dependencies (the control
+   * folder, the store's lock, git on the store) and Git's replay on the store, its attempts journalled in the workspace
+   * database under the card's cycle. A replay that can't be read stops the attempt (never "not the same").
+   */
+  /** HI-2871 (HR3's round 2): an offer still current: its target at its head, its candidate the visible commit recorded. */
+  private async offerCurrent(target: string, offer: JjCandidateOffer): Promise<boolean> {
+    if (!(await this.headIs(target, offer.expected))) return false
+    const integ = await this.deps?.integration()
+    if (!integ) return false
+    const now = await jjCandidateNow({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder }, { result: offer.result, change: offer.change }).catch(() => null)
+    return now === 'current'
+  }
+
+  /** HI-2871: an integrated cycle's candidates dropped (jjCandidateStep's `dropCandidates`); a failure only logged. */
+  private async candidatesDone(card: CardRecord, cycle: number): Promise<void> {
+    const rec = this.deps?.records
+    const integ = await this.deps?.integration()
+    if (!rec?.attempts || !rec.saveAttempt || !integ) return
+    const attempts = rec.attempts
+    const save = rec.saveAttempt
+    const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false }
+    await dropCandidates({ j4, entries: () => attempts(card.key, cycle), save: (e) => save(card.key, cycle, e) }).catch(() => 0)
+  }
+
+  private async candidateStep(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep> {
+    const d = this.deps
+    const rec = d?.records
+    const integ = await d?.integration()
+    if (!this.wf || !rec?.attempts || !rec.saveAttempt || !integ) return { unknown: 'notComposed' } // i18n-ignore: a protocol code, for the log
+    const o = this.wf.rulesetOf(card, s).options
+    let unread = false
+    const j4 = {
+      runner: integ.runner,
+      view: { jjRepo: integ.view.jjRepo, store: integ.view.store },
+      folder: integ.folder,
+      git: integ.git,
+      lock: integ.lock,
+      ...(d!.candidateHook ? { hook: d!.candidateHook } : {}),
+      sameChange: async (a: { base: string; revision: string }, b: { base: string; revision: string }) => {
+        const v = await this.H.sameChange(integ.view.store, a, b)
+        if (isUnknown(v)) {
+          unread = true
+          throw new SamenessUnread()
+        }
+        return v === true
+      }
+    }
+    const attempts = rec.attempts
+    const save = rec.saveAttempt
+    try {
+      return await jjCandidateStep(
+        {
+          j4,
+          targetHead: async (target) => {
+            const th = await jjTargetHead(integ, target)
+            if (isJjUnknown(th)) return { unknown: `target:${th.jjUnknown}` } // i18n-ignore: a protocol code, for the log
+            if (integrationRefused(th)) return { unknown: `refused: ${th.refused}` } // i18n-ignore: a protocol code, for the log
+            return th ? { head: th.head } : { unknown: 'target:none' } // i18n-ignore: a protocol code, for the log
+          },
+          entries: () => attempts(card.key, fp.cycle),
+          save: (e) => save(card.key, fp.cycle, e),
+          still,
+          token: () => randomUUID().replace(/-/g, '').slice(0, 16)
+        },
+        card.key,
+        fp,
+        { message: oneLine(mergeMessage(o.commitMessage, { card: { key: card.key, title: card.title }, revision: fp.revision, messages: [] })), updateMessage: oneLine(updateMessage(o.commitMessage, fp.target, card.key, fp.revision)) }
+      )
+    } catch (e) {
+      if (unread || e instanceof SamenessUnread) return { unknown: 'sameness:replay' } // i18n-ignore: a protocol code, for the log
+      throw e
+    }
   }
 
   /**

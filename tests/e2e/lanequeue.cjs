@@ -135,6 +135,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   const refusal = lane(la).locator('.progress-lane-refusal')
   check('a move before a card it depends on is refused in place, saying why', !!(await until(async () => (await refusal.count()) === 1 && /depends on/.test(await refusal.innerText()), HUNG_MS)), await refusal.innerText().catch(() => ''))
   check('…and nothing changed', (await listOf(la)) === [a1, a3, a4, a2].join() && (await laneNow(la)).listRev === revBefore)
+  // Said to screen readers only once main made it (HI-2932): the refused move is never announced as made.
+  const saidQ = lane(la).locator('.visually-hidden[role="status"]')
+  check('…and the refused move is not said as made', !new RegExp(`${K(a4)}: 2 of`).test(await saidQ.innerText().catch(() => '')), await saidQ.innerText().catch(() => ''))
   await clearToasts()
   await refusal.scrollIntoViewIfNeeded()
   for (const theme of ['dark', 'light']) {
@@ -151,6 +154,19 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   await row(la, a2).dragTo(row(la, a3), { targetPosition: { x: 60, y: 3 } })
   check('a card dragged above another goes there', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4].join(), HUNG_MS)), await listOf(la))
   check('…the list as it was: nothing left queued', !!(await until(async () => (await laneNow(la))?.queued === null && (await queuedLine.count()) === 0, HUNG_MS)))
+
+  // --- Two quick moves (HI-2932): Alt+Down twice before the first is answered moves A2 two places, neither refused as
+  // changed meanwhile; then Alt+Up twice puts it back.
+  await row(la, a2).focus()
+  await page.keyboard.press('Alt+ArrowDown')
+  await page.keyboard.press('Alt+ArrowDown')
+  check('two quick Alt+Downs move a card two places', !!(await until(async () => (await listOf(la)) === [a1, a3, a4, a2].join() && (await rows(la)).join() === [a1, a3, a4, a2].join(), HUNG_MS)), `${await listOf(la)} ${await refusal.innerText().catch(() => '')}`)
+  check('…neither refused', (await refusal.count()) === 0, await refusal.innerText().catch(() => ''))
+  check('…said once made, at its place now', !!(await until(async () => new RegExp(`${K(a2)}: 4 of 4`).test(await saidQ.innerText().catch(() => '')), HUNG_MS)), await saidQ.innerText().catch(() => ''))
+  await row(la, a2).focus()
+  await page.keyboard.press('Alt+ArrowUp')
+  await page.keyboard.press('Alt+ArrowUp')
+  check('…two quick Alt+Ups put it back', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4].join() && (await laneNow(la))?.queued === null && (await refusal.count()) === 0, HUNG_MS)), `${await listOf(la)} ${await refusal.innerText().catch(() => '')}`)
 
   // --- Cards from the board: one dropped onto the lane's row joins it (queued after the card in flight); a Done one is refused.
   await page.getByRole('button', { name: 'Task Board' }).click()

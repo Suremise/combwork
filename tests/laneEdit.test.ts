@@ -97,14 +97,16 @@ describe('editLanes (HI-2898)', () => {
     const l = await start('b1', [a, b, c])
     expect(l.listRev).toBe(0)
     const r = await edit({ op: 'move', lane: l.id, rev: 0, card: c, to: 0 })
-    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null }])
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null, rev: 1 }])
     expect((await lane(l.id)).cards.map((x) => x.number)).toEqual([c, a, b])
     expect((await lane(l.id)).listRev).toBe(1)
     expect(resumed).toEqual([l.id])
     // Back as it was: the same list, a new revision; the edit made on revision 0 is refused now.
-    await edit({ op: 'move', lane: l.id, rev: 1, card: c, to: 2 })
+    // Its reply names the revision it left (HI-2932): what the window's next quick edit names.
+    const back = await edit({ op: 'move', lane: l.id, rev: 1, card: c, to: 2 })
     expect((await lane(l.id)).cards.map((x) => x.number)).toEqual([a, b, c])
     expect((await lane(l.id)).listRev).toBe(2)
+    expect(back.lanes[0].rev).toBe(2)
     await expect(edit({ op: 'move', lane: l.id, rev: 0, card: c, to: 0 })).rejects.toThrow(/changed meanwhile/)
     expect((await lane(l.id)).cards.map((x) => x.number)).toEqual([a, b, c])
   })
@@ -128,7 +130,7 @@ describe('editLanes (HI-2898)', () => {
     const l = await start('b1', [a, b])
     await doing(a, 'b1')
     const r = await edit({ op: 'add', lane: l.id, rev: 0, card: c })
-    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: a }])
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: a, rev: 1 }])
     let rec = await raw(l.id)
     expect(rec.cards).toEqual([a, b])
     expect(rec.pending).toEqual([a, b, c])
@@ -147,6 +149,60 @@ describe('editLanes (HI-2898)', () => {
     expect(rec.pending).toBeUndefined()
     expect(rec.cards).toEqual([a, b])
     await expect(edit({ op: 'cancel', lane: l.id, rev: rec.listRev! })).rejects.toThrow(/no queued change/)
+  })
+
+  it('Cancel change never puts back a card another lane holds now, nor one that has started (HI-2943)', async () => {
+    const [a, t, b, c, x] = [await make('A'), await make('Transferred'), await make('B'), await make('C'), await make('X')]
+    const from = await start('b1', [a, t, b, c])
+    const to = await start('b2', [x])
+    await doing(a, 'b1')
+    await doing(x, 'b2')
+    // A reorder queued behind A, then T moved to B2's lane (still queued on B1's: not a plain removal of its list).
+    await edit({ op: 'move', lane: from.id, rev: 0, card: c, to: 1 })
+    await edit({ op: 'transfer', card: t, from: { lane: from.id, rev: 1 }, to: { lane: to.id, rev: 0 } })
+    expect((await raw(from.id)).pending).toEqual([a, c, b])
+    // Queued on B2's too (X in flight there).
+    const listOf = (r: { cards: number[]; pending?: number[] }): number[] => r.pending ?? r.cards
+    expect(listOf(await raw(to.id))).toEqual([x, t])
+    // Cancel drops the reorder, and T stays on B2's lane only: B1's list is its applied one without T, at once (a removal).
+    await edit({ op: 'cancel', lane: from.id, rev: (await raw(from.id)).listRev! })
+    const [f, g] = [await raw(from.id), await raw(to.id)]
+    expect(f.cards).toEqual([a, b, c])
+    expect(f.pending).toBeUndefined()
+    expect(listOf(g)).toEqual([x, t])
+    expect([f, g].filter((r) => listOf(r).includes(t))).toHaveLength(1)
+    // A card the queued change took off that has started since (on no lane): refused, nothing changed.
+    const [d, e] = [await make('D'), await make('E')]
+    const l = await start('b3', [d, e])
+    await doing(d, 'b3')
+    // F added behind D, then E taken off: still queued (not a plain removal of the applied list), E back on the board.
+    // A lane's revision before its first edit is 0 (its record has none yet).
+    const revOf = async (): Promise<number> => (await raw(l.id)).listRev ?? 0
+    const f2 = await make('F')
+    await edit({ op: 'add', lane: l.id, rev: await revOf(), card: f2, at: 1 })
+    const queued = (await raw(l.id)).pending!
+    await edit({ op: 'remove', lane: l.id, rev: await revOf(), card: e })
+    const left = queued.filter((n) => n !== e)
+    expect((await raw(l.id)).pending).toEqual(left)
+    /** Cancel refused with `why`, and nothing changed: the lane's lists and E as they were. */
+    const refused = async (why: RegExp): Promise<void> => {
+      const [laneBefore, cardBefore] = [await raw(l.id), await card(e)]
+      await expect(edit({ op: 'cancel', lane: l.id, rev: await revOf() })).rejects.toThrow(why)
+      const [laneAfter, cardAfter] = [await raw(l.id), await card(e)]
+      expect([laneAfter.cards, laneAfter.pending, laneAfter.listRev]).toEqual([laneBefore.cards, laneBefore.pending, laneBefore.listRev])
+      expect([cardAfter.column, cardAfter.agent ?? null, cardAfter.history.length]).toEqual([cardBefore.column, cardBefore.agent ?? null, cardBefore.history.length])
+    }
+    // Given to another agent since it left (still in To do, never started): never taken from them (HR1's round 1).
+    await run(() => tasks.updateTask(e, { agent: 'b2' }, user))
+    await refused(/changed since/)
+    await run(() => tasks.updateTask(e, { agent: null }, user))
+    // Started outside the lane: not in To do.
+    await doing(e, 'b1')
+    await refused(/isn’t in To do/)
+    // Then back in To do, given to nobody: its start stays in its facts, and that work keeps it off (HR1's round 1).
+    await run(() => tasks.updateTask(e, { column: 'todo', agent: null }, user))
+    await refused(/keeps work/)
+    expect((await raw(l.id)).pending).toEqual(left)
   })
 
   it('removes a queued card back to the board, and undoes it', async () => {
@@ -168,7 +224,7 @@ describe('editLanes (HI-2898)', () => {
     await doing(a, 'b1')
     // A removal keeping the card in flight applies at once (as cw_lane start's does).
     const r = await edit({ op: 'remove', lane: l.id, rev: 0, card: b })
-    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null }])
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null, rev: 1 }])
     expect((await raw(l.id)).cards).toEqual([a, c])
     await edit({ op: 'undo', undo: r.undo! })
     const rec = await raw(l.id)

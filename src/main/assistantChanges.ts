@@ -102,9 +102,10 @@ export function cardValue(card: TaskCard, field: CardField): Value {
       return card.agent ?? null
     case 'blocked':
       return card.blocked ?? null
-    // Waiting on purpose (HI-2618), whole: why, who marked it and when, so undo puts back the mark as it was.
+    // Waiting on purpose (HI-2618), whole: why, who marked it and when, so undo puts back the mark as it was; with the ref
+    // of the request it waits on (HI-2931), so a request's mark put back still goes when that request ends.
     case 'waitingFor':
-      return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at } : null
+      return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at, ...(card.waitingFor.ask ? { ask: card.waitingFor.ask } : {}) } : null
     default:
       return card[field]
   }

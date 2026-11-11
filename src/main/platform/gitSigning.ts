@@ -19,7 +19,7 @@ import { boundedSpawn, endBoundedSpawns, endBoundedSpawnsNow } from './boundedSp
 import { onOwnerGone, ownedWorkStopped } from './ownedWork'
 import type { QueueGitResult } from './integration'
 import { agentMsg, say } from '../../shared/agentText'
-import { NEEDS, isKnownSigner, lastScoped, resolveProgramWith } from './signerRules'
+import { NEEDS, envGet, isKnownSigner, lastScoped, resolveProgramWith, signerRun } from './signerRules'
 import type { GitScope, ScopedValue, SigningInfo, SigningStatus } from '../../shared/gitSigning'
 
 /** How long a check waits on its signer before ending it (a few seconds: a signer that asks takes longer). */
@@ -29,8 +29,12 @@ export const SIGN_CHECK_MS = 5_000
 export interface SignDeps {
   /** git in `cwd` (the caller's runner: the queue's in its lease's job). */
   git: (cwd: string, args: string[]) => Promise<QueueGitResult>
-  /** A program run to its end within `timeoutMs`, its tree ended there; `input` its stdin. */
-  spawn: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; signal?: AbortSignal }) => Promise<QueueGitResult>
+  /**
+   * A program run to its end within `timeoutMs`, its tree ended there; `input` its stdin. HI-2947: the check's signer
+   * comes as git would start it (`signerRun`): its words quoted already, `verbatim` (Windows' command line as given), and
+   * `argv0` its quoted first word.
+   */
+  spawn: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; signal?: AbortSignal; argv0?: string; verbatim?: boolean }) => Promise<QueueGitResult>
   /** The folder the commit runs in. */
   cwd: string
   /** The commit's own overrides (`-c user.name=… -c user.email=…`), before each git command. */
@@ -64,11 +68,22 @@ async function scoped(d: SignDeps, args: string[], regexp = false): Promise<Scop
 }
 const failed = (v: unknown): v is { failed: string } => !!v && typeof v === 'object' && 'failed' in v
 
+/**
+ * An ssh `user.signingkey` that is the key itself, as git reads it (`is_literal_ssh_key` in its gpg-interface.c, HI-2933):
+ * after `key::`, or the whole value when it starts with `ssh-` (kept by git for backward compatibility); null for a path.
+ */
+export function literalSshKey(value: string): string | null {
+  if (value.startsWith('key::')) return value.slice(5).trim()
+  if (value.startsWith('ssh-')) return value.trim()
+  return null
+}
+
 /** A key as it may be shown: never key material (an openpgp id's last 16 digits, an ssh key file's name, a literal key's type and comment). */
 export function shownKey(format: 'openpgp' | 'ssh' | 'x509', key: string): string {
   if (format === 'ssh') {
-    if (key.startsWith('key::')) {
-      const [type, , ...comment] = key.slice(5).trim().split(/\s+/)
+    const literal = literalSshKey(key)
+    if (literal !== null) {
+      const [type, , ...comment] = literal.split(/\s+/)
       return [type, ...comment].join(' ')
     }
     return basename(key)
@@ -181,6 +196,13 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
   live()
   if (!program) return { ...info, status: { kind: 'cantSign', message: say(T.notFound, { name }) } }
   const withProgram = { ...info, program }
+  // HI-2947: the signer started as git starts it (quote_arg_msvc, which also quotes ' * ? {: Git's own ssh-keygen and gpg
+  // are MSYS2 programs, whose runtime unquotes a bare ' and globs those), never with Node's quoting. A known signer is a
+  // .exe: no interpreter, no cmd. Its first word is the name as configured when that is a path, else the program found.
+  const run = (args: string[], o: { env: NodeJS.ProcessEnv; input?: string }): Promise<QueueGitResult> => {
+    const r = signerRun(program, /[\\/]/.test(name) ? name : program, args, null, () => null, envGet(d.env, 'ComSpec') ?? 'cmd.exe')
+    return d.spawn(r.file, r.args, { cwd: d.cwd, ...o, timeoutMs, ...(signal ? { signal } : {}), argv0: r.argv0, verbatim: true })
+  }
   // Where this git is installed, as it says itself (its own ssh-keygen and gpg are beside it).
   const exec = await d.git(d.cwd, ['--exec-path'])
   live()
@@ -197,7 +219,7 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
         who = v.out.trim().replace(/\s+\d+\s+[+-]\d{4}$/, '')
       }
       live()
-      const r = await d.spawn(program, ['--batch', '--no-tty', '--pinentry-mode', 'error', '--no-autostart', '--status-fd=2', '-bsau', who], { cwd: d.cwd, env: d.env, input: PAYLOAD, timeoutMs, ...(signal ? { signal } : {}) })
+      const r = await run(['--batch', '--no-tty', '--pinentry-mode', 'error', '--no-autostart', '--status-fd=2', '-bsau', who], { env: d.env, input: PAYLOAD })
       live()
       return { ...withProgram, status: signerSaid('openpgp', r) }
     }
@@ -211,9 +233,10 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
     }
     dir = await mkdtemp(join(tmpdir(), 'combwork-sign-'))
     liveDirs.add(dir)
-    if (key.value.startsWith('key::')) {
+    const literal = literalSshKey(key.value)
+    if (literal !== null) {
       file = join(dir, 'key.pub')
-      await writeFile(file, `${key.value.slice(5).trim()}\n`)
+      await writeFile(file, `${literal}\n`)
     } else {
       const home = d.env.HOME ?? d.env.USERPROFILE ?? ''
       const v = key.value.startsWith('~/') || key.value.startsWith('~\\') ? join(home, key.value.slice(2)) : key.value
@@ -228,7 +251,7 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
     delete env.DISPLAY
     delete env.SSH_ASKPASS
     live()
-    const r = await d.spawn(program, ['-Y', 'sign', '-n', 'git', '-f', file, payload], { cwd: d.cwd, env, timeoutMs, ...(signal ? { signal } : {}) })
+    const r = await run(['-Y', 'sign', '-n', 'git', '-f', file, payload], { env })
     live()
     return { ...withProgram, status: signerSaid('ssh', r) }
   } finally {

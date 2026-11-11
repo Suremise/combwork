@@ -545,7 +545,8 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks'] },
-    { id: 'merging', options: ['finish', 'target', 'otherTargets', 'dependenciesDone'] },
+    // HI-2871: style and strict shape the candidate Combwork builds before the user integrates.
+    { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'identity', 'stopOwnRuns'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
@@ -607,8 +608,9 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'mergeChecks' || key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
   if (key === 'mergeInstall') return o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
-  // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges.
-  if (key === 'strict') return o.finish === 'combworkMerges'
+  // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges; or (HI-2871) jj's candidate,
+  // where the user integrates.
+  if (key === 'strict') return o.finish === 'combworkMerges' || o.finish === 'userIntegrates'
   // G18 (#1179): only the merge queue pushes.
   if (key === 'pushTarget') return o.finish === 'combworkMerges'
   // G21 (HI-1183): only the merge queue fetches and publishes.

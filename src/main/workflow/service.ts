@@ -34,6 +34,7 @@ import { Workflow, type SlotForStart } from './runtime'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
+import { noticeTargetChanges } from '../targetChangesNotice'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = WORKFLOW_ENFORCE
@@ -211,6 +212,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
+    targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // jj's card work (HI-2868), composed once for the project while slots run.
     get jj() {
       jjDeps ??= jjCards?.(ws, project.path, () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path))

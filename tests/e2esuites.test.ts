@@ -211,6 +211,28 @@ describe('the e2e suite list', () => {
       expect(/CW_API_PORT:\s*'\d{5}'|const PORT = '?\d{5}'?(?!\))|127\.0\.0\.1:\d{5}/.test(src), `${s.name}: use lib.port()`).toBe(false)
     }
   })
+
+  it("PATH kept whatever Windows' spelling (HI-2945): read and put first through runContext's helpers, never a copy's .PATH", () => {
+    const rc = createRequire(import.meta.url)('./e2e/runContext.cjs') as {
+      baseEnv: (parent?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv
+      envValue: (env: NodeJS.ProcessEnv, name: string) => string | undefined
+      withPathFirst: (env: NodeJS.ProcessEnv, dirs: string | string[], rest?: string) => NodeJS.ProcessEnv
+    }
+    // A PowerShell shell's environment: Path, not PATH. A plain copy keeps that spelling, so .PATH reads nothing.
+    const parent = { Path: 'C:\\Program Files\\Git\\cmd;C:\\Windows', SystemRoot: 'C:\\Windows' }
+    const base = rc.baseEnv(parent)
+    expect(base.PATH).toBeUndefined()
+    expect(rc.envValue(base, 'PATH')).toBe(parent.Path)
+    // Put first, the rest kept, one spelling left: a later merge (apply's last-wins) can't keep the shorter one.
+    const env = rc.withPathFirst({ ...base, X: '1' }, 'C:\\jj', rc.envValue(base, 'PATH'))
+    expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
+    expect(env.PATH).toBe(`C:\\jj;${parent.Path}`)
+    expect(env.X).toBe('1')
+    expect(rc.withPathFirst({}, ['a', 'b'], 'c').PATH).toBe('a;b;c')
+    // No suite or harness reads PATH off a copied environment again.
+    const files = [...readdirSync(dir).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, f)), join(root, 'tests', 'scenarios', 'harness.cjs')]
+    for (const f of files) expect(/baseEnv\(\)\.PATH\b/.test(readFileSync(f, 'utf8')), `${basename(f)}: use lib.withPathFirst or lib.envValue`).toBe(false)
+  })
 })
 
 describe('the suites a change needs (affected.mjs)', () => {

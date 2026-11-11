@@ -720,7 +720,7 @@ Agent text (HI-2065; `shared:plans/2026-11-03-dialects-design.md`, Darren's deci
 - **Combwork's git commands never write the index as a side effect** (#212): they run beside the user's and agents' own git commands, and `git status` (and `git diff` against the working tree) otherwise refresh the index, taking `index.lock` for a moment, so a `git add` or `commit` at that moment failed with "index.lock: File exists". Every git command Combwork runs (`git()`, `GIT_PREFIX` in `src/main/git.ts`) passes `--no-optional-locks` and `-c diff.autoRefreshIndex=false`; locks a command needs (commit, merge, reset, worktree add) are still taken. Status compares content in memory, so a file touched but unchanged still isn't listed; a worktree branch's changes since it left base (`diff --name-status <merge-base>`, which without a refresh lists stat-only files as modified) drop such a file only when git says exactly that it isn't changed: its working copy matches the index (status) and the index matches the merge base (`diff --cached`, mode included). A working copy that differs from an index that differs from base is kept (shown even if it was changed back by hand), never hidden.
 - **Git itself** (#346, `gitTool.ts` in main and shared): whether git runs is kept apart from whether a folder is a repository. `git --version` on Combwork's own PATH (a Start-menu launch can have another PATH than a terminal), with a 10 s timeout, at start and with Provider Setup's **Check again**, cached: `ok`, `missing`, `old` (older than **2.38**, `GIT_MIN`: `merge-tree --write-tree`, which checks a merge for conflicts first, recognises squash-merged branches and is what the merge-ready skill runs) or `unknown`, with the version and the executable (git.com or git.exe on PATH, as Windows starts it). **The git Combwork starts** (HI-2137, `gitExe()`): where that executable is exactly Git for Windows' launcher (`<root>\cmd\git.exe`), which starts the real git as a second process, the check also finds the real one (`git --exec-path` is `<root>/mingw64/libexec/git-core`, or `clangarm64`, `mingw32`, under the same root; its `git.exe` is there and gives the same `--version`), and every git Combwork starts (git's worker, the merge queue's git host and launcher) starts it directly, in the environment the launcher gives it (`withLauncherEnv`, as Git for Windows' `git-wrapper.c` sets it up: its own `MSYSTEM` whatever was set, `PLINK_PROTOCOL=ssh` unless set, `HOME` unless set from `%HOMEDRIVE%%HOMEPATH%` when that is a folder other than System32, else `%USERPROFILE%`, then `<root>\<mingw>\bin`, `<root>\usr\bin` and `%HOME%\bin` before PATH), so hooks and aliases see what they see through the launcher. Anything else (another git, a wrapper, git.com, a different version) is started from PATH as before. The check itself always runs PATH's git, and finds the git to start again each time; a command that can't start the real git (uninstalled, moved) runs once more with PATH's git, whichever command found it gone first, and git is checked again. Below **2.17** (`GIT_REQUIRED`: `--no-optional-locks` needs 2.15, `git worktree remove` 2.17) nothing of Combwork's git runs, which counts as missing. `git()` reports a call that couldn't start git (ENOENT and the like, when its working folder exists: Node says ENOENT for a missing folder too) as `missing` with exit code -1, never 1, so no caller takes it for git's "no" (`check-ignore`'s "not ignored"); such a call marks git missing at once, and a call that runs while it is marked missing clears it and checks again (`git-tool` event, every window's store). **Provider Setup** shows a Git row under every provider's tab: the version and path; or **Git not found** / **Git x is older than 2.38**, what doesn't work and the fix (install or update Git for Windows, or add git.exe's folder to PATH, then Check again: no restart, as Check again reads the fresh PATH, #472), with **Git for Windows** (git-scm.com). No setting for git's path. The status bar shows **Git** (warning) when git is missing or unusable, **Git x** (caution) when old; either opens Provider Setup. Copy Diagnostics lists it. **Every git-dependent screen says "git missing" instead of "not a repository"** (`gitProblem`): Add Agent's New worktree ("Git isn't installed (or isn't on Combwork's PATH)", `ProjectGitInfo.gitProblem`), the Board's Start in a worktree, adding a worktree agent (Agent API and cards too), the Changes tab (`GitStatus.gitProblem`: the problem, the fix, Provider Setup and Retry), the Merge dialog (the error in place of the merge, which can't be started), Remove All and template loads (the reason a worktree is kept, or the load refused), Remove Project. **Fail safe**: a git call that can't run, or fails, never counts as merged, clean or nothing to lose. `branchStatus` throws whenever git can't read the project folder's branch (`checkedOutBranch`: a failed read is not a detached HEAD, which counts against the base), count the branch or read the worktree's status (no more "nothing to merge" on a failure: the unmerged badges show nothing, the Merge dialog the error; merging refuses too), `worktreeCheck` is never removable then, and `removeCheckedWorktree` deletes nothing git can't run for. The Changes tab's status is "not a git repository" only when git says so: any other failed `git status` (a damaged index, a dubious owner), merge base or diff against an agent's base is an error the tab shows with Retry, never an empty list. A read that fails only because another git command is rewriting the index (`INDEX_BUSY`, "index file open failed" on Windows while a user's `git add` runs) is tried again briefly first (`gitReading`: 4 tries, 50 ms apart; the Changes tab's status and diff, worktrees' uncommitted counts, the Files tab's ignored entries). `.combwork`'s exclude line is still written without git (file work), reported `unconfirmed` and logged, and stays excluded. Bundled skills keep to git that Provider Setup's row covers: merge-ready's `merge-tree --write-tree` needs 2.38, which the row names.
 - **Ignored entries in the Files tab** (#222): `git check-ignore` exits 0 or 1; any other exit (128, "index file open failed" while another git command rewrites the index on Windows) is a failure, not "nothing ignored". A busy index is tried again (4 tries, 50 ms apart); outside a repository nothing is ignored. If git still can't say, the folder keeps its last known ignored entries (a memory of the 500 folders listed last) and is listed again 500 ms later (`files-changed`; at most 3 times in a row while it keeps failing). The failure is logged once per project.
-- **The Files tab's Git menu** (HI-2743; `filesGit.ts`, `shared/gitIgnoreRules.ts`, `FilesGitMenu.ts`; Darren, 9 Nov 2026): a Git section in a row's right-click menu, a short menu rather than a git client (no discard, stage, commit, blame or history: Discard stays in Version Control with its confirmation, since in a multi-agent project it can wipe an agent's work). It acts on the project folder only (`workspace.assertProject`, never `assertRoot`): with an agent's slot or worktree shown, the menu has no Git section. Opening the menu asks main for the selection's state (`files:gitInfo`: `git ls-files` for tracked, a folder by any file in it; `git check-ignore -v` for the rule; the branch from `symbolic-ref`), so it opens once git has answered, or without the section if it fails. **Exclude from Git** ▸ *This file* / *This folder* / *These n items* (each its exact path from the repository's top, anchored with `/`, a folder with a trailing `/`, `\ * ? [` and trailing spaces escaped) or *All \*.ext files* (one file with an extension; not a dotfile), under *Shared with everyone* (the repository's top `.gitignore`) or *Only on this PC* (`.git/info/exclude`, by `rev-parse --git-path`), each choice's second line showing the line and its file; offered while something selected isn't ignored. The write appends a line not already there (equal, trailing spaces aside), in the file's own line ending (CRLF if its first break is), after a break when the last line has none, keeping a BOM; a file that isn't UTF-8 is refused, and so is an ignore file that is a link or whose folders lead outside where it belongs (the repository's top, or its git folder: `insideReal`, checked under the file's lock), as the Files tab refuses paths through a link (HR1 on HI-2743). Selected paths reach `ls-files` and `rm` as literal pathspecs (`:(literal)`), so `src/[ab].txt` never matches `src/a.txt`. **Stop Tracking, Keep the File…** for tracked items: a confirmation naming the branch (the file stays on disk; Version Control shows a deletion), then `git rm --cached --quiet` (`-r` with a folder). **Include Again** only when the rule is a plain line in the top `.gitignore` or `.git/info/exclude` equal to the item's exact line or, for a file, its `*.ext` line (`removableRule`); main finds the rule again and checks the line at that number is still it before removing that line and its break. **Why Is This Ignored?** for an ignored item with a rule: a rule file in the project folder (outside `.git`) opens in the Files tab at its line; another (`.git/info/exclude`, the global excludes file, a `.gitignore` above the project folder) opens read-only in Combwork's viewer (Monaco) at the rule's line, its text from `files:gitRuleText`, where main finds the rule again (the window can't name a file; UTF-8, 1 MB at most). A dimmed row's tooltip names the rule ("Ignored by .gitignore:12 `*.log`"): the listing reads `check-ignore -v`, leaving out paths only a negation matched. **Show Changes** for a changed or new file opens Version Control → Changes on the project folder at that file (`changesJump`). Several items: Exclude (exact paths) and Stop tracking only. Outside a repository: **Initialise Repository…** (#701's dialog, in Version Control). Notifications name the file written and the branch changed (not for `.git/info/exclude`). Git runs on git's worker and files are read and written asynchronously; git's errors are shown in plain words (a busy index: try again).
+- **The Files tab's Git menu** (HI-2743; `filesGit.ts`, `shared/gitIgnoreRules.ts`, `FilesGitMenu.ts`; Darren, 9 Nov 2026): a Git section in a row's right-click menu, a short menu rather than a git client (no discard, stage, commit, blame or history: Discard stays in Version Control with its confirmation, since in a multi-agent project it can wipe an agent's work). It acts on the project folder only (`workspace.assertProject`, never `assertRoot`): with an agent's slot or worktree shown, the menu has no Git section. Opening the menu asks main for the selection's state (`files:gitInfo`: `git ls-files` for tracked, a folder by any file in it; `git check-ignore -v` for the rule; the branch from `symbolic-ref`), so it opens once git has answered, or without the section if it fails. **Exclude from Git** ▸ *This file* / *This folder* / *These n items* (each its exact path from the repository's top, anchored with `/`, a folder with a trailing `/`, `\ * ? [` and trailing spaces escaped) or *All \*.ext files* (one file with an extension; not a dotfile), under *Shared with the repository (a commit)* (the repository's top `.gitignore`) or *Only on this PC (nothing to commit)* (`.git/info/exclude`, by `rev-parse --git-path`), each choice's second line showing the line and its file (HI-2944: the shared exclude's notification offers **Commit It**, which commits the top `.gitignore` alone, as it is now with any earlier edits, on the project folder's branch, refused as §16.9.2's Commit is: an agent working there, an operation under way, a detached HEAD; no general commit in Files); offered while something selected isn't ignored. The write appends a line not already there (equal, trailing spaces aside), in the file's own line ending (CRLF if its first break is), after a break when the last line has none, keeping a BOM; a file that isn't UTF-8 is refused, and so is an ignore file that is a link or whose folders lead outside where it belongs (the repository's top, or its git folder: `insideReal`, checked under the file's lock), as the Files tab refuses paths through a link (HR1 on HI-2743). Selected paths reach `ls-files` and `rm` as literal pathspecs (`:(literal)`), so `src/[ab].txt` never matches `src/a.txt`. **Stop Tracking, Keep the File…** for tracked items: a confirmation naming the branch (the file stays on disk; Version Control shows a deletion), then `git rm --cached --quiet` (`-r` with a folder). **Include Again** only when the rule is a plain line in the top `.gitignore` or `.git/info/exclude` equal to the item's exact line or, for a file, its `*.ext` line (`removableRule`); main finds the rule again and checks the line at that number is still it before removing that line and its break. **Why Is This Ignored?** for an ignored item with a rule: a rule file in the project folder (outside `.git`) opens in the Files tab at its line; another (`.git/info/exclude`, the global excludes file, a `.gitignore` above the project folder) opens read-only in Combwork's viewer (Monaco) at the rule's line, its text from `files:gitRuleText`, where main finds the rule again (the window can't name a file; UTF-8, 1 MB at most). A dimmed row's tooltip names the rule ("Ignored by .gitignore:12 `*.log`"): the listing reads `check-ignore -v`, leaving out paths only a negation matched. **Show Changes** for a changed or new file opens Version Control → Changes on the project folder at that file (`changesJump`). Several items: Exclude (exact paths) and Stop tracking only. Outside a repository: **Initialise Repository…** (#701's dialog, in Version Control). Notifications name the file written and the branch changed (not for `.git/info/exclude`). Git runs on git's worker and files are read and written asynchronously; git's errors are shown in plain words (a busy index: try again).
 
 ---
 
@@ -2275,7 +2275,7 @@ works.
 | Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
-| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`), built for an approved card by J9b2's reconciliation since HI-2871 | J4, HI-2871 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
@@ -2309,9 +2309,12 @@ a configured path outside what it can read, a tool that doesn't answer) is "uses
   repository still count. Its `core.autocrlf true` still counts (Git converts every text file's line endings, which
   jj doesn't): the dialog says to turn it off for that repository alone (`git config core.autocrlf false` in it).
 - **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
-- **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
-  the store's `hooks/` that isn't a `*.sample`.
-- **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
+- **hooks:** a hook in the folder Git runs hooks from, as Git itself names it (`git rev-parse --git-path hooks`, HI-2941:
+  `core.hooksPath` at any level with Git's own expansion, `~/` and `%(prefix)/` included, a relative one from the working
+  tree's top; else the store's `hooks/`), never a `*.sample`. Git unable to name it is unknown, never clear.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` on at any level, read as Git reads a boolean (HI-2942: any nonzero
+  number too, `2`, `0x10` or `1k`; a value Git refuses counts, failing closed), or jj's `signing.behavior` set to `own`
+  or `force`.
 
 ##### jj's runner and detection (1.5.0's J0, HI-2793)
 
@@ -2504,7 +2507,12 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
   name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
   child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
-  repository or workspace, is refused.
+  repository or workspace, is refused. A prune forgets only this project's workspaces whose folders are gone, each
+  proved again under the store's lock (HI-2946): still registered under that name at that root, read afresh at an
+  operation; then, with the control's proof at the forget's admission right before jj starts, that operation still the
+  single head (any registration changed since, such as the name forgotten and added again at another root, waits for
+  the next prune) and its folder still absent. A folder back by then (restored or replaced while the prune waited)
+  keeps its registration and everything in it.
 - **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
   operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
   jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
@@ -2535,7 +2543,11 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
 - **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
   released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
-  with no port there is kept (`cantCheck`).
+  with no port there is kept (`cantCheck`), its refresh, settle and owed pass leaving it as it is. HI-2936: after a
+  switch, the old platform's slots and copies are never lent again: they don't count toward the pool's size, and the
+  idle tidy removes each once unused for a day (its own port, the removal's guards: unmerged or uncommitted work keeps
+  it); the app registers jj's port while a project's board still holds a jj slot or copy, so a project switched back
+  to Git settles, keeps or removes them by jj.
 - **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
   forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
   worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
@@ -2677,7 +2689,7 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   then a fresh child of the target given the merge's tree (`jj restore --from <scratch> --into <it>`), the scratch
   abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
   later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
-  never moves. Strict's update (G8) isn't built for jj.
+  never moves. Strict's update (G8) came with HI-2853 (`prepareJjUpdate`); HI-2871 runs both for approved cards.
 - **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
   under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
   operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
@@ -3286,7 +3298,7 @@ Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). 
 Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
 - **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
   the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
-  journalled bundles, every bundle an Integrated fact already names as consumed, no J4 candidates: the user's own merge,
+  journalled bundles, every bundle an Integrated fact already names as consumed, and since HI-2871 the cycle's J4 attempt records, so a move onto J4's candidate is proved `via: 'candidate'`; the user's own merge,
   fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
   result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
   proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
@@ -3327,6 +3339,60 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### jj's pre-integration candidate (1.5.0, HI-2871)
+
+Darren's decision (11 Nov): J4's candidates run for jj cards as a pre-integration check, as strict's update and the test
+merge do for Git, in J9b2's runtime; the user still integrates (decision A: Combwork never moves a bookmark or pushes).
+Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its design is HI-2871/s13 and s21 (HR3's OK).
+- **When** (`reconcileJj`, workflow/reconcile.ts): a card in Approved that J5's proof finds not yet contained, its pass
+  holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
+  (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
+  `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
+  (J5's `jjTargetHead`); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
+  keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
+  Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
+  lock, Git's replay on the store for sameness (a replay that can't be read: unknown, never "not the same").
+- **The fingerprint** (`JjCandidateFingerprint`): the approval (`approvalOf`: cycle, approved submission, revision, base,
+  key, recorded jj commit, target; the stage Approved, its pass holding: no Stale recorded and the slot's observed head
+  the approved revision, HR3's round 1), the effective ruleset's id (its options' hash: an Override that
+  applies other options changes it) and the style and strict used. Each attempt is journalled with it (board_meta
+  `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
+  owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
+  options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
+- **Withdrawn first** (HR3's rounds 1 and 2): a ready offer that isn't current any more (its head not the target's, or
+  its candidate superseded or gone by `jjCandidateNow`, the target unmoved; or either unreadable: `offerCurrent`) is
+  deleted (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never
+  leaves it.
+- **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
+  the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
+  `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
+  containment record), shown only while its fingerprint is the card's now and, a ready one, while the target's head as
+  the window just read it (`jjWaiting`'s `targetHeads`) is the head it was built on (`candidateShown`): a moved target
+  hides it at once, before any reconciliation and across restarts. A conflict, or not up to
+  date (a merge in a rebase's suffix, not on top, or strict's update not the same change): `IntegrationFailed` (entry
+  `jj:<attempt>`; jj has no merge queue) with its files, hunks and log, the card to Active, its builder woken in jj's words
+  (`jjReturnedWake`) and the card's comment (`tasks.history.jjCandidateReturned`). A repository that signs
+  (`signing.behavior` own or force): a record saying so, nothing built. Unknown: nothing offered or returned; counted in
+  the record, shown from the third in a row.
+- **The credit:** J5's proof gets the cycle's attempt records (`candidates`): the user's `jj bookmark set` onto the
+  candidate is Integrated `via: 'candidate'`, its update validated again as J5 already does.
+- **Descriptions on one line:** J4 reads its writes back from jj's operation log a line each, and a newline in `-m`'s
+  argument makes that read malformed (0.47.1), so a candidate's and an update's descriptions are the first line of
+  Combwork's (`mergeMessage`, `updateMessage`): the card's key and title.
+- **Options:** jj's Merging group shows `style` (*Candidate style*) and `strict` (*The candidate brings work up to date
+  first*), each with its own words where the user integrates (`OptionText.integrates`, `optionTitle`, `optionDesc`: by the
+  descriptor, never the platform's id).
+- **The window:** Waiting for you to integrate shows *Candidate ready* (commit, change id, style, the head built on; no
+  conflicts, no merge checks) with `jj bookmark set <target> -r <candidate>` in place of the duplicate's commands; *No
+  candidate* for a signing repository and *couldn't build a candidate* (after three tries) keep the manual commands.
+- **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
+  Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
+  options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
+  rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build), and the e2e suites
+  `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
@@ -4193,7 +4259,10 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
   it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
   slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
-  any kind, not set aside), whose recorded target is only the last its lease served; the slots read inside the save's board write, the
+  any kind, not set aside), whose recorded target is only the last its lease served (HI-2928: once that branch is
+  deleted, a free slot's idle tidy and Remove check it against the default target instead (never for a jj preparation's
+  key, which has no head by design), so work in it that isn't
+  there keeps it, `unmerged`, and a slot with none is freed, rather than kept as `cantCheck`); the slots read inside the save's board write, the
   pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
   every slot recording it, its clean-up checking against it),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
@@ -4291,10 +4360,10 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Combwork merges (queue) · The agent merges, Combwork checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Combwork merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G7b | **Other branches work can merge into** (`otherTargets`, HI-2556) | Branch names, none by default | The branches besides G7 a lane's or card's **Merges into** may name. Not a rule: left out of every ruleset (`ruleOptions`), never set by a preset, never Custom, so a change applies at once. A pick is checked against it as it is made. |
-| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
+| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate`. In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Combwork merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
@@ -5153,7 +5222,8 @@ and a comment reaches no inbox: it sat an hour unseen):** `cw_ask_assistant` (`P
 in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
 Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
 the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
-("Asked the Assistant: …"), and a `control` delivery to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
+("Asked the Assistant: …"), and a message (`rebrief`, which the Assistant acks once it has dealt with it; a `control`
+notice before HI-2931, which needed no ack) to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
 the agent: sender kind `agent` with its project and id) quoting it whole as an agent's request, not the user's
 decision, with the card's key, offered at once: an idle or watching Assistant (its lane watch, which carries on) is
 woken by the doorbell, a busy one told at its next tool call. The Assistant acts on it only within its Control and what
@@ -5169,11 +5239,15 @@ by the card's own agent on its card in Doing with no waiting mark, the card is m
 mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
 `waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
 acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
-unread (`ended`), or never given. A take-off that fails is retried after 30 s, and each workspace's open
-(`reconcileAskWaits`) takes off every request mark whose delivery is no longer live (queued, offered, received or
-uncertain), so none stays for ever. A wait past the answer is the Assistant's own mark, set before it acks; its go is
-clearing it with the go as that change's comment, which wakes the builder's card watch. `ask` is Combwork's alone:
-never from the Agent API, and undo puts a mark back without it. A lane's row in the Progress panel says **waiting**
+without an ack (`ended`: unread, said as above; read and never acked for a week, expired with nothing said, HI-2931),
+or never given. A take-off that fails is retried after 30 s, and each workspace's open (`reconcileAskWaits`) takes off
+every request mark whose delivery is no longer live as the delivery service has it (`isLive`: queued, offered,
+uncertain, or received and not acked; an old `control` request once read is done), so none stays for ever. A wait past
+the answer is the Assistant's own mark, set before it acks; its go is clearing it with the go as that change's comment,
+which wakes the builder's card watch. `ask` is Combwork's alone: never from the Agent API (it takes a string), and kept
+only by undo (HI-2931): the Assistant's change snapshots the mark whole, `ask` with it, and undo puts it back so (a whole
+mark keeps its `ask`), so the request's end still takes it off; one whose request ended meanwhile goes as the undo
+ends (`reconcileAskWaits`). A lane's row in the Progress panel says **waiting**
 (what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
 for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
@@ -5637,6 +5711,29 @@ touched:
   revision (tested again), `staged` (the staged files named), `unstagedChanges` (the listed files with a change in the
   working copy or index, untracked ones included, from the folder's whole status, so a long list never makes a command
   line too long). The user's other edits are left as they are. Resume (#1353) checks each again.
+- **Commit or set aside** (HI-2944; Darren, 11 Nov 2026: relay the truth, never gatekeep): a pause of `unstagedChanges`
+  or `staged` offers **Commit** and **Set Aside** beside its text, on the queue's card (Merges, Version Control → Merge
+  queue) and in the card's Work section (`FolderChangeButtons`), acting on exactly the paused files. Port 5's
+  `folderChanges` (Git only; `gitFolderChanges.ts`, `queue:settleChanges`): main finds the folder itself (where the
+  target is checked out, from the project's own repository; never a folder the window names), acting only while that is
+  the folder the changes were seen in (a `staged` or `unstagedChanges` pause records it, `folder`; a start's warning names
+  it; one recorded before this: refused, saying to Resume, whose check of the condition records the folder it saw it in,
+  and a staged pause's files as staged then, which the pause's text names), and, under the repository
+  lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
+  operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: `add --intent-to-add`
+  for untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
+  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
+  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked -- <paths>`, named
+  *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
+  after it made one is said with that stash, kept. The pause shown (card, reason, time) must still be the current one
+  before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
+  own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
+- **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a
+  lane's (`cw_lane start`) read the target's folder (the adapter's `targetChanges`; Git only) and, when it has
+  uncommitted changes, warn: a `Warning:` line in the reply (five paths, then how many more) and a notification in the
+  project's window with **Commit**, **Set Aside** (on all the files found) and **Show Changes**; once a minute for the
+  same folder and files (64 remembered). Never a refusal: git may merge over files the card doesn't touch.
 - **The journal:** `IntegrationStarted` with the listed files and the folder, then `IntegrationPhase` `files`,
   `read-tree -m -u <expected> <result>`, `IntegrationPhase` `ref`, `update-ref`; each phase's fact is written through
   the runner's lease fence (#1360), and the lease is checked again just before each git step, so a runner that lost its
@@ -6012,7 +6109,8 @@ under two names, read together with the last line git reads winning. Each value'
 
 **The check** signs a throwaway payload, in a temp folder removed after, in the commit's folder and environment, bounded
 at 5 s with its tree ended there. It runs only what Combwork can vouch for: the program a commit would run is resolved to
-a full path first (the configured one, or git's default on the commit's PATH with PATHEXT), and is run only when that
+a full path first, as git for Windows finds it (HI-2934: a path as given, with no extension added; a name in each folder
+of the commit's PATH in turn, `<name>.exe` then `<name>`, never by PATHEXT), and is run only when that
 path is a known installation: Git for Windows' own `usr\bin\gpg.exe` or `usr\bin\ssh-keygen.exe` (beside the git
 Combwork runs, or its `--exec-path`), GnuPG's `…\GnuPG\bin\gpg.exe` under Program Files, or Windows' own
 `System32\OpenSSH\ssh-keygen.exe`. Anything else, an unrecognised default found on PATH included, is `notChecked` and is
@@ -6020,8 +6118,13 @@ never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`
 - openpgp: `--batch --no-tty --pinentry-mode error --no-autostart --status-fd=2 -bsau <key>` on stdin, the key being
   `user.signingkey` or git's default, the committer's identity as that commit would have it (`git var
   GIT_COMMITTER_IDENT` with its overrides).
-- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal `key::` key written to a temp file as git does, a path's
+- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
+  written to a temp file as git does, a path's
   `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
+- Either is started as git starts it (HI-2947): git's command line written out as is, each word quoted with
+  `quote_arg_msvc`, so Git's own MSYS2 gpg and ssh-keygen get a `'`, `*`, `?` or `{` (a key or temp folder under
+  `C:\Users\O'Brien`) as a commit would give it, never as Node's quoting would. The same in the merge queue's run and in
+  the Git view's.
 - Outcomes: `unattended`, `needsSomeone` (the signer's words), `couldNotComplete` (the bound: never taken as proof
   either way), `cantSign` (its words), `notChecked`, `off`, `unreadable` (never taken for off).
 - **Its limits, said:** a check that succeeds means only that this signer, key and environment signed just then, never
@@ -6065,7 +6168,9 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **Only the session's environment, never config.** A session with Combwork's tools (none "as from a terminal") gets two
   `GIT_CONFIG_*` entries, first so the user's own entries after them still win: `gpg.program` and `gpg.ssh.program` set
   to `cw-sign.exe`, and the variables it reads (`CW_SIGN_*`). Entries naming another Combwork's `cw-sign.exe` (a dev
-  build started from a session) are dropped. Combwork writes no git, ssh or gpg configuration.
+  build started from a session) are dropped. A `GIT_CONFIG_COUNT` git takes, 0 or empty included (HI-2934), gets them;
+  one git refuses, or an entry missing, is left as it is for git to refuse. Combwork writes no git, ssh or gpg
+  configuration.
 - **The launcher, `cw-sign.exe`** (`resources/cw-sign/cw-sign.cs`, compiled at each build by Windows' own .NET Framework
   `csc.exe` into `out/bin`, shipped as `resources\bin`; none built, sessions get no entries and sign as before). Git
   names one program with no arguments of its own, a `.cmd` loses arguments to cmd's parsing and a `#!/bin/sh` script
@@ -6085,10 +6190,14 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
   sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
   no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
   default: long enough for a hardware key's touch). Verification and every other signer run as before, the protection
-  being for known installations only: started as git for Windows starts them (HR2's round 1), a `.cmd` or `.bat` through
-  `cmd /c` with git's own command line (each part quoted as git's `quote_arg_msvc` quotes it, so cmd reads it as it
-  did), a `#!` script through its interpreter looked up on PATH as git looks it up, anything else as it is, with git's
-  arguments, stdio and exit; sharing the launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
+  being for known installations only. Every signer, known or not, is started as git for Windows starts it (HR2's round
+  1, HI-2934): a `.cmd` or `.bat` through `cmd /c` with git's own command line (so cmd reads it as it did), a `#!`
+  script through its interpreter looked up on PATH as git looks it up (the interpreter, the script's path, then git's
+  arguments), anything else, an `.exe` included, with git's command line, written out as is; each word quoted as git
+  quotes it, `quote_arg_msys2` for MSYS2's `sh` and `quote_arg_msvc` for the rest, so an MSYS2 program (Git's own gpg
+  and ssh-keygen among them) neither globs a `*`, `?` or `{` nor reads a `'` as a quote (a profile such as
+  `C:\Users\O'Brien`), where Node's own quoting would let it. Git's stdio and exit are kept; an unknown signer shares the
+  launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
@@ -8026,8 +8135,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
   out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
   the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
-  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
-  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  or queued, HI-2927: no card in flight into it, no pause, a stuck one too, and no Combwork running it, so those stay
+  controllable) is a past branch's (`QueueView.past`, set in every listing); targets that can't be read (the project not
+  Git now, git's default unreadable) make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
   history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
   only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
@@ -8106,11 +8216,21 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     on hold, another agent's) keeps its places in every edit; the card in flight shows a lock.
     - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
       `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a
-      queued list edits that list. **Cancel Change** drops the queued list only. The builders of the lanes it changed are
-      started on them if they aren't running, as an update by the user or the Assistant does.
+      queued list edits that list. **Cancel Change** drops the queued list only, as an edit whose list is the applied
+      one (HI-2943), checked as every edit is: a card the queued change took off that another running lane holds now
+      (Move here after a queued reorder) stays there, left out; each other card it brings back is checked as any card
+      brought in (To do, the project's, its target, no work kept from a start since: with no record from before its
+      removal, any kept work refuses it), and given to nobody or the lane's builder, else refused with nothing changed. The builders of the lanes it
+      changed are started on them if they aren't running, as an update by the user or the Assistant does.
     - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
       one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
-      a lane gone, ended or at another revision is refused, nothing saved. Every check is made again at the write, under
+      a lane gone, ended or at another revision is refused, nothing saved. **Quick edits in turn** (HI-2932): the window
+      asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
+      from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
+      board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
+      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
+      Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
       facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
       before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:

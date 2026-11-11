@@ -420,10 +420,22 @@
   "workflow.option.strict.desc": {
     "placeholders": {}
   },
+  "workflow.option.strict.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.jjTitle": {
+    "placeholders": {}
+  },
   "workflow.option.strict.title": {
     "placeholders": {}
   },
   "workflow.option.style.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.style.title": {

@@ -307,7 +307,8 @@ export class CopyStore {
         let copy = free.sort((a, b) => b.usedAt.localeCompare(a.usedAt))[0]
         let fresh = false
         if (!copy) {
-          if (all.length >= o.size) return { ok: false as const, size: o.size }
+          // HI-2936: the size counts this platform's copies alone: another's left by a switch is never reused, so never fills it.
+          if (all.filter((c) => (c.platform ?? 'git') === (o.platform ?? 'git')).length >= o.size) return { ok: false as const, size: o.size }
           const names = new Set(all.map((c) => c.name.toLowerCase()))
           let n = 1
           while (names.has(copyName(n)) || existsSync(join(o.dir, copyName(n)))) n++
@@ -530,6 +531,12 @@ export class CopyPool {
     // agent-protocol: a programming error, never an agent's or the user's
     if (!own) throw new Error(`No workspace port for copy platform ${p}`) // i18n-ignore: an internal error, for the log
     return own
+  }
+
+  /** Whether a copy has its port here (HI-2936: a leftover of a platform switched from, its port not registered). */
+  private hasPort(c: Pick<Copy, 'platform'>): boolean {
+    const p = c.platform ?? 'git'
+    return p === this.port.platform || (isPlatformId(p) && !!workspacePortOf(p))
   }
 
   private fenceOf(name: string, token: string): WorkspaceFence {
@@ -915,7 +922,8 @@ export class CopyPool {
       if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
     }
     for (const c of this.store.copies()) {
-      if (c.state === 'returning') await this.tryFree(c.name)
+      // HI-2936: one whose platform has no port here is kept as it is until it has one.
+      if (c.state === 'returning' && this.hasPort(c)) await this.tryFree(c.name)
       else if (c.state === 'free' && !(await folderThere(c.folder))) await this.store.markGone(c.name)
     }
   }
@@ -1022,8 +1030,13 @@ export class CopyPool {
     const removed: string[] = []
     const free = (c: Copy): boolean => !c.op && !c.job && !this.store.leaseOn(c.name)
     for (const c of all.filter((x) => x.state === 'creating' && x.warmError && free(x))) if (!(await this.remove(c.name))) removed.push(c.name)
-    let over = all.length - removed.length - size
-    for (const c of all.filter((x) => (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))) {
+    // HI-2936: another platform's copies, left by a switch of the project's, are never reused: each removed once idle (by
+    // its own port), and none counted against this platform's size.
+    const mine = (c: Copy): boolean => (c.platform ?? 'git') === this.port.platform
+    for (const c of all.filter((x) => !mine(x) && !removed.includes(x.name) && (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS && this.hasPort(x))) if (!(await this.remove(c.name))) removed.push(c.name)
+    const own = all.filter(mine)
+    let over = own.filter((c) => !removed.includes(c.name)).length - size
+    for (const c of own.filter((x) => (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))) {
       if (over <= 0) break
       if (!(await this.remove(c.name))) {
         removed.push(c.name)

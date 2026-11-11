@@ -95,6 +95,7 @@ interface CombworkMessageValues {
   'files.find.placeholder': undefined
   'files.find.searching': undefined
   'files.git.allExt': { ext: string | number }
+  'files.git.commitIt': undefined
   'files.git.exclude': undefined
   'files.git.excludeFailed': undefined
   'files.git.excluded': { added: number; file: string | number; line: string | number; branch: string }

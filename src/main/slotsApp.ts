@@ -355,9 +355,21 @@ const platforms = new Map<string, PlatformId>()
 const platformKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}
 ${projectPath.toLowerCase()}`
 async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<void> {
-  const p = (await ws.projectConfig(projectPath).catch(() => null))?.platform
-  if (p === 'jj') jjPort()
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const p = cfg?.platform
+  // HI-2936: a project switched from jj keeps its idle jj slots and copies: their port is registered while any is left,
+  // so its pools settle, keep or remove them by jj (R2.6), never failing a Git lending for want of it.
+  if (p === 'jj' || (cfg && heldByJj(ws, cfg.id ?? basename(projectPath)))) jjPort()
   platforms.set(platformKey(ws, projectPath), p === 'jj' ? 'jj' : 'git')
+}
+/** Whether a project's board still has a jj slot or copy (HI-2936); false when the board can't be read. */
+function heldByJj(ws: WorkspaceService, project: string): boolean {
+  if (!ws.path) return false
+  try {
+    return !!boardConn(ws).read((db) => db.prepare("SELECT 1 FROM slots WHERE project = ? AND platform = 'jj' UNION ALL SELECT 1 FROM copies WHERE project = ? AND platform = 'jj' LIMIT 1").get(project, project)) // i18n-ignore: SQL
+  } catch {
+    return false
+  }
 }
 /** The port a project's new slots and copies are made with now (Git's unless the project uses jj). */
 export function projectWorkspaces(ws: WorkspaceService, projectPath: string): WorkspacePort {

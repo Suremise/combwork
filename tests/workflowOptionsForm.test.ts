@@ -55,8 +55,12 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 const savedWorkflow = config.settings.workflow
-afterEach(() => {
+afterEach(async () => {
   config.settings.workflow = savedWorkflow
+  // HI-2954: each test's workspaces closed as it ends. Kept open to the file's end, every earlier test's board, repository
+  // lock and watchers went on working in later tests' time: on CI's runner (11 Nov, its disk taking seconds to sync) their
+  // boards' idle checkpoints (1.2 to 2.7 s each) ran during HR3's gap 3's open, the 53rd, which took 22 s of its 20.
+  for (const w of opened.splice(0)) await disposeWorkspaceService(w)
 })
 
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()

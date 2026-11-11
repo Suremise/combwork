@@ -5,7 +5,7 @@
 // stand-in (nothing runs by itself), its runs driven here.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -18,7 +18,9 @@ vi.mock('../src/main/workflow/queueHost', () => ({
   queueChanged: (_ws: unknown, _p: string, target: string) => void host.changed.push(target),
   queueLive: () => ({ running: false, now: null, run: null }),
   queueHostsStamp: () => host.stamp,
-  profileName: () => 'test'
+  profileName: () => 'test',
+  // HI-2944: nothing builds in a folder here.
+  folderBuilders: () => null
 }))
 
 const base = tempDir('cw-queuecontrols-')
@@ -32,7 +34,8 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
-const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
+const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue, settleQueueChanges } = await import('../src/main/workflow/queueControls')
+const { gitRepoOps } = await import('../src/main/platform/gitRepoOps')
 const { forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
 const { keptLive, nextFold, queueKey, shownReturns, unseenReturns, withKept, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
 const { runCardIntent } = await import('../src/main/cardIntents')
@@ -289,6 +292,139 @@ describe('Pause queue and Resume (#1353)', () => {
     expect((await resume()).resumed).toBe(true)
     expect(host.kicked).toEqual(['main', 'main', 'main', 'main', 'main'])
   })
+})
+
+describe('Commit and Set aside on a paused merge (HI-2944)', () => {
+  /** A workspace whose main (checked out in the project folder) is paused on a.txt's uncommitted change, as the queue pauses. */
+  async function paused(files = ['a.txt']) {
+    const { w, repo, wt } = await workspace()
+    const wf = (await service.workflowFor(w, repo))!
+    for (const f of files) writeFileSync(join(repo, f), `the user's ${f}\n`)
+    // As the queue pauses on the folder's changes: the folder named with them.
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files, folder: repo }))
+    const p = wf.store.queuePause('main')!
+    const ref = { card: p.card, reason: p.reason, at: p.at! }
+    const head = () => git(repo, 'rev-parse', 'HEAD')
+    // From a start's warning (no pause), the folder it named: the project folder.
+    const settle = (action: 'commit' | 'setAside', shown: string[], r: typeof ref | null = ref, ops = gitRepoOps) => inWorkspace(w, () => settleQueueChanges(w, repo, 'main', action, shown, r, r ? null : repo, ops))
+    return { w, repo, wt, wf, ref, head, settle }
+  }
+
+  it("Commit: the files shown committed, the same pause found clean by Resume's own check, the queue run", async () => {
+    const { repo, wf, settle } = await paused()
+    const r = await settle('commit', ['a.txt'])
+    expect(r).toMatchObject({ resumed: true, done: { action: 'commit', files: ['a.txt'], branch: 'main' } })
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe('Commit changes before merging p-1')
+    expect(wf.store.queuePause('main')).toBeNull()
+    expect(host.kicked).toEqual(['main'])
+  })
+
+  it('Set aside: stashed, resumed; from a start (no pause) only done, the queue untouched', async () => {
+    const { repo, wf, settle } = await paused()
+    expect(await settle('setAside', ['a.txt'])).toMatchObject({ resumed: true, done: { action: 'setAside' } })
+    expect(git(repo, 'stash', 'list', '--format=%s')).toMatch(/Combwork: set aside before merging p-1/)
+    writeFileSync(join(repo, 'a.txt'), 'again\n')
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' }))
+    host.kicked.length = 0
+    expect(await settle('commit', ['a.txt'], null)).toMatchObject({ resumed: false, done: { action: 'commit' } })
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe('Commit changes before starting work on main')
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(host.kicked).toEqual([])
+  })
+
+  it('a pause no longer the one shown: refused before anything is touched', async () => {
+    const { repo, wf, ref, head, settle } = await paused()
+    const before = head()
+    await expect(settle('commit', ['a.txt'], { ...ref, at: '2000-01-01T00:00:00.000Z' })).rejects.toThrow(/pause changed meanwhile/)
+    await wf.locked(() => wf.store.setQueuePause('main', null))
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/pause changed meanwhile/)
+    expect(head()).toBe(before)
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+  })
+
+  it('the pause replaced while the commit ran: committed, but the new pause stays, shown; nothing resumed', async () => {
+    const { wf, settle } = await paused()
+    const ops = {
+      ...gitRepoOps,
+      settleChanges: async (...a: Parameters<typeof gitRepoOps.settleChanges>) => {
+        const done = await gitRepoOps.settleChanges(...a)
+        await wf.locked(() => wf.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' }))
+        return done
+      }
+    }
+    const r = await settle('commit', ['a.txt'], undefined, ops)
+    expect(r.resumed).toBe(false)
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(host.kicked).toEqual([])
+  })
+
+  it('a paused file left changed: the merge stays paused, naming it', async () => {
+    const { wf, settle } = await paused(['a.txt', 'c.txt'])
+    const r = await settle('commit', ['a.txt'])
+    expect(r.resumed).toBe(false)
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', files: ['c.txt'] })
+  })
+
+  it("main checked out in another folder since, the same file changed there: refused (the pause's folder), nothing done, still paused", async () => {
+    const { repo, wf, ref, head, settle } = await paused()
+    const before = head()
+    git(repo, 'checkout', '-q', '--detach')
+    const elsewhere = join(repo, '..', 'p-main')
+    git(repo, 'worktree', 'add', '-q', elsewhere, 'main')
+    writeFileSync(join(elsewhere, 'a.txt'), 'an edit the user never saw paused\n')
+    await expect(settle('commit', ['a.txt'], ref)).rejects.toThrow(/checked out changed meanwhile/)
+    await expect(settle('setAside', ['a.txt'], ref)).rejects.toThrow(/checked out changed meanwhile/)
+    expect(git(repo, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(git(elsewhere, 'status', '--porcelain')).toBe('M a.txt')
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', folder: repo })
+  })
+
+  it("a start's warning shown for the project folder, main checked out elsewhere since with the same file changed: refused, nothing done", async () => {
+    const { repo, head, settle } = await paused()
+    const before = head()
+    git(repo, 'checkout', '-q', '--detach')
+    const elsewhere = join(repo, '..', 'p-start')
+    git(repo, 'worktree', 'add', '-q', elsewhere, 'main')
+    writeFileSync(join(elsewhere, 'a.txt'), 'an edit the warning never named\n')
+    // No pause: the warning's folder (the project folder) is what the action is bound to.
+    await expect(settle('commit', ['a.txt'], null)).rejects.toThrow(/checked out changed meanwhile/)
+    await expect(settle('setAside', ['a.txt'], null)).rejects.toThrow(/checked out changed meanwhile/)
+    expect(git(repo, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(git(elsewhere, 'status', '--porcelain')).toBe('M a.txt')
+    expect(() => git(elsewhere, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+  })
+
+  it("a pause that doesn't name its folder (from before it was recorded): refused, saying to Resume", async () => {
+    const { repo, wf, settle } = await paused()
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files: ['a.txt'] }))
+    const p = wf.store.queuePause('main')!
+    await expect(settle('commit', ['a.txt'], { card: p.card, reason: p.reason, at: p.at! })).rejects.toThrow(/Resume the queue/)
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+  })
+
+  for (const reason of ['unstagedChanges', 'staged'] as const) {
+    it(`an older ${reason} pause: refused, then Resume (still changed) records where it saw them, then Commit and the merge goes on`, async () => {
+      const { w, repo, wf, settle } = await paused()
+      if (reason === 'staged') git(repo, 'add', 'a.txt')
+      await wf.locked(() => wf.store.setQueuePause('main', { reason, card: 'p-1', files: ['a.txt'] }))
+      const old = wf.store.queuePause('main')!
+      await expect(settle('commit', ['a.txt'], { card: old.card, reason: old.reason, at: old.at! })).rejects.toThrow(/Resume the queue/)
+      // Resume, the change still there: still paused, now naming the folder (and the files staged now), a new pause.
+      const r = await inWorkspace(w, () => resumeQueue(w, repo, 'main'))
+      expect(r.resumed).toBe(false)
+      const now = wf.store.queuePause('main')!
+      expect(now).toMatchObject({ reason, files: ['a.txt'] })
+      expect(resolve(now.folder ?? '').toLowerCase()).toBe(resolve(repo).toLowerCase())
+      // The old pause shown is stale now: refused as changed.
+      await expect(settle('commit', ['a.txt'], { card: old.card, reason: old.reason, at: old.at! })).rejects.toThrow(/pause changed meanwhile/)
+      // The pause as shown now: committed, and the merge goes on.
+      const done = await settle('commit', ['a.txt'], { card: now.card, reason: now.reason, at: now.at! })
+      expect(done).toMatchObject({ resumed: true, done: { files: ['a.txt'] } })
+      expect(git(repo, 'status', '--porcelain')).toBe('')
+      expect(wf.store.queuePause('main')).toBeNull()
+    })
+  }
 })
 
 describe("the window's listing (#1356: which queues the panel can show)", () => {

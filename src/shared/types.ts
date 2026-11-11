@@ -3965,6 +3965,45 @@ export interface FileGitDone {
   branch: string | null
 }
 
+/** HI-2944: what is done with a folder's uncommitted changes: committed there, or set aside (a named git stash). */
+export type FolderChangeAction = 'commit' | 'setAside'
+
+/** HI-2944: a folder's changes committed or set aside. */
+export interface FolderChangesDone {
+  action: FolderChangeAction
+  /** The folder, as git lists it. */
+  folder: string
+  /** Its branch then. */
+  branch: string
+  /** The paths acted on (a rename's both). */
+  files: string[]
+  /** The commit's or the stash's message (the stash is found by it in `git stash list`). */
+  message: string
+  /** The commit made, or the stash's object (`git stash list` shows it). */
+  made: string
+}
+
+/** HI-2944: a target's folder with uncommitted changes, as a start finds it (warned of, never refused). */
+export interface TargetChanges {
+  target: string
+  folder: string
+  /** Every path git reports changed there, untracked ones too. */
+  files: string[]
+}
+
+/** HI-2944: the queue's pause a Commit or Set aside acts on, as the window showed it. */
+export interface QueuePauseRef {
+  card: string
+  reason: string
+  at: string
+}
+
+/** HI-2944: Commit or Set aside from a paused merge: done, and whether the queue goes on (the pause then, if not). */
+export interface QueueChangesSettled {
+  done: FolderChangesDone
+  resumed: boolean
+}
+
 /** A file opened in the Files tab editor. */
 export interface FileContent {
   /** not-utf8: text that isn't valid UTF-8, never offered for editing (saving would rewrite its bytes, HI-2331). */
@@ -4478,8 +4517,11 @@ export interface LaneEditUndo {
 export interface LaneEditResult {
   op: LaneEdit['op']
   card: number | null
-  /** Each lane it changed, with the card in flight its change was queued after (null: applied now). */
-  lanes: { lane: string; queuedAfter: number | null }[]
+  /**
+   * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
+   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   */
+  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
   undo: LaneEditUndo | null
 }
 

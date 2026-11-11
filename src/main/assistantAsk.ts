@@ -8,6 +8,7 @@ import type { TaskCard } from '../shared/types'
 import { assistantCanAct } from './answerRelay'
 import { createDelivery, offerNow, registerSource } from './deliveries'
 import { createLogger, userText } from './logger'
+import { isLive } from '../shared/deliveries'
 import { agentMsg, say } from '../shared/agentText'
 import { sessions } from './sessions'
 import { askAssistantOn, clearAskWait, noteOnCard, type TaskActor } from './tasks'
@@ -45,8 +46,6 @@ const REFUSED = {
 
 const SOURCE = 'assistant-ask'
 const ASSISTANT = 'assistant'
-/** A request's delivery still on its way or unread (its mark stands). */
-const LIVE = new Set(['queued', 'offered', 'received', 'uncertain'])
 /** How long after a failed take-off its retry looks again, doubled after each retry that fails, up to RETRY_MAX_MS. */
 let RETRY_MS = 30_000
 const RETRY_MAX_MS = 5 * 60_000
@@ -117,7 +116,10 @@ async function asked(ws: WorkspaceService, n: number, actor: TaskActor & { kind:
   try {
     const r = await createDelivery(ws.assistantHome, {
       agentId: ASSISTANT,
-      kind: 'control',
+      // A message the Assistant acks once it has dealt with it (HI-2931): its ack is what takes the card's mark off. A
+      // control notice needs none (its doorbell says so), and once received it was never live, so a mark waited on an
+      // ack that never came, hiding the card's stalls, until something cleared it by hand.
+      kind: 'rebrief',
       from: { kind: 'agent', name: askerName, project: self.project, agentId: self.agentId },
       card: n,
       body: askLine({ key, askerName, text, waiting }),
@@ -157,7 +159,9 @@ export async function reconcileAskWaits(ws: WorkspaceService): Promise<number> {
   try {
     const marks = askWaitMarks(ws).filter((m) => !making.has(m.ref))
     if (marks.length) {
-      const live = new Set((await deliveriesOf(ws.assistantHome, ASSISTANT)).filter((r) => r.source === SOURCE && LIVE.has(r.state)).map((r) => r.ref))
+      // Live as the delivery service has it (isLive): on its way, unread, or read and not acked yet. A request sent as a
+      // control notice before HI-2931 is done once received, so its mark goes here.
+      const live = new Set((await deliveriesOf(ws.assistantHome, ASSISTANT)).filter((r) => r.source === SOURCE && isLive(r)).map((r) => r.ref))
       for (const m of marks) {
         if (live.has(m.ref) || making.has(m.ref)) continue
         try {
@@ -242,12 +246,13 @@ registerSource(SOURCE, {
     const ws = workspaceFor(host)
     return !!ws && assistantCanAct(ws)
   },
-  // Ended unread (cancelled, refused, expired, stale): the user is told the Assistant didn't get it, and its card's mark goes.
+  // Ended without an ack: its card's mark goes. Unread (cancelled, refused, expired, stale): the user is told the
+  // Assistant didn't get it. Read and never acked (expired after a week, HI-2931): it did get it, so nothing is said.
   ended: (r, host) => {
     const ws = workspaceFor(host)
     const m = r.meta ?? {}
     if (!ws || typeof m.card !== 'number' || typeof m.project !== 'string') return
-    void untold(ws, m.card, m.project, typeof m.askerName === 'string' ? m.askerName : r.from.name).catch((e) => log.warn("telling the user the Assistant didn't get a request", e))
+    if (!r.received) void untold(ws, m.card, m.project, typeof m.askerName === 'string' ? m.askerName : r.from.name).catch((e) => log.warn("telling the user the Assistant didn't get a request", e))
     if (r.ref) void release(ws, m.card, r.ref)
   },
   // HI-2915: the Assistant dealt with it (go, decline, or its own mark set first): the request's mark goes.

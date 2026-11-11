@@ -103,6 +103,22 @@
     "defaultMessage": "Change {change}\nCommit {commit}",
     "description": "Tooltip of a jj commit’s ids (HI-2799): both in full."
   },
+  "jj.integrate.candidate": {
+    "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts; no merge checks were run on it.",
+    "description": "Under a passed jj card (HI-2871): Combwork built a candidate for the user to integrate: the reviewed change brought onto the target bookmark’s current commit ({expected}, short) as a new commit ({commit}, short; {change} its jj change id, short). {style} says how (keep the select keys). It has no conflicts; Combwork ran no merge checks on it."
+  },
+  "jj.integrate.candidateHow": {
+    "defaultMessage": "To integrate it, move {target} to the candidate:",
+    "description": "Above the jj command that integrates a passed card’s candidate (HI-2871): it moves the target bookmark {target} to the candidate commit. Combwork never runs it."
+  },
+  "jj.integrate.candidateSigning": {
+    "defaultMessage": "No candidate: this repository signs its commits, and Combwork doesn’t make commits in it. Integrate it yourself, for example:",
+    "description": "Under a passed jj card (HI-2871): Combwork didn’t build a candidate because the repository’s jj signs commits (signing.behavior). The user integrates it by hand; an example follows."
+  },
+  "jj.integrate.candidateUnknown": {
+    "defaultMessage": "Combwork couldn’t build a candidate ({why}). It tries again with each change; meanwhile, integrate it yourself, for example:",
+    "description": "Under a passed jj card (HI-2871): Combwork tried several times to build a candidate and couldn’t; {why} is a short code for the log (keep it as it is). The user can integrate it by hand; an example follows."
+  },
   "jj.integrate.card": {
     "defaultMessage": "{card} {title}: commit {commit} into {target}",
     "description": "A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into."

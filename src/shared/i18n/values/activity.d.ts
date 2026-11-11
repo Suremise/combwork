@@ -53,7 +53,8 @@ interface CombworkMessageValues {
   'activity.map.show': undefined
   'activity.map.state': { state: string }
   'activity.map.station': { station: string }
-  'activity.map.stationTip': { station: string | number; n: number; heat: number; last: string }
+  'activity.map.stationTip': { station: string | number; n: number; heat: number; hasLast: string; last: string | number }
+  'activity.map.stationTipPending': { station: string | number; status: string }
   'activity.map.stripLabel': undefined
   'activity.map.toggleContext': undefined
   'activity.map.toggleFeed': undefined
