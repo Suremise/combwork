@@ -215,6 +215,29 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       expect(await jjp.invalidated('tick')).toBe(false)
     })
 
+    it("a restart between a pass's pages begins a new pass, so what its first page left is never forgotten (HR1's round 4)", async () => {
+      const w = await world(true, { candidates: true })
+      const Z = (c: string) => c.repeat(40)
+      const held = [{ fp: { cycle: 1, submission: 1, revision: Z('a'), base: Z('b'), key: null, commit: Z('a'), target: 'main', ruleset: 'r', style: 'merge', strict: false, generation: 0, approval: 1 }, record: { attempt: 'aaaaaa01', card: 'AA-00', kind: 'candidate', style: 'merge', revision: Z('a'), base: Z('b'), expected: Z('b'), phase: 'done', baseOp: 'x', ops: [], commits: [Z('1')], pins: [], result: Z('1'), outcome: 'candidate' } }]
+      await w.deps.records!.write((db) => {
+        const put = db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)')
+        put.run(attemptsKey('p-jj', 'AA-00', 1), JSON.stringify(held))
+        for (let i = 0; i < 39; i++) put.run(attemptsKey('p-jj', `ZZ-${String(i).padStart(2, '0')}`, 1), '[]')
+      })
+      // Page 1 leaves the held one unresolved, its cursor mid-pass; then the app restarts (a new workflow, the same board).
+      expect(await new JjPlatform(w.wf).sweepEnded()).toEqual({ more: true })
+      const after = new JjPlatform(w.another())
+      // The new workflow's first sweep starts from the beginning (it reads 32, so more follow), not from the old cursor.
+      expect(await after.sweepEnded()).toEqual({ more: true })
+      expect(await after.sweepEnded()).toEqual({ more: false })
+      expect(await after.invalidated('tick')).toBe(true)
+      // Resolved: the next full pass drains and the tick stops.
+      await w.deps.records!.write((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run('[]', attemptsKey('p-jj', 'AA-00', 1)))
+      expect(await after.sweepEnded()).toEqual({ more: true })
+      expect(await after.sweepEnded()).toEqual({ more: false })
+      expect(await after.invalidated('tick')).toBe(false)
+    })
+
     it("a step run just after the user moved the target onto the candidate (it read the target before): the candidate left for the proof, credited via it", async () => {
       const w = await world(true, { candidates: true })
       const { card } = await approved(w)

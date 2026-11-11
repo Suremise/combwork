@@ -1021,7 +1021,9 @@ export class JjPlatform implements PlatformAdapter {
     // ends there (HR1's round 2): its cursor goes back to the start and `more` is false, so a quiet project's next pass
     // waits for a reason (a move, the tick while something was left unresolved, a start), never a continuation loop.
     const cursor = rec.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(cursorKey) as { value: string } | undefined)?.value ?? '') // i18n-ignore: SQL
-    const after = cursor > prefix ? cursor : prefix
+    // A workflow's first sweep begins a pass at the start, whatever the cursor (HR1's round 4): the pass's unresolved work
+    // is this workflow's memory, so a pass carried over a restart would forget what its earlier pages left.
+    const after = sweeps.has(wf) && cursor > prefix ? cursor : prefix
     const scan = (from: string, to: string, n: number): { key: string; value: string }[] =>
       n > 0 ? (rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ? ORDER BY key LIMIT ?').all(from, to, n)) as { key: string; value: string }[]) : [] // i18n-ignore: SQL
     const all = scan(after, `${prefix}\uffff`, SWEEP_SCAN)

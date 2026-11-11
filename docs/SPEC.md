@@ -3478,7 +3478,9 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   (`jj_sweep_cursor:<project>`, past every row scanned). A pass runs from the start to the last key and ends there, its
   cursor back at the start (HR1's round 2): `more` asks for a continuation run only mid-pass or for a page cut short, and
   the minute's tick asks for a new pass while anything was left unresolved, on any page of the pass under way or the last
-  finished one (HR2's round 3: kept across a pass's pages, reset as a pass begins). The `moved` hook asks for a run on a move
+  finished one (HR2's round 3: kept across a pass's pages, reset as a pass begins). That memory is the running
+  workflow's, so a workflow's first sweep (after a restart) begins a pass at the start, whatever the cursor (HR1's round
+  4). The `moved` hook asks for a run on a move
   into Todo or Done too.
 - **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
   run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleEnded` the
