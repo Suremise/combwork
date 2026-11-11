@@ -2443,8 +2443,9 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
     if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
-  // HI-2893: of the live queues only: a past branch's is named or never picked.
-  const views = (await queueViews(ws, p)).filter((x) => !x.past)
+  // HI-2893: of the live queues only: a past branch's is named or never picked. HI-2994: of those that hold or held
+  // something (an entry, an outcome, a pause, a card in flight), not each of the project's targets the listing has.
+  const views = (await queueViews(ws, p)).filter((x) => !x.past && (!!x.testing || x.queued.length > 0 || x.recent.length > 0 || !!x.paused || !!x.runBy || x.inFlight.length > 0))
   if (views.length === 1) return views[0].target
   throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }

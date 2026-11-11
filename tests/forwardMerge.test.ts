@@ -397,6 +397,29 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(api.filter((v) => v.past).map((v) => v.target)).toEqual(['1.1.0'])
   })
 
+  it('HI-2994: the Agent API lists every queue the window shows, an old branch’s with a card in flight into it included', async () => {
+    const { w, repo } = await versions()
+    const tasks = await import('../src/main/tasks')
+    const { agentActor } = await import('../src/shared/workflow/facts')
+    const { shownQueues } = await import('../src/shared/progressQueue')
+    // A card started on 1.4.0 (listed then), and 1.4.0 dropped from the project's targets since: in flight into an old branch.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Release fix', project: 'p', target: '1.4.0' }, user))
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${c.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+    expect(wf.state(wf.store.card(c.number)).started?.target).toBe('1.4.0')
+    await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['next'] } } })))
+    const window = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    const shown = shownQueues(window, Date.now()).map((v) => v.target)
+    expect(shown).toContain('1.4.0')
+    expect(window.find((v) => v.target === '1.4.0')).toMatchObject({ inFlight: [c.number] })
+    // The Agent API's listing (GET /v1/queue, cw_queue list: past branches' left out): the same queue, live.
+    const api = await inWorkspace(w, () => controls.queueViews(w, repo))
+    const listed = api.filter((v) => !v.past).map((v) => v.target)
+    for (const t of shown) expect(listed).toContain(t)
+    expect(api.find((v) => v.target === '1.4.0')).toMatchObject({ inFlight: [c.number] })
+    expect(api.find((v) => v.target === '1.4.0')?.past).toBeUndefined()
+  })
+
   it("HI-2927: a card in flight, a pause or a Combwork running it keeps an old target's queue live; unreadable targets mark none past", async () => {
     const { w, repo } = await versions()
     const { past: _past, ...one } = (await inWorkspace(w, () => controls.queueViews(w, repo, '1.0.0')))[0]
