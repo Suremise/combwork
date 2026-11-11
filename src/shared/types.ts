@@ -1919,6 +1919,18 @@ export interface ProjectConfig {
   loopStepWaitMinutes?: number | null
 }
 
+/**
+ * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
+ * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
+ * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.
+ */
+export interface SlotRecovery {
+  restored: number
+  copies: { path: string; copy: string }[]
+  keptDeleted: string[]
+  divergent: string | null
+}
+
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
 export interface SlotView {
   name: string

@@ -92,6 +92,19 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
         expect(w.wf.state(card).started).toMatchObject({ slot: 'slot-a' })
       })
 
+    it("refuses work holding a copy Recover… wrote beside a file (HI-2996), naming it; once deleted in a later commit, it's taken", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'recovered copies')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      w.commitIn(a.folder, 'p.txt.cw-recovered-r-0123abcd', a.identity.workspace)
+      expect(refusedBy(await w.wf.submit(card.key, B1, { summary: 's' }), 'platform.jjRefused').values).toMatchObject({ why: 'recovered', files: 'p.txt.cw-recovered-r-0123abcd' })
+      expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
+      rmSync(join(a.folder, 'p.txt.cw-recovered-r-0123abcd'))
+      w.h.jj(a.folder, 'commit', '-m', 'copy removed')
+      moved(await w.wf.submit(card.key, B1, { summary: 's' }))
+    })
+
     it("refuses what isn't committed work of this card: an uncommitted edit, a merge working copy, a change id named; the lease ended or an operation installed before the write", async () => {
       const w = await world(colocated)
       const a = w.slots['slot-a']

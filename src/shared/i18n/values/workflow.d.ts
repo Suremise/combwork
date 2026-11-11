@@ -362,7 +362,7 @@ interface CombworkMessageValues {
   'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.changed.message': { card: string | number; platform: string | number }
   'workflow.refused.platform.changed.next': { platform: string | number }
-  'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; base: string | number; commit: string | number; other: string | number; max: number }
+  'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; base: string | number; commit: string | number; other: string | number; max: number; files: string | number }
   'workflow.refused.platform.jjRefused.next': { why: string }
   'workflow.refused.platform.switching.message': { card: string | number }
   'workflow.refused.platform.switching.next': undefined
@@ -505,6 +505,11 @@ interface CombworkMessageValues {
   'workflow.slots.recoverMessage': undefined
   'workflow.slots.recoverTitle': { slot: string | number }
   'workflow.slots.recovered': { slot: string | number }
+  'workflow.slots.recoveredCopies': { n: number }
+  'workflow.slots.recoveredDivergent': { commit: string | number }
+  'workflow.slots.recoveredKeptDeleted': { n: number; files: string | number }
+  'workflow.slots.recoveredPutBack': { n: number }
+  'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
   'workflow.slots.reviewCopies': undefined
   'workflow.slots.reviewCopiesDesc': undefined

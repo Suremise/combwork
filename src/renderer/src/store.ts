@@ -128,6 +128,8 @@ export interface ConfirmRequest {
   wide?: boolean
   confirmLabel?: string
   cancelLabel?: string
+  /** Something to read, nothing to decide (HI-2996: what Recover… did): its one button, no Cancel; it resolves true. */
+  okOnly?: boolean
   danger?: boolean
   /** The session action it confirms (Stop, Remove…): the confirm button takes its colour (#344). */
   action?: SessionAction

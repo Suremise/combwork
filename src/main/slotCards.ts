@@ -58,7 +58,7 @@ import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, laneEndHeldNow, poolFor, poolIfMade, setSlotFreed } from './slotsApp'
 import { brokerWorkingIn } from './agentProcesses'
-import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type PrepareResult, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
+import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type PrepareResult, type RecoverOutcome, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
@@ -1288,7 +1288,7 @@ function failedCycleOf(wf: Workflow, l: SlotLease, laneCards: readonly number[])
  * preparation is still owed, `busy` when it was made or nothing failed there. After a recovery only, that cycle's failed
  * try is forgotten here and a pass prepares it again; a refused or cut-short recovery leaves both as they were.
  */
-export async function recoverHeldSlot(ws: WorkspaceService, projectPath: string, pool: SlotPool, name: string, l: SlotLease, run: Parameters<SlotPool['recoverStale']>[1]): Promise<{ ok: true } | { ok: false; why: string }> {
+export async function recoverHeldSlot(ws: WorkspaceService, projectPath: string, pool: SlotPool, name: string, l: SlotLease, run: Parameters<SlotPool['recoverStale']>[1]): Promise<RecoverOutcome> {
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
   const laneCards = async (): Promise<number[]> => (l.kind === 'lane' && l.lane ? ((await rawLanes(ws)).find((x) => x.id === l.lane)?.cards ?? []) : [])

@@ -222,7 +222,13 @@ export const RETAIN_PAGE = 8
 export const RETAIN_EVERY_MS = 6 * 60 * 60 * 1000
 
 /** A jj refusal of a card's move, worded by its code (`platform.jjRefused`). */
-type JjWhy = 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound'
+type JjWhy = 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound' | 'recovered'
+
+/**
+ * A file Recover… of a stale slot wrote beside another (HI-2996, jjRecovery.ts): its copy of the user's version, or the
+ * file it moved aside. Never part of a card's work unasked: a submission whose change holds one is refused, naming them.
+ */
+export const RECOVERY_COPY = /\.cw-(?:recovered|before-recovery)-[^/]+$/
 
 /** What prime reads for the evidence: a started card's slot (its view, lease and binding), or a Todo card's target. */
 interface Primed {
@@ -560,6 +566,8 @@ export class JjPlatform implements PlatformAdapter {
     const ch = await this.H.change(ctx.store, mb, P.commit)
     if (isUnknown(ch)) return { ok: false, refusal: this.unknownRefusal(card, ch, 'submit') }
     if (!ch.files.length) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'none' } } }
+    const copies = ch.files.filter((f) => f.status !== 'D' && RECOVERY_COPY.test(f.path)).map((f) => f.path)
+    if (copies.length) return { ok: false, refusal: this.refused(card, 'recovered', { files: copies.slice(0, 5).join(', ') + (copies.length > 5 ? ', …' : '') }) }
     const inputs: Partial<GuardInputs> = {}
     if (args.guards.includes('submit.clean')) inputs.dirty = []
     if (args.guards.includes('submit.ready')) inputs.conflicts = []

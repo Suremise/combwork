@@ -11,7 +11,8 @@
 // - B1 stopped, the slot back in the pool by itself (HI-2906: ready, detached at main);
 // - the slot made stale (its working-copy commit rewritten from the project folder): Slots and copies says Stale with
 //   Recover…; the confirmation names the folder unrecorded edits go to; an edit there is kept in it, and the slot is
-//   recovered (not stale any more), its Recover… gone;
+//   recovered (not stale any more), its Recover… gone; an edit the update also changed is written beside its file, and
+//   what Recover… did shows in a window naming that copy (HI-2996);
 // - the next card starts in that same slot (HI-2906);
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
@@ -278,9 +279,13 @@ const onDb = (fn) => {
     if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')
+    // HI-2996: an unrecorded edit of base.txt too, which the rewrite below also changes (deletes): an overlap, so Recover…
+    // keeps the update and writes this version beside it.
+    fs.writeFileSync(path.join(w1.folder, 'base.txt'), 'mine\n')
     // The slot's working-copy commit rewritten from the project folder, its own working copy untouched (a write of its
     // checkout state can race Combwork's reads there on Windows: Access is denied).
     jj(shop, '--ignore-working-copy', 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
+    jj(shop, '--ignore-working-copy', 'restore', '--from', 'root()', '--into', `${wsName}@`, 'base.txt')
     check('the slot is stale', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
     await toProject()
     await section('workflow')
@@ -294,7 +299,15 @@ const onDb = (fn) => {
     check('…the confirmation names the folder its unrecorded edits go to', !!(await until(async () => (await ask.count()) === 1 && (await text(ask)).includes(`.cw-recovery`) && (await text(ask)).includes(slot), HUNG_MS)), await text(page.locator('.dialog')))
     await shoot(ask, 'recover-confirm')
     await ask.getByRole('button', { name: 'Recover', exact: true }).click()
-    check('…recovered: the notice, not stale any more, the edit kept aside', !!(await until(async () => /is recovered/.test(await text(page.locator('body'))) && (await inv('slots:list', shop)).find((s) => s.name === slot)?.stale !== true, HUNG_MS)) && fs.existsSync(path.join(path.dirname(w1.folder), '.cw-recovery', slot)), await text(page.locator('body')))
+    // HI-2996: what it did, in a window: the copy it wrote beside base.txt (your version), the other file put back.
+    const did = page.locator('.dialog').filter({ hasText: `${slot} is recovered: look at these` })
+    const copyName = () => (fs.existsSync(w1.folder) ? fs.readdirSync(w1.folder).find((f) => f.startsWith('base.txt.cw-recovered-')) : undefined)
+    check('…what it did shows: the copy written beside base.txt, by its path, and the other file put back', !!(await until(async () => (await did.count()) === 1 && !!copyName() && (await text(did)).includes(path.join(w1.folder, copyName())) && /1 other file was put back as it was/.test(await text(did)), HUNG_MS)), await text(page.locator('.dialog')))
+    check('…the copy holds your version', copyName() !== undefined && fs.readFileSync(path.join(w1.folder, copyName()), 'utf8') === 'mine\n')
+    check('…one button, no Cancel', (await did.getByRole('button', { name: 'Cancel' }).count()) === 0 && (await did.getByRole('button', { name: 'OK', exact: true }).count()) === 1)
+    await shoot(did, 'recover-did')
+    await did.getByRole('button', { name: 'OK', exact: true }).click()
+    check('…recovered: not stale any more, the edit kept aside', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.stale !== true, HUNG_MS)) && fs.existsSync(path.join(path.dirname(w1.folder), '.cw-recovery', slot)), await text(page.locator('body')))
     const aside = path.join(path.dirname(w1.folder), '.cw-recovery', slot)
     const kept2 = fs.existsSync(aside) ? fs.readdirSync(aside, { recursive: true }).some((f) => String(f).endsWith('draft.txt')) || fs.existsSync(path.join(w1.folder, 'draft.txt')) : false
     check('…its unrecorded edit is kept', kept2, fs.existsSync(aside) ? JSON.stringify(fs.readdirSync(aside, { recursive: true })) : 'no aside folder')
@@ -304,6 +317,9 @@ const onDb = (fn) => {
     // --- HI-2906: the next card gets that same slot. The user, having looked, removes the draft the recovery kept in the
     // slot (its copy is aside), then starts another card for B1.
     fs.rmSync(path.join(w1.folder, 'draft.txt'), { force: true })
+    // HI-2996: and, having compared them, deletes the copy and puts base.txt back as main has it.
+    for (const f of fs.readdirSync(w1.folder).filter((x) => x.includes('.cw-recovered-') || x.includes('.cw-before-recovery-'))) fs.rmSync(path.join(w1.folder, f), { force: true })
+    fs.writeFileSync(path.join(w1.folder, 'base.txt'), 'base\n')
     const n2 = (await inv('tasks:create', { title: 'Shop second', project: 'shop', agent: b1.id })).number
     const started2 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: the next card' }).catch((e) => ({ error: String(e) }))
     const w2 = await until(async () => {
