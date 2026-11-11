@@ -5847,12 +5847,15 @@ touched:
   and a staged pause's files as staged then, which the pause's text names), and, under the repository
   lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
   operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
-  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: those paths alone, as
-  `commit --only` would (their working-tree content; every other index entry kept; a rename's both sides), except that
-  a path whose index entry is gone (a staged deletion, Files' Stop Tracking, or a rename's old side) is committed as
-  that deletion, the file on disk left untracked, never added back (HI-2982: `commit --only` took the kept file, so a
-  secret just taken out of Git went back in). The folder's `index.lock` is taken first and held to the end, as git's own
-  commit holds it (another git holding it: refused, nothing done). The commit is built in an index of its own (HEAD's
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: those paths alone, by
+  git itself wherever it can: `add --intent-to-add` for untracked ones, then `commit --only -- <paths>` (their
+  working-tree content; every other index entry kept; a rename's both sides); a failure (a hook, signing) undoes only
+  the intent-to-add entries it made and loses nothing. Except when a path whose index entry is gone (a staged deletion,
+  Files' Stop Tracking, or a rename's old side) still has its file in the folder: `commit --only` would add it back
+  (HI-2982: a secret just taken out of Git went back in), so that commit commits it as the deletion, the file left
+  untracked, built by Combwork as `commit --only` builds one. The folder's `index.lock` is taken first and held to the
+  end, as git's own commit holds it (another git holding it: refused, nothing done); both copies of the index are made
+  before the commit, and only a missing index counts as none. The commit is built in an index of its own (HEAD's
   tree over a copy of the folder's index, each path from the folder by `update-index --add --remove`, each deletion
   `--force-remove`) and committed from it (hooks and signing as any commit); the folder's new index (those paths
   brought to the commit, `reset -- <paths>` in a copy) is written into the lock and renamed over the index, as git

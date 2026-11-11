@@ -137,15 +137,61 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   return now.line
 }
 
+/**
+ * Copies the folder's index to `to`: true when copied, false when there is no index (a repository that has none yet,
+ * an empty index). Any other failure throws, as a refused commit: a copy that failed is never taken for an empty index.
+ */
+async function copyIndex(index: string, to: string): Promise<boolean> {
+  try {
+    await copyFile(index, to)
+    return true
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT' && !(await lstat(index).then(() => true, () => false))) return false
+    throw failed(M.commitFailed, `could not copy the index: ${(e as Error).message}`) // i18n-ignore: stands in for git's own (English) words
+  }
+}
+
 /** How often, and how far apart, the folder's new index is tried as it is published (Windows refuses a rename while
  * another process has the file open for a moment). */
 const PUBLISH_TRIES = 5
 const PUBLISH_RETRY_MS = 100
 
 /**
- * Commits `files` (repository-relative, as status reports them) in `folder` (a working tree's top), those paths only,
- * as `commit --only` would but keeping a staged deletion (HI-2982): `commit --only` takes each path from the folder, so a
- * file the user stopped tracking (its deletion staged, the file kept) went back into Git with its local content.
+ * Commits `files` (repository-relative, as status reports them) in `folder` (a working tree's top), those paths only.
+ * Git does the index work wherever it can (the Assistant's design note, round 3): `commit --only`, unless a path's
+ * deletion is staged while its file is still in the folder (Stop Tracking), which `commit --only` would add back with
+ * its local content (HI-2982); only then is the commit built in an index of Combwork's (commitKeepingDeletions).
+ */
+async function commitPaths(folder: string, files: string[], now: Map<string, Changed>, message: string): Promise<string> {
+  for (const p of files) if (now.get(p)?.deleted && (await lstat(join(folder, p)).then(() => true, () => false))) return commitKeepingDeletions(folder, files, now, message)
+  return commitOnly(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message)
+}
+
+/**
+ * `files` committed by git alone: an untracked one added as intent-to-add first (undone again if the commit fails, only
+ * those this call added), then `commit --only`, which commits their working-tree content through a temporary index of
+ * git's, under git's own index lock, and leaves every other index entry as it was. Never given a staged deletion whose
+ * file is still in the folder (commitPaths).
+ */
+async function commitOnly(folder: string, files: string[], untracked: string[], message: string): Promise<string> {
+  if (untracked.length) {
+    const add = await git(folder, ['add', '--intent-to-add', '--', ...untracked.map(literal)])
+    if (!add.ok) throw failed(M.commitFailed, add.err)
+  }
+  const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, '--', ...files.map(literal)], undefined, undefined, { env: quietEnv(), timeout: ACT_MS })
+  if (!r.ok) {
+    // The files as they were: the intent-to-add entries this call made taken out again (the working tree never touched).
+    if (untracked.length) await git(folder, ['reset', '--quiet', '--', ...untracked.map(literal)])
+    throw failed(M.commitFailed, `${r.err}\n${r.out}`)
+  }
+  const head = await git(folder, ['rev-parse', 'HEAD'])
+  return head.out.trim()
+}
+
+/**
+ * Commits `files` as `commit --only` would but keeping a staged deletion whose file is still in the folder (HI-2982):
+ * `commit --only` takes each path from the folder, so a file the user stopped tracking went back into Git with its
+ * local content.
  *
  * Under the folder's own index lock throughout, as git's own commit holds it (HR1's round 1): `index.lock` taken first
  * (held by another git: refused, nothing done), so no other git writes the index from the snapshot to the end. The
@@ -155,9 +201,10 @@ const PUBLISH_RETRY_MS = 100
  * folder's new index (a copy with those paths brought to the commit, `reset -- <paths>`) is written into the lock and
  * renamed over the index, as git publishes one. A refused commit leaves the index and files untouched; a failure after
  * the commit puts the branch back where it was (only if still at the new commit) and refuses, never a success with the
- * index and HEAD apart.
+ * index and HEAD apart. Both copies of the index are made before the commit, and only a missing index counts as none
+ * (HR1's round 2).
  */
-async function commitPaths(folder: string, files: string[], now: Map<string, Changed>, message: string): Promise<string> {
+async function commitKeepingDeletions(folder: string, files: string[], now: Map<string, Changed>, message: string): Promise<string> {
   const gone = files.filter((p) => now.get(p)?.deleted)
   const taken = files.filter((p) => !now.get(p)?.deleted)
   const at = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
@@ -176,7 +223,11 @@ async function commitPaths(folder: string, files: string[], now: Map<string, Cha
     const before = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
     const was = before.ok ? before.out.trim() : null
     const env = { ...quietEnv(), GIT_INDEX_FILE: building }
-    if (was) await copyFile(index, building).catch(() => undefined)
+    // Both copies of the index made before anything is committed (HR1's round 2): one the commit is built over, one the
+    // folder's new index is made from. Only an index that isn't there (a repository with none yet) is no copy; any
+    // other failure refuses here, nothing committed, never an index made from part of it.
+    const copied = await copyIndex(index, building)
+    if (copied !== (await copyIndex(index, next))) throw failed(M.commitFailed, 'the index changed while it was copied') // i18n-ignore: stands in for git's own (English) words
     let base = await git(folder, was ? ['read-tree', '-m', 'HEAD'] : ['read-tree', '--empty'], undefined, undefined, { env })
     // A copied index git can't merge from (an unmerged entry): HEAD's tree alone.
     if (!base.ok && was) base = await git(folder, ['read-tree', 'HEAD'], undefined, undefined, { env })
@@ -194,9 +245,8 @@ async function commitPaths(folder: string, files: string[], now: Map<string, Cha
     const after = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
     const made = after.ok ? after.out.trim() : ''
     try {
-      // The folder's index as the commit has those paths (a deletion's entry is gone already), from the index as it was
-      // under the lock: what `commit --only` leaves.
-      await copyFile(index, next).catch(() => undefined)
+      // The folder's index as the commit has those paths (a deletion's entry is gone already), from its copy made under
+      // the lock before the commit: what `commit --only` leaves.
       if (taken.length) {
         const sync = await git(folder, ['reset', '--quiet', '--', ...taken.map(literal)], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
         if (!sync.ok) throw new Error(sync.err.trim() || 'git reset failed') // i18n-ignore: git's own words, or the command

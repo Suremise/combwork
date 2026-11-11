@@ -15,6 +15,18 @@ import type { GitResult } from '../src/main/git'
 let failStashAfter = false
 /** HI-2982: the reset that makes the folder's new index after a commit answered as failed. */
 let failIndexSync = false
+/** HI-2982 (HR1's round 2): a copy of the index to a file matching this refused (EPERM), as Windows can. */
+let failCopyTo: RegExp | null = null
+vi.mock('original-fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  return {
+    ...real,
+    copyFile: (async (from: string, to: string, mode?: number) => {
+      if (failCopyTo?.test(String(to))) throw Object.assign(new Error(`EPERM: operation not permitted, copyfile '${from}'`), { code: 'EPERM' })
+      return real.copyFile(from, to, mode)
+    }) as typeof real.copyFile
+  }
+})
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -95,6 +107,7 @@ beforeEach(() => {
   failTopIn = null
   failStashAfter = false
   failIndexSync = false
+  failCopyTo = null
 })
 
 describe('Commit', () => {
@@ -274,44 +287,85 @@ describe('a file the user stopped tracking (its deletion staged, the file kept)'
     expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? a.txt', 'D  a.txt'])
   })
 
-  // HR1's round 1: the commit is built in an index of its own, so the folder's index is held as git's own commit holds it.
-  it('another git holding the index lock: refused, nothing done (HEAD, the index and the files as they were)', async () => {
+  // HR1's rounds 1 and 2: a stopped-tracking file selected, the commit is built in an index of Combwork's, so the folder's
+  // index is held as git's own commit holds it, and copied whole or not at all.
+  /** The whole index, each entry's mode, object and stage: compared before and after. */
+  const indexEntries = (): string => sh(proj, 'ls-files', '--stage')
+  const withStopped = (): void => {
+    stopTracking('secret.env', 'SECRET=1\n', true)
     writeFileSync(join(proj, 'a.txt'), 'new\n')
+  }
+
+  it('Git does the commit itself (commit --only) when no deletion kept on disk is selected', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    // Git's own commit --only hands a hook its next-index lock as GIT_INDEX_FILE; an index of Combwork's has no .lock.
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nbasename "$GIT_INDEX_FILE" > .git/hook-index\nexit 0\n')
+    await settle('commit', ['a.txt'])
+    expect(readFileSync(join(proj, '.git', 'hook-index'), 'utf8').trim()).toMatch(/^next-index-.*\.lock$/)
+    expect(committed()).toEqual(['a.txt'])
+  })
+
+  it('another git holding the index lock: refused, nothing done (HEAD, the index and the files as they were)', async () => {
+    withStopped()
     const before = head()
+    const entries = indexEntries()
     writeFileSync(join(proj, '.git', 'index.lock'), '')
     try {
-      await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Another git command is using the repository/)
+      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Another git command is using the repository/)
       expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(true)
     } finally {
       rmSync(join(proj, '.git', 'index.lock'))
     }
     expect(head()).toBe(before)
-    expect(status()).toBe('M a.txt')
+    expect(indexEntries()).toBe(entries)
     expect(read('a.txt')).toBe('new\n')
+    expect(read('secret.env')).toBe('SECRET=1\n')
   })
 
   it('another git writing the index while the commit runs (a hook staging into the real index) is refused, its file left as it was', async () => {
-    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    withStopped()
     writeFileSync(join(proj, 'b.txt'), 'b, edited\n')
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     // Git hands the hook the commit's own index (GIT_INDEX_FILE): unset, its add writes the folder's index, which is held.
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nunset GIT_INDEX_FILE\ngit add b.txt 2>/dev/null\necho $? > .git/hook-add\nexit 0\n')
-    await settle('commit', ['a.txt'])
+    await settle('commit', ['a.txt', 'secret.env'])
     expect(readFileSync(join(proj, '.git', 'hook-add'), 'utf8').trim()).not.toBe('0')
-    expect(committed()).toEqual(['a.txt'])
-    expect(status()).toBe('M b.txt')
+    expect(committed()).toEqual(['a.txt', 'secret.env'])
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['M .gitignore', 'M b.txt'])
     expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
   })
 
   it("the folder's index not written after the commit: the commit taken back and refused, never a success with them apart", async () => {
-    writeFileSync(join(proj, 'a.txt'), 'new\n')
+    withStopped()
     const before = head()
+    const entries = indexEntries()
     failIndexSync = true
-    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/Git did not commit: fatal: could not write the new index/)
+    await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: fatal: could not write the new index/)
     expect(head()).toBe(before)
-    expect(status()).toBe('M a.txt')
+    expect(indexEntries()).toBe(entries)
     expect(existsSync(join(proj, '.git', 'index.lock'))).toBe(false)
     expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
+  })
+
+  it("the index not copied (EPERM, not a missing index): refused before any commit; an unrelated file's staged version, the whole index and the files as they were", async () => {
+    withStopped()
+    writeFileSync(join(proj, 'b.txt'), 'STAGED VERSION\n')
+    sh(proj, 'add', 'b.txt')
+    writeFileSync(join(proj, 'b.txt'), 'UNSTAGED VERSION\n')
+    const before = head()
+    const entries = indexEntries()
+    for (const copy of [/\.cw-next-/, /\.cw-commit-/]) {
+      failCopyTo = copy
+      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: could not copy the index/)
+      expect(head()).toBe(before)
+      expect(indexEntries()).toBe(entries)
+      expect(sh(proj, 'show', ':b.txt')).toBe('STAGED VERSION')
+      expect(read('b.txt')).toBe('UNSTAGED VERSION\n')
+      expect(read('a.txt')).toBe('new\n')
+      expect(read('secret.env')).toBe('SECRET=1\n')
+      expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
+    }
   })
 
   it('a staged rename whose old name is back on disk: the rename committed, the old file left untracked', async () => {
