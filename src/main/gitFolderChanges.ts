@@ -15,7 +15,7 @@ import { INDEX_BUSY, git, gitErrorLine } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
-import { checkouts, worktreeNow } from './platform/git'
+import { checkouts, OPERATION_MARKERS, worktreeNow } from './platform/git'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { workspace } from './workspace'
@@ -107,7 +107,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   if (!now.line) throw combworkError(M.detached, { folder })
   if (branch !== null && now.line !== branch) throw combworkError(M.wrongBranch, { folder, target: branch })
-  const marker = now.dirty.find((f) => f.startsWith('('))
+  const marker = now.dirty.find((f) => OPERATION_MARKERS.has(f))
   if (marker) throw combworkError(M.midOperation, { state: STATES[marker] ?? 'revert', folder })
   const { folderBuilders } = await import('./workflow/queueHost')
   const held = folderBuilders(workspace, folder)

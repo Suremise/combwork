@@ -228,6 +228,21 @@ describe('the folder and its state, checked under the lock', () => {
     rmSync(join(proj, '.git', 'MERGE_HEAD'))
     expect(status()).toBe('M a.txt')
   })
+
+  it('a changed file whose name is in brackets is a file, not a git operation: Commit and Commit it go on beside it', async () => {
+    writeFileSync(join(proj, '(draft).md'), 'a draft\n')
+    mkdirSync(join(proj, '(notes)'), { recursive: true })
+    writeFileSync(join(proj, '(notes)', 'a.md'), 'notes\n')
+    writeFileSync(join(proj, '.gitignore'), 'node_modules/\n/reference/\n')
+    await settle('commit', ['.gitignore'])
+    expect(committed()).toEqual(['.gitignore'])
+    writeFileSync(join(proj, '.gitignore'), 'node_modules/\n/reference/\n/out/\n')
+    await inWorkspace(w, () => changes.commitIgnore(proj))
+    expect(committed()).toEqual(['.gitignore'])
+    // The bracketed ones are changes like any other: committed when shown.
+    await settle('commit', ['(draft).md', '(notes)/a.md'])
+    expect(committed()).toEqual(['(draft).md', '(notes)/a.md'])
+  })
 })
 
 describe("Files' Commit it", () => {
@@ -253,4 +268,3 @@ describe("Files' Commit it", () => {
     await expect(inWorkspace(w, () => changes.commitIgnore(proj))).rejects.toThrow(/isn't on a branch/)
   })
 })
-

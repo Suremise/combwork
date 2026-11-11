@@ -7,6 +7,8 @@
 //   Show Changes), and the builder's start says so too.
 // - The card's merge pauses naming .gitignore; the paused merge (Merges tab, the card's Work section) offers Commit and
 //   Set Aside; Commit commits just .gitignore and the merge goes on: Done, both lines in .gitignore.
+// - A second card's merge paused on the user's staged keep.txt: Set Aside in its Work section stashes it, named after
+//   the card, and the merge goes on.
 // - Exclude again, with another file changed: Commit It commits .gitignore alone.
 // Screenshots of the menu, the warning, the paused merge and the card's Work section, both themes. Dev build, throwaway
 // profiles, workspace and CLAUDE_CONFIG_DIR.
@@ -109,6 +111,27 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     check('Commit: .gitignore alone committed in the project folder, its message naming the card', !!(await waitHung(() => ours() || null)) && git('show', '--no-renames', '--name-only', '--format=', ours().split(/\s+/)[0]) === '.gitignore', git('log', '--format=%h %s', `${before}..HEAD`))
     check('…and the merge goes on: Done, both lines in .gitignore', !!(await waitHung(async () => (await h.card(n))?.column === 'done')) && f.text('.gitignore') === 'out/\n.combwork/\nnode_modules/\ndist/\n/reference/\n', JSON.stringify(f.text('.gitignore')))
     check('…the folder clean', git('status', '--porcelain', '--untracked-files=no') === '', git('status', '--porcelain'))
+
+    // --- Staged: the user's staged change pauses the next card's merge; Set Aside in the card's Work section, and it goes on.
+    fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'kept, and the user staged this\n')
+    git('add', 'keep.txt')
+    Object.assign(builder, await q.renewed(fx, h, builder))
+    const b = await q.approveBy(fx, h, builder, reviewer, 'Keep more', { 'keep.txt': 'kept\nby the card\n' })
+    check('a second card is approved', Object.values(b.steps).every((s) => s.status === 200), JSON.stringify(b.steps))
+    const ps = await waitHung(async () => ((await queue())?.paused?.reason === 'staged' ? (await queue()).paused : null))
+    check('its merge pauses on the staged keep.txt, naming it', JSON.stringify(ps?.files) === '["keep.txt"]', JSON.stringify(ps))
+    await q.showBoard(page)
+    await q.openByTitle(page, b.n)
+    const pausedB = dialog.locator('.card-work-queue-paused')
+    const aside = pausedB.locator('[data-action="set-aside-changes"]')
+    check("the card's Work section: the staged pause, with Set Aside", !!(await waitHung(async () => (await aside.count()) === 1)) && /staged/.test(await pausedB.innerText()), await pausedB.innerText().catch(() => ''))
+    await f.themes(page, pausedB, 'foldercommit-card-staged')
+    await aside.click()
+    const keyB = (await h.card(b.n))?.key
+    check('Set Aside: keep.txt kept in a stash named after the card, the index clean', !!(await waitHung(() => new RegExp(`Combwork: set aside before merging ${keyB}`).test(git('stash', 'list', '--format=%s')) || null)) && git('diff', '--cached', '--name-only') === '', git('stash', 'list', '--format=%s'))
+    check('…and the merge goes on: Done, keep.txt as the card made it', !!(await waitHung(async () => (await h.card(b.n))?.column === 'done')) && f.text('keep.txt') === 'kept\nby the card\n', JSON.stringify(f.text('keep.txt')))
+    check('…the user\'s staged change is in the stash', git('show', 'stash@{0}:keep.txt') === 'kept, and the user staged this', git('show', 'stash@{0}:keep.txt'))
+    await page.keyboard.press('Escape')
 
     // --- Exclude again, another file changed beside it: Commit It commits .gitignore alone.
     fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'the user is editing this\n')

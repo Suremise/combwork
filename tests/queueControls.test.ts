@@ -380,6 +380,21 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', folder: repo })
   })
 
+  it("a start's warning shown for the project folder, main checked out elsewhere since with the same file changed: refused, nothing done", async () => {
+    const { repo, head, settle } = await paused()
+    const before = head()
+    git(repo, 'checkout', '-q', '--detach')
+    const elsewhere = join(repo, '..', 'p-start')
+    git(repo, 'worktree', 'add', '-q', elsewhere, 'main')
+    writeFileSync(join(elsewhere, 'a.txt'), 'an edit the warning never named\n')
+    // No pause: the warning's folder (the project folder) is what the action is bound to.
+    await expect(settle('commit', ['a.txt'], null)).rejects.toThrow(/checked out changed meanwhile/)
+    await expect(settle('setAside', ['a.txt'], null)).rejects.toThrow(/checked out changed meanwhile/)
+    expect(git(repo, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(git(elsewhere, 'status', '--porcelain')).toBe('M a.txt')
+    expect(() => git(elsewhere, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+  })
+
   it("a pause that doesn't name its folder (from before it was recorded): refused, saying to Resume", async () => {
     const { repo, wf, settle } = await paused()
     await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files: ['a.txt'] }))

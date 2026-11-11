@@ -649,7 +649,7 @@ export class GitPlatform implements PlatformAdapter {
     if (!folder) return null
     const now = await G.worktreeNow(folder)
     // A git operation's marker (`(MERGE_HEAD)`) isn't a file to commit: the files only.
-    const files = isUnknown(now) ? [] : now.dirty.filter((f) => !f.startsWith('('))
+    const files = isUnknown(now) ? [] : now.dirty.filter((f) => !G.OPERATION_MARKERS.has(f))
     return files.length ? { target, folder, files } : null
   }
 
