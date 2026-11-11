@@ -2754,8 +2754,17 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   reads every pin the credit rests on once more, synchronously, at its answer. A drop of an update under a live merge
   candidate keeps U and its pins (the guard).
 - **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
-  operations carrying its marker walking back from the single head to its planned operation (at most 200), never by
-  description or change id. A marked operation's commits are owned only when it was validated in the attempt (the
+  operations carrying its marker walking back from the single head to its planned operation, never by
+  description or change id. Since HI-2992 (the Assistant's decision on the card): only a write under way (its step
+  journalled) needs the walk, since every write journals its step before jj runs and clears it only once its operation
+  is validated (or provably made nothing); with no step the attempt is settled from its journal alone, however far the
+  operation log has moved on (a walk of at most 200 left such an attempt unrecoverable for the rest of its cycle: every
+  step `recover:malformed`, its commits in the user's log, the sweep asking every minute). The walk pages back 1,000
+  operations at a time (`--at-op` each page's oldest's parent), at most 10,000 (`OPS_WALK_MAX`); a base past that, out
+  of the history, or past a page holding a merged operation gives the step up (`givenUp`, journalled): whatever that
+  write may have made isn't the attempt's (never owned or touched; it stays in the user's log), and the rest is recovered
+  and dropped as ever. The candidate step leaves an attempt it can't recover or drop now for later (only its owner gone
+  or a cancel ends the step), so it never stops a new candidate. A marked operation's commits are owned only when it was validated in the attempt (the
   journal's), or is its journalled step validated now as the attempt would have (the step's parent, its view's
   bookmarks, tags and workspaces unchanged, the step's shape). Any other marked operation's additions are **uncertain**:
   kept apart, never owned, pinned or abandoned (a restore that raced an outside descendant rebases it: that rebased
@@ -2787,7 +2796,9 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
   abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
   Git branch); HI-2990: a squash onto a head that already holds the change, its restore making no operation, its step
-  cleared, then recovered and dropped with nothing left.
+  cleared, then recovered and dropped with nothing left; HI-2992: a crash between writes, then more operations than
+  the walk reads, settled from the journal and dropped; a crash inside a write, its base past the walk, the step given up
+  and the rest dropped; the walk paging back to the base.
 
 ##### jj's integration evidence (1.5.0's J5, HI-2798)
 
@@ -3429,7 +3440,8 @@ Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its 
   rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
   rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build; HI-2989,
   each style in both modes: main set onto the candidate between a run's proof and its step, nothing built or returned,
-  Integrated via the candidate by the next run), and the e2e suites
+  Integrated via the candidate by the next run; HI-2992, both modes: a crash after its pins, then 205 operations, the next
+  run recovering and dropping it and offering a new candidate), and the e2e suites
   `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
 
 ##### The merge checks on a jj card's candidate (1.5.0, HI-2938)

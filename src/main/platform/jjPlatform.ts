@@ -959,7 +959,8 @@ export class JjPlatform implements PlatformAdapter {
           save: (e) => save(card.key, fp.cycle, e),
           still,
           token: () => randomUUID().replace(/-/g, '').slice(0, 16),
-          ...(d?.candidateChecks?.parkCopies ? { park: d.candidateChecks.parkCopies } : {})
+          ...(d?.candidateChecks?.parkCopies ? { park: d.candidateChecks.parkCopies } : {}),
+          log: (what) => checksLog.info(`#${userText(card.key)} cycle ${fp.cycle}: ${what}`) // i18n-ignore: a log line, English
         },
         card.key,
         fp,

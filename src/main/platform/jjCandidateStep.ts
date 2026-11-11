@@ -87,6 +87,13 @@ export interface JjCandidateStepDeps {
    * (a working copy on it keeps it); absent: none.
    */
   park?: (at: string, to: string) => Promise<boolean>
+  /** For the log (HI-2992: a step recovery gave up). */
+  log?: (what: string) => void
+}
+
+/** HI-2992: a step recovery gave up (journalled in `givenUp`), told to the log so it can be traced. */
+const tellGivenUp = (log: ((what: string) => void) | undefined, was: JjAttemptRecord, now: JjAttemptRecord): void => {
+  if ((now.givenUp?.length ?? 0) > (was.givenUp?.length ?? 0)) log?.(`${now.attempt}: step ${now.givenUp!.at(-1)} given up (its base operation past the walk)`) // i18n-ignore: a log line, English
 }
 
 export interface JjCandidateOffer {
@@ -123,11 +130,17 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
   // Clean-up runs under any fingerprint: its owner is only that the card's approval still stands as the step began.
   const cleanUp = j4(fp)
 
-  // 1. Recovery and drop of what isn't settled.
+  // 1. Recovery and drop of what isn't settled. One that can't finish now (raced, a pin, the history) is left for a later
+  // step or the sweep and never stops a new candidate (HI-2992); only the owner gone or a cancel ends the step.
+  const stops = (cause: string): boolean => cause === 'owner' || cause === 'cancelled'
   for (const e of deps.entries()) {
     if (e.state || settled(e.record)) continue
     const rec = await recoverJjAttempt(cleanUp, e.record)
-    if (isInterrupted(rec)) return { unknown: `recover:${rec.interrupted.why}` }
+    if (!isInterrupted(rec)) tellGivenUp(deps.log, e.record, rec.record)
+    if (isInterrupted(rec)) {
+      if (stops(rec.interrupted.why)) return { unknown: `recover:${rec.interrupted.why}` }
+      continue
+    }
     const d = await dropJjAttempt(cleanUp, rec.record, e.fp.target)
     if (isInterrupted(d)) {
       // Uncertain commits are never owned or dropped: kept, so they never block a new candidate.
@@ -135,7 +148,8 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
         await deps.save({ ...e, record: d.record, state: 'kept' })
         continue
       }
-      return { unknown: `drop:${d.interrupted.why}` }
+      if (stops(d.interrupted.why)) return { unknown: `drop:${d.interrupted.why}` }
+      continue
     }
     // A drop held back (a working copy or a bookmark on it) settles nothing: dropped again later (HI-2990).
     const st = dropState(d)
@@ -252,6 +266,7 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
         unresolved = true
         continue
       }
+      tellGivenUp(deps.log, record, rec.record)
       record = rec.record
     } else if (!toDrop(e)) continue
     // Its check copies off it first (HI-2938's copies stay where their checks ran); one still leased or returning: left
