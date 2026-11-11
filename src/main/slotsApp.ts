@@ -366,7 +366,7 @@ async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<
 function heldByJj(ws: WorkspaceService, project: string): boolean {
   if (!ws.path) return false
   try {
-    return !!boardConn(ws).read((db) => db.prepare("SELECT 1 FROM slots WHERE project = ? AND platform = 'jj' UNION ALL SELECT 1 FROM copies WHERE project = ? AND platform = 'jj' LIMIT 1").get(project, project))
+    return !!boardConn(ws).read((db) => db.prepare("SELECT 1 FROM slots WHERE project = ? AND platform = 'jj' UNION ALL SELECT 1 FROM copies WHERE project = ? AND platform = 'jj' LIMIT 1").get(project, project)) // i18n-ignore: SQL
   } catch {
     return false
   }
