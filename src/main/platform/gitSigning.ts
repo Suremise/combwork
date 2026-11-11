@@ -64,11 +64,22 @@ async function scoped(d: SignDeps, args: string[], regexp = false): Promise<Scop
 }
 const failed = (v: unknown): v is { failed: string } => !!v && typeof v === 'object' && 'failed' in v
 
+/**
+ * An ssh `user.signingkey` that is the key itself, as git reads it (`is_literal_ssh_key` in its gpg-interface.c, HI-2933):
+ * after `key::`, or the whole value when it starts with `ssh-` (kept by git for backward compatibility); null for a path.
+ */
+export function literalSshKey(value: string): string | null {
+  if (value.startsWith('key::')) return value.slice(5).trim()
+  if (value.startsWith('ssh-')) return value.trim()
+  return null
+}
+
 /** A key as it may be shown: never key material (an openpgp id's last 16 digits, an ssh key file's name, a literal key's type and comment). */
 export function shownKey(format: 'openpgp' | 'ssh' | 'x509', key: string): string {
   if (format === 'ssh') {
-    if (key.startsWith('key::')) {
-      const [type, , ...comment] = key.slice(5).trim().split(/\s+/)
+    const literal = literalSshKey(key)
+    if (literal !== null) {
+      const [type, , ...comment] = literal.split(/\s+/)
       return [type, ...comment].join(' ')
     }
     return basename(key)
@@ -211,9 +222,10 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
     }
     dir = await mkdtemp(join(tmpdir(), 'combwork-sign-'))
     liveDirs.add(dir)
-    if (key.value.startsWith('key::')) {
+    const literal = literalSshKey(key.value)
+    if (literal !== null) {
       file = join(dir, 'key.pub')
-      await writeFile(file, `${key.value.slice(5).trim()}\n`)
+      await writeFile(file, `${literal}\n`)
     } else {
       const home = d.env.HOME ?? d.env.USERPROFILE ?? ''
       const v = key.value.startsWith('~/') || key.value.startsWith('~\\') ? join(home, key.value.slice(2)) : key.value
