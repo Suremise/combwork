@@ -69,7 +69,7 @@ export interface RecoveryRequest {
 
 /** What a recovery did: each path's outcome, by kind. A refusal says why, with the journal kept for a resume. */
 export type RecoveryResult =
-  | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean }
+  | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean; leftOut: string[] }
   | { ok: false; why: RecoveryRefusal; detail?: string }
 
 export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence'
@@ -504,8 +504,11 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   const manifest = (await manifestOf(cur)) ?? []
   const paths = cur.paths ?? {}
   if (!(await fenced())) return refuse('busy')
-  const rec = await port.record!(folder, req.fence, req.identity)
+  const rec = await port.recordLeftOut(folder, req.fence, req.identity)
   if (isUnknown(rec)) return refuse('fence', rec.detail ?? rec.what)
+  // New files jj leaves out for its size limit (HI-2973) are in the manifest but in no commit (X can't hold them): put
+  // back on disk all the same, and named in the result; the slot's next record lists them as uncommitted.
+  const leftOut = new Set(rec.leftOut.map((p) => p.replace(/\\/g, '/')))
   let xKept = !!cur.X
   if (cur.X && !(cur.late ?? []).length) {
     const head = await port.pinned(folder)
@@ -513,7 +516,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const safe = await port.jj(folder, ['log', '--no-graph', '-r', `${cur.X} & ~::(visible_heads() ~ ${cur.X}) & ~bookmarks() & ~working_copies()`, '-T', 'commit_id ++ "\\n"'], { op: head })
       const x = await treeOf(cur.X)
       const ws = await treeOf(cur.WS)
-      const exact = !!x && !!ws && manifest.every((e) => (x.get(e.path)?.blob ?? null) === (e.kind === 'file' ? e.blob : null)) && [...x.keys()].every((p) => manifest.some((e) => e.path === p) || x.get(p)?.blob === ws.get(p)?.blob)
+      const exact = !!x && !!ws && manifest.every((e) => leftOut.has(e.path) || (x.get(e.path)?.blob ?? null) === (e.kind === 'file' ? e.blob : null)) && [...x.keys()].every((p) => manifest.some((e) => e.path === p) || x.get(p)?.blob === ws.get(p)?.blob)
       if (safe.ok && lines(safe.out).length === 1 && exact && (await mine())) {
         const ab = await port.jj(folder, ['abandon', cur.X], { write: true, recheck: async () => ((await mine()) ? null : 'fence') })
         xKept = !ab.ok
@@ -523,7 +526,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   if (cur.dir) await deps.trash(cur.dir).catch(() => undefined)
   await journal.clear()
   const by = (o: PathState['outcome']): string[] => Object.entries(paths).filter(([, s]) => s.outcome === o).map(([p]) => p)
-  return { ok: true, restored: by('restored'), beside: by('beside'), late: cur.late ?? [], deletedLocally: by('deletedLocally'), kept: by('kept'), xKept }
+  return { ok: true, restored: by('restored'), beside: by('beside'), late: cur.late ?? [], deletedLocally: by('deletedLocally'), kept: by('kept'), xKept, leftOut: [...leftOut] }
 }
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)

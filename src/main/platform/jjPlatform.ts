@@ -222,7 +222,7 @@ export const RETAIN_PAGE = 8
 export const RETAIN_EVERY_MS = 6 * 60 * 60 * 1000
 
 /** A jj refusal of a card's move, worded by its code (`platform.jjRefused`). */
-type JjWhy = 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound'
+type JjWhy = 'tooLarge' | 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound'
 
 /** What prime reads for the evidence: a started card's slot (its view, lease and binding), or a Todo card's target. */
 interface Primed {
@@ -506,6 +506,9 @@ export class JjPlatform implements PlatformAdapter {
       const owner = this.ownerOf(card, s, true)
       if (!owner) return { ok: false, refusal: this.refused(card, 'unbound') }
       const b = await jjBoundary({ ...ctx, folder }, owner, { lock: d.lock(ctx.store) }, this.runner())
+      // New files jj left out for its size limit (HI-2973): the work isn't all recorded, named for the agent to commit
+      // (raising the limit) or ignore.
+      if (boundaryRefused(b) && b.refused === 'tooLarge') return { ok: false, refusal: this.refused(card, 'tooLarge', { files: (b.files ?? []).slice(0, 10).join(', '), count: (b.files ?? []).length }) }
       if (boundaryRefused(b)) return { ok: false, refusal: b.refused === 'moved' || b.refused === 'owner' ? { rule: 'evidence.changed', values: { card: card.key } } : this.unknownRefusal(card, withDetail(unknown(UNREADABLE.state, { folder }), b.detail ?? b.refused), 'submit') }
       // Something recorded: the folder had changes jj hadn't seen (an uncommitted edit): commit them first.
       if (b.recorded) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'yes' } } }

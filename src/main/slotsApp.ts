@@ -342,6 +342,9 @@ export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string
       { port: jjPort(), git: (cwd, args) => storeGitGated(cwd, args, () => git(cwd, args)), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
       { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
     )
+    // Files jj leaves out for its size limit (HI-2973) are back on disk but in no commit: the slot's next record lists
+    // them as uncommitted, so it is kept, never reused or removed with them in it.
+    if (r.ok && r.leftOut.length) log.info(`Slot ${userText(s.name)} recovered with files jj leaves out for snapshot.max-new-file-size: ${userText(r.leftOut.slice(0, 10).join(', '))}`)
     return r.ok ? { ok: true } : { ok: false, why: r.why }
   }
   const held = pool.openLease(name)

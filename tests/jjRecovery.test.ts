@@ -91,6 +91,18 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
         expect(readdirSync(s.slot).filter((f) => f.includes('.cw-'))).toEqual([])
       })
 
+      it("a new file past jj's size limit (HI-2973): put back on disk and named, the rest tidied as usual, no divergent revision left", async () => {
+        const big = Buffer.alloc(2 * 1024 * 1024, 7)
+        const s = await stale(colocated, { local: (slot) => writeFileSync(join(slot, 'big.bin'), big) })
+        const r = await run(s, s.deps())
+        // jj's update never touched big.bin (it was in no commit), so it stayed where it was: not listed as restored.
+        expect(r).toMatchObject({ ok: true, restored: ['local.txt'], beside: [], late: [], xKept: false, leftOut: ['big.bin'] })
+        expect(readFileSync(join(s.slot, 'big.bin')).equals(big)).toBe(true)
+        expect(divergentCount(s)).toBe(0)
+        // jj still leaves it out: the slot's record lists it as uncommitted.
+        expect(await s.h.port.record!(s.slot, yes, s.id)).toContain('big.bin')
+      })
+
       it('an overlap (the update changed line 1, the local edit line 2): the current file kept, the preserved version beside it, nothing merged', async () => {
         const s = await stale(colocated, {
           destEdit: (repo) => writeFileSync(join(repo, 'shared.txt'), 'ONE\ntwo\n'),
