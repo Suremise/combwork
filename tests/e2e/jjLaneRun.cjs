@@ -266,7 +266,11 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const edits2 = { 'shared.txt': shared({ 5: 'six, by card two' }), 'two-notes.txt': 'in progress, never recorded\n' }
     for (const [f, t] of Object.entries(edits2)) fs.writeFileSync(path.join(slotFolder, f), t)
     const wcChange2 = id(slotFolder, `${w2.workspace}@`, 'change_id')
-    const laneOf = async (n) => ((await inv('lanes:list')) ?? []).find((l) => (l.cards ?? []).includes(n)) ?? null
+    // A lane's row, as Progress shows it: its cards are rows ({ number, … }), its slot the builder's lease's.
+    const laneOf = async (n) => {
+      const l = ((await inv('lanes:list')) ?? []).find((x) => (x.cards ?? []).some((c) => c.number === n))
+      return l ? { id: l.id, state: l.state, slot: l.slot, cards: l.cards.map((c) => c.number) } : null
+    }
     const lane2 = await laneOf(n2)
     console.log(`INFO card 2 before the restart: line ${w2.line}, base ${w2.base}, workspace ${w2.workspace}, working copy change ${wcChange2}, lane ${lane2?.id}`)
     await h.app.close()
@@ -277,7 +281,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     check('after a restart: card 2 still in Doing, in its slot, its workspace and base kept', (await column(n2)) === 'doing' && !!w2b && w2b.folder.toLowerCase() === slotFolder.toLowerCase() && w2b.workspace === w2.workspace && w2b.base === w2.base, JSON.stringify({ column: await column(n2), w2, w2b }))
     check('…its in-progress work kept, byte for byte, the working copy the same change', Object.entries(edits2).every(([f, t]) => fs.readFileSync(path.join(slotFolder, f), 'utf8') === t) && id(slotFolder, `${w2.workspace}@`, 'change_id') === wcChange2, JSON.stringify({ wc: id(slotFolder, `${w2.workspace}@`, 'change_id'), wcChange2 }))
     const lane2b = await laneOf(n2)
-    check('…and its lane, the same one with the same cards', !!lane2 && lane2b?.id === lane2.id && JSON.stringify(lane2b.cards) === JSON.stringify(lane2.cards), JSON.stringify({ lane2, lane2b }))
+    check('…and its lane, the same one with the same cards, running in the same slot', !!lane2 && lane2.id === lane?.lane?.id && lane2b?.id === lane2.id && JSON.stringify(lane2b.cards) === JSON.stringify(lane2.cards) && lane2b.state === lane2.state && lane2b.slot === lane2.slot, JSON.stringify({ lane2, lane2b, started: lane?.lane?.id }))
     console.log(`INFO card 2 after the restart: line ${w2b.line}, base ${w2b.base}, workspace ${w2b.workspace}`)
     // Its agents again: resumed by Combwork, or started once the slot's own look after the restart is over (a start refused
     // meanwhile says the slot is still being set up).
