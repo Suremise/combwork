@@ -10,6 +10,7 @@
 //   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. The switch's
 //   warning says cards run in slots (J9e: a jj card's start is jjwindow's). Back to Git refused (conflicted bookmark and commit), then,
 //   once jj's state is fixed, made: Git's sections again.
+//   Then (HI-2974) its switch to None, as a fence member, refused while a card is in flight (listed, Check Again), then warned.
 // - J9c (HI-2869): the publish records to check and the set-up's leftovers, seeded as
 //   J9b2's publish pass and HI-2887's control leave them; Mark as checked after its confirmation (only its resolution
 //   written); a leftover proved gone pruned, one still there listed. Waiting's containment and Recover… with a running
@@ -335,6 +336,22 @@ function jjRepo(dir, o = {}) {
     await shoot(back, 'switch-to-git')
     await back.getByRole('button', { name: 'Switch', exact: true }).click()
     check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), HUNG_MS)) && fs.existsSync(path.join(shop, '.jj')))
+
+    // --- HI-2974: shop's repository has been switched, so its switch to None waits for its work: refused while a card is
+    // in flight (the drain listed, Check Again), then the usual warning (cancelled here: shop goes on as Git below).
+    const card2 = await inv('tasks:create', { title: 'Still running', project: 'shop' })
+    await inv('tasks:move', card2.number, 'doing', { confirm: true, reason: 'jjview: a card in flight' })
+    await head.locator('[data-platform="none"]').click()
+    const memberDrained = dialog.filter({ has: page.locator('[data-vc-store-drain]') })
+    check('to None refused while a card is in flight: the drain lists it', !!(await until(async () => (await memberDrained.count()) === 1 && /Work is still running in this project/.test(await text(memberDrained)) && (await text(memberDrained)).includes('Still running'), HUNG_MS)), await text(dialog))
+    check('…no group listed (the project alone)', (await memberDrained.locator('[data-vc-store-group]').count()) === 0)
+    await shoot(memberDrained, 'member-none-drain')
+    await inv('tasks:move', card2.number, 'done', { confirm: true, reason: 'jjview: done' })
+    await memberDrained.getByRole('button', { name: 'Check Again' }).click()
+    const noneWarn = dialog.filter({ has: page.locator('[data-vc-switch="none"]') })
+    check('…then the warning to switch to None', !!(await until(async () => (await noneWarn.count()) === 1 && (await noneWarn.locator('[data-vc-store-drain]').count()) === 0, HUNG_MS)), await text(dialog))
+    await noneWarn.getByRole('button', { name: 'Cancel' }).click()
+    check('…cancelled: shop still Git', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'git')
 
     // --- All seven locales: jj's Repository section of notes after a switch would need clear gates; shop's offer and
     // the jj option's tooltip in each language, and a jj project's sections (shop again) in each.

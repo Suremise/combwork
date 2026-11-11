@@ -504,6 +504,7 @@
   "git.vc.switch.jjToolBack": "{state, select, missing {jj no está instalado (o no está en el PATH)} old {Este jj es anterior al que Combwork tiene probado} untested {Este jj es más reciente que el que Combwork tiene probado} other {No se pudo comprobar jj}}, así que Combwork no puede comprobar que este repositorio esté listo para volver a Git. Instala el jj con el que Combwork está probado y luego cambia. O, si ya no usas jj, elimina la carpeta .jj: el proyecto podrá volver a Git sin ella.",
   "git.vc.switch.jjUnknown": "jj no pudo confirmar este repositorio ({code}), así que este proyecto no puede cambiar.",
   "git.vc.switch.noJj": "Aquí no hay ningún repositorio jj. Combwork nunca crea uno: créalo con jj.",
+  "git.vc.switch.memberDrain": "Todavía hay trabajo en curso en este proyecto. Su repositorio ya se cambió entre Git y jj, así que el proyecto cambia a Ninguno solo cuando ese trabajo haya terminado.",
   "git.vc.switch.otherWorkspace": "Este repositorio también es un proyecto del espacio de trabajo abierto {workspace}: ciérralo allí primero.",
   "git.vc.switch.switching": "Se está cambiando el control de versiones de este repositorio: inténtalo de nuevo en un momento."
 }

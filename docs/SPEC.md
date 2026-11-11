@@ -2637,7 +2637,8 @@ merges under jj.
   local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
   `.jj` stays. With no `.jj` any more (the `jjGone` offer, HI-2975) nothing is checked: nothing can be unexported or
   conflicted, so it goes through, fenced and drained as any. jj missing or not the tested version refuses it as
-  `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
+  `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None (and Git → None) of a member is its own switch, drained through the fence as a group of one (HI-2974,
+  §16.6.5), so no jj card can be in flight once it is None.
 - **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
   `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
   and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
@@ -4550,6 +4551,13 @@ The Version Control tab documents each preset's choices and why (P6, from this t
 it applies from the next card, and the running lanes and cards in flight it won't affect yet (they finish under their
 ruleset, marked "old rules"). Confirming saves the options; nothing running is changed. Switching Git → None (or
 back) works the same: cards in flight keep their platform's ruleset; a Git card can't finish under None's rules.
+**Except a fence member** (HI-2974): a project whose repository has been switched between Git and jj (a member of its
+platform fence) switches to None only once nothing runs in it: no running lane, card in flight, queued merge,
+slot or copy lease (`memberDrain`, its drain listed with Check Again). The switch goes through the fence as a group of
+one (`memberSwitch`: begun, drained, written, settled, recovered from the disk as any switch), so its in-flight work is
+never left on leases the fence would refuse, nor outside a later store switch's group and drain. The other members take
+no part and keep their choice; their admissions are told to try again while it runs, as for any switch of the store.
+An unreadable membership or fence refuses (`switching`). A never-switched project's switch to None is unchanged.
 
 **Built [#1419], switching the version control:**
 - **Where:** the header's None · Git choice (`VersionControlHeader.tsx`), the offers (§16.3.5), and the Assistant's

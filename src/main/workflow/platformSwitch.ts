@@ -14,7 +14,8 @@ import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
 import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, storeWide, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
-import { checkStoreSwitch, noteMemberChoice, storeSwitch } from './storeSwitch'
+import { checkMemberSwitch, checkStoreSwitch, memberStoreOf, memberSwitch, noteMemberChoice, storeSwitch } from './storeSwitch'
+import { projectIdOf } from '../platform/fenceAdmit'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { withValues } from '../../shared/advanced'
 import type { PlatformSwitchCheck } from '../../shared/types'
@@ -67,11 +68,13 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
   const detected = same ? null : switchRefused(to, now.detected)
   // Git ↔ jj (HI-2799): the repository's projects switch together, after a drain and jj's checks.
   const store = !same && !detected && storeWide(now.id, to, now.detected) ? await checkStoreSwitch(ws, project.path, to) : null
+  // A fence member's switch to None (HI-2974): drained, as the repository's are; its lists shown when refused.
+  const member = !same && !detected && !store && !needsRepository(to) ? await checkMemberSwitch(ws, project.path, project.name, now.id) : null
   return {
     from: now.id,
     to,
-    refused: detected ?? store?.refused ?? null,
-    ...(store ? { store: store.store } : {}),
+    refused: detected ?? store?.refused ?? member?.refused ?? null,
+    ...(store ? { store: store.store } : member?.store ? { store: member.store } : {}),
     lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })),
     inFlight: same ? [] : await cardsInFlight(ws, project),
     // Git's repository stays in the folder, unused, when switched to a platform that needs none (the warning says Git's: a
@@ -115,6 +118,19 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
   const to = platformArg(raw)
   const expected = o.expected === undefined || o.expected === null ? null : platformArg(o.expected)
   const project = projectOf(ws, projectPath)
+  // A member of a switched repository's fence going to None (HI-2974): through its fence as a group of one, drained,
+  // its membership read here under the lock (an unreadable one refuses).
+  if (!needsRepository(to)) {
+    const store = memberStoreOf(ws, projectIdOf(await ws.projectConfig(project.path), project.path))
+    if (store) {
+      const r = await memberSwitch(ws, project.path, project.name, store, to, (from) => {
+        if (expected && expected !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
+        o.guard?.(from)
+      })
+      if (r.from !== r.to) await afterSwitch(ws, project.path, r.from, r.to)
+      return r
+    }
+  }
   let from: PlatformId = to
   await ws.mutateProjectConfig(project.path, (cfg) => {
     const now = projectPlatform(project.path, cfg.platform)
@@ -137,10 +153,16 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
   if (from === to) return { from, to }
   // A member of a switched repository's fence (HI-2799): its admissions held to its new choice.
   await noteMemberChoice(ws, project.path).catch((e) => log.warn('recording a switch in its repository’s platform fence', e))
+  await afterSwitch(ws, project.path, from, to)
+  return { from, to }
+}
+
+/** What follows a project's own switch: the log, the window's project and runtime read afresh, its queues' sections. */
+async function afterSwitch(ws: WorkspaceService, path: string, from: PlatformId, to: PlatformId): Promise<void> {
+  const project = projectOf(ws, path)
   log.info(`${userText(basename(project.path))} switched its version control from ${from} to ${to}: from its next card`)
   // The window's project (its platform, the offer gone) and the runtime read it afresh; its stages, its queues' sections.
   await ws.refresh().catch((e) => log.warn('refreshing after a switch of version control', e))
   workflowChanged(ws, project.path)
   queueChanged(ws, project.path, '')
-  return { from, to }
 }

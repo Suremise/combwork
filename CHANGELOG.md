@@ -64,6 +64,7 @@
 
 ### Fixed
 
+- **A project whose repository was switched between Git and jj no longer strands its cards by switching to None** (HI-2974). Its slots and review copies were refused afterwards, and switching back was blocked. Now such a project switches to None once its work has finished: until then the dialog lists what still runs, with **Check Again**. Other projects switch to None as before.
 - **A jj project whose `.jj` folder is gone can switch back to Git** (HI-2975). The offered switch was always refused with an unexplained "see the list"; now it goes through. While jj itself is missing or isn't the version Combwork is tested with, the switch back to Git says why and what to do (install that jj, or remove `.jj` once you're done with jj).
 - **A change left uncommitted where your branch is checked out no longer stops the merge queue unexplained** (HI-2944). Excluding a folder from Git into `.gitignore` left the change uncommitted, and a card that also changed `.gitignore` then paused its merge, with nothing in Combwork to put it right. Now:
   - The paused merge (Merges, Version Control → Merge queue, the card's Work section) has **Commit** and **Set Aside** for the files it names, and the merge goes on.

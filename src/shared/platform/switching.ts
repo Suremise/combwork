@@ -35,6 +35,7 @@ export type SwitchRefusal =
   | { why: 'gates' }
   | { why: 'fallback' }
   | { why: 'drain' }
+  | { why: 'memberDrain' }
   | { why: 'otherWorkspace'; workspace: string }
   | { why: 'groupChanged' }
   | { why: 'switching' }
@@ -52,6 +53,7 @@ export const SWITCH_REFUSED = {
   gates: msg({ id: 'git.vc.switch.gates', defaultMessage: 'This repository uses what jj doesn’t support: see the list.', description: 'Why a project can’t be switched to jj (HI-2799): the compatibility check found Git features jj doesn’t support (listed in the same dialog). Keep jj.' }),
   fallback: msg({ id: 'git.vc.switch.fallback', defaultMessage: 'The repository isn’t ready to go back to Git: see the list.', description: 'Why a jj project can’t be switched back to Git (HI-2799): conflicted bookmarks, changes Git hasn’t received and the like (listed in the same dialog). Keep Git.' }),
   drain: msg({ id: 'git.vc.switch.drain', defaultMessage: 'Work is still running on this repository: switch once it has finished.', description: 'Why a switch between Git and jj is refused (HI-2799): lanes, cards in flight, the merge queue or slots are still in use on the repository (listed in the same dialog). Keep Git and jj.' }),
+  memberDrain: msg({ id: 'git.vc.switch.memberDrain', defaultMessage: 'Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.', description: 'Why a project can’t be switched to None now (HI-2974): its repository was once switched between Git and jj, and lanes, cards in flight, the merge queue, slots or review copies of this project are still in use (listed in the same dialog). Keep Git, jj and None (glossary 2.1).' }),
   otherWorkspace: msg({ id: 'git.vc.switch.otherWorkspace', defaultMessage: 'This repository is also a project of the open workspace {workspace}: close it there first.', description: 'Why a switch between Git and jj is refused (HI-2799): another open workspace (another window) has a project on the same repository, whose work Combwork can’t hold while it switches. {workspace} is its name. Keep Git and jj.' }),
   groupChanged: msg({ id: 'git.vc.switch.groupChanged', defaultMessage: 'This repository’s projects changed meanwhile: look again before switching.', description: 'Why a switch between Git and jj is refused (HI-2799): a project joined the repository, or one of its projects’ choices or options changed, after the warning was shown.' }),
   switching: msg({ id: 'git.vc.switch.switching', defaultMessage: 'This repository’s version control is being switched: try again in a moment.', description: 'Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way.' })
