@@ -294,6 +294,15 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       }
       const shownNow = waiting(w, card.id)?.candidate
       expect(shownNow?.state === 'ready' && shownNow.checks).toMatchObject({ state: 'failing', misses: 3 })
+      // The project's setup command changed (a new checks key; other check commands are other rules, so another candidate)
+      // before the retry time: restarted at once, and its first miss is the first again, its retry the first delay, not the
+      // old set's fourth (HR1's round 1).
+      x.setSetup(`${NODE} -e "0"`)
+      await jjp.afterRun()
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(x.runs).toHaveLength(4)
+      expect(checks()).toMatchObject({ state: 'failing', misses: 1 })
+      expect(checks().retryAt! - Date.now()).toBeLessThan(1.1 * 3_600_000)
     })
 
     it("HI-2991: another slot's jj commit while a check runs in its copy: the check still counts; passed, offered", async () => {

@@ -3477,7 +3477,8 @@ and s11 (HR1's OK).
   The retry time is kept with the record (`retryAt`, HI-2991): every look before it (each reconciliation asks for one)
   leaves a waiting or failing set alone and sets the runner's timer for it; other checks or commands (a new checks key)
   restart them at once. The misses in a row (`misses`) are kept while the set runs again (`progress`) and cleared only by a
-  pass or a restart, so they rise to the window's message and the retry doubles with each.
+  pass or a restart, so they rise to the window's message and the retry doubles with each (after a restart the first
+  miss is the first again, its retry the first delay).
 - **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
   candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
   the runner to look. It never adopts or moves anything.

@@ -767,9 +767,13 @@ export class JjPlatform implements PlatformAdapter {
       const o = wf.rulesetOf(card0, s).options
       const key = checksKeyOf(o, setup)
       const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each; none after a
+      // restart under a new key (HR1's round 1: the restart clears them, so the delay counts from there too).
+      let misses = shown.checks.misses ?? 0
       // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
       if (key !== shown.checks.key) {
         if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer)))) continue
+        misses = 0
       } else {
         // HI-2991: a waiting or failing set under the same key runs again only at its retry time (SPEC's 30 s doubling to
         // 15 min), whatever asks for a look meanwhile (every reconciliation does); the look then is the timer's.
@@ -816,8 +820,6 @@ export class JjPlatform implements PlatformAdapter {
         },
         { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
       )
-      // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each.
-      const misses = shown.checks.misses ?? 0
       if ('green' in out) await publish({ passed: out.checks })
       else if ('red' in out) await publish({ red: { ...out.red, expected: offer.expected } })
       else if ('stopped' in out) await publish({ stopped: out.stopped.check })
