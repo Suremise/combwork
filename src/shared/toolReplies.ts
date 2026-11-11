@@ -47,6 +47,7 @@ const R = {
   and: agentMsg({ id: 'reply.list.and', text: '{a} and {b}', note: 'Two items, or a list of them joined one by one ("a and b and c").' }),
   askedNone: agentMsg({ id: 'reply.ask.assistantNone', text: "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).", note: "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key." }),
   asked: agentMsg({ id: 'reply.ask.assistant', text: '{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox.', note: "cw_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)." }),
+  askedWaiting: agentMsg({ id: 'reply.ask.assistantWaiting', text: '{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox or as a comment on {card}, which shows as waiting for it until the Assistant has dealt with it.', note: "cw_ask_assistant (HI-1866, HI-2915) on the asker's own card in Doing: the card is marked waiting for the answer. {delivery}: the request's id in the Assistant's inbox (m41)." }),
   notifiedOpens: agentMsg({ id: 'reply.notify.opens', text: 'Notification shown; a click opens {opens}.', note: 'cw_notify (HI-1961): what a click on the notification opens (an agent or a card).' }),
   notified: agentMsg({ id: 'reply.notify.shown', text: 'Notification shown.', note: 'cw_notify: the notification was shown.' }),
   changesNoneFor: agentMsg({ id: 'reply.undo.noneForGroup', text: 'No changes of yours are kept for message {group}.', note: "cw_undo's list for one message (#1282) when none is kept. {group} is the message's group id." }),
@@ -607,12 +608,14 @@ export interface AskedAssistant {
   ok: true
   card: string
   delivery: string
+  /** HI-2915: the card is marked waiting for the Assistant's answer (its own card in Doing). */
+  waiting?: boolean
 }
 
 /** "HI-12: asked the Combwork Assistant (m41 in its inbox). Its answer comes to your inbox." */
 export function askedAssistantText(a: AskedAssistant): string {
   if (!a.delivery) return say(R.askedNone, { card: a.card })
-  return say(R.asked, { card: a.card, delivery: a.delivery })
+  return say(a.waiting ? R.askedWaiting : R.asked, { card: a.card, delivery: a.delivery })
 }
 
 /** "Notification shown; a click opens HB4." (HI-1961: `opens`, the agent or card its target names.) */

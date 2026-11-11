@@ -5078,7 +5078,22 @@ woken by the doorbell, a busy one told at its next tool call. The Assistant acts
 the user decided or answered on the card, and tells the agent with `cw_message_agent`. Refused before anything is
 written (409, saying to ask the user with `cw_ask_user`) while the Assistant can't act on it (the same check as the
 relay's); one that ends unread (cancelled when Control is turned down before it is handed out, expired) says so on the
-card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). The card-loop skill says when to
+card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). **The request's wait (HI-2915; on
+11 Nov CB1 and CB2 asked the Assistant for a Windows Sandbox turn, were told to wait, and were reported stalled):** asked
+by the card's own agent on its card in Doing with no waiting mark, the card is marked waiting (§ HI-2618's
+`waitingFor`) in the request's own locked write, the request's words (cut to 200 characters) its reason, the asker its
+`by`, and the request's ref (`#n/<id>`, made first and the same for the mark, the delivery and their clean-up) its
+`ask`. The reply says so (`waiting: true`), and so does the Assistant's line, with how to keep the agent waiting. The
+mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
+`waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
+acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
+unread (`ended`), or never given. A take-off that fails is retried after 30 s, and each workspace's open
+(`reconcileAskWaits`) takes off every request mark whose delivery is no longer live (queued, offered, received or
+uncertain), so none stays for ever. A wait past the answer is the Assistant's own mark, set before it acks; its go is
+clearing it with the go as that change's comment, which wakes the builder's card watch. `ask` is Combwork's alone:
+never from the Agent API, and undo puts a mark back without it. A lane's row in the Progress panel says **waiting**
+(what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
+for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
 how the Assistant answers. **No code, proposed:** a code
 card that passes review with its change already in its target (nothing to merge) is proposed no code by Combwork

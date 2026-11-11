@@ -8742,6 +8742,14 @@ button.agent-place:hover {
   flex: none;
   white-space: nowrap;
 }
+/* Waiting on purpose (HI-2915): a line of its own under the card's, cut short; its title has it whole. */
+.activity-card-waiting {
+  margin: -2px 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .activity-card-title {
   color: var(--fg-strong);
   white-space: nowrap;
@@ -14525,6 +14533,10 @@ button.progress-card-key:hover {
 }
 .progress-lane-state.abandoned {
   color: var(--error);
+}
+/* A card waiting on purpose (HI-2915): said, never a warning. */
+.progress-lane-state.waiting {
+  color: var(--fg-muted);
 }
 /* Why it waits (#1279): in the header, in the room the lane's name had, cut short with its whole text in its title. */
 .progress-lane-why {

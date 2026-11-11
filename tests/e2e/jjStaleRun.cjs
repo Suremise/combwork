@@ -29,7 +29,8 @@ if (!exe) {
 
 const NC = process.env.CW_JJSTALE_NONCOLOCATED === '1'
 const SUITE = NC ? 'jjstalenc' : 'jjstale'
-const PORT = Number(lib.port(NC ? 47943 : 47941))
+// Each mode's default, clear of the e2e lanes' ports (a runner gives its own: CW_E2E_PORT).
+const PORT = Number(NC ? lib.port(47717) : lib.port(47716))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')

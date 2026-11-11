@@ -6,7 +6,8 @@
 // builder woken, a lane whose cards are all done ends; off, it records only, as P3 did. It works through the project's
 // runtime (service.ts), whose `reconcileActs` is that switch.
 //
-// Runs on the watcher's events (debounced: a burst of ref changes reconciles once), when a window is focused, when a
+// Runs on the watcher's events (debounced from the first: a burst of ref changes reconciles once, or once more for what
+// came after its run started), when a window is focused, when a
 // card's Work section is read, and once as a workspace opens. One run at a time per project; its platform reads are
 // made outside the board's lock, its writes inside a change of it (the runtime's `locked`), and a run belongs to its
 // workspace's lifetime: once it closes or its window opens another, the run stops and its watch goes.
@@ -130,10 +131,13 @@ function onObserved(f: Followed, e: ObserveEvent): void {
   schedule(f)
 }
 
-/** Reconciles a project soon: once after its events settle. */
+/**
+ * Reconciles a project soon: once, a debounce after the first ask, whatever asks follow meanwhile (they are folded into
+ * it, and those after it starts into the run after). Never put off by a later ask (HI-2914: restarting the wait on each,
+ * Waiting read every 200 ms, each read asking for a run, kept any from starting while the reads went on).
+ */
 function schedule(f: Followed): void {
-  if (!f.alive()) return
-  if (f.timer) clearTimeout(f.timer)
+  if (!f.alive() || f.timer) return
   f.timer = setTimeout(() => {
     f.timer = null
     void runFor(f)

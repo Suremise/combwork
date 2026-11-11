@@ -90,6 +90,7 @@
   "activity.task": "{type, select, subagent {Sous-agent en arrière-plan} command {Commande en arrière-plan} monitor {Surveillance} workflow {Flux de travail} other {Tâche en arrière-plan}}",
   "activity.thinking": "Réflexion…",
   "activity.toolFor": "{summary} · {time}",
+  "activity.waiting": "{assistant, select, yes {En attente de la réponse de l’Assistant : {reason}} other {En attente : {reason}}}",
   "activity.workspace.agentIn": "{project} · {agent}",
   "activity.workspace.assistant": "Assistant",
   "activity.workspace.cardNobody": "Personne ne travaille sur {card} en ce moment. La carte garde son historique.",
