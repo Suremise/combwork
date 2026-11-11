@@ -2910,9 +2910,19 @@ export class SlotPool {
     if (d.length) return { why: 'dirty', files: d.length }
     const head = await port.head(s.folder)
     if (isUnknown(head)) return { why: 'cantCheck', detail: head.what }
-    const target = s.target ?? (await this.defaultTarget())
+    let target = s.target ?? (await this.defaultTarget())
     if (!target) return { why: 'cantCheck', detail: sayStored(T.noTarget) }
-    const t = await port.lineHead(this.deps.project, target)
+    let t = await port.lineHead(this.deps.project, target)
+    // HI-2928: a free slot's own target deleted since it waited there (gone, not unreadable): it is checked against the
+    // default target instead, so work in it that isn't there still keeps it (unmerged), and a slot with none is freed.
+    // Git's only: a jj slot's target can be a preparation's key, which has no head by design (HI-2866).
+    if (t === null && s.target && port.platform === 'git' && !this.store.openLease(s.name)) {
+      const def = await this.defaultTarget()
+      if (def && def !== s.target) {
+        target = def
+        t = await port.lineHead(this.deps.project, def)
+      }
+    }
     if (isUnknown(t) || !t) return { why: 'cantCheck', detail: sayStored(T.noBranch, { target }) }
     if (t === head) return null
     // A jj slot's commits are its store's (HI-2866): §16.3.2's test asked of that Git store (a non-colocated project folder

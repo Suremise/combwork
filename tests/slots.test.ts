@@ -459,6 +459,24 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(again.slot.target).toBe('1.0.0')
   })
 
+  it("HI-2928: a free slot whose own target was deleted is checked against the default target: freed when its head is there, kept unmerged when not", async () => {
+    const w = world({ builders: 1 })
+    line100(w)
+    const r = await w.pool.lend({ agent: 'a1', card: 1 }, { target: '1.0.0' })
+    if (!r.ok) throw new Error(`refused: ${JSON.stringify(r.refusal)}`)
+    expect(await w.pool.serves(r.lease.id, 'a1', '1.0.0')).toBe(true)
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', target: '1.0.0' })
+    // 1.0.0 deleted with its commit not in main: the slot's head (1.0.0's) is unmerged there, so it is kept, saying so.
+    sh(w.project, 'branch', '-D', '1.0.0')
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'unmerged', target: 'main' })
+    // Its commit in main: nothing would be lost, so it can be removed.
+    sh(w.project, 'merge', '-q', '--no-edit', sh(r.slot.folder, 'rev-parse', 'HEAD').trim())
+    expect(await w.pool.check('slot-a')).toBeNull()
+    expect(await w.pool.remove('slot-a')).toBeNull()
+    expect(existsSync(r.slot.folder)).toBe(false)
+  })
+
   it("a carried slot made from main, handed off to a card for another line and serving it: released, it waits detached at that line's head (HI-2185)", async () => {
     const w = world({ builders: 3 })
     const folder = join(w.root, 'hb3')
