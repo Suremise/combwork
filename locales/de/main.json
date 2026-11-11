@@ -337,6 +337,7 @@
   "main.restart.resumedLine": "Fortgesetzt: {names}.",
   "main.restart.why.expired": "hat mehr als einen Tag gewartet",
   "main.restart.why.held": "Arbeitsordner ist für andere Arbeit reserviert (von Hand fortsetzen)",
+  "main.restart.why.idle": "war untätig, und keine Karte und keine Lane wartete auf ihn",
   "main.restart.why.movedOn": "hat eine neuere Unterhaltung",
   "main.restart.why.notReady": "war nicht rechtzeitig bereit und wurde gestoppt",
   "main.restart.why.notStopped": "war nicht rechtzeitig bereit und ist noch nicht gestoppt; die anderen werden danach fortgesetzt",

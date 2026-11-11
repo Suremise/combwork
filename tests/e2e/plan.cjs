@@ -53,6 +53,10 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   // no default model of its own since HI-1774). An account of the suite's own, never signed in, removed after: its first
   // connection edited, each choice saved with the dialog's Save and read back from the connection.
   const account = await inv('connections:add', 'claude-code', 'Max')
+  // Its picker lists its own models (HI-2852), read in its folder once it is added: a never signed-in account is asked
+  // too (Claude Code 2.1.322 answers), so its read is waited for (HI-2901), else the fallback list is what it shows.
+  const ownRead = await lib.until(async () => !!(await lib.accountCatalog(inv, 'claude-code', account.id)), CLI_HUNG_MS)
+  check("the new account's own models are read", !!ownRead)
   const form = page.locator('[data-connection-form]')
   const editConnection = async () => {
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
@@ -72,8 +76,9 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await picker.waitFor({ timeout: HUNG_MS })
   const groups = await picker.locator('optgroup').evaluateAll((els) => els.map((e) => e.label))
   const savedModel = async () => (await inv('connections:list')).connectionRows.find((c) => c.account === account.id)?.model ?? ''
-  // The models Claude Code reports for this version and account (#125), else Combwork's fallback list.
-  const catalog = (await inv('provider:info'))['claude-code']?.catalog
+  // The models Claude Code reports for this version and account (#125; HI-2852: in the account's own folder), else
+  // Combwork's fallback list.
+  const catalog = await lib.accountCatalog(inv, 'claude-code', account.id)
   const offered = (await picker.locator('select option').evaluateAll((os) => os.map((o) => o.value))).filter((v) => v && v !== 'custom')
   let first = 'claude-opus-5-5'
   if (catalog?.models.length) {

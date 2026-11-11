@@ -43,6 +43,8 @@ export interface RestartEntry {
   state: RestartState
   /** Why it was skipped, held or failed, for the notice. */
   why?: string
+  /** A skip from before the queue (idle as Combwork closed, or expired) that a start's notice has named (HI-2909). */
+  reported?: boolean
   /** When it was last changed. */
   changedAt: string
 }
@@ -74,7 +76,8 @@ export const isOpen = (s: RestartState): boolean => OPEN_STATES.includes(s)
 /**
  * A new snapshot (Combwork closing again) added to the record, with that close's reason: each agent in it replaces its
  * earlier entry (it ran in this run, so that entry is out of date), and entries of agents not in it are kept as they
- * are, so an offer the user hasn't answered isn't lost. Final entries are dropped.
+ * are, so an offer the user hasn't answered isn't lost. Final entries are dropped, a skip no notice has named yet
+ * (`unreported`) included: a later close replaces an earlier record's unreported skips (HI-2909, the Assistant's scope).
  */
 export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly RestartEntry[], reason: RestartReason): RestartRecord {
   const now = new Set(snapshot.map(agentKey))
@@ -98,8 +101,14 @@ export function atStart(record: RestartRecord, now: number): RestartRecord {
   }
 }
 
-/** Whether a record still has anything to do or tell: an entry not final. */
-export const recordOpen = (r: RestartRecord | null): boolean => !!r?.entries.some((e) => !isFinal(e.state))
+/**
+ * A skip from before any start's queue (HI-2909): idle as Combwork closed, or a day old at this start. Final, but kept
+ * until a start's notice has named it, so the notice accounts for every agent that ran, those all skipped included.
+ */
+export const unreported = (e: RestartEntry): boolean => e.state === 'skipped' && (e.why === 'idle' || e.why === 'expired') && !e.reported
+
+/** Whether a record still has anything to do or tell: an entry not final, or a skip not named yet. */
+export const recordOpen = (r: RestartRecord | null): boolean => !!r?.entries.some((e) => !isFinal(e.state) || unreported(e))
 
 /** Reads a record from its file's text: null when it isn't one (damaged, another version). */
 export function parseRecord(text: string): RestartRecord | null {
