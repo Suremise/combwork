@@ -5850,7 +5850,8 @@ touched:
   path shown still changed (an empty or stale list is refused, never a pathless stash). Git does all the index work;
   Combwork never writes the index. **Refused by name first** (HI-2982; Darren, 11 Nov 2026), before Commit or Set
   aside runs, nothing committed or changed: a path whose removal from Git is staged (Files' Stop Tracking, `git rm
-  --cached`, or a rename's old side) while its file is still in the folder, *"<file> is staged for removal from Git:
+  --cached`, or a rename's old side) while its file is still in the folder (absent only when the system says so: a
+  stat failing otherwise refuses too), *"<file> is staged for removal from Git:
   commit it yourself in Git; Combwork won't add it back."* `commit --only` takes each path from the folder, so it put
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for

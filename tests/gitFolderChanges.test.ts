@@ -13,6 +13,18 @@ import type { GitResult } from '../src/main/git'
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
+/** HI-2982 (HR2's round 5): an lstat of a path ending so refused (EPERM), as Windows can, though git still reads it. */
+let failLstatOf: string | null = null
+vi.mock('original-fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  return {
+    ...real,
+    lstat: (async (p: string, o?: unknown) => {
+      if (failLstatOf && String(p).replace(/\\/g, '/').endsWith(`/${failLstatOf}`)) throw Object.assign(new Error(`EPERM: operation not permitted, lstat '${p}'`), { code: 'EPERM' })
+      return real.lstat(p, o as Parameters<typeof real.lstat>[1])
+    }) as typeof real.lstat
+  }
+})
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -90,6 +102,7 @@ beforeEach(() => {
   fencedProbe = null
   failTopIn = null
   failStashAfter = false
+  failLstatOf = null
 })
 
 describe('Commit', () => {
@@ -231,6 +244,18 @@ describe('a file the user stopped tracking (its removal staged, the file kept)',
     expect(committed()).toEqual(['.gitignore'])
     expect(status()).toBe('D  settings.local.json')
     expect(inHead('settings.local.json')).toBe(true)
+  })
+
+  it("the kept file's stat failing (EPERM, not a missing file): Commit and Set Aside still refused by name, nothing changed", async () => {
+    stopTracking('secret.env', 'LOCAL-SECRET\n', true)
+    sh(proj, 'commit', '-q', '-m', 'ignore', '--only', '--', '.gitignore')
+    const before = state()
+    failLstatOf = 'secret.env'
+    for (const action of ['commit', 'setAside'] as const) {
+      await expect(settle(action, ['secret.env'])).rejects.toThrow(/^secret\.env is staged for removal from Git/)
+      expect(state()).toEqual(before)
+    }
+    expect(sh(proj, 'log', '--all', '-p', '--format=')).not.toContain('LOCAL-SECRET')
   })
 
   it('the removal alone (.gitignore committed before): Commit and Set Aside refused by name, neither looping nor leaving a stash', async () => {

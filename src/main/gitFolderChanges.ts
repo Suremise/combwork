@@ -171,7 +171,13 @@ async function keptDeleted(folder: string, files: string[], now: Map<string, Cha
   for (const p of files) {
     const c = now.get(p)
     if (!c?.deleted) continue
-    if (await lstat(join(folder, p)).then(() => true, () => false)) return p
+    // Absent only when the system says so (HR2's round 5): any other stat failure (EPERM, EACCES, I/O) refuses, as git
+    // could still read the file and add it back.
+    const absent = await lstat(join(folder, p)).then(
+      () => false,
+      (e: NodeJS.ErrnoException) => e?.code === 'ENOENT' || e?.code === 'ENOTDIR'
+    )
+    if (!absent) return p
   }
   return null
 }
