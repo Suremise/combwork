@@ -1972,12 +1972,13 @@ export class SlotPool {
    * refused with why; a recovered slot rejoins the pool only through its next look and preparation's check.
    *
    * `held` (HI-2913): a slot its card's or lane's lease still holds, let through only for that lease (`lease`) while its
-   * card's cycle there failed its preparation (`still`, the caller's: asked after the claim and again before each of the
-   * recovery's writes, with the lease still open and still this operation's, and the folder quiet). Claimed with
+   * card's cycle there failed its preparation (the caller's: `refresh` reads it afresh, slowly; `now` answers from what is
+   * stored, synchronously, inside the proof's transaction), proved after the claim and again before each of the recovery's
+   * writes (`still` below: the slow reads, then one final proof after them). Claimed with
    * `beginRecover`, never by relaxing a free slot's settle; the lease ending, being replaced or the cycle moving on stops
    * the recovery at its next write (its journal resumes it on the next Recover…).
    */
-  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>, held?: { lease: string; still: () => Promise<boolean> }): Promise<{ ok: true } | { ok: false; why: string }> {
+  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>, held?: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }): Promise<{ ok: true } | { ok: false; why: string }> {
     const seen = this.store.slot(name)
     if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
     if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
@@ -1996,21 +1997,24 @@ export class SlotPool {
       if (!(await (held ? this.store.beginRecover(name, held.lease, seen.folder, token, holder) : this.store.beginSettle(name, seen.state, seen.folder, token, holder)))) return void log.info(`Slot ${userText(name)}'s recovery refused: it changed before it could be claimed`)
       try {
         const s = this.store.slot(name) ?? seen
-        // A held slot's: its lease still open and this operation's, and its cycle still failed (the caller's), each time.
-        const leaseHeld = async (): Promise<boolean> => {
-          if (!held) return true
-          const mine = await this.store.fenced(name, token, (db, now) => now.op?.lease === held.lease && this.store.openIn(db, held.lease)).catch(() => false)
-          return mine && (await held.still())
-        }
-        if (!(await leaseHeld())) return void log.info(`Slot ${userText(name)}'s recovery refused: its lease or its card's failed preparation changed`)
-        // Each refusal of the fence said in the log once (the recovery stops at it): what was in the folder, or what changed.
+        // Each refusal said in the log once (the recovery stops at it): what was in the folder, or what changed.
+        const stop = (why: string): false => (log.info(`Slot ${userText(name)}'s recovery stopped: ${why}`), false)
+        // A held slot's proof (HR1's HI-2913 round 1): the slow reads first (the caller's eligibility, read afresh; the
+        // folder's quiet, its rename probe last), then, after the last of them, one write that finds the operation still
+        // this one's under the same open lease with no writer or job, the cycle still failed and unprepared (`now`, read in
+        // that same transaction), and no session in the folder read right after it: nothing observed before an await
+        // stands in for the answer.
         const still = async (): Promise<boolean> => {
+          if (held && !(await held.refresh())) return stop("its card's failed preparation changed") // agent-protocol: a log line's detail, never sent to an agent
           const why = await this.notQuiet(s, token)
-          if (why) return void log.info(`Slot ${userText(name)}'s recovery stopped: ${why}`), false
-          if (await leaseHeld()) return true
-          log.info(`Slot ${userText(name)}'s recovery stopped: its lease or its card's failed preparation changed`)
-          return false
+          if (why) return stop(why)
+          if (!held) return true
+          const proof = await this.store.fenced(name, token, (db, now) => (now.writer ? 'a writer came in' : now.job ? 'a job came in' : now.op?.lease !== held.lease || !this.store.openIn(db, held.lease) ? 'its lease ended or changed' : !held.now() ? "its card's failed preparation changed" : null)).catch(() => 'its operation was taken over') // agent-protocol: a log line's detail, never sent to an agent
+          if (proof) return stop(proof)
+          const session = this.deps.sessionIn?.(s.folder)
+          return session ? stop(`session ${session}`) : true // agent-protocol: a log line's detail, never sent to an agent
         }
+        if (held && !(await still())) return
         const fence: WorkspaceFence = { still }
         out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), still)
       } finally {

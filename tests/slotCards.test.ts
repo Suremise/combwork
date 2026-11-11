@@ -1763,7 +1763,7 @@ describe("a slot that couldn't be prepared, recorded and recovered (HI-2913)", {
     const { e, lease, tries, ws, facts, pool } = await failing({ error: 'stale (test)', stale: true })
     expect(tries.n).toBe(1)
     let asked = 0
-    state.pool = { ...state.pool, recoverStale: async (_name: string, _run: unknown, held: { lease: string; still: () => Promise<boolean> }) => (asked++, expect(held.lease).toBe('l-1'), expect(await held.still()).toBe(true), { ok: true }) }
+    state.pool = { ...state.pool, recoverStale: async (_name: string, _run: unknown, held: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }) => (asked++, expect(held.lease).toBe('l-1'), expect(await held.refresh()).toBe(true), expect(held.now()).toBe(true), { ok: true }) }
     expect(await recoverHeldSlot(ws, e.project, await pool(), 'slot-a', lease as never, async () => ({ ok: true }))).toEqual({ ok: true })
     expect(asked).toBe(1)
     await vi.waitFor(() => expect(cycleIn(facts())?.prepared).toMatchObject({ revision: 'r' }), { timeout: HUNG_MS })

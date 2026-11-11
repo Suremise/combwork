@@ -89,10 +89,10 @@ describe("the scenarios' fake providers", () => {
     })
   })
 
-  it('splits them as the ownership matrix does (HI-2663): 90 on the fake Claude Code, 16 model trials only, the rest on every fake', () => {
-    expect(FAKE_CLAUDE_ONLY).toHaveLength(90)
+  it('splits them as the ownership matrix does (HI-2663): 91 on the fake Claude Code, 16 model trials only, the rest on every fake', () => {
+    expect(FAKE_CLAUDE_ONLY).toHaveLength(91)
     expect(MODEL_TRIALS_ONLY).toHaveLength(16)
     expect(NOT_A_TRIAL).toEqual(['tool-sweep'])
-    expect(ids.filter((id: string) => fakesFor(id).length === FAKES.length)).toHaveLength(ids.length - 90 - 16)
+    expect(ids.filter((id: string) => fakesFor(id).length === FAKES.length)).toHaveLength(ids.length - 91 - 16)
   })
 })

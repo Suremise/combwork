@@ -1298,12 +1298,18 @@ export async function recoverHeldSlot(ws: WorkspaceService, projectPath: string,
     })
     return { ok: false, why: owed ? 'preparing' : 'busy' } // i18n-ignore: protocol codes
   }
-  const still = async (): Promise<boolean> => {
-    const now = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
-    const again = failedCycleOf(now, l, await laneCards())
+  // Read afresh (the workspace's runtime, the lane's cards), slowly; then answered from them synchronously, from the
+  // card's stored facts as they are at that moment (the pool asks it inside its final proof's transaction).
+  let latest = { wf, cards: await laneCards() }
+  const now = (): boolean => {
+    const again = failedCycleOf(latest.wf, l, latest.cards)
     return !!again && again.n === admitted.n && again.seq === admitted.seq
   }
-  const r = await pool.recoverStale(name, run, { lease: l.id, still })
+  const refresh = async (): Promise<boolean> => {
+    latest = { wf: (await workflowFor(ws, projectPath).catch(() => null)) ?? latest.wf, cards: await laneCards() }
+    return now()
+  }
+  const r = await pool.recoverStale(name, run, { lease: l.id, refresh, now })
   if (r.ok) {
     failed.delete(cycleKey(projectPath, admitted.n, admitted.seq))
     attempts.delete(cycleKey(projectPath, admitted.n, admitted.seq))

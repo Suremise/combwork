@@ -547,7 +547,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         const w = world(colocated)
         const { lent, row, key2 } = await staleLane(w)
         let asked = 0
-        const out = await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, still: async () => (asked++, true) })
+        const out = await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, refresh: async () => (asked++, true), now: () => true })
         expect(out).toEqual({ ok: true })
         expect(asked).toBeGreaterThan(1)
         expect(await w.port.stale(row.folder)).toBe(false)
@@ -572,7 +572,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         // The slot's working copy moved off the card's commit, the card's work never integrated: recovered, still refused.
         w.h.jj(w.repo, '--ignore-working-copy', 'rebase', '-r', `${row.identity!.workspace}@`, '-d', w.main())
         expect(await w.port.stale(row.folder)).toBe(true)
-        expect(await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, still: async () => true })).toEqual({ ok: true })
+        expect(await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, refresh: async () => true, now: () => true })).toEqual({ ok: true })
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         const r = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
         expect(JSON.stringify(r)).toMatch(/isn't in its target yet/)
@@ -600,7 +600,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.h.jj(w.repo, '--ignore-working-copy', 'new', 'root()', '--no-edit', '-m', 'unrelated')
         const X = w.h.id(w.repo, 'description(exact:"unrelated\n")')
         w.h.jj(w.repo, '--ignore-working-copy', 'rebase', '-r', `${row.identity!.workspace}@`, '-d', X)
-        expect(await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, still: async () => true })).toEqual({ ok: true })
+        expect(await w.pool.recoverStale(row.name, recoverWith(w), { lease: lent.lease.id, refresh: async () => true, now: () => true })).toEqual({ ok: true })
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         // An empty working copy on it: refused (by the record or the chain), nothing moved.
         const r = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
@@ -621,26 +621,63 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         const run: Parameters<SlotPool['recoverStale']>[1] = async () => (ran++, { ok: true })
         // A held slot without the lease named (a free slot's settle never takes it), or another lease named.
         expect(await w.pool.recoverStale(row.name, run)).toEqual({ ok: false, why: 'busy' })
-        expect(await w.pool.recoverStale(row.name, run, { lease: 'another', still: async () => true })).toEqual({ ok: false, why: 'busy' })
+        expect(await w.pool.recoverStale(row.name, run, { lease: 'another', refresh: async () => true, now: () => true })).toEqual({ ok: false, why: 'busy' })
         // Its cycle not failed (asked after the claim): released, nothing run.
-        expect(await w.pool.recoverStale(row.name, run, { lease: lent.lease.id, still: async () => false })).toEqual({ ok: false, why: 'busy' })
+        expect(await w.pool.recoverStale(row.name, run, { lease: lent.lease.id, refresh: async () => false, now: () => false })).toEqual({ ok: false, why: 'busy' })
         expect(w.store.slot(row.name)?.op).toBeNull()
         // An operation of the slot's (a preparation) holding it: the claim isn't taken.
         await w.store.conn.write((db) => void db.prepare("UPDATE slots SET op = 'a-preparation', op_kind = 'warm', op_lease = ? WHERE project = ? AND name = ?").run(lent.lease.id, 'p-jj', row.name))
-        expect(await w.pool.recoverStale(row.name, run, { lease: lent.lease.id, still: async () => true })).toEqual({ ok: false, why: 'busy' })
+        expect(await w.pool.recoverStale(row.name, run, { lease: lent.lease.id, refresh: async () => true, now: () => true })).toEqual({ ok: false, why: 'busy' })
         expect(w.store.slot(row.name)?.op?.token).toBe('a-preparation')
         expect(ran).toBe(0)
         expect(await w.port.stale(row.folder)).toBe(true)
       })
 
-      it("HI-2913: a held slot's recovery stopped at its next write when its cycle moves on, its lease ends, or a session comes in: still stale, the claim released", async () => {
+      it("HI-2913 (HR1's round 1): a change made while the fence's eligibility read is pending (lease ended or replaced, a session or a writer in, the cycle moved on) refuses the very next write", { timeout: RETRY_TEST_MS }, async () => {
+        for (const change of ['leaseEnded', 'leaseReplaced', 'session', 'writer', 'cycle'] as const) {
+          const w = world(colocated)
+          const { lent, row } = await staleLane(w)
+          let eligible = true
+          let refreshes = 0
+          // The first refresh is the proof right after the claim; the second is the run's first fence, and the change is
+          // made inside it, after its own start and before it answers.
+          const refresh = async (): Promise<boolean> => {
+            refreshes++
+            if (refreshes === 2) {
+              if (change === 'leaseEnded') await w.store.conn.write((db) => void db.prepare("UPDATE slot_leases SET ended_at = '2026-11-11T00:00:00Z', why = 'done' WHERE id = ?").run(lent.lease.id))
+              if (change === 'leaseReplaced') {
+                await w.store.conn.write((db) => {
+                  db.prepare("UPDATE slot_leases SET ended_at = '2026-11-11T00:00:00Z', why = 'done' WHERE id = ?").run(lent.lease.id)
+                  db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, lane, agent, from_at) VALUES ('l-other', 'p-jj', ?, 'lane', NULL, 'L9', 'a-x', '2026-11-11T00:00:00Z')").run(row.name)
+                })
+              }
+              if (change === 'session') w.sessions.add(row.folder.toLowerCase())
+              if (change === 'writer') await w.store.conn.write((db) => void db.prepare("UPDATE slots SET writer_run = 'run-x', writer_lease = ?, writer_agent = 'a-x', writer_pid = 1, writer_started = 1 WHERE project = 'p-jj' AND name = ?").run(lent.lease.id, row.name))
+              if (change === 'cycle') eligible = false
+            }
+            return true
+          }
+          const writes: boolean[] = []
+          const run: Parameters<SlotPool['recoverStale']>[1] = async (_s, fence) => {
+            // The next write's own check, as J2's are: what it answers is what the write may do.
+            writes.push(await fence.still())
+            return writes[0] ? { ok: true } : { ok: false, why: 'fence' }
+          }
+          const out = await w.pool.recoverStale(row.name, run, { lease: lent.lease.id, refresh, now: () => eligible })
+          expect(writes, change).toEqual([false])
+          expect(out, change).toEqual({ ok: false, why: 'fence' })
+          expect(await w.port.stale(row.folder), change).toBe(true)
+          w.sessions.delete(row.folder.toLowerCase())
+        }
+      })
+
+      it("HI-2913: a held slot's recovery stopped at its next write when its cycle moves on, its lease ends, or a session comes in: still stale, the claim released", { timeout: RETRY_TEST_MS }, async () => {
         for (const change of ['cycle', 'lease', 'session'] as const) {
           const w = world(colocated)
           const { lent, row } = await staleLane(w)
           let ok = true
           const seen = { writes: 0 }
           // Each fence check after the claim's own: the change made on the first, so every write after it is refused.
-          const still = async (): Promise<boolean> => ok
           const run = recoverWith(w, seen)
           const wrapped: Parameters<SlotPool['recoverStale']>[1] = async (s, fence, journal, quietNow) => {
             if (change === 'cycle') ok = false
@@ -648,7 +685,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
             if (change === 'session') w.sessions.add(row.folder.toLowerCase())
             return run(s, fence, journal, quietNow)
           }
-          const out = await w.pool.recoverStale(row.name, wrapped, { lease: lent.lease.id, still })
+          const out = await w.pool.recoverStale(row.name, wrapped, { lease: lent.lease.id, refresh: async () => ok, now: () => ok })
           expect(out.ok, change).toBe(false)
           expect(await w.port.stale(row.folder), change).toBe(true)
           expect(w.store.slot(row.name)?.op ?? null, change).toBeNull()
