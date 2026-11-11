@@ -77,15 +77,15 @@ describe("a refused submit's unseen items, from one snapshot (HI-2854, HR2's rou
     expect(older).toEqual({ lines: [expect.stringMatching(/: Old words$/)], generation: 1, comments: 0 })
   })
 
-  it("a comment of the user's archived since: given from the archive; one found nowhere stops the receipt before it, and says where to read it", () => {
+  it("a comment of the user's archived since: given from the archive; one found nowhere (not expected) said so and received, so it never refuses for ever", () => {
     const facts = [f('UserComment', { comment: 'c1', generation: 1 }), f('UserComment', { comment: 'c2', generation: 2 }), f('UserComment', { comment: 'c3', generation: 3 })]
     const c = (id: string, text: string) => ({ id, text, by: 'You', at: '2026-11-11T10:10:00Z' })
     const all = unseenIn({ card: { comments: [c('c3', 'Third')] }, facts, archived: [c('c1', 'First'), c('c2', 'Second')] }, 'a1')
     expect(all.lines.map((l) => l.replace(/^.*: /, ''))).toEqual(['First', 'Second', 'Third'])
     expect(all.comments).toBe(3)
     const lost = unseenIn({ card: { comments: [c('c3', 'Third')] }, facts, archived: [c('c1', 'First')] }, 'a1')
-    expect(lost.comments).toBe(1)
-    expect(lost.lines).toEqual([expect.stringMatching(/First$/), expect.stringMatching(/in the card's archive/)])
+    expect(lost.comments).toBe(3)
+    expect(lost.lines).toEqual([expect.stringMatching(/First$/), expect.stringMatching(/can't be found/), expect.stringMatching(/Third$/)])
   })
 
   it('a comment or decision with no fact in the snapshot (written after it) is neither listed nor received', () => {

@@ -572,24 +572,38 @@ export async function cardSnapshot(ws: WorkspaceService, n: number): Promise<{ c
   return { card, generation, comments, archived: a.archived + (a.mayHaveBeenLost ? 1 : 0), at: Date.now() }
 }
 
-/** How many of a card's newest archived comments cardWithFacts reads (HI-2641 archives past the 500 a card keeps). */
-const UNSEEN_ARCHIVE_MAX = 500
+/** A page of a card's comment archive, as cardWithFacts searches it (HI-2641 archives past the 500 a card keeps). */
+const ARCHIVE_PAGE = 500
 
 /**
- * A card, its facts and its newest archived comments, all read in one snapshot (HI-2854, HR2's round 1): what a refused
- * submit gives an agent of its unseen decisions and comments, and the receipt of exactly those, come from the same
- * board state, so nothing written between two reads is counted as given. Null when it isn't there.
+ * A card, its facts and the archived comments of the user's it needs, all read in one snapshot (HI-2854, HR2's rounds 1
+ * and 2): what a refused submit gives an agent of its unseen decisions and comments, and the receipt of exactly those,
+ * come from the same board state, so nothing written between two reads is counted as given. Of the archive, only the
+ * comments of `want` (ids) are kept, searched page by page from the newest, however deep, until all are found. Null
+ * when it isn't there, or no longer in `project` (a card moved to another project since its intent was checked).
  */
-export async function cardWithFacts(ws: WorkspaceService, n: number): Promise<{ card: TaskCard; facts: Fact[]; archived: TaskComment[] } | null> {
+export async function cardWithFacts(ws: WorkspaceService, n: number, opts: { project?: string; want?: (facts: Fact[], onCard: ReadonlySet<string>) => ReadonlySet<string> } = {}): Promise<{ card: TaskCard; facts: Fact[]; archived: TaskComment[] } | null> {
   if (!Number.isInteger(n) || n < 1 || !ws.path) return null
   const ids = await ws.projectIds()
   if (!ws.path) return null
   const got = boardRead(ws, () => {
-    const total = commentArchiveOf(ws, n).archived
-    return { raw: cardDoc(ws, n), key: cardKeys(ws, [n]).get(n), facts: cardFacts(ws, n), archived: total ? (archivedComments(ws, n, Math.max(0, total - UNSEEN_ARCHIVE_MAX), UNSEEN_ARCHIVE_MAX).comments as TaskComment[]) : [] }
+    const raw = cardDoc(ws, n)
+    const facts = cardFacts(ws, n)
+    const onCard = new Set(((raw as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
+    const wanted = new Set(opts.want?.(facts, onCard) ?? [])
+    const archived: TaskComment[] = []
+    const total = wanted.size ? commentArchiveOf(ws, n).archived : 0
+    for (let end = total; end > 0 && wanted.size; end -= ARCHIVE_PAGE) {
+      for (const c of archivedComments(ws, n, Math.max(0, end - ARCHIVE_PAGE), Math.min(ARCHIVE_PAGE, end)).comments as TaskComment[]) {
+        if (c.id && wanted.delete(c.id)) archived.push(c)
+      }
+    }
+    return { raw, key: cardKeys(ws, [n]).get(n), facts, archived }
   })
   if (!got.raw) return null
-  return { card: withoutGone(clean(got.raw, n, ids, got.key), (x) => hasCard(ws, x)), facts: got.facts, archived: got.archived }
+  const card = withoutGone(clean(got.raw, n, ids, got.key), (x) => hasCard(ws, x))
+  if (opts.project !== undefined && card.project.toLowerCase() !== opts.project.toLowerCase()) return null
+  return { card, facts: got.facts, archived: got.archived }
 }
 
 export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number }> {

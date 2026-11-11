@@ -198,13 +198,13 @@ describe('recording facts from the board’s moves (#1216)', () => {
     await inWorkspace(w, () => tasks.editDecision(card, gone.id, null, user))
     await inWorkspace(w, () => tasks.commentTask(card, 'Keep the JSON identical.', user))
     await inWorkspace(w, () => tasks.commentTask(card, 'Round 1 ready.', builder))
-    const lines = await giveUnseen(w, 'a1', card)
+    const lines = await giveUnseen(w, 'a1', card, 'p')
     expect(lines).toEqual([expect.stringMatching(/^Decision \(\d{4}-\d\d-\d\d, recorded by Assistant\): Use SQLite$/), expect.stringMatching(/^Comment from the user \(\d{4}-\d\d-\d\d\): Keep the JSON identical\.$/)])
     expect(foldCard(factsOf(w, card))).toMatchObject({ received: { a1: 3 }, receivedComments: { a1: 1 } })
     // Received: nothing more to give, until the user writes again.
-    expect(await giveUnseen(w, 'a1', card)).toEqual([])
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([])
     await inWorkspace(w, () => tasks.commentTask(card, 'One more.', user))
-    expect(await giveUnseen(w, 'a1', card)).toEqual([expect.stringMatching(/One more\.$/)])
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([expect.stringMatching(/One more\.$/)])
   })
 
   it("HI-2854 (HR2's round 1): a comment and a decision edit landing between a refusal's snapshot and its receipt are neither given nor received; the retry is refused for them, then goes on", async () => {
@@ -224,12 +224,31 @@ describe('recording facts from the board’s moves (#1216)', () => {
     const s = foldCard(factsOf(w, card))
     expect(s).toMatchObject({ generation: 2, received: { a1: 1 }, commentGeneration: 2, receivedComments: { a1: 1 } })
     // The retry: refused again, with exactly what it missed (the new words, the second comment).
-    const again = await giveUnseen(w, 'a1', card)
+    const again = await giveUnseen(w, 'a1', card, 'p')
     expect(again).toEqual([expect.stringMatching(/: New words$/), expect.stringMatching(/: Second$/)])
     // And another between that refusal and the next retry: given then, never skipped.
     await inWorkspace(w, () => tasks.commentTask(card, 'Third', user))
-    expect(await giveUnseen(w, 'a1', card)).toEqual([expect.stringMatching(/: Third$/)])
-    expect(await giveUnseen(w, 'a1', card)).toEqual([])
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([expect.stringMatching(/: Third$/)])
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([])
+  })
+
+  it("HI-2854 (HR2's round 2): a comment of the user's archived more than a page deep is found and given by a refused submit, then received; a card moved to another project gives nothing", { timeout: 300_000 }, async () => {
+    const { giveUnseen } = await import('../src/main/cardFreshness')
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Deep archive', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.commentTask(card, 'Needle', user))
+    // 1,100 comments after it: the card keeps 500, so it is archived with 600 after it, past the newest page of 500.
+    for (let i = 0; i < 1100; i++) await inWorkspace(w, () => tasks.commentTask(card, `Note ${i}`, builder))
+    const archive = await inWorkspace(w, () => tasks.commentArchive(card))
+    expect(archive.archived).toBeGreaterThan(500 + 1)
+    expect((await inWorkspace(w, () => tasks.getTask(card))).comments.some((c) => c.text === 'Needle')).toBe(false)
+    // Not this agent's project: nothing given, nothing received.
+    expect(await giveUnseen(w, 'a1', card, 'elsewhere')).toEqual([])
+    expect(foldCard(factsOf(w, card)).receivedComments.a1).toBeUndefined()
+    // Its own: found deep in the archive, given in full, received.
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([expect.stringMatching(/^Comment from the user \(\d{4}-\d\d-\d\d\): Needle$/)])
+    expect(foldCard(factsOf(w, card)).receivedComments.a1).toBe(1)
+    expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([])
   })
 
   it("HI-2854 (HR2's round 1 finding 2): a full read's comment receipt stops before the first comment of the user's it doesn't give (archived since), from where the agent's receipt is", async () => {

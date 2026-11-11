@@ -3859,9 +3859,10 @@ these moments).
   submit; their words reach the builder in its inbox. **The refusal gives them**: an agent's refused submit lists each
   unseen decision and comment of the user's in full (`unread` in the refusal, one line each, with who and when), and
   records exactly those as received before it replies, so the next submit goes on, unless another came meanwhile, which
-  refuses it again. The card, its facts and its newest archived comments are read in one snapshot: a decision is given in
-  its newest fact's words, a comment from the card or its archive, and one found in neither stops the receipt before it
-  (the refusal says to read the archive). A decision or comment written after that snapshot is neither listed nor
+  refuses it again. The card, its facts and the archived comments it needs are read in one snapshot, and only while the
+  card is still the agent's project's: a decision is given in its newest fact's words, a comment from the card or,
+  archived, from the whole archive, searched page by page for it (one found in neither, not expected, is said to be
+  missing and counted as received, so the refusal can't repeat for ever). A decision or comment written after that snapshot is neither listed nor
   counted as received.
 - **A start task that carries the whole card** (HI-2854): a card's start prompt (taskStart, a slot's placement) carries
   its decisions and every comment, each in full with who and when, ending "This is the card in full…", only when all of it
