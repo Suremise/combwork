@@ -185,7 +185,7 @@ const TARGET = 'integration'
     await ask.getByRole('button', { name: 'Resolve on a Builder', exact: true }).click()
     check('…the forward ends in Done, nothing merged', await done(clashCard) && !(await h.kinds(clashCard)).includes('Integrated'), JSON.stringify(await h.kinds(clashCard)))
     await h.page.keyboard.press('Escape')
-    const made = (await h.inv('tasks:list')).find((c) => c.links?.includes(clashCard) && /^Resolve: bring integration up to date with main/.test(c.title))
+    const made = (await h.inv('tasks:list')).find((c) => c.links?.includes(clashCard) && c.title.startsWith('Resolve: bring integration up to date with main'))
     check('…an ordinary card for a builder, in Todo, linked, saying what to merge', !!made && made.column === 'todo' && !made.agent && made.description.includes('git merge ') && made.description.includes('clash.txt') && (await h.facts(made.number)).some((f) => f.kind === 'ForwardResolution' && f.data.from === 'main' && f.data.to === TARGET), JSON.stringify(made && { column: made.column, title: made.title }))
     const again = await api(assistant, 'POST', '/v1/queue/resolve', { card: `#${clashCard}`, reason: 'again' })
     check('…the Assistant\'s Resolve of it again is refused (409), nothing made', again.status === 409 && (await h.inv('tasks:list')).filter((c) => c.links?.includes(clashCard)).length === 1, JSON.stringify(again.body))
