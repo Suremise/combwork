@@ -416,5 +416,6 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
   // The builders of the lanes it changed, started on them if they aren't running (as laneStartCall does for the user's
   // and the Assistant's update of a lane); one that is running reads its list with cw_lane next.
   if (ws.path) for (const x of done.lanes) await laneEditHooks.resume(join(ws.path, x.lane.project), x.lane).catch((err: unknown) => log.warn(`resuming lane ${x.lane.id}'s builder`, err))
-  return { op: done.op, card: done.card, lanes: queued.length ? queued : done.lanes.map((x) => ({ lane: x.lane.id, queuedAfter: null })), undo }
+  // Each lane's revision now (HI-2932): the window's next quick edit names it, knowing only its own edit came between.
+  return { op: done.op, card: done.card, lanes: (queued.length ? queued : done.lanes.map((x) => ({ lane: x.lane.id, queuedAfter: null }))).map((x) => ({ ...x, rev: revOf.get(x.lane) ?? 0 })), undo }
 }
