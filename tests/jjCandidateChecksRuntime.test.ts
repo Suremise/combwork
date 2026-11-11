@@ -576,7 +576,9 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       const j: ChecksJournal = { fp: rec.fp, attempt: rec.offer!.attempt, result: rec.offer!.result, expected: rec.offer!.expected, checksKey: rec.checks!.key, lease: old, checks: [{ name: 'typecheck', command: PASS, phase: 'started' }] }
       await w.deps.records!.write((db) => writeChecksJournal(db as unknown as SqlDb, checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt), j))
       x.h.lease = lease
-      // A new Combwork's runner: the old lease isn't freed (its job still runs), so nothing is leased or run.
+      // A new Combwork's runner, once the waiting set's retry time has come (HI-2991): the old lease isn't freed (its job
+      // still runs), so nothing is leased or run.
+      await due(w, card, cycle)
       const other = w.another()
       const next = new JjPlatform(other)
       next.checksWanted()
@@ -591,6 +593,7 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(await job.end()).toBe(true)
       await job.close()
       await vi.waitFor(async () => expect(await leaseJobGone(sup, old)).toBe(true), { timeout: 30_000, interval: 100 })
+      await due(w, card, cycle)
       next.checksWanted()
       await vi.waitFor(() => expect(next.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
