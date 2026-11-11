@@ -125,7 +125,7 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
 
   // 1. Recovery and drop of what isn't settled. One that can't finish now (raced, a pin, the history) is left for a later
   // step or the sweep and never stops a new candidate (HI-2992); only the owner gone or a cancel ends the step.
-  const stops = (why: string): boolean => why === 'owner' || why === 'cancelled'
+  const stops = (cause: string): boolean => cause === 'owner' || cause === 'cancelled'
   for (const e of deps.entries()) {
     if (e.state || settled(e.record)) continue
     const rec = await recoverJjAttempt(cleanUp, e.record)
