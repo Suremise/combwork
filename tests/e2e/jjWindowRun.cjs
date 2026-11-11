@@ -334,7 +334,7 @@ const onDb = (fn) => {
     // (not lent with no lease), Slots and copies says so, and the card started again gets that slot back with its work.
     fs.writeFileSync(path.join(w2.folder, 'second.txt'), 'second\n')
     jj(w2.folder, 'commit', '-m', 'second work')
-    const kept = jj(w2.folder, 'log', '--no-graph', '-r', `${w2.workspace}@-`, '-T', 'commit_id').trim()
+    const keptCommit = jj(w2.folder, 'log', '--no-graph', '-r', `${w2.workspace}@-`, '-T', 'commit_id').trim()
     const back2 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back' }).catch((e) => ({ error: String(e) }))
     await inv('session:stop', shop, b1.id)
     const keptRow = await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot && s.keptFor === n2 && s.state === 'dirty' && !s.lease) ?? null, HUNG_MS)
@@ -350,7 +350,7 @@ const onDb = (fn) => {
       const v = await inv('tasks:work', n2)
       return v?.folder && v.workspace && v.folder.toLowerCase() === w1.folder.toLowerCase() ? v : null
     }, HUNG_MS)
-    check('card 2 started again: the same slot back, with its commit', !!w3 && jj(w1.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${kept} & ::${w1.workspace}@`, '-T', 'commit_id').trim() === kept, JSON.stringify({ started3, w3, slots: await inv('slots:list', shop) }))
+    check('card 2 started again: the same slot back, with its commit', !!w3 && jj(w1.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${keptCommit} & ::${w1.workspace}@`, '-T', 'commit_id').trim() === keptCommit, JSON.stringify({ started3, w3, slots: await inv('slots:list', shop) }))
 
   } finally {
     await app.close().catch(() => undefined)
