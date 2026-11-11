@@ -406,13 +406,46 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     await leaseOk(w, p)
   })
 
-  it('an unreadable fence refuses, never falling through to an unfenced switch', async () => {
-    const { w, p } = await members(true)
-    const storeId = storeKey(await commonGitDir(p))
-    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => metaOf(db).set(FENCE_KEY(storeId), '{not json')))
-    expect((await sw.checkPlatformSwitch(w, p, 'none')).refused).toEqual({ why: 'switching' })
-    await expect(sw.setPlatform(w, p, 'none', { expected: 'git' })).rejects.toThrow(/being switched/)
-    expect(await platformIn(w, p)).toBe('git')
+  it('a fence unreadable, gone, or not listing the member: refused, never an unfenced switch; nothing changed (HR2 round 1)', async () => {
+    const corrupt: [string, (raw: string | null) => string | null][] = [
+      ['malformed', () => '{not json'],
+      ['gone', () => null],
+      ['without the member', (raw) => {
+        const f = JSON.parse(raw!) as { members: Record<string, unknown> }
+        for (const id of Object.keys(f.members)) if (id.startsWith('p')) delete f.members[id]
+        return JSON.stringify(f)
+      }]
+    ]
+    for (const [name, change] of corrupt) {
+      const { w, p } = await members(true)
+      const storeId = storeKey(await commonGitDir(p))
+      const before = await w.projectConfig(p)
+      await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => metaOf(db).set(FENCE_KEY(storeId), change(metaOf(db).get(FENCE_KEY(storeId))))))
+      expect((await sw.checkPlatformSwitch(w, p, 'none')).refused, name).toEqual({ why: 'switching' })
+      await expect(sw.setPlatform(w, p, 'none', { expected: 'git' }), name).rejects.toThrow(/being switched/)
+      expect(await w.projectConfig(p), name).toEqual(before)
+    }
+  })
+
+  it('authority revoked while it drains: refused at the write, nothing written, the fence settled back and admissions restored (HR2 round 1)', async () => {
+    const { w, p, q } = await members(true)
+    let revoked = false
+    let guarded = 0
+    ss.storeSwitchSeams.at = (pt) => {
+      if (pt === 'afterDrain') revoked = true
+    }
+    const guard = () => {
+      guarded++
+      if (revoked) throw new Error('Control was revoked')
+    }
+    await expect(sw.setPlatform(w, p, 'none', { expected: 'git', guard })).rejects.toThrow(/Control was revoked/)
+    ss.storeSwitchSeams.at = undefined
+    expect(guarded).toBe(2)
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'git'])
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'git' } }, [await idOf(w, q)]: { current: { platform: 'git' } } } })
+    await leaseOk(w, p)
+    await copyOk(w, p)
+    expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.switching' })
   })
 
   it('control: a project never switched goes to None with its work running, which keeps its leases (its old rules)', async () => {

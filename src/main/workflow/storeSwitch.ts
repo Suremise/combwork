@@ -482,8 +482,21 @@ export async function memberSwitch(ws: WorkspaceService, path: string, name: str
       throw refusalError({ why: 'memberDrain' }) // i18n-ignore: a code or SQL, never shown as text
     }
     const partial: Partial<ProjectConfig> = { platform: after.platform, platformFound: after.platformFound, ...(after.workflow !== undefined ? { workflow: after.workflow as ProjectConfig['workflow'] } : {}) }
-    if (storeSwitchSeams.write) await storeSwitchSeams.write(path, partial)
-    else await ws.mutateProjectConfig(path, () => partial, { existing: true })
+    // The platform shown and the caller's authority checked again at the write itself (HR2's HI-2974 round 1): the
+    // begin and the drain awaited since, and the Assistant's Control may have been revoked meanwhile.
+    const recheck = (c: ProjectConfig): void => check(projectPlatform(path, c.platform).id)
+    if (storeSwitchSeams.write) {
+      recheck(await ws.projectConfig(path))
+      await storeSwitchSeams.write(path, partial)
+    } else
+      await ws.mutateProjectConfig(
+        path,
+        (c) => {
+          recheck(c)
+          return partial
+        },
+        { existing: true }
+      )
     await storeSwitchSeams.at?.('afterWrite', { members: [id], generation: fence.generation })
     await storeSwitchSeams.at?.('beforeSettle', { members: [id], generation: fence.generation })
     const settled = await fenceWrite(ws, (meta) => settle(meta, store, fence!.generation, { [id]: after }))
