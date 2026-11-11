@@ -37,6 +37,6 @@ export const gitRepoOps: RepoOps = {
   exclude: (p, items, target, ext) => files.gitExclude(p, items, target, ext),
   untrack: (p, items) => files.gitUntrack(p, items),
   include: (p, items) => files.gitInclude(p, items),
-  settleChanges: (p, target, action, shown, label, guard) => changes.settleChanges(p, target, action, shown, label, guard),
+  settleChanges: (p, target, seen, action, shown, label, guard) => changes.settleChanges(p, target, seen, action, shown, label, guard),
   commitIgnore: (p) => changes.commitIgnore(p)
 }

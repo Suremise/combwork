@@ -39,7 +39,7 @@ export function noticeTargetChanges(ws: WorkspaceService, projectPath: string, c
   const files = [...changes.files].sort()
   if (!sayNow(`${projectPath.toLowerCase()}|${changes.folder.toLowerCase()}|${files.join('\0')}`)) return
   // Exactly the files found: the window's Commit and Set aside act on them, all of them, whatever the text shows.
-  const args = (action: string): unknown[] => [projectPath, changes.target, action, files]
+  const args = (action: string): unknown[] => [projectPath, changes.target, action, files, changes.folder]
   const actions: ToastAction[] = [
     { label: tr(T.commit), command: 'folderChanges.settle', args: args('commit') },
     { label: tr(T.setAside), command: 'folderChanges.settle', args: args('setAside') },

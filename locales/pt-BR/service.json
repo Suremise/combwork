@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task} terminou com o código {code}",
   "service.providers.unknownHost": "Nenhum projeto usa mais esse host do GitHub para {cli}. Clique em Verificar de novo e depois faça login.",
   "service.queue.pauseChanged": "A pausa da fila de merge mudou nesse meio-tempo: nada recebeu commit nem foi deixado de lado. Confira de novo.",
+  "service.queue.pauseNoFolder": "O Combwork não sabe em qual pasta essas alterações estavam. Retome a fila: ela verifica de novo e diz onde.",
   "service.repoOps.notOffered": "O controle de versão ({platform}) não oferece isso aqui.",
   "service.slots.notPrepared": "O Combwork não conseguiu preparar {slot} para {card}: {why}",
   "service.slots.resumeFailed": "O Combwork não conseguiu retomar a conversa de {agent} em {slot} para {card} (três tentativas): {why}. Retome {agent} em Sessões, ou comece do zero, e o Combwork entrega {card} a ele.",

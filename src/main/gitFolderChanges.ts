@@ -169,13 +169,16 @@ async function setAsidePaths(folder: string, files: string[], message: string): 
  * found from the project's own repository, then everything checked again under the lock and its fence before git runs.
  * `label` names why, in the commit's or stash's message (`before merging HI-12`).
  */
-export async function settleChanges(projectPath: string, target: string, action: FolderChangeAction, shownIn: unknown, label: string, guard?: () => void): Promise<FolderChangesDone> {
+export async function settleChanges(projectPath: string, target: string, shownFolder: string, action: FolderChangeAction, shownIn: unknown, label: string, guard?: () => void): Promise<FolderChangesDone> {
   projectPath = workspace.assertProject(projectPath)
   const shown = cleanShown(shownIn)
   const where = await checkouts(projectPath)
   if (isUnknown(where)) throw failed(M.commitFailed, where.detail ?? where.what)
   const seen = where[target]
   if (!seen) throw combworkError(M.noTarget, { target })
+  // Only where the user was shown the changes: the target checked out elsewhere since (another folder's same-named edit
+  // is never theirs to commit), nothing is done.
+  if (typeof shownFolder !== 'string' || !shownFolder || !samePlace(seen, shownFolder)) throw combworkError(M.moved, { target })
   const what = say(action === 'commit' ? FENCE.commit : FENCE.setAside)
   return withRepoLock(
     projectPath,
@@ -183,7 +186,7 @@ export async function settleChanges(projectPath: string, target: string, action:
       changingFolder(seen, what, async () => {
         // Where it is checked out read again, under the lock: moved meanwhile, nothing is done.
         const again = await checkouts(projectPath)
-        if (isUnknown(again) || !again[target] || !samePlace(again[target], seen)) throw combworkError(M.moved, { target })
+        if (isUnknown(again) || !again[target] || !samePlace(again[target], seen) || !samePlace(again[target], shownFolder)) throw combworkError(M.moved, { target })
         const folder = again[target]
         const branch = await assertQuiet(projectPath, folder, target)
         guard?.()

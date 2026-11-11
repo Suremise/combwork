@@ -1155,6 +1155,10 @@
     "defaultMessage": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
     "description": "HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else)."
   },
+  "service.queue.pauseNoFolder": {
+    "defaultMessage": "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.",
+    "description": "HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder."
+  },
   "service.repoOps.notOffered": {
     "defaultMessage": "Version control ({platform}) doesn’t offer that here.",
     "description": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation."

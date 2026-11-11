@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task} exited with code {code}",
   "service.providers.unknownHost": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
   "service.queue.pauseChanged": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
+  "service.queue.pauseNoFolder": "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.",
   "service.repoOps.notOffered": "Version control ({platform}) doesn’t offer that here.",
   "service.slots.notPrepared": "Combwork couldn't get {slot} ready for {card}: {why}",
   "service.slots.resumeFailed": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",

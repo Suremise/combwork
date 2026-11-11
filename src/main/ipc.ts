@@ -1089,7 +1089,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     // HI-2944: the port refuses it first where the project's version control doesn't offer it.
-    'queue:settleChanges': (p, target, action, shown, pause) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), opsAt('queue:settleChanges')),
+    'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     'project:excludeCombwork': async (p) => {

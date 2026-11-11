@@ -23,8 +23,8 @@ const T = {
  * Commit or Set aside exactly `files` in the folder `target` is checked out in. From a paused merge `pause` is that
  * pause as shown: main acts only while it is still the current one, and the merge goes on only if it then can.
  */
-export async function settleFolderChanges(projectPath: string, target: string, action: FolderChangeAction, files: string[], pause: QueuePauseRef | null = null): Promise<boolean> {
-  const r = await actions.attempt(tr(action === 'commit' ? T.commitFailed : T.setAsideFailed), () => repoOp('queue:settleChanges', projectPath, target, action, files, pause))
+export async function settleFolderChanges(projectPath: string, target: string, action: FolderChangeAction, files: string[], pause: QueuePauseRef | null = null, folder: string | null = null): Promise<boolean> {
+  const r = await actions.attempt(tr(action === 'commit' ? T.commitFailed : T.setAsideFailed), () => repoOp('queue:settleChanges', projectPath, target, action, files, pause, folder))
   if (!r) return false
   bumpGit(projectPath)
   const title = tr(action === 'commit' ? T.committed : T.setAside, { count: r.done.files.length, branch: r.done.branch })

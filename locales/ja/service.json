@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task}が終了コード{code}で終了しました",
   "service.providers.unknownHost": "現在、{cli}でそのGitHubホストを使っているプロジェクトはありません。「再確認」してからサインインしてください。",
   "service.queue.pauseChanged": "その間にマージキューの一時停止が変わりました。コミットも退避もしていません。もう一度確認してください。",
+  "service.queue.pauseNoFolder": "これらの変更がどのフォルダーにあったか Combwork にはわかりません。キューを再開してください。もう一度確認して場所を示します。",
   "service.repoOps.notOffered": "バージョン管理（{platform}）では、ここでその操作はできません。",
   "service.slots.notPrepared": "Combworkは{card}のために{slot}を準備できませんでした：{why}",
   "service.slots.resumeFailed": "Combworkは{card}のために{slot}にある{agent}の会話を再開できませんでした（3回試行）：{why}。セッション履歴から{agent}を再開するか、新しく開始すると、Combworkが{card}を渡します。",

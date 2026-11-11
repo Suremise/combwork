@@ -486,10 +486,11 @@ export interface CombworkRequests {
   'queue:resume': (projectPath: string, target: string) => QueueResumed
   /**
    * HI-2944: Commit or Set aside exactly `shown`, the uncommitted changes in the folder `target` is checked out in (main
-   * finds it). From a paused merge (`pause` as shown): refused unless that pause is still current, and the queue resumed
-   * only if it still is and its condition is gone; from a start's warning, null.
+   * finds it), only while that is still the folder they were seen in: a paused merge's own record (`pause` as shown:
+   * refused unless that pause is still current, and the queue resumed only if it still is and its condition is gone), or
+   * a start's warning's (`folder`, with `pause` null).
    */
-  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null) => QueueChangesSettled
+  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null) => QueueChangesSettled
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */

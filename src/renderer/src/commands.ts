@@ -576,8 +576,8 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'project',
     // A start's warning (HI-2944): exactly the files it named, in the folder the target is checked out in (main finds it).
     internal: true,
-    run: (projectPath?: unknown, target?: unknown, action?: unknown, files?: unknown) =>
-      typeof projectPath === 'string' && typeof target === 'string' && Array.isArray(files) ? settleFolderChanges(projectPath, target, action === 'setAside' ? 'setAside' : 'commit', files.filter((f): f is string => typeof f === 'string')).then(() => undefined) : undefined
+    run: (projectPath?: unknown, target?: unknown, action?: unknown, files?: unknown, folder?: unknown) =>
+      typeof projectPath === 'string' && typeof target === 'string' && Array.isArray(files) && typeof folder === 'string' ? settleFolderChanges(projectPath, target, action === 'setAside' ? 'setAside' : 'commit', files.filter((f): f is string => typeof f === 'string'), null, folder).then(() => undefined) : undefined
   },
   {
     id: 'folderChanges.show',

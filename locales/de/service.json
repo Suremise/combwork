@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task} mit Code {code} beendet",
   "service.providers.unknownHost": "Kein Projekt nutzt diesen GitHub-Host jetzt für {cli}. Klicke auf „Erneut prüfen“ und melde dich dann an.",
   "service.queue.pauseChanged": "Die Pause der Merge-Warteschlange hat sich inzwischen geändert: Es wurde nichts committet oder beiseitegelegt. Sieh noch einmal nach.",
+  "service.queue.pauseNoFolder": "Combwork weiß nicht, in welchem Ordner diese Änderungen waren. Setze die Warteschlange fort: Sie sieht noch einmal nach und nennt den Ordner.",
   "service.repoOps.notOffered": "Die Versionsverwaltung ({platform}) bietet das hier nicht an.",
   "service.slots.notPrepared": "Combwork konnte {slot} nicht für {card} vorbereiten: {why}",
   "service.slots.resumeFailed": "Combwork konnte die Unterhaltung von {agent} in {slot} für {card} nicht fortsetzen (drei Versuche): {why}. Setze {agent} unter Sitzungen fort oder starte neu, dann gibt Combwork {agent} die Karte {card}.",

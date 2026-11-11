@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task} terminée avec le code {code}",
   "service.providers.unknownHost": "Aucun projet n’utilise plus cet hôte GitHub pour {cli}. Clique sur Vérifier à nouveau, puis connecte-toi.",
   "service.queue.pauseChanged": "La pause de la file de fusion a changé entre-temps : rien n’a été commité ni mis de côté. Regarde de nouveau.",
+  "service.queue.pauseNoFolder": "Combwork ne sait pas dans quel dossier se trouvaient ces modifications. Reprenez la file : elle regarde à nouveau et indique où.",
   "service.repoOps.notOffered": "La gestion de versions ({platform}) ne propose pas cela ici.",
   "service.slots.notPrepared": "Combwork n’a pas pu préparer l’emplacement {slot} pour la carte {card} : {why}",
   "service.slots.resumeFailed": "Combwork n’a pas pu reprendre la conversation de {agent} dans l’emplacement {slot} pour la carte {card} (trois essais) : {why}. Reprends {agent} depuis Sessions, ou repars de zéro, et Combwork lui donnera {card}.",

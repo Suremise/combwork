@@ -300,11 +300,13 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     const { w, repo, wt } = await workspace()
     const wf = (await service.workflowFor(w, repo))!
     for (const f of files) writeFileSync(join(repo, f), `the user's ${f}\n`)
-    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files }))
+    // As the queue pauses on the folder's changes: the folder named with them.
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files, folder: repo }))
     const p = wf.store.queuePause('main')!
     const ref = { card: p.card, reason: p.reason, at: p.at! }
     const head = () => git(repo, 'rev-parse', 'HEAD')
-    const settle = (action: 'commit' | 'setAside', shown: string[], r: typeof ref | null = ref, ops = gitRepoOps) => inWorkspace(w, () => settleQueueChanges(w, repo, 'main', action, shown, r, ops))
+    // From a start's warning (no pause), the folder it named: the project folder.
+    const settle = (action: 'commit' | 'setAside', shown: string[], r: typeof ref | null = ref, ops = gitRepoOps) => inWorkspace(w, () => settleQueueChanges(w, repo, 'main', action, shown, r, r ? null : repo, ops))
     return { w, repo, wt, wf, ref, head, settle }
   }
 
@@ -363,15 +365,26 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', files: ['c.txt'] })
   })
 
-  it('main checked out in another folder since: acted on there or refused, never in the old folder; not resumed unless clean', async () => {
-    const { repo, ref, head, settle } = await paused()
+  it("main checked out in another folder since, the same file changed there: refused (the pause's folder), nothing done, still paused", async () => {
+    const { repo, wf, ref, head, settle } = await paused()
     const before = head()
     git(repo, 'checkout', '-q', '--detach')
     const elsewhere = join(repo, '..', 'p-main')
     git(repo, 'worktree', 'add', '-q', elsewhere, 'main')
-    // a.txt is changed only in the old folder: not the changes shown, in main's folder now.
-    await expect(settle('commit', ['a.txt'], ref)).rejects.toThrow(/aren't the ones shown/)
+    writeFileSync(join(elsewhere, 'a.txt'), 'an edit the user never saw paused\n')
+    await expect(settle('commit', ['a.txt'], ref)).rejects.toThrow(/checked out changed meanwhile/)
+    await expect(settle('setAside', ['a.txt'], ref)).rejects.toThrow(/checked out changed meanwhile/)
     expect(git(repo, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(git(elsewhere, 'status', '--porcelain')).toBe('M a.txt')
+    expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'unstagedChanges', folder: repo })
+  })
+
+  it("a pause that doesn't name its folder (from before it was recorded): refused, saying to Resume", async () => {
+    const { repo, wf, settle } = await paused()
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'unstagedChanges', card: 'p-1', files: ['a.txt'] }))
+    const p = wf.store.queuePause('main')!
+    await expect(settle('commit', ['a.txt'], { card: p.card, reason: p.reason, at: p.at! })).rejects.toThrow(/Resume the queue/)
     expect(git(repo, 'status', '--porcelain')).toBe('M a.txt')
   })
 })

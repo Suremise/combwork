@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task}已退出，退出码 {code}",
   "service.providers.unknownHost": "现在没有项目为 {cli} 使用该 GitHub 主机。请先点击“重新检查”，再登录。",
   "service.queue.pauseChanged": "合并队列的暂停在此期间发生了变化：没有提交或搁置任何内容。请重新查看。",
+  "service.queue.pauseNoFolder": "Combwork 不知道这些更改位于哪个文件夹。请恢复队列：它会重新检查并说明位置。",
   "service.repoOps.notOffered": "版本控制（{platform}）在此不提供该操作。",
   "service.slots.notPrepared": "Combwork 无法为 {card} 准备 {slot}：{why}",
   "service.slots.resumeFailed": "Combwork 无法为 {card} 恢复 {agent} 在 {slot} 中的对话（已尝试三次）：{why}。请在“会话历史”中恢复 {agent}，或重新开始，Combwork 随后会把 {card} 交给它。",

@@ -288,6 +288,7 @@
   "service.providers.taskFailed": "{task}: zakończono z kodem {code}",
   "service.providers.unknownHost": "Żaden projekt nie używa teraz tego hosta GitHub dla {cli}. Kliknij Sprawdź ponownie, a potem się zaloguj.",
   "service.queue.pauseChanged": "Wstrzymanie kolejki scalania zmieniło się w międzyczasie: nie zrobiono commita ani niczego nie odłożono. Sprawdź ponownie.",
+  "service.queue.pauseNoFolder": "Combwork nie wie, w którym folderze były te zmiany. Wznów kolejkę: sprawdzi ponownie i poda, gdzie.",
   "service.repoOps.notOffered": "Kontrola wersji ({platform}) nie oferuje tego tutaj.",
   "service.slots.notPrepared": "Combwork nie przygotował slotu {slot} dla karty {card}: {why}",
   "service.slots.resumeFailed": "Combwork nie wznowił rozmowy agenta {agent} w slocie {slot} dla karty {card} (trzy próby): {why}. Wznów agenta {agent} w Sesjach albo zacznij od nowa, a Combwork przekaże mu kartę {card}.",

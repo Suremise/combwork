@@ -11,7 +11,7 @@ import { createRequire } from 'module'
 
 const { baseEnv } = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 import { readFileSync, writeFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MergeQueue, type QueueConfig, type QueueHook } from '../../src/main/workflow/mergeQueue'
@@ -137,6 +137,8 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     const before = head(e)
     const [o] = await e.queue().drain('main')
     expect(o).toMatchObject({ outcome: 'paused', reason: 'unstagedChanges', files: ['.gitignore'] })
+    // The pause names the folder the changes are in: Commit and Set aside act there only.
+    expect(resolve(e.store.queuePause('main')?.folder ?? '').toLowerCase()).toBe(resolve(e.project).toLowerCase())
     expect(head(e)).toBe(before)
     expect(readFileSync(join(e.project, '.gitignore'), 'utf8')).toBe('node_modules/\n/reference/\n')
     expect(e.kinds(card.id)).not.toContain('IntegrationStarted')

@@ -5627,7 +5627,9 @@ touched:
   or `staged` offers **Commit** and **Set Aside** beside its text, on the queue's card (Merges, Version Control → Merge
   queue) and in the card's Work section (`FolderChangeButtons`), acting on exactly the paused files. Port 5's
   `folderChanges` (Git only; `gitFolderChanges.ts`, `queue:settleChanges`): main finds the folder itself (where the
-  target is checked out, from the project's own repository; never a folder the window names) and, under the repository
+  target is checked out, from the project's own repository; never a folder the window names), acting only while that is
+  the folder the changes were seen in (a `staged` or `unstagedChanges` pause records it, `folder`; a start's warning names
+  it; one recorded before this: refused, Resume pauses again with it), and, under the repository
   lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
   operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
   path shown still changed (an empty or stale list is refused, never a pathless stash). Commit: `add --intent-to-add`

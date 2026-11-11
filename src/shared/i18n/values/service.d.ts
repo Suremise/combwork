@@ -290,6 +290,7 @@ interface CombworkMessageValues {
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.providers.unknownHost': { cli: string | number }
   'service.queue.pauseChanged': undefined
+  'service.queue.pauseNoFolder': undefined
   'service.repoOps.notOffered': { platform: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }

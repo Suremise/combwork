@@ -390,6 +390,8 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
 /** HI-2944: a pause as stored is the one the window showed (its reason, card and time). */
 const samePause = (p: QueuePause | null | undefined, ref: QueuePauseRef): boolean => !!p && p.reason === ref.reason && p.card === ref.card && (p.at ?? '') === ref.at
 
+const PAUSE_NO_FOLDER = msg({ id: 'service.queue.pauseNoFolder', defaultMessage: "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.", description: 'HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.' })
+
 const PAUSE_CHANGED = msg({ id: 'service.queue.pauseChanged', defaultMessage: "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.", description: 'HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).' })
 
 /**
@@ -398,12 +400,17 @@ const PAUSE_CHANGED = msg({ id: 'service.queue.pauseChanged', defaultMessage: "T
  * still be the current one there, before anything is touched; then the queue is resumed only if that same pause still
  * stands and its condition is gone (Resume's own check, git read again). From a start's warning (no pause): only done.
  */
-export async function settleQueueChanges(ws: WorkspaceService, projectPath: string, target: string, action: FolderChangeAction, shown: unknown, pause: QueuePauseRef | null, ops: OpsFor<'folderChanges'>): Promise<QueueChangesSettled> {
+export async function settleQueueChanges(ws: WorkspaceService, projectPath: string, target: string, action: FolderChangeAction, shown: unknown, pause: QueuePauseRef | null, shownFolder: string | null, ops: OpsFor<'folderChanges'>): Promise<QueueChangesSettled> {
   const wf = pause ? await needWorkflow(ws, projectPath) : null
+  // The folder the changes were seen in: the pause's own record (never the window's word), else the start warning's.
+  const stored = wf && pause ? wf.store.queuePause(target) : null
+  if (pause && !samePause(stored, pause)) throw combworkError(PAUSE_CHANGED)
+  const seen = pause ? (stored?.folder ?? null) : shownFolder
+  if (!seen) throw combworkError(PAUSE_NO_FOLDER)
   const current = wf && pause ? () => void (samePause(wf.store.queuePause(target), pause) || (() => { throw combworkError(PAUSE_CHANGED) })()) : undefined
   // i18n-ignore: the commit's or stash's message (in the repository, English as Combwork's other commits)
   const label = pause ? `before merging ${pause.card}` : `before starting work on ${target}`
-  const done = await ops.settleChanges(projectPath, target, action, Array.isArray(shown) ? shown : [], label, current)
+  const done = await ops.settleChanges(projectPath, target, seen, action, Array.isArray(shown) ? shown : [], label, current)
   if (!pause) return { done, resumed: false }
   return { done, resumed: (await resumeQueue(ws, projectPath, target, undefined, pause)).resumed }
 }

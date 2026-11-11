@@ -54,7 +54,8 @@ const read = (rel: string): string => readFileSync(join(proj, rel), 'utf8')
 const status = (dir = proj): string => sh(dir, 'status', '--porcelain=v1', '--untracked-files=all')
 const head = (dir = proj): string => sh(dir, 'rev-parse', 'HEAD')
 const committed = (dir = proj): string[] => sh(dir, 'show', '--no-renames', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean).sort()
-const settle = (action: 'commit' | 'setAside', shown: unknown, guard?: () => void, target = 'main') => inWorkspace(w, () => changes.settleChanges(proj, target, action, shown, 'before merging AB-1', guard))
+/** The folder shown with the changes: the project folder unless a test says (where `target` is checked out, as the user saw it). */
+const settle = (action: 'commit' | 'setAside', shown: unknown, guard?: () => void, target = 'main', seen = proj) => inWorkspace(w, () => changes.settleChanges(proj, target, seen, action, shown, 'before merging AB-1', guard))
 
 beforeEach(() => {
   proj = join(ws, `proj${++n}`)
@@ -186,7 +187,7 @@ describe('the folder and its state, checked under the lock', () => {
     sh(proj, 'worktree', 'add', '-q', tree, 'side')
     writeFileSync(join(tree, 'a.txt'), 'in the worktree\n')
     writeFileSync(join(proj, 'a.txt'), 'in the project folder\n')
-    const done = await settle('commit', ['a.txt'], undefined, 'side')
+    const done = await settle('commit', ['a.txt'], undefined, 'side', tree)
     expect(resolve(done.folder).toLowerCase()).toBe(resolve(tree).toLowerCase())
     expect(status(tree)).toBe('')
     expect(status()).toBe('M a.txt')
@@ -195,7 +196,23 @@ describe('the folder and its state, checked under the lock', () => {
   it('a target checked out nowhere, or another project, is refused', async () => {
     sh(proj, 'branch', 'nowhere')
     await expect(settle('commit', ['a.txt'], undefined, 'nowhere')).rejects.toThrow(/isn't checked out in a folder/)
-    await expect(inWorkspace(w, () => changes.settleChanges(join(base, 'elsewhere'), 'main', 'commit', ['a.txt'], 'x'))).rejects.toThrow(/Not a project/)
+    await expect(inWorkspace(w, () => changes.settleChanges(join(base, 'elsewhere'), 'main', proj, 'commit', ['a.txt'], 'x'))).rejects.toThrow(/Not a project/)
+  })
+
+  it('the target checked out in another folder than the one shown, the same file changed there too: refused, nothing done in either', async () => {
+    const tree = join(base, `moved${n}`)
+    writeFileSync(join(proj, 'a.txt'), 'shown here\n')
+    const before = head()
+    // main moves: the project folder detached, main checked out in another folder, whose a.txt the user also edits.
+    sh(proj, 'checkout', '-q', '--detach')
+    sh(proj, 'worktree', 'add', '-q', tree, 'main')
+    writeFileSync(join(tree, 'a.txt'), 'another edit, never shown\n')
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/checked out changed meanwhile/)
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/checked out changed meanwhile/)
+    expect(sh(proj, 'rev-parse', 'refs/heads/main')).toBe(before)
+    expect(status(tree)).toBe('M a.txt')
+    expect(status()).toBe('M a.txt')
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
   })
 
   it('a merge under way, an agent working there, or a run holding files there: refused, nothing done', async () => {
