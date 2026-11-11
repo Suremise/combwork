@@ -155,9 +155,11 @@ describe("jj's runner", () => {
     const held = await jjFileGate.acquire([keys.root], 'shared')
     const ac2 = new AbortController()
     const queued = runner({ FAKE_JJ_PID: pid2 }).run(ws, ['new'], { write: true, signal: ac2.signal })
-    await new Promise((res) => setImmediate(res))
+    // Its keys found and its admission asked for: queued behind the reader, then cancelled.
+    await expect.poll(() => jjFileGate.queued, { timeout: 20_000 }).toBe(1)
     ac2.abort()
     expect(await queued).toMatchObject({ notRun: 'cancelled' })
+    expect(jjFileGate.queued).toBe(0)
     held.release()
     expect(existsSync(pid2)).toBe(false)
     expect(jjFileGate.size).toBe(0)
@@ -317,7 +319,8 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     const held = await jjFileGate.acquire([store], 'exclusive')
     let ran = false
     const git = storeGitGated(ws, ['rev-parse', 'HEAD'], async () => ((ran = true), { ok: true, out: '', err: '', buf: Buffer.alloc(0), code: 0 }))
-    await new Promise((res) => setImmediate(res))
+    // Its key found and its admission asked for: queued behind the held store, and not run.
+    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(1)
     expect(ran).toBe(false)
     held.release()
     expect((await git).ok).toBe(true)
@@ -335,9 +338,9 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     })
     const contains = port.contains(s.store)
     const git = storeGitGated(s.top, ['--git-dir', s.worktree, 'rev-parse', 'HEAD'], async () => (ran.push('git'), { ok: true, out: '', err: '', buf: Buffer.alloc(0), code: 0 }))
-    // The sync read gets nothing while the write holds its store.
+    // The sync read gets nothing while the write holds its store; both async readers queued behind it, not run.
     expect(port.refSync(s.store)).toBeNull()
-    await new Promise((res) => setImmediate(res))
+    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(2)
     expect(ran).toEqual([])
     held.release()
     expect(await contains).toBe(true)
