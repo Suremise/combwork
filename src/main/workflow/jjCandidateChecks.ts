@@ -158,7 +158,6 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
   if ('wait' in l) return { wait: l.wait }
   if ('refused' in l) return { transient: { check: 'copy', why: l.refused } }
   j.lease = l.id
-  await deps.journal.write(j)
   let ended = false
   const give = async (why: string, end = false): Promise<void> => {
     if (ended) return
@@ -204,6 +203,9 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
   // A bracket taken and not yet ended (ended by the finally when the run ends before its check).
   let open: { end(): Promise<unknown> } | null = null
   try {
+    // The lease's id journalled inside the try (HI-2963): a failed write still gives the copy back (its error thrown on);
+    // nothing ran in it, so the next run needs no barrier for it.
+    await step(() => deps.journal.write(j))
     await step(() => deps.hook?.('leased'))
     const ctx: CheckContext = { card: i.card.key, number: i.card.number, revision: i.result, env: { CW_CHECK_BASE: i.expected } }
     let noInstall = false

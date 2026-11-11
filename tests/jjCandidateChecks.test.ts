@@ -234,6 +234,17 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     }
   })
 
+  it("saving the lease's id fails: the copy given back, the error thrown on, nothing run (HI-2963)", async () => {
+    const p = parts()
+    const write = p.deps.journal.write
+    p.deps.journal.write = async (j) => {
+      if (j.lease) throw new Error('journal write failed')
+      await write(j)
+    }
+    await expect(runCandidateChecks(p.deps, input({ installAlways: true }))).rejects.toThrow('journal write failed')
+    expect(p.log).toEqual(['lease L1', 'give L1 checksEnded'])
+  })
+
   it('the checks key follows the checks, their order and commands, the install and the setup command', () => {
     const o = { mergeChecks: ['a', 'b'], commands: { a: 'x', b: 'y' }, mergeInstall: 'onManifestChange' as const }
     const k = checksKeyOf(o, 'npm ci')
