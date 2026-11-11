@@ -195,6 +195,8 @@ export const SUITES = [
   { name: 'jjview' },
   { name: 'jjwindow' },
   { name: 'jjwindownc' },
+  { name: 'jjlane' },
+  { name: 'jjlanenc' },
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },
