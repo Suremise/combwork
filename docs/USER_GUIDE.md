@@ -1110,15 +1110,15 @@ The **Overview** tab updates as sessions change (at most every 15 seconds; **Set
 
 Claude Code's `/usage` may show a line such as **MCP servers: combwork 26%** and suggest turning it off when you don't need it. That figure counts every request that followed one of Combwork's tool calls, across all your sessions on the machine: each request re-reads the whole conversation so far (mostly from the cache), so it is calls × context, not what Combwork's tools and replies themselves take. Combwork's fixed part is small: about 2k tokens of tool descriptions, instructions and skills, loaded as needed. What it adds is **requests**: reading the task, starting the card, submitting it, each re-reading the conversation.
 
-Measured with Claude Code (Opus 5.5, medium effort) on a small task (a CSV line parser and eight tests, run until green), in a project with no review, as a solo user works:
+Measured with Claude Code (Opus 5.5, medium effort) on a small task (a CSV line parser and eight tests, run until green), in a project with no version control and no review, as a solo user works, twice each in Combwork's test harness:
 
 | | Requests | Cache read | API-equivalent cost |
 |---|---|---|---|
-| Plain, as from a terminal | 3 | 123k | $0.14 |
-| As a card, Combwork 1.3 | 11 | 528k | $0.27 |
-| As a card, this version | 8–9 | 370k–421k | $0.21–$0.22 |
+| Plain, as from a terminal | 3–5 | 123k–216k | $0.12–$0.15 |
+| As a card, Combwork 1.3 | 12 | 583k | $0.27–$0.28 |
+| As a card, this version | 8 | 368k–371k | $0.20–$0.21 |
 
-The first two rows are Combwork 1.3 in a project with no version control; the last is this version measured the same way in Combwork's test harness, whose project uses Git, so the card also commits its work (a request or two the first rows don't have), and the plain run there took 2 to 5 requests ($0.11–$0.16). What the card still adds: reading its task from the inbox, loading the work-on-card skill and the submit tool, and submitting. On a real card the work dominates, and it is a few percent. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card.
+On a task that size, a card's coordination cost about twice the plain run before, and about one and a half times now. What the card still adds: reading its task from the inbox, loading the work-on-card skill and the submit tool, and submitting. To keep it down, Combwork gives a card's whole text in its start task when it fits (**Settings → Advanced → A card in full at its start, up to**, 6,000 characters), so the agent needn't read it again; says when the card is already the agent's, so it needn't start it; checks at submit that the agent has seen every decision and every comment of yours, rather than having it read the card again; and acknowledges a card's start task when the agent starts or submits that card. On a real card the work dominates, and it is a few percent.
 
 ### Long conversations <a id="long-conversations"></a>
 
