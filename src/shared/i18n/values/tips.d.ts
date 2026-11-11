@@ -356,6 +356,8 @@ interface CombworkMessageValues {
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
   'tips.mergePush.title': undefined
+  'tips.mergeQueueCommit.text': undefined
+  'tips.mergeQueueCommit.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined

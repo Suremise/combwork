@@ -348,6 +348,8 @@
   "tips.mergeMessage.title": "Scalenia z własnymi komunikatami commitów",
   "tips.mergePush.text": "Gdy scala Combwork, Kontrola wersji → Przepływ pracy może wypychać gałąź docelową po każdym scaleniu, nigdy z wymuszeniem. Jeśli zdalne repozytorium odmówi, kolejka wstrzymuje się i mówi dlaczego: ściągnij zmiany i wznów albo wyłącz opcję i wznów.",
   "tips.mergePush.title": "Wypychaj każde scalenie do zdalnego repozytorium",
+  "tips.mergeQueueCommit.text": "Scalanie wstrzymane przez Twoje zmiany bez commita tam, gdzie wybrana jest jego gałąź, ma przyciski Zrób commit i Odłóż: w obu przypadkach scalanie trwa dalej. Combwork informuje Cię też, gdy karta lub tor startuje z takimi zmianami w tym miejscu.",
+  "tips.mergeQueueCommit.title": "Zrób commit lub odłóż to, co wstrzymuje scalanie",
   "tips.mergeQueueFolder.text": "Gdy kolejka scalania scala do gałęzi wybranej w folderze (main w folderze projektu), aktualizuje też ten folder, ale wstrzymuje się, zamiast ruszać plik, który właśnie zmieniasz. W Ustawienia → Zaawansowane możesz sprawić, by najpierw pytała w sekcji Dla Ciebie.",
   "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
   "tips.mergeQueuePanel.text": "Zakładka Scalenia w panelu Postęp pokazuje każdą kolejkę scalania: kartę, którą testuje, i ile zwykle trwają jej sprawdzenia, karty, które czekają, oraz kartę, którą zwróciła, dopóki jej nie zobaczysz. Są tam też „Wstrzymaj kolejkę” i „Wznów kolejkę”.",

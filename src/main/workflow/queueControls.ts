@@ -12,7 +12,8 @@
 
 import { queueIntegration } from '../platform/integrationPorts'
 import { app } from 'electron'
-import { CombworkError } from '../combworkError'
+import { CombworkError, combworkError } from '../combworkError'
+import type { OpsFor } from '../platform/repoOps'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
@@ -26,7 +27,7 @@ import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
 import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
-import type { TaskCard } from '../../shared/types'
+import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
 import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
@@ -365,10 +366,13 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
  * Resume: the pause cleared and the queue run, once its cause, where Combwork can see it, is gone; else paused again, as
  * it is now (`resumed` false). A queue not paused is just run.
  */
-export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void): Promise<QueueResumed> {
+export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void, expected?: QueuePauseRef): Promise<QueueResumed> {
   const wf = await needWorkflow(ws, projectPath)
   const p = wf.store.queuePause(target)
+  // HI-2944: only the pause a Commit or Set aside acted on; another one now stays as it is, shown.
+  if (expected && !samePause(p, expected)) return { resumed: false, view: queueView(ws, wf, projectPath, target) }
   const still = p ? await stillPaused(ws, wf, projectPath, target, p) : null
+  let cleared = false
   await wf.locked(() => {
     // The caller's authority as it is now, in the write: refused, nothing is cleared and the queue isn't run.
     guard?.()
@@ -376,10 +380,39 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
     // Changed meanwhile (another Resume, the queue pausing for something else): left as it is, said as it is.
     if (!now || !p || now.reason !== p.reason || now.at !== p.at) return
     wf.store.setQueuePause(target, still ? { ...p, ...still, at: undefined } : null)
+    cleared = !still
   })
   queueChanged(ws, projectPath, target)
   if (!still) void kickQueue(ws, projectPath, target)
-  return { resumed: !still, view: queueView(ws, wf, projectPath, target) }
+  return { resumed: expected ? cleared : !still, view: queueView(ws, wf, projectPath, target) }
+}
+
+/** HI-2944: a pause as stored is the one the window showed (its reason, card and time). */
+const samePause = (p: QueuePause | null | undefined, ref: QueuePauseRef): boolean => !!p && p.reason === ref.reason && p.card === ref.card && (p.at ?? '') === ref.at
+
+const PAUSE_NO_FOLDER = msg({ id: 'service.queue.pauseNoFolder', defaultMessage: "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.", description: 'HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.' })
+
+const PAUSE_CHANGED = msg({ id: 'service.queue.pauseChanged', defaultMessage: "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.", description: 'HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).' })
+
+/**
+ * HI-2944: Commit or Set aside exactly the files shown, in the folder `target` is checked out in (port 5's folderChanges,
+ * which finds it and checks it again under the repository lock and its fence). From a paused merge, the pause shown must
+ * still be the current one there, before anything is touched; then the queue is resumed only if that same pause still
+ * stands and its condition is gone (Resume's own check, git read again). From a start's warning (no pause): only done.
+ */
+export async function settleQueueChanges(ws: WorkspaceService, projectPath: string, target: string, action: FolderChangeAction, shown: unknown, pause: QueuePauseRef | null, shownFolder: string | null, ops: OpsFor<'folderChanges'>): Promise<QueueChangesSettled> {
+  const wf = pause ? await needWorkflow(ws, projectPath) : null
+  // The folder the changes were seen in: the pause's own record (never the window's word), else the start warning's.
+  const stored = wf && pause ? wf.store.queuePause(target) : null
+  if (pause && !samePause(stored, pause)) throw combworkError(PAUSE_CHANGED)
+  const seen = pause ? (stored?.folder ?? null) : shownFolder
+  if (!seen) throw combworkError(PAUSE_NO_FOLDER)
+  const current = wf && pause ? () => void (samePause(wf.store.queuePause(target), pause) || (() => { throw combworkError(PAUSE_CHANGED) })()) : undefined
+  // i18n-ignore: the commit's or stash's message (in the repository, English as Combwork's other commits)
+  const label = pause ? `before merging ${pause.card}` : `before starting work on ${target}`
+  const done = await ops.settleChanges(projectPath, target, seen, action, Array.isArray(shown) ? shown : [], label, current)
+  if (!pause) return { done, resumed: false }
+  return { done, resumed: (await resumeQueue(ws, projectPath, target, undefined, pause)).resumed }
 }
 
 /**

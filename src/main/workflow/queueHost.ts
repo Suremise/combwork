@@ -403,7 +403,7 @@ function testHooks(projectPath: string, target: string): QueueHooks {
  * going there (an agent's, the Assistant's or a script's; not Combwork's own). Null when there are none: an idle agent, or one
  * whose session lives there but works in a review copy, holds no lock and runs nothing there.
  */
-function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
+export function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
   const locked = sessions.locksIn(folder)
   const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'combwork' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
   const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]

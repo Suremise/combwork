@@ -716,6 +716,8 @@ interface CombworkMessageValues {
   'board.queue.pause.byAssistant': undefined
   'board.queue.pause.byYou': undefined
   'board.queue.pause.checkedOut': { target: string | number }
+  'board.queue.pause.commit': undefined
+  'board.queue.pause.commitTip': { files: string | number; target: string | number }
   'board.queue.pause.fetchFailed': { target: string | number }
   'board.queue.pause.folderBusy': { target: string | number }
   'board.queue.pause.hookTimedOut': undefined
@@ -735,13 +737,15 @@ interface CombworkMessageValues {
   'board.queue.pause.remoteDiverged': { target: string | number }
   'board.queue.pause.remoteUnsupported': { target: string | number }
   'board.queue.pause.rulesOff': undefined
+  'board.queue.pause.setAside': undefined
+  'board.queue.pause.setAsideTip': { files: string | number }
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined
-  'board.queue.pause.staged': { target: string | number }
+  'board.queue.pause.staged': { files: string; target: string | number; count: number }
   'board.queue.pause.subfolderTarget': { card: string | number }
   'board.queue.pause.targetMovesFast': { target: string | number }
   'board.queue.pause.uncounted': undefined
-  'board.queue.pause.unstagedChanges': { files: string; target: string | number }
+  'board.queue.pause.unstagedChanges': { files: string; target: string | number; count: number }
   'board.queue.pause.wrongBranch': { target: string | number }
   'board.queue.pauseFailed': undefined
   'board.queue.pauseTip': undefined

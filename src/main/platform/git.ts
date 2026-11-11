@@ -379,6 +379,9 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
 
+/** HI-2944: the dirty list's operation markers, exactly as it writes them; a changed file named `(draft).md` is a file. */
+export const OPERATION_MARKERS: ReadonlySet<string> = new Set(MARKERS.map((m) => `(${m})`))
+
 /**
  * A worktree's branch, head and uncommitted state, and optionally a line's head and some git paths, in two gits run at
  * once (#1374: lanes read this several times a pass, and six gits each outran tests' bounds under load): `status

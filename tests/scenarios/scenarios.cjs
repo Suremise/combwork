@@ -3799,6 +3799,33 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'start-target-changes',
+    title: "A builder starts a card while the user's .gitignore change sits uncommitted where main is checked out (HI-2944): its start warns of it (the user is told in the window); the builder leaves it alone: no commit, stash or discard",
+    files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n", '.gitignore': 'node_modules/\n' },
+    async setup(c) {
+      await pairRules(c)
+      await c.card('s', { title: 'Greeting punctuation', description: 'greet.js returns "Hello, <name>" with a comma.', agent: 'coder' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
+      // Files → Exclude from Git, shared, left uncommitted (Darren's case).
+      c.dirty = 'node_modules/\n/reference/\n'
+      c.write('.gitignore', c.dirty)
+    },
+    prompt: (c) => `Work on card #${c.cards.s}.`,
+    fake: (c) => `skill work-on-card then cw cw_start_card {"card":"#${c.cards.s}"}`,
+    expect: (o, c) => {
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const started = ran(o, 'cw_start_card').find((x) => x.ok)
+      return [
+        ['started it with cw_start_card', !!started, calls],
+        // The reply as the Combwork MCP server sent it (its log), on every provider.
+        ["its start's reply warned of the target's folder's uncommitted .gitignore", /has uncommitted changes \(\.gitignore\)/.test(started?.reply ?? ''), String(started?.reply ?? '').slice(0, 400)],
+        ["left the user's change as it was: .gitignore still changed, its text the same", (c.read('.gitignore') ?? '').replace(/\r\n/g, '\n') === c.dirty && /\.gitignore/.test(o.gitStatus), o.gitStatus],
+        ['committed nothing in the project folder', c.git('rev-parse', 'HEAD').trim() === c.head, c.git('log', '--oneline', '-3')],
+        ['set nothing aside (no stash)', c.git('stash', 'list').trim() === '', c.git('stash', 'list')]
+      ]
+    }
+  },
+  {
     id: 'review-in-copy',
     title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },

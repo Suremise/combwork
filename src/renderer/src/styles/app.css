@@ -13996,6 +13996,13 @@ button.progress-card-key:hover {
 .progress-queue-paused .progress-queue-text {
   flex: 1 1 160px;
 }
+/* HI-2944: Commit and Set Aside on a merge paused on uncommitted changes (the queue card, a card's Work section). */
+.folder-change-buttons,
+.card-work-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .progress-queue-merged > .codicon {
   color: var(--success);
 }

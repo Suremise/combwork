@@ -1,0 +1,14 @@
+{
+  "folderChanges.fence.commit": {
+    "text": "a commit of changes the user chose",
+    "note": "HI-2944: what changes a folder while the user's Commit runs there (a paused merge, a start's warning): Combwork types nothing into an agent there meanwhile."
+  },
+  "folderChanges.fence.ignore": {
+    "text": "a commit of .gitignore",
+    "note": "HI-2944: what changes the project folder while Files' Commit it commits .gitignore."
+  },
+  "folderChanges.fence.setAside": {
+    "text": "setting aside changes the user chose",
+    "note": "HI-2944: what changes a folder while the user's Set aside (a git stash) runs there."
+  }
+}

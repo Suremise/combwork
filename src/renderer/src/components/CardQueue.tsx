@@ -14,6 +14,7 @@ import { useForYou } from '../forYou'
 import { showQueueRun } from '../queueSource'
 import { confirm, notify, prompt, useStore } from '../store'
 import { timeAgo } from '../util'
+import { FolderChangeButtons } from './FolderChangeButtons'
 import { Icon } from './ui'
 
 /**
@@ -382,9 +383,12 @@ function Paused({ queue, projectPath }: { queue: QueueView; projectPath: string 
         <Icon name="debug-pause" /> <span>{tr(M.paused, { target: queue.target })}</span>
       </div>
       <div className="card-work-queue-why">{pauseText(queue.paused!, queue.target, tr, list)}</div>
-      <button type="button" className="btn small" data-action="resume" onClick={() => void resume()}>
-        <Icon name="debug-continue" /> {tr(M.resume)}
-      </button>
+      <div className="card-work-queue-actions">
+        <FolderChangeButtons projectPath={projectPath} target={queue.target} paused={queue.paused!} />
+        <button type="button" className="btn small" data-action="resume" onClick={() => void resume()}>
+          <Icon name="debug-continue" /> {tr(M.resume)}
+        </button>
+      </div>
     </div>
   )
 }

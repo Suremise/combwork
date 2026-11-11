@@ -347,7 +347,10 @@ interface EntryReads {
 }
 
 /** What an advance came to (advanceRef, advanceCheckedOut); `again` only before anything was touched. */
-type Advance = 'done' | 'moved' | 'denied' | 'held' | 'waiting' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
+/** HI-2944: the pauses on a checked-out folder's own changes, which record that folder. */
+const FOLDER_PAUSES: ReadonlySet<string> = new Set(['staged', 'unstagedChanges'])
+
+type Advance = 'done' | 'moved' | 'denied' | 'held' | 'waiting' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck; folder?: string } | { residue: QueueStuck } | { outcome: QueueOutcome }
 
 /** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
 /**
@@ -494,12 +497,12 @@ export class MergeQueue {
    * Pauses the target's queue at this entry: its reason, the files or folder it names, git's message (bounded). A stuck
    * advance (§16.9.2's terminal state) keeps its state, and the user is asked (For you) to finish or undo it.
    */
-  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck): Promise<QueueOutcome> {
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck, folder?: string): Promise<QueueOutcome> {
     const m = message?.trim().slice(0, 4000) || undefined
     const named = stuck ? stuck.files.map((f) => f.path) : files
     // Never in place of a pause saved meanwhile (the user's Pause queue, say), decided in the pause's own write; the
     // terminal state, which says more, and which the user must settle, is written whatever was there.
-    const wrote = await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }, !stuck))
+    const wrote = await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : folder ? { folder } : {}) }, !stuck))
     if (!wrote) return this.held(card, entry, this.paused(target)?.reason ?? 'user')
     if (stuck) {
       const finish = stuck.commands.find((c) => c.purpose === 'finish')
@@ -1053,7 +1056,7 @@ export class MergeQueue {
     const cond = await I.conditions(h, folder, target, c.from, c.to)
     if (isAgain(cond)) return null
     if (cond === 'retest') return 'again'
-    if ('pause' in cond) return this.catchUpPause(target, c, cond.pause, cond.files)
+    if ('pause' in cond) return this.catchUpPause(target, c, cond.pause, cond.files, undefined, undefined, FOLDER_PAUSES.has(cond.pause) ? folder : undefined)
     // Its plan journalled before anything moves (from the local head it found: never an earlier plan's files).
     const plan: CatchUp = { from: c.from, to: c.to, card: c.card, entry: c.entry, folder, files: cond.files, phase: 'files' }
     await this.setCatchUp(target, c.to, plan)
@@ -1105,12 +1108,12 @@ export class MergeQueue {
   }
 
   /** A catch-up's pause, naming the published card (Done already); a stuck one asks For you on it, as an advance's does. */
-  private async catchUpPause(target: string, c: CatchUp, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck): Promise<QueueOutcome> {
+  private async catchUpPause(target: string, c: CatchUp, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck, folder?: string): Promise<QueueOutcome> {
     const card = this.wf.store.cardByKey(c.card)
     const entry = card ? this.wf.state(card).entries.find((x) => x.id === c.entry) : undefined
-    if (card && entry) return this.pause(target, card, entry, reason, files, message, stuck)
+    if (card && entry) return this.pause(target, card, entry, reason, files, message, stuck, folder)
     const m = message?.trim().slice(0, 4000) || undefined
-    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: c.card, ...(files?.length ? { files } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }, !stuck))
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: c.card, ...(files?.length ? { files } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : folder ? { folder } : {}) }, !stuck))
     return { card: c.card, entry: c.entry, outcome: 'paused', reason, ...(files?.length ? { files } : {}), ...(m ? { message: m } : {}) }
   }
 
@@ -1863,7 +1866,7 @@ export class MergeQueue {
     }
     // A pause on a condition after the entry was failed and queued again (an edit since the check): that entry's.
     const at = adv.stuck ? entry : (openEntry(this.wf.state(card)) ?? entry)
-    return { outcome: await this.pause(target, card, at, adv.pause, adv.files, adv.message, adv.stuck) }
+    return { outcome: await this.pause(target, card, at, adv.pause, adv.files, adv.message, adv.stuck, adv.folder) }
   }
 
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
@@ -1908,7 +1911,9 @@ export class MergeQueue {
       if (isUnknown(now)) return again(gitSaid(now))
       if (!now[target] || resolve(now[target]).toLowerCase() !== seen.toLowerCase()) return 'retest'
       const j = await this.journal(card, entry, target, expected, result, seen)
-      return isAgain(j) ? j : this.settle(card, entry, target, j, integrate)
+      // HI-2944: a pause on the folder's own changes names the folder they are in (Commit and Set aside act there only).
+      const named = typeof j === 'object' && 'pause' in j && FOLDER_PAUSES.has(j.pause) ? { ...j, folder: seen } : j
+      return isAgain(named) ? named : this.settle(card, entry, target, named, integrate)
     })
     if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
     return r

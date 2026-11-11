@@ -1255,6 +1255,13 @@ function carriedNote(builder: string, from: LaneRecord | null, ownName: boolean)
   return say(A.carriedBrief, { builder, lane: from.id, what: brief && name ? 'both' : brief ? 'brief' : 'name' })
 }
 
+/** HI-2944: a lane's target's folder with uncommitted changes, told to the window; the warning for the caller, or null. */
+async function targetChangesWarning(ws: WorkspaceService, projectPath: string, target: string | null): Promise<string | null> {
+  if (!target) return null
+  const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
+  return wf ? wf.targetChangesWarning(target) : null
+}
+
 /** A project's targets (HI-2556), or null: not a Git project, or none readable. */
 async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<ProjectTargets | null> {
   return ws.path ? await projectTargets(ws, join(ws.path, project)).catch(() => null) : null
@@ -1481,7 +1488,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const carriedText = carriedNote(builder.name, carried, s.name != null)
   const gone = leftOut.length ? withCardNames(ws, () => say(A.leftOut, { cards: leftOut.map(cardRef).join(', '), n: leftOut.length }), scope) : null
   const stays = kept.length ? withCardNames(ws, () => say(A.stays, { cards: kept.map(cardRef).join(', '), n: kept.length }), scope) : null
-  const note = [applied, carriedText, gone, stays, queued, shared].filter(Boolean).join(' ') || undefined
+  // HI-2944: the folder its target is checked out in has uncommitted changes: said before its first card starts.
+  const dirty = r.did === 'started' && ws.path ? await targetChangesWarning(ws, join(ws.path, s.project), (r.rec.ruleset ? targetOfRulesetId(r.rec.ruleset) : null) ?? defaultTarget) : null
+  const note = [applied, carriedText, gone, stays, queued, shared, dirty].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 

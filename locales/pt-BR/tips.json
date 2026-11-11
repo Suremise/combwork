@@ -348,6 +348,8 @@
   "tips.mergeMessage.title": "Merges com suas próprias mensagens de commit",
   "tips.mergePush.text": "Quando o Combwork faz o merge, Controle de versão → Fluxo de trabalho pode fazer push do branch de destino depois de cada merge, nunca forçado. Se o remote recusar, a fila pausa e diz por quê: faça pull e retome, ou desative e retome.",
   "tips.mergePush.title": "Faça push de cada merge para o seu remote",
+  "tips.mergeQueueCommit.text": "Um merge pausado pelas suas alterações sem commit, onde o branch dele está em checkout, tem Fazer commit e Deixar de lado: de um jeito ou de outro, o merge continua. O Combwork também avisa quando um cartão ou uma raia começa com alterações assim ali.",
+  "tips.mergeQueueCommit.title": "Faça commit ou deixe de lado o que pausa um merge",
   "tips.mergeQueueFolder.text": "Quando a fila de merge faz o merge em um branch em checkout numa pasta (o main na pasta do projeto), ela também atualiza a pasta, mas pausa em vez de mexer num arquivo que você está mudando. Em Configurações → Avançado ela pode perguntar antes em Para você.",
   "tips.mergeQueueFolder.title": "Merge na pasta em que você trabalha",
   "tips.mergeQueuePanel.text": "A aba Merges do painel Progresso mostra cada fila de merge: o cartão que ela está testando e quanto tempo suas verificações costumam levar, os cartões aguardando e um cartão que ela devolveu, até você vê-lo. Pausar a fila e Retomar a fila também estão lá.",

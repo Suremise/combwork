@@ -97,6 +97,9 @@ async function needRepo(projectPath: string): Promise<Repo> {
   return repo
 }
 
+/** The project folder's repository (HI-2944: Commit it after a shared exclude), refused outside one. */
+export const filesRepo = (projectPath: string): Promise<Pick<Repo, 'cwd' | 'top' | 'branch'>> => needRepo(projectPath)
+
 const repoRel = (repo: Repo, rel: string): string => repo.prefix + rel
 
 /** check-ignore -v for these items: their rules, by project-relative path. */
