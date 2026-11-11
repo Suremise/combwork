@@ -1458,7 +1458,7 @@ export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultM
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null },
   actor: TaskActor,
-  opts: { commit?: () => void } = {}
+  opts: { commit?: () => void; pinTarget?: boolean } = {}
 ): Promise<TaskCard> {
   if (!workspace.path) throw combworkError(ERR.noWorkspace, undefined, { kind: 'conflict' })
   const title = text(input.title, MAX_TITLE, 'title').trim()
@@ -1493,7 +1493,9 @@ async function createTaskLocked(
   if (skipReason !== null && actor.kind !== 'user' && !skipReason) throw new TaskConflictError(SKIP.needsReason)
   if (skipReason !== null && !(await reviewsOf(ws, project, null))?.reviews) throw new TaskConflictError(SKIP.nothingNew)
   // Its Merges into (HI-2556): the user's or the Assistant's, one of the project's targets (null: the project's own).
-  const target = input.target === undefined ? null : await targetPick(project, input.target, actor)
+  // `pinTarget` (HI-2985): the branch named is stored even when it is the default now, so the card keeps it when Work
+  // merges into moves (a forward's resolution, which merges into the branch it resolves and nowhere else).
+  const target = input.target === undefined ? null : await targetPick(project, input.target, actor, !!opts.pinTarget)
   const n = await nextNumber(ws)
   const card: TaskCard = {
     number: n,
@@ -2120,6 +2122,7 @@ const TARGET = {
   changed: msg({ id: 'tasks.error.targetChanged', defaultMessage: '{card}’s Merges into changed since it was listed, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).' }),
   moved: msg({ id: 'tasks.error.targetMoved', defaultMessage: '{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.', description: 'HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12).' }),
   checkedOut: msg({ id: 'tasks.error.targetCheckedOut', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}', description: 'HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.' }),
+  resolution: msg({ id: 'tasks.error.targetResolution', defaultMessage: '{card} resolves the merge of {from} into {to}, so it merges into {to} only. To bring {from} into another branch, use Bring Up to Date there.', description: 'HI-2985: an error setting the Merges into of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand) to another branch than {to}. {card} is its key (HI-12). Bring Up to Date is a command’s name in the window: as translated there.' }),
   inLane: msg({ id: 'tasks.error.targetLane', defaultMessage: '{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.', description: 'HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.' }),
   moveRefused: msg({
     id: 'tasks.error.targetMoveRefused',
@@ -2220,10 +2223,12 @@ async function moveInFlight(n: number, target: string | null, def: string, actor
 }
 
 /** A card's Merges into as a call names it (HI-2556), checked against the project's targets: null for the default. */
-async function targetPick(project: string, raw: unknown, actor: TaskActor): Promise<string | null> {
+async function targetPick(project: string, raw: unknown, actor: TaskActor, pin = false): Promise<string | null> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const t = workspace.path && project ? await projectTargets(workspace, join(workspace.path, project)).catch(() => null) : null
-  const p = pickTarget(t, raw)
+  const picked = pickTarget(t, raw)
+  // Pinned (HI-2985): the default named is kept as itself, not as none.
+  const p = pin && t && 'target' in picked && picked.target === null && typeof raw === 'string' && raw.trim() ? { target: t.default } : picked
   if ('target' in p) {
     // A listed branch work can start from now (HR2's round 1: listed is not made).
     const there = p.target && workspace.path ? await branchExists(join(workspace.path, project), p.target) : true
@@ -2262,9 +2267,13 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
   const wf = first.project ? await workflowFor(ws, projectPath).catch(() => null) : null
   const def = first.project ? ((await projectTargets(ws, projectPath).catch(() => null))?.default ?? null) : null
   const names = new Map(first.project ? projectAgents(await ws.projectConfig(projectPath)).map((a) => [a.id, a.name] as const) : [])
+  // HI-2985: a forward's resolution merges into the branch it resolves, never elsewhere; set to it, it is pinned there.
+  const res = wf ? (wf.state(wf.store.card(n)).resolves ?? null) : null
+  if (res && ((await targetPick(first.project, raw, actor)) ?? def) !== res.to) throw new TaskConflictError(withValues(TARGET.resolution, { card: cardRef(n), from: res.from, to: res.to }))
   // HI-2753: a card in flight moves with its work kept, when that work is provably its own (its own path and locks).
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
-    const target = await targetPick(first.project, raw, actor)
+    const target = await targetPick(first.project, raw, actor, !!res)
+    if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
     // A retarget's move only from the target it was seen on (a stale preview, after an earlier move, moves nothing).
     if (o.expectFrom !== undefined && wf.state(wf.store.card(n)).started?.target !== o.expectFrom) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
     if ((target ?? def) === wf.state(wf.store.card(n)).started?.target && (wf.store.card(n).target ?? null) === target) return first
@@ -2275,7 +2284,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
       const card = await getTask(n, ws)
       if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
       if (card.project !== first.project) throw new TaskConflictError(withValues(TARGET.notListed, { hasTargets: 'no', target: '', default: '', hasOthers: 'no', others: '' }))
-      const target = await targetPick(card.project, raw, actor)
+      const target = await targetPick(card.project, raw, actor, !!res)
       const store = FactStore.forBoard(ws, { project: card.project, key: '' })
       // HI-2680: a move bound to what its caller saw (a retarget's preview): only from that target, as it is now.
       if (o.expect !== undefined && (store.card(n).target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))

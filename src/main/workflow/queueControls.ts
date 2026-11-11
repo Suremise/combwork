@@ -599,7 +599,7 @@ export interface ForwardResolved {
 /**
  * HI-2959 (SPEC §16.9): Resolve on a builder, on a forward merge the queue returned, the user's or the Assistant's alone
  * (`actor`; the Assistant's guard checked again inside each write). One board change: an ordinary code card made on the
- * forward's destination, linked to it, saying what came back and how to resolve it; marked its forward resolution
+ * forward's destination, pinned to it even when it is Work merges into now (HI-2985), linked to it, saying what came back and how to resolve it; marked its forward resolution
  * (`ForwardResolution`: its rules merge it as a merge commit); and the forward ended (Done, nothing merged). The returned
  * attempt's frozen source is what the card merges, not the source's head now. Refused or stopped part way, none of it is
  * kept: a Retry, a Remove or another Resolve meanwhile leaves no card.
@@ -621,7 +621,7 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   const { cardBatch, createTask, runIntent } = await import('../tasks')
   const done = await cardBatch(ws, async (): Promise<ForwardResolved> => {
     guard?.()
-    const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
+    const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { pinTarget: true, ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
     const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source }, by, guard), undefined, guard)
     if (isRefusal(marked.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
     // Refused (a Retry, a Remove or another Resolve since it was read): thrown, so the card made just now goes too.

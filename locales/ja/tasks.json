@@ -87,6 +87,7 @@
   "tasks.error.targetMoved": "{card} の「マージ先」を変更している間に古いブランチが変わったため、変更していません。まず、そこに追加された内容を確認してください。",
   "tasks.error.targetNotAgents": "カードをどのブランチにマージするかを設定できるのは、あなたかアシスタントだけです。",
   "tasks.error.targetNotListed": "{hasTargets, select, yes {{target}は、ここで作業をマージできるブランチではありません。{default}{hasOthers, select, yes {または{others}のいずれか} other {}}を指定するか、「バージョン管理」→「ワークフロー」の「その他のマージ先ブランチ」に追加してください。} other {このプロジェクトには、Combworkが選べるマージ先ブランチがありません。カードの「マージ先」はGitプロジェクト用です。}}",
+  "tasks.error.targetResolution": "{card}は{from}を{to}にマージする作業を解決するカードなので、{to}にだけマージされます。{from}を別のブランチに取り込むには、そのブランチで「最新にする」を使ってください。",
   "tasks.error.tooLong": "{what, select, title {タイトルが長すぎます（最大{max, number}文字）。} description {説明が長すぎます（最大{max, number}文字）。} comment {コメントが長すぎます（最大{max, number}文字）。} decision {決定事項が長すぎます（最大{max, number}文字）。} other {ブロックの理由が長すぎます（最大{max, number}文字）。}}",
   "tasks.error.tooManyContext": "カードに設定できる「最初に読む」セクションは{max}個までです。",
   "tasks.error.tooManyDecisions": "カードの決定事項は{max}件までです。",

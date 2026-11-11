@@ -87,6 +87,7 @@
   "tasks.error.targetMoved": "在更改 {card} 的“合并到”时，其旧分支发生了变化，因此保持不变。请先查看那里新增的内容。",
   "tasks.error.targetNotAgents": "只有你或助手可以设置卡片合并到哪个分支。",
   "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} 不是此处工作可合并到的分支：请指定 {default}{hasOthers, select, yes {或 {others} 之一} other {}}，或在“版本控制”→“工作流程”的“工作可合并到的其他分支”中添加它。} other {此项目没有 Combwork 可选的合并分支：卡片的“合并到”仅适用于 Git 项目。}}",
+  "tasks.error.targetResolution": "{card} 解决的是把 {from} 合并到 {to}，因此它只合并到 {to}。要把 {from} 带入另一个分支，请在那个分支上使用“更新到最新”。",
   "tasks.error.tooLong": "{what, select, title {标题太长（最多 {max, number} 个字符）。} description {描述太长（最多 {max, number} 个字符）。} comment {评论太长（最多 {max, number} 个字符）。} decision {决定太长（最多 {max, number} 个字符）。} other {受阻原因太长（最多 {max, number} 个字符）。}}",
   "tasks.error.tooManyContext": "一张卡片最多可以有 {max} 个先读的文档章节。",
   "tasks.error.tooManyDecisions": "一张卡片最多只能有 {max} 个决定。",

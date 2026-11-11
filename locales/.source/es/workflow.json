@@ -289,6 +289,8 @@
   "workflow.refused.evidence.changed.next": "Try again: Combwork reads it afresh.",
   "workflow.refused.forward.notAgents.message": "{card} brings one branch up to date with another: only the user or the Assistant acts on it.",
   "workflow.refused.forward.notAgents.next": "Leave it to the user or the Assistant.",
+  "workflow.refused.forward.resolutionTarget.message": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
+  "workflow.refused.forward.resolutionTarget.next": "The user or the Assistant can set its Merges into to {to}, then start it again.",
   "workflow.refused.integrate.approved.message": "{card} at {revision} isn't approved: {why}",
   "workflow.refused.integrate.approved.next": "Submit it for review.",
   "workflow.refused.integrate.checksPassed.change": "This rule is set in Version Control → Checks pass on the merged result.",

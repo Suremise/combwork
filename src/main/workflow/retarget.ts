@@ -76,6 +76,12 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       continue
     }
     const c = flying[0]
+    // Its card a forward's resolution (HI-2985): it and its lane stay, as a resolution merges into its branch alone.
+    if (c && wf.state(c).resolves?.to === from) {
+      out.lanes.push({ ...lane, why: 'refused' }) // i18n-ignore: a reason's code, said in words where it is shown
+      out.cards.keep.push({ ...row(c), why: 'refused' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
     const checked = c ? await checkCardMove(wf, projectPath, c, to) : null
     if (checked && !checked.ok) {
       const why = keepOf(checked.why)
@@ -90,6 +96,11 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
     const s = wf.state(c)
     if (s.stage === 'done' || grouped.has(c.id)) continue
     const own = c.target ?? null
+    // A forward's resolution (HI-2985) merges into the branch it resolves alone: never moved (tasks.setTarget refuses it).
+    if (s.resolves?.to === from && (own === from || s.started?.target === from)) {
+      out.cards.keep.push({ ...row(c), why: 'refused' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
     // Started on it (HI-2753): moves with its work kept when that work is provably its own, else stays with why.
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.started?.target === from) {
       if (!inFlight(c, s) || !ended) {

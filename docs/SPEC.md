@@ -5704,7 +5704,7 @@ release path's direction as it reads now unless its request recorded the user's 
 direction is never handed over (Remove from queue alone ends it), so a builder's card never makes a merge the forward
 rules refuse. One board change
 (`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
-the forward's destination (its Merges into), linked to it, its description the files in conflict, the returned attempt's
+the forward's destination (its Merges into, stored even when it is Work merges into then, HI-2985), linked to it, its description the files in conflict, the returned attempt's
 frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by}, written before its start
 and kept over every cycle; and the forward ended as Remove from queue ends it (Done, an override, never an `Integrated`),
 its comment naming the new card. The forward's intent is refused unless its last entry is still the one read, so a Retry,
@@ -5713,6 +5713,12 @@ now. The new card is an ordinary card: agents start it (it has no `ForwardReques
 queue are its rules', except that a card with a `ForwardResolution` merges as a merge commit always
 (`mergeCommitOf`: G6 merge, its id the base's marked `~mergeCommit`, `rulesBaseId` reading through it), so a squash or
 rebase project never drops the source's history from the destination.
+
+It merges into its `to` alone (HI-2985): Work merges into moving on after it is made (Start the next version) leaves it
+there. Its Merges into set to any other branch is refused (`tasks.setTarget`), a version retarget keeps it and its lane
+(`refused`), a lane merging elsewhere refuses it (`refuseOtherTargets` comparing a card's own target with the lane's,
+the project's default resolved), and its start is refused (`forward.resolutionTarget`) when it would start from another
+branch, as a card made before HI-2985 stored none: setting its Merges into to `to` then starts it there.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a

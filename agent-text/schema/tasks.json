@@ -395,6 +395,13 @@
       "others": "plain"
     }
   },
+  "tasks.error.targetResolution": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "tasks.error.tooLong": {
     "placeholders": {
       "what": "select",
