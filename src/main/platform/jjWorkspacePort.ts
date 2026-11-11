@@ -234,8 +234,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       return fn()
     })
 
-  const jj = (folder: string, args: readonly string[], o: { op?: string; write?: boolean } = {}): Promise<JjRunResult> =>
-    runner.run(folder, o.op ? ['--at-op', o.op, ...args] : args, o.write ? { write: true } : {})
+  /** `away`: a read that names no file, run from outside the folder (the runner's readAt), so it never holds it (HI-2912). */
+  const jj = (folder: string, args: readonly string[], o: { op?: string; write?: boolean; away?: boolean } = {}): Promise<JjRunResult> =>
+    runner.run(folder, o.op ? ['--at-op', o.op, ...args] : args, o.write ? { write: true } : o.away ? { away: true } : {})
 
   /** The one operation head of a folder's repository, confirmed by jj; unknown with none, several or no answer. */
   const pinned = async (folder: string): Promise<Maybe<string>> => {
@@ -245,13 +246,16 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     const heads = await readdir(join(ctx.jjRepo, 'op_heads', 'heads')).catch(() => null)
     if (!heads) return u
     if (heads.length !== 1) return withDetail(u, JJ_REFUSED.heads)
-    const r = await jj(folder, ['op', 'log', '--no-graph', '--limit', '1', '-T', 'id ++ "\\n"'], { op: heads[0] })
+    const r = await jj(folder, ['op', 'log', '--no-graph', '--limit', '1', '-T', 'id ++ "\\n"'], { op: heads[0], away: true })
     return r.ok && r.out.trim() === heads[0] ? heads[0] : withDetail(u, r.err)
   }
 
-  /** A pinned read, its output; unknown when jj didn't answer or failed. */
-  const read = async (folder: string, op: string, args: readonly string[], what: Unknown): Promise<Maybe<string>> => {
-    const r = await jj(folder, args, { op })
+  /**
+   * A pinned read, its output; unknown when jj didn't answer or failed. From outside the folder (`away`) unless it prints
+   * files' paths (`paths`), which jj gives relative to its working folder.
+   */
+  const read = async (folder: string, op: string, args: readonly string[], what: Unknown, o: { paths?: boolean } = {}): Promise<Maybe<string>> => {
+    const r = await jj(folder, args, { op, away: !o.paths })
     return r.ok ? r.out : withDetail(what, r.err)
   }
 
@@ -1009,7 +1013,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (isUnknown(after)) return after
       const name = await nameAt(folder, after)
       if (isUnknown(name)) return name
-      const out = await read(folder, after, ['diff', '--summary', '-r', `${revsetName(name)}@`], u)
+      const out = await read(folder, after, ['diff', '--summary', '-r', `${revsetName(name)}@`], u, { paths: true })
       if (isUnknown(out)) return out
       return lines(out).map((l) => l.replace(/^[A-Z] /, ''))
     },

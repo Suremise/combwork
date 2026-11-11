@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { generationOf, JJ_REFUSED } from '../src/main/platform/jjWorkspacePort'
 import { isUnknown } from '../src/main/platform/types'
+import { quiet } from '../src/main/slots'
 import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { harness, jjExe, real } from './jjWorkspaceHarness'
 
@@ -53,6 +54,36 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         // A folder that exists, or inside another repository, is refused.
         expect((await h.port.create(repo, folder, base)).err).toBe(JJ_REFUSED.exists)
       })
+
+      it("its polled reads don't hold the slot's folder: the quiet probe finds it quiet while they run (HI-2912)", async () => {
+        const h = harness()
+        const { repo, root, base } = h.repo('away', colocated)
+        const folder = join(root, 'slot-a')
+        expect((await h.port.create(repo, folder, base)).ok).toBe(true)
+        // A slot listing's staleness and the pool's head, two at a time, as jjwindow's 200 ms poll and the pool read it.
+        // Each loop probes the folder after each of its reads, while the other loop's read goes on, until 80 have answered.
+        const run = { answered: 0, probes: 0, inUse: 0 }
+        const answers: unknown[] = []
+        const loop = async (): Promise<void> => {
+          while (run.answered < 80) {
+            for (const a of [await h.port.stale(folder), await h.port.head(folder)]) {
+              answers.push(a)
+              if (!isUnknown(a)) run.answered++
+            }
+            run.probes++
+            if (!(await quiet(folder))) run.inUse++
+          }
+        }
+        await Promise.all([loop(), loop()])
+        // A probe can still meet Combwork's own file reads (the checkout file, a realpath: a few ms each); jj's working
+        // folder in the slot held it about half the time (before: 10 and 8 of 22 probes, colocated and not, 40 answers;
+        // after: 0 to 3 of about 44, 80 answers).
+        expect(run.inUse * 4 < run.probes, `${run.inUse} of ${run.probes} probes found it in use, ${run.answered} answers`).toBe(true)
+        // The reads still answered (a read a probe's rename caught is unknown, never a wrong answer).
+        expect(answers.some((a) => a === false)).toBe(true)
+        expect(answers.some((a) => a === base)).toBe(true)
+        expect(answers.every((a) => a === false || a === base || isUnknown(a))).toBe(true)
+      }, 120_000)
 
       it('two agents in two workspaces: both kept, each recorded only by its holder; the line operations refused', async () => {
         const h = harness()

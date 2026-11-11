@@ -124,7 +124,8 @@ export async function jjContextOf(folder: string, runner: JjRunner = jjRunner, o
   if (heads.length > 1) return unknown('opHeads', String(heads.length), { tool })
   const pin = ['--at-op', heads[0]]
   const ask = async (command: string[], expected: string): Promise<JjUnknown | null> => {
-    const r = await runner.run(root, [...pin, ...command], o)
+    // From outside the folder (HI-2912): both answers are absolute folders, and a slot's detection mustn't hold it.
+    const r = await runner.run(root, [...pin, ...command], { ...o, away: true })
     if (r.code === -1) return unknown('notRun', r.err, { command, expected, tool, ...(r.cancelled ? { cancelled: true as const } : {}) })
     const said = await jjFolder(r)
     return said && same(said, expected) ? null : unknown('disagrees', (r.out.trim() || r.err).slice(0, 400), { command, expected, tool })

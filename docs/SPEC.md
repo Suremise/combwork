@@ -3053,6 +3053,13 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   pool's start and by `refresh()`. A wake owns nothing: cancelled, or finding a slot taken, it loses nothing. The pool's
   close cancels the wake and awaits the running pass and settles. A refusal for good and known dirty files aren't owed:
   the next refresh or event looks again, with no periodic jj loop. Git's detach takes no fence, so Git is unchanged.
+- **Combwork's own reads never hold a slot** (HI-2912): quiet is a rename probe, and Windows refuses to rename a folder
+  that is any process's working folder (or holds one). jj's reads that name no file (the workspace port's ids, names,
+  staleness and roots; detection's `root` and `git root`) run from outside the folder, its workspace root given as
+  `--repository` (`away`, `readAt` in jjRunner.ts). Before, a slot's polled reads (its listing's staleness) kept it in use
+  most of the time under load, so its owed settle kept finding it busy for minutes after its builder had gone. Reads
+  that print a file's path (relative to jj's working folder) and writes stay in the folder: only the slot's operation
+  writes there, and a write's working folder keeps a probe from renaming the folder under it.
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
