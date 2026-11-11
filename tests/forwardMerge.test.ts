@@ -4,7 +4,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -538,6 +538,21 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     // The queue card names it beside how far 1.2.0 is behind main (the window then offers nothing for that pair).
     const view = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')!
     expect(view.forward?.behind.find((b) => b.from === 'main')).toMatchObject({ resolving: { card: rc, key } })
+    // HR1's round 1: the lookup reads the open cards alone (the Done forward never folded), once per listing, not per pair.
+    const folded = vi.spyOn(wf, 'state')
+    const reads = vi.spyOn(wf.store, 'cardsOpen')
+    try {
+      expect(controls.openPairs(wf).get('main\n1.2.0')?.id).toBe(rc)
+      expect(folded.mock.calls.map(([c]) => c.id)).toEqual([rc])
+      folded.mockClear()
+      reads.mockClear()
+      await inWorkspace(w, () => store.boardWrite(w, async () => undefined))
+      await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+      expect(reads).toHaveBeenCalledTimes(1)
+    } finally {
+      folded.mockRestore()
+      reads.mockRestore()
+    }
     // Done (here by the user's move, nothing to merge): the pair is open again, and a request makes a new forward.
     const tasks = await import('../src/main/tasks')
     await inWorkspace(w, () => tasks.moveTask(rc, 'done', { confirm: true, reason: 'resolved elsewhere' }))

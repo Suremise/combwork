@@ -5840,7 +5840,7 @@ reads. The queue reads it again at each attempt and merges only on true: false r
 nothing merged), however it reached the queue; unreadable, the entry goes round again as another read git couldn't
 make (HI-2019), then pauses needs-you with git's text, nothing merged.
 
-While it is open (not Done), it is the pair's open work (HI-3000, `openForPair`), as an open forward is: a forward
+While it is open (not Done), it is the pair's open work (HI-3000, `openPairs`: the board's open cards alone read and folded, `cardsOpen`, once per listing), as an open forward is: a forward
 request for `from` into `to` (the window's or the Assistant's) returns it and makes nothing, and the destination's queue
 card names it on that pair's behind line (`QueueForward.behind[].resolving`), offering no Bring Up to Date for that pair
 until it is Done.
