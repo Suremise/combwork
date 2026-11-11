@@ -379,10 +379,10 @@ describe('the folder and its state, checked under the lock', () => {
 // HI-2983: each path was its own argument, so a few hundred passed Windows' 32,767-character command line (spawn
 // ENAMETOOLONG) and both buttons failed with nothing done. The paths now go to git on its input.
 describe('many changed files', () => {
-  const many = (n: number): string[] => {
+  const many = (count: number): string[] => {
     const out: string[] = []
     mkdirSync(join(proj, 'build', 'a fairly long generated folder name'), { recursive: true })
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < count; i++) {
       const rel = `build/a fairly long generated folder name/generated output file number ${String(i).padStart(4, '0')}.txt`
       writeFileSync(join(proj, rel), `${i}\n`)
       out.push(rel)
