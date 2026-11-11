@@ -254,7 +254,7 @@ async function commitKeepingDeletions(folder: string, files: string[], now: Map<
     const tree = await git(folder, ['write-tree'], undefined, undefined, { env })
     const after = await git(folder, ['rev-parse', '--verify', 'HEAD^{commit}'])
     const made = after.ok ? after.out.trim() : ''
-    const id = (r: { ok: boolean; out: string }): string => (r.ok && /^[0-9a-f]{40,64}$/.test(r.out.trim()) ? r.out.trim() : '')
+    const id = (read: { ok: boolean; out: string }): string => (read.ok && /^[0-9a-f]{40,64}$/.test(read.out.trim()) ? read.out.trim() : '')
     const ours =
       !!made && !!id(tree) && id(await git(folder, ['rev-parse', '--verify', `${made}^1`])) === was && id(await git(folder, ['rev-parse', '--verify', `${made}^{tree}`])) === id(tree)
     if (!ours) {
