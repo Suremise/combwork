@@ -12,8 +12,10 @@ export function detect(folder: string): Detection {
   // Jujutsu (HI-2799): its nearest `.jj`, colocated with Git or not. jj is offered, never taken by itself (`initialOf`).
   const jj = jjOf(folder)
   if (jj) return { platform: 'jj', root: jj.root, jj: { colocated: jj.colocated, ...(jj.inGit ? { inGit: jj.inGit } : {}) }, ...(resolve(jj.root) !== resolve(folder) ? { subfolder: true } : {}) }
+  // Another system found above: None, unless it is a jj repository a nearer Git repository is inside (HI-2976: jjOf
+  // found no jj, so a `.git` is nearer; the nearest marker decides, as the repository boundary does).
   const other = otherVcsOf(folder)
-  if (other) return { platform: 'none', other: other.name }
+  if (other && other.name !== 'Jujutsu') return { platform: 'none', other: other.name } // i18n-ignore: a product's name, the marker's
   const v = vcsOf(folder)
   if (v?.kind === 'git') return { platform: 'git', root: v.root, ...(resolve(v.root) !== resolve(folder) ? { subfolder: true } : {}) }
   return { platform: 'none' }
