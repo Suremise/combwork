@@ -450,6 +450,8 @@
   "tips.recentWorkspaces.title": "Deine zuletzt geöffneten Arbeitsbereiche aufräumen",
   "tips.removeAll.text": "„Alle entfernen“ im Projektkopf entfernt nach einer Rückfrage alle Agenten eines Projekts. Worktrees bleiben erhalten, außer du hakst das Kästchen an; dann werden nur gemergte, saubere gelöscht.",
   "tips.removeAll.title": "Alle Agenten auf einmal entfernen",
+  "tips.resolveOnBuilder.text": "„Auf den neuesten Stand bringen…“ kam mit einem Konflikt zurück? „Von einem Bearbeiter lösen lassen…“ auf seiner Karte erstellt eine normale Karte, auf der ein Bearbeiter von Hand mergt und den Konflikt löst; sie wird wie jede Karte geprüft und als Merge-Commit gemergt.",
+  "tips.resolveOnBuilder.title": "Ein Forward-Merge mit Konflikt",
   "tips.resumeAfterUpdate.text": "Beim Installieren einer neuen Version erfahren es die Agenten, die gearbeitet haben oder in einer Kartenschleife waren, und wenn Combwork wieder startet, setzt es sie in ihren Unterhaltungen fort, einen nach dem anderen, und jeder erfährt seine Karte, Runde und Lane. Nach dem Beenden bietet der nächste Start stattdessen an, sie fortzusetzen.",
   "tips.resumeAfterUpdate.title": "Updates lassen deine Agenten, wo sie waren",
   "tips.resumeAll.text": "Nach einem Neustart setzt „Alle Agenten fortsetzen“ im Projektkopf die letzte Sitzung jedes gestoppten Agenten in einem Schritt fort.",

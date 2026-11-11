@@ -726,6 +726,7 @@
   "assistant.undo.why.context": "The doc sections to read first stay as set.",
   "assistant.undo.why.decision": "A decision it recorded stays: only you change or remove decisions.",
   "assistant.undo.why.declarePaths": "The paths it declared stay with the card.",
+  "assistant.undo.why.forwardResolved": "A forward merge it handed to a builder stays ended, and the card made for the builder stays: put that card on hold or remove it if it isn't wanted.",
   "assistant.undo.why.freshRetried": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
   "assistant.undo.why.handOver": "A hand-over can't be undone: the work went to the other agent.",
   "assistant.undo.why.laneEnded": "A lane that ended stays ended: start it again if it should go on.",

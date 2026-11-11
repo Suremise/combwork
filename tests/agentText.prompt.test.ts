@@ -64,6 +64,9 @@ function stalls(): { name: string; text: string | null }[] {
   const review = { ...doing, column: 'review', history: [{ at: at(125), by: 'You', what: 'Moved to Review' }] }
   const out: { name: string; text: string | null }[] = [
     { name: 'no agent', text: stalledReason({ ...doing, agent: null } as never, null) },
+    // HI-2959: a returned forward merge, and one returned for its direction.
+    { name: 'forward waits', text: stalledReason({ ...doing, agent: null } as never, null, undefined, { from: 'main', to: 'main', removeOnly: false }) },
+    { name: 'forward remove only', text: stalledReason({ ...doing, agent: null } as never, null, undefined, { from: 'main', to: 'main', removeOnly: true }) },
     { name: 'removed', text: stalledReason(doing as never, null) },
     { name: 'removed unnamed', text: stalledReason({ ...doing, agentName: null } as never, null) },
     { name: 'not running', text: stalledReason(doing as never, { name: 'Agent2', running: false }) },

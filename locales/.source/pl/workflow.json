@@ -166,6 +166,7 @@
   "workflow.move.putBack": "Put back",
   "workflow.move.removeFromQueue": "Remove from queue",
   "workflow.move.reportMerge": "Report the merge",
+  "workflow.move.resolveOnBuilder": "Resolve on a builder",
   "workflow.move.retryMerge": "Retry merge",
   "workflow.move.start": "Start",
   "workflow.move.startReview": "Start review",

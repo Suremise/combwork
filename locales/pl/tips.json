@@ -450,6 +450,8 @@
   "tips.recentWorkspaces.title": "Uporządkuj ostatnie obszary robocze",
   "tips.removeAll.text": "Usuń wszystkich w nagłówku projektu usuwa wszystkich agentów projektu po jednym pytaniu. Worktree zostają, chyba że zaznaczysz pole – wtedy usuwane są tylko scalone i czyste.",
   "tips.removeAll.title": "Usuń wszystkich agentów naraz",
+  "tips.resolveOnBuilder.text": "Zaktualizuj… wróciło z konfliktem? Rozwiąż przez wykonawcę… na jego karcie tworzy zwykłą kartę, na której wykonawca scala ręcznie i rozwiązuje konflikt; jest przeglądana i scalana jako commit scalający, jak każda karta.",
+  "tips.resolveOnBuilder.title": "Scalenie aktualizujące z konfliktem",
   "tips.resumeAfterUpdate.text": "Instalacja nowej wersji powiadamia agentów, którzy pracowali lub byli w pętli kart, a gdy Combwork uruchomi się ponownie, wznawia ich w ich rozmowach, jednego po drugim, a każdy dowiaduje się swojej karty, rundy i toru. Po zamknięciu następne uruchomienie proponuje ich wznowienie.",
   "tips.resumeAfterUpdate.title": "Aktualizacje zostawiają agentów tam, gdzie byli",
   "tips.resumeAll.text": "Po ponownym uruchomieniu Wznów wszystkich agentów w nagłówku projektu wznawia za jednym razem ostatnią sesję każdego zatrzymanego agenta.",

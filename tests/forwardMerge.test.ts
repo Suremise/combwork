@@ -346,6 +346,15 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(wf.state(wf.store.card(old.number))).toMatchObject({ stage: 'active', integrated: null })
     await expect(inWorkspace(w, () => controls.queueCardChange(w, old.number, user, 'retryMerge', 'again'))).rejects.toThrow(new RegExp(`${old.key} isn’t merged again: its request recorded no override, and 1\\.4\\.0 is an older version than 1\\.5\\.0`))
     expect(wf.state(wf.store.card(old.number)).stage).toBe('active')
+    // HI-2959: nor handed to a builder (the Assistant's or the user's Resolve): refused for its direction, the board
+    // unchanged, its stall naming Remove from queue alone.
+    const cards = wf.store.cards().length
+    for (const by of [assistant, user]) await expect(inWorkspace(w, () => controls.resolveForward(w, old.number, by, 'by hand'))).rejects.toThrow(new RegExp(`${old.key} isn’t merged again: its request recorded no override`))
+    expect(wf.store.cards().length).toBe(cards)
+    expect(wf.state(wf.store.card(old.number)).stage).toBe('active')
+    expect(wf.returnedForward(wf.store.card(old.number))).toBeNull()
+    const { forwardWaitOf } = await import('../src/main/queueReturn')
+    expect(await forwardWaitOf(w, repo, old.number)).toEqual({ from: '1.5.0', to: '1.4.0', removeOnly: true })
     // Remove from queue ends it, nothing merged.
     await inWorkspace(w, () => controls.queueCardChange(w, old.number, user, 'removeFromQueue', 'not this way'))
     expect(wf.state(wf.store.card(old.number)).stage).toBe('done')
@@ -425,5 +434,77 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(wf.state(wf.store.card(card!.number))).toMatchObject({ stage: 'merging', forward: { override: { dir: 'backward', why: 'older' } } })
     expect(await drain(w, repo, '1.4.0')).toMatchObject([{ outcome: 'integrated' }])
     expect(git(repo, 'merge-base', '--is-ancestor', settled, '1.4.0') === '').toBe(true)
+  })
+
+  it('HI-2959: a forward made with the override that conflicts can still be handed to a builder; the card merges as a merge commit', async () => {
+    const { w, repo } = await versions({ conflict: true })
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, '1.5.0', '1.4.0', user, undefined, { override: true }))
+    const card = 'card' in made ? made.card : null
+    expect(await drain(w, repo, '1.4.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const { forwardWaitOf } = await import('../src/main/queueReturn')
+    expect(await forwardWaitOf(w, repo, card!.number)).toEqual({ from: '1.5.0', to: '1.4.0', removeOnly: false })
+    const r = await inWorkspace(w, () => controls.resolveForward(w, card!.number, assistant, 'by hand'))
+    const wf = (await workflowFor(w, repo))!
+    expect(r).toMatchObject({ from: '1.5.0', to: '1.4.0', source: git(repo, 'rev-parse', '1.5.0') })
+    expect(wf.state(wf.store.card(card!.number)).stage).toBe('done')
+    expect(wf.store.card(r.card.number).target).toBe('1.4.0')
+    expect(wf.rulesetOf(wf.store.card(r.card.number)).options.style).toBe('merge')
+  })
+})
+
+describe('HI-2959: Resolve on a builder, on the real board', () => {
+  /** project(), with 1.2.0 changing main's fix too: the forward of main into 1.2.0 conflicts. */
+  async function conflicting(): Promise<{ w: WS; repo: string }> {
+    const p = await project()
+    git(p.repo, 'checkout', '-q', '1.2.0')
+    writeFileSync(join(p.repo, 'fix0.txt'), 'the 1.2.0 version\n')
+    git(p.repo, 'add', '-A')
+    git(p.repo, 'commit', '-qm', '1.2.0 changes it too')
+    git(p.repo, 'checkout', '-q', '--detach')
+    return p
+  }
+
+  it("is the user's or the Assistant's, only on a returned forward; one board change, never two cards", async () => {
+    const { w, repo } = await conflicting()
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    const fwd = 'card' in made ? made.card : null
+    const resolve = (actor: Parameters<typeof controls.resolveForward>[2], guard?: () => void) => inWorkspace(w, () => controls.resolveForward(w, fwd!.number, actor, 'merge by hand', guard))
+    const wf = (await workflowFor(w, repo))!
+    const before = wf.store.cards().length
+    // Queued, not returned yet: nothing to hand over.
+    await expect(resolve(user)).rejects.toThrow(/isn’t a forward merge the merge queue sent back/)
+    expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const source = git(repo, 'rev-parse', 'main')
+    // A project agent: refused, as the forward request is.
+    await expect(resolve(agent)).rejects.toThrow(/Only the user or the Assistant/)
+    // The Assistant's guard withdrawn as it writes (after the card is made, or as the forward ends): nothing kept.
+    for (const after of [1, 2, 3]) {
+      let calls = 0
+      await expect(resolve(assistant, () => { if (++calls >= after) throw new Error('Control turned off meanwhile') })).rejects.toThrow(/turned off meanwhile/)
+      expect(wf.store.cards().length).toBe(before)
+      expect(wf.state(wf.store.card(fwd!.number)).stage).toBe('active')
+    }
+    // Two at once (the window and the Assistant): one card, the other refused.
+    const both = await Promise.allSettled([resolve(user), resolve(assistant)])
+    expect(both.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(wf.store.cards().length).toBe(before + 1)
+    const fkey = wf.store.card(fwd!.number).key
+    const done = (both.find((r) => r.status === 'fulfilled') as PromiseFulfilledResult<Awaited<ReturnType<typeof resolve>>>).value
+    expect(done).toMatchObject({ forward: fkey, from: 'main', to: '1.2.0', source })
+    const card = done.card
+    expect(card).toMatchObject({ column: 'todo', agent: null, links: [fwd!.number], title: 'Resolve: bring 1.2.0 up to date with main' })
+    expect(card.description).toContain(`git merge ${source}`)
+    expect(card.description).toContain('fix0.txt')
+    expect(wf.store.card(card.number).target).toBe('1.2.0')
+    expect(wf.state(wf.store.card(card.number)).resolves).toMatchObject({ forward: fkey, source })
+    // The forward ended, nothing merged; its comment names the new card.
+    expect(wf.state(wf.store.card(fwd!.number)).stage).toBe('done')
+    const comments = (await inWorkspace(w, () => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'comment' ORDER BY id").all(fwd!.number)))) as { payload: string }[]
+    expect(JSON.parse(comments.at(-1)!.payload).text).toContain(`Resolve on a builder made ${wf.store.card(card.number).key}`)
+    // The return's own comment before it: the user's choices, never a builder's cw_submit.
+    expect(JSON.parse(comments.at(-2)!.payload).text).toMatch(/Resolve on a builder ends it/)
+    expect(JSON.parse(comments.at(-2)!.payload).text).not.toContain('cw_submit')
+    // Once ended, again: refused.
+    await expect(resolve(user)).rejects.toThrow(/isn’t a forward merge the merge queue sent back/)
   })
 })

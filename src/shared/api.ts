@@ -495,6 +495,8 @@ export interface CombworkRequests {
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
   'queue:retry': (n: number, reason?: string) => TaskCard
+  /** HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder. */
+  'queue:resolve': (n: number, reason?: string) => TaskCard
   /** Adds the project's .combwork to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeCombwork': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .combwork git tracks (#364), for the confirmation before untracking them. */

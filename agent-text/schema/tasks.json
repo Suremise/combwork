@@ -590,6 +590,14 @@
       "revision": "plain"
     }
   },
+  "tasks.history.forwardResolving": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain"
+    }
+  },
   "tasks.history.fromOlder": {
     "placeholders": {
       "was": "plain"

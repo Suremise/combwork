@@ -125,6 +125,7 @@
   "tasks.history.dependsOn": "Depende de {cards}",
   "tasks.history.description": "Alterou a descrição",
   "tasks.history.followUpSubmitted": "Acompanhamento enviado para revisão em {revision}",
+  "tasks.history.forwardResolving": "Encerrado aqui, sem merge: Resolver com um executor criou {card} para um executor fazer o merge de {from} ({source}) em {to} e resolver o conflito lá. Acompanhe {card}.",
   "tasks.history.fromOlder": "Adicionado de um Combwork mais antigo, onde foi criado como #{was}",
   "tasks.history.given": "Entregue ao agente {agent}",
   "tasks.history.imported": "Trazido de volta com o projeto {project} (era #{was})",

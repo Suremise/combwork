@@ -412,6 +412,13 @@ export interface FactData {
   /** HI-2892: `override`, the user's explicit choice of a pair against the release path's direction (forwardOrder.ts). */
   ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string; override?: ForwardOverride }
   /**
+   * HI-2959: this card resolves a forward merge the queue returned (`forward`: its key), made for a builder by Resolve on
+   * a builder (the user's or the Assistant's): its work merges `from` at `source` (the returned attempt's frozen commit)
+   * into `to`. Written while it is in Todo, before its start, and kept over every cycle: its rules always merge it as a
+   * merge commit (`mergeCommitOf`), so the destination keeps the source's history.
+   */
+  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant' }
+  /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its
    * own (`retargetCard.ts`). `base`: its latest submission's merge base with `to` (a card reviewed: the same commits), which
@@ -539,6 +546,8 @@ export interface CardState {
   stale: FactData['Stale'] | null
   /** HI-2679: a forward merge's request (its `ForwardRequested`), this cycle's; null for every other card. */
   forward: FactData['ForwardRequested'] | null
+  /** HI-2959: the forward merge this card resolves (its `ForwardResolution`), over every cycle; null for every other card. */
+  resolves: FactData['ForwardResolution'] | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
@@ -610,6 +619,7 @@ export const emptyState = (): CardState => ({
   approved: null,
   stale: null,
   forward: null,
+  resolves: null,
   staleSince: null,
   requests: [],
   made: {},
@@ -661,7 +671,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
         const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq, lines: s.lines })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -755,6 +765,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'ForwardRequested': {
         s.forward = f.data as FactData['ForwardRequested']
+        break
+      }
+      case 'ForwardResolution': {
+        s.resolves = f.data as FactData['ForwardResolution']
         break
       }
       case 'Retargeted': {

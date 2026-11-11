@@ -56,6 +56,9 @@
   "activity.undo.declarePaths": {
     "placeholders": {}
   },
+  "activity.undo.forwardResolved": {
+    "placeholders": {}
+  },
   "activity.undo.freshRetried": {
     "placeholders": {}
   },

@@ -450,6 +450,8 @@
   "tips.recentWorkspaces.title": "Faire le tri dans tes espaces de travail récents",
   "tips.removeAll.text": "Tout retirer, dans l’en-tête du projet, retire tous les agents du projet après une seule question. Les worktrees sont conservés sauf si tu coches la case, qui ne supprime que ceux qui sont fusionnés et propres.",
   "tips.removeAll.title": "Retirer tous les agents d’un coup",
+  "tips.resolveOnBuilder.text": "Mettre à jour… est revenue avec un conflit ? Faire résoudre par un auteur… sur sa carte crée une carte ordinaire pour qu’un auteur fusionne à la main et résolve le conflit ; elle est relue et fusionnée en commit de fusion, comme toute carte.",
+  "tips.resolveOnBuilder.title": "Une fusion de mise à jour en conflit",
   "tips.resumeAfterUpdate.text": "Installer une nouvelle version prévient les agents qui travaillaient ou étaient dans une boucle de cartes, et quand Combwork redémarre il les reprend dans leurs conversations, l’un après l’autre, chacun informé de sa carte, de son tour et de son couloir. Après que tu l’as quitté, le démarrage suivant propose de les reprendre.",
   "tips.resumeAfterUpdate.title": "Les mises à jour laissent tes agents là où ils en étaient",
   "tips.resumeAll.text": "Après un redémarrage, Reprendre tous les agents, dans l’en-tête du projet, reprend d’un coup la dernière session de chaque agent arrêté.",

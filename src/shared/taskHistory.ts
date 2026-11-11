@@ -96,6 +96,11 @@ export const HISTORY = {
     description:
       "A comment Combwork writes on a card when the merge queue sends it back to its builder instead of merging it (HI-2087). {reason} says why (select: translate each; keep the keys): a merge conflict with the target branch {target} (a branch name, such as main), a merge check {check} (the check's name, such as typecheck) that failed on the merged result or failed because of the machine or network rather than the code, the install before the checks, a git hook that refused the merge commit, the target branch moving while it was merged, the folder where the target branch is checked out being busy, the card's work not being up to date with the target, its focused tests, or (direction, HI-2892) a forward merge that would bring {target} up to date against the release path's direction (into an older version, or into main), made without the user's override. {files} lists the files concerned (file paths, keep them; none: leave that part out). \"Merge queue\" and \"Work section\" are Combwork's terms."
   }),
+  forwardResolving: msg({
+    id: 'tasks.history.forwardResolving',
+    defaultMessage: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.',
+    description: 'A comment Combwork writes on a forward merge card (HI-2959: Combwork’s own card merging branch {from} into branch {to} through the merge queue) after the user or the Assistant chose Resolve on a builder on it, when it came back with a conflict: it ends without merging, and a new card {card} (its key, such as HI-12) was made for an agent to do the merge by hand. {source} is a short commit id. Resolve on a builder is a button: as translated there.'
+  }),
   jjCandidateReturned: msg({
     id: 'tasks.history.jjCandidateReturned',
     defaultMessage: "Came back from its candidate on {target}: {reason, select, conflict {it conflicts with {target}} checks {its merge check {check} failed on the candidate} other {it isn't up to date with {target}}}{files, select, none {} other { (in {files})}}. Its builder {reason, select, checks {fixes it} other {brings {target} in with jj}} and submits it again.",

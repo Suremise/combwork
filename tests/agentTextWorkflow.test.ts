@@ -94,6 +94,8 @@ function queueTexts(): { name: string; text: string }[] {
     out.push({ name: `returned ${i} short`, text: returnedText('HI-7', f, 160) })
     out.push({ name: `resubmitted ${i}`, text: resubmittedText('HI-7', f, 'Coder') })
   }
+  // HI-2959: a forward merge's return names the user's choices, not a builder's step.
+  out.push({ name: 'returned forward', text: returnedText('HI-7', FAILURES[0], undefined, undefined, { from: 'main', to: 'main' }) })
   out.push({ name: 'stale', text: staleWake('HI-7', 'abc1234', null) })
   for (const to of ['review', 'active'] as const) out.push({ name: `left decision ${to}`, text: leftWake('HI-7', 'decision', to) })
   out.push({ name: 'left stale', text: leftWake('HI-7', 'stale', 'review') })

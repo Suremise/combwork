@@ -2036,7 +2036,8 @@ export class MergeQueue {
       // merge (HI-2679) has no builder: its card says it, for the user or the Assistant to Retry merge or Remove.
       if (!w.state().forward) this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
       // HI-2087: and on the card, for whoever reads it (its latest comment was the review's pass).
-      w.action('comment', { ...returnedComment(card.key, failed) })
+      const fw = w.state().forward
+      w.action('comment', { ...returnedComment(card.key, failed, fw ? { from: fw.from, to: fw.to } : undefined) })
       return true
     })
     if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' } // i18n-ignore: a reason's key, not text

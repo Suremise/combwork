@@ -129,6 +129,7 @@ interface CombworkMessageValues {
   'tasks.history.dependsOn': { cards: string | number }
   'tasks.history.description': undefined
   'tasks.history.followUpSubmitted': { revision: string | number }
+  'tasks.history.forwardResolving': { card: string | number; from: string | number; source: string | number; to: string | number }
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
   'tasks.history.imported': { project: string | number; was: string | number }

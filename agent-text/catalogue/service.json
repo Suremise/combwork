@@ -439,6 +439,11 @@
     "note": "HI-2679: a forward merge refused: asked by a project agent or a script.",
     "audience": "both"
   },
+  "service.forward.notReturned": {
+    "text": "{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.",
+    "note": "HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card).",
+    "audience": "both"
+  },
   "service.forward.notTargets": {
     "text": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
     "note": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.",
@@ -452,6 +457,11 @@
   "service.forward.raced": {
     "text": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
     "note": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.",
+    "audience": "both"
+  },
+  "service.forward.resolveRaced": {
+    "text": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
+    "note": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.",
     "audience": "both"
   },
   "service.fsutil.keptBusy": {
