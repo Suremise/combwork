@@ -2372,20 +2372,23 @@ module.exports.SCENARIOS = [
     },
     // The review copies Combwork lends Coder while it works, and what Git and jj each see there (HR2 on HI-2870/s7); each
     // looked at again while it is still Coder's, so an edit or a jj record there is seen (HR2's round 1). Its first look
-    // once Combwork has it ready (on the submitted revision); none once it is given back (Combwork cleans it then).
+    // only once Combwork has it ready, by the copy's state, never while it is still being made (HI-2907: firstLook); none
+    // after it is given back (Combwork cleans it then), but a copy given back between two looks was still on the revision.
     async during(c) {
-      const { copySnapshot, copyChanges } = require('./jjReviewCopy.cjs')
+      const { copySnapshot, firstLook, copyChanges } = require('./jjReviewCopy.cjs')
       for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) {
-        if (v.lease?.kind !== 'review' || v.lease.agent !== c.agents.coder.id || v.lease.returned) continue
+        if (v.lease?.kind !== 'review' || v.lease.agent !== c.agents.coder.id) continue
+        if (v.lease.returned && c.copies.has(v.folder)) continue
         const now = copySnapshot(v.folder, (...a) => jjIn(c, '--ignore-working-copy', ...a, { cwd: v.folder, allowFail: true }))
         if (!c.copies.has(v.folder)) {
-          if (!now || now.parent !== c.sub.revision) continue
+          const first = firstLook(v, now, c.sub.revision)
+          if (!first) continue
           c.copies.add(v.folder)
-          c.copyFirst.set(v.folder, now)
+          if (first === 'baseline') c.copyFirst.set(v.folder, now)
           c.copySeen = jjCopySeen(c, v.folder)
           continue
         }
-        if (!now) continue
+        if (!now || !c.copyFirst.has(v.folder)) continue
         c.copyLooks++
         for (const x of copyChanges(c.copyFirst.get(v.folder), now)) c.copyChanged.add(x)
       }

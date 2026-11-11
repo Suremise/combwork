@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Reordene uma raia em andamento agora",
   "tips.laneBranchSquash.text": "Depois que o cartão de um agente é mesclado com squash, o Combwork atualiza o branch dele antes do próximo cartão, para que cada revisão mostre só o trabalho daquele cartão. O que não puder fazer com segurança, ele pergunta em Para você; Configurações → Avançado faz com que pergunte toda vez.",
   "tips.laneBranchSquash.title": "O branch de um agente em dia entre cartões",
+  "tips.laneEdit.text": "Na aba Raias do painel Progresso, abra uma raia em andamento para arrastar os cartões em espera para uma nova ordem, tirar um ou adicionar outro com Adicionar cartão… ou arrastando-o do quadro. Ctrl+Z desfaz.",
+  "tips.laneEdit.title": "Altere você mesmo os cartões de uma raia",
   "tips.laneGates.text": "No painel Progresso, uma raia diz no cabeçalho o que está aguardando, e um entalhe vermelho no segmento de um cartão significa que o último pedido dele foi recusado: passe o mouse para ver o motivo e o próximo passo.",
   "tips.laneGates.title": "Veja por que uma raia não avança",
   "tips.laneNext.text": "Com as regras do fluxo de trabalho aplicadas, quando um cartão de uma raia está concluído, o Combwork entrega o próximo ao executor assim que o turno dele termina, e a raia segue sem que você ou o Assistente precisem pedir.",
@@ -594,5 +596,7 @@
   "tips.opencodeHistory.text": "A conversa de um agente do OpenCode aparece na aba Sessões, e os tokens e o custo dele na Visão geral e no rodapé do painel, como o OpenCode os informa. Um custo de $0 não mede a cota do seu plano; limites só aparecem para o OpenCode Go ou o Console.",
   "tips.opencodeHistory.title": "O histórico, os tokens e o custo de um agente do OpenCode",
   "tips.versionControlJj.text": "Em um repositório jj, escolha jj no alto da aba Controle de versão: o Histórico mostra cada change id ao lado do seu commit id, e Comparar, Bookmarks e Conflitos leem o repositório sem alterá-lo. Você mesmo integra o trabalho revisado.",
-  "tips.versionControlJj.title": "Veja um repositório jj"
+  "tips.versionControlJj.title": "Veja um repositório jj",
+  "tips.activityMap.text": "Atividade desenha seus agentes como um favo de mel: cada chamada de ferramenta vai até sua estação (Ler, Editar, Shell, Agentes, Ferramentas, Você), com um anel de contexto por agente. Escolha um agente em Agentes ▾ para ver o mapa dele; Mostrar desliga o mapa, seu registro e os anéis.",
+  "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo"
 }

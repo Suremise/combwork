@@ -171,7 +171,7 @@ export const AREAS = [
   // Disable hardware acceleration (#676): the early read, the restart offer, the terminals' renderer, diagnostics.
   { paths: ['src/main/gpu.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/components/TerminalView.tsx', 'src/main/diagnostics.ts', 'tests/e2e/hwaccel.cjs'], suites: ['hwaccel'] },
   { paths: ['src/main/agentTokens.ts'], suites: ['boardscope', 'review', 'progress', 'progressreport', 'cardloop', 'replysize', 'combworktools'] },
-  { paths: ['src/main/assistantControl.ts', 'src/main/assistantChanges.ts', 'src/main/assistantUndo.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/taskBatch.ts', 'src/shared/assistant.ts', 'src/shared/assistantStatus.ts', 'src/shared/assistantTools.ts', 'src/main/modes.ts', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/components/AssistantChanges.tsx', 'src/renderer/src/assistantUndo.ts', 'src/shared/assistantChangeList.ts', 'src/renderer/src/components/AssistantMark.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/Modes.tsx', 'src/shared/modeDescriptions.ts'], suites: ['assistantside', 'assistant', 'assistant-control', 'assistantend', 'assistantimages', 'tipcorner', 'replysize', 'claude-real', 'assistantoverview', 'assistantbatch', 'assistantcompact', 'assistantsettings', 'assistantmode', 'cardchip', 'assistantpanel', 'assistantundo'] },
+  { paths: ['src/main/assistantControl.ts', 'src/main/assistantChanges.ts', 'src/main/assistantUndo.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/taskBatch.ts', 'src/shared/assistant.ts', 'src/shared/assistantStatus.ts', 'src/shared/assistantTools.ts', 'src/main/modes.ts', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/components/AssistantChanges.tsx', 'src/renderer/src/assistantUndo.ts', 'src/shared/assistantChangeList.ts', 'src/renderer/src/components/AssistantMark.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/Modes.tsx', 'src/shared/modeDescriptions.ts'], suites: ['assistantside', 'assistant', 'assistantcodex', 'assistant-control', 'assistantend', 'assistantimages', 'tipcorner', 'replysize', 'claude-real', 'assistantoverview', 'assistantbatch', 'assistantcompact', 'assistantsettings', 'assistantmode', 'cardchip', 'assistantpanel', 'assistantundo'] },
   { paths: ['src/main/installDir.ts'], suites: ['installdir'] },
   { paths: ['src/main/benchmarks.ts', 'src/shared/benchmark.ts', 'src/renderer/src/views/PerformanceCompare.tsx'], suites: ['perfcompare'] },
   // Cost per card and per lane (#602): the holds, the minutes the parsers give, the card's line, the lane's hover, Performance's Cards.
@@ -233,14 +233,16 @@ export const AREAS = [
   // A card's attachment read through Combwork (HI-1751).
   { paths: ['tests/e2e/attachread.cjs'], suites: ['attachread'] },
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
-  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove'] },
+  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove', 'assistantcodex'] },
   // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
   { paths: ['src/shared/localModelLimits.ts', 'src/main/providers/claude/localLimits.ts', 'src/main/localLimitsTest.ts'], suites: ['connections-server', 'serverdiag'] },
   { paths: ['src/main/serverConnections.ts', 'src/main/serverMarks.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
   // Server diagnostics (HI-2683): its service, judgements, dialog and the plain request it sends.
   { paths: ['src/main/serverDiagnostics.ts', 'src/shared/serverDiagnostics.ts', 'src/renderer/src/components/ServerDiagnostics.tsx', 'tests/e2e/serverdiag.cjs'], suites: ['serverdiag'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
-  { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex'] },
+  { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex', 'assistantcodex'] },
+  // HI-2899: the Assistant's CLI as its launch picks it, its account banner and its home's migration (unpinned), on the fake Codex.
+  { paths: ['tests/e2e/assistantcodex.cjs', 'src/shared/connectionLabel.ts', 'src/main/connectionMoves.ts', 'src/shared/connectionDefaults.ts'], suites: ['assistantcodex'] },
   { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
   // Plan usage per connection, the status bar's and Overview's (HI-1756).
   { paths: ['src/main/planUsage.ts', 'src/shared/planLimits.ts', 'src/renderer/src/connectionUsage.ts', 'tests/e2e/connectionusage.cjs'], suites: ['connectionusage', 'planusage', 'antigravity'] },
@@ -251,7 +253,8 @@ export const AREAS = [
   { paths: ['src/shared/connectionDefaults.ts', 'src/main/connectionMoves.ts', 'src/renderer/src/components/ConnectionDefaults.tsx', 'tests/e2e/connectiondefaults.cjs'], suites: ['connectiondefaults', 'connections', 'context'] },
   // The agent rows and templates name connections (HI-1769).
   { paths: ['src/shared/connectionLabel.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'tests/e2e/connectionrows.cjs'], suites: ['connectionrows', 'connectionfirst', 'templates', 'templatesv2'] },
-  { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab', 'activityworkspace', 'activitywindows'] },
+  { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab', 'activityworkspace', 'activitywindows', 'activitymap'] },
+  { paths: ['src/shared/activityMap.ts', 'src/renderer/src/views/ActivityMap.tsx', 'src/renderer/src/views/WorkspaceActivity.tsx'], suites: ['activitymap', 'activityworkspace'] },
   { paths: ['src/renderer/src/views/WorkspaceActivity.tsx', 'src/main/activityWorkspace.ts'], suites: ['activityworkspace'] },
   // What agents' commands leave running while they run (HI-2111).
   { paths: ['src/main/orphanProcesses.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/activityWorkspace.ts', 'src/main/teamParked.ts', 'src/main/inboxNotices.ts', 'src/renderer/src/views/ActivityTab.tsx', 'tests/e2e/fake-claude/linger.cjs'], suites: ['orphans'] },
@@ -294,7 +297,7 @@ export const AREAS = [
   // The close commands (HI-1368): run as a workspace closes and as Combwork quits, after the drain of its writes.
   { paths: ['src/main/closeCommand/', 'src/main/dbWrites.ts', 'src/shared/closeCommand.ts', 'src/shared/commands.ts', 'src/main/openGate.ts', 'src/renderer/src/components/CloseCommandPanel.tsx', 'src/renderer/src/components/CommandsSettings.tsx', 'tests/e2e/onclose/', 'tests/e2e/onopen.cjs'], suites: ['onclose', 'onopen', 'quit', 'closewindow'] },
   { paths: ['src/main/progress.ts', 'src/main/progressService.ts', 'src/shared/progress.ts', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/ShowAllList.tsx', 'src/shared/progressTabs.ts', 'tests/e2e/progresstabs.cjs'], suites: ['progress', 'progressgates', 'progresslanes', 'progressreport', 'progressstates', 'progresstabs', 'replysize'] },
-  { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost'] },
+  { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost', 'lanequeue'] },
   // Branches next to their cards (#1424).
   { paths: ['src/shared/branchCards.ts', 'tests/e2e/gitbranchcards.cjs'], suites: ['gitbranchcards'] },
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
@@ -338,6 +341,7 @@ export const AREAS = [
   { paths: ['src/main/mergeSlots.ts', 'src/main/mergeSlotHost.ts', 'src/shared/mergeSlot.ts', 'src/renderer/src/components/MergeSlots.tsx'], suites: ['mergeslot', 'progresslanes', 'replysize'] },
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
+  { paths: ['src/main/laneEdits.ts', 'src/renderer/src/laneEdits.ts', 'src/shared/laneQueueEdit.ts', 'src/shared/laneDay.ts', 'tests/e2e/lanequeue.cjs'], suites: ['lanequeue'] },
   // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
   { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.
@@ -605,7 +609,7 @@ export const AREAS = [
   { paths: ['tests/e2e/claudemanagedreal.cjs'], suites: ['claudemanagedreal'] },
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'codexnudge', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp', 'independentlaunch'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'assistantcodex', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'codexnudge', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp', 'independentlaunch'] },
   // Agents' temp folder (HI-2496): each launch's TEMP, TMP, TMPDIR and CLAUDE_CODE_TMPDIR, the empty default, a refused folder.
   { paths: ['src/main/agentTemp.ts', 'tests/e2e/agenttemp.cjs'], suites: ['agenttemp'] },
   // An Independent agent launches as from a terminal (HI-2731): one agent's role cycle and a fresh one per fake CLI, a running one restarted.
@@ -882,6 +886,8 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // The Activity map's stations over each provider's recorded fixtures (HI-2903), whatever files they hold.
+  { test: 'tests/activityMap.test.ts', paths: ['tests/fixtures/copilot/', 'tests/fixtures/antigravity/', 'tests/fixtures/opencode/', 'tests/fixtures/turns/'] },
   // The upgrade's code and the test area's: no existsSync, no handler swallowing an I/O failure (HI-2617).
   { test: 'tests/presenceChecks.test.ts', paths: [...PRESENCE_SCOPE, 'tests/presenceAllow.json'] },
   // Test tooling and Combwork end processes by identity (#603).

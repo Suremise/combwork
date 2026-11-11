@@ -288,6 +288,8 @@
   "tips.laneApplyNow.title": "Réordonner un couloir en cours, tout de suite",
   "tips.laneBranchSquash.text": "Après la fusion en squash de la carte d’un agent, Combwork met sa branche à jour avant sa carte suivante, pour que chaque relecture ne montre que le travail de cette carte. Ce qu’il ne peut pas faire sans risque, il le demande dans Pour toi ; Paramètres → Avancé le fait demander à chaque fois.",
   "tips.laneBranchSquash.title": "La branche d’un agent à jour entre les cartes",
+  "tips.laneEdit.text": "Dans l’onglet Couloirs du panneau Progression, ouvre un couloir en cours pour faire glisser ses cartes en attente dans un nouvel ordre, en retirer une, ou en ajouter une avec Ajouter une carte… ou en la faisant glisser depuis le tableau. Ctrl+Z annule.",
+  "tips.laneEdit.title": "Modifier toi-même les cartes d’un couloir",
   "tips.laneGates.text": "Dans le panneau Progression, un couloir dit dans son en-tête ce qu’il attend, et une encoche rouge sur le segment d’une carte signifie que sa dernière demande a été refusée : survole-la pour voir pourquoi et quoi faire ensuite.",
   "tips.laneGates.title": "Vois pourquoi un couloir n’avance pas",
   "tips.laneNext.text": "Quand les règles du flux de travail sont appliquées, dès qu’une carte d’un couloir est terminée, Combwork donne la suivante à son auteur dès la fin de son tour : le couloir continue sans que toi ni l’Assistant ayez à le relancer.",
@@ -594,5 +596,7 @@
   "tips.opencodeHistory.text": "La conversation d’un agent OpenCode s’affiche dans l’onglet Sessions, et ses tokens et son coût dans la Vue d’ensemble et le pied de son volet, tels qu’OpenCode les indique. Un coût de $0 ne mesure pas le quota de votre forfait ; les limites ne s’affichent que pour OpenCode Go ou Console.",
   "tips.opencodeHistory.title": "L’historique, les tokens et le coût d’un agent OpenCode",
   "tips.versionControlJj.text": "Dans un dépôt jj, choisis jj en haut de l’onglet Gestion de versions : son Historique montre chaque identifiant de changement à côté de son identifiant de commit, et Comparer, Signets et Conflits lisent le dépôt sans le modifier. Tu intègres toi-même le travail relu.",
-  "tips.versionControlJj.title": "Voir un dépôt jj"
+  "tips.versionControlJj.title": "Voir un dépôt jj",
+  "tips.activityMap.text": "Activité dessine ses agents en nid d’abeilles : chaque appel d’outil part vers sa station (Lire, Modifier, Shell, Agents, Outils, Toi), avec un anneau de contexte par agent. Choisis un agent dans Agents ▾ pour sa propre carte ; Afficher masque la carte, son fil et les anneaux.",
+  "tips.activityMap.title": "Une carte de ce que font tes agents"
 }

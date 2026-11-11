@@ -102,6 +102,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneEdit,
+  LaneEditResult,
   LaneStartRequest,
   LaneStartInfo,
   LaneStartResult,
@@ -945,6 +947,14 @@ export interface CombworkRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * The user edits a running lane's list (HI-2898, Progress → Lanes): moves, adds or removes a queued card, cancels its
+   * queued change, moves a card here from another lane, or undoes such an edit. Applied or queued as `cw_lane start` is;
+   * refused, with nothing changed, once the lane's list moved on from the revision the edit names.
+   */
+  'lanes:edit': (edit: LaneEdit) => LaneEditResult
+  /** The window's workspace's lanes that ended at or after `since` (an ISO time, HI-2898: today's, from local midnight). */
+  'lanes:endedSince': (since: string) => LaneInfo[]
   /** The user retries a lane's new conversations no more tried (HI-2034: an agent busy as the lane started): how many. */
   'lanes:retryFresh': (laneId: string) => number
   /** Test copies only (HI-2034): a lane agent owed its new conversation, as a busy start leaves it, `minutesAgo` since. */

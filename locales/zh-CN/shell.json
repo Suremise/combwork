@@ -68,6 +68,7 @@
   "shell.command.help.shortcuts": "键盘快捷键",
   "shell.command.help.tips": "提示…",
   "shell.command.hooks.adminSnippet": "Claude Code 管理员代码片段…",
+  "shell.command.lanes.undoEdit": "撤销通道更改",
   "shell.command.layout": "布局：{layout}",
   "shell.command.mcp.import": "将项目的 MCP 服务器复制到工作区",
   "shell.command.notes.open": "打开共享笔记",

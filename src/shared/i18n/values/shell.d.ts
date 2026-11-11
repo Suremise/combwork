@@ -70,6 +70,7 @@ interface CombworkMessageValues {
   'shell.command.help.shortcuts': undefined
   'shell.command.help.tips': undefined
   'shell.command.hooks.adminSnippet': undefined
+  'shell.command.lanes.undoEdit': undefined
   'shell.command.layout': { layout: string | number }
   'shell.command.mcp.import': undefined
   'shell.command.notes.open': undefined

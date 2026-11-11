@@ -1,4 +1,6 @@
 {
+  "tips.activityMap.text": "Activity draws its agents as a honeycomb: each tool call goes out to its station (Read, Edit, Shell, Agents, Tools, You), with a context ring for each agent. Pick one agent in Agents ▾ for its own map; Show turns the map, its feed and the rings off.",
+  "tips.activityMap.title": "A map of what your agents are doing",
   "tips.activityTab.text": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
   "tips.activityTab.title": "See what each agent is running",
   "tips.activityWorkspace.text": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
@@ -288,6 +290,8 @@
   "tips.laneApplyNow.title": "Reorder a running lane now",
   "tips.laneBranchSquash.text": "After an agent's card is squash-merged, Combwork brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
   "tips.laneBranchSquash.title": "An agent's branch kept up to date between cards",
+  "tips.laneEdit.text": "In Progress → Lanes, open a running lane to drag its waiting cards into a new order, take one off, or add one with Add Card… or by dragging it from the board. Ctrl+Z undoes it.",
+  "tips.laneEdit.title": "Change a lane's cards yourself",
   "tips.laneGates.text": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
   "tips.laneGates.title": "See why a lane isn’t moving",
   "tips.laneNext.text": "With workflow rules on, once a lane's card is Done Combwork gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",

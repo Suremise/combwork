@@ -19,6 +19,7 @@
 export const SUITES = [
   { name: 'about' },
   { name: 'accounts' },
+  { name: 'activitymap' },
   { name: 'activitytab' },
   { name: 'activitywindows' },
   { name: 'activityworkspace' },
@@ -43,6 +44,7 @@ export const SUITES = [
   { name: 'assistant' },
   { name: 'assistant-control' },
   { name: 'assistantbatch' },
+  { name: 'assistantcodex' },
   { name: 'assistantcompact' },
   { name: 'assistantend' },
   { name: 'assistantimages' },
@@ -200,6 +202,7 @@ export const SUITES = [
   { name: 'lanebrief' },
   { name: 'laneend' },
   { name: 'lanenotices' },
+  { name: 'lanequeue' },
   { name: 'laneslotretry' },
   { name: 'lanesslots' },
   { name: 'lanestages' },

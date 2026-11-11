@@ -1734,6 +1734,31 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit.",
     "audience": "both"
   },
+  "settings.advanced.cw.activity.mapMotion.desc": {
+    "text": "The Activity map sends a dot along a spoke to its station for each tool call an agent makes, and back when it ends. As Windows says follows Windows' Show animations setting; On always moves them; Off only lights the station.",
+    "note": "What the advanced setting \"The Activity map's moving pulses\" does (Settings → Advanced, under Combwork). As Windows says, On and Off are the setting's choices: use the words its list shows. Show animations is the name of a Windows setting: use the name Windows gives it in your language.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.activity.mapMotion.off": {
+    "text": "Off",
+    "note": "A choice of the advanced setting \"The Activity map's moving pulses\": never move them; the station lights instead.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.activity.mapMotion.on": {
+    "text": "On",
+    "note": "A choice of the advanced setting \"The Activity map's moving pulses\": always move them.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.activity.mapMotion.system": {
+    "text": "As Windows says",
+    "note": "A choice of the advanced setting \"The Activity map's moving pulses\": follow Windows' animation setting.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.activity.mapMotion.title": {
+    "text": "The Activity map's moving pulses",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: whether the Activity tab's map shows a dot travelling to a station for each tool call.",
+    "audience": "both"
+  },
   "settings.advanced.cw.agents.tempFolder.desc": {
     "text": "A folder for agents' own temporary files (Claude Code's scratchpad, and what Codex, Copilot and their shells write to the temp folder), instead of Windows' Temp folder: each agent and the Assistant get a folder of their own in it, made at launch, and kept. A full path (%LOCALAPPDATA% and other variables at the start are filled in), never inside a project or a slot. Empty: the system's Temp folder, as before. Sessions started afterwards take it.",
     "note": "What the advanced setting \"Agents' temp folder\" does (Settings → Advanced, under Combwork). Scratchpad is Claude Code's word for its working folder. %LOCALAPPDATA% is a Windows variable: keep it.",

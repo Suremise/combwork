@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "In diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet, daher kann der Assistent nicht starten. Füge eines hinzu und melde es an.",
+  "assistant.banner.noAccountAny": "In diesem Arbeitsbereich ist kein Konto eingeschaltet, daher kann der Assistent nicht starten. Füge eines für einen beliebigen Coding-Agenten hinzu, den Combwork unterstützt, und melde es an: Der Assistent läuft auf dem ersten in deiner Reihenfolge der Konten.",
+  "assistant.banner.noAccountFor": "{others, select, yes {Der Assistent läuft auf {cli}, und in diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet, daher kann er nicht starten. Füge eines hinzu oder wähle in den Assistenten-Einstellungen das Konto eines anderen Coding-Agenten.} other {Der Assistent läuft auf {cli}, und in diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet, daher kann er nicht starten. Füge eines hinzu und melde es an.}}",
+  "assistant.banner.signedOut": "{name}, das Konto des Assistenten für {cli}, ist abgemeldet, daher kann der Assistent nicht starten. Melde es unter Einstellungen → Konten & Verbindungen wieder an.",
   "assistant.chooseConnections.agent": "Agent",
   "assistant.chooseConnections.next": "Danach",
   "assistant.chooseConnections.now": "Jetzt",

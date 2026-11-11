@@ -77,7 +77,7 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
-import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { agentLaunchView, allAccounts, allConnections, checkAccount, getConnection, launchCli, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
 import { connectionSwitchDue } from '../shared/connectionLabel'
@@ -1806,7 +1806,7 @@ class SessionManager {
     // account on the CLI's own home (Copilot's sign-in, a test home).
     // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
     // (decision A); Settings' old choice only where none is usable.
-    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, s)) : agentProvider(forAgent, s)
+    const cli = launchCli(forAgent, workspace.config, assistant)
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
@@ -2330,13 +2330,14 @@ class SessionManager {
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
     // nor a change of the agent's own re-points one. A new conversation of an agent with no CLI of its own (a new
-    // workspace's Assistant) follows Automatic: it waits until Combwork knows what is installed.
+    // workspace's Assistant: the first usable account's, HI-2899) waits until Combwork knows what is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
     times.mark('resumeProvider')
     this.assertStarting(id)
     if (!recorded && !agent.provider && autoProviderPending(config.settings)) await providerService.settle()
     this.assertStarting(id)
-    const providerId = recorded ?? agentProvider(agent, config.settings)
+    // HI-2899: the Assistant naming no CLI, the first usable account's (decision A), as its launch settings read it.
+    const providerId = recorded ?? launchCli(agent, workspace.path ? workspace.config : null, assistant)
     // At start, Combwork may still be looking for that CLI.
     await providerService.settle(providerId)
     times.mark('providerSettle')

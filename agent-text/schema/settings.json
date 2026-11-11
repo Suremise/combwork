@@ -1064,6 +1064,21 @@
   "settings.advanced.cw.accounts.usageMoves.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.activity.mapMotion.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.off": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.on": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.system": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.agents.tempFolder.desc": {
     "placeholders": {}
   },

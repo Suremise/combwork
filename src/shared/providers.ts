@@ -1,5 +1,6 @@
 import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
 import type { AttachmentKind } from './attachments'
+import type { MapStation } from './activityMap'
 import type { TypedNewline } from './terminalInput'
 import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
@@ -146,6 +147,11 @@ export interface ProviderCapabilities {
    * tasks are only counted.
    */
   backgroundWakes: boolean
+  /**
+   * The Activity map's stations its transcript parse reports (HI-2903), set only from a recorded fixture showing a gap
+   * (tests/activityMap.test.ts); absent: all six. The map shows the others as not reported, never as an observed zero.
+   */
+  activityStations?: readonly MapStation[]
   /**
    * A turn the user's typing begins may come with no prompt hook (HI-2673: Claude Code 2.1.319 runs the model on a `!`
    * command's output and sends no UserPromptSubmit): while the user's Enter into the idle pane waits for its hook, a hook

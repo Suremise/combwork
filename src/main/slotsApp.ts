@@ -348,6 +348,12 @@ export const refreshProjectWorkspaces = (ws: WorkspaceService, projectPath: stri
 const pools = new Map<string, { life: AbortSignal; pool: Promise<SlotPool> }>()
 const poolKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
+/** A project's slot pool in a workspace if one has been made (never makes one): for what only concerns existing slots. */
+export function poolIfMade(ws: WorkspaceService, projectPath: string): Promise<SlotPool> | null {
+  const known = pools.get(poolKey(ws, projectPath))
+  return known && known.life === ws.lifetime && !known.life.aborted ? known.pool : null
+}
+
 /** A project's slot pool in a workspace (made on first use, for the workspace's life). */
 export function poolFor(ws: WorkspaceService, projectPath: string): Promise<SlotPool> {
   const key = poolKey(ws, projectPath)
@@ -410,6 +416,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
     sweepSealsOf(root, { once: true })
     // Writers a Combwork that has gone left, settled where what was kept of their runs allows (HI-1886).
     void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Combwork that has gone in ${userText(projectPath)}`, e))
+    // Slots that owed a settle when Combwork last ran (HI-2906): looked at now.
+    void made.owedPass().catch((e) => log.warn(`looking at the slots that owe a settle in ${userText(projectPath)}`, e))
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })

@@ -8,6 +8,7 @@ import { APP_NAME } from '@shared/appName'
 import { msg, tr, type Msg, type Values } from '@shared/i18n'
 import { call } from './api'
 import { EXPORT_BOARD, exportBoard, unarchiveBatch } from './boardBatches'
+import { undoLaneEdit } from './laneEdits'
 import { restoreBoard09 } from './components/BoardUpgrade'
 import { checkForUpdates, openReleaseNotes } from './components/Updates'
 import { openModeMenu } from './components/PermissionMode'
@@ -559,6 +560,14 @@ const COMMAND_DEFS: CommandDef[] = [
     // The Undo of an Archived n cards toast (#351): its batch back where it was.
     internal: true,
     run: (id: string, workspacePath?: unknown) => unarchiveBatch(id, typeof workspacePath === 'string' ? workspacePath : undefined).then(() => undefined)
+  },
+  {
+    id: 'lanes.undoEdit',
+    name: msg({ id: 'shell.command.lanes.undoEdit', defaultMessage: 'Undo Lane Change', description: "HI-2898: a command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. It isn't in the menus or the palette: the notification after changing a lane's cards (Progress → Lanes) runs it by its name." }),
+    category: 'tasks',
+    // The Undo of a change of a lane's cards (HI-2898): the last one made in this window, while it still can be.
+    internal: true,
+    run: (id?: unknown, workspacePath?: unknown) => undoLaneEdit(typeof id === 'string' ? id : undefined, typeof workspacePath === 'string' ? workspacePath : undefined)
   },
   {
     id: 'agent.show',

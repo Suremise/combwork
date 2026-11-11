@@ -143,6 +143,8 @@ Every agent, and the Assistant, runs on a **connection**. They're in **Settings 
 - **Several off here:** they're named, with **Choose in Settings**.
 - **None added yet:** they offer to add one.
 
+The Assistant runs on the CLI of its connection (**Assistant Settings…**); until you choose one, on the first account in your order that's on here, whatever its coding agent. Its panel names only that: with no account at all it asks you to add one, for any coding agent Combwork supports; if its account is signed out, it names the connection to sign in again; and if you chose a coding agent with no account on here while another's is, **Assistant Settings…** lets you switch.
+
 A notice says so once, until you add an account or dismiss it.
 
 **The list.** Each account is a card with the same fields in the same place:
@@ -537,6 +539,26 @@ Combwork only ever ends processes the agent's session started: never one you sta
 - A process an agent's session started has **End Process…** in its details. It ends only that process, after you confirm, and only while it is still the one listed. The agent's own CLI isn't ended here: use **Stop**.
 - **Left running**: a process whose parent has exited while the agent runs (a server started with `&` from a shell that has ended, a search a command left behind) is marked once it has run ten minutes, with how long and its CPU time, and has **End It…** in its details (the same question). Combwork says so once in a notice, which opens the agent, and tells the agent once at its next tool call or turn's end, so it can end it itself; Combwork doesn't end it. **Settings → Advanced → Processes left running: tell me and the agent** turns off the notice and the agent's line (Activity still marks it). The agent's CLI and what it runs directly (its MCP servers, a command under way) have a living parent, so they never count.
 - **Blocked edits** show under **Now** while they stand: *Edit blocked: app.ts is locked by HB3* when Combwork's file lock stopped the agent editing a file another agent is editing (or *waiting for your OK* with **Ask me**). The row goes once the other agent finishes and releases the file, the agent tries again or does something else, or its turn ends. Its history is in the agent's **Hooks…** dialog.
+
+#### The Activity map <a id="the-activity-map"></a>
+
+Above the list (beside it when the tab is wide), the **map** draws the same activity as a honeycomb: the agent in the centre, and around it six stations its tool calls go to:
+
+- **You**: its prompts; outlined in red, *Needs you*, while it waits for your answer or permission.
+- **Read**: reading and searching files. **Edit**: changing files (red while Combwork's file lock blocks one of its edits).
+- **Shell**: commands, with the program running now. **Agents**: subagents and background tasks.
+- **Tools**: everything else: the web, skills, Combwork's own tools and other MCP tools.
+
+Each station counts the calls of the agent's current turn and names the last one. Live, each new call sends a dot out along its spoke and back when it ends; a spoke thickens with the calls of the last ten minutes, and a station turns red when a call failed. **Last actions** beside it lists the newest calls. The map shows names, never content: a file by its last two folders, a web page by its host, a command only as its tool. A command's arguments, a search's words or a prompt never appear on it.
+
+- **One agent** in **Agents ▾**: its own map, with its context as a ring around it (the share of its context window, as its pane's footer shows it): amber from 70 %, red from 90 %.
+- The map shows the agents the tabs do: **Agents ▾**, **Cards ▾** and **Hide finished** narrow it as they narrow the list, and with nothing shown there's no map.
+- **Several agents, or All**: one shared map, each agent in its own colour, with a small context ring per agent below it. Click an agent's ring to show its map alone. The shared map reads up to eight agents' calls; the rest are listed as *not shown*.
+- A station an agent's coding CLI can't report says *not reported*, and one still being read says *loading…*: neither is a zero. When the map counts only part of the calls (an agent made a great many, or more than eight agents run), it says so under **Last actions**.
+- **Show** above the list turns the **Map**, its **Feed** and the **Context** rings on and off, for every Activity view. With the map off, it reads nothing of its own.
+- Like the list, it is frozen when it opens: dots move only while it follows live (**Play**), and nothing is drawn while the tab is hidden. With Windows' **Show animations** off, a station flashes instead of a dot moving; **Settings → Advanced → The Activity map's moving pulses** chooses that yourself.
+
+The workspace's Activity (below) has the same map, across its projects.
 
 ### An agent's hooks <a id="agent-hooks"></a>
 
@@ -1253,6 +1275,23 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 - **End or abandon a lane** from its row: right-click it for **End Lane** (the loop is over; the cards stay where they are) and **Abandon Lane…** (it stops here, unmerged), which asks first.
 
 With no lanes and no merge going on, the panel is just the runs, as before.
+
+#### Editing a lane's cards <a id="editing-a-lanes-cards"></a>
+
+In the **Lanes** tab, open a running lane (the chevron before its name) to change its cards yourself, without asking the Assistant or the builder:
+
+- **Move a card:** drag a card waiting its turn by its row to another place; a line shows where it goes. With the keyboard, Tab to the card and press **Alt+Up** or **Alt+Down**.
+- **Take a card off:** the **×** at the end of its row, or **Delete** on it. It goes back to the board, in Todo: nothing is deleted.
+- **Add a card:** **Add Card…** at the end of the cards opens a search: type part of a key or a title, then click a card or press **Enter** for the first. Or drag a card from the board (the **Tasks** view) onto the lane's row, where it goes last, or into its open cards, where you drop it. A card given to another agent is taken off that agent, so the lane takes it.
+- **Only cards still waiting their turn move.** The card being worked shows a lock, and it and the cards before it (done, in review, approved) keep their places.
+
+A change made while a card is being worked waits until that card is Done, as a change by the Assistant or the builder does: it shows under the lane's bar (*Next, once HI-12 is Done: …*) with **Cancel Change**, which drops it. Between cards it applies at once. Either way, the builder reads its cards as they are next.
+
+When Combwork can't make a change, it says why under the lane and changes nothing: a card of another project, one that's Done or not in Todo any more, one placed before a card it depends on, one keeping work from an earlier start, or a lane that changed meanwhile (look again and try again). A card on another running lane is refused with **Move Here**, which takes it off that lane and adds it to this one in one step.
+
+Each change says what it did in a notification with **Undo**, and **Ctrl+Z** in the tab undoes the last change you made in this window. An undo puts back exactly what was there, or nothing: it's refused once the lane or the card changed since (a card started, someone else changed the lane or gave the card to an agent).
+
+**Ended today**, at the top of the tab, lists the lanes that ended or were abandoned today (since midnight, your time), collapsed until you open it: each with its builder and reviewer, merged or abandoned, its cards and how long it ran, and its merge commit (click it to copy). Open a lane for its cards as it left them. A lane that ended today shows there, not again in the list below.
 
 #### Slots, pools and copies in the Progress panel <a id="slots-pools-and-copies-in-the-progress-panel"></a>
 

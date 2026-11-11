@@ -275,6 +275,10 @@
     "defaultMessage": "Claude Code Admin Snippet…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings so Combwork's hooks run where policy allows only managed hooks (HI-2777). The … says it opens a dialog first: keep it."
   },
+  "shell.command.lanes.undoEdit": {
+    "defaultMessage": "Undo Lane Change",
+    "description": "HI-2898: a command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. It isn't in the menus or the palette: the notification after changing a lane's cards (Progress → Lanes) runs it by its name."
+  },
   "shell.command.layout": {
     "defaultMessage": "Layout: {layout}",
     "description": "A command per agent layout (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. {layout} is the layout's name."

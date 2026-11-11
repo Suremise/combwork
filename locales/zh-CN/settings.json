@@ -1634,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
   "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",
   "settings.advanced.opencode.version.desc": "opencode --version 的输出：版本是其第一个分组。Combwork 只使用 OpenCode 2 或更高版本。设置错误时，将找不到 OpenCode。",
-  "settings.advanced.opencode.version.title": "opencode --version 中的版本"
+  "settings.advanced.opencode.version.title": "opencode --version 中的版本",
+  "settings.advanced.cw.activity.mapMotion.desc": "智能体每次调用工具时，活动地图会沿辐条向对应站点发出一个点，调用结束时再返回。“跟随 Windows”遵循 Windows 的“显示动画”设置；“开”总是移动；“关”只点亮站点。",
+  "settings.advanced.cw.activity.mapMotion.off": "关",
+  "settings.advanced.cw.activity.mapMotion.on": "开",
+  "settings.advanced.cw.activity.mapMotion.system": "跟随 Windows",
+  "settings.advanced.cw.activity.mapMotion.title": "活动地图的移动脉冲"
 }

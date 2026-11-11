@@ -1224,6 +1224,8 @@ export interface PoolDeps {
   inFlight?: (card: number) => boolean | Promise<boolean>
   /** Settings → Advanced, Remove idle slots after a day. */
   removeIdle?: () => boolean
+  /** The owed pass's wake (HI-2906): a timer by default; tests give a scheduler they fire themselves. */
+  later?: (fn: () => void, ms: number) => { cancel(): void }
   /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
   ended?: (lease: SlotLease, slot: Slot) => void
   /**
@@ -1406,6 +1408,48 @@ async function combworkSkillFolders(folder: string): Promise<string[]> {
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
+/** The longest pause between two owed passes (HI-2906/s101), as a held lane slot's (HI-2466). */
+const OWED_PASS_MAX_MS = 30_000
+
+/** board_meta: a slot that owes a settle (HI-2906/s101), by its project's id. */
+export const owedKey = (project: string, slot: string): string => `slot_settle_owed:${project}:${slot}`
+
+/** The default scheduler of the owed pass's wake: an unref'd timer. */
+const laterBy = (fn: () => void, ms: number): { cancel(): void } => {
+  const t = setTimeout(fn, ms)
+  t.unref?.()
+  return { cancel: () => clearTimeout(t) }
+}
+
+/** What one settle attempt's fences saw (HI-2906): whether any of them found the folder no longer quiet. */
+interface QuietLatch {
+  lostQuiet: boolean
+  /** What its first refusal saw (for the log), where it was read. */
+  why?: string
+}
+
+/** A fence whose refusals (a false `still`, an unheld `commit`) set the attempt's latch before they are answered. */
+function latched(fence: WorkspaceFence, latch: QuietLatch | undefined): WorkspaceFence {
+  if (!latch) return fence
+  const commit = fence.commit
+  return {
+    still: async () => {
+      const ok = await fence.still()
+      if (!ok) latch.lostQuiet = true
+      return ok
+    },
+    ...(commit
+      ? {
+          commit: async <T>(fn: (db: FenceDb) => T) => {
+            const r = await commit<T>(fn)
+            if (!r.held) latch.lostQuiet = true
+            return r
+          }
+        }
+      : {})
+  }
+}
+
 export class SlotPool {
   private readonly store: SlotStore
   /** The operations this pool runs now, awaited as it closes. */
@@ -1439,14 +1483,24 @@ export class SlotPool {
    * What's in a slot's folder, read by the holder of its operation (`token`): the port's explicit record where it has
    * one (jj: a snapshot, which only the holder may take, HI-2795), else `dirty` (Git, its git command unchanged).
    */
-  private async dirtyOwned(s: Slot, token: string): Promise<Maybe<string[]>> {
+  private async dirtyOwned(s: Slot, token: string, latch?: QuietLatch): Promise<Maybe<string[]>> {
     const port = this.portOf(s)
     if (!port.record) return port.dirty(s.folder)
     // A record is a write in the folder (HR1, HI-2795 round 1): only once nothing else writes there, proved right before
     // it: the operation still holds the slot with no writer or job on it, no session in it, and no process in it.
-    if (!(await this.quietFor(s, token))) return { unknown: true, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
-    const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
-    return port.record(s.folder, fence, s.identity ?? null)
+    const busy = { unknown: true as const, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
+    const why = await this.notQuiet(s, token)
+    if (why) {
+      if (latch) {
+        latch.lostQuiet = true
+        latch.why ??= why
+      }
+      return busy
+    }
+    const fence: WorkspaceFence = latched({ still: () => this.quietFor(s, token) }, latch)
+    const r = await port.record(s.folder, fence, s.identity ?? null)
+    // The record refused because its fence lost quiet during it (HI-2906): busy, not dirty.
+    return isUnknown(r) && latch?.lostQuiet ? busy : r
   }
 
   /**
@@ -1478,8 +1532,16 @@ export class SlotPool {
 
   /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
   private async quietFor(s: Slot, token: string): Promise<boolean> {
-    const held = await this.store.fenced(s.name, token, (_db, now) => !now.writer && !now.job).catch(() => false)
-    return held && !this.deps.sessionIn?.(s.folder) && (await quiet(s.folder))
+    return (await this.notQuiet(s, token)) === null
+  }
+
+  /** What keeps a slot from being quiet for this operation (quietFor's answer, for the log): null when it is. English. */
+  private async notQuiet(s: Slot, token: string): Promise<string | null> {
+    const held = await this.store.fenced(s.name, token, (_db, now) => (now.writer ? 'writer' : now.job ? 'job' : null)).catch(() => 'operation lost') // agent-protocol: a log line's detail, never sent to an agent
+    if (held) return held
+    const session = this.deps.sessionIn?.(s.folder)
+    if (session) return `session ${session}` // agent-protocol: a log line's detail, never sent to an agent
+    return (await quiet(s.folder)) ? null : 'the folder is in use' // agent-protocol: a log line's detail, never sent to an agent
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -1707,16 +1769,23 @@ export class SlotPool {
    * free and as it was read, so another look of it (this pool's or another Combwork's, a finished card's slot question)
    * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
    */
-  private async settle(name: string): Promise<void> {
+  private async settle(name: string): Promise<boolean> {
     const seen = this.store.slot(name)
-    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return
-    if (seen.state === 'creating' || seen.state === 'removing') return
+    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return false
+    if (seen.state === 'creating' || seen.state === 'removing') return false
     // Set aside by a retarget (HI-2680): stays as it is, whatever its folder now looks like, until it is removed.
-    if (this.store.asideOf(name)) return
+    if (this.store.asideOf(name)) return false
     const token = newToken()
     let s: Slot = seen
     let to: SlotState = seen.state
     let began = false
+    // HI-2906 (design s101): its look or its detach couldn't run while something still left the folder, known from what
+    // this attempt's own fences saw (the latch), never from a later check. The slot then owes a settle: recorded in this
+    // attempt's fenced end write, with its row, and run by the pool's owed pass.
+    let busyDetach = false
+    // What the end write does to the slot's owed record: set (busy), cleared (decided), or left (the look couldn't say).
+    const end: { owed: 'set' | 'clear' | 'keep' } = { owed: 'keep' }
+    const latch: QuietLatch = { lostQuiet: false }
     try {
       // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
       // a pool takes its row, once written, for an abandoned one (HR2's HI-2170 round 1, finding 1).
@@ -1729,27 +1798,150 @@ export class SlotPool {
         began = true
         s = this.store.slot(name) ?? seen
         try {
-          const now = await this.look(s, token)
+          const now = await this.looks(s, token, latch)
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
           // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
           // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
-          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token)))) to = now
+          if (now === 'busy') busyDetach = true
+          else if (now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token, latch))) {
+            // A refusal for good (the work not in the target, the target moved) waits for the next refresh or event; one
+            // while the folder wasn't quiet yet (its builder's session or a process still leaving it: jj's owned move is
+            // fenced by quiet) is asked again soon, as nothing else may say when it has gone (HI-2906).
+            busyDetach = latch.lostQuiet
+            // For the log only (the latch decided): what is in the way now, read after the refusal.
+            if (busyDetach && !latch.why) latch.why = `the detach's fence; now: ${(await this.notQuiet(s, token)) ?? 'quiet'}` // agent-protocol: a log line's detail, never sent to an agent
+          } else if (now !== null) to = now
+          // Busy: owed. Decided (ready, dirty, gone, or a refusal for good, which waits for the next event): not owed. The
+          // listing failed (null): as it was.
+          end.owed = busyDetach ? 'set' : now === null ? 'keep' : 'clear'
         } finally {
-          // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
-          await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
-            if (!(e instanceof OpLost)) throw e
-            // Taken over meanwhile: what it found isn't the slot's, its new holder's look is.
-            to = s.state
-          })
+          // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again), and its
+          // owed record with it, in one transaction: lost meanwhile (taken over), neither is written.
+          let wrote = false
+          await this.store
+            .fenced(name, token, (db) => {
+              this.store.setIn(db, name, to, {}, { op: null })
+              if (end.owed === 'set') db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(owedKey(this.store.project, name), JSON.stringify({ why: latch.why ?? 'busy', since: Date.now() })) // agent-protocol: SQL
+              else if (end.owed === 'clear') db.prepare('DELETE FROM board_meta WHERE key = ?').run(owedKey(this.store.project, name)) // agent-protocol: SQL
+              wrote = true
+            })
+            .catch((e) => {
+              if (!(e instanceof OpLost)) throw e
+              // Taken over meanwhile: what it found isn't the slot's, its new holder's look is.
+              to = s.state
+            })
+          if (!wrote) end.owed = 'keep'
         }
       })
     } finally {
       // After its row's write, only a change: a pass that settles slots asks for itself again, so a slot that stays dirty
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
+      // Owed now: the pool's owed pass is asked for (after its pause), after this settle's fenced end. While a pass runs,
+      // its own end reads the records (with no await since its last settle) and asks, with its pause grown.
+      if (end.owed === 'set') {
+        log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): it owes a settle, looked at again by the pool`)
+        if (!this.owedRunning) this.wakeOwed()
+      }
     }
+    return began
+  }
+
+  /** The owed pass running now (at most one), and whether another was asked for while it ran (HI-2906). */
+  private owedRunning: Promise<void> | null = null
+  private owedAgain = false
+  /** The one pending wake of the owed pass, and how many passes in a row have found a slot still owed (its pause). */
+  private owedWake: { cancel(): void } | null = null
+  private owedTries = 0
+  private owedOwned = false
+
+  /** The slots of this project that owe a settle (HI-2906), by name. */
+  owedSlots(): string[] {
+    const prefix = owedKey(this.store.project, '')
+    return this.store.conn.read((db) => (db.prepare('SELECT key FROM board_meta WHERE substr(key, 1, ?) = ?').all(prefix.length, prefix) as { key: string }[]).map((r) => r.key.slice(prefix.length))) // agent-protocol: SQL
+  }
+
+  /** A slot's owed record (tests, the log): why and since when, or null. */
+  owedOf(name: string): { why: string; since: number } | null {
+    const v = this.store.conn.read((db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(owedKey(this.store.project, name)) as { value: string } | undefined) // agent-protocol: SQL
+    try {
+      return v ? (JSON.parse(v.value) as { why: string; since: number }) : null
+    } catch {
+      return { why: 'unreadable', since: 0 } // agent-protocol: a log detail
+    }
+  }
+
+  /** Whether a wake of the owed pass is pending (tests). */
+  owedWakePending(): boolean {
+    return !!this.owedWake
+  }
+
+  /**
+   * The owed pass asked for after its pause (1 s, doubling with each pass that still finds a slot owed, at most
+   * OWED_PASS_MAX_MS), unless one is pending or the pool is closed. A wake owns nothing: the records stay until a settle
+   * decides them, so a wake cancelled, or a pass that finds a slot taken, loses nothing (HI-2906/s101).
+   */
+  private wakeOwed(): void {
+    if (this.closed || this.owedWake) return
+    if (!this.owedOwned) {
+      // One listener for the pool: its close cancels the pending wake (the running pass is in `running`, awaited).
+      this.owedOwned = true
+      this.life.signal.addEventListener('abort', () => {
+        this.owedWake?.cancel()
+        this.owedWake = null
+      }, { once: true })
+    }
+    const ms = Math.min(OWED_PASS_MAX_MS, 1000 * 2 ** this.owedTries)
+    const later = this.deps.later ?? laterBy
+    this.owedWake = later(() => {
+      this.owedWake = null
+      void this.owedPass().catch((e) => log.warn('looking at slots that owe a settle', e))
+    }, ms)
+  }
+
+  /**
+   * The owed pass (HI-2906/s101): each slot of this project that owes a settle, settled in turn (the ordinary settle, which
+   * re-reads everything under the slot's operation and decides its record in its fenced end). One at a time: asked for
+   * while one runs, it runs again once that ends. Records for slots no longer in the pool go. Afterwards, while any slot
+   * still owes one, the next pass is asked for (its pause growing); none, the pause starts again from 1 s.
+   */
+  owedPass(): Promise<void> {
+    if (this.closed) return Promise.resolve()
+    if (this.owedRunning) {
+      this.owedAgain = true
+      return this.owedRunning
+    }
+    const run = (async () => {
+      do {
+        this.owedAgain = false
+        for (const name of this.owedSlots()) {
+          if (this.closed) return
+          if (!this.store.slot(name)) {
+            // A slot removed since: its record can't keep the pass alive. Its absence proved again in the delete itself, so a
+            // slot of that name made meanwhile (and its fresh record) keeps it (HR1's round 4).
+            await this.store.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ? AND NOT EXISTS (SELECT 1 FROM slots WHERE project = ? AND name = ?)').run(owedKey(this.store.project, name), this.store.project, name)) // agent-protocol: SQL
+            continue
+          }
+          await this.settle(name)
+        }
+      } while (this.owedAgain && !this.closed)
+    })()
+    const tracked = run.finally(() => {
+      this.running.delete(tracked)
+      if (this.owedRunning === tracked) this.owedRunning = null
+      if (this.closed) return
+      // Decided right here, with no await since the pass's last settle: a slot still owed (busy again, or taken by another
+      // settle meanwhile, whose own end asks too) asks for the next pass.
+      if (this.owedSlots().length) {
+        this.owedTries++
+        this.wakeOwed()
+      } else this.owedTries = 0
+    })
+    this.running.add(tracked)
+    this.owedRunning = tracked
+    return tracked
   }
 
   /**
@@ -1787,7 +1979,7 @@ export class SlotPool {
    * worktree (a carried lease, #1441) stays on its agent's own line. False when it should be and isn't (unread, or the
    * switch failed); true when it is, or needn't be.
    */
-  private async detach(s: Slot, token?: string): Promise<boolean> {
+  private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<boolean> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
     const port = this.portOf(s)
@@ -1797,7 +1989,7 @@ export class SlotPool {
     if (isUnknown(h.target) || !h.target) return false
     // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
     // with the folder quiet, the target read again right before it. Git ignores the options.
-    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: token ? this.ownedFence(s, token, null) : { still: () => false }, settles: h.line, target: s.target } : {}
+    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
     const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
@@ -1812,10 +2004,20 @@ export class SlotPool {
    * worktrees (HI-2810, SPEC §16.3.6 R2.1: unknown is never gone, nor ready), so the caller keeps the slot as it is.
    */
   private async look(s: Slot, token: string): Promise<SlotState | null> {
+    const l = await this.looks(s, token)
+    return l === 'busy' ? 'dirty' : l
+  }
+
+  /**
+   * As `look`, but `busy` when its check couldn't run because something still worked in the folder (HI-2906: jj's record
+   * is fenced by quiet), so the settle leaves the slot as it was and looks again soon, never marking it dirty for that.
+   */
+  private async looks(s: Slot, token: string, latch?: QuietLatch): Promise<SlotState | 'busy' | null> {
     const there = await this.present(s)
     if (there === null) return null
     if (!there) return 'gone'
-    const d = await this.dirtyOwned(s, token)
+    const d = await this.dirtyOwned(s, token, latch)
+    if (isUnknown(d) && d.detail === 'busy') return 'busy'
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
@@ -1911,6 +2113,8 @@ export class SlotPool {
       }
       if (s.state === 'lent' || s.state === 'dirty' || s.state === 'gone') await this.settle(s.name)
     }
+    // And the slots that owe a settle (HI-2906): the owed pass, which runs one at a time.
+    if (!this.closed) await this.owedPass()
   }
 
   /**
