@@ -2,9 +2,10 @@
 // jj:fetch) on its PATH, a throwaway profile and workspace, and the real Claude Code in its test home (CLAUDE_TEST_HOME,
 // claudeHome: 'test'; not signed in there, the suite is skipped, tests/e2e/README.md). A jj card starts for B1 (Haiku)
 // in a slot (a jj workspace); B1 runs jj once there with its Bash tool, as its card says (one short turn, tokens); the card is
-// committed, submitted, passed and integrated by the test as jjwindow does; B1 is stopped, and the slot must come back
-// to the pool by itself (ready, not lent). jj's settle and detach run only once the slot's folder is quiet (slots.ts
-// `quiet`, a rename probe), so a process Claude Code left with its working folder there would keep it out: not back,
+// committed, submitted, passed and integrated by the test as jjwindow does; B1 is stopped. Its folder must be quiet, so
+// the pool's settle detaches the slot (jj's detach is fenced by the folder's quiet, slots.ts `quiet`, a rename probe: a
+// process Claude Code left with its working folder there would keep it out); then the slot must be back in the pool
+// (ready, not lent), which fails with a real Claude Code until HI-2920 (a restart for its tools takes it). Not back,
 // the processes naming this run's folders and Combwork's leftovers for B1 are listed, for what held it. The suite never
 // probes the folder itself: two rename probes at once can strand a folder under its aside name (slots.ts, HI-1753).
 // Each wait on the CLI is a lib.cliStep: a usage limit, sign-in or network failure there makes the suite a SKIP.
@@ -148,15 +149,21 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     // --- B1 stopped as Combwork stops it (its terminal ended); the slot must come back by itself once its folder is quiet.
     await inv('session:stop', shop, b1.id)
     check('Combwork stops Claude Code', !!(await until(async () => !(await live()) || (await live())?.status === 'exited', 20000)), JSON.stringify(await live()))
-    // The pool's retries' pauses grow to 30 s (HI-2906): two of the longest beyond the usual bound, as jjwindow waits.
+    const appLog = path.join(userData, 'logs', 'combwork.log')
+    const logLines = () => (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/)
+    // HI-2912's: its folder quiet once Claude Code has gone, so the pool's settle detaches it (jj's detach is fenced by the
+    // folder's quiet; the pool's retries' pauses grow to 30 s, HI-2906: two of the longest beyond the usual bound).
+    const detached = await until(() => logLines().some((l) => l.includes(`${slot}⁩ detached at`)), HUNG_MS * 2)
+    check('after Done and B1 stopped, its folder is quiet: the slot is detached', !!detached, JSON.stringify(await inv('slots:list', shop)))
+    // And back in the pool, not lent. HI-2920: a restart for B1's tools, under way across Done, takes the freed slot as a
+    // carried lease, so this fails with a real Claude Code until that is fixed.
     const back = await until(async () => {
       const s = (await inv('slots:list', shop)).find((x) => x.name === slot)
       return s && s.state === 'ready' ? s : null
-    }, HUNG_MS * 2)
-    check('after Done and B1 stopped, the slot is back in the pool (ready, not lent): its folder is quiet', !!back, JSON.stringify(await inv('slots:list', shop)))
-    const appLog = path.join(userData, 'logs', 'combwork.log')
-    for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /isn't quiet|detaching|detached/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
-    if (!back) {
+    }, detached ? HUNG_MS : 1)
+    check('…and back in the pool (ready, not lent) (HI-2920 while it fails)', !!back, JSON.stringify(await inv('slots:list', shop)))
+    for (const l of logLines().filter((x) => /isn't quiet|detaching|detached|resumes in/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
+    if (!detached || !back) {
       // What still names this run's folders (read only, nothing ended), and what Combwork lists as B1's leftovers.
       try {
         const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
@@ -166,7 +173,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
       }
       console.log(`INFO leftovers: ${JSON.stringify((await inv('session:leftovers')).filter((l) => l.agentId === b1.id))}`)
       // What jj and the pool said meanwhile (a write that failed, a stale slot), from the app's log.
-      for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /\[(WARN|ERROR)\] \[(slots|jj|slotCards|workspacePort)\]/.test(x))) console.log(`INFO app: ${l.slice(0, 500)}`)
+      for (const l of logLines().filter((x) => /\[(WARN|ERROR)\] \[(slots|jj|slotCards|workspacePort)\]/.test(x))) console.log(`INFO app: ${l.slice(0, 500)}`)
     }
   } finally {
     await app.close().catch(() => undefined)
