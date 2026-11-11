@@ -15,6 +15,17 @@ import type { GitResult } from '../src/main/git'
 let failStashAfter = false
 /** HI-2982: the reset that makes the folder's new index after a commit answered as failed. */
 let failIndexSync = false
+/** HI-2982 (HR2's round 3): the next `rev-parse … HEAD^{commit}` answered as failed. */
+let failHeadRead = false
+/** HI-2982 (HR2's round 3): the branch moved by another just before the next commit's git starts, or just after it. */
+let moveBranch: 'before' | 'after' | null = null
+/** Another's commit of HEAD's own tree on top of HEAD, the branch moved to it (no index lock needed), its id kept. */
+function moveBranchNow(cwd: string): void {
+  moveBranch = null
+  const c = sh(cwd, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'other')
+  sh(cwd, 'update-ref', 'refs/heads/main', c)
+  writeFileSync(join(cwd, '.git', 'other'), c)
+}
 /** HI-2982 (HR1's round 2): a copy of the index to a file matching this refused (EPERM), as Windows can. */
 let failCopyTo: RegExp | null = null
 vi.mock('original-fs/promises', async (original) => {
@@ -36,7 +47,14 @@ vi.mock('../src/main/git', async (original) => {
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
+      if (moveBranch === 'before' && args[0] === 'commit') moveBranchNow(cwd)
       const r = await real.git(cwd, args, max, input, opts)
+      if (moveBranch === 'after' && args[0] === 'commit') moveBranchNow(cwd)
+      // HI-2982 (HR2's round 3): the next read of HEAD answered as failed.
+      if (failHeadRead && args[0] === 'rev-parse' && args.includes('HEAD^{commit}')) {
+        failHeadRead = false
+        return { ok: false, code: 128, out: '', err: 'fatal: injected read error', buf: Buffer.alloc(0) }
+      }
       // HI-2982: the folder's new index not made, after the commit (its reset into a side index).
       if (failIndexSync && args[0] === 'reset' && opts?.env?.GIT_INDEX_FILE) return { ok: false, code: 128, out: '', err: 'fatal: could not write the new index', buf: Buffer.alloc(0) }
       if (failStashAfter && args[0] === 'stash') {
@@ -108,6 +126,8 @@ beforeEach(() => {
   failStashAfter = false
   failIndexSync = false
   failCopyTo = null
+  failHeadRead = false
+  moveBranch = null
 })
 
 describe('Commit', () => {
@@ -367,6 +387,47 @@ describe('a file the user stopped tracking (its deletion staged, the file kept)'
       expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
     }
   })
+
+  it('HEAD unreadable: refused, never taken for an unborn branch (no commit of every other file deleted); HEAD, the index and the files as they were', async () => {
+    withStopped()
+    writeFileSync(join(proj, 'b.txt'), 'STAGED VERSION\n')
+    sh(proj, 'add', 'b.txt')
+    writeFileSync(join(proj, 'b.txt'), 'UNSTAGED VERSION\n')
+    const before = head()
+    const entries = indexEntries()
+    failHeadRead = true
+    await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(/Git did not commit: fatal: injected read error/)
+    expect(failHeadRead).toBe(false)
+    expect(head()).toBe(before)
+    expect(indexEntries()).toBe(entries)
+    expect(sh(proj, 'show', ':b.txt')).toBe('STAGED VERSION')
+    expect(read('b.txt')).toBe('UNSTAGED VERSION\n')
+    expect(read('a.txt')).toBe('new\n')
+    expect(read('secret.env')).toBe('SECRET=1\n')
+    expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
+  })
+
+  // Another moves the branch (no index lock needed): a commit of HEAD's own tree on top of it. During git's commit (a
+  // hook), git's own compare-and-swap refuses it. Before git's commit starts or just after it ends, HEAD isn't provably
+  // this commit: refused, the branch never moved back (a take-back could drop the other's commit).
+  for (const when of ['during the commit (a hook)', 'after HEAD was read, before the commit starts', 'just after the commit']) {
+    it(`the branch moved by another ${when}: refused, the other's commit kept, nothing taken back, the index as it was`, async () => {
+      withStopped()
+      const entries = indexEntries()
+      if (when.startsWith('during')) {
+        mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+        writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nunset GIT_INDEX_FILE\nC=$(git commit-tree "HEAD^{tree}" -p HEAD -m other)\ngit update-ref refs/heads/main "$C"\necho "$C" > .git/other\nexit 0\n')
+      } else moveBranch = when.startsWith('after') ? 'before' : 'after'
+      await expect(settle('commit', ['a.txt', 'secret.env'])).rejects.toThrow(when.startsWith('during') ? /Git did not commit: fatal: cannot lock ref 'HEAD'/ : /Git did not commit: the branch moved while the commit was made: look at git log/)
+      const other = readFileSync(join(proj, '.git', 'other'), 'utf8').trim()
+      expect(() => sh(proj, 'merge-base', '--is-ancestor', other, 'HEAD')).not.toThrow()
+      expect(sh(proj, 'reflog', '-1', '--format=%gs')).not.toMatch(/Combwork: put back/)
+      expect(indexEntries()).toBe(entries)
+      expect(read('a.txt')).toBe('new\n')
+      expect(read('secret.env')).toBe('SECRET=1\n')
+      expect(readdirSync(join(proj, '.git')).filter((f) => f.startsWith('index.'))).toEqual([])
+    })
+  }
 
   it('a staged rename whose old name is back on disk: the rename committed, the old file left untracked', async () => {
     sh(proj, 'mv', 'b.txt', 'c.txt')

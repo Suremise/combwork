@@ -5855,7 +5855,10 @@ touched:
   (HI-2982: a secret just taken out of Git went back in), so that commit commits it as the deletion, the file left
   untracked, built by Combwork as `commit --only` builds one. The folder's `index.lock` is taken first and held to the
   end, as git's own commit holds it (another git holding it: refused, nothing done); both copies of the index are made
-  before the commit, and only a missing index counts as none. The commit is built in an index of its own (HEAD's
+  before the commit, and only a missing index counts as none. HEAD must be read for certain (a failed read refuses,
+  never taken for an unborn branch: a staged deletion is of a file HEAD has), and the tree is that commit's, by its id.
+  After the commit, HEAD must be provably this commit (its parent the HEAD read, its tree the one committed): another
+  that moved the branch around it leaves it refused, saying to look at git log, with the branch never moved back. The commit is built in an index of its own (HEAD's
   tree over a copy of the folder's index, each path from the folder by `update-index --add --remove`, each deletion
   `--force-remove`) and committed from it (hooks and signing as any commit); the folder's new index (those paths
   brought to the commit, `reset -- <paths>` in a copy) is written into the lock and renamed over the index, as git

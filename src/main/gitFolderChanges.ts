@@ -220,17 +220,22 @@ async function commitKeepingDeletions(folder: string, files: string[], now: Map<
   if (!held) throw combworkError(M.indexBusy)
   let published = false
   try {
-    const before = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
-    const was = before.ok ? before.out.trim() : null
+    // HEAD read for certain (HR2's round 3): a staged deletion is of a file HEAD has, so there is always one here, and a
+    // read that fails refuses: never taken for an unborn branch, whose empty tree would commit every other file deleted.
+    const before = await git(folder, ['rev-parse', '--verify', 'HEAD^{commit}'])
+    const was = before.ok ? before.out.trim() : ''
+    if (!/^[0-9a-f]{40,64}$/.test(was)) throw failed(M.commitFailed, before.err || 'git could not read HEAD') // i18n-ignore: stands in for git's own (English) words
     const env = { ...quietEnv(), GIT_INDEX_FILE: building }
     // Both copies of the index made before anything is committed (HR1's round 2): one the commit is built over, one the
     // folder's new index is made from. Only an index that isn't there (a repository with none yet) is no copy; any
     // other failure refuses here, nothing committed, never an index made from part of it.
     const copied = await copyIndex(index, building)
     if (copied !== (await copyIndex(index, next))) throw failed(M.commitFailed, 'the index changed while it was copied') // i18n-ignore: stands in for git's own (English) words
-    let base = await git(folder, was ? ['read-tree', '-m', 'HEAD'] : ['read-tree', '--empty'], undefined, undefined, { env })
-    // A copied index git can't merge from (an unmerged entry): HEAD's tree alone.
-    if (!base.ok && was) base = await git(folder, ['read-tree', 'HEAD'], undefined, undefined, { env })
+    if (!copied) throw failed(M.commitFailed, 'the repository has no index') // i18n-ignore: stands in for git's own (English) words
+    // The tree of the HEAD read, by its id (never `HEAD` read again).
+    let base = await git(folder, ['read-tree', '-m', was], undefined, undefined, { env })
+    // A copied index git can't merge from (an unmerged entry): that tree alone.
+    if (!base.ok) base = await git(folder, ['read-tree', was], undefined, undefined, { env })
     if (!base.ok) throw failed(M.commitFailed, base.err)
     if (taken.length) {
       const add = await git(folder, ['update-index', '--add', '--remove', '--', ...taken.map(plain)], undefined, undefined, { env })
@@ -242,13 +247,25 @@ async function commitKeepingDeletions(folder: string, files: string[], now: Map<
     }
     const r = await git(folder, ['commit', '--quiet', '-m', message], undefined, undefined, { env, timeout: ACT_MS })
     if (!r.ok) throw failed(M.commitFailed, `${r.err}\n${r.out}`)
-    const after = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD^{commit}'])
+    // HEAD is this commit only when proved (HR2's round 3): read for certain, its parent the HEAD read and its tree the
+    // one committed (git leaves the committed state in the index it was given). Another moving the branch around it
+    // (which needs no index lock) leaves HEAD at a commit that isn't provably this one: then the branch is never moved
+    // (a take-back could drop their commit), nothing more is written, and it is refused, saying to look at the history.
+    const tree = await git(folder, ['write-tree'], undefined, undefined, { env })
+    const after = await git(folder, ['rev-parse', '--verify', 'HEAD^{commit}'])
     const made = after.ok ? after.out.trim() : ''
+    const id = (r: { ok: boolean; out: string }): string => (r.ok && /^[0-9a-f]{40,64}$/.test(r.out.trim()) ? r.out.trim() : '')
+    const ours =
+      !!made && !!id(tree) && id(await git(folder, ['rev-parse', '--verify', `${made}^1`])) === was && id(await git(folder, ['rev-parse', '--verify', `${made}^{tree}`])) === id(tree)
+    if (!ours) {
+      log.warn(`Committed in ${userText(folder)}, but HEAD (${made || 'unread'}) isn't provably that commit: nothing taken back`)
+      throw failed(M.commitFailed, 'the branch moved while the commit was made: look at git log before going on') // i18n-ignore: stands in for git's own (English) words
+    }
     try {
       // The folder's index as the commit has those paths (a deletion's entry is gone already), from its copy made under
       // the lock before the commit: what `commit --only` leaves.
       if (taken.length) {
-        const sync = await git(folder, ['reset', '--quiet', '--', ...taken.map(literal)], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
+        const sync = await git(folder, ['reset', '--quiet', made, '--', ...taken.map(literal)], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
         if (!sync.ok) throw new Error(sync.err.trim() || 'git reset failed') // i18n-ignore: git's own words, or the command
       }
       await held.close()
@@ -266,9 +283,10 @@ async function commitKeepingDeletions(folder: string, files: string[], now: Map<
       }
       if (!published) throw last ?? new Error('the index could not be written') // i18n-ignore: a reason, log- and git-facing
     } catch (e) {
-      // HEAD back where it was, only if still at this commit (compare and swap), the index never written: as before.
-      const back = was ? await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', 'HEAD', was, made]) : await git(folder, ['update-ref', '-d', 'HEAD', made])
-      log.warn(`Committed in ${userText(folder)} but couldn't write its index (${userText((e as Error).message)}); ${back.ok ? 'the commit was taken back' : `the commit couldn't be taken back: ${userText(back.err.trim())}`}`)
+      // HEAD back where it was, only if still at this commit, proved this call's (compare and swap), the index never
+      // written: as before.
+      const back = await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', 'HEAD', was, made])
+      log.warn(`Committed in ${userText(folder)} but couldn't finish (${userText((e as Error).message)}); ${back.ok ? 'the commit was taken back' : `the commit couldn't be taken back: ${userText(back.err.trim())}`}`)
       throw failed(M.commitFailed, (e as Error).message)
     }
     return made
