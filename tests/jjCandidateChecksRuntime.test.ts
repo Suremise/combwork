@@ -23,6 +23,7 @@ import { jobSpawn } from '../src/main/workflow/jobSpawn'
 import { journalPath, LeaseJob, leaseJobGone, queueHost } from '../src/main/workflow/queueJobs'
 import { checksJournalKey, writeChecksJournal, type ChecksJournal } from '../src/main/workflow/jjCandidateChecks'
 import { checkLeaseOver, holdCandidateLease, releaseCandidateLease } from '../src/main/workflow/candidateLeases'
+import { attemptsKey, readAttempts, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
 import { CopyPool, CopyStore } from '../src/main/copies'
 import type { OpHolder } from '../src/main/slots'
 import type { SqlDb } from '../src/main/platform/jjObligations'
@@ -281,6 +282,34 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
   })
 
   describe("HR1's round 1 (colocated)", () => {
+    it("HI-2950 (HR1's round 1): a real check copy still leased at the candidate when its cycle ends: unresolved, never marked done; dropped once the copy is freed and parked", async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, {})
+      const { card } = await approved(w)
+      const jjp = await settle(w, card)
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      // A check copy leased at the candidate (its working copy on it), as a candidate's checks leave one until it is freed.
+      const leased = await x.pool.leaseCopy({ kind: 'check', card: card.id, revision: c.result, agent: null })
+      if (!leased.ok) throw new Error(JSON.stringify(leased))
+      expect(await w.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'by hand' })).toMatchObject({ ok: true })
+      await jjp.afterRun()
+      const e1 = (w.conn.read((db) => readAttempts(db as unknown as SqlDb, attemptsKey('p-jj', card.key, cycle))) as JjAttemptEntry[]).find((e) => e.record.attempt === c.attempt)!
+      expect(e1.state).toBeUndefined()
+      expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${c.result} & ::visible_heads()`, '-T', 'commit_id').trim()).toBe(c.result)
+      // The copy freed (its barrier), then the next sweep parks it and drops the candidate.
+      await x.pool.returnCopy(leased.lease.id, 'done')
+      await vi.waitFor(async () => {
+        await x.pool.refresh()
+        expect(x.pool.lease(leased.lease.id)?.freed).toBeTruthy()
+      }, { timeout: REAL_JJ_MS, interval: 200 })
+      await jjp.afterRun()
+      const e2 = (w.conn.read((db) => readAttempts(db as unknown as SqlDb, attemptsKey('p-jj', card.key, cycle))) as JjAttemptEntry[]).find((e) => e.record.attempt === c.attempt)!
+      expect(e2.state).toBe('dropped')
+      expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${c.result} & ::visible_heads()`, '-T', 'commit_id').trim()).toBe('')
+    })
+
     it('finding 1: the pool refreshed between the install and a check and between two checks: the lease stays the attempt’s', async () => {
       const w = await world(true, { candidates: true })
       const x = host(w)

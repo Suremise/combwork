@@ -15,7 +15,7 @@
 //    fingerprint, its owner the fingerprint still being the card's (`still`, read from the board before every write).
 // The caller publishes what this answers only while the fingerprint and the head are still these (reconcile.ts).
 
-import { dropJjAttempt, isCandidate, isInterrupted, jjCandidateNow, prepareJjCandidate, prepareJjUpdate, recoverJjAttempt, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle } from './jjCandidates'
+import { dropJjAttempt, isCandidate, isInterrupted, jjCandidateNow, prepareJjCandidate, prepareJjUpdate, recoverJjAttempt, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle, type JjDropped } from './jjCandidates'
 import { isJjUnknown, type JjReadUnknown } from './jjReads'
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import type { SqlDb } from './jjObligations'
@@ -165,10 +165,12 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
     // A candidate the target's head already reaches is the user's integration, not superseded (HI-2950: a run that read
     // the target just before the user moved it onto the candidate): left as it is, for the proof that credits it.
     if (e.record.result && (await reaches(deps.j4.git, e.record.result, head))) continue
-    if (e.record.result) await deps.park?.(e.record.result, e.record.expected)
+    // Its check copies off it first; one still leased or returning: dropped on a later step, once it is freed (HR1, HI-2950).
+    if (e.record.result && deps.park && !(await deps.park(e.record.result, e.record.expected))) continue
     const d = await dropJjAttempt(cleanUp, e.record, e.fp.target)
     if (isInterrupted(d)) return { unknown: `drop:${d.interrupted.why}` }
-    await deps.save({ ...e, record: d.record, state: d.dropped.keptRefs.some((k) => k.why === 'reached') ? 'kept' : 'dropped' })
+    const st = dropState(d)
+    await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })
   }
   if (current) return { offer: offerOf(current, head) }
 
@@ -216,15 +218,17 @@ function offerOf(e: JjAttemptEntry, head: string): JjCandidateOffer {
  * which keeps whatever the target reaches (the candidate the user integrated stays). Nothing else is built or answered;
  * an interrupted drop is left for the record (its pins keep its evidence) and the rest go on. How many it dropped.
  */
-export async function dropCandidates(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries' | 'save'> & { still?: () => boolean }): Promise<number> {
+export async function dropCandidates(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries' | 'save' | 'park'> & { still?: () => boolean }): Promise<number> {
   const j4: JjCandidateDeps = { ...deps.j4, owner: { still: deps.still ?? (() => true) }, journal: () => undefined }
   let n = 0
   for (const e of deps.entries()) {
     if (e.state || e.failure || e.record.phase !== 'done' || (e.record.outcome !== 'candidate' && e.record.outcome !== 'updated')) continue
+    if (e.record.result && deps.park && !(await deps.park(e.record.result, e.record.expected))) continue
     const d = await dropJjAttempt({ ...j4, journal: (record) => deps.save({ ...e, record }) }, e.record, e.fp.target)
     if (isInterrupted(d)) continue
-    await deps.save({ ...e, record: d.record, state: d.dropped.keptRefs.some((k) => k.why === 'reached') ? 'kept' : 'dropped' })
-    n++
+    const st = dropState(d)
+    await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })
+    if (st) n++
   }
   return n
 }
@@ -252,8 +256,12 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
       }
       record = rec.record
     } else if (record.outcome !== 'candidate' && record.outcome !== 'updated') continue
-    // Its check copies off it first (HI-2938's copies stay where their checks ran): one still leased, the drop refuses.
-    if (record.result) await deps.park?.(record.result, record.expected)
+    // Its check copies off it first (HI-2938's copies stay where their checks ran); one still leased or returning: left
+    // unresolved, the drop not tried, until the pool frees it (HR1's round 1, finding 1).
+    if (record.result && deps.park && !(await deps.park(record.result, record.expected))) {
+      unresolved = true
+      continue
+    }
     const d = await dropJjAttempt({ ...j4, journal: (r) => deps.save({ ...e, record: r }) }, record, e.fp.target)
     if (isInterrupted(d)) {
       if (d.interrupted.why === 'uncertain') {
@@ -262,13 +270,26 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
       } else unresolved = true
       continue
     }
-    await deps.save({ ...e, record: d.record, state: d.dropped.keptRefs.some((k) => k.why === 'reached') ? 'kept' : 'dropped' })
+    const st = dropState(d)
+    if (!st) unresolved = true
+    await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })
   }
   return { unresolved }
 }
 
+/**
+ * What a drop settles an entry to (HR1's round 1, finding 1): `kept` when the target reaches what it kept (for good);
+ * none when it kept anything else back (a working copy or a bookmark on it: a hold that can pass, so the entry stays live
+ * and is dropped again later); else `dropped`.
+ */
+export function dropState(d: JjDropped): 'kept' | 'dropped' | null {
+  if (d.dropped.keptRefs.some((k) => k.why === 'kept') || d.dropped.kept.length) return null
+  return d.dropped.keptRefs.some((k) => k.why === 'reached') ? 'kept' : 'dropped'
+}
+
 /** Whether a cycle's journal has anything a clean-up would still do: an attempt not dropped, kept or failed. */
 export const cycleLive = (entries: readonly JjAttemptEntry[]): boolean => entries.some((e) => !e.state && !e.failure && (!settled(e.record) || e.record.outcome === 'candidate' || e.record.outcome === 'updated'))
+// (An entry a held drop left without a state keeps its outcome, so it stays live and is dropped again: HR1's finding 1.)
 
 /** The board_meta key of a card and cycle's candidate attempts, by the project's canonical id. */
 export const attemptsKey = (project: string, card: string, cycle: number): string => `jj_attempts:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`

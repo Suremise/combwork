@@ -3471,10 +3471,11 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
 - **Ended** (`cycleEnded`, reconcile.ts): an earlier cycle than the card's current one; the current one while the card is
   in Todo, or Done with no Integrated fact (the user's own Done). A reopen or a restart is a new cycle, so an ended cycle
   never becomes live again; an Approved, Review or Active card's current cycle never has ended.
-- **The sweep** (JjPlatform `sweepEnded`, from `afterRun`, whatever the cards' stages, so after every start too): the
-  project's attempt journals by one key-prefix query; each card and cycle with something left (an attempt not dropped or
+- **The sweep** (JjPlatform `sweepEnded`, from `afterRun`, whatever the cards' stages, so after every start too): at most
+  `SWEEP_SCAN` (32) of the project's attempt journals read a run, by the key's index after the cursor (wrapping), each
+  card looked up by its key (never the whole board: HR1's round 1); each card and cycle with something left (an attempt not dropped or
   kept, a checks journal, the window's record) whose cycle has ended, a fair page of 8 after a durable cursor
-  (`jj_sweep_cursor:<project>`); `more` asks for a continuation run, and the minute's tick asks for one while anything was
+  (`jj_sweep_cursor:<project>`, past every row scanned); `more` asks for a continuation run, and the minute's tick asks for one while anything was
   left unresolved. The `moved` hook asks for a run on a move into Todo or Done too.
 - **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
   run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleEnded` the
@@ -3485,7 +3486,8 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   candidate, which J4 never abandons under a working copy. Before a candidate is dropped (here, and a superseded one in the
   candidate step), the pool's free copies at it are reset onto the head it was built on (the port's `resetTo`, under an
   operation of a lease's kind, never while a run or a process is in one); a copy leased or returning leaves the drop
-  unresolved until it is freed.
+  untried and unresolved until it is freed. A drop J4 keeps back for anything but the target reaching it (a working copy
+  or a bookmark on it) settles nothing: the entry stays live and is dropped again later (HR1's round 1).
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`);

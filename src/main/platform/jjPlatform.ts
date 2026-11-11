@@ -202,6 +202,8 @@ const cardLocks = new WeakMap<Workflow, Map<number, Promise<unknown>>>()
 const sweeps = new WeakMap<Workflow, { unresolved: boolean }>()
 /** Ended cycles cleaned up per sweep, at most. */
 export const SWEEP_PAGE = 8
+/** Journals read per sweep, at most (HR1's round 1, finding 2): the selection bounded, not only the clean-up. */
+export const SWEEP_SCAN = 32
 
 /** HI-2938: each workflow's checks runner: one look at a time, another asked for mid-look runs after it. */
 interface ChecksRunner {
@@ -850,7 +852,8 @@ export class JjPlatform implements PlatformAdapter {
     const attempts = rec.attempts
     const save = rec.saveAttempt
     const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false }
-    await dropCandidates({ j4, entries: () => attempts(card.key, cycle), save: (e) => save(card.key, cycle, e) }).catch(() => 0)
+    const park = this.deps?.candidateChecks?.parkCopies
+    await dropCandidates({ j4, entries: () => attempts(card.key, cycle), save: (e) => save(card.key, cycle, e), ...(park ? { park } : {}) }).catch(() => 0)
   }
 
   private async candidateStep(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep> {
@@ -1007,9 +1010,16 @@ export class JjPlatform implements PlatformAdapter {
     const project = rec.projectId().toLowerCase()
     const prefix = `jj_attempts:${project}:`
     const cursorKey = `jj_sweep_cursor:${project}`
-    const all = rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ? ORDER BY key').all(prefix, `${prefix}\uffff`) as { key: string; value: string }[]) // i18n-ignore: SQL
+    // Bounded on main (HR1's round 1, finding 2): at most SWEEP_SCAN journals read a run, by the key's index after the
+    // durable cursor (from the start again once past the last), whatever they hold; each card looked up by its key.
     const cursor = rec.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(cursorKey) as { value: string } | undefined)?.value ?? '') // i18n-ignore: SQL
-    const byKey = (k: string): CardRecord | null => wf.store.cards().find((c) => c.key.toLowerCase() === k) ?? null
+    const after = cursor > prefix ? cursor : prefix
+    const scan = (from: string, to: string, n: number): { key: string; value: string }[] =>
+      n > 0 ? (rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ? ORDER BY key LIMIT ?').all(from, to, n)) as { key: string; value: string }[]) : [] // i18n-ignore: SQL
+    const first = scan(after, `${prefix}\uffff`, SWEEP_SCAN)
+    const wrapped = first.length < SWEEP_SCAN && after !== prefix ? scan(prefix, `${after}\u0000`, SWEEP_SCAN - first.length) : []
+    const all = [...first, ...wrapped]
+    const byKey = (k: string): CardRecord | null => wf.store.cardByKey(k)
     type Due = { key: string; cardKey: string; cycle: number }
     const due: Due[] = []
     for (const row of all) {
@@ -1024,9 +1034,9 @@ export class JjPlatform implements PlatformAdapter {
       if (!cycleLive(entries) && !rows) continue
       due.push({ key: row.key, cardKey, cycle })
     }
-    // Fair: after the cursor first, then from the start; the cursor moves past each one visited.
-    const ordered = [...due.filter((x) => x.key > cursor), ...due.filter((x) => x.key <= cursor)]
-    const page = ordered.slice(0, SWEEP_PAGE)
+    // Fair: in scan order (after the cursor, then from the start), the cursor past each row scanned, due or not.
+    const page = due.slice(0, SWEEP_PAGE)
+    const lastScanned = (page.length === due.length ? all.at(-1)?.key : page.at(-1)?.key) ?? null
     let unresolved = false
     for (const x of page) {
       if (signal?.aborted) break
@@ -1070,10 +1080,11 @@ export class JjPlatform implements PlatformAdapter {
         unresolved = true
         checksLog.warn(`cleaning up #${userText(x.cardKey)}'s ended cycle ${x.cycle}`, e) // i18n-ignore: a log line, English
       }
-      await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, x.key)) // i18n-ignore: SQL
     }
+    // The cursor past what this run took on: every row scanned when the page took them all, else its last page row.
+    if (lastScanned) await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, lastScanned)) // i18n-ignore: SQL
     sweeps.set(wf, { unresolved })
-    return { more: ordered.length > page.length }
+    return { more: due.length > page.length || all.length >= SWEEP_SCAN }
   }
 
   /**

@@ -12,8 +12,8 @@
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
-import { JjPlatform } from '../src/main/platform/jjPlatform'
+import { describe, expect, it, vi } from 'vitest'
+import { JjPlatform, SWEEP_SCAN } from '../src/main/platform/jjPlatform'
 import { jjIntegratedOf } from '../src/main/platform/jjFacts'
 import { attemptsKey, readAttempts, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
 import type { SqlDb } from '../src/main/platform/jjObligations'
@@ -169,6 +169,26 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   })
 
   describe('ended cycles: the rest (colocated, HI-2950)', () => {
+    it("the sweep's selection is bounded (HR1's round 1): SWEEP_SCAN journals a run, after its cursor, wrapping; no whole-board card load", async () => {
+      const w = await world(true, { candidates: true })
+      const jjp = new JjPlatform(w.wf)
+      // 40 journals of cards gone, each with nothing left to do.
+      await w.deps.records!.write((db) => {
+        const put = db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)')
+        for (let i = 0; i < 40; i++) put.run(attemptsKey('p-jj', `ZZ-${String(i).padStart(2, '0')}`, 1), '[]')
+      })
+      const cards = vi.spyOn(w.wf.store, 'cards')
+      const cursor = () => w.store.boardMeta('jj_sweep_cursor:p-jj')
+      const keys = Array.from({ length: 40 }, (_, i) => attemptsKey('p-jj', `ZZ-${String(i).padStart(2, '0')}`, 1)).sort()
+      expect(await jjp.sweepEnded()).toEqual({ more: true })
+      expect(cursor()).toBe(keys[SWEEP_SCAN - 1])
+      // The next run: the 8 left after the cursor, then from the start again (wrapping), still SWEEP_SCAN at most.
+      expect(await jjp.sweepEnded()).toEqual({ more: true })
+      expect(cursor()).toBe(keys[(2 * SWEEP_SCAN - 1) % 40])
+      expect(cards).not.toHaveBeenCalled()
+      cards.mockRestore()
+    })
+
     it("a step run just after the user moved the target onto the candidate (it read the target before): the candidate left for the proof, credited via it", async () => {
       const w = await world(true, { candidates: true })
       const { card } = await approved(w)
