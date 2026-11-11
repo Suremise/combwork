@@ -2,8 +2,8 @@
 // on its PATH, fake Claude Code builders (B1, B2), a throwaway profile and workspace, a colocated repository with a
 // remote.
 // - card 1 built by B1, passed by the user and integrated (main moved onto it, pushed): Done;
-// - card 2 started for B2 at once: started (not refused because the user's jj operations just ran), in a slot of its own
-//   within a minute.
+// - card 2 started for B2 at once by the user (a drag into Doing), beside Combwork's own jj operations after card 1's
+//   Done (its slot detached, another made): started first time, in a slot within a minute.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -147,7 +147,8 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
       const v = await inv('tasks:work', n2)
       return v?.folder && v.workspace ? v : null
     }, HUNG_MS)
-    check(`…in a slot of its own within a minute (${Date.now() - t2} ms)`, !!w2 && w2.folder.toLowerCase() !== c1.w.folder.toLowerCase(), JSON.stringify({ w2, slots: await inv('slots:list', shop) }))  } finally {
+    // A slot of its own, or card 1's once that one is back in the pool: either is the pool's to pick.
+    check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2,JSON.stringify({ w2, slots: await inv('slots:list', shop) }))  } finally {
     await h.app.close().catch(() => undefined)
   }
   console.log(failed ? `${failed} FAILED` : 'ALL PASSED')

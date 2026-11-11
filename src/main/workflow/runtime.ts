@@ -2590,7 +2590,9 @@ export class Workflow {
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
-      if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
+      const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
+      if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
       // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
@@ -2599,6 +2601,7 @@ export class Workflow {
         if (more.length) throw new DragUndone({ rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: [...skipped, ...more].join(', ') } })
       }
       let out: GuardRefusal | null
+      let startMoved = false
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
@@ -2611,6 +2614,7 @@ export class Workflow {
           if (fromHold) w.move(fromHold, 'user')
           // The evidence on the state it was gathered on (back where it was, from On Hold): moved since, the write is undone.
           const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+          startMoved = !!changed && !!gs
           if (changed) throw new DragUndone(changed)
           if (gs) {
             decided(this.failingIn(w, 'start', gs.ins))
@@ -2633,6 +2637,9 @@ export class Workflow {
         })
       } catch (e) {
         if (!(e instanceof DragUndone)) throw e
+        // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
+        // allows more passes (`start`'s rule, HI-2916).
+        if (startMoved && gs && gathers > 1 && (this.regathering.get(card.id) ?? 0) < gathers && (await this.sameContent(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)

@@ -165,21 +165,23 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       expect(sub.data).not.toMatchObject({ revision: P })
     })
 
-    it('start: an unrelated jj operation before each of its first three writes gathers it again each time; one before every write refuses once the passes are spent (HI-2916)', async () => {
+    it.each(['start', 'drag'] as const)("%s: an unrelated jj operation before each of its first three writes gathers it again each time; one before every write refuses once the passes are spent (HI-2916)", async (how) => {
       const w = await world(colocated)
       const elsewhere = (): void => void w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'elsewhere')
+      // The agent's start, or the user's drag into Active (its own gather and write).
+      const go = (key: string, builder: typeof B1) => (how === 'start' ? w.wf.start(key, builder) : w.wf.move(key, 'active', 'user', { confirm: true, builder: builder === B2 ? 'B2' : 'B1' }))
       // Before each of the first three writes (#1206's one pass would refuse the second): started on the fourth gather.
       let writes = 0
-      w.wf.cfg.hooks = { beforeWrite: (m) => void (m === 'start' && writes++ < 3 && elsewhere()) }
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++ < 3 && elsewhere()) }
       const card = w.wf.createCard({ title: 'churn' })
-      moved(await w.wf.start(card.key, B1))
+      moved(await go(card.key, B1))
       expect(writes).toBe(4)
       expect(w.wf.state(card).started).toMatchObject({ base: w.main(), target: 'main', slot: 'slot-a' })
       // Before every write: refused as evidence that changed once its passes are spent, nothing started.
       writes = 0
-      w.wf.cfg.hooks = { beforeWrite: (m) => void (m === 'start' && (writes++, elsewhere())) }
+      w.wf.cfg.hooks = { beforeWrite: () => void (writes++, elsewhere()) }
       const other = w.wf.createCard({ title: 'continual' })
-      refusedBy(await w.wf.start(other.key, B2), 'evidence.changed')
+      refusedBy(await go(other.key, B2), 'evidence.changed')
       w.wf.cfg.hooks = undefined
       expect(writes).toBe(4)
       expect(w.wf.state(other).started).toBeFalsy()
