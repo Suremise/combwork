@@ -66,6 +66,7 @@
 
 ### Fixed
 
+- **A jj card passing review no longer restarts its builder** (HI-3008). Each card that reached Approved under **You integrate** gave its builder back **Report merge**, which it can never use there, so an idle builder was restarted and a working one asked about in "Restart … for the new workflow?". The same held for a card moved into Approved by hand when **Committed is done**.
 - **A jj card started right after another card's integration is no longer refused for nothing** (HI-2972). Starting a card while Combwork's own jj operations ran (the finished card's slot put back) could still say "What Combwork read … changed while it decided" under load. Combwork now reads it again instead, and its log says which check refused a start when one is.
 - **The switch to jj notices Git's older `crlf` attribute** (HI-2978). A `.gitattributes` line such as `*.txt crlf` (or `-crlf`, `crlf=input`) still makes Git convert line endings, which jj doesn't do, so switching would have changed every such file. It now refuses the switch and lists the line, as it does for `text` and `eol`. A `.gitattributes` you haven't committed yet counts too.
 - **A jj card put back and started again in its slot keeps its uncommitted edits** (HI-2981). A card in a jj lane put back with an edit not committed yet was refused when started again in the same slot, and stalled after three tries. It now carries on with the edit, as in Git; another card is still refused over edits that aren't its own.

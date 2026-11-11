@@ -7488,7 +7488,10 @@ repeating them (#533) [note §8].
   (any merge into a branch), cw_lane and the builder's moves. **Usable if any set of rules still in force allows it**
   (`hiddenForWorkflow`): the project's options now, each distinct ruleset recorded on the facts of its cards out of Hold,
   Todo and Done (not archived), and its running lanes' (`cardWork.workRetained`, one snapshot), and kept by a card's stage
-  (Review keeps the review tools, Approved and Merging the merge report) whatever its rules say. Nothing hidden when the
+  (Review keeps the review tools, Approved and Merging the merge report) past what those options allow: the merge report
+  only where one of those sets finishes in a way its handler takes it (Combwork merges, the agent merges, not checked), so
+  an Approved card under You integrate or Committed is done keeps nothing (`WORKFLOW_TOOL_STAGES`' `under`; HI-3008: each
+  jj card's Approved restarted its builder, or asked to, for a tool it could never use). Nothing hidden when the
   rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
   included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
   be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database
