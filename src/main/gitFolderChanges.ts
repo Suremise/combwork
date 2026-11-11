@@ -10,7 +10,7 @@ import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
-import { changingFolder } from './folderFence'
+import { changingFolder, inFolder } from './folderFence'
 import { INDEX_BUSY, git, gitErrorLine } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
@@ -100,9 +100,11 @@ const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() ==
 
 /**
  * Under the lock and the fence: the folder still on `branch` (null: any branch, never a detached HEAD), no operation
- * under way, no agent or run working there. Throws the refusal, in the window's words.
+ * under way, no agent or run working there. `agentsAt`: the projects whose agents count, each with the folder they'd
+ * work in (the folder's own project's agents there, unless the caller names more). Throws the refusal, in the
+ * window's words.
  */
-async function assertQuiet(projectPath: string, folder: string, branch: string | null): Promise<string> {
+async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<string> {
   const now = await worktreeNow(folder)
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   if (!now.line) throw combworkError(M.detached, { folder })
@@ -112,8 +114,10 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   const { folderBuilders } = await import('./workflow/queueHost')
   const held = folderBuilders(workspace, folder)
   if (held) throw combworkError(M.busy, { folder, what: held[0] })
-  const agent = await busyAgentIn(projectPath, folder)
-  if (agent) throw combworkError(M.agentBusy, { agent, folder })
+  for (const at of agentsAt) {
+    const agent = await busyAgentIn(at.project, at.folder)
+    if (agent) throw combworkError(M.agentBusy, { agent, folder: at.folder })
+  }
   return now.line
 }
 
@@ -204,25 +208,42 @@ export async function settleChanges(projectPath: string, target: string, shownFo
 }
 
 /**
+ * The workspace's projects in the working tree whose top is `top` (HI-2962): `own` first, then each other project folder
+ * in it that git finds in the same tree (never one that is a repository of its own, nor another worktree).
+ */
+async function projectsInTree(own: string, top: string): Promise<string[]> {
+  const out = [own]
+  for (const p of await workspace.listProjectPaths()) {
+    if (samePlace(p, own) || !inFolder(p, top)) continue
+    const r = await git(p, ['rev-parse', '--show-toplevel'])
+    if (r.ok && samePlace(r.out.trim(), top)) out.push(p)
+  }
+  return out
+}
+
+/**
  * Files' Commit it after a shared Exclude from git: the repository's top .gitignore committed alone, as it is now (any
  * earlier edits to it with it), on the project folder's branch. Refused, as above, while an agent works there or git is
- * in the middle of something, and when it has no change.
+ * in the middle of something, and when it has no change. The commit moves the HEAD of the whole working tree, so a
+ * project in a larger repository has that tree's top fenced and checked (HI-2962): a run anywhere in it, and the agents
+ * of every project in it, refuse it, not only the project folder's own.
  */
 export async function commitIgnore(projectPath: string): Promise<FolderChangesDone> {
   const repo = await filesRepo(projectPath)
   return withRepoLock(
-    repo.cwd,
+    repo.top,
     () =>
-      changingFolder(repo.cwd, say(FENCE.ignore), async () => {
-        const branch = await assertQuiet(repo.cwd, repo.cwd, null)
+      changingFolder(repo.top, say(FENCE.ignore), async () => {
+        const agentsAt = (await projectsInTree(repo.cwd, repo.top)).map((p) => ({ project: p, folder: p }))
+        const branch = await assertQuiet(repo.cwd, repo.top, null, agentsAt)
         // Its paths from the repository's top (the project folder may be a folder in a larger repository).
         const now = await changedIn(repo.top)
         const file = '.gitignore'
         if (!now.has(file)) throw combworkError(M.nothing, { file })
         const message = 'Update .gitignore' // i18n-ignore: the commit's message, in the repository (English, as Combwork's other commits)
         const made = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
-        log.info(`Committed .gitignore in ${userText(repo.cwd)} on ${userText(branch)}`)
-        return { action: 'commit', folder: repo.cwd, branch, files: [file], message, made }
+        log.info(`Committed .gitignore in ${userText(repo.top)} on ${userText(branch)}`)
+        return { action: 'commit', folder: repo.top, branch, files: [file], message, made }
       }),
     { project: repo.cwd }
   )
