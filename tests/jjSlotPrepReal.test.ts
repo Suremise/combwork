@@ -14,6 +14,8 @@
 //   journal over refuses this one's publication. A crash before the write then a foreign `jj new` on the same base is
 //   rewritten by its own marked write, never taken for it; a crash after it then another operation is confirmed, and an
 //   unchanged retry writes nothing; then an unrecorded edit or a foreign write in the slot is uncertain, never published.
+// - HI-2925: a restart with uncommitted work in a prepared slot: a fresh process still reads the card's line and binding,
+//   and its preparation again writes nothing and keeps the work; work written before the preparation leaves the last line.
 //
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { DatabaseSync } from 'node:sqlite'
@@ -444,6 +446,29 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect((await prepareFor(w, 5, 8)).err).toMatch(/couldn't be read back/)
       expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
       expect(readFileSync(join(w.slot, 'late.txt'), 'utf8')).toBe('late\n')
+    })
+
+    it("HI-2925: a restart with uncommitted work in a prepared slot: a fresh process reads the card's line, and its preparation again writes nothing", async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 2, 1)
+      // The builder's work in progress, never recorded by jj: an edit and a new file.
+      writeFileSync(join(w.slot, 'base.txt'), 'changed by card two\n')
+      writeFileSync(join(w.slot, 'two-notes.txt'), 'in progress\n')
+      const heads = w.heads()
+      // Combwork closed and opened again: a new port (no cached context), the same board store.
+      const after = h.portWith({ prep: () => w.store, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
+      expect(await after.line(w.slot)).toBe(w.key(2, 1))
+      expect(await after.binding!(w.slot)).toMatchObject({ key: w.key(2, 1), card: 2, cycle: 1, base: w.main() })
+      expect(await after.prepare(w.slot, w.key(2, 1), w.main(), { identity: w.identity, fence: yes, lease: 'L1', target: 'main' })).toEqual({ ok: true, err: '' })
+      expect(w.heads()).toEqual(heads)
+      expect(readFileSync(join(w.slot, 'base.txt'), 'utf8')).toBe('changed by card two\n')
+      expect(readFileSync(join(w.slot, 'two-notes.txt'), 'utf8')).toBe('in progress\n')
+      // What jjlane's card 2 hit (HI-2925): written before its preparation, the slot is still on the last card's line.
+      const w2 = await world(colocated)
+      await prepareFor(w2, 1, 1)
+      writeFileSync(join(w2.slot, 'early.txt'), 'before card two was prepared\n')
+      const after2 = h.portWith({ prep: () => w2.store, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
+      expect(await after2.line(w2.slot)).toBe(w2.key(1, 1))
     })
 
     it("crash after the write, then a foreign `jj new` on the same base replaced the slot's working copy: uncertain (HR1)", async () => {
