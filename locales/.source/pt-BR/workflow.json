@@ -446,6 +446,7 @@
   "workflow.rule.approval.given": "Your OK before merging",
   "workflow.rule.card.kind": "A card's kind is set when it is made",
   "workflow.rule.done.contained": "Combwork checks the merge",
+  "workflow.rule.forward.resolutionSource": "A resolution merges the commit it resolves",
   "workflow.rule.integrate.approved": "Work is reviewed before it's merged",
   "workflow.rule.integrate.checksPassed": "Checks pass on the merged result",
   "workflow.rule.integrate.upToDate": "Work is up to date before it merges",

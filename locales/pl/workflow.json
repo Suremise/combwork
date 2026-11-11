@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "Praca bez zmian wraca do kolejki tylko po błędzie spoza niej",
   "workflow.rule.review.decisionsReceived": "Recenzent przeczytał każdą decyzję",
   "workflow.rule.review.inProgress": "Jeden recenzent naraz",
+  "workflow.rule.forward.resolutionSource": "Rozwiązanie scala commit, który rozwiązuje",
   "workflow.rule.review.notAuthor": "Nikt nie recenzuje własnej pracy",
   "workflow.rule.start.dependenciesIntegrated": "Karta startuje dopiero, gdy karty, na które czeka, są gotowe",
   "workflow.rule.start.notBlocked": "Zablokowane karty nie startują",

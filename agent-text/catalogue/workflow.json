@@ -1379,6 +1379,11 @@
     "note": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5).",
     "audience": "both"
   },
+  "workflow.rule.forward.resolutionSource": {
+    "text": "A resolution merges the commit it resolves",
+    "note": "A rule of the workflow, named where a move can’t check it (HI-2999): a card made by Resolve on a builder (it merges one branch into another by hand) must contain, merged, the commit that came back from the merge queue, not a copy of its changes.",
+    "audience": "both"
+  },
   "workflow.rule.integrate.approved": {
     "text": "Work is reviewed before it's merged",
     "note": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G1).",

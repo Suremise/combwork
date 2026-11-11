@@ -448,6 +448,7 @@ interface CombworkMessageValues {
   'workflow.rule.approval.given': undefined
   'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
+  'workflow.rule.forward.resolutionSource': undefined
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined
   'workflow.rule.integrate.upToDate': undefined

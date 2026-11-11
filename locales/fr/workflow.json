@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "Un travail inchangé ne revient dans la file qu’après un échec extérieur à lui",
   "workflow.rule.review.decisionsReceived": "Le relecteur a lu toutes les décisions",
   "workflow.rule.review.inProgress": "Un seul relecteur à la fois",
+  "workflow.rule.forward.resolutionSource": "Une résolution fusionne le commit qu’elle résout",
   "workflow.rule.review.notAuthor": "Personne ne relit son propre travail",
   "workflow.rule.start.dependenciesIntegrated": "Une carte ne démarre que lorsque les cartes qu’elle attend sont terminées",
   "workflow.rule.start.notBlocked": "Les cartes bloquées ne démarrent pas",

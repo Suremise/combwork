@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "Unveränderte Arbeit kommt nur nach einem Fehler außerhalb der Arbeit erneut in die Warteschlange",
   "workflow.rule.review.decisionsReceived": "Der Reviewer hat jede Entscheidung gelesen",
   "workflow.rule.review.inProgress": "Immer nur ein Reviewer",
+  "workflow.rule.forward.resolutionSource": "Eine Auflösung mergt den Commit, den sie auflöst",
   "workflow.rule.review.notAuthor": "Niemand reviewt die eigene Arbeit",
   "workflow.rule.start.dependenciesIntegrated": "Karten starten erst, wenn die Karten, auf die sie warten, erledigt sind",
   "workflow.rule.start.notBlocked": "Blockierte Karten starten nicht",

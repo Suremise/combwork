@@ -1172,6 +1172,9 @@
   "workflow.rule.done.contained": {
     "placeholders": {}
   },
+  "workflow.rule.forward.resolutionSource": {
+    "placeholders": {}
+  },
   "workflow.rule.integrate.approved": {
     "placeholders": {}
   },

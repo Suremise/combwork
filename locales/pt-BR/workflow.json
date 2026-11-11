@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "Trabalho sem alterações volta à fila só após uma falha externa a ele",
   "workflow.rule.review.decisionsReceived": "O revisor leu todas as decisões",
   "workflow.rule.review.inProgress": "Um revisor por vez",
+  "workflow.rule.forward.resolutionSource": "Uma resolução faz merge do commit que resolve",
   "workflow.rule.review.notAuthor": "Ninguém revisa o próprio trabalho",
   "workflow.rule.start.dependenciesIntegrated": "Os cartões só começam quando os cartões que aguardam estão concluídos",
   "workflow.rule.start.notBlocked": "Cartões bloqueados não começam",

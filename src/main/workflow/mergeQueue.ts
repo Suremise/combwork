@@ -1293,8 +1293,15 @@ export class MergeQueue {
       // comes back with why, whatever let it be queued (one from before, or the default branch changed since). HI-2998: and
       // so does a forward's resolution (Resolve on a builder), checked at Resolve, with its forward's override.
       if ((s.forward || s.resolves) && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
-      // HI-2999: a resolution without the commit it resolves (cherry-picked, not merged), however it got here: back to its builder.
-      if (s.resolves && (await this.wf.resolutionMissing(this.wf.rulesetOf(card, s).options, s, s.approved?.revision ?? entry.revision))) return this.returnCard(card, entry, entry.revision, target, 'resolution', false)
+      // HI-2999: a resolution without the commit it resolves (cherry-picked, not merged), however it got here: back to its
+      // builder. Merged only once it reads true: unreadable, the entry goes round again, then pauses with git's text.
+      const has = s.resolves ? await this.wf.resolutionHasSource(this.wf.rulesetOf(card, s).options, s, s.approved?.revision ?? entry.revision) : true
+      if (has === false) return this.returnCard(card, entry, entry.revision, target, 'resolution', false)
+      if (has !== true) {
+        const o = await readFailed(again(has?.detail ?? has?.what))
+        if (o) return o
+        continue
+      }
       // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
       const blockers = this.wf.queueWaitingOn(card.id)
       if (blockers.length) return this.waiting(card, entry, blockers)

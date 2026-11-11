@@ -5810,8 +5810,11 @@ only a new forward request with the user's override merges that pair.
 Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
 `source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
 next forward conflict again) is refused (`forward.resolutionSource`, its next step `git merge <source>`). Read with the
-project's history port (`resolutionMissing`); what can't be read doesn't refuse, and the queue reads it again at each
-attempt, returning one without it to its builder (`resolution`, nothing merged), however it reached the queue.
+project's history port (`resolutionHasSource`: true, false, or unknown, never taken as either): unreadable (git failed
+or threw, a platform with no history) it is refused too (`platform.unknown`, naming that rule), submitted again once it
+reads. The queue reads it again at each attempt and merges only on true: false returns it to its builder (`resolution`,
+nothing merged), however it reached the queue; unreadable, the entry goes round again as another read git couldn't
+make (HI-2019), then pauses needs-you with git's text, nothing merged.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a

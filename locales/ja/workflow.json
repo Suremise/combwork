@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "変更のない作業を再びキューに入れるのは、作業外の原因で失敗した後だけ",
   "workflow.rule.review.decisionsReceived": "レビュアーがすべての決定事項を読んでいる",
   "workflow.rule.review.inProgress": "レビュアーは一度に一人",
+  "workflow.rule.forward.resolutionSource": "解決カードは解決するコミットをマージする",
   "workflow.rule.review.notAuthor": "作業した本人はレビューしない",
   "workflow.rule.start.dependenciesIntegrated": "待っているカードが完了してから開始する",
   "workflow.rule.start.notBlocked": "ブロック中のカードは開始しない",

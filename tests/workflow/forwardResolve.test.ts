@@ -10,6 +10,7 @@ import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
 import type { FactData } from '../../src/shared/workflow/facts'
 import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
+import { historyOf } from '../../src/main/platform/historyPorts'
 import type { ForwardOverride } from '../../src/shared/workflow/forwardOrder'
 
 let env: Env | null = null
@@ -299,4 +300,82 @@ describe('a resolution carries the commit it resolves, merged (HI-2999)', () => 
     expect(said).toContain(`the resolution of ${fwd.key} doesn’t contain ${source}`)
     expect(said).toContain(`git merge ${source}`)
   })
+})
+
+describe('an ancestry read that fails never lets a resolution through (HI-2999, HR2 round 1)', () => {
+  /** git's isAncestor answering `as` (unknown, as git.ts gives for a merge-base failure other than exit 1; throwing; true) until restored. */
+  const ancestry = (as: 'unknown' | 'throws' | true) => {
+    const h = historyOf('git')!
+    const real = h.isAncestor
+    h.isAncestor = async () => {
+      if (as === 'throws') throw new Error('git merge-base: spawn EAGAIN')
+      return as === true ? true : { unknown: true as const, what: 'whether it is an ancestor', detail: 'fatal: bad object' }
+    }
+    return () => {
+      h.isAncestor = real
+    }
+  }
+
+  /** A resolution started on a builder, its work committed: the source merged (`merge`) or its change copied. */
+  async function approved(merge: boolean) {
+    const e = conflicting()
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const folder = started.data!.folder as string
+    if (merge) {
+      try {
+        sh(folder, 'merge', '-q', '--no-edit', source)
+      } catch {
+        // the conflict
+      }
+    }
+    commit(folder, { 'fix.txt': 'resolved\n' }, merge ? 'Merge main, resolved' : 'copied')
+    return { e, made, source, folder }
+  }
+
+  for (const how of ['unknown', 'throws'] as const) {
+    it(`at submit (${how}): refused, saying what couldn't be read, nothing submitted`, { timeout: GIT_HEAVY_MS }, async () => {
+      const { e, made } = await approved(true)
+      const restore = ancestry(how)
+      try {
+        const r = await e.wf.submit(made.key, B1, { summary: 'merged' })
+        expect(isRefusal(r) && r.rule).toBe('platform.unknown')
+        expect(JSON.stringify(r)).toContain('forward.resolutionSource')
+        expect(e.wf.state(made).latest).toBeNull()
+      } finally {
+        restore()
+      }
+      moved(await e.wf.submit(made.key, B1, { summary: 'merged' }))
+    })
+
+    it(`in the queue (${how}): never merged; paused needsYou, then returned once it reads false, or merged once it reads true`, { timeout: GIT_HEAVY_MS }, async () => {
+      for (const merge of [false, true]) {
+        const { e, made } = await approved(merge)
+        // Submitted as it reads; the copied one only past a read that wrongly said true (no route does it: the backstop).
+        const lied = merge ? null : ancestry(true)
+        try {
+          moved(await e.wf.submit(made.key, B1, { summary: merge ? 'merged' : 'copied' }))
+        } finally {
+          lied?.()
+        }
+        moved(await e.wf.startReview(made.key, R1))
+        moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+        const dest = head(e, '1.2.0')
+        const restore = ancestry(how)
+        try {
+          expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'paused', reason: 'needsYou' }])
+        } finally {
+          restore()
+        }
+        expect(head(e, '1.2.0')).toBe(dest)
+        expect(e.wf.store.facts(made.id).some((f) => f.kind === 'Integrated')).toBe(false)
+        e.queue().resume('1.2.0')
+        expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: merge ? 'integrated' : 'returned', ...(merge ? {} : { reason: 'resolution' }) }])
+        e.close()
+        env = null
+      }
+    })
+  }
 })

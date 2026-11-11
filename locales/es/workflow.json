@@ -443,6 +443,7 @@
   "workflow.rule.requeue.allowed": "El trabajo sin cambios vuelve a la cola solo tras un fallo ajeno a él",
   "workflow.rule.review.decisionsReceived": "El revisor ha leído todas las decisiones",
   "workflow.rule.review.inProgress": "Un revisor cada vez",
+  "workflow.rule.forward.resolutionSource": "Una resolución fusiona el commit que resuelve",
   "workflow.rule.review.notAuthor": "Nadie revisa su propio trabajo",
   "workflow.rule.start.dependenciesIntegrated": "Las tarjetas empiezan solo cuando las tarjetas que esperan están hechas",
   "workflow.rule.start.notBlocked": "Las tarjetas bloqueadas no empiezan",
