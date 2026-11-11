@@ -75,6 +75,7 @@ function replies(): { name: string; text: string }[] {
   add('refused', R.refusedText({ refused: true, rule: 'move.needsOverride', message: 'refused text', next: 'Do this next.', change: 'Change it there.', override: null, warnings: ['a warning'] }))
   add('asked', R.askedAssistantText({ ok: true, card: 'HI-12', delivery: 'm41' }))
   add('asked none', R.askedAssistantText({ ok: true, card: 'HI-12', delivery: '' }))
+  add('asked, waiting', R.askedAssistantText({ ok: true, card: 'HI-12', delivery: 'm41', waiting: true }))
   add('notified', R.notifiedText({}))
   add('notified opens', R.notifiedText({ opens: 'Coder' }))
   const groups = [{ group: 'm41', at: 'x', changes: [{ id: 'a-1', what: 'title', card: 12, fields: ['title'], undone: true as const }, { id: 'a-1', what: 'title', fields: [], final: 'it was taken' }, ...Array.from({ length: 41 }, (_, i) => ({ id: 'a-1', what: 'title', card: i + 1, fields: [] }))] }]

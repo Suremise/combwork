@@ -215,7 +215,7 @@ function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?
     blocked: typeof raw.blocked === 'string' && raw.blocked.trim() ? raw.blocked : null,
     // Waiting on purpose (HI-2618), as kept: a move out of Doing clears it where it is written (updateTaskAs), which reads
     // it to say so, so it is kept whatever the column here (a runtime move has saved the new column first).
-    ...(raw.waitingFor && typeof raw.waitingFor.reason === 'string' && raw.waitingFor.reason.trim() && typeof raw.waitingFor.by === 'string' && typeof raw.waitingFor.at === 'string' ? { waitingFor: { reason: raw.waitingFor.reason, by: raw.waitingFor.by, at: raw.waitingFor.at } } : {}),
+    ...(raw.waitingFor && typeof raw.waitingFor.reason === 'string' && raw.waitingFor.reason.trim() && typeof raw.waitingFor.by === 'string' && typeof raw.waitingFor.at === 'string' ? { waitingFor: { reason: raw.waitingFor.reason, by: raw.waitingFor.by, at: raw.waitingFor.at, ...(typeof raw.waitingFor.ask === 'string' && raw.waitingFor.ask ? { ask: raw.waitingFor.ask } : {}) } } : {}),
     blockedBy: nums(raw.blockedBy),
     links: nums(raw.links),
     comments: Array.isArray(raw.comments) ? raw.comments.filter((c) => c && typeof c.text === 'string') : [],
@@ -2676,8 +2676,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       if (reason) {
         if (card.column !== 'doing') throw combworkError(ERR.waitingNotActive, { card: cardRef(n), active: stageName('active', await stageNamesOf(ws, card.project)) }, { kind: 'conflict' })
         const mark = whole ? { reason, by: whole.by, at: whole.at } : { reason, by, at: new Date().toISOString() }
-        if (reason !== card.waitingFor?.reason || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
-          if (reason !== card.waitingFor?.reason) said.push(storedText(HISTORY.waiting, { reason }))
+        // A mark set here never carries a request's ref (HI-2915): set over a request's own mark, even with its words, it
+        // replaces it, so that request's end leaves it.
+        if (reason !== card.waitingFor?.reason || card.waitingFor?.ask || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
+          if (reason !== card.waitingFor?.reason || card.waitingFor?.ask) said.push(storedText(HISTORY.waiting, { reason }))
           card.waitingFor = mark
         }
       } else if (card.waitingFor) {
@@ -3100,8 +3102,12 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
  * An agent's request for the Combwork Assistant on a card (HI-1866, assistantAsk.ts): written as its comment, with a history
  * line, in one change of the board. `check` sees the card as it is in the change (another project's is unknown first) and
  * throws to refuse it, so a refused request writes nothing.
+ *
+ * HI-2915: asked by the card's own agent on its card in Doing with no waiting mark, the card is marked waiting in the same
+ * write, the request's words its reason and `ref` (the request's delivery ref) its `ask`: the request's own mark, which
+ * clearAskWait takes off when that request ends. A mark there already (by hand, an earlier request's) is kept.
  */
-export async function askAssistantOn(n: number, asked: string, actor: TaskActor, check: (card: TaskCard) => void, ws: WorkspaceService = workspace): Promise<TaskCard> {
+export async function askAssistantOn(n: number, asked: string, actor: TaskActor, check: (card: TaskCard) => void, ws: WorkspaceService = workspace, ref?: string): Promise<TaskCard> {
   const t = commentText(asked)
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
@@ -3110,10 +3116,37 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
     const by = actorName(actor)
     note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
     addComment(c, by, t)
+    if (ref && actor.kind === 'agent' && actor.self && c.agent === actor.self.agentId && c.column === 'doing' && !c.waitingFor) {
+      const reason = clip(t.replace(/\s+/g, ' ').trim(), 200)
+      c.waitingFor = { reason, by, at: new Date().toISOString(), ask: ref }
+      note(c, by, storedText(HISTORY.waiting, { reason }))
+    }
     await saveCard(ws, n, c)
     changed(ws)
     return c
   }))
+}
+
+/**
+ * HI-2915: the Assistant request `ref` on card `n` ended (the Assistant acked it, or it ended unread or was never given):
+ * its waiting mark is taken off, under the board's lock, only while it is still that request's own (a mark set since, by
+ * hand or by another request, is kept, whatever its words). True when it was taken off. A card gone: false.
+ */
+export async function clearAskWait(n: number, ref: string, ws: WorkspaceService = workspace): Promise<boolean> {
+  return boardLock(ws, async () => {
+    let c: TaskCard
+    try {
+      c = await getTask(n, ws)
+    } catch {
+      return false
+    }
+    if (c.waitingFor?.ask !== ref) return false
+    delete c.waitingFor
+    note(c, BY.combwork, storedText(HISTORY.notWaiting))
+    await saveCard(ws, n, c)
+    changed(ws)
+    return true
+  })
 }
 
 /** Files attached with a card's change (HI-1700): staged (cardAttachments.stage), and the draft link each stands for, if any. */

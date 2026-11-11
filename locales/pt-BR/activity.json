@@ -90,6 +90,7 @@
   "activity.task": "{type, select, subagent {Subagente em segundo plano} command {Comando em segundo plano} monitor {Monitor} workflow {Fluxo de trabalho} other {Tarefa em segundo plano}}",
   "activity.thinking": "Pensando…",
   "activity.toolFor": "{summary} · {time}",
+  "activity.waiting": "{assistant, select, yes {Aguardando a resposta do Assistente: {reason}} other {Aguardando: {reason}}}",
   "activity.workspace.agentIn": "{project} · {agent}",
   "activity.workspace.assistant": "Assistente",
   "activity.workspace.cardNobody": "Ninguém está trabalhando em {card} agora. O cartão tem o histórico.",

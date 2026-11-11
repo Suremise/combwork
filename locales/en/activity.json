@@ -363,6 +363,10 @@
     "defaultMessage": "{summary} · {time}",
     "description": "A tool call node's second line in the Activity tab while it runs: what it does ({summary}, from the agent, such as a command) and how long it has run so far ({time}: \"40 s\", \"4 min\")."
   },
+  "activity.waiting": {
+    "defaultMessage": "{assistant, select, yes {Waiting for the Assistant’s answer: {reason}} other {Waiting: {reason}}}",
+    "description": "A line under the card an agent works on in the Activity tab (HI-2915): the card, in Active, is marked as waiting on purpose, so Combwork doesn't report it as stalled. assistant is yes when its agent asked the Combwork Assistant for something and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys."
+  },
   "activity.workspace.agentIn": {
     "defaultMessage": "{project} · {agent}",
     "description": "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})."

@@ -56,6 +56,12 @@
       "card": "plain"
     }
   },
+  "reply.ask.assistantWaiting": {
+    "placeholders": {
+      "card": "plain",
+      "delivery": "plain"
+    }
+  },
   "reply.attachment.bytes": {
     "placeholders": {
       "n": "number"
