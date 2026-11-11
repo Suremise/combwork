@@ -550,7 +550,8 @@ export interface JjReconcilePorts {
 /**
  * HI-2938: a candidate's merge checks as the window shows them, bound to the checks key they run under (s11 §2):
  * running (`done` of `names`, `current` the one running), passed (adoptable), waiting for a check copy, stopped (Stop:
- * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`).
+ * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`). HI-2991: `misses` is kept while they run
+ * again (only a pass or a restart under a new key clears it), and a waiting or failing set isn't run again before `retryAt`.
  */
 export interface JjCandidateChecksShown {
   key: string
@@ -560,6 +561,8 @@ export interface JjCandidateChecksShown {
   current?: string
   why?: string
   misses?: number
+  /** HI-2991: waiting or failing, when the checks runner may run them again (ms since the epoch). */
+  retryAt?: number
 }
 
 /**
@@ -659,9 +662,10 @@ export type JjChecksUpdate =
   /** The checks' key changed (other checks, commands, install or setup): they start anew under it (HR1's round 1 finding 3). */
   | { restart: string[] }
   | { passed: string[] }
-  | { waiting: string }
+  /** HI-2991: `retryMs`, how long until the checks runner tries again. */
+  | { waiting: string; retryMs: number }
   | { stopped: string }
-  | { failing: string }
+  | { failing: string; retryMs: number }
   | { red: { check: string; output: string; logPath?: string; expected: string } }
 
 /**
@@ -709,14 +713,15 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
       'restart' in u
         ? { key: at.key, names: u.restart, state: 'running', done: 0 }
         : 'progress' in u
-        ? { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}) }
+        ? // HI-2991: the misses in a row kept while they run again, so a failing set counts up to the window's message.
+          { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}), ...(c.misses ? { misses: c.misses } : {}) }
         : 'passed' in u
           ? { key: c.key, names: c.names, state: 'passed', done: c.names.length }
           : 'waiting' in u
-            ? { ...c, state: 'waiting', why: u.waiting }
+            ? { key: c.key, names: c.names, state: 'waiting', why: u.waiting, ...(c.misses ? { misses: c.misses } : {}), retryAt: Date.now() + u.retryMs }
             : 'stopped' in u
-              ? { ...c, state: 'stopped', why: u.stopped }
-              : { ...c, state: 'failing', why: u.failing, misses: (c.state === 'failing' ? (c.misses ?? 1) : 0) + 1 }
+              ? { ...c, state: 'stopped', why: u.stopped, retryAt: undefined }
+              : { key: c.key, names: c.names, state: 'failing', why: u.failing, misses: (c.misses ?? 0) + 1, retryAt: Date.now() + u.retryMs }
     const row: JjCandidateShown = { ...r, checks: next, at: Date.now() }
     w.tx.sql((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify(row), key)) // i18n-ignore: SQL
     wrote = true
