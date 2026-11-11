@@ -141,7 +141,11 @@ function host(w: World, o: { job?: { host: ReturnType<typeof queueHost> }; freed
     install: (folder, ctx, spawnIt) => runner(spawnIt).install(folder, true, ctx),
     stopped: (run) => stop.delete(run),
     againMs: () => 3_600_000,
-    watchMs: 100
+    watchMs: 100,
+    parkCopies: async (at, to) => {
+      await pool.refresh()
+      return pool.parkFree(at, to)
+    }
   }
   const jobs = new Map<string, LeaseJob>()
   w.deps.candidateChecks = h
@@ -356,6 +360,37 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(await jjp.checksAgain(w.wf.store.card(card.id))).toBe(true)
       await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
+    })
+
+    it("HI-2950: a held check when its card is moved to Done: its job ended, its checks journal kept while the lease is out, then the cycle cleaned up", async () => {
+      const w = await world(true, { candidates: true })
+      const sup = queueHost()
+      ends.push(() => void sup.close())
+      let freed = false
+      const x = host(w, { job: { host: sup }, freed: async () => freed })
+      const dir = tempDir('jjended-')
+      const marker = join(dir, 'check-started')
+      withChecks(w, { typecheck: held(marker, join(dir, 'never')) })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: REAL_JJ_MS, interval: 50 })
+      const cycle = w.wf.state(card).cycle
+      const rec = shown(w, card, cycle)!
+      expect(await w.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'integrated by hand' })).toMatchObject({ ok: true })
+      // The watcher ends the check's job (its candidate no longer valid) and gives the lease back.
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(x.leases[0].given).toBe('invalid')
+      const checksKey = checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt)
+      // The lease not freed yet: the candidate dropped, its checks journal kept (its lease ref the evidence).
+      await jjp.afterRun()
+      expect(w.store.boardMeta(checksKey)).not.toBeNull()
+      expect(w.refAt(`refs/cw/jj/${card.key}/${rec.offer!.attempt}/candidate`)).toBeNull()
+      // Freed: the next sweep removes the journal and the window's row.
+      freed = true
+      await jjp.afterRun()
+      expect(w.store.boardMeta(checksKey)).toBeNull()
+      expect(shown(w, card, cycle)).toBeNull()
     })
 
     for (const what of ['a re-approval', 'the target moved', 'changed check options'] as const) {

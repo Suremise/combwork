@@ -187,6 +187,41 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     check('the Work section: integrated from a prepared candidate', !!(await until(async () => /from a prepared candidate/.test(await text(workSection)), HUNG_MS)), await text(workSection))
     await shoot(workSection, 'work')
     await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // --- HI-2950: a second card's candidate, the card put back to Todo by the user: its candidate leaves the jj log, by
+    // the app's own scheduling (the move asks for a reconciliation; its pass's sweep drops the ended cycle's candidate).
+    await inv('session:stop', shop, b1.id).catch(() => undefined)
+    check('the slot back in the pool for a second card', !!(await until(async () => {
+      const all = (await inv('slots:list', shop)) ?? []
+      return all.length > 0 && all.every((x) => x.state === 'ready')
+    }, HUNG_MS * 2)), JSON.stringify(await inv('slots:list', shop)))
+    const n2 = (await inv('tasks:create', { title: 'Put back work', project: 'shop', agent: b1.id })).number
+    const key2 = (await card(n2)).key
+    await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjcandidate: start 2' }).catch((e) => ({ error: String(e) }))
+    const w2 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      return v?.folder && v.workspace ? v : null
+    }, HUNG_MS)
+    check(`${key2} starts in a jj slot, B1 there`, !!w2 && !!(await ready(b1.id)), JSON.stringify(w2))
+    fs.writeFileSync(path.join(w2.folder, 'later.txt'), 'later work\n')
+    jj(w2.folder, 'commit', '-m', 'later work')
+    await ready(b1.id)
+    const sub2 = await call(await tokenOf(b1.id), 'POST', `/v1/tasks/${encodeURIComponent(key2)}/submit`, { summary: 'Done.' })
+    check(`${key2}: B1 submits it`, sub2.status === 200 && !!(await until(async () => (await card(n2))?.column === 'review', HUNG_MS)), JSON.stringify(sub2.body))
+    await inv('tasks:move', n2, 'passed', { confirm: true, reason: 'jjcandidate: passed 2' }).catch((e) => ({ error: String(e) }))
+    const row2 = repo.locator(`[data-jj-integrate-card="${n2}"]`)
+    // Back to the project's Version Control → Repository (the board was shown for the Work section).
+    if (await page.locator('.board').isVisible()) await page.locator('.activity-btn').first().click()
+    await page.getByText('shop', { exact: true }).first().click()
+    await vcTab.first().click()
+    await page.locator('.git-sections [data-section="jjRepo"]').click()
+    const command2 = row2.locator('[data-jj-command="candidate"]')
+    const shown2 = await until(async () => ((await command2.count()) === 1 ? await text(command2) : null), HUNG_MS)
+    const result2 = shown2 ? (/-r ([0-9a-f]{40})$/.exec(shown2) ?? [])[1] : null
+    const seen = (commit) => jj(shop, '--ignore-working-copy', 'log', '--no-graph', '-r', `${commit} & ::visible_heads()`, '-T', 'commit_id').trim().length > 0
+    check(`${key2}: its candidate shown and in the jj log`, !!result2 && seen(result2), shown2)
+    await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjcandidate: put back' }).catch((e) => ({ error: String(e) }))
+    check(`${key2} put back to Todo: its candidate leaves the jj log by itself`, !!(await until(async () => !seen(result2), HUNG_MS * 2)), result2)
   } finally {
     await app.close().catch(() => undefined)
   }

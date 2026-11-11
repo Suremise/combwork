@@ -586,6 +586,32 @@ export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, pro
   }
 }
 
+/**
+ * Whether a card's cycle has ended without Integrated (HI-2950/s10): an earlier cycle than its current one (put back and
+ * restarted), or its current one while it is in Todo (put back) or Done with no Integrated fact (the user's own Done, or
+ * one while the rules were off). An Approved, Review or Active card's current cycle never has.
+ */
+export const cycleEnded = (card: Pick<CardRecord, 'stage'>, s: Pick<CardState, 'cycle' | 'integrated'>, cycle: number): boolean => cycle < s.cycle || (cycle === s.cycle && (card.stage === 'todo' || (card.stage === 'done' && !s.integrated)))
+
+/**
+ * An ended cycle's rows for the window and its checks (HI-2950/s10) deleted, only in a write that finds the cycle still
+ * ended in its own transaction (the card reopened or re-approved meanwhile: nothing deleted). `checks`: the checks
+ * journals' keys whose leases are freed. Whether it deleted.
+ */
+export async function clearEndedCycle(wf: Workflow, card: CardRecord, project: string, cycle: number, checks: readonly string[]): Promise<boolean> {
+  let done = false
+  await wf.write(card, null, 'combwork', (w) => {
+    if (!cycleEnded(wf.store.card(card.id), w.state(), cycle)) return
+    w.tx.sql((db) => {
+      const del = db.prepare('DELETE FROM board_meta WHERE key = ?') // i18n-ignore: SQL
+      del.run(candidateKey(project, card.key, cycle))
+      for (const k of checks) del.run(k)
+    })
+    done = true
+  })
+  return done
+}
+
 /** What a candidate's checks run came to, as the runner publishes it (HI-2938). */
 export type JjChecksUpdate =
   | { progress: { done: number; current?: string } }

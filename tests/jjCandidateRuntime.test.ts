@@ -135,6 +135,140 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
   })
 
+  describe.each([true, false] as const)('ended cycles cleaned up, through afterRun (HI-2950), colocated: %s', (colocated) => {
+    it('put back and restarted: the earlier cycle’s candidate dropped, its pins and row gone; the new cycle untouched', async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle1 = w.wf.state(card).cycle
+      const c1 = shown(w, card, cycle1)!.offer!
+      // Put back, then started again (a new cycle) before any sweep.
+      expect(await w.wf.move(card.key, 'todo', 'user', { confirm: true, reason: 'again' })).toMatchObject({ ok: true })
+      moved(await w.wf.start(card.key, B1))
+      expect(w.wf.state(w.wf.store.card(card.id)).cycle).toBeGreaterThan(cycle1)
+      await jjp.afterRun()
+      expect(visible(w, c1.result)).toBe(false)
+      expect(entries(w, card, cycle1).find((e) => e.record.attempt === c1.attempt)?.state).toBe('dropped')
+      expect(w.refAt(`refs/cw/jj/${card.key}/${c1.attempt}/candidate`)).toBeNull()
+      expect(shown(w, card, cycle1)).toBeNull()
+    })
+
+    it("the user's Done without a proof: its candidate dropped", async () => {
+      const w = await world(colocated, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      expect(await w.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'integrated by hand' })).toMatchObject({ ok: true })
+      await jjp.afterRun()
+      expect(visible(w, c.result)).toBe(false)
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+    })
+  })
+
+  describe('ended cycles: the rest (colocated, HI-2950)', () => {
+    it('put back with no restart: dropped; Integrated by the candidate then Done: the reached candidate kept', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      expect(await w.wf.move(card.key, 'todo', 'user', { confirm: true, reason: 'later' })).toMatchObject({ ok: true })
+      await jjp.afterRun()
+      expect(visible(w, c.result)).toBe(false)
+      // Another card, integrated by its candidate: Done with Integrated, never an ended cycle: its candidate stays.
+      const w2 = await world(true, { candidates: true })
+      const { card: k } = await approved(w2)
+      const j2 = new JjPlatform(w2.wf)
+      await j2.reconcile(k, {})
+      const c2 = shown(w2, k, w2.wf.state(k).cycle)!.offer!
+      w2.h.jj(w2.repo, 'bookmark', 'set', 'main', '-r', c2.result)
+      await j2.reconcile(w2.wf.store.card(k.id), {})
+      expect(w2.wf.state(k).stage).toBe('done')
+      await j2.afterRun()
+      expect(visible(w2, c2.result)).toBe(true)
+      expect(w2.refAt(`refs/cw/jj/${k.key}/${c2.attempt}/candidate`)).not.toBeNull()
+    })
+
+    it('reopened while its drop runs: a reopen is a new cycle, so the ended one stays ended and its drop completes; the new cycle untouched', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      expect(await w.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'by hand' })).toMatchObject({ ok: true })
+      let once = true
+      w.deps.candidateHook = async (point) => {
+        if (once && point.startsWith('beforeDelete:')) {
+          once = false
+          // The user reopens it, mid-drop (back to Doing): a new cycle (a jj card can't go back to Passed unprepared).
+          const r = await w.wf.move(card.key, 'active', 'user', { confirm: true, reason: 'not integrated after all' })
+          if (!('ok' in r) || !r.ok) throw new Error(`reopen refused: ${JSON.stringify(r)}`)
+        }
+      }
+      await jjp.afterRun()
+      expect(once).toBe(false)
+      const now = w.wf.state(w.wf.store.card(card.id))
+      expect(now.stage).toBe('active')
+      expect(now.cycle).toBeGreaterThan(cycle)
+      // The ended cycle's candidate dropped; the new cycle has no journal, nothing of its touched; nothing offered.
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+      expect(entries(w, card, now.cycle)).toEqual([])
+      expect(waiting(w, card.id)).toBeUndefined()
+      w.deps.candidateHook = undefined
+    })
+
+    it('a candidate attempt in flight when its cycle ends: the sweep waits for it, then recovers and drops what it left', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      let sweep: Promise<unknown> | null = null
+      w.deps.candidateHook = async (point) => {
+        if (point === 'written' && !sweep) {
+          // The card put back mid-attempt, and a sweep started then: it must wait for the attempt's lock.
+          const r = await w.wf.move(card.key, 'todo', 'user', { confirm: true, reason: 'later' })
+          if (!('ok' in r) || !r.ok) throw new Error(`put back refused: ${JSON.stringify(r)}`)
+          sweep = jjp.afterRun()
+        }
+      }
+      await jjp.reconcile(card, {})
+      expect(sweep).not.toBeNull()
+      await sweep
+      w.deps.candidateHook = undefined
+      const cycle = w.wf.state(card).cycle
+      // Whatever the attempt left (stopped as its owner went): recovered and dropped, nothing of it visible.
+      await jjp.afterRun()
+      for (const e of entries(w, card, cycle)) {
+        expect(e.state).toBe('dropped')
+        for (const commit of e.record.commits) expect(visible(w, commit)).toBe(false)
+      }
+    })
+
+    it('a drop that crashed (at a pin delete): the next sweep, as after a restart, completes it', async () => {
+      const w = await world(true, { candidates: true })
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      const c = shown(w, card, cycle)!.offer!
+      expect(await w.wf.move(card.key, 'todo', 'user', { confirm: true, reason: 'later' })).toMatchObject({ ok: true })
+      w.deps.candidateHook = async (point) => {
+        if (point.startsWith('beforeDelete:')) throw new Error('crash')
+      }
+      await jjp.afterRun()
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBeUndefined()
+      w.deps.candidateHook = undefined
+      const other = w.another()
+      await new JjPlatform(other).afterRun()
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+      expect(w.refAt(`refs/cw/jj/${card.key}/${c.attempt}/candidate`)).toBeNull()
+    })
+  })
+
   describe("an offer's lifetime (colocated, HR3's round 1)", () => {
     it('a ready offer, then the target moves and the rebuild is interrupted: withdrawn at once, and after a restart', async () => {
       const w = await world(true, { candidates: true })

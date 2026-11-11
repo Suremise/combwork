@@ -3464,6 +3464,35 @@ and s11 (HR1's OK).
   scenario `jj-checks-back` (a builder given the checks' wake fixes the card with jj and submits again); the e2e suites
   `jjchecks` and `jjchecksnc`.
 
+##### Candidates of ended cycles (1.5.0, HI-2950)
+
+A candidate is dropped (J4's `dropJjAttempt`: owned pins only, what the target reaches kept) when its card's cycle ends
+without Integrated, not only when it is superseded (HI-2871) or after Integrated. Its design is HI-2950/s10 (HR1's OK).
+- **Ended** (`cycleEnded`, reconcile.ts): an earlier cycle than the card's current one; the current one while the card is
+  in Todo, or Done with no Integrated fact (the user's own Done). A reopen or a restart is a new cycle, so an ended cycle
+  never becomes live again; an Approved, Review or Active card's current cycle never has ended.
+- **The sweep** (JjPlatform `sweepEnded`, from `afterRun`, whatever the cards' stages, so after every start too): the
+  project's attempt journals by one key-prefix query; each card and cycle with something left (an attempt not dropped or
+  kept, a checks journal, the window's record) whose cycle has ended, a fair page of 8 after a durable cursor
+  (`jj_sweep_cursor:<project>`); `more` asks for a continuation run, and the minute's tick asks for one while anything was
+  left unresolved. The `moved` hook asks for a run on a move into Todo or Done too.
+- **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
+  run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleEnded` the
+  owner (read before every J4 write, pin delete and abandon); an interrupted drop is left as it was (found again next
+  sweep), only J4's `uncertain` kept for good; failures keep their pinned evidence. Then its window record and its checks
+  journals deleted in a write that finds the cycle still ended, a checks journal only once its lease is freed.
+- **Check copies parked first** (`CopyPool.parkFree`): a check copy stays where its checks ran, its working copy on the
+  candidate, which J4 never abandons under a working copy. Before a candidate is dropped (here, and a superseded one in the
+  candidate step), the pool's free copies at it are reset onto the head it was built on (the port's `resetTo`, under an
+  operation of a lease's kind, never while a run or a process is in one); a copy leased or returning leaves the drop
+  unresolved until it is freed.
+- **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
+  restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
+  candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`);
+  `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
+  while its lease is out, the copy parked and the candidate dropped); e2e `jjcandidate`/`jjcandidatenc` (a card put back
+  to Todo in the app: its candidate leaves the jj log by itself).
+
 ##### The window for jj cards (1.5.0's J9c, HI-2869)
 
 What the window shows of jj cards and the user's acts on them; design HI-2869/s7 to s16 (HR2's). Behind

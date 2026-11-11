@@ -200,6 +200,11 @@ export async function candidateLeaseBack(ws: WorkspaceService, projectPath: stri
   await (await copiesFor(ws, projectPath)).returnCopy(lease, why)
 }
 
+/** HI-2950: the project's free check copies at a candidate moved onto `to` (CopyPool.parkFree): whether none is left at it. */
+export async function parkCandidateCopies(ws: WorkspaceService, projectPath: string, at: string, to: string): Promise<boolean> {
+  return (await copiesFor(ws, projectPath)).parkFree(at, to).catch(() => false)
+}
+
 /** HI-2938: whether a lease is freed (or gone): the pool's barrier passed, so nothing of its tree can still write. */
 export async function copyLeaseFreed(ws: WorkspaceService, projectPath: string, lease: string): Promise<boolean> {
   const pool = await copiesFor(ws, projectPath)

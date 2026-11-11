@@ -27,7 +27,7 @@ import { mergeBundles, type SqlDb } from './platform/jjObligations'
 import { SlotStore } from './slots'
 import { attemptsKey, readAttempts, saveAttemptIn } from './platform/jjCandidateStep'
 import type { WorkspaceService } from './workspace'
-import { candidateCheckLease, candidateLeaseBack, candidateRun, copyAt, copyLeaseFreed, takeStopped } from './copiesApp'
+import { candidateCheckLease, candidateLeaseBack, candidateRun, copyAt, copyLeaseFreed, parkCandidateCopies, takeStopped } from './copiesApp'
 import { appQueueChecks } from './workflow/queueChecksApp'
 import { jobSpawn } from './workflow/jobSpawn'
 import type { Spawn } from './workflow/queueChecks'
@@ -139,6 +139,7 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         const id = r.lease.id
         return { id, folder: r.folder, spawn: jobSpawn(r.job), copy: r.copy, give: (why: string, end?: boolean) => candidateLeaseBack(ws, projectPath, id, why, !!end) }
       },
+      parkCopies: (at, to) => parkCandidateCopies(ws, projectPath, at, to),
       leaseFreed: (id) => copyLeaseFreed(ws, projectPath, id),
       runCheck: (name, command, folder, ctx, spawn) => checksIn(folder, spawn).runCheck(name, command, folder, ctx),
       install: (folder, ctx, spawn) => checksIn(folder, spawn).install(folder, true, ctx),

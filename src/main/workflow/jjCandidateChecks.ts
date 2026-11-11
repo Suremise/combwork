@@ -157,10 +157,14 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
   j.lease = l.id
   await deps.journal.write(j)
   let ended = false
-  const give = async (why: string, end = false): Promise<void> => {
-    if (ended) return
-    ended = true
-    await l.give(why, end).catch(() => undefined)
+  let giving: Promise<void> = Promise.resolve()
+  // Given back once, whoever asks first (the run's end, the watcher, the close); every caller waits for that one.
+  const give = (why: string, end = false): Promise<void> => {
+    if (!ended) {
+      ended = true
+      giving = l.give(why, end).catch(() => undefined)
+    }
+    return giving
   }
   // The workspace closing mid-run: its job ended (the running check's whole tree) and the lease given back at once.
   const onClose = (): void => void give('closed', true)
@@ -237,6 +241,7 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
     return { green: true, checks: [...i.names] }
   } finally {
     deps.signal?.removeEventListener('abort', onClose)
+    // Never answered before the lease is back (its job ended, its copy parked): the give already under way, else this one.
     await give('checksEnded')
   }
 }

@@ -226,7 +226,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     moved: (card, _from, to) => {
       // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
       // never a window's proxy of it, which this workflow may have been made from.
-      if (to === 'approved' && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+      // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
     },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.

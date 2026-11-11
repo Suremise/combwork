@@ -40,18 +40,18 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { candidateFingerprint, candidateShown, checksAgain, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
-import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps } from '../workflow/jjCandidateChecks'
+import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleEnded, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
+import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from '../workflow/jjCandidateChecks'
 import { jjCandidateEntry } from '../workflow/jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
 import type { CheckContext, CheckResult } from '../workflow/mergeQueue'
 import type { CheckWhyNot } from '../../shared/types'
 import type { FactData } from '../../shared/workflow/facts'
 import { CW_RUNS } from '../progress'
-import { createLogger } from '../logger'
+import { createLogger, userText } from '../logger'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
 import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
-import { dropCandidates, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { cleanCycle, cycleLive, readAttemptsValue, dropCandidates, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -179,6 +179,11 @@ export interface JjChecksHost {
   setup(): Promise<{ setup: string; stamp: string }>
   setupStamp(): string
   lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
+  /**
+   * HI-2950: the free check copies still at a candidate's commit moved onto the head it was built on, so it can be dropped
+   * (a working copy on it would keep it): whether none is left there (one leased or returning: later).
+   */
+  parkCopies?(at: string, to: string): Promise<boolean>
   leaseFreed(id: string): Promise<boolean>
   runCheck(name: string, command: string, folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult>
   install(folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult & { skipped?: boolean }>
@@ -191,6 +196,12 @@ export interface JjChecksHost {
   /** The workspace's life (s11 §3): closing it ends a running check's job and gives its lease back; nothing more runs. */
   signal?: AbortSignal
 }
+
+/** HI-2950: each workflow's per-card locks (the candidate step and an ended cycle's clean-up), and its sweep's state. */
+const cardLocks = new WeakMap<Workflow, Map<number, Promise<unknown>>>()
+const sweeps = new WeakMap<Workflow, { unresolved: boolean }>()
+/** Ended cycles cleaned up per sweep, at most. */
+export const SWEEP_PAGE = 8
 
 /** HI-2938: each workflow's checks runner: one look at a time, another asked for mid-look runs after it. */
 interface ChecksRunner {
@@ -652,7 +663,7 @@ export class JjPlatform implements PlatformAdapter {
       },
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
       projectId: () => rec.projectId(),
-      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.candidateStep(card, s, fp, still), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle), checksNow: (_c: CardRecord, s: CardState) => this.checksNow(card, s), checksWanted: () => this.checksWanted() } : {})
+      ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.withCardLock(card.id, () => this.candidateStep(card, s, fp, still)), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle), checksNow: (_c: CardRecord, s: CardState) => this.checksNow(card, s), checksWanted: () => this.checksWanted() } : {})
     })
   }
 
@@ -880,7 +891,8 @@ export class JjPlatform implements PlatformAdapter {
           entries: () => attempts(card.key, fp.cycle),
           save: (e) => save(card.key, fp.cycle, e),
           still,
-          token: () => randomUUID().replace(/-/g, '').slice(0, 16)
+          token: () => randomUUID().replace(/-/g, '').slice(0, 16),
+          ...(d?.candidateChecks?.parkCopies ? { park: d.candidateChecks.parkCopies } : {})
         },
         card.key,
         fp,
@@ -900,7 +912,7 @@ export class JjPlatform implements PlatformAdapter {
     const rec = this.deps?.records
     if (!rec) return false
     const project = rec.projectId()
-    if (what === 'tick') return rec.read((db) => anyRetainedDue(db, project, Date.now(), RETAIN_EVERY_MS))
+    if (what === 'tick') return (!!this.wf && sweeps.get(this.wf)?.unresolved === true) || rec.read((db) => anyRetainedDue(db, project, Date.now(), RETAIN_EVERY_MS))
     if (what === 'retained:*') {
       await rec.write((db) => markRetainedDue(db, project, null))
       return true
@@ -950,6 +962,8 @@ export class JjPlatform implements PlatformAdapter {
       }
       await observePublish({ ...integ, ...(signal ? { signal } : {}), commit }, target, sqlObligations(reader, project))
     }
+    // HI-2950: ended cycles' candidates cleaned up, a fair page each run.
+    const swept = await this.sweepEnded(signal)
     const page = rec.read((db) => dueRetained(db, project, Date.now(), RETAIN_EVERY_MS, RETAIN_PAGE))
     for (const row of page.rows) {
       if (signal?.aborted) return { more: false }
@@ -957,7 +971,109 @@ export class JjPlatform implements PlatformAdapter {
       const outcome = isJjUnknown(r) ? `unknown:${r.jjUnknown}` : integrationRefused(r) ? `refused:${r.refused}` : 'held'
       await rec.write((db) => retainedVisited(db, project, row, Date.now(), outcome))
     }
-    return { more: page.more }
+    return { more: page.more || swept.more }
+  }
+
+  /** HI-2950: runs `fn` with the card's own lock (the candidate step and an ended cycle's clean-up never run at once). */
+  withCardLock<T>(card: number, fn: () => Promise<T>): Promise<T> {
+    const wf = this.wf!
+    const locks = cardLocks.get(wf) ?? new Map<number, Promise<unknown>>()
+    cardLocks.set(wf, locks)
+    const before = locks.get(card) ?? Promise.resolve()
+    const run = before.then(fn, fn)
+    const tail = run.catch(() => undefined)
+    locks.set(card, tail)
+    void tail.then(() => {
+      if (locks.get(card) === tail) locks.delete(card)
+    })
+    return run
+  }
+
+  /**
+   * HI-2950's sweep (design HI-2950/s10), from `afterRun` whatever the cards' stages: the project's candidate journals
+   * read by one key-prefix query; each card and cycle with something left to do (an attempt not dropped or kept, a checks
+   * journal, the window's record) whose cycle has ended (`cycleEnded`) is cleaned up, a fair page at a time after a durable
+   * cursor (so one that stays unresolved never starves the rest): under the card's lock, its attempts recovered and
+   * dropped with the cycle still ended as their owner, then its rows deleted in a write that finds it still ended; a checks
+   * journal only once its lease is freed. `more`: due ones beyond the page.
+   */
+  async sweepEnded(signal?: AbortSignal): Promise<{ more: boolean }> {
+    const wf = this.wf
+    const d = this.deps
+    const rec = d?.records
+    if (!wf || !d || !rec?.attempts || !rec.saveAttempt) return { more: false }
+    const integ = await d.integration()
+    if (!integ) return { more: false }
+    const project = rec.projectId().toLowerCase()
+    const prefix = `jj_attempts:${project}:`
+    const cursorKey = `jj_sweep_cursor:${project}`
+    const all = rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ? ORDER BY key').all(prefix, `${prefix}\uffff`) as { key: string; value: string }[]) // i18n-ignore: SQL
+    const cursor = rec.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(cursorKey) as { value: string } | undefined)?.value ?? '') // i18n-ignore: SQL
+    const byKey = (k: string): CardRecord | null => wf.store.cards().find((c) => c.key.toLowerCase() === k) ?? null
+    type Due = { key: string; cardKey: string; cycle: number }
+    const due: Due[] = []
+    for (const row of all) {
+      const m = /^jj_attempts:[^:]+:(.+):(\d+)$/.exec(row.key)
+      if (!m) continue
+      const cardKey = m[1]
+      const cycle = Number(m[2])
+      const card = byKey(cardKey)
+      if (card && !cycleEnded(card, wf.state(card), cycle)) continue
+      const entries = readAttemptsValue(row.value)
+      const rows = rec.read((db) => (db.prepare('SELECT COUNT(*) AS n FROM board_meta WHERE key = ? OR (key > ? AND key < ?)').get(candidateKey(project, cardKey, cycle), `jj_candidate_checks:${project}:${cardKey}:${cycle}:`, `jj_candidate_checks:${project}:${cardKey}:${cycle}:\uffff`) as { n: number }).n) // i18n-ignore: SQL
+      if (!cycleLive(entries) && !rows) continue
+      due.push({ key: row.key, cardKey, cycle })
+    }
+    // Fair: after the cursor first, then from the start; the cursor moves past each one visited.
+    const ordered = [...due.filter((x) => x.key > cursor), ...due.filter((x) => x.key <= cursor)]
+    const page = ordered.slice(0, SWEEP_PAGE)
+    let unresolved = false
+    for (const x of page) {
+      if (signal?.aborted) break
+      const card = byKey(x.cardKey)
+      const still = (): boolean => {
+        const c = byKey(x.cardKey)
+        return !c || cycleEnded(c, wf.state(c), x.cycle)
+      }
+      const clean = async (): Promise<void> => {
+        if (!still()) return
+        const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false, ...(d.candidateHook ? { hook: d.candidateHook } : {}) }
+        const keyOf = card?.key ?? x.cardKey
+        const park = d.candidateChecks?.parkCopies
+        const out = await cleanCycle({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, ...(park ? { park } : {}), log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) })
+        if (out.unresolved) unresolved = true
+        // Its checks journals: each deleted only once its lease is freed (its tree can't still write; HR1's gap 2).
+        const checks = rec.read((db) => db.prepare('SELECT key, value FROM board_meta WHERE key > ? AND key < ?').all(`jj_candidate_checks:${project}:${x.cardKey}:${x.cycle}:`, `jj_candidate_checks:${project}:${x.cardKey}:${x.cycle}:\uffff`) as { key: string; value: string }[]) // i18n-ignore: SQL
+        const free: string[] = []
+        for (const c of checks) {
+          let lease: string | undefined
+          try {
+            lease = (JSON.parse(c.value) as ChecksJournal).lease
+          } catch {
+            lease = undefined
+          }
+          if (lease && d.candidateChecks && !(await d.candidateChecks.leaseFreed(lease))) unresolved = true
+          else free.push(c.key)
+        }
+        if (card) await clearEndedCycle(wf, wf.store.card(card.id), project, x.cycle, free)
+        else
+          await rec.write((db) => {
+            const del = db.prepare('DELETE FROM board_meta WHERE key = ?') // i18n-ignore: SQL
+            del.run(candidateKey(project, x.cardKey, x.cycle))
+            for (const k of free) del.run(k)
+          })
+      }
+      try {
+        if (card) await this.withCardLock(card.id, clean)
+        else await clean()
+      } catch (e) {
+        unresolved = true
+        checksLog.warn(`cleaning up #${userText(x.cardKey)}'s ended cycle ${x.cycle}`, e)
+      }
+      await rec.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(cursorKey, x.key)) // i18n-ignore: SQL
+    }
+    sweeps.set(wf, { unresolved })
+    return { more: ordered.length > page.length }
   }
 
   /**
