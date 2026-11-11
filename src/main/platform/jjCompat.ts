@@ -229,7 +229,8 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     // Signing on at any level, as Git reads the value (HI-2942: any nonzero int too); a value Git refuses fails closed.
     if (e.key === 'commit.gpgsign' || e.key === 'tag.gpgsign') {
       const on = gitBool(e.value)
-      if (on !== false) add(a, 'signing', on === null ? `${at} = ${e.value} (not a boolean Git reads)` : at) // i18n-ignore: what was found, shown as data beside its message
+      // A refused value is named with its value (data, as core.autocrlf's is: no words of Combwork's, HR1's round 1).
+      if (on !== false) add(a, 'signing', on === null ? `${at} = ${e.value}` : at) // i18n-ignore: what was found, shown as data beside its message
     }
     if (e.key === 'core.hookspath') hooksPath = e.value
     if (e.key === 'core.attributesfile') attributesFile = e.value

@@ -263,7 +263,7 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     git(r.root, 'config', 'tag.gpgsign', 'off')
     expect(await signing()).toEqual({ clear: true })
     git(r.root, 'config', 'tag.gpgsign', 'maybe')
-    expect(await signing()).toEqual({ uses: ['tag.gpgsign (local) = maybe (not a boolean Git reads)'] })
+    expect(await signing()).toEqual({ uses: ['tag.gpgsign (local) = maybe'] })
   })
 
   it('hooks in the folder Git runs them from (HI-2941): core.hooksPath with ~/, relative or absolute; clear when it holds none', async () => {
