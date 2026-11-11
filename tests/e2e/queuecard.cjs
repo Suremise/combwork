@@ -80,7 +80,8 @@ const f = q.folderHelpers(fx)
       return /Returned .*checks failed: quick/.test(t) ? t : null
     }, HUNG_MS)
     check('Work section: returned, the check by name, its output\'s last lines', !!redText && /red: unit broke on line 12/.test(redText), redText ?? (await text(part)))
-    check('…with Show log and Retry merge…', (await part.locator('[data-action="show-log"]').count()) === 1 && (await part.locator('[data-action="retry"]').count()) === 1)
+    const redButtons = { showLog: await part.locator('[data-action="show-log"]').count(), retry: await part.locator('[data-action="retry"]').count() }
+    check('…with Show log and Retry merge…', redButtons.showLog === 1 && redButtons.retry === 1, `${JSON.stringify(redButtons)}: ${await text(part)}`)
     await part.locator('[data-action="show-log"]').click()
     check('…Show log opens its check\'s log', !!(await until(async () => ((await opened()) ?? []).some((p) => /\.log$/i.test(p)), HUNG_MS)), JSON.stringify(await opened()))
     await shoot(dialog.locator('.card-work'), 'returned-checks')
