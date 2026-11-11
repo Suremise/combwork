@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Cards on jj** (HI-2866, HI-2868, HI-2882, HI-2869, HI-2870, HI-2874). Cards now run in a jj project, as in Git: each in a slot of its own (a jj workspace), built with jj, checked and reviewed, and then **you integrate it yourself**. Combwork never merges, moves a bookmark or pushes under jj.
+  - **Waiting for you to integrate**, in Version Control → Repository: the cards that passed review, each with a `jj rebase` command to start from and what Combwork last saw. Move the target bookmark onto a card, or rebase it there, and Combwork moves it to Done by itself.
+  - **Publish records to check**: after you push, anything that later looks different (the remote moved back, another remote, the work no longer in its target) is listed for you, with **Mark as checked**.
+  - **Setting up a jj project's slots records your working copy once**, as your own `jj status` would, and only while no agent works in the project folder. What an interrupted set-up left is listed for you to remove; Combwork never deletes it.
+  - **A stale slot** (another workspace rewrote it) waits for your **Recover…**, which keeps any edits jj hadn't recorded. A card's Work section shows its jj workspace and change id.
+  - Projects switched to jj before this pick it up with no change, lanes already running there included.
 - **jj repositories that aren't colocated with Git** (HI-2896). A jj repository that keeps Git's data inside `.jj` (no `.git` in the folder) can now use **jj** as its version control too, as a colocated one does: the same views and switch, and the same slots and review copies once jj cards run. Combwork never runs git in such a folder, never exports, imports or changes colocation, and agents there are told to use jj for everything.
   - **Back to Git** needs a Git working copy: make the repository colocated yourself (`jj git colocation enable`), then switch; **None** is always offered.
   - **Inside a Git repository**: a repository that isn't colocated and sits inside a Git working tree can't use jj, since git commands run in it would change that other repository.

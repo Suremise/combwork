@@ -7,13 +7,13 @@
 //   sections first (Git's UI kept). The switch to jj refused while a card is in flight (the drain, listed, Check Again),
 //   then made: the group named, every gate clear, jj's limits listed. jj's sections: Repository (the unsupported list,
 //   Waiting for you to integrate), History (change id beside commit id, divergent, conflicted, working copy), Compare (a
-//   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. A card's
-//   start refused (cards don't run in a jj project yet). Back to Git refused (conflicted bookmark and commit), then,
+//   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. The switch's
+//   warning says cards run in slots (J9e: a jj card's start is jjwindow's). Back to Git refused (conflicted bookmark and commit), then,
 //   once jj's state is fixed, made: Git's sections again.
-// - J9c (HI-2869), before J9e lets a jj card run: the publish records to check and the set-up's leftovers, seeded as
+// - J9c (HI-2869): the publish records to check and the set-up's leftovers, seeded as
 //   J9b2's publish pass and HI-2887's control leave them; Mark as checked after its confirmation (only its resolution
-//   written); a leftover proved gone pruned, one still there listed. Waiting's containment and Recover… need a running
-//   jj card: their unit tests (jjReconcile, jjControl) until J9e's suites.
+//   written); a leftover proved gone pruned, one still there listed. Waiting's containment and Recover… with a running
+//   jj card are jjwindow's.
 // - notes: a colocated jj repository whose .gitattributes sets eol: the switch refused, the gate listed.
 // - loose: a jj repository not colocated with Git (HI-2896): jj offered and switched to (the gates read through jj's store,
 //   all clear), its Repository saying so; back to Git greyed out (no Git working copy), its reason in the tooltip; None,
@@ -157,6 +157,8 @@ function jjRepo(dir, o = {}) {
     // --- The switch: the group, the gates, jj's limits.
     const warn = dialog.filter({ has: page.locator('[data-vc-store="jj"]') })
     check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 5, HUNG_MS)), await text(dialog))
+    // J9e (HI-2874): cards run under jj, and the warning says how (no "not yet").
+    check('…it says cards run in slots of their own and you integrate', /Cards run in slots of their own, and you integrate the reviewed work yourself/.test(await text(warn)) && !/don.t run in a jj project yet/.test(await text(warn)), await text(warn))
     await shoot(warn, 'switch-to-jj')
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
     check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
@@ -280,11 +282,6 @@ function jjRepo(dir, o = {}) {
     check('…one whose bookmark moved again since: no command, the later work listed', !!(await until(async () => (await overlapPreview.count()) === 1 && (await overlapPreview.locator('[data-jj-op-command]').count()) === 0 && /moved/.test(await text(overlapPreview.locator('[data-jj-op-later]'))), HUNG_MS)), await text(ops))
     await shoot(page.locator('.vc-view'), 'operations-overlap')
     check('…and no preview wrote anything (the operation heads only the commands’ own)', JSON.stringify(heads(shop)) === afterMoved && before !== afterMoved && heads(shop).length === 1)
-
-    // --- A card can't start in a jj project.
-    const next = await inv('tasks:create', { title: 'Under jj', project: 'shop' })
-    const r = await inv('tasks:move', next.number, 'doing').catch((e) => ({ error: String(e) }))
-    check("a card's start refused: cards don't run in a jj project yet", /don.t run in a jj project yet/.test(JSON.stringify(r)), JSON.stringify(r))
 
     // --- Unsupported features: notes' .gitattributes refuses the switch, listed; its own core.autocrlf too, with the hint
     // to turn it off there alone (HI-2872), and the note that Git for Windows' stock settings don't count.

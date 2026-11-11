@@ -946,7 +946,7 @@ const jjConsistent = (c) => {
 /**
  * A jj project for jj's card scenarios (HI-2870): alpha's repository made a colocated jj one and switched to jj through
  * Combwork, as the window does; jj's Pair with its branch as the target bookmark; `builder` building, `reviewer` reviewing.
- * The harness turns jj card starts on in this test copy (sc.jjCards: CW_TEST_JJ_CARDS, before J9e lifts the guard).
+ * jj cards start as in the product (J9e, HI-2874, retired the guard and the test copies' switch).
  */
 async function jjCardProject(c, { builder = 'coder', reviewer = 'implementer' } = {}) {
   c.git('config', 'user.email', 'agent@example.com')
@@ -2317,7 +2317,7 @@ module.exports.SCENARIOS = [
     id: 'jj-card-submit',
     title: "A builder given a jj card in its slot (HI-2870): it records the work with jj commit, submits the commit under the slot's empty working copy, runs no git command that moves HEAD, the index or a ref, and moves no bookmark",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
-    // The pinned jj on Combwork's PATH and the agent's, and jj card starts on in this test copy (CW_TEST_JJ_CARDS).
+    // The pinned jj on Combwork's PATH and the agent's (jj cards start as in the product since J9e, HI-2874).
     jj: true,
     jjCards: true,
     // Combwork gives the card to Coder in its slot and starts it with the card's line (BuilderPlaced): the prompt below is

@@ -1,5 +1,5 @@
 // jj cards in the runtime, through Review (HI-2868, J9b1; design HI-2868/s7–s19), on the real jj in both Git-backed
-// modes, behind the guard (compile.ts' test seam turns `start.platformReady` off for these rulesets only):
+// modes (J9e, HI-2874: jj card starts on, no seam):
 // - a card starts in its slot (J9a's key, on the target's head), its work is committed with jj, submitted (its endpoints,
 //   its chain recorded as its provenance), pinned (create-only, read back, then the binding's submitted commits), a check
 //   credited, reviewed and passed;
@@ -13,7 +13,7 @@
 // - pins: a foreign ref at another oid untouched, at the same oid held but not owned, an interrupted create uncertain,
 //   an older submission's binding record never over a newer one's;
 // - checks: an unchanged run counted, a transient edit not, a throw still ends the bracket, --isolated refused;
-// - without the seam, a jj start is refused `start.platformReady`.
+// - a lane started before J9e, under a stored jj ruleset with the retired guard: its card starts, in a slot.
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
 import { rmSync, writeFileSync } from 'fs'
@@ -25,7 +25,7 @@ import type { Workflow } from '../src/main/workflow/runtime'
 import { JjPlatform } from '../src/main/platform/jjPlatform'
 import { jjLineKey } from '../src/main/platform/jjSlotPrep'
 import { jjChainOf } from '../src/main/platform/jjFacts'
-import { setJjCardsReadyForTests } from '../src/shared/workflow/compile'
+import { RETIRED_GUARD } from '../src/shared/workflow/compile'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { jjExe } from './jjWorkspaceHarness'
@@ -426,11 +426,22 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
     expect(w.wf.state(card).started).toMatchObject({ folder, slot: 'slot-new' })
   })
 
-  it('without the seam, a jj start is still refused start.platformReady', async () => {
+  it("a lane started before J9e (HI-2874), under a stored jj ruleset with the retired guard: its card starts in a slot, under the rest of its rules", async () => {
     const w = await world(true)
-    setJjCardsReadyForTests(false)
-    const card = w.wf.createCard({ title: 'guarded' })
-    refusedBy(await w.wf.start(card.key, B1), 'start.platformReady')
+    const now = w.wf.currentRuleset()
+    expect(now.guards.start).not.toContain(RETIRED_GUARD)
+    // The lane's rules as a Combwork before J9e stored them: the guard in, under their own id.
+    const legacy = { ...now, id: `${now.id}-before-j9e`, guards: { ...now.guards, start: [RETIRED_GUARD, ...now.guards.start] } }
+    w.store.saveRuleset(legacy)
+    const card = w.wf.createCard({ title: 'in an old lane' })
+    w.store.startLane('lane-old', [card.id], legacy.id)
+    // Read back by its id (as an Override's rules are too): without the guard, its id kept.
+    expect(w.store.ruleset(legacy.id)).toMatchObject({ id: legacy.id, guards: { start: now.guards.start } })
+    const r = w.wf.rulesetOf(w.store.card(card.id))
+    expect(r.id).toBe(legacy.id)
+    expect(r.options).toMatchObject({ platform: 'jj', folder: 'slots', finish: 'userIntegrates' })
+    moved(await w.wf.start(card.key, B1))
+    expect(w.wf.state(card).started).toMatchObject({ folder: expect.stringContaining('slot-') })
   })
 })
 

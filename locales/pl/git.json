@@ -490,7 +490,7 @@
   "git.vc.store.slot": "{project}: slot {slot}, użyczony agentowi {agent}",
   "git.vc.store.stock": "Domyślne ustawienia samego Git for Windows (jego filtr LFS, sterownik diff dla dokumentów Office) się nie liczą: liczy się tylko to, czego używa repozytorium lub Twoje własne ustawienia Git.",
   "git.vc.store.toGit": "Combwork zostawia .jj na miejscu: usuń go za pomocą jj, jeśli już go nie chcesz.",
-  "git.vc.store.toJj": "Combwork nigdy nie tworzy repozytorium jj ani nie zmienia sposobu jego współistnienia z Gitem: .jj oraz .git, jeśli jest, zostają, jak są. Karty jeszcze nie działają w projekcie jj.",
+  "git.vc.store.toJj": "Combwork nigdy nie tworzy repozytorium jj ani nie zmienia sposobu jego współistnienia z Gitem: .jj oraz .git, jeśli jest, zostają, jak są. Karty działają we własnych slotach, a przejrzaną pracę integrujesz sam: Combwork nigdy nie przesuwa zakładki ani nie wypycha zmian.",
   "git.vc.store.unknown": "{gate}: nie udało się sprawdzić ({what}), więc liczy się jako używane",
   "git.vc.store.unsupported": "Nieobsługiwane w jj, niezależnie od repozytorium:",
   "git.vc.store.uses": "{gate}: używane ({what})",

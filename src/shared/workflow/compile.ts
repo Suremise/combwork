@@ -89,35 +89,11 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   return out
 }
 
-/**
- * HI-2868 (J9b1): jj's card work is built behind `start.platformReady`, which stays in every jj ruleset until J9e turns
- * it on. Tests of the runtime compile jj rulesets without it through this seam alone; J9e removes the seam.
- */
-let jjCardsReady = false
-
-/** For tests only (HI-2868): compile jj rulesets without `start.platformReady`; false again when done. */
-export function setJjCardsReadyForTests(on: boolean): void {
-  jjCardsReady = on
-}
-
-/**
- * HI-2870 (J9d): the scenarios' switch, so the jj-slot guidance's scenarios can start jj cards in a test profile before
- * J9e. Only an unpackaged build with `CW_TEST_JJ_CARDS=1` turns the seam on; a packaged build never does, whatever its
- * environment. J9e removes it with the seam. Returns whether it turned it on.
- */
-export function jjCardsTestSwitch(packaged: boolean, flag: string | undefined): boolean {
-  if (packaged || flag !== '1') return false
-  jjCardsReady = true
-  return true
-}
-
 function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   const g = Object.fromEntries(MOVES.map((m) => [m, [] as GuardId[]])) as Record<MoveId, GuardId[]>
   const review = o.review !== 'none'
   const agent = reviewerAgent(o.review)
   if (o.dependenciesDone) g.start.push('start.notBlocked', 'start.dependenciesIntegrated')
-  // HI-2799: a jj card can't start yet (its slot's line under jj is a later card's): refused first, whatever else holds.
-  if (o.platform === 'jj' && !jjCardsReady) g.start.push('start.platformReady')
   if (o.folder === 'slots') g.start.push('start.slotAvailable')
   g.submit.push('submit.notDuplicate')
   if (needsChange(o)) g.submit.push('submit.ready', 'submit.clean')
@@ -189,7 +165,24 @@ export function loadRuleset(data: unknown): LoadResult {
     if (!(MOVES as readonly string[]).includes(move)) return { ok: false, error: 'unknownPiece', piece: move }
     for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
   }
-  return { ok: true, ruleset: r as Ruleset, readOnly: r.version > RULESET_VERSION }
+  const readOnly = r.version > RULESET_VERSION
+  return { ok: true, ruleset: readOnly ? (r as Ruleset) : withoutRetired(r as Ruleset), readOnly }
+}
+
+/**
+ * The guard J6 put in every jj ruleset until J9e (HI-2874) let jj cards run: `start.platformReady`. A jj ruleset stored
+ * before (a lane's, an Override's) still names it; it is dropped as the ruleset is read, so its cards start under the rest
+ * of its rules. Kept a known piece so such a row still loads, and its texts kept for the `Refused` facts it left.
+ */
+export const RETIRED_GUARD: GuardId = 'start.platformReady'
+
+/**
+ * A supported ruleset as read (HI-2874): a jj one with the retired guard gets a copy without it, its id, version, other
+ * guards, options and stages as they were; any other is returned as it is.
+ */
+function withoutRetired(r: Ruleset): Ruleset {
+  if (r.options?.platform !== 'jj' || !r.guards.start?.includes(RETIRED_GUARD)) return r
+  return { ...r, guards: { ...r.guards, start: r.guards.start.filter((g) => g !== RETIRED_GUARD) } }
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)

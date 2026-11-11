@@ -490,7 +490,7 @@
   "git.vc.store.slot": "{project}：スロット{slot}（{agent}に貸出中）",
   "git.vc.store.stock": "Git for Windows自体の既定の設定（LFSフィルター、Office文書用のdiffドライバー）は数えません。数えるのは、リポジトリやご自身のGit設定が使っているものだけです。",
   "git.vc.store.toGit": "Combworkは.jjをそのまま残します。不要な場合はjjで削除してください。",
-  "git.vc.store.toJj": "Combworkはjjリポジトリを作成せず、Gitとの共存の仕方も変更しません。.jjと、ある場合は.gitもそのままです。jjのプロジェクトではまだカードを実行できません。",
+  "git.vc.store.toJj": "Combworkはjjリポジトリを作成せず、Gitとの共存の仕方も変更しません。.jjと、ある場合は.gitもそのままです。カードはそれぞれ専用のスロットで実行され、レビュー済みの作業はご自身で統合します。Combworkがブックマークを動かしたりプッシュしたりすることはありません。",
   "git.vc.store.unknown": "{gate}：確認できなかったため（{what}）、使用中として扱います",
   "git.vc.store.unsupported": "リポジトリに関係なく、jjでは対応していないもの：",
   "git.vc.store.uses": "{gate}：使用中（{what}）",

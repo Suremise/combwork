@@ -128,8 +128,10 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     }
     expect(await platformIn(w, p)).toBe('jj')
     expect(await platformIn(w, q)).toBe('jj')
-    // After: Q's start resolves afresh under jj and meets jj's refusal; P's stale runtime is refused as changed.
-    expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'start.platformReady' })
+    // After: Q's start resolves afresh under jj (since J9e, HI-2874, it reaches jj's adapter, which can't read this
+    // fixture's folder as a jj repository); P's stale runtime is refused as changed.
+    expect((await workflowFor(w, q))!.currentRuleset(false).options.platform).toBe('jj')
+    expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.unknown' })
     const card = await inWorkspace(w, () => tasks.createTask({ title: 'Stale', project: 'p' }, user))
     expect(await store.boardWrite(w, async () => staleP.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ refused: true, rule: 'platform.changed' })
     // A Git slot lease of Q (compiled Git) is refused as changed; a jj one isn't refused by the fence.
@@ -142,8 +144,8 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     const switchingBack = sw.setPlatform(w, q, 'git', { expected: 'jj', token: back.store!.token })
     await pause2.at
     try {
-      // Q compiles jj's rules now, whose start refuses first; its Git copy lease meets the fence.
-      expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'start.platformReady' })
+      // Q compiles jj's rules now (its start reaches jj's adapter, J9e); its Git copy lease meets the fence.
+      expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.unknown' })
       await expect(copyTake(w, p)).rejects.toThrow(/being switched/)
       await expect(slotTake(w, q)).rejects.toThrow(/being switched/)
     } finally {

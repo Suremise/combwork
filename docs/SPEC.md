@@ -2586,10 +2586,9 @@ merges under jj.
   supported with jj" (`shared/platform/gateTexts.ts`). Git's and None's `gates` are empty.
 - **Workflow options for jj**: Git's rows without a merge step or a shared folder (`FORM_GROUPS.jj`); finish
   `userIntegrates` ("You integrate it yourself", jj's only finish: `jjYouIntegrate` otherwise) in slots only
-  (`jjNeedsSlots`); presets Solo, Pair, Team; workspace and Combwork defaults for jj as for the others. Every jj ruleset
-  carries `start.platformReady`, which the runtime refuses before asking the adapter anything (no override crosses it):
-  **no jj card starts yet** (J2 refuses prepare and attach in a jj slot; a card's line under jj is a later card's). jj's
-  adapter (`platform/jjPlatform.ts`) answers unknown or nothing for everything else.
+  (`jjNeedsSlots`); presets Solo, Pair, Team; workspace and Combwork defaults for jj as for the others. Until J9e (HI-2874)
+  every jj ruleset carried `start.platformReady`, refusing every jj start before the adapter was asked anything; J9e
+  retired it (below, "jj card starts on"), and jj cards run in slots under J9a–J9f.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
@@ -3354,6 +3353,29 @@ s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports,
   (views and the gates through the store), `tests/jjIntegrationReal.test.ts` (a manual export then a move and a push),
   `tests/jjColocationChange.test.ts` (both ways, while a slot's making waits for the lock) and `tests/jjCards.test.ts`
   (an outer Git refuses a start) on the pinned jj, beside the existing both-mode suites.
+
+##### jj card starts on (1.5.0's J9e, HI-2874)
+
+The only activation point of J9 (design HI-2874/s7, HR1's). Decision A holds: nothing in Combwork moves a bookmark or
+pushes, and lifting the guard enables nothing beyond J9a–J9f.
+- **The guard retired:** `guardsOf` (compile.ts) no longer adds `start.platformReady` to a jj ruleset, and the start's
+  special case in `gatherStart` is gone. The test seams that turned it off (`setJjCardsReadyForTests`, J9b1's;
+  `jjCardsTestSwitch` and `CW_TEST_JJ_CARDS`, HI-2870's) are gone with it: the scenarios and e2e suites start jj cards
+  the way the product does. Git's and None's rulesets, ids included, are unchanged.
+- **Rulesets stored before it:** a lane started on a jj project before J9e keeps the rules then in force, and so may an
+  Override; both carry the guard. `loadRuleset` (the one reader of a stored ruleset) drops `start.platformReady` from a
+  supported jj ruleset after its ordinary validation, on a copy, keeping its id and version and every other guard,
+  option and stage: so every read of that id is unguarded, and its cards start under the rest of its rules (slots
+  only, the user integrating). A newer version's read-only row, and every non-jj row, are left as they are. The guard id
+  stays a known piece (an old row still loads), and its refusal and rule texts stay, for the `Refused` facts already in
+  cards' histories.
+- **Tests:** `tests/workflow/compile.test.ts` (a jj ruleset has no guard; Git's and None's ids unchanged; a stored
+  guarded jj ruleset loads unguarded with its id; a future version and a Git row untouched), `tests/storeSwitch.test.ts`
+  (a project switched to jj: its start reaches jj's adapter), `tests/jjCards.test.ts`
+  (a lane, and an Override, under a stored guarded ruleset: its card starts, in a slot), the scenarios `jj-card-submit`,
+  `jj-card-review`, `jj-card-passed` and their `-nc` variants on the fakes `fakeScope.cjs` gives them, and the e2e
+  suites `jjwindow` and `jjwindownc` (a jj card started, submitted, passed, integrated by the user and Done, in both
+  modes), `jjview` (a jj project's card start isn't refused for jj) and `vcswitch`.
 
 ##### Open: jj's target advance (J1's gate)
 

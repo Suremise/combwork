@@ -1131,6 +1131,14 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjCards.text": {
+    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, you integrate it yourself: Version Control → Repository lists what waits for you, and Combwork moves the card to Done once its work is in the target.",
+    "description": "A tip (HI-2874). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
+  },
+  "tips.jjCards.title": {
+    "defaultMessage": "Cards in a jj project",
+    "description": "A tip's title (HI-2874). Keep jj."
+  },
   "tips.jjOperations.text": {
     "defaultMessage": "In a jj project, Version Control → Operations lists jj’s operations by name. Preview Undo shows what undoing one would change, and gives you the command to run when nothing else would change. Combwork never runs it.",
     "description": "A tip (HI-2800). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."

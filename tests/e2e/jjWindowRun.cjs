@@ -1,7 +1,6 @@
 // The window for jj cards (HI-2869, J9c; SPEC "The window for jj cards"): the real app, the pinned jj (npm run jj:fetch)
-// on its PATH, a fake Claude Code builder (B1), a throwaway profile and workspace. jj cards start here before J9e through
-// the unpackaged seam alone (CW_TEST_JJ_CARDS=1, HI-2870's jjCardsTestSwitch); a packaged build never takes it. Colocated
-// here; the suite `jjwindownc` runs the same steps on a repository not colocated with Git (J9f, HI-2896:
+// on its PATH, a fake Claude Code builder (B1), a throwaway profile and workspace. jj cards start as in the product (J9e,
+// HI-2874, retired the start guard and its test seam). Colocated here; the suite `jjwindownc` runs the same steps on a repository not colocated with Git (J9f, HI-2896:
 // CW_JJWINDOW_NONCOLOCATED=1), its screenshots `jjwindownc-…`.
 // - shop (jj, you review, target main): the user starts a card for B1, in a slot (a jj workspace); B1 commits there with
 //   jj and submits through the Agent API; the user passes it. Repository's Waiting for you to integrate shows it with its change id and
@@ -17,7 +16,6 @@
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
 // both themes.
-// Dev build only (#1578): jj cards start through CW_TEST_JJ_CARDS, which a packaged build ignores (until J9e).
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -97,7 +95,7 @@ const onDb = (fn) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = { ...toolEnv(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}`, CW_TEST_JJ_CARDS: '1', CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }
+  const env = { ...toolEnv(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}`, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }
   delete env.CW_USER_DATA
   const { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
