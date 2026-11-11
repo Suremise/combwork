@@ -65,7 +65,7 @@
   },
   "runtime.start.moreFiles": {
     "text": "{files} and {more} more",
-    "note": "HI-2944: a list of paths cut at five, and how many more there are."
+    "note": "HI-2944: a list of paths cut at three, and how many more there are."
   },
   "runtime.start.slotMove": {
     "text": "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
@@ -77,7 +77,7 @@
   },
   "runtime.start.targetChanges": {
     "text": "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.",
-    "note": "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to five paths, then how many more."
+    "note": "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more."
   },
   "runtime.submit.movedAhead": {
     "text": "moved ahead of {cards} (not started); its reviewer is told",
