@@ -172,6 +172,12 @@ function refSync(H: HistoryPort, store: string, ref: string): string {
 
 export class JjPlatform implements PlatformAdapter {
   readonly id = 'jj' as const
+  /**
+   * A start gathered again up to three times while only the operation head moved (HI-2916, HR1's answer on its s12): the
+   * head stays in the evidence (it witnesses jj's whole view of the target, not only its exported ref), and Combwork's own
+   * jj operations beside a start (a slot made, another detached) move it.
+   */
+  readonly startGathers = 3
 
   constructor(private readonly wf?: Workflow) {}
 

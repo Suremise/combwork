@@ -739,7 +739,12 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           .map((l) => l.split(SEPARATOR))
           .filter(([c, e]) => !(c === wc.commit && e === 'true'))
           .map(([c]) => c)
-        if (!chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
+        // Also (HI-2913) exactly the shape a rebase of the card's commit leaves: the working copy empty, neither conflicted nor
+        // divergent (both refused above), with one parent, the previous binding's base itself, so nothing lies between them.
+        // An empty range alone proves nothing (a working copy on unrelated history has none); its integration is still
+        // required below.
+        const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
+        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
         if (j.prev?.submitted.length) {
           if (!j.prev.target || !deps.contains) return refuse(JJ_REFUSED.notIntegrated)
           const th = await bookmarkAt(folder, H, j.prev.target)

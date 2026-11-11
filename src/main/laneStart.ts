@@ -452,12 +452,15 @@ async function firstCardWithBrief(ws: WorkspaceService, projectPath: string, lan
  * A lane's first card whose slot couldn't be prepared (slotCards' pass, HI-2558): its builder, stopped and never given
  * the lane's brief (its brief went with the card, which never reached it), started with its brief now, as the step by
  * step start would have, so it reads the failure's wake there. Nothing for a builder running, one given its brief before,
- * or a card that isn't the lane's first still to do.
+ * or a card that isn't the lane's first (an open card before it, or one of its cards Done).
  */
 export async function briefAfterFailedPrepare(ws: WorkspaceService, projectPath: string, n: number, builderId: string): Promise<void> {
   const lane = (await rawLanes(ws)).find((l) => l.state === 'active' && l.builder.id === builderId && l.cards.includes(n))
   if (!lane || sessions.liveFor(projectPath, builderId)) return
-  if (laneNow(ws, { lane: lane.id })?.cards.find(ownOpen)?.number !== n) return
+  // The lane's first card only (HI-2923): a later card's builder had its brief with an earlier one, and a jj lane's builder
+  // is stopped before each card's preparation (freeSlotOfBuilder), so stopped says nothing about a brief never given.
+  const view = laneNow(ws, { lane: lane.id })
+  if (view?.cards.find(ownOpen)?.number !== n || view.cards.some((c) => c.number !== n && c.column === 'done')) return
   const ref = `${lane.id}:builder`
   if ((await deliveriesOf(projectPath, builderId)).some((r) => r.source === BRIEF && r.ref === ref && !NOT_GIVEN.has(r.state))) return
   const cfg = await ws.projectConfig(projectPath)

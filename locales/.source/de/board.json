@@ -1012,6 +1012,7 @@
   "board.work.noRevision": "No revision recorded",
   "board.work.none": "No revision submitted yet.",
   "board.work.notRead": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Combwork couldn't read {why}}}",
+  "board.work.notReady": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
   "board.work.openFile": "Open {path} in Files",
   "board.work.outsideCombwork": "Merged outside Combwork.",
   "board.work.outsideRules": "Merged outside the rules: {rules}.",

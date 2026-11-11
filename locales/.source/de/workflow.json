@@ -484,7 +484,7 @@
   "workflow.slots.levelNone": "Set here: none",
   "workflow.slots.noSlots": "No slots yet: one is made when a card starts.",
   "workflow.slots.none": "None",
-  "workflow.slots.notRecovered": "{slot} wasn’t recovered: {why, select, busy {something works in it} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
+  "workflow.slots.notRecovered": "{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
   "workflow.slots.off": "Off",
   "workflow.slots.on": "On",
   "workflow.slots.openAdvanced": "Open Advanced",

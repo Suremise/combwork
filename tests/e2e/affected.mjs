@@ -140,6 +140,10 @@ export const AREAS = [
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
+  // HI-2919: a jj slot its builder has left after Done comes back, and the next card's start gets a slot.
+  { paths: ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/slotsApp.ts'], suites: ['jjafterpush'] },
+  // HI-2916: a jj card started right after another's integration, beside Combwork's own jj operations.
+  { paths: ['src/main/platform/jjPlatform.ts', 'src/main/platform/jjIntegration.ts', 'src/main/platform/adapter.ts'], suites: ['jjafterpush'] },
   // HI-2914: a jj card's observation after a restart, and the reconciler's debounce under Waiting's repeated reads.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/jjRepoWatch.ts', 'src/main/jjWindow.ts'], suites: ['jjreopen'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
@@ -200,7 +204,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
   // jj in the Version Control tab and the switch (HI-2799).
   { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts', 'src/main/platform/jjFileGate.ts'], suites: ['jjslot-claude', 'jjwindow', 'jjwindownc', 'slotpool', 'slotrelease', 'jjview'] },
-  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts', 'src/main/jjWindow.ts'], suites: ['jjview', 'jjwindow', 'jjwindownc', 'vcswitch'] },
+  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts', 'src/main/jjWindow.ts'], suites: ['jjview', 'jjwindow', 'jjwindownc', 'jjstale', 'jjstalenc', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
@@ -368,6 +372,8 @@ export const AREAS = [
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },
   { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/processTree.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
+  // A jj lane's slot through the user's integrations (HI-2913): the suggested copy, a rebase's stale slot, Recover… on a held slot, the builder ended for jj's preparation.
+  { paths: ['tests/e2e/jjstale.cjs', 'tests/e2e/jjstalenc.cjs', 'tests/e2e/jjStaleRun.cjs', 'src/main/slotCards.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/platform/jjWorkspacePort.ts', 'src/main/platform/jjRecovery.ts', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/SlotsAndCopies.tsx', 'src/shared/workflow/workView.ts'], suites: ['jjstale', 'jjstalenc'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/slotwriterhold.cjs', 'src/main/agentFolders.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts'], suites: ['slotwriterhold'] },
   // P7's switches and slot options set in the window and acting in the app (#1563).

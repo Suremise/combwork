@@ -1031,6 +1031,7 @@
   "board.work.verdict": "{reviewer}: {pass, select, yes {zaliczona} other {niezaliczona}}{current, select, no { (już się nie liczy)} other {}}",
   "board.work.via": "{via, select, ancestry {(znaleziono w jego historii)} replay {(jego zmianę znaleziono zastosowaną ponownie)} sameTree {(cel już ją miał)} candidate {(z przygotowanego kandydata)} other {}}",
   "board.work.workspace": "Obszar roboczy",
+  "board.work.notReady": "Jeszcze nie rozpoczęta w slocie {slot}: {stale, select, yes {inny obszar roboczy jj przepisał jego kopię roboczą, więc jest nieaktualny. Odzyskaj go w Kontroli wersji → Sloty i kopie, a karta zostanie tam przygotowana ponownie.} other {Combwork nie mógł go przygotować ({why}).}}",
   "board.workQueue.advance": "Przetestowana i gotowa: zaktualizować teraz gałąź {target} w jej folderze?",
   "board.workQueue.advancing": "Trwa scalanie z {target}",
   "board.workQueue.answerFailed": "Nie udało się odpowiedzieć",
