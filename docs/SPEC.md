@@ -2296,8 +2296,10 @@ the store's environment), jj's effective config (`jj config list`: user, reposit
 attribute source Git applies. Anything it can't read, list or resolve (an unreadable file, an include it can't follow,
 a configured path outside what it can read, a tool that doesn't answer) is "uses it": the gate stays closed.
 - **attributes:** any of Git's attribute sources (the system `gitattributes`, the file `core.attributesFile` names or
-  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, the store's `info/attributes`) setting
-  `text`, `eol`, `filter`, `diff`, `merge`, `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
+  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, every untracked one Git sees in a
+  colocated working tree, and any on disk in the root or a folder holding a tracked file, ignored or not (HI-2978), the store's `info/attributes`) setting
+  `text`, `eol`, `crlf` (`text`'s legacy spelling, which Git still converts by, HI-2978), `filter`, `diff`, `merge`,
+  `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
   `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
 - **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
   `.lfsconfig`.
@@ -2638,7 +2640,9 @@ merges under jj.
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
-  `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
+  `.gitattributes`, untracked ones (colocated: `ls-files -o --exclude-standard`; in either mode, the one on disk in the root and in each
+  folder holding a tracked file, ignored or not, past 100,000 such folders unknown),
+  `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
   without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
   hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
   Windows' stock system settings (`filter.lfs.*`, `diff=astextplain`) don't count (HI-2872: `GFW_STOCK_CONFIG`,
