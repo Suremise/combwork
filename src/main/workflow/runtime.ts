@@ -1238,7 +1238,7 @@ export class Workflow {
     // A start allowed several passes (HI-2972): `startAgain`'s answer, a steady fingerprint going on to the write.
     if (passes > 1) {
       const again = await this.startAgain(card, s, o, before)
-      if (again === 'moved' || again === 'unreadable') this.startPassLog(card, 'before write', again, passes)
+      if (again === 'moved' || again === 'unreadable') this.startPassLog(card, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
       return again === 'moved' || again === 'unreadable'
     }
     const a = before.value === null ? null : this.evidenceNow(card, s, o, before.primed)
