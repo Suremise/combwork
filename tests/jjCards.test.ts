@@ -16,7 +16,7 @@
 // - a lane started before J9e, under a stored jj ruleset with the retired guard: its card starts, in a slot.
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
-import { rmSync, writeFileSync } from 'fs'
+import { readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -323,6 +323,8 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       const base = w.wf.state(card).started!.base!
       w.commitIn(a.folder, 'one.txt', a.identity.workspace)
       w.commitIn(a.folder, 'two.txt', a.identity.workspace)
+      // An edit not committed yet when it is put back (HI-2981): the card's own, carried with it.
+      writeFileSync(join(a.folder, 'half.txt'), 'half\n')
       // The target moves on meanwhile (the user's commit on main).
       w.h.jj(w.repo, 'new', 'main', '-m', 'next')
       writeFileSync(join(w.repo, 'n.txt'), 'n\n')
@@ -332,8 +334,11 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       moved(await w.wf.start(card.key, B1))
       const s = w.wf.state(card)
       expect(s.started).toMatchObject({ line: jjLineKey(a.identity.workspace, card.id, 2), base })
+      // The pool's dirty check lets the card's own edit through (it carries), as Git's same branch does.
+      expect(await w.port.carries!(a.folder, s.started!.line!, s.started!.base!, { identity: a.identity, target: 'main' })).toBe(true)
       const heads = w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
       expect(await w.prepare(card.id)).toEqual({ ok: true, err: '' })
+      expect(readFileSync(join(a.folder, 'half.txt'), 'utf8')).toBe('half\n')
       expect(w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()).toBe(heads)
       expect(await w.port.line(a.folder)).toBe(s.started!.line)
       // Put back again, its target changed: its earlier work is in the slot on main, so the start is refused.

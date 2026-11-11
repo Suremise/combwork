@@ -31,7 +31,7 @@ import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey } from './jjFileGate'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import type { OwnedWrite, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
-import { chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
+import { carriesBinding, chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
 /** Why a jj workspace step was refused (a protocol code: the pool words what it shows). */
 export const JJ_REFUSED = {
@@ -635,7 +635,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       // A restart of the same card in its own slot (HI-2868, s10 §3): its earlier binding carried, with no jj write, only
       // when the slot is the folder it was bound in (its generation), on the same target, from the same base (the start
       // planned on the carried base). Anything else is a fresh preparation, checked as one.
-      const carry = kind === 'prepare' && !!ptr0 && ptr0.card !== null && ptr0.card === bound.card && ptr0.key !== bound.key && ptr0.generation === bound.generation && ptr0.target === bound.target && ptr0.base === bound.base
+      const carry = kind === 'prepare' && carriesBinding(ptr0, bound)
       if (carry) bound = { ...bound, submitted: [...ptr0.submitted], ...(ptr0.submittedSeq !== undefined ? { submittedSeq: ptr0.submittedSeq } : {}) }
       // Already this preparation's (a retry after its publication, before the caller's fact): the same binding, nothing written.
       if (ptr0 && ptr0.prep === bound.prep && ptr0.key === bound.key && ptr0.base === bound.base && ptr0.generation === bound.generation) return step(true)
@@ -976,6 +976,14 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     },
     // A card cycle's preparation (HI-2866/s13): always onto its base (a card's line under jj is made, never "the one it
     // has"), owned and journalled; its binding published once the slot is on the base.
+    carries: async (folder, line, base, o) => {
+      const k = parseJjLineKey(line)
+      if (!k || !base || !o.identity || k.workspace !== o.identity.workspace || !(await owns(folder, o.identity))) return false
+      const ctx = await contextOf(folder)
+      const prep = ctx && samePath(ctx.store, o.identity.store) ? (deps.prep?.(ctx.store) ?? null) : null
+      const ptr = prep ? prep.pointer(ctx!.store, o.identity.workspace) : null
+      return ptr !== 'unreadable' && carriesBinding(ptr, { card: k.card, key: line, generation: o.identity.generation, target: o.target ?? null, base })
+    },
     prepare: async (folder, line, base, o = {}) => {
       const k = parseJjLineKey(line)
       if (!k || !base || !o.lease) return step(false, JJ_REFUSED.line)
