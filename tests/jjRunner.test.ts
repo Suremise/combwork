@@ -3,8 +3,8 @@
 // missing tool, and that none of those is ever taken for jj's answer (SPEC §16.3.6 rule 3). The real jj's cases are
 // jjReal.test.ts's.
 import { spawn } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { build } from 'esbuild'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compareJjVersions, jjRunnable, jjSupported, jjToolOf, parseJjVersion, TESTED_JJ } from '../src/shared/jjTool'
@@ -89,25 +89,6 @@ describe("jj's runner", () => {
     expect(said.cwd.toLowerCase()).toBe(dir.toLowerCase())
     // A write is asked for by name; J0 has none.
     expect(JSON.parse((await r.run(dir, ['describe'], { write: true })).out).args).toEqual([...JJ_PREFIX, 'describe'])
-  })
-
-  it('runs an away read from outside its folder, naming its workspace root; writes and other reads stay in it (HI-2912)', async () => {
-    const r = runner()
-    const root = tempDir('jj-runner-away-')
-    mkdirSync(join(root, '.jj'))
-    mkdirSync(join(root, 'sub', 'deeper'), { recursive: true })
-    const away = JSON.parse((await r.run(root, ['op', 'log'], { away: true })).out)
-    expect(away.args).toEqual([...JJ_PREFIX, ...JJ_READ, '--repository', root, 'op', 'log'])
-    expect(away.cwd.toLowerCase()).toBe(dirname(root).toLowerCase())
-    // A folder below the root (a project that is a subfolder): its workspace's root, which --repository doesn't search for.
-    const below = JSON.parse((await r.run(join(root, 'sub', 'deeper'), ['log'], { away: true })).out)
-    expect(below.args).toEqual([...JJ_PREFIX, ...JJ_READ, '--repository', root, 'log'])
-    expect(below.cwd.toLowerCase()).toBe(dirname(root).toLowerCase())
-    // A read that prints paths (no `away`), and a write even when asked away: in the folder, as before.
-    expect(JSON.parse((await r.run(root, ['diff'])).out)).toMatchObject({ args: [...JJ_PREFIX, ...JJ_READ, 'diff'], cwd: root })
-    expect(JSON.parse((await r.run(root, ['new'], { write: true, away: true })).out)).toMatchObject({ args: [...JJ_PREFIX, 'new'], cwd: root })
-    // Its folder gone: it doesn't run (as a working folder that isn't there), never jj's answer.
-    expect(await r.run(join(root, 'gone'), ['op', 'log'], { away: true })).toMatchObject({ ok: false, code: -1, notRun: 'failed' })
   })
 
   it("gives jj's own exit code as its answer, and its standard input closed after what it is given", async () => {

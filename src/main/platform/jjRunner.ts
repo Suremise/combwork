@@ -5,8 +5,7 @@
 // Copy Diagnostics' row and detection's tests. Git's runner is untouched (§16.3.6: a later platform adds its own).
 
 import { existsSync } from 'original-fs'
-import { stat } from 'original-fs/promises'
-import { delimiter, dirname, join, resolve } from 'path'
+import { delimiter, join } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { jjRunnable, jjToolOf, parseJjVersion, TESTED_JJ, type JjTool } from '../../shared/jjTool'
 import { createLogger, userText } from '../logger'
@@ -56,11 +55,6 @@ export interface JjRunOptions extends RunOptions {
   signal?: AbortSignal
   /** It may change the repository: run without `--ignore-working-copy`. No J0 caller writes. */
   write?: boolean
-  /**
-   * A read whose answer names no file (ids, names, flags, absolute roots): run from outside its folder (readAt, HI-2912).
-   * Never for one that prints a file's path, which jj gives relative to its working folder. Ignored for a write.
-   */
-  away?: boolean
 }
 
 /** What a jj command answered: port 1's RunResult, plus whether it was cancelled. Never an answer when `code` is -1. */
@@ -68,37 +62,10 @@ export interface JjRunResult extends RunResult {
   cancelled?: true
 }
 
-/**
- * Where an `away` read runs (HI-2912): from the parent of its folder's workspace root, that root given as
- * `--repository` (which, unlike a working folder, jj doesn't search upward from), so the read never holds the folder as
- * its working folder. On Windows a process's working folder (or one inside it) can't be renamed, and a slot's quiet
- * probe (slots.ts `quiet`) renames the slot's folder: the reads polled in a slot (its listing's staleness, every 200 ms
- * in jjwindow) kept it "in use" most of the time under load (probed with jj 0.47.1, two reads at a time: 76 of 84 probes
- * in use, none from outside). Null when the folder isn't there (such a read doesn't run, as when it ran in it). Writes,
- * and reads that print paths, stay in their folder: only its slot's operation writes there, and a write's working folder
- * keeps a probe from renaming the folder while it goes on.
- */
-export async function readAt(folder: string): Promise<{ cwd: string; args: string[] } | null> {
-  const at = resolve(folder)
-  if (!(await isDir(at))) return null
-  let root = at
-  for (let d = at; ; d = dirname(d)) {
-    if (await isDir(join(d, '.jj'))) {
-      root = d
-      break
-    }
-    if (dirname(d) === d) break
-  }
-  return { cwd: dirname(root), args: ['--repository', root] }
-}
-
-const isDir = (folder: string): Promise<boolean> => stat(folder).then((s) => s.isDirectory(), () => false)
-
 export interface JjRunner {
   /**
-   * Runs jj in `folder` (an `away` read: on it, from outside, readAt) with `args`, prefixed (JJ_PREFIX, and JJ_READ unless
-   * `write`). Runs the pinned jj or a newer (untested) one, whose answers its callers don't trust (jjSupported); never
-   * one missing or too old.
+   * Runs jj in `folder` with `args`, prefixed (JJ_PREFIX, and JJ_READ unless `write`). Runs the pinned jj or a newer
+   * (untested) one, whose answers its callers don't trust (jjSupported); never one missing or too old.
    */
   run(folder: string, args: readonly string[], o?: JjRunOptions): Promise<JjRunResult>
   /** Checks the tool again (`jj --version`), one check at a time. */
@@ -373,12 +340,8 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
         if (closed) return stopped(what, 'failed')
         if (ac.signal.aborted) return stopped(what, 'cancelled')
         if (!jjRunnable(t) || !t.path) return refused(t, what)
-        // An away read on a folder that isn't there doesn't run, as when it ran in it (Node: ENOENT for a missing working
-        // folder).
-        const away = opts.away && !opts.write ? await readAt(folder) : null
-        if (opts.away && !opts.write && !away) return resultOf({ stdout: new Uint8Array(), stderr: new Uint8Array(), end: { notRun: 'failed', detail: 'ENOENT' } }, what) // i18n-ignore: a protocol detail, for the log
-        const full = [...(o.before ?? []), ...JJ_PREFIX, ...(opts.write ? [] : JJ_READ), ...(away ? away.args : []), ...args]
-        const r = resultOf(await exec({ exe: t.path, cwd: away ? away.cwd : folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? JJ_DEFAULTS.timeout, ...(opts.input !== undefined ? { input: opts.input } : {}) }, ac.signal), what)
+        const full = [...(o.before ?? []), ...JJ_PREFIX, ...(opts.write ? [] : JJ_READ), ...args]
+        const r = resultOf(await exec({ exe: t.path, cwd: folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? JJ_DEFAULTS.timeout, ...(opts.input !== undefined ? { input: opts.input } : {}) }, ac.signal), what)
         // The tool went (uninstalled, moved): checked again, so the next command and Copy Diagnostics say so.
         if (r.missing) void readiness()
         return r
