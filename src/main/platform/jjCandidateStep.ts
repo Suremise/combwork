@@ -87,6 +87,13 @@ export interface JjCandidateStepDeps {
    * (a working copy on it keeps it); absent: none.
    */
   park?: (at: string, to: string) => Promise<boolean>
+  /** For the log (HI-2992: a step recovery gave up). */
+  log?: (what: string) => void
+}
+
+/** HI-2992: a step recovery gave up (journalled in `givenUp`), told to the log so it can be traced. */
+const tellGivenUp = (log: ((what: string) => void) | undefined, was: JjAttemptRecord, now: JjAttemptRecord): void => {
+  if ((now.givenUp?.length ?? 0) > (was.givenUp?.length ?? 0)) log?.(`${now.attempt}: step ${now.givenUp!.at(-1)} given up (its base operation past the walk)`) // i18n-ignore: a log line, English
 }
 
 export interface JjCandidateOffer {
@@ -129,6 +136,7 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
   for (const e of deps.entries()) {
     if (e.state || settled(e.record)) continue
     const rec = await recoverJjAttempt(cleanUp, e.record)
+    if (!isInterrupted(rec)) tellGivenUp(deps.log, e.record, rec.record)
     if (isInterrupted(rec)) {
       if (stops(rec.interrupted.why)) return { unknown: `recover:${rec.interrupted.why}` }
       continue
@@ -258,6 +266,7 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
         unresolved = true
         continue
       }
+      tellGivenUp(deps.log, record, rec.record)
       record = rec.record
     } else if (!toDrop(e)) continue
     // Its check copies off it first (HI-2938's copies stay where their checks ran); one still leased or returning: left
