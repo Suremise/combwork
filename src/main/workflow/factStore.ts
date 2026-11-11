@@ -78,6 +78,11 @@ export interface QueuePause {
   reason: string
   card: string
   files?: string[]
+  /**
+   * HI-2944: the folder the target was checked out in when a checked-out advance paused on its conditions (staged or
+   * uncommitted changes there): Commit and Set aside act there only. A stuck advance's folder is its `stuck`'s.
+   */
+  folder?: string
   /** A process Combwork couldn't end (a dead runner's, at a takeover: #1360). */
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
@@ -654,7 +659,7 @@ export class FactStore {
         const of = (ord: number): string[] => args.filter((a) => a.command === ord).map((a) => a.arg)
         stuck = { folder: row.folder, branch: row.branch, ref: row.ref, expected: row.expected, result: row.result, phase: row.phase, files: rows.map((r) => ({ path: r.path, side: r.side ?? 'other' })), commands: commands.map((c) => ({ purpose: c.purpose, place: c.place, args: of(c.ord), command: shellLine(of(c.ord)) })) }
       }
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}), ...(stuck ? { stuck } : {}) }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}), ...(stuck ? { stuck } : row.folder !== null ? { folder: row.folder } : {}) }
     })
   }
 
@@ -697,7 +702,7 @@ export class FactStore {
       this.logPause(db, target, before ?? null, pause ? { reason: pause.reason, card: pause.card, ...(pause.by ? { by: pause.by } : {}), ...(pause.message ? { message: pause.message } : {}), at } : null, now)
       if (!pause) return true
       const st = pause.stuck
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, at, st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, at, st?.folder ?? pause.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
       // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
       if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))

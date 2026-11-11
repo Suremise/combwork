@@ -138,6 +138,23 @@ function baseEnv(parent = process.env) {
 }
 
 /**
+ * A variable of a plain environment object whatever its name's case: a copy of Windows' environment keeps the parent's
+ * spelling (PowerShell gives `Path`, Git Bash `PATH`), so `env.PATH` reads nothing from one of them (HI-2945).
+ */
+function envValue(env, name) {
+  const k = Object.keys(env).find((x) => x.toUpperCase() === name.toUpperCase())
+  return k === undefined ? undefined : env[k]
+}
+
+/**
+ * `env` with `dirs` first on its PATH, before `rest` (the allowlisted PATH unless given), read whatever its spelling; a
+ * copy holding PATH under one spelling only, so no later merge can keep the shorter one (HI-2945).
+ */
+function withPathFirst(env, dirs, rest = envValue(baseEnv(), 'PATH')) {
+  return apply({ ...env }, { PATH: [...[].concat(dirs), rest ?? ''].join(';') })
+}
+
+/**
  * A child that is part of Combwork but not a copy of it (the combwork MCP server, the cw-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
@@ -276,4 +293,4 @@ function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots
   return env
 }
 
-module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, combworkEnv, isCombworkEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }
+module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, envValue, withPathFirst, childEnv, combworkEnv, isCombworkEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }

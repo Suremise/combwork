@@ -10,7 +10,7 @@ export const SIGNALLED = 129
 
 /**
  * The launcher (run by Node): waits for its input's first line, then runs the command it was given (CW_QUEUE_LAUNCH,
- * JSON: command, args, shell, verbatim: Windows' arguments as given, a shell's command line) with its own output and what follows on its input, and exits with its code. Its input
+ * JSON: command, args, shell, verbatim: Windows' arguments as given, a shell's command line; argv0: its first word, HI-2947) with its own output and what follows on its input, and exits with its code. Its input
  * closing before that line (Combwork gone, or the launch given up) ends it with nothing run.
  */
 const LAUNCHER = `
@@ -28,7 +28,7 @@ process.stdin.on('data', (d) => {
   if (process.env.CW_QUEUE_RUN_AS_NODE !== undefined) process.env.ELECTRON_RUN_AS_NODE = process.env.CW_QUEUE_RUN_AS_NODE
   else delete process.env.ELECTRON_RUN_AS_NODE
   delete process.env.CW_QUEUE_RUN_AS_NODE
-  const c = require('child_process').spawn(spec.command, spec.args, { stdio: ['pipe', 'inherit', 'inherit'], shell: !!spec.shell, windowsVerbatimArguments: !!spec.verbatim, windowsHide: true })
+  const c = require('child_process').spawn(spec.command, spec.args, { stdio: ['pipe', 'inherit', 'inherit'], shell: !!spec.shell, windowsVerbatimArguments: !!spec.verbatim, windowsHide: true, ...(spec.argv0 !== undefined ? { argv0: spec.argv0 } : {}) })
   c.stdin.on('error', () => {})
   const rest = got.slice(i + 1)
   if (rest) c.stdin.write(rest)
@@ -57,7 +57,7 @@ process.stdin.on('end', () => { if (!started) end(70) })
  * executable runs it as Node (ELECTRON_RUN_AS_NODE, which the command gets back as it was). The clock readings either
  * side of its start come back with it, for the job's check and the record.
  */
-export function startLauncher(spec: { command: string; args: readonly string[]; shell?: boolean; verbatim?: boolean }, opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): { child: ChildProcess; after: number; before: number; nonce: string } {
+export function startLauncher(spec: { command: string; args: readonly string[]; shell?: boolean; verbatim?: boolean; argv0?: string }, opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): { child: ChildProcess; after: number; before: number; nonce: string } {
   const env = opts.env ?? process.env
   // HI-2020: the launch's own mark for "the command never started" (launcherNotStarted), unknown to the command.
   const nonce = randomUUID()

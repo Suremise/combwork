@@ -177,6 +177,8 @@ interface CombworkMessageValues {
   'tips.combworkMerges.title': undefined
   'tips.combworkSkills.text': undefined
   'tips.combworkSkills.title': undefined
+  'tips.combworkTokens.text': undefined
+  'tips.combworkTokens.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
@@ -356,6 +358,8 @@ interface CombworkMessageValues {
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
   'tips.mergePush.title': undefined
+  'tips.mergeQueueCommit.text': undefined
+  'tips.mergeQueueCommit.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined

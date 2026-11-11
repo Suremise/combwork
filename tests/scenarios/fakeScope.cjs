@@ -30,12 +30,14 @@ const FAKE_CLAUDE_ONLY = [
   'card-loop-already-in-review', 'card-loop-two-cards', 'card-loop-disputed', 'card-loop-design-first', 'card-loop-follow-up', 'card-loop-follow-up-check', 'card-loop-ask-assistant', 'card-loop-released', 'card-loop-loop-wake',
   // Wakes are the fake Claude Code's alone (harness.cjs: fakeWakes): on the others these check only their fixture.
   'card-loop-blocked', 'coordinator-lanes-to-end',
+  // HI-2944: a start's warning of the target folder's changes; the repository and the start's reply after the server.
+  'start-target-changes',
   // A stuck lane's wake waiting in the inbox, read with cw_inbox; the board, facts and slot after the server (HI-2913).
   'jj-slot-stale',
   // A returned jj card's wake waiting in the inbox (HI-2938), read with cw_inbox; the board, facts and slot after the server.
   'jj-checks-back',
   // Overrides, intents, old moves, presets.
-  'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'preset-pair-lane',
+  'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'solo-ab-card', 'preset-pair-lane',
   // The Assistant's board work.
   'assistant-dispatch', 'assistant-reply-decision', 'assistant-doing-nobody', 'assistant-decision-answers', 'assistant-decision-answers-one', 'assistant-card-question', 'assistant-look-lanes', 'assistant-lane-reorder-now', 'assistant-bulk-move', 'assistant-retarget-release',
   'assistant-next-version-ask', 'assistant-next-version', 'assistant-next-version-retarget', 'assistant-ask-wait', 'assistant-ask-go',
@@ -48,7 +50,9 @@ const FAKE_CLAUDE_ONLY = [
 
 const MODEL_TRIALS_ONLY = [
   'pick-up-named', 'hold-skipped', 'assistant-plan', 'assistant-look', 'coordinator-relayed-ok', 'fresh-start-solo-done', 'fresh-start-lanes-ended', 'review-screenshot-report', 'prioritise',
-  'follow-up-title', 'assistant-follow-up-title', 'progress-background', 'mode-coordinator-coordinates', 'mode-planner-coordinates', 'mode-qa-triager-coordinates', 'mode-release-manager-coordinates'
+  'follow-up-title', 'assistant-follow-up-title', 'progress-background', 'mode-coordinator-coordinates', 'mode-planner-coordinates', 'mode-qa-triager-coordinates', 'mode-release-manager-coordinates',
+  // HI-2854's A: its one check (the parser's tests) holds by construction on a fake, whose script writes them.
+  'solo-ab-plain'
 ]
 
 const NOT_A_TRIAL = ['tool-sweep']

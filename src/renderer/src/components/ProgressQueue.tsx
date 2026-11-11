@@ -11,6 +11,7 @@ import { cardLabelOf, choose, confirm, findProject, notify, openVersionControl, 
 import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
+import { FolderChangeButtons } from './FolderChangeButtons'
 import { Icon, Tooltip } from './ui'
 
 /**
@@ -133,6 +134,7 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
           <Icon name="debug-pause" />
           <span className="progress-queue-text">{pauseText(v.paused, v.target, tr, list)}</span>
           {v.paused.reason === 'needsYou' && v.paused.card && <CardButton keyOf={v.paused.card} />}
+          <FolderChangeButtons projectPath={v.projectPath} target={v.target} paused={v.paused} />
         </div>
       )}
       {v.testing && (

@@ -52,6 +52,7 @@ import { pausedFor } from './teamPause'
 import { pauseHolds } from '../shared/teamPause'
 import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
+import { workStartedAt } from '../shared/tasks'
 import { scopeOfHost, withCardNames } from './projectKeys'
 import { saidError } from './combworkError'
 
@@ -799,6 +800,12 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   // its `after`), with how it was received. Never its text.
   if (to === 'received' || to === 'acked') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${out.receivedVia && (to === 'received' || !r.received) ? ` (${out.receivedVia})` : ''}`))
   if ((to === 'received' || to === 'acked') && !r.received) tell(store, d, out, 'received')
+  // HI-2854: a start task that carried the whole card, received: what it gave of the card is the agent's to have read.
+  if ((to === 'received' || to === 'acked') && !r.received && r.kind === 'task' && r.card && typeof r.meta?.seenDecisions === 'number' && typeof r.meta?.seenComments === 'number') {
+    const seen = { decisions: r.meta.seenDecisions, comments: r.meta.seenComments, at: typeof r.meta.seenAt === 'number' ? r.meta.seenAt : Date.now() }
+    const card = r.card
+    d.after.push(() => cardTaskReceived(store.host, r.agentId, card, seen))
+  }
   // Read after the line that rang for it was marked not taken (#1514: Codex took it as queued input, late): that line was
   // taken, so its mark goes, in the launch it was offered into; a mark of another line's stays (round 1 finding).
   if ((to === 'received' || to === 'acked') && r.state === 'offered' && r.offerRun) {
@@ -1385,6 +1392,38 @@ export async function ackDeliveries(host: string, agentId: string, ids: readonly
  * yet is `unread` and stays as it is; another agent's is `unknown`), then the read. What the read gives is received, never
  * acked: nothing is acked by being read, so an item listed here is acked by a later call, after acting on it.
  */
+/**
+ * HI-2854: the task a card was started with (`meta.cardTask`, its work cycle in `meta.cycle`), acked by its builder's
+ * successful cw_start_card or cw_submit of that card: only that agent's, for that card and that cycle, and only once it
+ * was received (read with cw_inbox). Everything else, a later task about the card included, stays as it is. Recorded as
+ * acked like any ack, with how. The ids it acked.
+ */
+export async function ackCardTask(host: string, agentId: string, card: Pick<TaskCard, 'number' | 'history'>): Promise<string[]> {
+  const store = await load(host)
+  const cycle = workStartedAt(card)
+  if (!cycle) return []
+  const acked = await transact(store, (d) => {
+    const out: string[] = []
+    for (const x of [...d.records]) {
+      if (x.agentId !== agentId || x.kind !== 'task' || x.card !== card.number || x.state !== 'received' || x.meta?.cardTask !== true || x.meta?.cycle !== cycle) continue
+      // agent-protocol: how it was acked, kept with the delivery for the log and its row
+      if (set(store, d, x, 'acked', 'by its start or submit of the card')) out.push(x.id)
+    }
+    return out
+  })
+  if (acked.length) show(store, agentId)
+  return acked
+}
+
+/**
+ * HI-2854: a card's start task that carried the whole card (`meta.seenDecisions`, `meta.seenComments`: the generations it
+ * was made at) counts as the agent reading it, once received: main/servers.ts records its receipt.
+ */
+let cardTaskReceived: (host: string, agentId: string, card: number, seen: { decisions: number; comments: number; at: number }) => void = () => undefined
+export function onCardTaskReceived(fn: typeof cardTaskReceived): void {
+  cardTaskReceived = fn
+}
+
 export async function ackThenRead(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
   const acked = await ackDeliveries(host, agentId, ids)
   return { ...acked, ...(await readInbox(host, agentId)) }

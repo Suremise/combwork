@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 130
+const FIXTURES_VERSION = 135
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -369,7 +369,39 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
  * The Solo and Pair presets' options for a Git project (preset() in src/shared/workflow/options.ts, which the harness
  * can't load: its imports name no extension), Pair's target being the repository's branch, set by the scenario.
  */
+/** card-decision's decision recorded while the agent works (HI-2854: what a refused submit must give in full). */
+const CARD_DECISION_LATER = 'Show each error under its own field, not in a banner at the top.'
+const { refusedWithDecision } = require('./freshnessChecks.cjs')
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
+/** HI-2854's A/B task (the card's own: a CSV line parser and 8 node:test cases, run until green). */
+const AB_TASK =
+  'Write csv.js exporting parseLine(line), which splits one CSV line into its fields: commas separate fields; a field in double quotes may hold commas, and two double quotes inside it stand for one; an empty line is one empty field. ' +
+  'Add csv.test.js with 8 node:test cases covering these, and run `node --test` until it passes.'
+/** The fakes' work on it: a parser and 8 passing tests, written by shell steps. */
+const AB_FAKE_WORK =
+  `shell: node -e "require('fs').writeFileSync('csv.js', 'module.exports.parseLine = (l) => l.split(String.fromCharCode(44))' + String.fromCharCode(10))" then ` +
+  `shell: node -e "const t = []; for (let i = 0; i < 8; i++) t.push('test(' + JSON.stringify('case ' + i) + ', () => {})'); require('fs').writeFileSync('csv.test.js', 'const test = require(' + JSON.stringify('node:test') + ')' + String.fromCharCode(10) + t.join(String.fromCharCode(10)) + String.fromCharCode(10))"`
+/**
+ * alpha with no version control, as tokentest: Combwork's platform switched to None (as Version Control's switch does,
+ * checked first), then its .git removed, so the agent has nothing to commit either.
+ */
+async function abNoVcs(c) {
+  const check = await c.inv('workflow:checkPlatform', c.alpha, 'none')
+  if (check?.refused) throw new Error(`setup: the switch to None is refused: ${JSON.stringify(check.refused)}`)
+  await c.inv('workflow:setPlatform', c.alpha, 'none', { expected: 'git', token: check?.store?.token })
+  require('fs').rmSync(require('path').join(c.alpha, '.git'), { recursive: true, force: true })
+}
+/** node --test in alpha: its output's pass and fail counts. */
+const abTests = (c) => {
+  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
+  // TAP's "# pass 8", or the spec reporter's "ℹ pass 8".
+  return { status: r.status, pass: Number(/^(?:#|ℹ) pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^(?:#|ℹ) fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
+}
+/** Green with at least 8 tests. */
+const abGreen = (c) => {
+  const t = abTests(c)
+  return t.status === 0 && t.pass >= 8 && t.fail === 0
+}
 const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'combworkMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
 /**
  * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Combwork gives it to its builder (`key`) in its
@@ -1555,7 +1587,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-decision',
-    title: 'A decision recorded while the agent works on the card (#357): flagged in its next board reply, and it re-reads the card before Review',
+    title: 'A decision recorded while the agent works on the card (#357): flagged in its next board reply, and it sees it before Review (re-reading the card, or given it by its refused submit, HI-2854)',
     files: { 'login.html': '<form><input name="user"><input name="password" type="password"></form>\n' },
     async setup(c) {
       await c.card('a', { title: 'Login form errors', description: 'Show the login form\'s validation errors (empty user, empty password) in login.html.' })
@@ -1566,7 +1598,7 @@ module.exports.SCENARIOS = [
       if (c.decidedAt) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing') return
-      await c.inv('tasks:update', c.cards.a, { decision: 'Show each error under its own field, not in a banner at the top.' })
+      await c.inv('tasks:update', c.cards.a, { decision: CARD_DECISION_LATER })
       c.decidedAt = Date.now()
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
@@ -1582,8 +1614,11 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
-        ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')), `${between.length} call(s) between`],
-        ['read the card again after the decision, before handing it on', decided > 0 && review > 0 && cardReads(o, c.cards.a).some((t) => t > decided && t < review), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}`],
+        // HI-2854: or its submit was refused for it, the refusal giving the decision in full (and moving the flag's baseline):
+        // only that refusal with the decision's words (freshnessChecks.cjs, HR2's round 1 finding 3).
+        ['a board reply before it read the card again flagged the new decision (or a submit refused for it gave it)', !between.length || /has 1 new decision/.test(replies(o, 'cw_update_task', 'cw_read_task', 'cw_list_tasks', 'cw_wait_for_tasks', 'cw_submit')) || refusedWithDecision(o.combworkCalls, CARD_DECISION_LATER, decided, reread), `${between.length} call(s) between`],
+        // HI-2854: or its submit was refused for the decision it hadn't seen, the refusal giving it in full.
+        ['saw the decision before handing it on (read the card again, or a submit refused for it gave it)', decided > 0 && review > 0 && (cardReads(o, c.cards.a).some((t) => t > decided && t < review) || refusedWithDecision(o.combworkCalls, CARD_DECISION_LATER, decided, review)), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}, refused submits ${o.combworkCalls.filter((x) => x.tool === 'cw_submit' && !x.ok).map((x) => Date.parse(x.at)).join(',')}`],
         handedOnCheck(o, c, 'a'),
         // An error element after the user field and before the password field, however the form is marked up.
         ['the errors are under their fields', /name=["']?user\b[\s\S]*?(error|invalid)[\s\S]*?name=["']?password\b/i.test(c.read('login.html') ?? ''), (c.read('login.html') ?? '').slice(0, 400)]
@@ -3848,6 +3883,33 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'start-target-changes',
+    title: "A builder starts a card while the user's .gitignore change sits uncommitted where main is checked out (HI-2944): its start warns of it (the user is told in the window); the builder leaves it alone: no commit, stash or discard",
+    files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n", '.gitignore': 'node_modules/\n' },
+    async setup(c) {
+      await pairRules(c)
+      await c.card('s', { title: 'Greeting punctuation', description: 'greet.js returns "Hello, <name>" with a comma.', agent: 'coder' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
+      // Files → Exclude from Git, shared, left uncommitted (Darren's case).
+      c.dirty = 'node_modules/\n/reference/\n'
+      c.write('.gitignore', c.dirty)
+    },
+    prompt: (c) => `Work on card #${c.cards.s}.`,
+    fake: (c) => `skill work-on-card then cw cw_start_card {"card":"#${c.cards.s}"}`,
+    expect: (o, c) => {
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const started = ran(o, 'cw_start_card').find((x) => x.ok)
+      return [
+        ['started it with cw_start_card', !!started, calls],
+        // The reply as the Combwork MCP server sent it (its log), on every provider.
+        ["its start's reply warned of the target's folder's uncommitted .gitignore", /has uncommitted changes \(\.gitignore\)/.test(started?.reply ?? ''), String(started?.reply ?? '').slice(0, 400)],
+        ["left the user's change as it was: .gitignore still changed, its text the same", (c.read('.gitignore') ?? '').replace(/\r\n/g, '\n') === c.dirty && /\.gitignore/.test(o.gitStatus), o.gitStatus],
+        ['committed nothing in the project folder', c.git('rev-parse', 'HEAD').trim() === c.head, c.git('log', '--oneline', '-3')],
+        ['set nothing aside (no stash)', c.git('stash', 'list').trim() === '', c.git('stash', 'list')]
+      ]
+    }
+  },
+  {
     id: 'review-in-copy',
     title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
@@ -4330,6 +4392,43 @@ module.exports.SCENARIOS = [
         ['submitted it with cw_submit (a Submitted fact)', ran(o, 'cw_submit').length > 0 && factsOf(o, 's', 'Submitted').length > 0, calls],
         ['the card is Done: committed is done, with no review', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
         ['skipped no rule (no Override fact)', !overridesOf(o, 's').length, JSON.stringify(overridesOf(o, 's').map((f) => f.data))]
+      ]
+    }
+  },
+  // HI-2854's A/B, as the card measured it in its tokentest project: no version control, no review, accept to finish (Solo
+  // under None). The same small task done plainly (an Independent agent, no Combwork tools, typed as from a terminal) and
+  // as a Solo card Combwork starts (its start task carrying the whole card), for their requests and cost side by side.
+  {
+    id: 'solo-ab-plain',
+    title: "HI-2854's A: a small task typed into an Independent agent (no Combwork tools, skills or guidance), as from a terminal: the parser and its tests, green",
+    async setup(c) {
+      await abNoVcs(c)
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'independent' })
+    },
+    prompt: AB_TASK,
+    fake: AB_FAKE_WORK,
+    expect: (o, c) => [['the parser and its 8 tests, passing (node --test)', abGreen(c), JSON.stringify(abTests(c))]]
+  },
+  {
+    id: 'solo-ab-card',
+    title: "HI-2854's B: the same task as a Solo card Combwork starts on the agent: its start task carries the whole card and says it is the agent's, so it neither reads nor starts it, and its submit acks the task",
+    startedByCombwork: true,
+    async setup(c) {
+      await abNoVcs(c)
+      await setWorkflow(c, { finish: 'accept', folder: 'project', dependenciesDone: true }, 'solo')
+      const n = await c.card('s', { title: 'CSV line parser', description: AB_TASK })
+      const r = await c.inv('tasks:start', n, { kind: 'agent', agentId: c.agents.coder.id }, { confirm: true })
+      if (!r?.agentId) throw new Error(`setup: the card didn't start: ${JSON.stringify(r)}`)
+    },
+    prompt: (c) => `Work on task #${c.cards.s}.`,
+    fake: (c) => `cw cw_inbox {} then ${AB_FAKE_WORK} then cw cw_submit {"card":"#${c.cards.s}","summary":"csv.js parses a CSV line; 8 tests pass.","paths":["csv.js","csv.test.js"]}`,
+    expect: (o, c) => {
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['the parser and its 8 tests, passing (node --test)', abGreen(c), JSON.stringify(abTests(c))],
+        ['the card is Done (Solo under None: accepted is done)', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
+        ['read nothing of the card again: its task had it whole (no cw_read_task)', !ran(o, 'cw_read_task').length, calls],
+        ["didn't start it again: its task said it was its own (no cw_start_card)", !ran(o, 'cw_start_card').length, calls]
       ]
     }
   },

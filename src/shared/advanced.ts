@@ -353,6 +353,9 @@ export const ACTIVITY_MAP_MOTION = 'cw.activity.mapMotion'
 /** A card started on an agent is typed as its own words, without Combwork's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 
+/** HI-2854 (Darren's C): the most characters a card's start task carries the whole card in (its decisions and every comment); 0: never. */
+export const WHOLE_CARD_MAX = 'cw.prompt.wholeCardMax'
+
 /**
  * The Combwork Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
  * per server in each workspace: no longer listed, but kept in advanced.json (LEGACY_ADVANCED) so a workspace opened
@@ -1400,6 +1403,22 @@ const SOURCES: readonly AdvancedSource[] = [
     }),
     kind: 'boolean',
     default: false,
+    applies: 'now'
+  },
+  {
+    id: WHOLE_CARD_MAX,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.prompt.wholeCardMax.title', defaultMessage: 'A card in full at its start, up to', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"6000 characters\")." }),
+    desc: msg({
+      id: 'settings.advanced.cw.prompt.wholeCardMax.desc',
+      defaultMessage: "When a card is started on an agent, Combwork gives it the whole card, its decisions and every comment included, if all of it fits in this many characters, so the agent needn't read the card again before it starts. A longer card gets its title, description and latest feedback, and the agent reads the rest. 0 never gives the whole card.",
+      description: 'What the advanced setting "A card in full at its start, up to" does (Settings → Advanced, under Combwork).'
+    }),
+    kind: 'number',
+    default: 6000,
+    min: 0,
+    max: 20000,
+    unit: 'characters',
     applies: 'now'
   },
   // Combwork's guidance for project agents (#1285, #966 row 13), separate from giving them Combwork's tools. The Assistant's role

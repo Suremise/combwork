@@ -559,6 +559,8 @@
   "settings.advanced.cw.prompt.clearDraft.title": "Clear the CLI's draft before Combwork types",
   "settings.advanced.cw.prompt.rawCardStart.desc": "When a card is started on an agent, Combwork gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Combwork's other prompts (its wakes and messages) stay as they are: they are how Combwork and its agents talk.",
   "settings.advanced.cw.prompt.rawCardStart.title": "A card's start in its own words",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "When a card is started on an agent, Combwork gives it the whole card, its decisions and every comment included, if all of it fits in this many characters, so the agent needn't read the card again before it starts. A longer card gets its title, description and latest feedback, and the agent reads the rest. 0 never gives the whole card.",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "A card in full at its start, up to",
   "settings.advanced.cw.queue.checkMinutes.desc": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
   "settings.advanced.cw.queue.checkMinutes.title": "Merge queue: longest a merge check runs",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "Ask each time",

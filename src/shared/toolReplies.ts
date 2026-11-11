@@ -575,10 +575,12 @@ export interface Refused {
   override: string | null
   /** HI-2339: what else to know (a None submit's files left out of its paths), each a line, as a moved reply's. */
   warnings?: string[]
+  /** HI-2854: a refused submit's unseen decisions and comments of the user's, each in full. */
+  unread?: string[]
 }
 
 /** A refusal's three sentences, each on a line, and its rule: what was refused, what to do next, where the rule is changed; then its warnings. */
-export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning }))].join('\n')
+export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning })), ...(r.unread ?? [])].join('\n')
 
 // agent-protocol: intent names and the Combwork tools that take them
 export const INTENT_TOOL: Record<string, string> = { start: 'cw_start_card', submit: 'cw_submit', verdict: 'cw_verdict', 'report merge': 'cw_report_merge', 'put back': 'cw_put_back', 'start review': 'cw_start_review' }

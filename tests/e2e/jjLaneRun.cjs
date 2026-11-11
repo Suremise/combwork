@@ -13,11 +13,15 @@
 //   nothing to check in Publish records;
 // - card 3 in the same slot, copied onto main as Waiting suggests: Done; the lane ends with it, its slot back in the pool
 //   (ready), no review copy leased;
-// - card 4, on its own, a true conflict (it and the user's main change the same line), resolved by hand while
-//   integrating: that changes the card's change, so Combwork can't prove it is there and fails closed: it stays waiting,
-//   nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is their word that
-//   it's integrated (HI-2924): "Done by you, integration not proved", and its slot back in the pool.
-// Screenshots of Waiting (card 2 not in main yet) and the Work section (card 2's route; card 4's Done), both themes.
+// - card 4, on its own, a true conflict (it and the user's main change the same line): main moving under the approved
+//   card rebuilds its candidate (HI-2871), which conflicts, so the card goes back to its builder (HI-2953); the user's
+//   Done, and its slot back in the pool;
+// - card 5, on its own, approved and integrated by hand with a conflict resolved and part of it left out, main moved once
+//   onto the result: its candidate built again there doesn't conflict, but Combwork can't prove the card is there and
+//   fails closed: it stays waiting, nothing Integrated, attributed or published, no bookmark moved by Combwork. The
+//   user's own Done is their word that it's integrated (HI-2924): "Done by you, integration not proved", and its slot
+//   back in the pool.
+// Screenshots of Waiting (card 2 not in main yet) and the Work section (card 2's route; card 5's Done), both themes.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -94,7 +98,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = { ...gitEnvOfTools(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}`, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }
+  const env = lib.withPathFirst({ ...gitEnvOfTools(), CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, jjDir())
   delete env.CW_USER_DATA
   let h = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
@@ -352,10 +356,10 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     check('its slot back in the pool (ready)', !!back, JSON.stringify(await inv('slots:list', shop)))
     check('no review copy left leased', ((await inv('copies:list', shop)) ?? []).every((c) => c.state !== 'leased'), JSON.stringify(await inv('copies:list', shop)))
 
-    // --- Card 4, on its own: a true conflict (it and the user's main change the same line), resolved by hand while
-    // integrating. Combwork can't prove it (the resolution changes the card's change), so it fails closed: it stays
-    // waiting, nothing Integrated, attributed or published, no bookmark moved by Combwork. The user's own Done is a
-    // separate route (HI-2924 decides what follows from it).
+    // --- Card 4, on its own: a true conflict (it and the user's main change the same line). Once main moves under the
+    // approved card, its candidate is built again on main's new head (HI-2871) and conflicts, so the card goes back to its
+    // builder (IntegrationFailed conflict, in Doing), as a Git project's queue returns one (HI-2953: the suite waits for
+    // that return rather than racing it): nothing Integrated or pushed.
     const n4 = (await inv('tasks:create', { title: 'Card four', project: 'shop', agent: b1.id })).number
     const k4 = (await card(n4)).key
     const started4 = await inv('tasks:move', n4, 'doing', { confirm: true, reason: 'jjlane: the conflict card' }).catch((e) => ({ error: String(e) }))
@@ -371,55 +375,114 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     jj(shop, 'commit', '-m', 'the user again')
     jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
     const remoteBefore = remoteMain()
-    const R4b = duplicateOnto(R4, `${k4}: card 4`)
-    check('the copy onto main stores a conflict', id(shop, R4b, 'if(conflict, "yes", "no")') === 'yes')
-    // While the conflict stands: an observation made after the conflicted copy exists (the barrier), and nothing recorded.
-    const g1 = genNow()
-    const seen1 = await observedAfter(n4, k4, g1)
-    console.log(`INFO card 4, the conflict standing: observation ${JSON.stringify(seen1)} (after generation ${g1})`)
-    check('…while the conflict stands (an observation made after it): not in main, not Integrated, not Done', seen1?.state === 'notYet' && seen1.revision === R4 && (await integrationOf(n4)) === null && (await column(n4)) === 'passed', JSON.stringify({ seen1, integration: await integrationOf(n4), column: await column(n4) }))
-    // The user resolves it: the copy's file as they want it, squashed into the copy.
-    jj(shop, 'new', R4b, '-m', 'resolve')
-    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ 0: 'one, by card four and the user', 5: 'six, by card two' }))
-    // Its own description kept (-u): with both described, jj would ask an editor to combine them (HB5 on HI-2923).
-    jj(shop, 'squash', '-u')
-    const R4c = id(shop, `change_id(${id(shop, R4b, 'change_id')})`)
-    check('…resolved: no conflict stored', id(shop, R4c, 'if(conflict, "yes", "no")') === 'no')
-    jj(shop, 'bookmark', 'set', 'main', '-r', R4c)
-    // Fail-closed: an observation made after main moved to the resolved copy (the barrier: its generation reserved after the
-    // move, so its proof read the repository with main at R4c) says it isn't provably there, and nothing is recorded.
-    const g2 = genNow()
-    const seen2 = await observedAfter(n4, k4, g2)
-    console.log(`INFO card 4, after the user's resolution: observation ${JSON.stringify(seen2)} (after generation ${g2})`)
-    check("a hand-resolved integration isn't proved (an observation made after main moved to it): card 4 stays waiting", seen2?.state === 'notYet' && seen2.revision === R4 && seen2.target === 'main' && (await column(n4)) === 'passed', JSON.stringify({ seen2, column: await column(n4) }))
-    check('…nothing Integrated or attributed', (await integrationOf(n4)) === null, JSON.stringify(await integrationOf(n4)))
-    check('…main is the user\'s resolved copy, moved by no one else; nothing pushed', id(shop, 'main') === R4c && remoteMain() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c, remote: remoteMain(), remoteBefore }))
-    check('…nothing to check in Publish records for it', ((await inv('jj:toCheck', shop, null))?.rows ?? []).every((r) => r.card !== k4), JSON.stringify(await inv('jj:toCheck', shop, null)))
-    console.log(`INFO card 4: reviewed ${R4} (change ${change4}); the user's conflicted copy ${R4b}, resolved as ${R4c} (change ${id(shop, R4c, 'change_id')}) on main`)
-    // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
-    const done4 = await inv('tasks:move', n4, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
-    check('the user moves card 4 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n4)) === 'done', HUNG_MS)) && (await integrationOf(n4)) === null, JSON.stringify({ done4, column: await column(n4), integration: await integrationOf(n4) }))
-    // HI-2924 (Darren's decision): the user's own Done is their word that it's integrated. The Work section says so, and
-    // the slot (holding exactly the submitted commits) goes back to the pool without a proof.
-    const unproved = await until(async () => (await inv('tasks:work', n4))?.doneUnproved ?? null, HUNG_MS)
-    check("card 4's Work section: Done by you, integration not proved", !!unproved?.at && (await integrationOf(n4)) === null, JSON.stringify({ doneUnproved: (await inv('tasks:work', n4))?.doneUnproved, integration: await integrationOf(n4) }))
-    await showBoard(h.page)
-    await openByTitle(h.page, n4)
-    const work4 = h.page.locator('.card-work')
-    check('…and the window says so', !!(await until(async () => (await text(work4)).includes('Done by you, integration not proved'), HUNG_MS)), await text(work4))
-    for (const theme of ['dark', 'light']) {
-      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-      await work4.first().screenshot({ path: path.join(shots, `${SUITE}-work-done-unproved-${theme}.png`) })
-    }
-    await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
-    await h.page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
-    for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
+    // main moved under the approved card: its candidate, built again on main's new head, conflicts, and the card goes back
+    // to its builder with the conflict's file named and a comment saying so (the return, not a pass that stays).
+    // Its return is an IntegrationFailed naming the candidate's attempt (`jj:…`: jj has no queue entry, so the Work
+    // section's queue stays empty).
+    const failed4 = async () => ((await inv('tasks:facts', n4)) ?? []).findLast((f) => f.kind === 'IntegrationFailed')?.data ?? null
+    const returned4 = await until(async () => {
+      const f = await failed4()
+      return (await column(n4)) === 'doing' && f?.reason === 'conflict' ? f : null
+    }, HUNG_MS)
+    console.log(`INFO card 4, main moved under it: ${JSON.stringify({ column: await column(n4), failed: await failed4() })}`)
+    check('main moved under approved card 4 (a conflicting change): its rebuilt candidate conflicts, and it goes back to its builder', !!returned4 && String(returned4.entry).startsWith('jj:') && returned4.revision === R4 && returned4.target === 'main', JSON.stringify(returned4))
+    const told4 = await until(async () => ((await card(n4))?.comments ?? []).some((c) => /came back from its jj candidate/.test(c.text ?? '')), HUNG_MS)
+    check('…with a comment saying it came back from its candidate', !!told4, JSON.stringify(((await card(n4))?.comments ?? []).slice(-2)))
+    check('…nothing Integrated, main the user\'s, nothing pushed', (await integrationOf(n4)) === null && remoteMain() === remoteBefore, JSON.stringify({ integration: await integrationOf(n4), remote: remoteMain(), remoteBefore }))
+    console.log(`INFO card 4: reviewed ${R4} (change ${change4}), returned on main at ${id(shop, 'main')}`)
+    // The user leaves it there and moves it to Done themselves (their word, HI-2924): its slot goes back to the pool.
+    const done4 = await inv('tasks:move', n4, 'done', { confirm: true, reason: 'jjlane: done with the returned card' }).catch((e) => ({ error: String(e) }))
+    check('the user moves returned card 4 to Done themselves: Done by you, nothing Integrated', !!(await until(async () => (await column(n4)) === 'done' && !!(await inv('tasks:work', n4))?.doneUnproved, HUNG_MS)) && (await integrationOf(n4)) === null, JSON.stringify({ done4, column: await column(n4), work: await inv('tasks:work', n4) }))
     const back4 = await until(async () => {
       const s = ((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())
       return s && s.state === 'ready' ? s : null
     }, HUNG_MS * 2)
     check("card 4's slot back in the pool after the user's Done (ready)", !!back4, JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w4.folder.toLowerCase())))
-    check('…main still the user\'s resolved copy; nothing pushed', id(shop, 'main') === R4c && remoteMain() === remoteBefore, JSON.stringify({ main: id(shop, 'main'), R4c }))
+
+    // --- Card 5, on its own: approved, then integrated by hand in a way Combwork can't prove, while its candidate never
+    // conflicts. It changes two lines; the user's own commit (main not moved yet) changes the first of them, so their copy
+    // of the card onto it conflicts there. They resolve that line to the card's text and leave the card's other line out,
+    // then move main once, onto the resolved copy. The candidate built again on that head is clean (the first line the
+    // same on both sides, the second applying), so the card isn't returned; but main lacks part of its change, so
+    // Combwork can't prove it is there and fails closed: it stays waiting, nothing Integrated, attributed or published,
+    // no bookmark moved by Combwork. The user's own Done is their word that it's integrated (HI-2924): "Done by you,
+    // integration not proved", and its slot back in the pool.
+    const n5 = (await inv('tasks:create', { title: 'Card five', project: 'shop', agent: b1.id })).number
+    const k5 = (await card(n5)).key
+    const started5 = await inv('tasks:move', n5, 'doing', { confirm: true, reason: 'jjlane: the hand-resolved card' }).catch((e) => ({ error: String(e) }))
+    const w5 = await workOf(n5)
+    check('card 5 starts in a slot', !!w5, JSON.stringify({ started5, w5 }))
+    for (const a of [r1]) {
+      const up = await until(async () => !!(await live(a.id)) || (await inv('session:start', shop, { agentId: a.id }).then(() => true, () => false)), HUNG_MS)
+      check(`${a.name} running for card 5's review`, !!up, JSON.stringify(await live(a.id)))
+    }
+    const lines5 = { 0: 'one, by the user again', 5: 'six, by card two' }
+    const { R: R5, change: change5 } = await buildAndReview(n5, k5, w5.folder, { 'shared.txt': shared({ ...lines5, 1: 'two, by card five', 4: 'five, by card five' }) }, 'card 5')
+    const remoteBefore5 = remoteMain()
+    jj(shop, 'new', 'main', '-m', 'the user, a third time')
+    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ ...lines5, 1: 'two, by the user' }))
+    jj(shop, 'commit', '-m', 'the user, a third time')
+    const U5 = id(shop, '@-')
+    jj(shop, '--ignore-working-copy', 'duplicate', '-r', R5, '--onto', U5)
+    const R5b = id(shop, `description(exact:${JSON.stringify(`${k5}: card 5\n`)}) & ~${R5} & ${U5}+`)
+    check("the user's copy of card 5 onto their own commit stores a conflict", id(shop, R5b, 'if(conflict, "yes", "no")') === 'yes')
+    // The user resolves it: the card's text on the line both changed, the card's other line left out (as it was).
+    jj(shop, 'new', R5b, '-m', 'resolve')
+    fs.writeFileSync(path.join(shop, 'shared.txt'), shared({ ...lines5, 1: 'two, by card five' }))
+    // Its own description kept (-u): with both described, jj would ask an editor to combine them (HB5 on HI-2923).
+    jj(shop, 'squash', '-u')
+    const R5c = id(shop, `change_id(${id(shop, R5b, 'change_id')})`)
+    check('…resolved: no conflict stored', id(shop, R5c, 'if(conflict, "yes", "no")') === 'no')
+    jj(shop, 'bookmark', 'set', 'main', '-r', R5c)
+    // Fail-closed: an observation made after main moved to the resolved copy (the barrier: its generation reserved after the
+    // move, so its proof read the repository with main at R5c) says it isn't provably there, and nothing is recorded.
+    const g5 = genNow()
+    const seen5 = await observedAfter(n5, k5, g5)
+    console.log(`INFO card 5, after the user's resolution: observation ${JSON.stringify(seen5)} (after generation ${g5})`)
+    check("a hand-resolved integration isn't proved (an observation made after main moved to it): card 5 stays waiting", seen5?.state === 'notYet' && seen5.revision === R5 && seen5.target === 'main' && (await column(n5)) === 'passed', JSON.stringify({ seen5, column: await column(n5) }))
+    // Its candidate, built again on main's new head, doesn't conflict: no return, whenever it lands.
+    // Its candidate record (the window's, board_meta) offered on exactly that head, or the card returned (which fails).
+    const candidateOf = (key) => {
+      const prefix = `jj_candidate:${pid.toLowerCase()}:${key.toLowerCase()}:`
+      return metaRead('SELECT value FROM board_meta WHERE substr(key, 1, ?) = ?', prefix.length, prefix).map((r) => JSON.parse(r.value))
+    }
+    const failed5 = async () => ((await inv('tasks:facts', n5)) ?? []).filter((f) => f.kind === 'IntegrationFailed').map((f) => f.data)
+    const rebuilt5 = await until(async () => (await failed5()).length > 0 || candidateOf(k5).some((c) => c.state === 'ready' && c.offer?.expected === R5c), HUNG_MS)
+    console.log(`INFO card 5, its candidate on main's new head: ${JSON.stringify({ candidates: candidateOf(k5), returns: await failed5() })}`)
+    check('…its candidate built again on the new head is clean (offered there): card 5 not returned, still waiting', !!rebuilt5 && !(await failed5()).length && (await column(n5)) === 'passed', JSON.stringify({ returns: await failed5(), column: await column(n5) }))
+    check('…nothing Integrated or attributed', (await integrationOf(n5)) === null, JSON.stringify(await integrationOf(n5)))
+    check('…main is the user\'s resolved copy, moved by no one else; nothing pushed', id(shop, 'main') === R5c && remoteMain() === remoteBefore5, JSON.stringify({ main: id(shop, 'main'), R5c, remote: remoteMain(), remoteBefore5 }))
+    check('…nothing to check in Publish records for it', ((await inv('jj:toCheck', shop, null))?.rows ?? []).every((r) => r.card !== k5), JSON.stringify(await inv('jj:toCheck', shop, null)))
+    console.log(`INFO card 5: reviewed ${R5} (change ${change5}); the user's conflicted copy ${R5b}, resolved as ${R5c} (change ${id(shop, R5c, 'change_id')}) on main`)
+    // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
+    const done5 = await inv('tasks:move', n5, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
+    check('the user moves card 5 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n5)) === 'done', HUNG_MS)) && (await integrationOf(n5)) === null, JSON.stringify({ done5, column: await column(n5), integration: await integrationOf(n5) }))
+    // HI-2924 (Darren's decision): the user's own Done is their word that it's integrated. The Work section says so, and
+    // the slot (holding exactly the submitted commits) goes back to the pool without a proof.
+    const unproved = await until(async () => (await inv('tasks:work', n5))?.doneUnproved ?? null, HUNG_MS)
+    check("card 5's Work section: Done by you, integration not proved", !!unproved?.at && (await integrationOf(n5)) === null, JSON.stringify({ doneUnproved: (await inv('tasks:work', n5))?.doneUnproved, integration: await integrationOf(n5) }))
+    await showBoard(h.page)
+    // Nothing over the board before the click (HI-2953): a dialog standing there is named, with a screenshot, not a click's
+    // timeout.
+    const clear = await until(async () => (await h.page.locator('.overlay').count()) === 0, HUNG_MS)
+    if (!clear) await h.page.screenshot({ path: path.join(shots, `${SUITE}-overlay-over-board.png`) })
+    check('nothing over the board before card 5 is opened', !!clear, JSON.stringify({ overlay: (await text(h.page.locator('.overlay').first())).slice(0, 1000) }))
+    await openByTitle(h.page, n5)
+    const work5 = h.page.locator('.card-work')
+    check('…and the window says so', !!(await until(async () => (await text(work5)).includes('Done by you, integration not proved'), HUNG_MS)), await text(work5))
+    for (const theme of ['dark', 'light']) {
+      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await work5.first().screenshot({ path: path.join(shots, `${SUITE}-work-done-unproved-${theme}.png`) })
+    }
+    await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await h.page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    for (const a of [b1, r1]) await inv('session:stop', shop, a.id).catch(() => undefined)
+    const back5 = await until(async () => {
+      const s = ((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w5.folder.toLowerCase())
+      return s && s.state === 'ready' ? s : null
+    }, HUNG_MS * 2)
+    check("card 5's slot back in the pool after the user's Done (ready)", !!back5, JSON.stringify(((await inv('slots:list', shop)) ?? []).find((x) => x.folder.toLowerCase() === w5.folder.toLowerCase())))
+    check('…main still the user\'s resolved copy; nothing pushed', id(shop, 'main') === R5c && remoteMain() === remoteBefore5, JSON.stringify({ main: id(shop, 'main'), R5c }))
   } finally {
     await h.app.close().catch(() => undefined)
   }

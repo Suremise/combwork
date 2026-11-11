@@ -12,6 +12,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, Maybe } from './types'
+import type { TargetChanges } from '../../shared/types'
 
 /** What a start records of the platform: the card's folder, line, base and target (None: its manifests). */
 export interface StartPlan {
@@ -125,6 +126,11 @@ export interface PlatformAdapter {
    * the head is in the target (an ancestor of it), and its uncommitted files.
    */
   lineNow?(folder: string, target: string): Promise<Maybe<LineNow>>
+  /**
+   * HI-2944: the folder a target is checked out in and its uncommitted files, for a start's warning (Git only; absent:
+   * no such folder). Null: checked out nowhere, clean, or unreadable (a warning, never a refusal).
+   */
+  targetChanges?(target: string): Promise<TargetChanges | null>
   /**
    * Moves an agent's worktree's line to `to` (Git: `reset --keep`, which refuses to overwrite a local change), only from
    * `expect` (its line and head as checked): true; git's reason; or null when the line changed since (nothing moved).

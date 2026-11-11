@@ -613,7 +613,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     // A jj scenario (HI-2800, sc.jj): the pinned jj first on Combwork's PATH (whatever PATH the provider's settings gave
     // it, Copilot's and Codex's included), so its sessions' shells find it too, with a jj config of the run's own.
-    if (sc.jj) Object.assign(env, jjScenarioEnv(root, env.PATH ?? lib.baseEnv().PATH))
+    // PATH read whatever its spelling (HI-2945: PowerShell's copy of Windows' environment gives Path, not PATH).
+    if (sc.jj) Object.assign(env, jjScenarioEnv(root, lib.envValue(env, 'PATH') ?? lib.envValue(lib.baseEnv(), 'PATH')))
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
@@ -1136,9 +1137,11 @@ async function runScenario(sc, providerKey, opts = {}) {
       return e.isDir ? (e.children ?? []).flatMap(flat) : [e.relPath]
     })
     // A non-colocated jj project (HI-2896, sc.separate) has no .git: no Git status or branches to read.
-    observed.gitStatus = sc.separate ? '' : ctx.git('status', '--porcelain')
+    // No repository (a scenario that took alpha out of version control, HI-2854's A/B): neither to read.
+    const noGit = sc.separate || !fs.existsSync(path.join(alpha, '.git'))
+    observed.gitStatus = noGit ? '' : ctx.git('status', '--porcelain')
     // alpha's branches and its Work merges into and other branches as the run left them (HI-2811: Start the next version).
-    observed.branches = sc.separate ? [] : String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
+    observed.branches = noGit ? [] : String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
     observed.targets = await inv('workflow:form', alpha).then((f) => ({ target: f?.options?.target ?? null, otherTargets: f?.options?.otherTargets ?? [] })).catch(() => null)
     // A scenario's own reading of what the run left, through Combwork (its `after`), for its checks: `observed.after`.
     if (sc.after) observed.after = await sc.after(ctx).catch((e) => ({ error: String(e?.message ?? e) }))

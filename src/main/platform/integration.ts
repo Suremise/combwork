@@ -87,7 +87,7 @@ export interface CandidateHost {
    * HI-1185: a program other than git run to its end within a bound, its tree ended there (the signing check's signer),
    * in the queue's run (its lease's job). Left out, a bounded spawn of its own (tests).
    */
-  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number }) => Promise<QueueGitResult>
+  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; argv0?: string; verbatim?: boolean }) => Promise<QueueGitResult>
   /** The longest a signed commit runs (Advanced `cw.queue.signSeconds`). */
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
@@ -182,9 +182,10 @@ export interface IntegrationPort {
   pruneWorkspaces(project: string): Promise<void>
   /**
    * A checked-out target's paused condition read again (Resume's check): `null` when it no longer holds (or the target
-   * isn't checked out), `{}` when it still does or can't be told, with the files it names now.
+   * isn't checked out), `{}` when it still does or can't be told, with the files it names now and (HI-2944: staged or
+   * uncommitted changes, seen there) the folder it saw them in.
    */
-  pausedCondition(project: string, target: string, reason: 'wrongBranch' | 'staged' | 'unstagedChanges', files: string[] | undefined): Promise<{ files?: string[] } | null>
+  pausedCondition(project: string, target: string, reason: 'wrongBranch' | 'staged' | 'unstagedChanges', files: string[] | undefined): Promise<{ files?: string[]; folder?: string } | null>
 
   // Follow mode (HI-1183, SPEC §16.9.4): the target is the branch it tracks on its remote. Optional: a platform without
   // them has no follow mode (the option isn't shown), and the queue never calls them for one.

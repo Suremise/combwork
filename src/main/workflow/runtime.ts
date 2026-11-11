@@ -21,7 +21,7 @@ import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
-import type { StoredText } from '../../shared/types'
+import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
@@ -197,6 +197,8 @@ export interface WorkflowConfig {
   slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
+  /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
+  targetChanges?: (changes: TargetChanges, card: string) => void
   /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
   jj?: JjCardDeps
   /** Runs an agent started that are still going (G13). */
@@ -312,6 +314,9 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
  * is a durable action delivered later, and a fact's reason is stored: both are said in the Default (`stored`) until
  * stored text is said when read (dialects, 4 and 5b); a reply's text is said in the caller's scope.
  */
+/** HI-2944: paths as a warning names them: five at most, then how many more. */
+const filesNamed = (files: readonly string[]): string => (files.length <= 5 ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, 5).join(', '), more: files.length - 5 }))
+
 const W = {
   choiceCarryOn: agentMsg({ id: 'runtime.choice.carryOn', text: 'carry on', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
@@ -334,6 +339,8 @@ const W = {
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
   blocked: agentMsg({ id: 'runtime.start.blocked', text: '{card} is blocked: {why}', note: "A start's warning: the card is blocked. {why}: the block's reason, in its author's words." }),
+  targetChanges: agentMsg({ id: 'runtime.start.targetChanges', text: "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.", note: "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to five paths, then how many more." }),
+  moreFiles: agentMsg({ id: 'runtime.start.moreFiles', text: '{files} and {more} more', note: 'HI-2944: a list of paths cut at five, and how many more there are.' }),
   slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
   slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now." }),
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
@@ -916,6 +923,18 @@ export class Workflow {
     return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
   }
 
+  /**
+   * HI-2854 (Darren's B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
+   * All off: their compiled guards and ids unchanged, so the user's drags there still ask nothing), is refused all the
+   * same while the agent hasn't seen a decision or a comment of the user's: work-on-card no longer reads the card again
+   * before submitting. In the submit's write, under its lock; nothing with the rules off, or what an override leaves out.
+   */
+  private agentHasSeen(w: Write, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    const id: GuardId = 'submit.decisionsReceived'
+    if (!this.enforced() || !inputs.agent || (only && !only(id)) || (w.ruleset?.guards.submit ?? []).includes(id)) return null
+    return evaluate([id], this.guardInputs(w, inputs))
+  }
+
   private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
     return this.idsOf(w.ruleset, move, only)
   }
@@ -1103,6 +1122,13 @@ export class Workflow {
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key }))
+    // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
+    // a merge into it that changes them pauses. A warning only; never asked of a dry run (a drag's plan).
+    const tc = !dry && data.target ? await this.platform(o).targetChanges?.(String(data.target)).catch(() => null) : null
+    if (tc) {
+      warnings.push(say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) }))
+      this.cfg.targetChanges?.(tc, card.key)
+    }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
@@ -1301,6 +1327,17 @@ export class Workflow {
    */
   laneDone(id: number): boolean {
     return this.state(id).stage === 'done'
+  }
+
+  /**
+   * HI-2944: a lane starting for `target` (a start's own warning is gatherStart's): its folder's uncommitted changes told to
+   * the window, and the warning for the caller's reply; null when there are none (or no such folder, or no platform read).
+   */
+  async targetChangesWarning(target: string): Promise<string | null> {
+    const tc = await this.platform(this.cfg.options()).targetChanges?.(target).catch(() => null)
+    if (!tc) return null
+    this.cfg.targetChanges?.(tc, '')
+    return say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) })
   }
 
   /**
@@ -1642,7 +1679,7 @@ export class Workflow {
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
       const ins = this.submitInputs(g)
-      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
+      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
       ahead = this.enforced() && !args.drag && !followUp && g.o.review !== 'none' ? this.laneReorder(w, card) : null
