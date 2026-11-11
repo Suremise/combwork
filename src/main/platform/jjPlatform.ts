@@ -566,7 +566,11 @@ export class JjPlatform implements PlatformAdapter {
     const ch = await this.H.change(ctx.store, mb, P.commit)
     if (isUnknown(ch)) return { ok: false, refusal: this.unknownRefusal(card, ch, 'submit') }
     if (!ch.files.length) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'none' } } }
-    const copies = ch.files.filter((f) => f.status !== 'D' && RECOVERY_COPY.test(f.path)).map((f) => f.path)
+    // Recover…'s copies in any commit of the chain, not only its net change (HR1's HI-2996 round 1): a copy added and
+    // deleted later is still in the history the integration takes. Every path a commit adds or changes, from the store.
+    const touched = await d.git(ctx.store, ['log', '--no-renames', '--format=', '--name-only', '--diff-filter=d', '-z', `${base0}..${P.commit}`])
+    if (!touched.ok) return { ok: false, refusal: this.unknownRefusal(card, unknown(UNREADABLE.commitsSince, { revision: P.commit.slice(0, 7), base: base0.slice(0, 7) }), 'submit') }
+    const copies = [...new Set(touched.out.split('\0').map((x) => x.trim()).filter((x) => x && RECOVERY_COPY.test(x)))]
     if (copies.length) return { ok: false, refusal: this.refused(card, 'recovered', { files: copies.slice(0, 5).join(', ') + (copies.length > 5 ? ', …' : '') }) }
     const inputs: Partial<GuardInputs> = {}
     if (args.guards.includes('submit.clean')) inputs.dirty = []

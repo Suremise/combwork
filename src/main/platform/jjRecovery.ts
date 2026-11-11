@@ -70,10 +70,11 @@ export interface RecoveryRequest {
 /**
  * What a recovery did: each path's outcome, by kind. A refusal says why, with the journal kept for a resume. `copies`: each
  * file it wrote beside its path (`beside` and `late`), relative to the folder with `/` (HI-2996: the window lists them);
- * `x`: the commit it kept (`xKept`), else null.
+ * `asides`: each file it moved aside and had to leave under that name (its path created again meanwhile); `x`: the commit
+ * it kept (`xKept`), else null.
  */
 export type RecoveryResult =
-  | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean; copies: { path: string; copy: string }[]; x: string | null }
+  | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean; copies: { path: string; copy: string }[]; asides: { path: string; copy: string }[]; x: string | null }
   | { ok: false; why: RecoveryRefusal; detail?: string }
 
 export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence'
@@ -93,6 +94,8 @@ interface PathState {
   aside: string
   recovered: string
   outcome?: 'already' | 'restored' | 'beside' | 'kept' | 'deletedLocally'
+  /** The moved-aside file left under its name: its path was created again meanwhile (HI-2996: listed for the window). */
+  asideKept?: boolean
 }
 
 interface Journal {
@@ -486,7 +489,8 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
             await copyFile(s.aside, target, constants.COPYFILE_EXCL)
             await unlink(s.aside)
           } catch {
-            // The path was recreated meanwhile: the moved-aside file keeps its unique name.
+            // The path was recreated meanwhile: the moved-aside file keeps its unique name, and the result says so.
+            s = { ...s, asideKept: existsSync(s.aside) }
           }
         }
         if (e.kind === 'file') s = { ...s, recovered: await besideCopy(preservedFile!, s.recovered) }
@@ -533,7 +537,8 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   const by = (o: PathState['outcome']): string[] => Object.entries(paths).filter(([, s]) => s.outcome === o).map(([p]) => p)
   const rel = (file: string): string => norm(relative(folder, file))
   const copies = [...Object.entries(paths).filter(([, s]) => s.outcome === 'beside').map(([path, s]) => ({ path, copy: rel(s.recovered) })), ...Object.entries(cur.lateCopies ?? {}).map(([path, copy]) => ({ path, copy: rel(copy) }))]
-  return { ok: true, restored: by('restored'), beside: by('beside'), late: cur.late ?? [], deletedLocally: by('deletedLocally'), kept: by('kept'), xKept, copies, x: xKept ? (cur.X ?? null) : null }
+  const asides = Object.entries(paths).filter(([, s]) => s.asideKept).map(([path, s]) => ({ path, copy: rel(s.aside) }))
+  return { ok: true, restored: by('restored'), beside: by('beside'), late: cur.late ?? [], deletedLocally: by('deletedLocally'), kept: by('kept'), xKept, copies, asides, x: xKept ? (cur.X ?? null) : null }
 }
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)

@@ -343,7 +343,7 @@ export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string
       { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
     )
     // What it did, for the window (HI-2996): the copies it wrote beside, the deletions it kept, a divergent commit kept.
-    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why }
+    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, asides: r.asides, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why }
   }
   const held = pool.openLease(name)
   const out = held ? await (await import('./slotCards')).recoverHeldSlot(ws, projectPath, pool, name, held, run) : await pool.recoverStale(name, run)

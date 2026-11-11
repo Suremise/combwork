@@ -1927,6 +1927,8 @@ export interface ProjectConfig {
 export interface SlotRecovery {
   restored: number
   copies: { path: string; copy: string }[]
+  /** Files it moved aside and left there, the version before the recovery: their path was created again meanwhile. */
+  asides: { path: string; copy: string }[]
   keptDeleted: string[]
   divergent: string | null
 }

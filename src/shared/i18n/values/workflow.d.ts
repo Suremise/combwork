@@ -505,6 +505,7 @@ interface CombworkMessageValues {
   'workflow.slots.recoverMessage': undefined
   'workflow.slots.recoverTitle': { slot: string | number }
   'workflow.slots.recovered': { slot: string | number }
+  'workflow.slots.recoveredAsides': { n: number; files: string | number }
   'workflow.slots.recoveredCopies': { n: number }
   'workflow.slots.recoveredDivergent': { commit: string | number }
   'workflow.slots.recoveredKeptDeleted': { n: number; files: string | number }

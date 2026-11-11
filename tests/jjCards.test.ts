@@ -92,16 +92,24 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
         expect(w.wf.state(card).started).toMatchObject({ slot: 'slot-a' })
       })
 
-    it("refuses work holding a copy Recover… wrote beside a file (HI-2996), naming it; once deleted in a later commit, it's taken", async () => {
+    it("refuses work whose commits hold a copy Recover… wrote beside a file (HI-2996), naming it, even once deleted in a later commit; taken once no commit holds it", async () => {
       const w = await world(colocated)
       const a = w.slots['slot-a']
       const card = await started(w, 'recovered copies')
       w.commitIn(a.folder, 'p.txt', a.identity.workspace)
-      w.commitIn(a.folder, 'p.txt.cw-recovered-r-0123abcd', a.identity.workspace)
-      expect(refusedBy(await w.wf.submit(card.key, B1, { summary: 's' }), 'platform.jjRefused').values).toMatchObject({ why: 'recovered', files: 'p.txt.cw-recovered-r-0123abcd' })
-      expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
+      const C = w.commitIn(a.folder, 'p.txt.cw-recovered-r-0123abcd', a.identity.workspace)
+      const refused = async (): Promise<void> => {
+        expect(refusedBy(await w.wf.submit(card.key, B1, { summary: 's' }), 'platform.jjRefused').values).toMatchObject({ why: 'recovered', files: 'p.txt.cw-recovered-r-0123abcd' })
+        expect(w.store.facts(card.id).some((f) => f.kind === 'Submitted')).toBe(false)
+      }
+      await refused()
+      // Deleted in a later commit (HR1's round 1): its net change has no copy, but the earlier commit still holds it.
       rmSync(join(a.folder, 'p.txt.cw-recovered-r-0123abcd'))
       w.h.jj(a.folder, 'commit', '-m', 'copy removed')
+      await refused()
+      // The deletion squashed into the commit that added it: no commit of the work holds the copy now.
+      const D = w.h.id(a.folder, `${a.identity.workspace}@-`)
+      w.h.jj(a.folder, 'squash', '--from', D, '--into', C, '-m', 'p.txt.cw-recovered-r-0123abcd')
       moved(await w.wf.submit(card.key, B1, { summary: 's' }))
     })
 
