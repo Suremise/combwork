@@ -1,7 +1,7 @@
 // A real Claude Code session ending in a jj slot leaves the slot quiet (HI-2912): the real app, the pinned jj (npm run
 // jj:fetch) on its PATH, a throwaway profile and workspace, and the real Claude Code in its test home (CLAUDE_TEST_HOME,
 // claudeHome: 'test'; not signed in there, the suite is skipped, tests/e2e/README.md). A jj card starts for B1 (Haiku)
-// in a slot (a jj workspace); B1 runs jj once there with its Bash tool (one short prompt, tokens); the card is
+// in a slot (a jj workspace); B1 runs jj once there with its Bash tool, as its card says (one short turn, tokens); the card is
 // committed, submitted, passed and integrated by the test as jjwindow does; B1 is stopped, and the slot must come back
 // to the pool by itself (ready, not lent). jj's settle and detach run only once the slot's folder is quiet (slots.ts
 // `quiet`, a rename probe), so a process Claude Code left with its working folder there would keep it out: not back,
@@ -94,7 +94,9 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
 
     // --- A jj card for B1: a slot of its own (a jj workspace), the real Claude Code started there; one turn running jj.
     const launchMark = lib.combworkLogLines(userData).length
-    const n = (await inv('tasks:create', { title: 'Shop work', project: 'shop', agent: b1.id })).number
+    // What B1 does is its card's (a builder started on a card works on it first): run jj once in its folder, nothing more.
+    const description = 'Use the Bash tool once, in your working folder, to run: jj --ignore-working-copy log --no-graph -r @ > jj-ran.txt   Do nothing else: no commit, no submit, no other card or board change. Then reply with the single word DONE.'
+    const n = (await inv('tasks:create', { title: 'Run jj once', description, project: 'shop', agent: b1.id })).number
     const cardKey = (await card(n)).key
     const started = await inv('tasks:move', n, 'doing', { confirm: true, reason: 'jjslot-claude: start' }).catch((e) => ({ error: String(e) }))
     const w1 = await until(async () => {
@@ -106,11 +108,14 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     const slot = path.basename(w1.folder)
     const marker = path.join(w1.folder, 'jj-ran.txt')
     await lib.cliStep('B1 runs jj in its slot', { session: key }, async () => {
-      await lib.acceptClaudeTrust(inv, shop, b1.id, 60000)
-      check('Claude Code starts in the slot', !!(await until(async () => ['ready', 'finished'].includes((await live())?.status), 90000)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
-      const prompt = 'Use the Bash tool once to run: jj --ignore-working-copy log --no-graph -r @ > jj-ran.txt   Then reply with the single word DONE.'
-      await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live())?.status === 'working' || fs.existsSync(marker), ready: () => lib.combworkToolsConnected(userData, b1.id, launchMark) })
-      check('B1 ran jj there (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), 120000)), lib.plainText(await inv('pty:buffer', key)).slice(-600))
+      // The slot's trust question, answered once it shows (the session starts with the card, after the slot is made).
+      const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-1500)
+      const trusted = await until(async () => {
+        if (/trust this folder/i.test(await screen())) await lib.acceptClaudeTrust(inv, shop, b1.id, 15000)
+        return lib.combworkToolsConnected(userData, b1.id, launchMark) && !/trust this folder/i.test(await screen())
+      }, 90000)
+      check('Claude Code starts in the slot, its Combwork tools connected', !!trusted, await screen())
+      check('B1 ran jj there, as its card asks (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), 180000)), await screen())
       check('…and its turn ended', !!(await until(async () => ['ready', 'finished'].includes((await live())?.status), 120000)), JSON.stringify(await live()))
     })
 
