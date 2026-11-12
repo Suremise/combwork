@@ -7971,6 +7971,12 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
   another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
   with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
+  The merge queue's folder (HI-3027) removes such a checkout earlier: just before its test merge, strict's update or
+  a rebase, each checkout of its own clones (as above, but claimed whether or not a gitlink is there now) that the
+  revision checked out or the one merged into it doesn't keep as a submodule (vendored into ordinary files, or gone),
+  folder and all; its clone stays. git's checkout and merge leave a populated submodule's folder in place, whose files
+  would otherwise stand as untracked where the card tracks its own, pausing the queue on every pass. A doubtful one is
+  left for git to name.
 - **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
   status reports it (a user's `ignore` setting honoured).
 - **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A

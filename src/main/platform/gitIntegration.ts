@@ -4,7 +4,7 @@
 // platform's reads (head, sameChange) are platform/git.ts's as before. The queue's worktree is made or reused (never
 // removed or pruned), a failure leaves it clean at the target's head, and a result is kept on `refs/cw/queue/*`.
 
-import { SKIP_SMUDGE } from './gitModules'
+import { clearSubmoduleCheckouts, SKIP_SMUDGE } from './gitModules'
 import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
 import { git } from '../git'
@@ -65,9 +65,11 @@ function signs(h: CandidateHost, f: string): Promise<boolean | Again> {
  * repository's worktree list names it (HI-2019: never because a folder is there); made when it is neither there nor
  * listed, or there and empty. A git that failed (the listing, the add, the checkout, which may have done part of its
  * work) is `again`: the next pass looks afresh. Nothing is ever removed or pruned: a folder there but not listed with
- * something in it, or listed but gone, is left as it is and pauses, named.
+ * something in it, or listed but gone, is left as it is and pauses, named. HI-3027: a reused folder's own submodule
+ * checkouts that `at` or a revision it will merge (`merging`) doesn't keep as a submodule are removed first, so their
+ * files never stand in the way of that revision's own (clearSubmoduleCheckouts).
  */
-async function folderAt(h: CandidateHost, at: string): Promise<Again | CandidatePause | null> {
+async function folderAt(h: CandidateHost, at: string, merging: string[] = []): Promise<Again | CandidatePause | null> {
   const f = h.folder
   const list = await h.run(h.project, ['worktree', 'list', '--porcelain'])
   if (!list.ok) return again(list.err)
@@ -75,6 +77,9 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
   const there = existsSync(f)
   if (listed && there) {
+    const runGit = { git: (cwd: string, args: string[], o?: { env?: Record<string, string> }) => h.run(cwd, args, o?.env ? { env: { ...process.env, ...o.env } } : undefined) }
+    const cleared = await clearSubmoduleCheckouts(runGit, f, [at, ...merging])
+    if (cleared) return again(cleared)
     const co = await h.run(f, ['checkout', '--detach', '-f', at])
     if (!co.ok) return again(co.err)
     await h.run(f, ['clean', '-fdq'])
@@ -426,7 +431,7 @@ export const gitIntegration: IntegrationPort = {
     const id = await h.identity()
     if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [h.project] }
-    const at = await folderAt(h, revision)
+    const at = await folderAt(h, revision, [expected])
     if (at) return at
     const f = h.folder
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
@@ -484,11 +489,11 @@ export const gitIntegration: IntegrationPort = {
     if (c.style === 'rebase') return rebaseOnto(h, { ...c, base: c.base || (await mergeBase(h, c.revision, c.expected)) }, id)
     const { expected } = c
     const f = h.folder
-    const at = await folderAt(h, expected)
+    const revision = c.updated ?? c.revision
+    const at = await folderAt(h, expected, [revision])
     if (at) return at
     const message = await c.message()
     if (isAgain(message)) return message
-    const revision = c.updated ?? c.revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = c.style === 'squash'
     // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
@@ -555,7 +560,7 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
   if (onTop.code !== 0 && onTop.code !== 1) return again(onTop.err)
   // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
   // lands as it is, and its merge checks still run there, on exactly that revision.
-  const at = await folderAt(h, revision)
+  const at = await folderAt(h, revision, [expected])
   if (at) return at
   let result = revision
   if (!linear || onTop.code !== 0) {
