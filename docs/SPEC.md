@@ -3281,7 +3281,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   preparation publishes the new key with the old base and submitted commits, no jj write. What the card left in the
   folder uncommitted is its own and stays (HI-2981): the pool's dirty refusal is skipped when the port's `carries`
   says the preparation carries the slot's binding (`carriesBinding`, the same test the preparation makes), as Git's
-  same branch skips it; any other preparation over uncommitted edits is refused as before. On another target it is
+  same branch skips it; any other preparation over uncommitted edits is refused as before. A carry is never of a stale
+  workspace (HI-3095: the card's commit rewritten elsewhere while its slot was kept, a rebase say): the preparation
+  reads the folder's staleness at the pinned head it carries at (`staleAt`) and refuses `stale` (unknown: refused too),
+  so the start says `slot.prepare.stale` with Recover… (`SlotPrepareFailed`'s `stale`) before any agent runs there, and
+  nothing in the folder changes: an edit not recorded yet stays for Recover… to keep aside, where a builder's
+  `jj workspace update-stale` would have dropped it. On another target it is
   refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
   recovered.
 - **A card lease ended with the card's committed work in its slot** (HI-2995; design HI-2995/s12): put back, or

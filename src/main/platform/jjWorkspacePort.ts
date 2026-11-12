@@ -957,10 +957,15 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         return step(true)
       }
       // Carried: the slot's working copy still on the binding's base (read pinned), then the guard at that head, then
-      // published. Nothing in the folder changes.
+      // published. Nothing in the folder changes. Never a stale workspace (HI-3095: the card's commit rewritten elsewhere
+      // while it was kept, a rebase say): refused `stale`, said with Recover…, before any agent runs there and a
+      // `jj workspace update-stale` drops its unrecorded edits. Unknown: refused as well.
       if (carry && j.phase !== 'writing' && j.phase !== 'written') {
         const H = await pinned(folder)
         if (isUnknown(H)) return refuse(H.detail ?? H.what)
+        const stale = await staleAt(folder, H)
+        if (isUnknown(stale)) return refuse(stale.detail ?? stale.what)
+        if (stale) return refuse(JJ_REFUSED.stale)
         const on = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::${revsetName(ws)}@`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revisionIn, { folder }))
         if (isUnknown(on) || lines(on)[0] !== bound.base) return refuse(isUnknown(on) ? (on.detail ?? on.what) : JJ_REFUSED.notBound)
         const g = await guard(H)
