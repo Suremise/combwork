@@ -90,7 +90,7 @@ let privateIndexes = 0
  * from outside never removes its lock), git leaves only the copy's lock, Combwork's own by its name, removed with the
  * copy. What git did to the shown paths' entries is then taken into the real index in one short step (takeEntries).
  */
-async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], fn: (env: NodeJS.ProcessEnv, copy: string, take: () => Promise<Taken>) => Promise<T>): Promise<T> {
+async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], fn: (env: NodeJS.ProcessEnv, copy: string, take: (made?: Made) => Promise<Taken>) => Promise<T>): Promise<T> {
   const where = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
   if (!where.ok || !where.out.trim()) throw failed(m, where.err || "git didn't say where its index is") // i18n-ignore: stands in for git's own (English) words
   const index = resolve(where.out.trim())
@@ -100,11 +100,12 @@ async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M
     if (e?.code !== 'ENOENT') throw failed(m, e?.message ?? String(e))
   })
   try {
-    // HI-3053: the real index's entries for `files` as the copy was taken (git writes an index whole, by its lock and a
-    // rename, so the copy is one index git wrote): what they must still be when git's are taken in, or kept.
-    const was = await entriesIn(folder, files, copy)
+    // HI-3053: the real index's entries as the copy was taken (git writes an index whole, by its lock and a rename, so
+    // the copy is one index git wrote): what they must still be when git's are taken in, or kept. Every entry (HI-3074:
+    // a commit's hook can change paths beyond `files`).
+    const was = await entriesIn(folder, null, copy)
     if (!was.ok) throw failed(m, was.why)
-    return await fn({ ...quietEnv(), GIT_INDEX_FILE: copy }, copy, () => takeEntries(folder, index, copy, files, was.entries))
+    return await fn({ ...quietEnv(), GIT_INDEX_FILE: copy }, copy, (made) => takeEntries(folder, index, copy, made?.paths ?? files, was.entries, made?.entries))
   } finally {
     await removePrivateIndex(copy)
   }
@@ -187,8 +188,8 @@ export function changedPaths(files: readonly string[], was: readonly string[], n
  * Combwork's own file steps while the lock is held. Another git wrote the index meanwhile: made again from its new bytes,
  * a few times; still moving, the entries are made under the lock unrefreshed (git's own work alone, no filter).
  */
-async function takeEntries(folder: string, index: string, copy: string, files: string[], was: readonly string[]): Promise<Taken> {
-  const from = await entriesIn(folder, files, copy)
+async function takeEntries(folder: string, index: string, copy: string, files: string[], was: readonly string[], made?: readonly string[]): Promise<Taken> {
+  const from = made ? { ok: true as const, entries: [...made] } : await entriesIn(folder, files, copy)
   if (!from.ok) return from
   const fmt = await git(folder, ['rev-parse', '--show-object-format'])
   const none = '0'.repeat(fmt.out.trim() === 'sha256' ? 64 : 40)
@@ -320,13 +321,13 @@ async function noHooks(folder: string, copy: string): Promise<{ ok: true; args: 
   return { ok: true, args: ['-c', `core.hooksPath=${copy}.no-hooks`, '-c', 'core.fsmonitor=false', ...[...names].flatMap((n) => ['-c', `hook.${n}.command=true`])] }
 }
 
-/** The entries the private index `copy` has for `files`, as `ls-files -s` says them (mode, object, stage, path). */
-async function entriesIn(folder: string, files: string[], copy: string): Promise<{ ok: true; entries: string[] } | { ok: false; why: string }> {
+/** The entries the private index `copy` has for `files` (null: every one), as `ls-files -s` says them (mode, object, stage, path). */
+async function entriesIn(folder: string, files: string[] | null, copy: string): Promise<{ ok: true; entries: string[] } | { ok: false; why: string }> {
   // Every entry, those of `files` kept (ls-files takes no pathspecs on its input, and they can be many). No fsmonitor.
   const ls = await git(folder, ['-c', 'core.fsmonitor=false', 'ls-files', '-s', '-z', '--full-name'], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: copy } })
   if (!ls.ok) return { ok: false, why: gitErrorLine(ls.err) || ls.err.trim() }
-  const wanted = new Set(files)
-  return { ok: true, entries: ls.out.split('\0').filter((e) => e && wanted.has(e.slice(e.indexOf('\t') + 1))) }
+  const wanted = files && new Set(files)
+  return { ok: true, entries: ls.out.split('\0').filter((e) => e && (!wanted || wanted.has(e.slice(e.indexOf('\t') + 1)))) }
 }
 
 /** The same entries, whatever their order: each side sorted once (HR2's round 4: never once per entry). */
@@ -365,6 +366,35 @@ async function madeByThis(folder: string, now: string, before: string | null, me
     return `${mode} ${object}\t${path}`
   })
   return sameEntries(inTree, fromCopy)
+}
+
+/** HI-3074: what a commit leaves the index: its paths (those shown, and every path it changed) and its entries for them. */
+interface Made {
+  paths: string[]
+  entries: string[]
+}
+
+/**
+ * HI-3074: the index entries commit `made` gives `files` and every path it changed from `before` (null: its first
+ * commit, all of its paths), as `ls-files -s` says them (`mode object 0\tpath`): a path not in its tree has none (taken
+ * out of the index). So the index matches the commit, whatever its hooks staged.
+ */
+async function entriesOfCommit(folder: string, made: string, before: string | null, files: string[]): Promise<({ ok: true } & Made) | { ok: false; why: string }> {
+  const changed = await git(folder, ['diff-tree', '-r', '-z', '--no-renames', '--name-only', '--no-commit-id', ...(before ? [before, made] : ['--root', made])])
+  if (!changed.ok) return { ok: false, why: gitErrorLine(changed.err) || changed.err.trim() }
+  const paths = [...new Set([...files, ...changed.out.split('\0').filter(Boolean)])]
+  const tree = await git(folder, ['ls-tree', '-r', '-z', '--full-tree', made])
+  if (!tree.ok) return { ok: false, why: gitErrorLine(tree.err) || tree.err.trim() }
+  const wanted = new Set(paths)
+  // ls-tree's `mode type object\tpath` as the index's `mode object 0\tpath`.
+  const entries = tree.out
+    .split('\0')
+    .filter((e) => e && wanted.has(pathOf(e)))
+    .map((e) => {
+      const [mode, , object] = e.slice(0, e.indexOf('\t')).split(' ')
+      return `${mode} ${object} 0\t${pathOf(e)}`
+    })
+  return { ok: true, paths, entries }
 }
 
 /** The environment of these commits: no prompt is ever waited on (a passphrase, credentials, a credential manager). */
@@ -511,7 +541,11 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
       throw failed(M.commitFailed, r.ok ? "git couldn't read HEAD after the commit" : `${r.err}\n${r.out}`) // i18n-ignore: stands in for git's own (English) words
     }
     if (!r.ok) log.warn(`A commit in ${userText(folder)} was ended at its bound after it was made (${made})`)
-    const took = await take()
+    // HI-3074: from the commit, never the private index: a pre-commit hook's `git add` (a formatter, a generated file)
+    // goes into what git commits, not into the private index.
+    const entries = await entriesOfCommit(folder, made, before, files)
+    if (!entries.ok) throw combworkError(M.indexNotTaken, { action: 'commit', made: made.slice(0, 12), why: entries.why })
+    const took = await take(entries)
     if (!took.ok) throw combworkError(M.indexNotTaken, { action: 'commit', made: made.slice(0, 12), why: took.why })
     if (took.kept.length) throw indexKept('commit', made, took.kept)
     return made
