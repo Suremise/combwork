@@ -48,11 +48,11 @@ function following(o: Partial<WorkflowOptions> = {}, opts: { checkedOut?: boolea
   return { e, bare, transport, queue }
 }
 
-async function queued(e: Env, title: string, file: string, text = `${title}\n`) {
+async function queued(e: Env, title: string, file: string, text = `${title}\n`, more: Record<string, string> = {}) {
   const card = e.wf.createCard({ title })
   const s = await e.wf.start(card.key, B1)
   moved(s)
-  commit(s.data!.folder as string, { [file]: text }, title)
+  commit(s.data!.folder as string, { [file]: text, ...more }, title)
   moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   return card
 }
@@ -675,9 +675,9 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
   })
 
   /** A published, Done; Combwork stopped inside its catch-up into the checked-out main at `at` (journalled). */
-  async function stoppedIn(at: 'beforeCatchUpRef' | 'beforeCatchUpFiles') {
+  async function stoppedIn(at: 'beforeCatchUpRef' | 'beforeCatchUpFiles', more: Record<string, string> = {}) {
     const f = following({}, { checkedOut: true })
-    const a = await queued(f.e, 'A', 'a.txt')
+    const a = await queued(f.e, 'A', 'a.txt', 'A\n', more)
     await expect(f.queue({ hooks: { [at]: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
     expect(f.e.wf.state(a).stage).toBe('done')
     expect(catchUpOf(f.e.store.meta(catchUpKey('main')))?.phase).toBe(at === 'beforeCatchUpRef' ? 'ref' : 'files')
@@ -727,6 +727,22 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     const owed = catchUpOf(e.store.meta(catchUpKey('main')))
     expect(owed).toMatchObject({ card: a.key })
     expect(owed?.phase).toBeUndefined()
+  })
+
+  it('HI-3090 (HR1): stopped between its files and its ref, the user commits only one of the two files it staged: the committed one never rolled back; the other kept staged; paused remoteDiverged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, transport, a } = await stoppedIn('beforeCatchUpRef', { 'b.txt': 'B\n' })
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  a.txt\nA  b.txt')
+    sh(e.project, 'commit', '-q', '--only', '-m', 'mine', '--', 'a.txt')
+    const mine = head(e.project)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  b.txt')
+    await restarted(e, transport).drain('main')
+    expect(head(e.project)).toBe(mine)
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(readFileSync(join(e.project, 'b.txt'), 'utf8')).toBe('B\n')
+    // No staged deletion of the user's committed a.txt; b.txt left staged at the result, as it was.
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  b.txt')
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'remoteDiverged', card: a.key })
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))?.phase).toBeUndefined()
   })
 
   it('HI-3089: Resume of a catch-up whose remote can’t be read, nothing else queued: still paused (fetchFailed, git’s words), never cleared silently; read again, caught up', { timeout: GIT_HEAVY_MS * 2 }, async () => {
