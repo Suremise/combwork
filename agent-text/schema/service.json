@@ -330,6 +330,14 @@
   "service.folderChanges.indexBusy": {
     "placeholders": {}
   },
+  "service.folderChanges.indexKept": {
+    "placeholders": {
+      "action": "select",
+      "made": "plain",
+      "file": "plain",
+      "others": "plural"
+    }
+  },
   "service.folderChanges.indexNotTaken": {
     "placeholders": {
       "action": "select",
