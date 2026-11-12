@@ -423,6 +423,12 @@ export interface FactData {
    */
   ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant'; override?: ForwardOverride }
   /**
+   * HI-3040: the user's explicit override of the release path's direction, recorded on a resolution the queue returned
+   * for its direction (`entry`: that failed entry's id), by a forward request with the override for its pair. Sets the
+   * resolution's `override`, and lets its same revision go back in once, as a requeue bound to that entry.
+   */
+  ResolutionOverride: { override: ForwardOverride; entry: string; by: 'user' | 'assistant' }
+  /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its
    * own (`retargetCard.ts`). `base`: its latest submission's merge base with `to` (a card reviewed: the same commits), which
@@ -552,6 +558,8 @@ export interface CardState {
   forward: FactData['ForwardRequested'] | null
   /** HI-2959: the forward merge this card resolves (its `ForwardResolution`), over every cycle; null for every other card. */
   resolves: FactData['ForwardResolution'] | null
+  /** HI-3040: the queue entry a recorded `ResolutionOverride` lets its revision requeue after (once), or null. */
+  overrideEntry: string | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
@@ -624,6 +632,7 @@ export const emptyState = (): CardState => ({
   stale: null,
   forward: null,
   resolves: null,
+  overrideEntry: null,
   staleSince: null,
   requests: [],
   made: {},
@@ -773,6 +782,13 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'ForwardResolution': {
         s.resolves = f.data as FactData['ForwardResolution']
+        break
+      }
+      case 'ResolutionOverride': {
+        const d = f.data as FactData['ResolutionOverride']
+        if (!s.resolves) break
+        s.resolves = { ...s.resolves, override: d.override }
+        s.overrideEntry = d.entry
         break
       }
       case 'Retargeted': {

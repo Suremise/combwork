@@ -594,6 +594,13 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   const done = await cardBatch(ws, async (): Promise<ForwardDone> => {
     // One open for this pair: that one (not Done: queued, advancing, or back for a Retry), or HI-3000 the card resolving it.
     const open = openPairs(wf).get(pairKey(from, to))
+    // HI-3040: a resolution the queue returned for its direction takes the override (recorded in its own write, which
+    // checks it again, and wakes its builder to submit the same revision again); nothing else made.
+    if (open && override && wf.state(open).resolves && !wf.state(open).resolves!.override) {
+      const r = await runIntent(wf, open.id, actor, (x) => x.overrideResolution(open.id, { from, to, override }, by, guard), undefined, guard)
+      if (isRefusal(r.reply)) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
+      return { card: r.saved ?? (await readTask(open.id, { kind: 'user' })), queued: false, from, to, overridden: true }
+    }
     if (open && override && !(wf.state(open).forward ?? wf.state(open).resolves)?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
     if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
     guard?.()

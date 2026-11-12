@@ -8,7 +8,9 @@ import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { forwardOf, MERGE_COMMIT, rulesBaseId } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
-import type { FactData } from '../../src/shared/workflow/facts'
+import type { CardState, FactData, QueueEntry } from '../../src/shared/workflow/facts'
+import { GUARD_FNS } from '../../src/shared/workflow/guards'
+import type { Ruleset } from '../../src/shared/workflow/compile'
 import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
 import { historyOf } from '../../src/main/platform/historyPorts'
 import type { ForwardOverride } from '../../src/shared/workflow/forwardOrder'
@@ -327,6 +329,29 @@ describe('a default branch that can’t be read or named at the merge is no answ
       H.defaultTarget = real
     }
     expect(reads).toBe(0)
+  })
+})
+
+describe('the override recorded on a resolution returned for its direction lets its revision back in once (HI-3040)', () => {
+  const entry = (id: string, seq: number, o: Partial<QueueEntry> = {}): QueueEntry => ({ id, seq, revision: 'abc1234', target: '1.2.0', state: 'failed', phases: [], ...o })
+  const failed = (id: string, reason: 'direction' | 'checks', transient: boolean): Partial<QueueEntry> => ({ failure: { entry: id, revision: 'abc1234', target: '1.2.0', reason, transient } as QueueEntry['failure'] })
+  const allowed = (entries: QueueEntry[], overrideEntry: string | null) =>
+    GUARD_FNS['requeue.allowed']({ card: { key: 'AM-2', kind: 'code', labels: [], blocked: null }, state: { latest: { id: 1 }, entries, overrideEntry } as unknown as CardState, ruleset: {} as Ruleset, agent: null, revision: 'abc1234' })
+  // Two transient requeues used already (the limit), then the direction return.
+  const atCap = [entry('e1', 2, failed('e1', 'checks', true)), entry('e2', 3, { requeue: 'transient', ...failed('e2', 'checks', true) }), entry('e3', 4, { requeue: 'transient', ...failed('e3', 'checks', true) }), entry('e4', 5, { requeue: 'transient', ...failed('e4', 'direction', false) })]
+
+  it('bound to the direction-failed entry: allowed, whatever transient requeues counted', () => {
+    expect(allowed(atCap, 'e4')).toBeNull()
+  })
+
+  it('no override, or one bound to another entry: the ordinary rules (not transient: refused)', () => {
+    expect(allowed(atCap, null)).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
+    expect(allowed(atCap, 'e3')).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
+  })
+
+  it('used: once its requeue has an entry of its own, the binding never matches again (its transient return at the cap is refused)', () => {
+    const after = [...atCap, entry('e5', 6, { requeue: 'transient', ...failed('e5', 'checks', true) })]
+    expect(allowed(after, 'e4')).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueLimit' } })
   })
 })
 
