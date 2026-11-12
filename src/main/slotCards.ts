@@ -72,6 +72,7 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
 import { briefOf } from './laneBriefs'
+import { asCardCounts } from './workflow/containment'
 
 const log = createLogger('slots')
 
@@ -1830,7 +1831,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       if (!allowed()) return false
       const head = await port().lineHead(projectPath, line)
       if (isUnknown(head) || !head) return false
-      const inTarget = await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null })
+      const inTarget = asCardCounts(s, await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null }))
       if (isUnknown(inTarget) || !inTarget) return false
       const before = await port().list(projectPath).catch(() => null)
       if (!before || before.some((w) => w.line === line) || !allowed()) return false

@@ -5974,7 +5974,9 @@ merge commit with the destination's tree, through the merge checks. A card's sub
 refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card. A forward's
 resolution is the exception (HI-3082): its merge commit bringing the resolved `source` into its history, the source not
 in its base's, is its work even when it changes no file (the destination's side kept, or a forward returned for a check
-whose merge changes nothing), and the queue merges it as a merge commit, never taking it as already there by its tree.
+whose merge changes nothing), and the queue merges it as a merge commit. A forward and its resolution count as in the
+destination only by ancestry wherever that is read (`asCardCounts`, workflow/containment.ts: the queue, reconciliation,
+a pass's no-code proposal, an agent's merge report, a dependency, a line's removal), never by its tree or a squash.
 
 **Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
 next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the

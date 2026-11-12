@@ -28,6 +28,7 @@ import { inTargetNow } from '../../shared/workflow/workView'
 import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 import { checksKeyOf } from './jjCandidateChecks'
+import { asCardCounts } from './containment'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -331,7 +332,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const approved = { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key }
     // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
-      const c = await H.contains(project, target, approved)
+      const c = asCardCounts(s, await H.contains(project, target, approved))
       if (!isUnknown(c) && c) {
         await hooks.afterRead?.()
         return integratedOutside(wf, H, card, s, approved.revision, c.method, [])
@@ -394,7 +395,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     // submission, for the submission it was read for.
     if (inTargetNow(s)) return
     const sub = s.latest
-    const c = await H.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
+    const c = asCardCounts(s, await H.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key }))
     if (isUnknown(c) || !c) return
     await hooks.afterRead?.()
     await wf.write(card, null, 'outside', (w) => {
@@ -433,7 +434,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
     const from = s.latest?.base ?? base
     if (!revision || !from || revision === from) return
-    const c = await H.contains(project, target, { base: from, revision, key: s.latest?.key })
+    const c = asCardCounts(s, await H.contains(project, target, { base: from, revision, key: s.latest?.key }))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
     const th = await H.lineHead(project, target)
@@ -472,7 +473,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
       }
     }
     const sub = s.latest
-    const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
+    const c = asCardCounts(s, await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     // HI-3041 (Darren's 3a): merged back by hand (the card's own change in its target again, by the test that marks it
     // left), the mark cleared too, not only once the queue's result is back.
