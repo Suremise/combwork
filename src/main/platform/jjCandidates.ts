@@ -1060,7 +1060,8 @@ export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptR
 
 /** What a drop did: the refs it deleted, those it kept and why, the commits it abandoned and those it kept. */
 export interface JjDropped {
-  dropped: { refs: string[]; keptRefs: { ref: string; why: 'reached' | 'kept' | 'notOwned' }[]; abandoned: string[]; kept: string[] }
+  /** `keptSuccessors` (HI-3045): its hidden commits' visible successors left alone, as the user's or unclassifiable. */
+  dropped: { refs: string[]; keptRefs: { ref: string; why: 'reached' | 'kept' | 'notOwned' }[]; abandoned: string[]; kept: string[]; keptSuccessors?: JjKeptSuccessor[] }
   record: JjAttemptRecord
 }
 
@@ -1094,18 +1095,24 @@ async function reachedNow(a: Attempt, target: string, ids: readonly string[]): P
  * attempt's hidden commits, exactly one visible commit outside the attempt's, not divergent, and the same change as the
  * attempt's last commit of that change (`jj interdiff` empty) with the same description and author (HR1's round 1):
  * rebased, never edited; a change the user made to its files or its metadata is theirs and kept. Read at the single head; never owned until the drop adopts them.
+ *
+ * HI-3045 (design HI-3045/s15): and only those **jj's automatic rebase** made (`automaticRebase`); one the user's own
+ * operation made (their `jj rebase` of the candidate, say, before setting the target onto it) is theirs and kept, as is
+ * one whose operation can't be classified (concurrent history, or a history cut short below it). Every successor is
+ * classified before any is adopted, by reads alone: a read that fails stops the drop (interrupted, nothing adopted).
  */
-async function successorsOf(a: Attempt): Promise<string[]> {
+async function successorsOf(a: Attempt): Promise<{ adopt: string[]; kept: JjKeptSuccessor[] }> {
   const rec = a.rec
-  if (!rec.commits.length) return []
+  const none = { adopt: [], kept: [] }
+  if (!rec.commits.length) return none
   const op = a.head()
   const shown = new Set((await a.commits(op, visibleOf(rec.commits))).map((c) => c.commit))
   const hidden = rec.commits.filter((c) => !shown.has(c))
-  if (!hidden.length) return []
+  if (!hidden.length) return none
   // Named by their ids, hidden commits are read as they were (their change ids among them).
   const was = await a.commits(op, set(hidden))
   const mine = new Set(rec.commits)
-  const found: string[] = []
+  const found: Successor[] = []
   for (const change of new Set(was.map((c) => c.change))) {
     const now = (await a.commits(op, `change_id(${change}) & ::visible_heads()`)).filter((c) => !mine.has(c.commit))
     if (now.length !== 1 || now[0].divergent) continue
@@ -1117,10 +1124,106 @@ async function successorsOf(a: Attempt): Promise<string[]> {
     // `jj metaedit` changes them with the files untouched, and that edit is theirs.
     const meta = async (id: string): Promise<string> => a.read(op, ['log', '--no-graph', '-r', id, '-T', META_T])
     if ((await meta(from)) !== (await meta(now[0].commit))) continue
-    found.push(now[0].commit)
+    found.push({ pred: was.find((w) => w.commit === from)!, succ: now[0] })
   }
+  const out = found.length ? await classifySuccessors(a, op, found) : none
   if (!a.reads.stillAt(op)) throw new Stop('raced', 'successors read') // i18n-ignore: a protocol detail for logs and tests, never shown
-  return found
+  return out
+}
+
+/** A hidden commit of the attempt's, and the visible successor of its change. */
+interface Successor {
+  pred: JjCommit
+  succ: JjCommit
+}
+
+/** A successor the drop left alone (HI-3045): made by the user's own operation, or by one that couldn't be classified. */
+export interface JjKeptSuccessor {
+  commit: string
+  why: 'user' | 'concurrent' | 'history'
+}
+
+/** The operation that made a commit, and that operation's parents, as `jj evolog` names them (one entry). */
+const EVOLOG_OP_T = `operation.id() ++ "${SEP}" ++ operation.parents().map(|o| o.id()).join(",") ++ "\\n"`
+const OP_ID = /^[0-9a-f]{128}$/
+const ROOT_OP = /^0+$/
+
+/**
+ * HI-3045: the successors grouped by the operation that made each (one `jj evolog` read each, at the head), each group
+ * decided whole: an operation with several parents (concurrent history) or with the root as its parent (history cut
+ * short below it: `jj op abandon`) can't be classified, and its successors are kept; else `automaticRebase` decides.
+ * Reads only, every group decided before anything is adopted.
+ */
+async function classifySuccessors(a: Attempt, head: string, found: Successor[]): Promise<{ adopt: string[]; kept: JjKeptSuccessor[] }> {
+  const groups = new Map<string, { parents: string[]; list: Successor[] }>()
+  for (const f of found) {
+    const [l, ...more] = lines(await a.read(head, ['evolog', '--no-graph', '--limit', '1', '-r', f.succ.commit, '-T', EVOLOG_OP_T]))
+    const parts = l?.split(SEP)
+    if (!parts || more.length || parts.length !== 2 || !OP_ID.test(parts[0])) throw new Stop('malformed', l)
+    const parents = parts[1] ? parts[1].split(',') : []
+    if (!parents.every((p) => OP_ID.test(p))) throw new Stop('malformed', l)
+    const g = groups.get(parts[0]) ?? { parents, list: [] }
+    g.list.push(f)
+    groups.set(parts[0], g)
+  }
+  const adopt: string[] = []
+  const kept: JjKeptSuccessor[] = []
+  const keep = (list: Successor[], why: JjKeptSuccessor['why']): void => void kept.push(...list.map((f) => ({ commit: f.succ.commit, why })))
+  for (const [op, g] of groups) {
+    if (g.parents.length !== 1) keep(g.list, 'concurrent')
+    else if (ROOT_OP.test(g.parents[0])) keep(g.list, 'history')
+    else if (await automaticRebase(a, head, op, g.parents[0], g.list)) adopt.push(...g.list.map((f) => f.succ.commit))
+    else keep(g.list, 'user')
+  }
+  return { adopt, kept }
+}
+
+/**
+ * HI-3045 (HI-3045/s15 §1): whether operation `op` (parent `parent`) made these successors by jj's automatic rebase of
+ * descendants, the only shape adopted: for each, its parents in order are its predecessor's, each either (inside the
+ * attempt) that commit's own successor in this group, or (outside) the same commit or that parent's change **rewritten
+ * in place** by `op` (made by it, its own parents the same changes: a describe, metaedit, squash-into, amend or
+ * absorb, never a move), and, for each root (a successor with a parent outside the attempt), at least one of its own
+ * outside parents so rewritten. Anything else (a parent of another change, a
+ * parent moved, a successor whose parents don't line up) is the user's operation, or ambiguous: false, so it stays.
+ */
+async function automaticRebase(a: Attempt, head: string, op: string, parent: string, list: Successor[]): Promise<boolean> {
+  const mine = new Set(a.rec.commits)
+  const byChange = new Map(list.map((f) => [f.pred.change, f.succ.commit]))
+  const changeOf = async (ids: readonly string[]): Promise<Map<string, string>> => new Map((await a.commits(head, set([...new Set(ids)]))).map((c) => [c.commit, c.change]))
+  // HR2's round 1: the rewrite is required of each root (one with a parent outside the attempt), never shared across the
+  // group, so one root's rebased parent can't vouch for another root rewritten with its parents unchanged (ambiguous).
+  let roots = 0
+  for (const { pred, succ } of list) {
+    if (pred.parents.length !== succ.parents.length) return false
+    const root = pred.parents.some((p) => !mine.has(p))
+    let rewritten = false
+    const inside = pred.parents.filter((p) => mine.has(p))
+    const insideChange = inside.length ? await changeOf(inside) : new Map<string, string>()
+    for (let i = 0; i < pred.parents.length; i++) {
+      const p = pred.parents[i]
+      const q = succ.parents[i]
+      if (mine.has(p)) {
+        if (byChange.get(insideChange.get(p) ?? '') !== q) return false
+        continue
+      }
+      if (q === p) continue
+      const pair = await a.commits(head, set([p, q]))
+      const pc = pair.find((c) => c.commit === p)
+      const qc = pair.find((c) => c.commit === q)
+      if (!pc || !qc || pc.change !== qc.change) return false
+      // Made by `op`: visible there, not at its parent (where it may not exist yet: `present`, so naming it isn't an error).
+      if ((await a.commits(parent, `present(${q}) & ::visible_heads()`)).length || !(await a.commits(op, visibleOf([q]))).length) return false
+      // In place: its own parents the same changes, in order.
+      const ch = await changeOf([...pc.parents, ...qc.parents])
+      const changes = (ids: readonly string[]): string => ids.map((x) => ch.get(x) ?? `?${x}`).join(',')
+      if (changes(pc.parents) !== changes(qc.parents)) return false
+      rewritten = true
+    }
+    if (root && !rewritten) return false
+    if (root) roots++
+  }
+  return roots > 0
 }
 
 /**
@@ -1141,7 +1244,8 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
     if (rec.step) throw new Stop('uncertain', `step:${rec.step.name}`)
     const owned = rec.pins.filter((p) => p.state === 'created')
     const ids0 = [...new Set([...rec.commits, ...owned.map((p) => p.oid)])]
-    const successors = await successorsOf(a)
+    // HI-3045: those the user's own operation made, or one that couldn't be classified, are kept (`keptSuccessors`).
+    const { adopt: successors, kept: keptSuccessors } = await successorsOf(a)
     const r0 = await reachedNow(a, target, [...ids0, ...successors])
     // HI-2990: the successors jj made of the attempt's commits (none the target reaches) adopted, journalled and pinned
     // before anything is abandoned, so they are dropped with the rest, guarded as the rest.
@@ -1188,7 +1292,7 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
       })
     }
     await a.phase('dropped')
-    return { dropped: { refs: dropped, keptRefs, abandoned: [...(rec.abandoned ?? [])], kept }, record: structuredClone(rec) }
+    return { dropped: { refs: dropped, keptRefs, abandoned: [...(rec.abandoned ?? [])], kept, ...(keptSuccessors.length ? { keptSuccessors } : {}) }, record: structuredClone(rec) }
   } catch (e) {
     if (e instanceof Stop) return a.interrupted(e)
     throw e

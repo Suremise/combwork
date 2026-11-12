@@ -16,6 +16,7 @@ import { jjContextOf } from '../src/main/platform/jjDetect'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { readOpHeads } from '../src/main/platform/jjView'
 import type { RunResult } from '../src/main/platform/repoContext'
+import type { JjRunner } from '../src/main/platform/jjRunner'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, type OpHolder } from '../src/main/slots'
 import { CopyPool, CopyStore } from '../src/main/copies'
@@ -787,5 +788,137 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
     expect(existsSync(join(leased.copy.folder, 'k.txt')) && existsSync(join(leased.copy.folder, 't.txt'))).toBe(true)
     await pool.returnCopy(leased.lease.id, 'checked')
     expect(store.lease(leased.lease.id)).toMatchObject({ intact: true })
+  })
+
+  // HI-3045 (design HI-3045/s15): a hidden candidate commit's successor is adopted only when jj's automatic rebase made
+  // it. Here the operation-level cases: what each read costs, and what an operation that can't be classified, or a read
+  // that fails, does. The user's own commands are jjCandidateRuntime's (the runtime, T1–T6).
+  describe("HI-3045: a hidden candidate's successor, classified by the operation that made it", () => {
+    /** h.runner with each call's args recorded and, where `swap` answers, its answer given instead of jj's. */
+    const counted = (swap?: (args: readonly string[]) => RunResult | null) => {
+      const calls: string[][] = []
+      const runner: JjRunner = Object.assign(Object.create(h.runner) as JjRunner, {
+        run: async (folder: string, args: readonly string[], o?: Parameters<JjRunner['run']>[2]) => {
+          calls.push([...args])
+          return swap?.(args) ?? h.runner.run(folder, args, o)
+        }
+      })
+      return { runner, calls, evologs: () => calls.filter((c) => c.includes('evolog')).length }
+    }
+    const said = (out: string): RunResult => ({ ok: true, out, buf: Buffer.from(out), err: '', code: 0 })
+    const OP = 'a'.repeat(128)
+    /** A merge candidate, then the builder's `jj describe` of the reviewed commit: jj rebases the candidate (HI-2990's case). */
+    async function rebasedByJj() {
+      const w = await world(false)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      h.jj(w.builder, 'describe', 'builder@-', '-m', 'reworded')
+      const change = w.log(out.candidate.result, 'change_id')[0]
+      const successor = (): string[] => w.log(`change_id(${change}) & ::visible_heads()`)
+      expect(successor()).toHaveLength(1)
+      return { w, out, successor }
+    }
+
+    it("jj's automatic rebase: adopted and dropped, with one evolog read and at most 6 more for its one root", async () => {
+      const auto = await rebasedByJj()
+      const a = counted()
+      const d = await dropJjAttempt(auto.w.deps({ runner: a.runner }), auto.out.record, 'main')
+      expect(isInterrupted(d) ? d.interrupted : null).toBeNull()
+      expect(auto.successor()).toEqual([])
+      expect(a.evologs()).toBe(1)
+      // The same drop with the operation unclassifiable (no automaticRebase reads): the difference is the classification's.
+      const other = await rebasedByJj()
+      const b = counted((args) => (args.includes('evolog') ? said(`${OP}\u001f${OP},${'b'.repeat(128)}\n`) : null))
+      const kept = await dropJjAttempt(other.w.deps({ runner: b.runner }), other.out.record, 'main')
+      expect(isInterrupted(kept)).toBe(false)
+      // The reads after the evolog read up to the target's (`reachedNow`, the first after classification): automaticRebase's.
+      const classifying = (calls: string[][]): number => {
+        const from = calls.findIndex((c) => c.includes('evolog'))
+        const to = calls.findIndex((c, i) => i > from && c.some((x) => x.startsWith('bookmarks(exact:')))
+        return to - from - 1
+      }
+      expect(classifying(a.calls)).toBeGreaterThan(0)
+      expect(classifying(a.calls)).toBeLessThanOrEqual(6)
+      expect(classifying(b.calls)).toBe(0)
+    })
+
+    it("T5: a squash into the reviewed commit under a merge candidate: rewritten in place, jj's rebase, adopted and dropped", async () => {
+      const w = await world(false)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      const change = w.log(out.candidate.result, 'change_id')[0]
+      writeFileSync(join(w.builder, 'more.txt'), 'more\n')
+      h.jj(w.builder, 'squash', '--use-destination-message', '--into', 'builder@-', 'more.txt')
+      expect(w.log(`change_id(${change}) & ::visible_heads()`)).toHaveLength(1)
+      const d = await dropJjAttempt(w.deps(), out.record, 'main')
+      expect(isInterrupted(d) ? d.interrupted : null).toBeNull()
+      expect(w.log(`change_id(${change}) & ::visible_heads()`)).toEqual([])
+    })
+
+    it("a mixed group (HR2's round 1): one root's parent rewritten in place, another root rewritten with its parents unchanged, in one operation: both kept", async () => {
+      const w = await world(false)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      // A second root of the attempt's, on the target's head (as if the attempt had made it).
+      h.jj(w.repo, '--ignore-working-copy', 'new', '--no-edit', w.T, '-m', 'hi3045 second root')
+      const X = w.log(`children(${w.T}) & description(substring:"hi3045 second root")`)[0]
+      const record = { ...out.record, commits: [...out.record.commits, X] }
+      const changes = [out.candidate.result, X].map((c) => w.log(c, 'change_id')[0])
+      // One operation: the reviewed commit rewritten in place (jj rebases the candidate) and X rewritten as it is.
+      h.jj(w.repo, '--ignore-working-copy', 'metaedit', '--force-rewrite', '-r', `${w.R} | ${X}`)
+      const now = changes.map((c) => w.log(`change_id(${c}) & ::visible_heads()`))
+      expect(now.map((n) => n.length)).toEqual([1, 1])
+      const d = await dropJjAttempt(w.deps(), record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d.interrupted))
+      expect(d.dropped.keptSuccessors?.map((k) => [k.commit, k.why]).sort()).toEqual(now.map((n) => [n[0], 'user']).sort())
+      expect(changes.map((c) => w.log(`change_id(${c}) & ::visible_heads()`))).toEqual(now)
+    })
+
+    it('an operation with several parents (concurrent history): the successor kept, said so, the attempt dropped', async () => {
+      const { w, out, successor } = await rebasedByJj()
+      const now = successor()
+      const c = counted((args) => (args.includes('evolog') ? said(`${OP}\u001f${OP},${'b'.repeat(128)}\n`) : null))
+      const d = await dropJjAttempt(w.deps({ runner: c.runner }), out.record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d.interrupted))
+      expect(d.dropped.keptSuccessors).toEqual([{ commit: now[0], why: 'concurrent' }])
+      expect(successor()).toEqual(now)
+      expect(d.record.commits).not.toContain(now[0])
+    })
+
+    it('an operation whose parent is the root (history abandoned below it): the successor kept, said so', async () => {
+      const { w, out, successor } = await rebasedByJj()
+      const now = successor()
+      const c = counted((args) => (args.includes('evolog') ? said(`${OP}\u001f${'0'.repeat(128)}\n`) : null))
+      const d = await dropJjAttempt(w.deps({ runner: c.runner }), out.record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d.interrupted))
+      expect(d.dropped.keptSuccessors).toEqual([{ commit: now[0], why: 'history' }])
+      expect(successor()).toEqual(now)
+    })
+
+    it('a classification read that fails: interrupted, nothing adopted, pinned or abandoned; the next drop decides', async () => {
+      const { w, out, successor } = await rebasedByJj()
+      const now = successor()
+      const c = counted((args) => (args.includes('evolog') ? { ok: false, out: '', buf: Buffer.alloc(0), err: 'Error: boom', code: 1 } : null))
+      const d = await dropJjAttempt(w.deps({ runner: c.runner }), out.record, 'main')
+      expect(isInterrupted(d)).toBe(true)
+      expect(d.record.commits).toEqual(out.record.commits)
+      expect(d.record.pins).toEqual(out.record.pins)
+      expect(successor()).toEqual(now)
+      expect(c.calls.some((x) => x.includes('abandon'))).toBe(false)
+      // Read again on the next pass: jj's rebase, adopted and dropped.
+      const again = await dropJjAttempt(w.deps(), d.record, 'main')
+      expect(isInterrupted(again) ? again.interrupted : null).toBeNull()
+      expect(successor()).toEqual([])
+    })
+
+    it('the ordinary path, no hidden commit: no classification read at all', async () => {
+      const w = await world(false)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      const c = counted()
+      const d = await dropJjAttempt(w.deps({ runner: c.runner }), out.record, 'main')
+      expect(isInterrupted(d)).toBe(false)
+      expect(c.evologs()).toBe(0)
+    })
   })
 })
