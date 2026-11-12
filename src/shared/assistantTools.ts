@@ -170,25 +170,32 @@ export const WORKFLOW_TOOLS: Readonly<Record<string, (o: WorkflowToolOptions) =>
 }
 
 /**
- * The stages a card can be in that keep a tool usable whatever its rules say (HI-2694, HR1's s15 check): a card left in
- * Review or Approved while the rules were off, or moved there past them, still takes these.
+ * The stages a card can be in that keep a tool usable past what its options allow (HI-2694, HR1's s15 check): a card
+ * moved into Review or Approved past its rules still takes these, `under` the finishes its handler takes them in. The
+ * merge report is refused outside Combwork merges, the agent merges and not checked whatever the card's stage
+ * (runtime.ts's reportMerge), so an Approved card under You integrate (jj) or Committed is done keeps nothing: kept,
+ * every Approved jj card restarted its builder for a tool it could never use (HI-3008).
  */
-export const WORKFLOW_TOOL_STAGES: Readonly<Record<string, readonly string[]>> = {
-  cw_start_review: ['review'],
-  cw_verdict: ['review'],
-  cw_report_merge: ['approved', 'merging']
+export const WORKFLOW_TOOL_STAGES: Readonly<Record<string, { stages: readonly string[]; under: (o: WorkflowToolOptions) => boolean }>> = {
+  cw_start_review: { stages: ['review'], under: () => true },
+  cw_verdict: { stages: ['review'], under: () => true },
+  cw_report_merge: { stages: ['approved', 'merging'], under: (o) => o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked' }
 }
 
 /**
- * The tools hidden for a project's workflow (HI-2694): those no option set allows and no card's stage keeps, sorted. `sets`:
- * the project's options now and every ruleset its cards in flight and running lanes still work under; `stages`: the
- * stages its cards in flight are in. No set (nothing known): nothing hidden.
+ * The tools hidden for a project's workflow (HI-2694): those no option set allows and no card's stage keeps under one of
+ * them, sorted. `sets`: the project's options now and every ruleset its cards in flight and running lanes still work
+ * under; `stages`: the stages its cards in flight are in. No set (nothing known): nothing hidden.
  */
 export function hiddenForWorkflow(sets: readonly WorkflowToolOptions[], stages: Iterable<string> = []): string[] {
   if (!sets.length) return []
   const at = new Set(stages)
+  const kept = (name: string): boolean => {
+    const keep = WORKFLOW_TOOL_STAGES[name]
+    return !!keep && keep.stages.some((s) => at.has(s)) && sets.some(keep.under)
+  }
   return Object.entries(WORKFLOW_TOOLS)
-    .filter(([name, usable]) => !sets.some(usable) && !(WORKFLOW_TOOL_STAGES[name] ?? []).some((s) => at.has(s)))
+    .filter(([name, usable]) => !sets.some(usable) && !kept(name))
     .map(([name]) => name)
     .sort()
 }

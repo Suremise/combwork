@@ -79,7 +79,17 @@ describe('tools by workflow (HI-2694): which are hidden', () => {
     expect(hidden(presetOf('solo'), presetOf('pair'))).toEqual(hidden(presetOf('pair')))
     // A card sitting in Review or Approved (left there with the rules off, moved there past them) keeps what takes it.
     expect(hiddenForWorkflow([presetOf('solo')], ['review'])).not.toContain('cw_verdict')
-    expect(hiddenForWorkflow([presetOf('solo')], ['approved'])).not.toContain('cw_report_merge')
+    // The merge report only where its handler takes one from Approved (not checked with no review, say), never under
+    // Committed is done or You integrate, whose cards it refuses in any stage (HI-3008: a jj card's Approved restarted
+    // its builder for it).
+    const notChecked = { ...presetOf('solo'), finish: 'notChecked' as const, folder: 'slots' as const }
+    expect(hidden(notChecked)).toContain('cw_report_merge')
+    expect(hiddenForWorkflow([notChecked], ['approved'])).not.toContain('cw_report_merge')
+    expect(hiddenForWorkflow([notChecked], ['merging'])).not.toContain('cw_report_merge')
+    expect(hiddenForWorkflow([presetOf('solo')], ['approved'])).toContain('cw_report_merge')
+    const youIntegrate = { ...presetOf('pair'), finish: 'userIntegrates' as const }
+    expect(hiddenForWorkflow([youIntegrate], ['approved'])).toEqual(hidden(youIntegrate))
+    expect(hidden(youIntegrate)).toContain('cw_report_merge')
     expect(hiddenForWorkflow([presetOf('solo')], ['active'])).toEqual(hidden(presetOf('solo')))
     // Nothing known: nothing hidden.
     expect(hiddenForWorkflow([])).toEqual([])

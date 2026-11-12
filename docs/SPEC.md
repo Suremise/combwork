@@ -5188,7 +5188,10 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
   outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
   a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
-  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is. For an answer
+  or `proceed`, nothing waiting (`loop.noStep`) and an earlier step named (`loop.staleStep`) are said before whose it is
+  (HI-3011): a design closes when its card leaves Doing (put back to To do), and the reviewer the pool gave it, answering
+  late, hears that nothing waits (its feedback goes on the card as a comment), not that it isn't its.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
   notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
   whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a
@@ -5830,6 +5833,15 @@ default branch as it reads then, or the override its forward's request recorded,
 the default branch or the branches changed since Resolve so that it no longer reads forward, it is returned to its
 builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
 only a new forward request with the user's override merges that pair.
+
+Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
+`source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
+next forward conflict again) is refused (`forward.resolutionSource`, its next step `git merge <source>`). Read with the
+project's history port (`resolutionHasSource`: true, false, or unknown, never taken as either): unreadable (git failed
+or threw, a platform with no history) it is refused too (`platform.unknown`, naming that rule), submitted again once it
+reads. The queue reads it again at each attempt and merges only on true: false returns it to its builder (`resolution`,
+nothing merged), however it reached the queue; unreadable, the entry goes round again as another read git couldn't
+make (HI-2019), then pauses needs-you with git's text, nothing merged.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
@@ -7499,7 +7511,10 @@ repeating them (#533) [note §8].
   (any merge into a branch), cw_lane and the builder's moves. **Usable if any set of rules still in force allows it**
   (`hiddenForWorkflow`): the project's options now, each distinct ruleset recorded on the facts of its cards out of Hold,
   Todo and Done (not archived), and its running lanes' (`cardWork.workRetained`, one snapshot), and kept by a card's stage
-  (Review keeps the review tools, Approved and Merging the merge report) whatever its rules say. Nothing hidden when the
+  (Review keeps the review tools, Approved and Merging the merge report) past what those options allow: the merge report
+  only where one of those sets finishes in a way its handler takes it (Combwork merges, the agent merges, not checked), so
+  an Approved card under You integrate or Committed is done keeps nothing (`WORKFLOW_TOOL_STAGES`' `under`; HI-3008: each
+  jj card's Approved restarted its builder, or asked to, for a tool it could never use). Nothing hidden when the
   rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
   included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
   be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database

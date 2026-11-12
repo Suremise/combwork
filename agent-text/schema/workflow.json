@@ -525,6 +525,20 @@
   "workflow.refused.forward.notAgents.next": {
     "placeholders": {}
   },
+  "workflow.refused.forward.resolutionSource.message": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain",
+      "revision": "plain",
+      "source": "plain"
+    }
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "placeholders": {
+      "source": "plain"
+    }
+  },
   "workflow.refused.forward.resolutionTarget.message": {
     "placeholders": {
       "card": "plain",
@@ -1172,6 +1186,9 @@
     "placeholders": {}
   },
   "workflow.rule.done.contained": {
+    "placeholders": {}
+  },
+  "workflow.rule.forward.resolutionSource": {
     "placeholders": {}
   },
   "workflow.rule.integrate.approved": {

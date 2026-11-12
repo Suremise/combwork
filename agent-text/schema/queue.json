@@ -124,6 +124,12 @@
       "target": "plain"
     }
   },
+  "queue.failure.resolution": {
+    "placeholders": {
+      "forward": "plain",
+      "source": "plain"
+    }
+  },
   "queue.failure.targetMoved": {
     "placeholders": {
       "target": "plain"
@@ -234,6 +240,11 @@
   },
   "queue.next.repick": {
     "placeholders": {}
+  },
+  "queue.next.resolution": {
+    "placeholders": {
+      "source": "plain"
+    }
   },
   "queue.next.runner": {
     "placeholders": {}

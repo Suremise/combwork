@@ -101,6 +101,10 @@ function queueTexts(): { name: string; text: string }[] {
   out.push({ name: 'returned resolution', text: returnedText('HI-7', dir, undefined, undefined, { from: 'main', to: 'main', resolution: 'HI-6' }) })
   out.push({ name: 'returned resolution short', text: returnedText('HI-7', dir, 160, undefined, { from: 'main', to: 'main', resolution: 'HI-6' }) })
   out.push({ name: 'resubmitted resolution', text: resubmittedText('HI-7', dir, 'Coder', { from: 'main', to: 'main', resolution: 'HI-6' }) })
+  // HI-2999: a resolution returned without the commit it resolves.
+  const missing: Failed = { ...base, reason: 'resolution' }
+  out.push({ name: 'returned resolution source', text: returnedText('HI-7', missing, undefined, undefined, { from: 'main', to: 'main', resolution: 'HI-6', source: 'abc1234' }) })
+  out.push({ name: 'resubmitted resolution source', text: resubmittedText('HI-7', missing, 'Coder', { from: 'main', to: 'main', resolution: 'HI-6', source: 'abc1234' }) })
   out.push({ name: 'stale', text: staleWake('HI-7', 'abc1234', null) })
   for (const to of ['review', 'active'] as const) out.push({ name: `left decision ${to}`, text: leftWake('HI-7', 'decision', to) })
   out.push({ name: 'left stale', text: leftWake('HI-7', 'stale', 'review') })

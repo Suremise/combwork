@@ -95,6 +95,10 @@
     "text": "publishing it to {target}’s remote was refused (a pre-push hook or the remote); it is tested again after Resume",
     "note": "What came back (HI-1183, follow mode): the project’s pre-push hook or the remote refused the push of the merge; nothing was published."
   },
+  "queue.failure.resolution": {
+    "text": "the resolution of {forward} doesn’t contain {source}, the commit it resolves (cherry-picked or copied, not merged); nothing merged",
+    "note": "What came back (HI-2999): a card made by Resolve on a builder whose revision lacks the commit it resolves. {forward}: the forward merge card (a key like HI-12); {source}: a commit id."
+  },
   "queue.failure.targetMoved": {
     "text": "{target} moved while it was being merged",
     "note": "What came back: its target branch moved during the merge."
@@ -182,6 +186,10 @@
   "queue.next.repick": {
     "text": "Bring your worktree up to date, then submit again naming the tests the change needs (tests on cw_submit), for review.",
     "note": "The next step when its focused tests couldn't be chosen (G20, HI-1367)."
+  },
+  "queue.next.resolution": {
+    "text": "In its branch, run git merge {source}, resolve the conflict, commit, and submit again.",
+    "note": "The next step after a resolution came back without the commit it resolves (HI-2999). {source}: a full commit id."
   },
   "queue.next.runner": {
     "text": "Tell the user: Version Control → Each card’s focused tests needs the command that runs them.",

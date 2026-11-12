@@ -709,6 +709,16 @@
     "note": "HI-2679: the next step after an agent was refused acting on a forward-merge card.",
     "audience": "both"
   },
+  "workflow.refused.forward.resolutionSource.message": {
+    "text": "{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.",
+    "note": "HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "text": "In its branch, run git merge {source}, resolve the conflict, commit, and submit again.",
+    "note": "HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; \"git merge\" is a command, never translated) into the card’s branch.",
+    "audience": "both"
+  },
   "workflow.refused.forward.resolutionTarget.message": {
     "text": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
     "note": "HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12.",
@@ -825,8 +835,8 @@
     "audience": "both"
   },
   "workflow.refused.loop.noStep.next": {
-    "text": "Read the card: it may have been answered, or the card moved on.",
-    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.",
+    "text": "Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.",
+    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.",
     "audience": "both"
   },
   "workflow.refused.loop.roundLimit.message": {
@@ -1377,6 +1387,11 @@
   "workflow.rule.done.contained": {
     "text": "Combwork checks the merge",
     "note": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5).",
+    "audience": "both"
+  },
+  "workflow.rule.forward.resolutionSource": {
+    "text": "A resolution merges the commit it resolves",
+    "note": "A rule of the workflow, named where a move can’t check it (HI-2999): a card made by Resolve on a builder (it merges one branch into another by hand) must contain, merged, the commit that came back from the merge queue, not a copy of its changes.",
     "audience": "both"
   },
   "workflow.rule.integrate.approved": {

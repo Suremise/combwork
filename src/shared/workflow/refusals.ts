@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.jjRefused' | 'platform.switching' | 'platform.changed' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.jjRefused' | 'platform.switching' | 'platform.changed' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -222,7 +222,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'loop.noStep': r(
     msg({ id: 'workflow.refused.loop.noStep.message', defaultMessage: '{card} has no design or follow-up waiting for its check.', description: "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key." }),
-    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.' })
+    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.' })
   ),
   'loop.noReviewer': r(
     msg({ id: 'workflow.refused.loop.noReviewer.message', defaultMessage: '{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.', description: "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer." }),
@@ -299,6 +299,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'forward.resolutionTarget': r(
     msg({ id: 'workflow.refused.forward.resolutionTarget.message', defaultMessage: '{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.', description: 'HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12.' }),
     msg({ id: 'workflow.refused.forward.resolutionTarget.next', defaultMessage: 'The user or the Assistant can set its Merges into to {to}, then start it again.', description: 'HI-2985: the next step after a refused start of a Resolve on a builder card: set its Merges into (a name in the window: as translated there) to branch {to}.' })
+  ),
+  'forward.resolutionSource': r(
+    msg({ id: 'workflow.refused.forward.resolutionSource.message', defaultMessage: '{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.', description: 'HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.forward.resolutionSource.next', defaultMessage: 'In its branch, run git merge {source}, resolve the conflict, commit, and submit again.', description: 'HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; "git merge" is a command, never translated) into the card’s branch.' })
   )
 }
 
