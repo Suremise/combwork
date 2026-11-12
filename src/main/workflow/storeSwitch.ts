@@ -141,9 +141,14 @@ async function otherWorkspaceOn(ws: WorkspaceService, store: string): Promise<st
   return null
 }
 
-/** What still runs on the group's repository (none of it changed by a switch). */
-async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promise<SwitchDrain> {
-  const d: SwitchDrain = { lanes: [], cards: [], queue: [], slots: [], copies: [] }
+/**
+ * What still runs on the group's repository (none of it changed by a switch). HI-3069: and each slot kept for a card
+ * (put back with its committed work) that isn't of the platform switched `to`: it could never be lent back after the
+ * switch, so the switch waits until its card has finished. One already of `to` is left out, so switching back to the
+ * platform it was made under is never refused for it.
+ */
+async function drainOf(ws: WorkspaceService, members: readonly Member[], to: PlatformId): Promise<SwitchDrain> {
+  const d: SwitchDrain = { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] }
   for (const m of members) {
     for (const l of await listLanes(ws, { project: m.name })) if (l.state === 'active' || l.state === 'paused') d.lanes.push({ project: m.name, id: l.id, name: l.name, builder: l.builder.name })
     for (const c of await cardsInFlight(ws, { path: m.path, name: m.name })) d.cards.push({ project: m.name, number: c.number, title: c.title })
@@ -154,6 +159,7 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promis
     })) d.queue.push(m.name)
     for (const l of new SlotStore(boardConn(ws), m.id).openLeases()) d.slots.push({ project: m.name, slot: l.slot, agent: l.agent })
     for (const l of new CopyStore(boardConn(ws), m.id).unfreed()) d.copies.push({ project: m.name, copy: l.copy, kind: l.kind })
+    for (const k of new SlotStore(boardConn(ws), m.id).keptSlots()) if (k.platform !== to) d.kept.push({ project: m.name, slot: k.slot, card: k.card })
   }
   return d
 }
@@ -257,9 +263,9 @@ export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Pro
 /** A store-wide switch's warning and its refusal, read without changing anything (the dialog's, and the switch's own). */
 export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
   const g = await groupOf(ws, path)
-  const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [] } }
+  const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
   if (!g) return { refused: { why: to === 'jj' ? 'noJj' : 'noGit' }, store: none } // i18n-ignore: a code or SQL, never shown as text
-  const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members) }
+  const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members, to) }
   let refused: SwitchRefusal | null = null
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
@@ -342,7 +348,7 @@ async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId
     const ids = begin.map((m) => m.id)
     await storeSwitchSeams.at?.('afterBegin', { members: ids, generation: fence.generation })
     // Nothing more can be admitted on the store: what runs now is final (s17). Anything still running: back, nothing written.
-    const drain = await drainOf(ws, g.members)
+    const drain = await drainOf(ws, g.members, to)
     await storeSwitchSeams.at?.('afterDrain', { members: ids, generation: fence.generation })
     if (!drainEmpty(drain)) {
       await fenceWrite(ws, (meta) => settle(meta, g.store, fence!.generation, Object.fromEntries(begin.map((m) => [m.id, m.before]))))
@@ -469,7 +475,7 @@ export async function checkMemberSwitch(ws: WorkspaceService, path: string, name
   if (!store) return null
   const fence = boardRead(ws, (db) => readFence(metaOf(db), store))
   if (fence === null || typeof fence !== 'object' || fence.state === 'switching') return { refused: { why: 'switching' } } // i18n-ignore: a code or SQL, never shown as text
-  const drain = await drainOf(ws, [{ id, path, name, from }])
+  const drain = await drainOf(ws, [{ id, path, name, from }], 'none')
   if (drainEmpty(drain)) return { refused: null }
   return { refused: { why: 'memberDrain' }, store: { group: [], token: '', drain } } // i18n-ignore: a code or SQL, never shown as text
 }
@@ -500,7 +506,7 @@ export async function memberSwitch(ws: WorkspaceService, path: string, name: str
     if (!fence) throw refusalError({ why: 'switching' }) // i18n-ignore: a code or SQL, never shown as text
     await storeSwitchSeams.at?.('afterBegin', { members: [id], generation: fence.generation })
     // Nothing more can be admitted for the project: what runs now is final. Anything still running: back, nothing written.
-    const drain = await drainOf(ws, [{ id, path, name, from }])
+    const drain = await drainOf(ws, [{ id, path, name, from }], to)
     await storeSwitchSeams.at?.('afterDrain', { members: [id], generation: fence.generation })
     if (!drainEmpty(drain)) {
       await fenceWrite(ws, (meta) => settle(meta, store, fence!.generation, { [id]: before }))

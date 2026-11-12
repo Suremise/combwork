@@ -1009,6 +1009,16 @@
     "note": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore and jj config set --repo snapshot.max-new-file-size are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them).",
     "audience": "both"
   },
+  "workflow.refused.platform.keptAcross.message": {
+    "text": "{card} can't start: its committed work from before it was put back is kept in slot {slot}, a {platform} slot from before the repository switched to {now}.",
+    "note": "HI-3069: a refused start: the card was put back with commits under one version control, kept for it in its slot, and the repository has since switched to the other, so that slot can’t be lent back and the card would start without its work. {card} is a card key like AM-12; {slot} a slot’s name; {platform} and {now} are Git or jj (keep them).",
+    "audience": "both"
+  },
+  "workflow.refused.platform.keptAcross.next": {
+    "text": "{gone, select, yes {Its folder is gone, so nothing of it is left to go on with: remove the slot (Version Control → Slots and copies, Remove…), and {card} starts afresh from its target.} other {Switch the repository back to {platform} to go on with {card} in that slot.}}",
+    "note": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key.",
+    "audience": "both"
+  },
   "workflow.refused.platform.offLine.message": {
     "text": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",
     "note": "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select.",

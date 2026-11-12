@@ -1775,6 +1775,10 @@
     "defaultMessage": "jj has {n, plural, =0 {no readable operation head} one {# operation head} other {# operation heads}}: let jj reconcile them first.",
     "description": "Why a jj project can’t go back to Git yet (HI-2799): jj’s operation log has diverged. Keep jj."
   },
+  "git.vc.store.kept": {
+    "defaultMessage": "{project}: {card}’s committed work, kept in slot {slot} for when it starts again: start {card} and finish it",
+    "description": "In the switch’s warning (HI-3069): a card was put back with commits, and its slot is kept for it; after the switch that slot could never be lent back, so the switch waits until the card has finished. {card} is a card key like AM-12; {slot} a slot’s name (glossary 2.5: slot)."
+  },
   "git.vc.store.lane": {
     "defaultMessage": "{project}: lane “{name}” (builder {builder})",
     "description": "A running lane in the switch’s warning (HI-2799). A noun before the name (glossary §1 rule 4)."

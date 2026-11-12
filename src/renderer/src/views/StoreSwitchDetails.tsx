@@ -21,6 +21,7 @@ const M = {
   card: msg({ id: 'git.vc.store.card', defaultMessage: '{project}: {card} {title}, in flight', description: 'A card started and not done, in the switch’s warning (HI-2799). {card} is its key.' }),
   queue: msg({ id: 'git.vc.store.queue', defaultMessage: '{project}: its merge queue', description: 'In the switch’s warning (HI-2799): a project’s merge queue still has work (glossary 2.5: merge queue).' }),
   slot: msg({ id: 'git.vc.store.slot', defaultMessage: '{project}: slot {slot}, lent to {agent}', description: 'In the switch’s warning (HI-2799): a slot (a card’s own folder) still lent to an agent (glossary 2.5: slot).' }),
+  kept: msg({ id: 'git.vc.store.kept', defaultMessage: '{project}: {card}’s committed work, kept in slot {slot} for when it starts again: start {card} and finish it', description: 'In the switch’s warning (HI-3069): a card was put back with commits, and its slot is kept for it; after the switch that slot could never be lent back, so the switch waits until the card has finished. {card} is a card key like AM-12; {slot} a slot’s name (glossary 2.5: slot).' }),
   copy: msg({ id: 'git.vc.store.copy', defaultMessage: '{project}: {kind, select, review {review copy} other {check copy}} {copy}', description: 'In the switch’s warning (HI-2799): a review or check copy still in use.' }),
   gates: msg({ id: 'git.vc.store.gates', defaultMessage: 'What this repository uses, checked for jj:', description: 'In the warning before switching to jj (HI-2799): above each Git feature jj doesn’t support, checked in this repository. Keep jj.' }),
   clear: msg({ id: 'git.vc.store.clear', defaultMessage: '{gate}: not used', description: 'A feature jj doesn’t support, not used by this repository (HI-2799). {gate} is its name.' }),
@@ -43,7 +44,7 @@ const M = {
 export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: PlatformId }) {
   const tasks = useStore((s) => s.tasks)
   const d = store.drain
-  const busy = d.lanes.length + d.cards.length + d.queue.length + d.slots.length + d.copies.length
+  const busy = d.lanes.length + d.cards.length + d.queue.length + d.slots.length + d.copies.length + (d.kept?.length ?? 0)
   return (
     <div className="vc-store" data-vc-store={to}>
       {store.group.length > 0 && (
@@ -74,6 +75,11 @@ export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: Plat
             ))}
             {d.copies.map((c) => (
               <li key={`k${c.project}${c.copy}`}>{tr(M.copy, { project: c.project, kind: c.kind === 'review' ? 'review' : 'check', copy: c.copy })}</li>
+            ))}
+            {(d.kept ?? []).map((k) => (
+              <li key={`h${k.project}${k.slot}`} data-vc-store-kept={k.slot}>
+                {tr(M.kept, { project: k.project, card: cardLabelOf({ tasks }, k.card), slot: k.slot })}
+              </li>
             ))}
           </ul>
         </>

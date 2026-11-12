@@ -632,6 +632,8 @@
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "O cartão {card} não pode começar com estas regras: o projeto agora usa {platform}.",
   "workflow.refused.platform.changed.next": "Comece de novo: ele será verificado com as regras de {platform}.",
+  "workflow.refused.platform.keptAcross.message": "O cartão {card} não pode começar: o trabalho com commit de antes de ele ser devolvido está reservado no slot {slot}, um slot de {platform} de antes de o repositório mudar para {now}.",
+  "workflow.refused.platform.keptAcross.next": "{gone, select, yes {A pasta dele está ausente, então não sobrou nada para continuar: remova o slot (Controle de versão → Slots e cópias, Remover…) e {card} recomeçará do zero a partir do destino.} other {Mude o repositório de volta para {platform} para continuar {card} nesse slot.}}",
   "workflow.refused.platform.switching.message": "O cartão {card} não pode começar agora: o controle de versão do repositório está sendo mudado.",
   "workflow.refused.platform.switching.next": "Tente de novo em instantes, quando a mudança terminar.",
   "workflow.refused.start.platformReady.message": "O cartão {card} não pode começar: os cartões ainda não rodam em um projeto jj.",

@@ -112,9 +112,11 @@ export interface SwitchDrain {
   queue: string[]
   slots: { project: string; slot: string; agent: string }[]
   copies: { project: string; copy: string; kind: string }[]
+  /** HI-3069: slots kept for a card (its committed work from before it was put back) that the switch would strand. */
+  kept: { project: string; slot: string; card: number }[]
 }
 
-export const drainEmpty = (d: SwitchDrain): boolean => !d.lanes.length && !d.cards.length && !d.queue.length && !d.slots.length && !d.copies.length
+export const drainEmpty = (d: SwitchDrain): boolean => !d.lanes.length && !d.cards.length && !d.queue.length && !d.slots.length && !d.copies.length && !d.kept.length
 
 /** A gate the repository uses (from main's assessment): what uses it, or what couldn't be read (which counts as using it). */
 /** A repository gate's finding (`autocrlf`: Git's line-ending conversion is among its uses, HI-2872). */

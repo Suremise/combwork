@@ -31,8 +31,10 @@ async function prunable(repo: string): Promise<string[]> {
   const common = (await git(repo, ['rev-parse', '--git-common-dir'])).out.trim()
   const out: string[] = []
   for (const m of `${r.out}\n${r.err}`.matchAll(/^Removing worktrees\/([^:]+):/gm)) {
-    const gitdir = await readFile(join(resolve(repo, common), 'worktrees', m[1], 'gitdir'), 'utf8').catch(() => '')
-    out.push(gitdir.trim() ? dirname(resolve(gitdir.trim())) : `(${m[1]})`)
+    const entry = join(resolve(repo, common), 'worktrees', m[1])
+    const gitdir = await readFile(join(entry, 'gitdir'), 'utf8').catch(() => '')
+    // A relative gitdir (git's worktree.useRelativePaths, or a colocated jj workspace's, HI-3069) is the entry's own.
+    out.push(gitdir.trim() ? dirname(resolve(entry, gitdir.trim())) : `(${m[1]})`)
   }
   return out
 }

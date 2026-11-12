@@ -121,6 +121,17 @@ export interface Effects {
 }
 
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
+/** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross): its platform's and the project's now. */
+export interface KeptAcross {
+  slot: string
+  platform: string
+  now: string
+  gone: boolean
+}
+
+/** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
+const shownPlatform = (p: string): string => ({ git: 'Git', jj: 'jj', none: 'None' })[p] ?? p // i18n-ignore: product names, the same in every language
+
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 
 /**
@@ -198,6 +209,12 @@ export interface WorkflowConfig {
    * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
    */
   slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /**
+   * HI-3069: the card's committed work kept in a slot of the other version control (a switch since it was put back): the
+   * slot, its platform, the project's now, and whether its folder is gone. Every start asks it before its folder is
+   * chosen (`platform.keptAcross`). Left out, none.
+   */
+  keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
@@ -1128,6 +1145,10 @@ export class Workflow {
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
+    // HI-3069: its work kept in a slot of the other version control: refused before any folder is chosen (a slot, the
+    // project folder or its builder's own), so it never starts without that work, the user's start included.
+    const across = await this.cfg.keptAcross?.(card)
+    if (across) return { rule: 'platform.keptAcross', values: { card: card.key, slot: across.slot, platform: shownPlatform(across.platform), now: shownPlatform(across.now), gone: across.gone ? 'yes' : 'no' } }
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
     if (isUnknown(plan)) {
