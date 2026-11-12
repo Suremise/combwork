@@ -501,7 +501,7 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
-    const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, files, untracked, message)
+    const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, copy, files, untracked, message)
     // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read, moved, and proved this
     // commit's says so (HR2's round 3: another git can commit meanwhile, the real index being free).
     const now = r.ok || r.timedOut ? await headOf(folder) : undefined
@@ -519,9 +519,14 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
 }
 
 /** The commit as git's own partial commit makes it, in the private index: untracked paths as intent-to-add first. */
-async function commitOnly(folder: string, env: NodeJS.ProcessEnv, files: string[], untracked: string[], message: string): Promise<GitResult> {
+async function commitOnly(folder: string, env: NodeJS.ProcessEnv, copy: string, files: string[], untracked: string[], message: string): Promise<GitResult> {
   if (untracked.length) {
-    const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), { env })
+    // HI-3079: Combwork's own step, not the commit: nothing of the repository's run (a post-index-change hook, an
+    // fsmonitor), as for the step into the real index (noHooks), and bounded as the commit is. Ended, nothing was made.
+    const quiet = await noHooks(folder, copy)
+    if (!quiet.ok) throw failed(M.commitFailed, quiet.why)
+    const add = await git(folder, [...quiet.args, 'add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), { env, timeout: folderChangesBounds.actMs })
+    if (!add.ok && add.timedOut) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
   return git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })

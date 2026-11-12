@@ -543,6 +543,34 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(existsSync(lockPath())).toBe(false)
   })
 
+  // HI-3079: a new file's intent-to-add, before the commit, was neither bounded nor kept from the repository's hooks: a
+  // post-index-change hook hanging there held the repository's lock and the folder's fence for good.
+  it("Commit of a new file: its intent-to-add runs no hook or fsmonitor and is bounded; a post-index-change hook that hangs is ended with the commit, at its bound", async () => {
+    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    const marker = join(tempDir('cw-folderchanges-pic-'), 'ran')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    // Hangs (30 s) the first time it runs, wherever that is.
+    writeFileSync(join(proj, '.git', 'hooks', 'post-index-change'), `#!/bin/sh\n[ -e "${fwd(marker)}" ] && exit 0\n: > "${fwd(marker)}"\n${slowScript(pids).split('\n').slice(1).join('\n')}\n`)
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    gitCalls = []
+    const t = performance.now()
+    const out = await settle('commit', ['new.txt']).catch((e: Error) => e)
+    const took = performance.now() - t
+    const add = gitCalls.filter((c) => c.args.includes('--intent-to-add'))
+    gitCalls = null
+    expect(add).toHaveLength(1)
+    expect(add[0].timeout).toBe(changes.folderChangesBounds.actMs)
+    expect(add[0].args).toContain('core.fsmonitor=false')
+    expect(add[0].args.some((a) => a.startsWith('core.hooksPath=') && a.endsWith('.no-hooks'))).toBe(true)
+    // The hook hung in the commit itself (bounded) or nowhere: never past the bound in a step without one (it took
+    // 30 s before). A bound for a hung run, generous for git's own work.
+    expect(took).toBeLessThan(20_000)
+    console.log(`HI-3079: ${out instanceof Error ? out.message : `made ${out.made}`} in ${Math.round(took)} ms`)
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    expect(existsSync(lockPath())).toBe(false)
+    expect(leftovers()).toEqual([])
+  })
+
   // HI-3053: the real index is free while the commit or stash runs, so another git can stage a shown path meanwhile.
   it('Commit: a shown path staged by another git after the commit is made and before its entries are taken in keeps that staging; the other shown path and an unshown staged one as they should be; said with the commit', async () => {
     writeFileSync(join(proj, 'a.txt'), 'content Combwork commits\n')
