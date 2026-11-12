@@ -543,9 +543,9 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const x = rows.find(([c]) => c === cur.X)
       const u = rows.find(([c]) => c !== cur.X)
       // The working copy is still U (nothing recorded since the update), X still there: else not this recovery's shape.
-      if (!x || (u && u[0] !== cur.U)) return refuse('provenance', 'U or X')
+      if (!x || (u && u[0] !== cur.U)) return refuse('provenance', 'U or X') // i18n-ignore: a protocol code, never wording
       const second = Number(x[2])
-      if (!Number.isFinite(second)) return refuse('provenance', 'X time')
+      if (!Number.isFinite(second)) return refuse('provenance', 'X time') // i18n-ignore: a protocol code, never wording
       if (!u || u[1] !== x[1] || Math.floor(clock.now() / 1000) > second) break
       if (waited >= COLLISION_CAP_MS) return refuse('collision')
       if (!(await mine())) return refuse('fence')
