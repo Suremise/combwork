@@ -1,7 +1,7 @@
 // G21 (HI-1183, SPEC §16.9.4): the merge queue's target follows its remote. On real temporary repositories, each with
 // a bare repository of its own as the remote (never a real remote): the fetch before each test merge, the publication as
 // an exact compare-and-swap at the remote, the sealed transport, unknown publications, and the local target's catch-up.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { execFileSync } from 'child_process'
@@ -559,6 +559,63 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     const { reconcile } = await import('../../src/main/workflow/reconcile')
     await reconcile(e.wf, e.store.card(a.id))
     expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (2b): a published merge undone on the remote and locally is marked as having left, as with a push; on the remote still, behind is not left', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    const marks: Record<string, unknown> = {}
+    for (const follow of [true, false]) {
+      env?.close()
+      env = null
+      const { e, bare, queue } = following({ followRemote: follow, pushTarget: !follow })
+      const a = await queued(e, 'A', 'a.txt')
+      expect((await queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+      expect(head(bare)).toBe(head(e.project))
+      const before = sh(e.project, 'rev-parse', `${e.wf.state(a).integrated!.result}^1`)
+      // Behind locally only: the remote still has it, so not left (HI-2988).
+      sh(e.project, 'update-ref', 'refs/heads/main', before)
+      await reconcile(e.wf, e.store.card(a.id))
+      if (follow) expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+      // Undone on the remote too.
+      const other = join(tempDir('other-'), 'clone')
+      execFileSync('git', ['clone', '-q', bare, other])
+      sh(other, 'reset', '-q', '--hard', before)
+      sh(other, 'push', '-q', '-f', 'origin', 'main')
+      // A pass over a minute later (the remote's head is kept a minute per repository and target): only Date is faked.
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(Date.now() + 61_000)
+        await reconcile(e.wf, e.store.card(a.id))
+      } finally {
+        vi.useRealTimers()
+      }
+      marks[follow ? 'follow' : 'push'] = e.wf.state(a).marks.leftTarget ?? null
+    }
+    expect(marks.push).toMatchObject({ target: 'main' })
+    expect(marks.follow).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (3a): left its target, then merged back by hand (a new merge of its revision): the mark cleared', { timeout: GIT_HEAVY_MS }, async () => {
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [] }))
+    sh(e.project, 'checkout', '-q', '--detach')
+    const before = head(e.project)
+    const a = await queued(e, 'A', 'a.txt')
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    const i = e.wf.state(a).integrated!
+    sh(e.project, 'update-ref', 'refs/heads/main', before)
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeDefined()
+    sh(e.project, 'checkout', '-q', 'main')
+    sh(e.project, 'merge', '-q', '--no-ff', '--no-edit', i.revision)
+    sh(e.project, 'checkout', '-q', '--detach')
+    expect(contains(e.project, i.result)).toBe(false)
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    expect(e.kinds(a.id).filter((k) => k === 'LeftTarget' || k === 'BackInTarget')).toEqual(['LeftTarget', 'BackInTarget'])
+    // Again: a second pass writes nothing more.
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.kinds(a.id).filter((k) => k === 'BackInTarget')).toHaveLength(1)
   })
 
   it('HI-3041: while the remote still has the result, a local commit of the user’s still pauses remoteDiverged (the remote looked at, not trusted away)', { timeout: GIT_HEAVY_MS }, async () => {

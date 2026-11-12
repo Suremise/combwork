@@ -8,8 +8,33 @@ import { git, gitReading } from '../git'
 import * as G from './git'
 import type { HistoryPort } from './history'
 import { gitOwnWork } from './gitOwnWork'
-import { unknown } from './types'
+import { isUnknown, unknown, type Maybe } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
+import { isAgain } from './again'
+import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
+
+/** HI-3041: how long a target's remote head, fetched for the reconciler, stands for it (a pass over many cards fetches once). */
+const REMOTE_HEAD_MS = 60_000
+const REMOTE_HEADS_MAX = 64
+const remoteHeads = new Map<string, { at: number; head: Promise<Maybe<string>> }>()
+
+/** The head of the remote branch `target` follows, fetched (sealed, as slots' start) into its own pin, or kept a minute. */
+function remoteHeadOf(repo: string, target: string): Promise<Maybe<string>> {
+  const k = `${repo}\0${target}`
+  const kept = remoteHeads.get(k)
+  if (kept && Date.now() - kept.at < REMOTE_HEAD_MS) return kept.head
+  const head = (async (): Promise<Maybe<string>> => {
+    const h = projectHost(repo)
+    const d = await destinationOf(h, target)
+    if (isAgain(d) || 'pause' in d) return unknown(U.remoteSetup, { target })
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/reconcile/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`)
+    return 'failed' in f ? unknown(U.remoteHead, { branch: d.snapshot.ref.replace(/^refs\/heads\//, ''), endpoint: d.snapshot.display, target }) : f.head
+  })()
+  remoteHeads.delete(k)
+  remoteHeads.set(k, { at: Date.now(), head })
+  while (remoteHeads.size > REMOTE_HEADS_MAX) remoteHeads.delete(remoteHeads.keys().next().value!)
+  return head
+}
 
 export const gitHistory: HistoryPort = {
   step: (fn) => G.gitStep(fn),
@@ -42,6 +67,12 @@ export const gitHistory: HistoryPort = {
   candidateKey: (repo, base, head) => G.candidateKey(repo, base, head),
   sameChange: (repo, a, b) => G.sameChange(repo, a, b),
   contains: (repo, target, c, at) => G.contains(repo, target, c, at),
+  // HI-3041 (Darren's 2b): follow mode's reconciler, telling a local target merely behind a published result from one
+  // whose result the remote no longer has either.
+  async remoteHas(repo, target, revision) {
+    const head = await remoteHeadOf(repo, target)
+    return isUnknown(head) ? head : G.isAncestor(repo, revision, head)
+  },
   firstParents: (repo, base, head) => G.firstParents(repo, base, head),
   commits: (repo, range, opts) => G.commits(repo, range, opts),
   workspaceNow: (folder, o) => G.worktreeNow(folder, o),

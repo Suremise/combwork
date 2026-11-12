@@ -134,6 +134,11 @@ export interface HistoryPort {
   sameChange(repo: string, a: ChangeAt, b: ChangeAt): Promise<boolean>
   /** How `target` holds a change (at `at`, its head as read, when given), or null when it doesn't. */
   contains(repo: string, target: string, c: ChangeAt, at?: string): Promise<Maybe<Containment | null>>
+  /**
+   * HI-3041: whether the remote `target` follows (G21) has `revision` now, from a fetch of its branch (the remote's head
+   * kept a minute per repository and target). Unknown when it can't be read. Absent: a platform with no remote to look at.
+   */
+  remoteHas?(repo: string, target: string, revision: string): Promise<Maybe<boolean>>
   /** A line's own revisions since a base, newest first (its first parents). */
   firstParents(repo: string, base: string, head: string): Promise<Maybe<readonly string[]>>
   /** A range's commits, oldest first, with their authors and card trailers (attribution's read). */
