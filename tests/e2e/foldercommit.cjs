@@ -153,17 +153,27 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     // HI-3059: another git stages .gitignore once the commit is made, before Combwork takes its entries in (a post-commit
     // hook staging through the real index): the commit stands, and the window says so, with the warning.
     const hook = path.resolve(fx.alpha, git('rev-parse', '--git-path', 'hooks'), 'post-commit')
+    const hookLog = `${hook}.log`
     fs.mkdirSync(path.dirname(hook), { recursive: true })
-    fs.writeFileSync(hook, '#!/bin/sh\nunset GIT_INDEX_FILE\nprintf "/staged-meanwhile/\\n" >> .gitignore\ngit add .gitignore\n')
+    fs.writeFileSync(hook, `#!/bin/sh\nunset GIT_INDEX_FILE\nprintf "/staged-meanwhile/\\n" >> .gitignore\ngit add .gitignore 2>> "${hookLog.replace(/\\/g, '/')}"\necho "add: $?" >> "${hookLog.replace(/\\/g, '/')}"\n`)
     await second.getByRole('button', { name: 'Commit It' }).click()
-    check('Commit It: .gitignore alone committed, keep.txt still changed', !!(await waitHung(() => git('rev-parse', 'HEAD') !== at || null)) && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)
-    check('…the line committed as written', git('show', 'HEAD:.gitignore').replace(/\r\n/g, '\n').endsWith('/reference/\n/notes/'), git('show', 'HEAD:.gitignore'))
+    // Combwork's notification first, once its commit, the hook and its index step are all done: git writes HEAD before
+    // the post-commit hook runs, and a git status from here meanwhile may take the index's lock (to refresh it), failing
+    // the hook's git add.
     const madeWarned = toast('Committed 1 file on main, with a warning')
-    check('…another git staged .gitignore meanwhile: titled as committed, with a warning', !!(await waitHung(async () => (await madeWarned.count()) === 1)), await page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
-    check('…saying the commit was made and that staging kept', /Git made the commit \([0-9a-f]{12}\), but another git command staged \.gitignore meanwhile/.test(await madeWarned.innerText()), await madeWarned.innerText())
+    const anyCommitted = page.locator('.toast').filter({ hasText: /Committed 1 file on main/ })
+    await waitHung(async () => (await anyCommitted.count()) > 0)
+    const hookSaid = () => (fs.existsSync(hookLog) ? fs.readFileSync(hookLog, 'utf8').trim() : 'no hook log')
+    check('Commit It: .gitignore alone committed, keep.txt still changed', git('rev-parse', 'HEAD') !== at && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)
+    check('…the line committed as written', git('show', 'HEAD:.gitignore').replace(/\r\n/g, '\n').endsWith('/reference/\n/notes/'), git('show', 'HEAD:.gitignore'))
+    check('…the hook staged .gitignore through the real index', hookSaid() === 'add: 0', hookSaid())
+    check('…another git staged .gitignore meanwhile: titled as committed, with a warning', (await madeWarned.count()) === 1, await page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
+    const warnedText = (await madeWarned.count()) === 1 ? await madeWarned.innerText() : '(no such notification)'
+    check('…saying the commit was made and that staging kept', /Git made the commit \([0-9a-f]{12}\), but another git command staged \.gitignore meanwhile/.test(warnedText), warnedText)
     check('…never as a failure', (await toast('Could not commit').count()) === 0)
-    await f.themes(page, madeWarned, 'foldercommit-commit-it-warning')
+    if ((await madeWarned.count()) === 1) await f.themes(page, madeWarned, 'foldercommit-commit-it-warning')
     fs.rmSync(hook)
+    fs.rmSync(hookLog, { force: true })
     git('reset', '-q', '--', '.gitignore')
     git('checkout', '--', '.gitignore', 'keep.txt')
 
