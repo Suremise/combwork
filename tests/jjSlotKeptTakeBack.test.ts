@@ -5,7 +5,9 @@
 // - D: its folder gone, seen by a refresh first: the card's start says so ("its folder is gone");
 // - C2: a lane that took it back and went on to another card keeps that card's work for that card (HI-3057);
 // - F: its workspace forgotten by the user (jj workspace forget), its folder left: said so, and Remove… trashes the
-//   folder whole only on the port's fresh proof that jj lists no such workspace (HI-3097).
+//   folder whole only on the port's fresh proof that jj lists no such workspace (HI-3097);
+// - S: stale by the user's rebase of the card's commit while kept: its preparation says stale (Recover…), nothing in
+//   the folder changed, an unrecorded edit still there (HI-3095).
 // Skipped without the fetched jj (npm run jj:fetch).
 
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
@@ -384,5 +386,33 @@ describe.skipIf(!jjExe)('a kept jj slot whose workspace the user forgot (HI-3097
       expect(trashed.map((t) => t.from)).toEqual([a.folder])
       expect(w.store.slot(a.name)).toBeNull()
     }
+  })
+})
+
+describe.skipIf(!jjExe)('a kept jj slot gone stale (HI-3095)', { timeout: REAL_JJ_MS }, () => {
+  it.each([true, false])('S: the card taken back: its preparation says stale (Recover…), the folder as it was, its edit kept (colocated: %s)', async (colocated) => {
+    const w = world(colocated)
+    const a = await putBackWithWork(w, false)
+    const row = w.store.slot(a.name)!
+    const ws = row.identity!.workspace
+    const base = w.main()
+    // An edit not recorded yet, left in the kept slot; then, in the project folder, main moved on and the card's commit
+    // rebased onto it: the slot's working copy is stale.
+    writeFileSync(join(a.folder, 'half.txt'), 'half done\n')
+    w.h.jj(w.repo, 'new', 'main', '-m', 'next')
+    writeFileSync(join(w.repo, 'n.txt'), 'n\n')
+    w.h.jj(w.repo, 'commit', '-m', 'next')
+    w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+    w.h.jj(w.repo, 'rebase', '-s', a.R, '-d', 'main')
+    expect(await w.port.stale(a.folder)).toBe(true)
+    const again = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+    expect(again).toMatchObject({ ok: true, slot: { name: a.name } })
+    if (!again.ok) throw new Error('not lent')
+    // The card's start carries its binding (the same target and base): refused as stale, with its way out.
+    expect(await w.pool.prepare(again.lease.id, { line: jjLineKey(ws, 1, 2), base, install: false, target: 'main' })).toMatchObject({ stale: true, error: expect.stringMatching(/is stale: .*Recover…/) })
+    expect(await w.port.stale(a.folder)).toBe(true)
+    expect(readFileSync(join(a.folder, 'half.txt'), 'utf8')).toBe('half done\n')
+    // The slot's working copy still on the card's commit (rewritten by the user's rebase, so a new id), never updated.
+    expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${ws}@-`, '-T', 'description.first_line()').trim()).toBe('card 1 work')
   })
 })
