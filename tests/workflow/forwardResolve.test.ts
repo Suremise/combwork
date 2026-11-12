@@ -223,8 +223,11 @@ describe("a resolution whose direction no longer reads forward at its merge (HI-
     moved(await e.wf.submit(made.key, B1, { summary: 'merged' }))
     moved(await e.wf.startReview(made.key, R1))
     moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
-    // Checked at Resolve, forward then; the default branch changes before its merge (here: main deleted).
+    // Checked at Resolve, forward then; the default branch changes before its merge (here: main deleted, and trunk, made
+    // and checked out in the project folder, is git's default now: main into 1.2.0 reads unknown).
     sh(e.project, 'branch', '-D', 'main')
+    sh(e.project, 'checkout', '-q', '-b', 'trunk')
+    expect(await historyOf('git')!.defaultTarget(e.project)).toBe('trunk')
     return { e, made, fwd }
   }
 
@@ -245,6 +248,85 @@ describe("a resolution whose direction no longer reads forward at its merge (HI-
   it("merges when its forward's request recorded the user's override", { timeout: GIT_HEAVY_MS }, async () => {
     const { e, made } = await approvedThenMainGone({ by: 'user', dir: 'unknown', why: 'unordered' })
     expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+  })
+})
+
+describe('a default branch that can’t be read or named at the merge is no answer (HI-3040)', () => {
+  /** A resolution of `from` into 1.2.0, resolved on a builder, reviewed and approved; `from` the default branch. */
+  async function approvedResolution(e: Env, from: string) {
+    const card = e.wf.createCard({ title: `Bring 1.2.0 up to date with ${from}` })
+    const source = head(e, from)
+    moved(await e.wf.forwardStart(card.key, { from, to: '1.2.0', source, base: sh(e.project, 'merge-base', from, '1.2.0') }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0')))
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const back = e.wf.returnedForward(e.wf.store.card(card.id))!
+    const made = e.wf.createCard({ title: `Resolve: bring 1.2.0 up to date with ${from}`, target: back.to })
+    moved(await e.wf.markForwardResolution(made.key, { forward: card.key, from: back.from, to: back.to, source: back.source }, 'user'))
+    moved(await e.wf.resolveForward(card.key, { entry: back.entry, resolver: made.key }, 'merge by hand', 'user'))
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const folder = started.data!.folder as string
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict, resolved by hand
+    }
+    commit(folder, { 'fix.txt': 'the 1.2.0 version, with the release fix\n' }, `Merge ${from} into 1.2.0, resolved`)
+    moved(await e.wf.submit(made.key, B1, { summary: `merged ${from}` }))
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    return made
+  }
+
+  it('trunk the default (no main or master), the project folder detached at the merge: paused saying so, not returned; back on trunk, resumed, merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    sh(e.project, 'branch', '-m', 'main', 'trunk')
+    sh(e.project, 'checkout', '-q', 'trunk')
+    expect(await historyOf('git')!.defaultTarget(e.project)).toBe('trunk')
+    const made = await approvedResolution(e, 'trunk')
+    // The user looks at a commit in the project folder meanwhile: git names no default branch.
+    sh(e.project, 'checkout', '-q', '--detach')
+    const dest = head(e, '1.2.0')
+    const out = await e.queue().drain('1.2.0')
+    expect(out).toMatchObject([{ card: made.key, outcome: 'paused', reason: 'needsYou' }])
+    expect(e.queue().paused('1.2.0')).toMatchObject({ reason: 'needsYou', card: made.key, message: expect.stringContaining('the default branch of') })
+    expect(head(e, '1.2.0')).toBe(dest)
+    expect(e.wf.state(made).stage).toBe('merging')
+    expect(e.wf.store.facts(made.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+    // Back on trunk and resumed: the same approved revision merges.
+    sh(e.project, 'checkout', '-q', 'trunk')
+    e.queue().resume('1.2.0')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+  })
+
+  it('one unreadable read of the default branch: the entry goes round and merges', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    const made = await approvedResolution(e, 'main')
+    const H = historyOf('git')!
+    const real = H.defaultTarget
+    let reads = 0
+    H.defaultTarget = async (repo) => (reads++ === 0 ? { unknown: true as const, what: 'the default branch', detail: 'fatal: unable to read HEAD' } : real(repo))
+    try {
+      expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    } finally {
+      H.defaultTarget = real
+    }
+    expect(reads).toBeGreaterThan(1)
+  })
+
+  it('two versions: decided by their names, the default branch never read', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    sh(e.project, 'branch', '1.1.0', 'main')
+    const made = await approvedResolution(e, '1.1.0')
+    const H = historyOf('git')!
+    const real = H.defaultTarget
+    let reads = 0
+    H.defaultTarget = async (repo) => (reads++, real(repo))
+    try {
+      expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    } finally {
+      H.defaultTarget = real
+    }
+    expect(reads).toBe(0)
   })
 })
 

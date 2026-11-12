@@ -28,10 +28,10 @@ import { hasStage } from '../../shared/workflow/compile'
 import { forwardDirection, forwardPermitted } from '../../shared/workflow/forwardOrder'
 import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
-import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
+import { FOR_YOU, UNREADABLE, workflowText } from '../../shared/workflow/texts'
 import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
 import type { HistoryPort } from '../platform/history'
-import { isUnknown, type Maybe, type Unknown } from '../platform/types'
+import { isUnknown, unknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
@@ -1313,7 +1313,16 @@ export class MergeQueue {
       // HI-2892: a forward merge against the release path's direction, its request with no override, is never merged: it
       // comes back with why, whatever let it be queued (one from before, or the default branch changed since). HI-2998: and
       // so does a forward's resolution (Resolve on a builder), checked at Resolve, with its forward's override.
-      if ((s.forward || s.resolves) && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
+      if (s.forward || s.resolves) {
+        const allowed = await this.forwardAllowed(card, s)
+        // HI-3040: the default branch unreadable or unnamed now: round again, then paused with why.
+        if (isAgain(allowed)) {
+          const o = await readFailed(allowed)
+          if (o) return o
+          continue
+        }
+        if (!allowed) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
+      }
       // HI-2999: a resolution without the commit it resolves (cherry-picked, not merged), however it got here: back to its
       // builder. Merged only once it reads true: unreadable, the entry goes round again, then pauses with git's text.
       const has = s.resolves ? await this.wf.resolutionHasSource(this.wf.rulesetOf(card, s).options, s, s.approved?.revision ?? entry.revision) : true
@@ -1570,18 +1579,26 @@ export class MergeQueue {
   /** The history port of the card's platform (port 3, HI-2792): the queue's step reads ask it. */
   /**
    * HI-2892: whether a forward merge may go, as its direction reads now (the default branch as the card's own port names
-   * it; one it can't name or that is gone counts as none, so it makes no direction) or with its request's override.
-   * HI-2998: a forward's resolution as its forward, with the override its forward's request recorded.
+   * it) or with its request's override. HI-2998: a forward's resolution as its forward, with the override its forward's
+   * request recorded. HI-3040: when the branches' names alone don't decide it, a default branch that can't be read or
+   * named now (git unable to answer, a detached project folder with no main or master), or whose head can't be read, is
+   * no answer: `Again`, so the entry goes round, then pauses with why, never comes back for good on it.
    */
-  private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean> {
+  private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean | Again> {
     const f = s.forward ?? s.resolves
     if (!f) return true
+    if (f.override) return true
+    const alone = forwardDirection(f.from, f.to, null)
+    if (alone.dir !== 'unknown' || alone.why !== 'unordered') return forwardPermitted(alone, f.override)
     const H = this.history(card, s)
+    const none = (): Again => again(gitSaid(unknown(UNREADABLE.defaultBranch, { folder: this.project })))
     const d = await H.defaultTarget(this.project).catch(() => null)
-    const named = d && !isUnknown(d) ? d : null
-    const there = named ? await H.lineHead(this.project, named).catch(() => null) : null
-    const main = named && there && !isUnknown(there) ? named : null
-    return forwardPermitted(forwardDirection(f.from, f.to, main), f.override)
+    if (!d) return none()
+    if (isUnknown(d)) return again(gitSaid(d))
+    const there = await H.lineHead(this.project, d).catch(() => null)
+    if (there && isUnknown(there)) return again(gitSaid(there))
+    if (!there) return none()
+    return forwardPermitted(forwardDirection(f.from, f.to, d), f.override)
   }
 
   private history(card: CardRecord, s?: CardState): HistoryPort {
