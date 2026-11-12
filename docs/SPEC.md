@@ -8158,8 +8158,12 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   only after: git's clean check made as git would (`status --porcelain --ignore-submodules=none` empty, so a user's
   `ignore` setting hides nothing here), and every clone under `<gitdir>/modules`, nested ones too, holding no commit
   that its remote-tracking refs lack (`rev-list -n1 --all --not --remotes`: branches, tags, a stash, HEAD, any ref).
+  A clone where that finds something is read again with its remotes' tags (HI-3077; `ls-remote --tags --refs` per
+  remote, no prompt, only then): a tag a remote has under the same name at the same object is the remote's (a release
+  tag whose branch was deleted, fetched with the clone), so what it reaches doesn't count; any other tag, one moved
+  locally included, is local work. A remote that can't be read is "couldn't check", kept.
   Else the slot is kept (`gitRefused`), its detail naming the submodule. Conservative by design: a commit fetched by
-  its id alone, or a fetched tag on no remote branch, keeps it; another checkout's copy is never taken as proof. The
+  its id alone keeps it; another checkout's copy is never taken as proof. The
   clones are found failing closed (an unreadable folder, a link, a stray file, a clone missing HEAD or config, a
   depth past the bound: "couldn't check", kept), and any failed read keeps it. Without `modules`, the plain removal as
   before; copies keep their forced removal. git refuses `worktree move` of such a worktree, forced or not, so an adopted

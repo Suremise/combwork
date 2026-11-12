@@ -469,8 +469,9 @@ async function everyClone(gitDir: string): Promise<{ clones: { dir: string; rel:
  * refuses any unforced removal of one; forced, it skips its own clean check and deletes the clones with it. So first:
  * git's clean check as it would make it (`status --porcelain --ignore-submodules=none`, empty), and every clone, nested
  * too, holding no commit that a remote-tracking ref there lacks (`rev-list --all --not --remotes`: branches, tags, a
- * stash, HEAD, any ref). A commit fetched by its id alone counts as not on the remote: kept, conservatively. A read that
- * failed keeps it too. The reason is stored, in the Default dialect.
+ * stash, HEAD, any ref), the tags a remote has too taken for the remote's (HI-3077: keptPastRemoteTags). A commit
+ * fetched by its id alone counts as not on the remote: kept, conservatively. A read that failed keeps it too. The reason
+ * is stored, in the Default dialect.
  */
 export async function submoduleWorkKept(x: Pick<GitFilesExec, 'git'>, folder: string): Promise<string | null> {
   const gitDir = await gitFileTarget(folder)
@@ -484,10 +485,53 @@ export async function submoduleWorkKept(x: Pick<GitFilesExec, 'git'>, folder: st
   for (const c of all.clones) {
     const r = await x.git(c.dir, [`--git-dir=${c.dir}`, 'rev-list', '-n1', '--all', '--not', '--remotes'])
     if (!r.ok) return stored(T.workUnread, { path: c.rel, error: firstLine(r) })
-    if (r.out.trim()) return stored(T.workUnpushed, { path: c.rel })
+    if (!r.out.trim()) continue
+    const kept = await keptPastRemoteTags(x, c.dir)
+    if ('error' in kept) return stored(T.workUnread, { path: c.rel, error: kept.error })
+    if (kept.kept) return stored(T.workUnpushed, { path: c.rel })
   }
   return null
 }
+
+/** Past this much of a command line for the tags no remote has, a clone is kept unchecked (Windows' limit is 32K). */
+const LOCAL_TAGS_BUDGET = 16_000
+
+/**
+ * HI-3077: a clone whose commits its remote-tracking branches lack, read again with its remotes' tags (`ls-remote
+ * --tags --refs`, no prompt): a tag a remote has under the same name, at the same object, is the remote's (fetched
+ * with the clone, say a release tag whose branch was deleted), so what it reaches is on the remote; a tag no remote
+ * has (or has elsewhere) is local work, as is any other ref. `kept`: something only this clone has. A remote that
+ * can't be read is an error, never taken for "nothing there"; so many local tags they can't be named keeps it.
+ */
+async function keptPastRemoteTags(x: Pick<GitFilesExec, 'git'>, dir: string): Promise<{ kept: boolean } | { error: string }> {
+  const gd = `--git-dir=${dir}`
+  const tagsR = await x.git(dir, [gd, 'for-each-ref', '--format=%(objectname) %(refname:strip=2)', 'refs/tags'])
+  if (!tagsR.ok) return { error: firstLine(tagsR) }
+  const tags = lines(tagsR.out)
+  if (!tags.length) return { kept: true }
+  const remotesR = await x.git(dir, [gd, 'remote'])
+  if (!remotesR.ok) return { error: firstLine(remotesR) }
+  const theirs = new Set<string>()
+  for (const remote of lines(remotesR.out)) {
+    const ls = await x.git(dir, [gd, 'ls-remote', '--tags', '--refs', remote], { env: { ...NO_PROMPT } })
+    if (!ls.ok) return { error: firstLine(ls) }
+    for (const l of lines(ls.out)) {
+      const m = /^([0-9a-f]+)\trefs\/tags\/(.+)$/.exec(l)
+      if (m) theirs.add(`${m[1]} ${m[2]}`)
+    }
+  }
+  const mine = tags.filter((t) => !theirs.has(t))
+  if (mine.length === tags.length) return { kept: true }
+  // Every ref but the tags, and the tags no remote has, less what the remote-tracking branches and the remotes' tags reach.
+  const minePos = mine.map((t) => t.slice(0, t.indexOf(' ')))
+  const mineExcl = mine.map((t) => `--exclude=${t.slice(t.indexOf(' ') + 1)}`)
+  if ([...minePos, ...mineExcl].reduce((n, a) => n + a.length + 1, 0) > LOCAL_TAGS_BUDGET) return { kept: true }
+  const r = await x.git(dir, [gd, 'rev-list', '-n1', '--exclude=refs/tags/*', '--all', ...minePos, '--not', '--remotes', ...mineExcl, '--tags'])
+  if (!r.ok) return { error: firstLine(r) }
+  return { kept: !!r.out.trim() }
+}
+
+const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.trim())
 
 // ---- git-lfs ----
 
