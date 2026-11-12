@@ -75,6 +75,8 @@ const STATES: QueueState[] = [
   { state: 'testing', target: 'main', step: null },
   ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
   { state: 'paused', target: 'main', reason: 'needsYou', card: 'HI-6', stuck: true },
+  // HI-3091: an unknown publication the user has answered.
+  { state: 'paused', target: 'main', reason: 'publishUnknown', card: 'HI-6', answered: true },
   { state: 'returned', reason: 'conflict', transient: false, failure: FAILURES[0] },
   { state: 'left', why: 'stale' },
   { state: 'left', why: 'decision' },
