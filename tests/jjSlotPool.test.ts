@@ -4,7 +4,7 @@
 // removal cut short between forget and the trash, resumed; a Git slot in the same project finishing under Git; and a
 // copy verified only after its barrier, the result stored with its freeing. Skipped without the fetched jj; with
 // CW_JJ_REAL=1 its absence fails.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -116,6 +116,19 @@ describe.skipIf(!jjExe)(`the slot and copy pools over jj's port (jj ${TESTED_JJ.
         expect(second.store.slot(lent.slot.name)).toMatchObject({ op: null, state: 'ready' })
       })
 
+      it('a free slot whose folder was deleted: made again under its name by the next lend (HI-3046: colocated, its Git entry cleared)', async () => {
+        const w = world(colocated)
+        const { pool, store } = w.pool(1)
+        const lent = await pool.lend({ card: 5, agent: 'a-5' }, { target: 'main' })
+        if (!lent.ok) throw new Error('not lent')
+        await pool.release(lent.lease.id, 'done')
+        expect(store.slot(lent.slot.name)?.state).toBe('ready')
+        rmSync(lent.slot.folder, { recursive: true, force: true })
+        const again = await pool.lend({ card: 6, agent: 'a-6' }, { target: 'main' })
+        expect(again).toMatchObject({ ok: true, slot: { name: lent.slot.name } })
+        expect(readFileSync(join(lent.slot.folder, 'base.txt'), 'utf8')).toBe('base\n')
+      })
+
       it('removes a jj slot by forget and the Recycle Bin, with its ignored files; cut short between them, resumed by the next removal, never lent meanwhile', async () => {
         const w = world(colocated)
         const crashing = w.pool(1, { hooks: { afterForget: () => { throw new Error('stopped') } } })
@@ -213,7 +226,6 @@ describe.skipIf(!jjExe)(`the slot and copy pools over jj's port (jj ${TESTED_JJ.
     if (!first.ok) throw new Error('not leased')
     await pool.returnCopy(first.lease.id, 'verdict')
     const id = store.copy(first.copy.name)!.identity!
-    const { rmSync } = await import('fs')
     w.h.jj(w.repo, 'workspace', 'forget', id.workspace)
     rmSync(first.copy.folder, { recursive: true, force: true })
     w.h.jj(w.repo, 'workspace', 'add', first.copy.folder, '--name', id.workspace, '-r', w.base, '--colocate')
