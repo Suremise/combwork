@@ -3280,7 +3280,9 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   three times while only that moved, each pass read afresh, and refused once they're spent (HI-2916). A fingerprint
   that can't be read at the instant it is asked (the operation heads while any jj operation lands: jj writes the new
   head before it removes the old one) also gathers it again while passes are left, rather than refusing (HI-2972); the
-  write still needs exactly the fingerprint it gathered. A start refused as `evidence.changed` logs which check refused
+  write still needs exactly the fingerprint it gathered. So is the target's ref read while a jj write of Combwork's
+  holds or waits on the store (its file gate, HI-2918): unreadable then, never an empty ref, which looked like a change
+  by content and refused the start beside a slot being detached (HI-3012). A start refused as `evidence.changed` logs which check refused
   it (the plan, the write, the lane, the baseline) and on which pass, and each pass gathered again logs why. The
   target's read itself is made again whole when the head moves under it, at most three reads.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same

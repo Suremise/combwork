@@ -26,6 +26,9 @@ import { JjPlatform } from '../src/main/platform/jjPlatform'
 import { jjLineKey } from '../src/main/platform/jjSlotPrep'
 import { jjChainOf } from '../src/main/platform/jjFacts'
 import { readOpHeads } from '../src/main/platform/jjView'
+import { jjFileGate, pathKeySync, storeKey, type Grant } from '../src/main/platform/jjFileGate'
+import { storeGatedHistory } from '../src/main/platform/jjRunner'
+import { gitHistory } from '../src/main/platform/gitHistory'
 import { RETIRED_GUARD } from '../src/shared/workflow/compile'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
@@ -333,6 +336,49 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
         expect(nulls).toBe(0)
         expect(w.wf.state(card).started).toMatchObject({ target: 'main', slot: 'slot-a' })
       } finally {
+        spy.mockRestore()
+      }
+    })
+
+    it("start: the target's ref read while a jj write of Combwork's holds the store (its slot detached beside it): unreadable, gathered again and started, never refused as a change by content (HI-3012)", async () => {
+      const w = await world(colocated)
+      const key = pathKeySync(w.ctx.store)
+      expect(key).toBeTruthy()
+      // Git's history of the store under Combwork's file gate, as the app's (jjCards.ts): a read it holds answers null.
+      const ungated = w.deps.history
+      w.deps.history = storeGatedHistory(gitHistory)
+      // The store held exclusively from just before the first write, as a jj write's export holds it, until the evidence has
+      // read it as unreadable: a pass after reads it freely. Read as '' (before HI-3012), the target seemed to have gone.
+      const real = JjPlatform.prototype.evidence
+      let held: Grant | null = null
+      let unreadable = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...a: Parameters<JjPlatform['evidence']>) {
+        const e = real.apply(this, a)
+        if (held && e === null) {
+          unreadable++
+          held.release()
+          held = null
+        }
+        return e
+      })
+      let once = true
+      w.wf.cfg.hooks = {
+        beforeWrite: async () => {
+          if (!once) return
+          once = false
+          held = await jjFileGate.acquire([storeKey(key!)], 'exclusive')
+        }
+      }
+      try {
+        const card = w.wf.createCard({ title: 'store held at the write' })
+        moved(await w.wf.start(card.key, B1))
+        expect(once).toBe(false)
+        expect(unreadable).toBe(1)
+        expect(w.wf.state(card).started).toMatchObject({ base: w.main(), target: 'main', slot: 'slot-a' })
+      } finally {
+        ;(held as Grant | null)?.release()
+        w.deps.history = ungated
+        w.wf.cfg.hooks = undefined
         spy.mockRestore()
       }
     })

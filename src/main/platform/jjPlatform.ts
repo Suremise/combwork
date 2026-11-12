@@ -55,6 +55,7 @@ import { cleanCycle, cycleLive, readAttemptsValue, jjCandidateStep, sameFingerpr
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
+import { jjFileGate, pathKeySync, storeKey } from './jjFileGate'
 import { jjLineKey } from './jjSlotPrep'
 import { readCheckout, singleHead, viewNow } from './jjView'
 import type { JjWorkspacePort } from './jjWorkspacePort'
@@ -255,9 +256,15 @@ function generationSync(folder: string): string {
   }
 }
 
-/** A ref's object id read from the store's files (loose, then packed), synchronously; null where they don't say. */
-function refSync(H: HistoryPort, store: string, ref: string): string {
-  return H.refSync(store, ref) ?? ''
+/**
+ * A ref's object id read from the store's files (loose, then packed), synchronously; '' where they don't say, and null
+ * while a jj write of Combwork's holds or waits on the store (HI-3012): not read then, as the store-gated history's own
+ * answer is, so the evidence is unreadable rather than a target that seems to have gone. Read as '', a start's answer by
+ * content looked changed beside Combwork's own jj operations and was refused instead of gathered again.
+ */
+function refSync(H: HistoryPort, store: string, ref: string): string | null {
+  const key = pathKeySync(store)
+  return key ? jjFileGate.readSync([storeKey(key)], () => H.refSync(store, ref) ?? '', null) : (H.refSync(store, ref) ?? '')
 }
 
 export class JjPlatform implements PlatformAdapter {
@@ -404,7 +411,9 @@ export class JjPlatform implements PlatformAdapter {
       if (!p.project) return null
       const head = singleHead(p.project.jjRepo)
       if (!head) return null
-      parts.push(`head:${head}`, p.target ? `target:${refSync(this.H, p.project.store, `refs/heads/${p.target}`)}` : '')
+      const target = p.target ? refSync(this.H, p.project.store, `refs/heads/${p.target}`) : ''
+      if (target === null) return null
+      parts.push(`head:${head}`, p.target ? `target:${target}` : '')
       return parts.join('|')
     }
     // J3's view without the checkout record's operation: a snapshot that records nothing (the boundary's own, after
@@ -415,7 +424,11 @@ export class JjPlatform implements PlatformAdapter {
     const co = readCheckout(p.view.workspace)
     const ptr = co && d.port() ? d.port()!.pointerSync(p.view.store, co.workspace) : null
     parts.push(fp, `gen:${generationSync(p.folder)}`, `ptr:${ptr === 'unreadable' ? 'unreadable' : ptr ? `${ptr.prep}:${ptr.key}:${ptr.generation}` : '-'}`, `slot:${this.holdPrint(p.lease, p.holder)}`)
-    if (p.target) parts.push(`target:${refSync(this.H, p.view.store, `refs/heads/${p.target}`)}`)
+    if (p.target) {
+      const target = refSync(this.H, p.view.store, `refs/heads/${p.target}`)
+      if (target === null) return null
+      parts.push(`target:${target}`)
+    }
     return parts.join('|')
   }
 
