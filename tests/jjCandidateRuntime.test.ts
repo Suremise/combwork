@@ -80,7 +80,7 @@ const REAL_JJ_MS = 60_000
 describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
     it("Approved: a candidate built and shown; the user's bookmark set onto it is Integrated via the candidate, Done", async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card, P } = await approved(w)
       const head = w.main()
       const jjp = new JjPlatform(w.wf)
@@ -107,7 +107,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('the target moved between runs: a new candidate on the new head, the old one dropped', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -124,7 +124,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a conflict with the target returns the card to its builder, in jj words; nothing offered', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w, 'conflicting', 'f.txt', 'card\n')
       // The target moves after the card started, changing the same file: the candidate conflicts.
       onTarget(w, 'f.txt', 'target\n')
@@ -140,7 +140,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   describe.each([true, false] as const)('ended cycles cleaned up, through afterRun (HI-2950), colocated: %s', (colocated) => {
     it('put back and restarted: the earlier cycle’s candidate dropped, its pins and row gone; the new cycle untouched', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -158,7 +158,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it("the user's Done without a proof: its candidate dropped", async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -173,7 +173,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   describe('ended cycles: the rest (colocated, HI-2950)', () => {
     it("the sweep's selection is bounded (HR1's rounds 1 and 2): SWEEP_SCAN journals a run after its cursor; a pass ends at the last (no continuation loop); no whole-board card load", async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const jjp = new JjPlatform(w.wf)
       // 40 journals of cards gone, each with nothing left to do.
       await w.deps.records!.write((db) => {
@@ -196,7 +196,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it("work left unresolved on a pass's first page keeps the tick asking after the pass ends; once resolved and a pass drained, it stops (HR2's round 3)", async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const jjp = new JjPlatform(w.wf)
       const Z = (c: string) => c.repeat(40)
       // First by key: a gone card's live candidate whose drop can't be made (its commit unknown to jj): unresolved.
@@ -219,7 +219,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it("a restart between a pass's pages begins a new pass, so what its first page left is never forgotten (HR1's round 4)", async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const Z = (c: string) => c.repeat(40)
       const held = [{ fp: { cycle: 1, submission: 1, revision: Z('a'), base: Z('b'), key: null, commit: Z('a'), target: 'main', ruleset: 'r', style: 'merge', strict: false, generation: 0, approval: 1 }, record: { attempt: 'aaaaaa01', card: 'AA-00', kind: 'candidate', style: 'merge', revision: Z('a'), base: Z('b'), expected: Z('b'), phase: 'done', baseOp: 'x', ops: [], commits: [Z('1')], pins: [], result: Z('1'), outcome: 'candidate' } }]
       await w.deps.records!.write((db) => {
@@ -242,7 +242,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it("a step run just after the user moved the target onto the candidate (it read the target before): the candidate left for the proof, credited via it", async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -264,7 +264,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('put back with no restart: dropped; Integrated by the candidate then Done: the reached candidate kept', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -274,7 +274,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       await jjp.afterRun()
       expect(visible(w, c.result)).toBe(false)
       // Another card, integrated by its candidate: Done with Integrated, never an ended cycle: its candidate stays.
-      const w2 = await world(true, { candidates: true })
+      const w2 = await world(true, { candidates: true, oneSlot: true })
       const { card: k } = await approved(w2)
       const j2 = new JjPlatform(w2.wf)
       await j2.reconcile(k, {})
@@ -288,7 +288,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('reopened while its drop runs: a reopen is a new cycle, so the ended one stays ended and its drop completes; the new cycle untouched', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -317,7 +317,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a candidate attempt in flight when its cycle ends: the sweep waits for it, then recovers and drops what it left', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       let sweep: Promise<unknown> | null = null
@@ -343,7 +343,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a drop that crashed (at a pin delete): the next sweep, as after a restart, completes it', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -365,7 +365,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   describe("an offer's lifetime (colocated, HR3's round 1)", () => {
     it('a ready offer, then the target moves and the rebuild is interrupted: withdrawn at once, and after a restart', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -390,7 +390,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a ready candidate rewritten (superseded, main unmoved) and its rebuild interrupted: withdrawn (round 2)', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -416,7 +416,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a stale pass after a ready offer: no longer offered', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const a = w.slots['slot-a']
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
@@ -433,7 +433,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
     it('a pass gone stale while its candidate is built: nothing offered or returned', async () => {
       let once: (() => void) | null = null
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'written' && once) {
           const f = once
@@ -454,7 +454,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   describe('integrated another way (colocated)', () => {
     it("the user's own fast-forward to the reviewed commit: Done, and the unused candidate dropped from their log", async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       const { card, P } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -472,7 +472,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   describe('races and recovery (colocated)', () => {
     it('a new approval while the candidate is built: nothing offered; the next run builds for the new one', async () => {
       let once: (() => void) | null = null
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'written' && once) {
           const f = once
@@ -496,7 +496,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
     it('the rules reapplied (another style) while it is built: nothing offered; the next run builds in the new style', async () => {
       let once: (() => void) | null = null
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'written' && once) {
           const f = once
@@ -518,7 +518,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
     it('the target moved while it is built: not offered as current; the next run builds on the new head', async () => {
       let once: (() => void) | null = null
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'pinned' && once) {
           const f = once
@@ -538,7 +538,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('an attempt interrupted after its pins (a crash): the next run recovers and drops it, then builds afresh', async () => {
-      const w = await world(true, { candidates: true })
+      const w = await world(true, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'pinned') throw new Error('crash')
       }
@@ -558,7 +558,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   describe('styles and signing (not colocated)', () => {
     it('rebase: the reviewed commits copied onto the head; strict merge: built on its update', async () => {
-      const w = await world(false, { candidates: true })
+      const w = await world(false, { candidates: true, oneSlot: true })
       const { card, P } = await approved(w)
       reapply(w, card, { style: 'rebase' })
       const jjp = new JjPlatform(w.wf)
@@ -578,7 +578,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('a repository that signs: none built, and the record says so', async () => {
-      const w = await world(false, { candidates: true })
+      const w = await world(false, { candidates: true, oneSlot: true })
       w.h.jj(w.repo, 'config', 'set', '--repo', 'signing.behavior', 'own')
       const { card } = await approved(w)
       await new JjPlatform(w.wf).reconcile(card, {})
@@ -592,7 +592,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   // HI-2990 (found by HI-2967's probes): what a clean-up skipped or held back is tried again until the cycle is settled.
   describe.each([true, false] as const)('nothing left in the log for good (HI-2990), colocated: %s', (colocated) => {
     it('strict merge, the target moved twice: each superseded update dropped after its candidate; after Integrated, only what the target reaches', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       onTarget(w, 'theirs1.txt', 'one\n')
       reapply(w, card, { style: 'merge', strict: true })
@@ -621,7 +621,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('the builder rewrites the reviewed commit under a merge candidate: the candidate jj rebased is dropped too, not only the recorded one', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -643,7 +643,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
     for (const how of ['its files', 'its description alone'] as const) {
       it(`a successor the user changed (${how}) is theirs: kept, and the attempt settled`, async () => {
-        const w = await world(colocated, { candidates: true })
+        const w = await world(colocated, { candidates: true, oneSlot: true })
         const { card } = await approved(w)
         const jjp = new JjPlatform(w.wf)
         await jjp.reconcile(card, {})
@@ -664,7 +664,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     }
 
     it('squash: an attempt cut short (a crash after its scratch commit) when the user then integrates their own way: recovered and dropped after Integrated, its scratch commit included', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card, P } = await approved(w)
       reapply(w, card, { style: 'squash' })
       const jjp = new JjPlatform(w.wf)
@@ -695,7 +695,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
     })
 
     it('Integrated recorded with the rules off, its drop then cut short (a crash): the sweep drops the unused candidate, the card still Approved', async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       const { card, P } = await approved(w)
       const jjp = new JjPlatform(w.wf)
       await jjp.reconcile(card, {})
@@ -720,7 +720,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   // HI-2992 (found by HI-2967): a candidate's build interrupted, then more operations than recovery's old walk read.
   describe.each([true, false] as const)('an interrupted attempt recovered however far the operation log moved on (HI-2992), colocated: %s', (colocated) => {
     it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: 170_000 }, async () => {
-      const w = await world(colocated, { candidates: true })
+      const w = await world(colocated, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'pinned') throw new Error('crash')
       }
@@ -747,7 +747,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   describe.each([true, false] as const)('integrated between the proof and the step (HI-2989), colocated: %s', (colocated) => {
     for (const style of ['rebase', 'squash', 'merge'] as const) {
       it(`${style}: nothing built or returned in that run; the next run's proof makes it Integrated via the candidate, Done`, async () => {
-        const w = await world(colocated, { candidates: true })
+        const w = await world(colocated, { candidates: true, oneSlot: true })
         const { card } = await approved(w)
         reapply(w, card, { style })
         const jjp = new JjPlatform(w.wf)

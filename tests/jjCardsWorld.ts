@@ -38,7 +38,8 @@ export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}
 
 /** A jj project with a workspace database, two slots, J9a's port on its bindings, and a Workflow composed with jj's deps. */
 /** `candidates`: HI-2871's candidate step on (its attempts journalled in the database, as the app's). */
-export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean } = {}) {
+/** `oneSlot`: slot-a only, for a file whose cards are all B1's (HI-3018: a slot is a dozen jj runs a test never uses). */
+export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean } = {}) {
   const h = harness()
   const { repo, root } = h.repo(`cards${colocated ? 'c' : 'n'}`, colocated)
   const home = tempDir('jjcards-')
@@ -60,12 +61,17 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
   const main = (): string => h.id(repo, 'main')
   const slots: Record<string, { folder: string; identity: WorkspaceIdentity; lease: string }> = {}
   for (const [name, lease] of [['slot-a', 'L1'], ['slot-b', 'L2']] as const) {
+    if (o.oneSlot && name === 'slot-b') continue
     const folder = join(root, name)
     expect((await port.create(repo, folder, main())).ok).toBe(true)
     slots[name] = { folder, identity: (await port.identity!(folder))!, lease }
   }
   /** The slot each builder is lent (B1: slot-a, B2: slot-b). */
-  const slotOf = (builder: string) => slots[builder === 'B2' ? 'slot-b' : 'slot-a']
+  const slotOf = (builder: string) => {
+    const s = slots[builder === 'B2' ? 'slot-b' : 'slot-a']
+    if (!s) throw new Error(`no slot for ${builder}: this world was made with oneSlot`)
+    return s
+  }
   /** Each lease's hold as the app's slotHold answers it: open and held, or ended or busy (not held), with what was read. */
   const holds = new Map<string, { held: boolean; print: string }>([['L1', OPEN('slot-a')], ['L2', OPEN('slot-b')]])
   const pins = new Map<string, JjPinRecord>()
