@@ -12,7 +12,7 @@
 import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
 import { JjPlatform } from '../src/main/platform/jjPlatform'
@@ -254,14 +254,13 @@ describe.skipIf(!jjExe)(`jj cards reconciled to Integrated (jj ${TESTED_JJ.versi
       })
     })
 
-    // HI-3018: the publish pass's steps, each a test of its own over one world made in beforeAll (its closers run in
-    // afterAll), so no step carries the world's setup and each fits its time bound on a loaded machine.
+    // HI-3018: the publish pass's steps, each a test of its own from a world made in beforeEach (an Approved card
+    // integrated, its obligation owed, a remote): the setup has its own time bound, and each step runs on its own.
     describe('the publish pass (afterRun)', () => {
       let s: { w: World; remote: string; card: Awaited<ReturnType<typeof approved>>['card']; P: string; jjp: JjPlatform } | null = null
-      const own: (() => void)[] = []
-      beforeAll(async () => {
+      beforeEach(async () => {
+        s = null
         const w = await world(colocated, ONE)
-        own.push(...closers.splice(0))
         const remote = join(tempDir('jjremote-'), 'remote.git')
         execFileSync('git', ['init', '--bare', '-q', remote], { env: w.h.env })
         w.h.jj(w.repo, 'git', 'remote', 'add', 'origin', remote)
@@ -269,24 +268,24 @@ describe.skipIf(!jjExe)(`jj cards reconciled to Integrated (jj ${TESTED_JJ.versi
         w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
         const jjp = new JjPlatform(w.wf)
         await jjp.reconcile(card, {})
+        expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'owed' }])
         s = { w, remote, card, P, jjp }
       })
-      afterAll(() => {
-        for (const c of own.splice(0)) c()
-      })
-
-      it("the user's push settles the obligation published", async () => {
+      /** The user pushes main (their act, test-side), then the pass observes it: published. */
+      const pushed = async (): Promise<void> => {
         const { w, remote, P, jjp } = s!
-        expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'owed' }])
-        // The user pushes main (their act, test-side), then the pass observes it.
         execFileSync('git', ['--git-dir', w.ctx.store, 'push', '-q', remote, `${P}:refs/heads/main`], { env: w.h.env })
         await jjp.afterRun()
         expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'published', pushed: P }])
+      }
+
+      it("the user's push settles the obligation published", async () => {
+        await pushed()
       })
 
       it("the remote rewound: the next pass's re-check flags it checkThis", async () => {
         const { w, remote, jjp } = s!
-        expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'published' }])
+        await pushed()
         execFileSync('git', ['--git-dir', remote, 'update-ref', 'refs/heads/main', w.h.id(w.repo, 'main-')], { env: w.h.env })
         execFileSync('git', ['--git-dir', w.ctx.store, 'fetch', '-q', remote, '+refs/heads/main:refs/remotes/origin/main'], { env: w.h.env })
         await jjp.afterRun()
