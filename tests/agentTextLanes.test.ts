@@ -129,6 +129,8 @@ function sharedTexts(): { name: string; text: string }[] {
   out.push({ name: 'next paused', text: laneNextText({ lane: { ...view, state: 'paused' }, next: null, waits: { reason: 'hold', card: 3 } }) })
   out.push({ name: 'next none', text: laneNextText({ lane: view, next: null, waits: null }) })
   out.push({ name: 'next none, queued', text: laneNextText({ lane: view, next: null, waits: null, queue }) })
+  // An agent that only reviews (HI-3118): a card waiting for its review, or none.
+  out.push({ name: 'next review', text: laneNextText({ lane: view, next: null, waits: null, review: { card: 2, title: 'Card 2' } }) }, { name: 'next review none', text: laneNextText({ lane: view, next: null, waits: null, review: null }) })
   for (const slot of [null, 'slot-b'])
     for (const waits of [null, { reason: 'reviewer', card: 2 } as LaneStatus]) {
       const lane = { ...view, slot }
@@ -225,6 +227,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       outputs.leftOut = lane.note ?? ''
       // While c1 is still its own (HI-3117: once B2's lane below owns it, B1's lane has none left and may end).
       outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
+      outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
       outputs.stays = await start({ cards: [c2.number], ownBuilder: true })
       outputs.shared = await start({ builder: 'b2', reviewer: 'r1', cards: [c1.number] })
       outputs.fresh = (await lanes.freshCardsNote(w, [c2.number], 'B9', 0, null)) ?? ''
@@ -233,7 +236,6 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       outputs.joinNoLane = await said(lanes.joinLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', by: 'R1 (alpha)' }))
       outputs.joinedFirst = await said(lanes.joinLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c2.number], by: 'R1 (alpha)' }))
       outputs.endNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b3' }))
-      outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
       outputs.nextNone = await said(lanes.laneNext(w, 'alpha', 'g1'))
       await lanes.endLane(w, lane.lane.id, { abandoned: true })
       outputs.nextAbandoned = await said(lanes.laneNext(w, 'alpha', 'b1'))

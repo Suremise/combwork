@@ -7305,6 +7305,16 @@ Whether a conversation may resume there is its **hold** (none: it may):
   included) and the slot looked at.
   A run of another Combwork is that Combwork's to stop; the slot stays its until it exits. No off switch: one writer needs it
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
+- **A lane over with its card in flight keeps that card's slot** (HI-3118; design HI-3118/s12, agreed with HR2). The
+  slot pass decides a running-no-more lane's lease in one write (`SlotStore.laneOver`), reading there the lane's row and
+  each card whose current cycle started on that lease (its Started `lease`) at a stage that keeps a slot. None: the
+  lease ends (`laneEnded` / `laneAbandoned`), as below. One: the lease becomes that card's in place (same id, slot and
+  agent; `kind: card`), whoever the card is given to now, so the card keeps its slot and work, is never lent away from
+  them, and its lease then ends as a card's does (Done, or put back, HI-2995 keeping committed work). Several (a race;
+  the rules allow one): nothing ends, the slot stays protected, and the log says which. A lane running again is left
+  alone. **A Git submit** from a card started on a slot's lease is refused (`platform.slotLeft`) unless that lease is
+  open now, on that slot at the card's folder, and the card's own or a lane's listing the card; unreadable, refused
+  too. Nothing is changed there on refusal.
 - **A lane's end lets its builder finish** (HI-1706, Darren 26 Oct: "Who the heck wants cut off like that."; design
   HI-1706/s10, agreed with HR1). A lane's lease ending (`laneEnded`, `laneAbandoned`) never cuts its builder off
   mid-turn, and ends it cleanly (`slotsApp.ts`'s `laneEnd`). Other lease ends, Stop and restarts are as above.
@@ -8426,7 +8436,13 @@ a returned card gets its own slot and a fresh conversation) is put to Darren as 
 - **One card at a time:** the runtime refuses to start a lane's card while a card before it in the lane isn't Done
   (`lane.oneAtATime`, a refusal in all 7 locales; no option of its own: `workflow.enforce` off turns it off; the user's
   own drag isn't refused). `cw_lane next` (`GET /v1/lanes/next`) names the card to start or carry on, or why the lane
-  waits. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
+  waits. **A queued list counts once its boundary has passed** (HI-3118): with no card of the lane's own in flight,
+  `cw_lane next` names its next card from the queued list and an agent's `cw_lane end` is refused while that list has
+  open work, whether or not the lanes' look has applied it yet; neither applies it, and the user's End ends the lane as
+  asked. For an agent that **only reviews** running lanes, `cw_lane next` answers as a reviewer: the first card of its
+  lanes waiting in Review, or that none waits; never a card to start. Once its lane has ended, it says "all its cards
+  are Done" only when the lane's kept snapshot says so; ended with cards open (the user's End), it names them; with
+  nothing kept, it claims nothing. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
   goes before the earlier cards of the lane nobody has started (Todo), in the submission's own write (`LaneChanged`):
   its reviewer's wake says so and names the card the lane goes on to, and the submit's reply says it moved. Not while
   an earlier card is in flight unreviewed (Doing or Review: the lane waits on that one as it is), while a list change is

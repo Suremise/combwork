@@ -384,6 +384,11 @@ export class GitPlatform implements PlatformAdapter {
     let base: string | null
     let commits: string[] | undefined
     let dirty: Maybe<string[]> | undefined
+    // HI-3118: a card started on a slot's lease submits from that slot only while the lease still holds it for the card
+    // (its own, or its lane's listing it): once Combwork ended it, the folder may be another card's (lent again since).
+    const asked = this.wf.cfg.slotHeld
+    const held = asked && s.started?.lease && s.started.slot ? asked(s.started.lease, s.started.slot, folder, card.id) : true
+    if (held !== true) return { ok: false, refusal: { rule: 'platform.slotLeft', values: { card: card.key, slot: s.started!.slot!, folder, unknown: held === null ? 'yes' : 'no' } } } // i18n-ignore: codes
     if (this.wf.ownLine(s)) {
       // Its head and the target's, with its uncommitted state when a guard asks for it, read together (#1376): the target
       // read in the folder, whose branches are the project's.

@@ -16,7 +16,8 @@ import { commit, gitRepo, sh } from './workflow/harness'
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => true }))
 // The lanes running (the slot pass ends a lane's lease once its lane isn't): the next ones, never the one that ended.
 const { running } = vi.hoisted(() => ({ running: new Set<string>() }))
-vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [...running].map((id) => ({ id, state: 'active', cards: [] })) }))
+// Their builder is always B1 here (HI-3117: a lane card's start takes the lane's slot only for that lane's builder).
+vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [...running].map((id) => ({ id, state: 'active', cards: [] })), laneRunsWith: (_ws: unknown, id: string, role: string, agent: string) => running.has(id) && role === 'builder' && agent === 'b1' }))
 
 const base = tempDir('writtenslot-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

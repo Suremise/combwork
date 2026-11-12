@@ -216,6 +216,12 @@ export interface WorkflowConfig {
   keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
+  /**
+   * HI-3118: whether the lease a card's cycle started on still holds its slot for it (FactStore.leaseHolds: open, that
+   * slot at that folder, the card's own or a lane's listing it); null when it can't be read. The app's; left out (tests
+   * of a slot made by hand), a submit doesn't ask.
+   */
+  slotHeld?: (lease: string, slot: string, folder: string, card: number) => boolean | null
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
   targetChanges?: (changes: TargetChanges, card: string) => void
   /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */

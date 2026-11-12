@@ -141,6 +141,8 @@ const A = {
   endNotDone: agentMsg({ id: 'lane.refused.end.notDone', text: 'The lane ends by itself once all its cards are Done: {cards} not yet', note: "cw_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet." }),
   movedOn: agentMsg({ id: 'lane.refused.end.movedOn', text: 'Its cards moved on meanwhile: read the lane again', note: "cw_lane end refused: the lane's cards moved between its read and its save (a card reopened)." }),
   nextEnded: agentMsg({ id: 'lane.refused.next.ended', text: "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "cw_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again." }),
+  nextEndedOpen: agentMsg({ id: 'lane.refused.next.endedOpen', text: "Your lane {lane} was ended with {cards} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with {n, plural, one {that card} other {those cards}}.", note: 'cw_lane next (HI-3118), for an agent whose lane was just ended (by the user, say) while cards of it were still open: never "all its cards are Done". {cards} is their keys, joined with ", "; {n} how many.' }),
+  nextEndedUnknown: agentMsg({ id: 'lane.refused.next.endedUnknown', text: "Your lane {lane} has ended. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "cw_lane next (HI-3118), for an agent whose lane just ended when how its cards stood then wasn't kept: says nothing of them." }),
   nextAbandoned: agentMsg({ id: 'lane.refused.next.abandoned', text: "Your lane {lane} was abandoned: don't start it again; ask the user if there is more to do.", note: 'cw_lane next, for an agent whose lane was just abandoned (HI-2273).' }),
   nextNone: agentMsg({ id: 'lane.refused.next.none', text: 'No running lane of yours: start one with cw_lane start, or ask the user', note: 'cw_lane next, for an agent with no running lane.' }),
   journal: agentMsg({ id: 'lane.journal.fact', text: 'Lane {named, select, yes {"{name}" } other {}}{state, select, started {started} ended {ended} merged {ended, merged at {commit}} other {abandoned}}: {who}, {cards}', note: "A lane's start or end as a fact in the Assistant's journal (#1031), stored: {who} is \"builder / reviewer\", {cards} its cards; {named} yes when the lane has a name ({name})." })
@@ -864,15 +866,28 @@ const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly numbe
  * lane's by cardOwnersNow).
  */
 const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
+  if (ownInFlight(ws, l, cards)) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
+}
+
+/** Whether one of a lane's own cards (HI-1821: not another agent's or lane's) is in flight now: Doing, Review or Passed. */
+function ownInFlight(ws: WorkspaceService, l: LaneRecord, cards: readonly number[]): boolean {
   const places = cardPlacesNow(ws, cards)
   const owners = cardOwnersNow(ws, cards)
-  const flying = cards.some((n) => {
+  return cards.some((n) => {
     const c = places.get(n)
     const o = owners.get(n)
     const own = o?.agent ? o.agent === l.builder.id : !o?.lane || o.lane === l.id
     return !!c && !c.archived && same(c.project, l.project) && FLYING.has(c.column) && own
   })
-  if (flying) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
+}
+
+/**
+ * A running lane's list as its next start reads it (HI-3118): its queued list once none of its own cards is in flight
+ * (the boundary has passed, so the queue applies at the next start), else its list. Read only: the queue stays queued
+ * for its boundary writer (applyLaneList, the runtime's applyLaneBoundary).
+ */
+export function effectiveCards(ws: WorkspaceService, l: LaneRecord): number[] {
+  return l.pending?.length && !ownInFlight(ws, l, l.cards) ? [...l.pending] : [...l.cards]
 }
 
 const FLYING: ReadonlySet<string> = new Set(['doing', 'review', 'passed'])
@@ -1636,15 +1651,25 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
     if (o.agent && l.builder.id !== o.agent && l.reviewer?.id !== o.agent) throw new LaneError(403, say(A.endNotOurs))
     if (running(l)) {
       const v = (await views(ws, [l]))[0]
+      // HI-3118: its cards as its next start reads them, a queued list included once its boundary has passed (read
+      // here, never applied: refused, the queue stays for its own writer; ended, it was all Done anyway).
+      const list = effectiveCards(ws, l)
+      const queued = !sameList(list, l.cards)
+      const ev = queued ? (await views(ws, [{ ...l, cards: list, pending: undefined }]))[0] : v
       // Combwork owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, say(A.abandonNotOurs))
-      if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.elsewhere).map((c) => cardRef(c.number)).join(', ') })))
+      if (on && o.agent && !allDone(ev.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: ev.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.elsewhere).map((c) => cardRef(c.number)).join(', ') })))
       // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
       const given = on && o.agent ? null : (o.mergeCommit ?? null)
-      if (!o.abandoned && allDone(v.cards)) {
-        checks.push(stillAllDone(ws, l, [...l.cards]))
-        endVerified(ws, l, v.cards, on, verified, given)
+      if (!o.abandoned && allDone(ev.cards)) {
+        checks.push(stillAllDone(ws, l, list))
+        // Ended on its queued list (every card of it Done): that list is the one it ends with.
+        if (queued) {
+          l.cards = list
+          delete l.pending
+        }
+        endVerified(ws, l, ev.cards, on, verified, given)
       }
       else close(l, o.abandoned ? 'abandoned' : 'ended', v.cards, given)
       ended = true
@@ -1667,7 +1692,21 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
  * The next card of an agent's running lane (#1270, `cw_lane next`): the card to start, the one in flight to carry on,
  * or why the lane waits (a card passed but not merged: one card at a time, §16.11.2); none once every card is Done.
  */
-export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status'] }> {
+export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status']; review?: { card: number; title: string } | null }> {
+  // An agent that reviews lanes and builds none (HI-3118): a reviewer's answer, the first card of its lanes (in their
+  // order) waiting in Review, or none; never a builder's next card. One that builds a lane gets that lane, as before.
+  const runningHere = (await read(ws)).filter((l) => running(l) && same(l.project, project))
+  if (!runningHere.some((l) => l.builder.id === agentId)) {
+    const reviews = runningHere.filter((l) => l.reviewer?.id === agentId)
+    if (reviews.length) {
+      const vs = await views(ws, reviews)
+      for (const v of vs) {
+        const c = v.cards.find((x) => x.column === 'review' && !x.elsewhere)
+        if (c) return { lane: v, next: null, waits: null, review: { card: c.number, title: c.title } }
+      }
+      return { lane: vs[0], next: null, waits: null, review: null }
+    }
+  }
   const lane = await laneOf(ws, project, agentId)
   if (!lane) {
     // HI-2273: its lane just ended (all its cards Done) or was abandoned: said so, never "start one", which invited a
@@ -1675,12 +1714,24 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
     const gone = (await read(ws))
       .filter((l) => !running(l) && same(l.project, project) && (l.builder.id === agentId || l.reviewer?.id === agentId) && !!l.endedAt && Date.parse(l.endedAt) >= Date.now() - LANE_CARRY_MS)
       .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
-    if (gone?.state === 'ended') throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+    // HI-3118: "all its cards are Done" only when its kept snapshot says so; ended with cards open (the user's End),
+    // which; nothing kept (or a card's place unrecorded), nothing claimed.
+    if (gone?.state === 'ended') {
+      const kept = gone.frozen
+      if (!kept || kept.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
+      const open = kept.filter((c) => c.column !== 'done' && c.column !== 'gone')
+      if (open.length) throw new LaneError(404, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
+      throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+    }
     if (gone) throw new LaneError(404, say(A.nextAbandoned, { lane: gone.id }))
     throw new LaneError(404, say(A.nextNone))
   }
+  // Its queued list once the boundary has passed (HI-3118: no card of its own in flight), as the next start reads it.
+  const rec = (await read(ws)).find((x) => x.id === lane.id)
+  const list = rec ? effectiveCards(ws, rec) : null
+  const eff = rec && list && !sameList(list, rec.cards) ? (await views(ws, [{ ...rec, cards: list, pending: undefined }]))[0] : lane
   // Another agent's card is never the lane's next (HI-1821).
-  const open = lane.cards.filter(ownOpen)
+  const open = eff.cards.filter(ownOpen)
   const pauses = lane.state === 'paused' ? lane.status : null
   if (pauses) return { lane, next: null, waits: pauses }
   const flying = open.find((c) => c.column === 'doing' || c.column === 'review')
