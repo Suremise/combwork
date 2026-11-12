@@ -2755,6 +2755,17 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
   later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
   never moves. Strict's update (G8) came with HI-2853 (`prepareJjUpdate`); HI-2871 runs both for approved cards.
+- **Never from a commit the user hid** (HI-3100). The reviewed revision is read visible at the base operation
+  (`R & ::visible_heads()`; hidden, a user's rewrite since: refused unwritten, `moved`), for a candidate of any style and
+  strict's update; and every write names the reviewed commit and the target's head so (`jj new`'s parents, and
+  `jj duplicate -r '<base>..(exactly(<id> & ::visible_heads(), 1))' --onto exactly(…)` for a rebase and squash's update,
+  HR1's round 1): `exactly(<id> & ::visible_heads(), 1)`, which jj resolves at the
+  operation it loads, so a rewrite that lands after the checks and before jj runs makes the write fail having made
+  nothing ("fewer than the expected 1 revisions", probed on 0.47.1; without `exactly`, `jj new` drops an empty argument
+  and builds on the target alone), never the hidden commit brought back as a parent beside its rewritten self. A write
+  jj refused while another's operation moved the head is one that made nothing when no operation between its parent and
+  the head carries the attempt's marker (`opsSince`, 50 back): its step cleared, not left uncertain and kept.
+  Tests: `tests/jjCandidateHidden.test.ts`.
 - **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
   under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
   operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits

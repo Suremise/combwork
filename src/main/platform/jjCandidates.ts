@@ -268,6 +268,17 @@ export async function validUpdate(git: (args: readonly string[]) => Promise<RunR
 const SEP = '\u001f'
 const ZERO = '0'.repeat(40)
 const ATTEMPT = /^[a-z0-9]{6,40}$/
+
+/** A commit only while it is visible (HI-3100): read so, a commit the user hid since (rewrote it) reads as none. */
+const visibleRev = (commit: string): string => `${commit} & ::visible_heads()`
+
+/**
+ * A write's parent named only while it is visible, and exactly once (HI-3100): jj resolves it at the operation it loads,
+ * so a commit the user hid since (`jj describe`, a rebase) makes the write fail having made nothing ("fewer than the
+ * expected 1 revisions", probed on 0.47.1), never brought back as a parent. Without `exactly`, `jj new` unions its
+ * arguments and drops an empty one: a commit on the target alone.
+ */
+const visibleOne = (commit: string): string => `exactly(${visibleRev(commit)}, 1)`
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length > 0)
 const toml = (s: string): string => JSON.stringify(s)
 const marker = (attempt: string): string => `--config=combwork.txn=${toml(attempt)}`
@@ -441,6 +452,18 @@ class Attempt {
     return found
   }
 
+  /** The operations from `op` back to (not including) `parent`, newest first; null when `parent` isn't met within 50. */
+  async opsSince(op: string, parent: string): Promise<JjOpEntry[] | null> {
+    const out: JjOpEntry[] = []
+    for (const l of lines(await this.read(op, ['op', 'log', '--no-graph', '--limit', '50', '-T', OP_T]))) {
+      const e = parseOpLine(l)
+      if (!e) return null
+      if (e.id === parent) return out
+      out.push(e)
+    }
+    return null
+  }
+
   async opEntry(op: string): Promise<JjOpEntry> {
     const [l, ...more] = lines(await this.read(op, ['op', 'log', '--no-graph', '--limit', '1', '-T', OP_T]))
     const e = l ? parseOpLine(l) : null
@@ -503,6 +526,16 @@ class Attempt {
       if (op === parent) {
         await nothing()
         throw new Stop('failed', r.err || `${name}: no operation`) // i18n-ignore: a protocol detail for logs and tests, never shown
+      }
+      // HI-3100: jj refused (a parent of ours hidden meanwhile, say) while another's operation moved the head: ours made
+      // nothing when no operation between `parent` and the head carries this attempt's marker (read in full, else as
+      // before: uncertain), so it is no longer under way either.
+      if (!r.ok) {
+        const since = await this.opsSince(op, parent)
+        if (since && !since.some((e) => markerIn(e.args, this.rec.attempt))) {
+          await nothing()
+          throw new Stop('raced', `${name}: refused, nothing made`) // i18n-ignore: a protocol detail for logs and tests, never shown
+        }
       }
       const entry = await this.opEntry(op)
       const added = await this.commits(op, `::visible_heads() ~ ::at_operation(${parent}, visible_heads())`)
@@ -708,8 +741,10 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
   if (isJjUnknown(signing)) return signing
   if (signing === 'own' || signing === 'force') return { pause: 'signing', message: `signing.behavior = ${signing}` } // i18n-ignore: a protocol detail for logs and tests, never shown
   // The inputs at h0: the reviewed revision and the target's head visible, neither divergent; the suffix linear for a rebase.
-  const rev = await reads.commitAt(h0, req.revision)
-  if (isJjUnknown(rev)) return rev
+  // HI-3100: visible, not only present: a reviewed commit the user rewrote since (`jj describe`, say) is hidden, and a
+  // commit built on it would bring it back beside its rewritten self. Refused unwritten; the next pass reads the head.
+  const rev = await reads.commitAt(h0, visibleRev(req.revision))
+  if (isJjUnknown(rev)) return rev.jjUnknown === 'none' ? jjUnknown('moved', 'hidden') : rev
   const exp = await reads.commitAt(h0, req.expected)
   if (isJjUnknown(exp)) return exp
   if (!reads.stillAt(h0)) return jjUnknown('moved')
@@ -745,17 +780,17 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
       if (!suffix.length) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
       await a.phase('writing')
-      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
+      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..(${visibleOne(req.revision)})`, '--onto', visibleOne(req.expected)], { kind: 'duplicate', n: suffix.length, onto: req.expected })
       rec.result = headOf(d.added)!.commit
     } else if (req.style === 'merge') {
       await a.phase('writing')
-      const d = await a.write('merge', ['new', req.expected, from, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected, from] })
+      const d = await a.write('merge', ['new', visibleOne(req.expected), visibleOne(from), '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected, from] })
       rec.result = d.added[0].commit
     } else {
       await a.phase('writing')
-      const m = await a.write('scratch', ['new', req.expected, from, '--no-edit', '-m', `combwork scratch ${req.attempt}`], { kind: 'new', parents: [req.expected, from] }) // i18n-ignore: a protocol detail for logs and tests, never shown
+      const m = await a.write('scratch', ['new', visibleOne(req.expected), visibleOne(from), '--no-edit', '-m', `combwork scratch ${req.attempt}`], { kind: 'new', parents: [req.expected, from] }) // i18n-ignore: a protocol detail for logs and tests, never shown
       const merged = m.added[0].commit
-      const s = await a.write('squash', ['new', req.expected, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected] })
+      const s = await a.write('squash', ['new', visibleOne(req.expected), '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected] })
       const empty = s.added[0].commit
       const t = await a.write('restore', ['restore', '--from', merged, '--into', empty], { kind: 'restore', into: empty, change: s.added[0].change, parent: req.expected })
       rec.result = t.added[0].commit
@@ -832,8 +867,10 @@ export async function prepareJjUpdate(deps: JjCandidateDeps, req: JjUpdateReques
   const signing = await reads.configAt(h0, 'signing.behavior')
   if (isJjUnknown(signing)) return signing
   if (signing === 'own' || signing === 'force') return { pause: 'signing', message: `signing.behavior = ${signing}` } // i18n-ignore: a protocol detail for logs and tests, never shown
-  const rev = await reads.commitAt(h0, req.revision)
-  if (isJjUnknown(rev)) return rev
+  // HI-3100: visible, not only present: a reviewed commit the user rewrote since (`jj describe`, say) is hidden, and a
+  // commit built on it would bring it back beside its rewritten self. Refused unwritten; the next pass reads the head.
+  const rev = await reads.commitAt(h0, visibleRev(req.revision))
+  if (isJjUnknown(rev)) return rev.jjUnknown === 'none' ? jjUnknown('moved', 'hidden') : rev
   const exp = await reads.commitAt(h0, req.expected)
   if (isJjUnknown(exp)) return exp
   if (rev.divergent || exp.divergent) return jjUnknown('ambiguous', 'divergent')
@@ -854,11 +891,11 @@ export async function prepareJjUpdate(deps: JjCandidateDeps, req: JjUpdateReques
       if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
       if (!suffix.length) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
       await a.phase('writing')
-      const d = await a.write('update', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
+      const d = await a.write('update', ['duplicate', '-r', `${req.base}..(${visibleOne(req.revision)})`, '--onto', visibleOne(req.expected)], { kind: 'duplicate', n: suffix.length, onto: req.expected })
       rec.result = headOf(d.added)!.commit
     } else {
       await a.phase('writing')
-      const d = await a.write('update', ['new', req.revision, req.expected, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.revision, req.expected] })
+      const d = await a.write('update', ['new', visibleOne(req.revision), visibleOne(req.expected), '--no-edit', '-m', req.message], { kind: 'new', parents: [req.revision, req.expected] })
       rec.result = d.added[0].commit
     }
     await a.phase('written')
