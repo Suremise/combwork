@@ -1,12 +1,12 @@
 // HI-3009: a command's tree ended on main's thread never blocks it (as HI-2997 did for jj's, tests/jjProcessTree.test.ts):
 // the merge queue's bounded git, a card's focused pick, a check's or a slot's command and the submodules step end theirs
 // through treeEnding (endTreeAsync), never endTree's spawnSync; the thread ticks meanwhile; and the outcome comes only
-// once the whole tree has gone. The source guard: in src/main only cw-progress's own process (its wrapper) uses the
-// blocking endTree. Windows only for the trees (listed with PowerShell); tempDir() only.
+// once the whole tree has gone. The source guard (only cw-progress's own process uses the blocking endTree) is
+// tests/endTreeImports.test.ts, run by check:repo. Windows only (the trees are listed with PowerShell); tempDir() only.
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
-import { dirname, join, relative } from 'path'
+import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
@@ -118,25 +118,4 @@ describe.skipIf(!isWin)("a command's tree ended off main's thread (HI-3009)", ()
       }
     }, 60_000)
   }
-})
-
-describe('the blocking endTree stays out of main (HI-3009)', () => {
-  it("in src/main only cw-progress's wrapper, its own process, uses it; every other caller ends a tree through treeEnding or endTreeAsync", () => {
-    const root = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', 'src', 'main')
-    const files: string[] = []
-    const walk = (d: string): void => {
-      for (const n of readdirSync(d)) {
-        const p = join(d, n)
-        if (statSync(p).isDirectory()) walk(p)
-        else if (/\.tsx?$/.test(n)) files.push(p)
-      }
-    }
-    walk(root)
-    // An import or call of `endTree` itself (not endTreeAsync, nor a `deps.endTree` seam), outside its own module.
-    const uses = files
-      .map((f) => relative(root, f).replace(/\\/g, '/'))
-      .filter((f) => f !== 'processTree.ts')
-      .filter((f) => /(?<![.\w])endTree\b(?!Async)(?!\s*:)/.test(readFileSync(join(root, f), 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '')))
-    expect(uses).toEqual(['progressReporters/wrapper.ts'])
-  })
 })

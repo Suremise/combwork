@@ -139,7 +139,7 @@ export function treeEnding(platform = process.platform): TreeEnding {
 
 /**
  * Ends the command and everything it started (#549). Blocks the thread it runs on (two spawnSync PowerShell runs): only for
- * cw-progress's own process; Combwork's main process uses treeEnding (HI-3009, tests/treeEndingOffThread.test.ts). On Windows a command that isn't an .exe runs through cmd.exe (npm,
+ * cw-progress's own process; Combwork's main process uses treeEnding (HI-3009, tests/endTreeImports.test.ts). On Windows a command that isn't an .exe runs through cmd.exe (npm,
  * a .cmd server): ending cmd alone would leave the server running, holding its port, its folder and the output pipes,
  * so the whole tree goes: listed with start times (treeToEnd: never an older process whose parent id is only a reused
  * number, as `taskkill /T` would end, #655) and each ended as the process it was when listed. If that can't run, the

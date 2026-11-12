@@ -952,6 +952,8 @@ export const UNIT_SCANS = [
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/accounts.ts', 'src/main/providers/common.ts', 'src/main/providers/claude/memoryDir.ts', 'src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts', 'src/main/projectAgents.ts'] },
   { test: 'tests/historyPortsImports.test.ts', paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/targets.ts', 'src/main/workflow/retarget.ts', 'src/main/workflow/runChecks.ts', 'src/main/workflow/focusedRun.ts', 'src/main/workflow/queueChecks.ts', 'src/main/platform/history.ts', 'src/main/platform/historyPorts.ts'] },
   { test: 'tests/historyPortsImports.test.ts', paths: ['src/'], lines: ['gitHistory'] },
+  // HI-3009: the blocking endTree only in cw-progress's own process: any src/main line naming it.
+  { test: 'tests/endTreeImports.test.ts', paths: ['src/main/'], lines: ['endTree'] },
   // HI-2790: the merge queue's candidate through the integration port, its contract, and who imports Git's implementation of it.
   { test: 'tests/integrationPortsImports.test.ts', paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts', 'src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts'] },
   { test: 'tests/integrationPortsImports.test.ts', paths: ['src/'], lines: ['gitIntegration'] },
