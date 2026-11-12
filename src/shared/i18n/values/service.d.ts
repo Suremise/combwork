@@ -101,6 +101,7 @@ interface CombworkMessageValues {
   'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number }
   'service.folderChanges.submoduleInside': { folder: string | number }
   'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
+  'service.folderChanges.unmerged': { file: string | number }
   'service.folderChanges.unplaced': { folder: string | number }
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined

@@ -88,6 +88,7 @@
   "service.folderChanges.stashPartial": "Git 将更改保存到储藏（{stash}）后，在搁置过程中报告了问题。继续之前，请检查 git stash list 和这些文件。Git 的信息：{why}",
   "service.folderChanges.stashTimedOut": "Git 未在 {seconds, number} 秒内完成搁置更改，因此 Combwork 结束了它及其启动的所有进程。{made, select, yes {此前它已将更改保存到储藏（{stash}）中。} other {}}继续之前，请检查 git stash list 和这些文件。",
   "service.folderChanges.tooManyToSetAside": "Git 无法在 {folder} 中一次搁置这么多文件（{count, number} 个）。请提交它们，或自己用 git stash 搁置。",
+  "service.folderChanges.unmerged": "{file} 在 Git 中存在冲突：请先在 Git 中解决（修正文件，然后 git add）。Combwork 不会提交或搁置有冲突的文件。",
   "service.folderChanges.unplaced": "Git 没有说明 {folder} 位于哪个仓库，因此在无法检查在那里工作的智能体之前，Combwork 不会提交 .gitignore。请重试。",
   "service.folderChanges.wrongBranch": "{folder} 现在不在 {target} 上。请重新查看。",
   "service.forward.byAssistant": "助手",

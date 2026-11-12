@@ -6105,7 +6105,10 @@ touched:
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
   of paths (some 300 files) is refused before any stash is made (*Git can't set aside this many files (n) at once in
   …*), even when they are every change in the folder: a stash with no paths would also take a change made after the
-  check, never shown (HR1, HI-2983), so Set aside always names exactly the paths shown. **Refused by name too:** an untracked repository of its own inside the folder (git lists it whole, `nested/`),
+  check, never shown (HR1, HI-2983), so Set aside always names exactly the paths shown. **Refused by name too:** a
+  path in conflict (HI-3025: porcelain `UU`, `AA`, `DD`, `AU`, `UA`, `DU`, `UD`, with no operation under way needed,
+  as after a `git stash pop` that conflicted), since `commit --only` would add it markers and all, marking it
+  resolved (*… is in conflict in Git: resolve it there first …*; Files' Commit it refuses `.gitignore` so too); an untracked repository of its own inside the folder (git lists it whole, `nested/`),
   never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
   submodule, yourself*). And a registered submodule whose only changes are inside it (HI-3023: nothing staged, its
   recorded commit the one checked out, edited or untracked files in it; porcelain v2 `S.M.`, `S..U`), which neither

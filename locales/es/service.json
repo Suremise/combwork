@@ -88,6 +88,7 @@
   "service.folderChanges.stashPartial": "Git informó de un problema al apartar los cambios, después de guardarlos en un stash ({stash}). Revisa git stash list y los archivos antes de continuar. Git dijo: {why}",
   "service.folderChanges.stashTimedOut": "Git no terminó de apartar los cambios en {seconds, number} segundos, así que Combwork lo detuvo junto con todo lo que había iniciado.{made, select, yes { Para entonces ya los había guardado en un stash ({stash}).} other {}} Revisa git stash list y los archivos antes de continuar.",
   "service.folderChanges.tooManyToSetAside": "Git no puede apartar tantos archivos ({count, number}) a la vez en {folder}. Haz commit de ellos, o apártalos tú con git stash.",
+  "service.folderChanges.unmerged": "{file} tiene un conflicto en Git: resuélvelo allí primero (corrige el archivo y luego haz git add). Combwork no hace commit ni aparta un archivo en conflicto.",
   "service.folderChanges.unplaced": "Git no indicó en qué repositorio está {folder}, así que Combwork no hace commit de .gitignore mientras no pueda comprobar los agentes que trabajan allí. Inténtalo de nuevo.",
   "service.folderChanges.wrongBranch": "{folder} ya no está en {target}. Vuelve a mirar.",
   "service.forward.byAssistant": "el Asistente",

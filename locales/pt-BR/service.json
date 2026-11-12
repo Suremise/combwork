@@ -88,6 +88,7 @@
   "service.folderChanges.stashPartial": "O Git relatou um problema ao deixar as alterações de lado, depois de guardá-las em um stash ({stash}). Confira git stash list e os arquivos antes de continuar. O Git disse: {why}",
   "service.folderChanges.stashTimedOut": "O Git não terminou de deixar as alterações de lado em {seconds, number} segundos, então o Combwork o encerrou junto com tudo o que ele tinha iniciado.{made, select, yes { Até então, ele já as tinha guardado em um stash ({stash}).} other {}} Confira git stash list e os arquivos antes de continuar.",
   "service.folderChanges.tooManyToSetAside": "O Git não consegue deixar de lado tantos arquivos ({count, number}) de uma vez em {folder}. Faça commit deles, ou deixe-os de lado você mesmo com git stash.",
+  "service.folderChanges.unmerged": "{file} está em conflito no Git: resolva lá primeiro (corrija o arquivo e depois faça git add). O Combwork não faz commit nem deixa de lado um arquivo em conflito.",
   "service.folderChanges.unplaced": "O Git não informou em qual repositório {folder} está, então o Combwork não faz commit do .gitignore enquanto não puder verificar os agentes que trabalham ali. Tente novamente.",
   "service.folderChanges.wrongBranch": "{folder} não está mais em {target}. Confira de novo.",
   "service.forward.byAssistant": "o Assistente",

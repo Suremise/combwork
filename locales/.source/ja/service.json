@@ -99,6 +99,7 @@
   "service.folderChanges.stashTimedOut": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.",
   "service.folderChanges.submoduleInside": "{folder} is a submodule whose changes are inside it, so Combwork can't commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.",
   "service.folderChanges.tooManyToSetAside": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
+  "service.folderChanges.unmerged": "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.",
   "service.folderChanges.unplaced": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",
   "service.folderChanges.wrongBranch": "{folder} isn't on {target} now. Look again.",
   "service.forward.byAssistant": "the Assistant",

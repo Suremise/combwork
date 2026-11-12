@@ -64,6 +64,7 @@
 
 ### Fixed
 
+- **Commit no longer commits a file in conflict, markers and all** (HI-3025). After a `git stash pop` that conflicted, the uncommitted-changes notification listed the file like any other, and **Commit** put it on the branch with its conflict markers. Commit and Set Aside now refuse a file in conflict by name: resolve it in Git first.
 - **A submodule changed only inside it no longer blocks Commit and Set Aside** (HI-3023). A submodule with files edited or added inside it, its commit unchanged, was named among a folder's uncommitted changes when work started, and Commit and Set Aside both failed on it with Git's "On branch main". It is no longer named when work starts; where a paused merge still shows it (the merge changes that submodule's commit), both buttons say to commit or set aside the changes inside the submodule.
 - **A merge into a branch that isn't checked out is signed and runs your hooks** (HI-3030). The Merge dialog's merge into a branch checked out nowhere made its commit unsigned and ran no hooks, even with commit signing on. It now merges as every other merge does: signed as your repository says, or refused with Git's reason, and with the repository's commit hooks run.
 - **A card made with a branch of its own says so too** (HI-3043). Creating a card with a Merges into other than the project's gave no note, unlike changing one (HI-3017); now it does. The note says to clear the card's target with `""`, the value the tool takes, and a resolution card kept on the project's own branch is no longer said to follow the project.
