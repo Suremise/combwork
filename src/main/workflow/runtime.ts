@@ -1498,7 +1498,7 @@ export class Workflow {
    * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
    * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
    */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; folder?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
     const s = w.state()
     // Combwork's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
@@ -1506,7 +1506,7 @@ export class Workflow {
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.actions?.length ? { actions: o.actions } : {}), ...(o.tests ? { tests: o.tests } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.folder ? { folder: o.folder } : {}), ...(o.actions?.length ? { actions: o.actions } : {}), ...(o.tests ? { tests: o.tests } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }

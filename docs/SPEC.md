@@ -6669,7 +6669,11 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    request on its entry and result) stands; a catch-up with none (a card found already on the remote, Done as merged
    outside) asks once conditions hold ("{card} is merged and on {target}'s remote already: update {target} in {folder}
    to it now?", `QUEUE_ADVANCE_GATE` on the Done card's entry), the queue paused `approval` until the answer. Approved,
-   it goes on; declined, the catch-up ends and the folder stays as it is (the user pulls when they want). A
+   it goes on; declined, the catch-up ends and the folder stays as it is (the user pulls when they want). An answer
+   covers only the update it was asked about (HR2's HI-3092 round 1): the request's entry, result, `folder` and
+   `revision` (the local head); the target checked out in another folder since, or moved, is asked about again, the new
+   request replacing the old. A catch-up that ends any way (done by itself once Automatically, the user's pull, which
+   the paused queue notices, declined, left) closes its open question (`RequestClosed`, `done`). A
    condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
    A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
    pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with

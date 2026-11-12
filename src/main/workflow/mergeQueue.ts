@@ -1021,12 +1021,29 @@ export class MergeQueue {
   }
 
   /** Replaces the owed catch-up (null: clears it), only while it is still the one for `to` (a newer merge's is kept). */
-  private setCatchUp(target: string, to: string, next: CatchUp | null): Promise<void> {
-    return this.wf.locked(() =>
+  private async setCatchUp(target: string, to: string, next: CatchUp | null): Promise<void> {
+    let ended: CatchUp | null = null
+    await this.wf.locked(() =>
       this.wf.store.tx((tx) => {
-        if (catchUpOf(tx.meta(catchUpKey(target)))?.to === to) tx.setMeta(catchUpKey(target), next ? JSON.stringify(next) : '')
+        const was = catchUpOf(tx.meta(catchUpKey(target)))
+        if (was?.to !== to) return
+        tx.setMeta(catchUpKey(target), next ? JSON.stringify(next) : '')
+        if (!next) ended = was
       })
     )
+    if (ended) await this.retireCatchUpAsk(ended)
+  }
+
+  /**
+   * HI-3092 (HR2's round 1): an ended catch-up's open Ask each time question (done by itself once Automatically, the user's
+   * pull, declined, left): closed, so no answer seems to decide what is over.
+   */
+  private async retireCatchUpAsk(c: CatchUp): Promise<void> {
+    const card = this.wf.store.cardByKey(c.card)
+    if (!card || !this.wf.state(card).requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === c.entry && r.result === c.to)) return
+    await this.write(card, (w) => {
+      for (const r of w.state().requests.filter((x) => x.gate === QUEUE_ADVANCE_GATE && x.entry === c.entry && x.result === c.to)) w.fact('RequestClosed', { request: r.request, why: 'done' }) // i18n-ignore: a fact's kind and codes, not text
+    })
   }
 
   /**
@@ -1267,7 +1284,11 @@ export class MergeQueue {
   private async catchUpAsked(target: string, c: CatchUp, folder: string): Promise<'approved' | QueueOutcome | null> {
     const card = this.wf.store.cardByKey(c.card)
     if (!card) return 'approved'
-    const mine = (r: { gate: string; entry?: string; result?: string }): boolean => r.gate === QUEUE_ADVANCE_GATE && r.entry === c.entry && r.result === c.to
+    // HR2's round 1: an answer covers only the update it was asked about: this entry's result, into this folder, from
+    // this local head. The target checked out elsewhere since (or moved) is asked about again; an advance asked before a
+    // publication counts only where it named the same folder and head.
+    const mine = (r: { gate: string; entry?: string; result?: string; folder?: string; revision?: string | null }): boolean =>
+      r.gate === QUEUE_ADVANCE_GATE && r.entry === c.entry && r.result === c.to && r.revision === c.from && !!r.folder && resolve(r.folder).toLowerCase() === folder.toLowerCase()
     const s = this.wf.state(card)
     const asked = Object.values(s.made).filter(mine).at(-1)
     if (asked && !s.requests.some((r) => r.request === asked.request)) {
@@ -1283,7 +1304,7 @@ export class MergeQueue {
     if (this.paused(target)?.reason !== 'approval' || this.paused(target)?.card !== card.key) return out
     await this.write(card, (w) => {
       if (w.state().requests.some(mine)) return
-      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueCatchUp, { card: card.key, target, folder }), { unbound: true, entry: c.entry, revision: c.from, result: c.to })
+      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueCatchUp, { card: card.key, target, folder }), { unbound: true, entry: c.entry, revision: c.from, result: c.to, folder })
     })
     return out
   }
@@ -1347,9 +1368,15 @@ export class MergeQueue {
     // Lifted only from the approval it is (a Pause queue saved in its place stays, and the queue with it).
     const lift = (): Promise<boolean> => this.wf.locked(() => this.wf.store.clearQueuePause(target, 'approval'))
     // HI-3092: the owed catch-up's own question (its card Done already), still open: it waits, unless the setting says
-    // Automatically now (the catch-up then goes on, asking nothing). Answered: lifted, and the catch-up reads the answer.
+    // Automatically now (the catch-up then goes on, asking nothing) or the local target holds the result already (the
+    // user pulled: the catch-up ends, its question closed). Answered: lifted, and the catch-up reads the answer.
     const owed = catchUpOf(this.wf.store.meta(catchUpKey(target)))
-    if (card && !e && owed?.card === key && s?.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === owed.entry && r.result === owed.to) && this.cfg.checkedOutTarget?.() !== 'auto') return null
+    if (card && !e && owed?.card === key && s?.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === owed.entry && r.result === owed.to) && this.cfg.checkedOutTarget?.() !== 'auto') {
+      const I = this.catchUpPort(owed)
+      const local = I ? await I.targetHead(this.project, target) : null
+      const pulled = I && local && !isUnknown(local) ? await I.contains(this.project, owed.to, local) : false
+      if (pulled !== true) return null
+    }
     if (!card || !s || !e || e.target !== target || !asked) {
       return (await lift()) ? this.runOnce(target) : null
     }
@@ -2007,7 +2034,7 @@ export class MergeQueue {
     await this.write(card, (w) => {
       const s = w.state()
       if (s.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === entry.id && r.revision === expected && r.result === result)) return
-      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueAdvance, { card: card.key, target, folder }), { unbound: true, entry: entry.id, revision: expected, result })
+      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueAdvance, { card: card.key, target, folder }), { unbound: true, entry: entry.id, revision: expected, result, folder })
     })
     return out
   }

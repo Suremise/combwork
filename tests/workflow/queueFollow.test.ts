@@ -543,6 +543,47 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
   })
 
+  it('HI-3092 (HR2): main checked out in another folder after the question, the old one approved: that folder isn’t moved; it is asked about, then caught up once approved', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a, ask, before, request } = await foundOnRemote()
+    const first = request()!
+    sh(e.project, 'checkout', '-q', '--detach')
+    const other = join(tempDir('other-wt-'), 'main')
+    sh(e.project, 'worktree', 'add', '-q', other, 'main')
+    moved(await e.wf.answer(a.key, first.request, 'approved'))
+    await queue(ask).drain('main')
+    // Not moved on the approval of another folder's question: asked again, naming this one.
+    expect(head(other)).toBe(before)
+    expect(existsSync(join(other, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'approval', card: a.key })
+    const second = request()!
+    expect(second.request).not.toBe(first.request)
+    expect(second.text).toContain(other.replace(/\\/g, '/').split('/').pop()!)
+    moved(await e.wf.answer(a.key, second.request, 'approved'))
+    await queue(ask).drain('main')
+    expect(head(other)).toBe(head(bare))
+    expect(readFileSync(join(other, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('HI-3092 (HR2): the setting switched to Automatically while asked: caught up, and its question closed', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, request } = await foundOnRemote()
+    await queue({ checkedOutTarget: () => 'auto' }).drain('main')
+    expect(head(e.project)).toBe(head(bare))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(request()).toBeUndefined()
+  })
+
+  it('HI-3092 (HR2): the user pulls while asked: the catch-up ends, its question closed, nothing paused', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, ask, request } = await foundOnRemote()
+    sh(e.project, 'pull', '-q', '--ff-only', 'origin', 'main')
+    expect(head(e.project)).toBe(head(bare))
+    await queue(ask).drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(request()).toBeUndefined()
+  })
+
   it('a checked-out target is caught up in its folder after the publication; an edit in its way pauses, naming the published card', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following({}, { checkedOut: true })
     const a = await queued(e, 'A', 'a.txt')
