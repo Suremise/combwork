@@ -1,11 +1,12 @@
 // A jj project's repository watch (HI-2882's J9b2, design HI-2882/s7 §3, s13 §3), on the real jj in both Git-backed
-// modes, through a test's watch (counted and driven): three subscriptions whatever the repository holds; a slot-only
+// modes, through a test's watch (counted and driven): two subscriptions whatever the repository holds; a slot-only
 // commit (no bookmark moved) reported as a new operation; a bookmark move as its line; a change under a retained bundle's
 // pins as that bundle's invalidation; refs gone and back re-armed, every bundle marked due; disposal leaves nothing.
 // HI-2977: where the repository is, asked again at each tick until jj answers, and a changed store followed.
+// HI-3033: with the real watch, `jj git colocation enable` and `disable` go through while the project is watched.
 // Skipped without the fetched jj (npm run jj:fetch).
 import { execFileSync } from 'child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import type { ObserveEvent } from '../src/main/platform/history'
@@ -32,7 +33,7 @@ function fakeWatch() {
 
 describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version}), HI-2882`, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
-    it('three subscriptions; operations, bookmarks and retained pins reported; refs re-armed; disposed', async () => {
+    it('two subscriptions; operations, bookmarks and retained pins reported; the store re-armed; disposed', async () => {
       const h = harness()
       const { repo, root } = h.repo(`watch${colocated ? 'c' : 'n'}`, colocated)
       const d = await jjContextOf(repo, h.runner)
@@ -41,7 +42,9 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
       const f = fakeWatch()
       const events: ObserveEvent[] = []
       const rw = jjRepoWatch(repo, (e) => void events.push(e), { watch: f.watch, intervalMs: 0, where })
-      expect(rw.open()).toBe(3)
+      expect(rw.open()).toBe(2)
+      // Nothing watched below the store (HI-3033): its folder itself, and the operation heads'.
+      expect(f.live().map(([d]) => d).sort()).toEqual([join(where.jjRepo, 'op_heads', 'heads'), where.store].sort())
       // Attached: every retained bundle marked due once (a pin deleted while Combwork was closed is checked, HR1's round 1).
       expect(events).toEqual([{ kind: 'invalidated', project: repo, what: 'retained:*' }])
       events.length = 0
@@ -59,9 +62,13 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
       h.jj(repo, 'bookmark', 'set', 'main', '-r', h.id(slot, 'slot-x@-'))
       rw.tick()
       expect(events.some((e) => e.kind === 'folderMoved')).toBe(true)
-      f.fire('refs', join('heads', 'main'))
+      f.fire(where.store, join('refs', 'heads', 'main'))
       expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'refs' })
       expect(events.some((e) => e.kind === 'lineMoved')).toBe(false)
+      // What else the store holds says nothing.
+      events.length = 0
+      for (const file of [join('objects', 'ab', 'cdef'), 'index', join('logs', 'HEAD'), join('refs', 'tags', 'v1')]) f.fire(where.store, file)
+      expect(events).toEqual([])
       // A change under a retained bundle's pins: that bundle due. 500 bundles: still three subscriptions.
       events.length = 0
       const head = h.id(repo, 'main')
@@ -70,17 +77,23 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
         mkdirSync(p, { recursive: true })
         writeFileSync(join(p, 'revision'), `${head}\n`)
       }
-      f.fire('refs', join('cw', 'jj-integrated', 'AM-1', '1', 'b1-x7', 'revision'))
+      f.fire(where.store, join('refs', 'cw', 'jj-integrated', 'AM-1', '1', 'b1-x7', 'revision'))
       expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'retained:AM-1:1:b1-x7' })
-      expect(rw.open()).toBe(3)
-      // The refs watch lost (its folder deleted, then back): re-armed by the tick, every bundle marked due.
-      events.length = 0
-      const refsSub = f.live().find(([dir]) => dir.endsWith('refs'))![1]
-      refsSub.closed = true
-      for (const l of refsSub.lost) l()
       expect(rw.open()).toBe(2)
+      // packed-refs, or refs itself gone and back: every bundle due and a run.
+      for (const file of ['packed-refs', 'refs']) {
+        events.length = 0
+        f.fire(where.store, file)
+        expect(events).toEqual([{ kind: 'invalidated', project: repo, what: 'retained:*' }, { kind: 'invalidated', project: repo, what: 'refs' }])
+      }
+      // The store's watch lost: re-armed by the tick, every bundle marked due.
+      events.length = 0
+      const storeSub = f.live().find(([dir]) => dir === where.store)![1]
+      storeSub.closed = true
+      for (const l of storeSub.lost) l()
+      expect(rw.open()).toBe(1)
       rw.tick()
-      expect(rw.open()).toBe(3)
+      expect(rw.open()).toBe(2)
       expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'retained:*' })
       expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'tick' })
       rw.dispose()
@@ -140,7 +153,7 @@ describe('where the repository is, asked again until jj answers, and its store f
     events.length = 0
     rw.tick()
     await settle()
-    expect([asked, rw.open()]).toEqual([5, 3])
+    expect([asked, rw.open()]).toEqual([5, 2])
     expect(events).toContainEqual({ kind: 'invalidated', project: r.top, what: 'retained:*' })
     // Known now: never asked again; an operation reported.
     rw.tick()
@@ -180,7 +193,7 @@ describe('where the repository is, asked again until jj answers, and its store f
     expect(f.live()).toEqual([])
   })
 
-  it('a store that changed (colocation enabled): the refs watches move to it, the operation heads’ stays', async () => {
+  it('a store that changed (colocation enabled): the store’s watch moves to it, the operation heads’ stays', async () => {
     const r = folders('moved')
     const newStore = join(r.top, '.git')
     mkdirSync(join(newStore, 'refs', 'heads'), { recursive: true })
@@ -188,28 +201,28 @@ describe('where the repository is, asked again until jj answers, and its store f
     const events: ObserveEvent[] = []
     let store = r.store
     const rw = jjRepoWatch(r.top, (e) => void events.push(e), { watch: f.watch, intervalMs: 0, where: { jjRepo: r.jjRepo, store: r.store, root: r.top }, storeAt: async () => ({ jjRepo: r.jjRepo, store }) })
-    expect(rw.open()).toBe(3)
+    expect(rw.open()).toBe(2)
     const opsSub = f.live().find(([d]) => d.endsWith(join('op_heads', 'heads')))![1]
     rw.tick()
     await settle()
-    expect(f.live().map(([d]) => d).sort()).toEqual([join(r.jjRepo, 'op_heads', 'heads'), join(r.store, 'refs'), r.store].sort())
+    expect(f.live().map(([d]) => d).sort()).toEqual([join(r.jjRepo, 'op_heads', 'heads'), r.store].sort())
     store = newStore
     events.length = 0
     rw.tick()
     await settle()
-    expect(f.live().map(([d]) => d).sort()).toEqual([join(r.jjRepo, 'op_heads', 'heads'), join(newStore, 'refs'), newStore].sort())
+    expect(f.live().map(([d]) => d).sort()).toEqual([join(r.jjRepo, 'op_heads', 'heads'), newStore].sort())
     expect(opsSub.closed).toBe(false)
     expect(events).toContainEqual({ kind: 'invalidated', project: r.top, what: 'retained:*' })
     // A ref change on the new store is seen.
     events.length = 0
-    f.fire(join('.git', 'refs'), join('heads', 'main'))
+    f.fire(newStore, join('refs', 'heads', 'main'))
     expect(events).toContainEqual({ kind: 'invalidated', project: r.top, what: 'refs' })
     rw.dispose()
   })
 })
 
 describe.skipIf(!jjExe)(`the watch on the real jj (jj ${TESTED_JJ.version}), HI-2977`, () => {
-  it('jj unknown at the start, then readable: armed; then `jj git colocation enable`: its refs watches follow the store', async () => {
+  it('jj unknown at the start, then readable: armed; then `jj git colocation enable`: its store’s watch follows the store', async () => {
     const h = harness()
     const { repo } = h.repo('late', false)
     let ready = false
@@ -225,7 +238,7 @@ describe.skipIf(!jjExe)(`the watch on the real jj (jj ${TESTED_JJ.version}), HI-
     expect(rw.open()).toBe(0)
     ready = true
     rw.tick()
-    await until(() => rw.open() === 3, HUNG_MS)
+    await until(() => rw.open() === 2, HUNG_MS)
     const before = f.live().map(([d]) => d)
     expect(before.some((d) => d.toLowerCase().includes(join('.jj', 'repo', 'store').toLowerCase()))).toBe(true)
     // Colocated now: Git's store at the project's .git.
@@ -233,13 +246,52 @@ describe.skipIf(!jjExe)(`the watch on the real jj (jj ${TESTED_JJ.version}), HI-
     const d = await jjContextOf(repo, h.runner)
     if (!('jj' in d)) throw new Error(JSON.stringify(d))
     rw.tick()
-    await until(() => f.live().some(([dir]) => dir.toLowerCase() === join(d.jj.store, 'refs').toLowerCase()), HUNG_MS)
-    expect(rw.open()).toBe(3)
+    await until(() => f.live().some(([dir]) => dir.toLowerCase() === d.jj.store.toLowerCase()), HUNG_MS)
+    expect(rw.open()).toBe(2)
     // A bookmark moved by jj: its ref change on the new store reported.
     events.length = 0
     h.jj(repo, 'bookmark', 'set', 'main', '-r', '@', '--allow-backwards')
-    f.fire('refs', join('heads', 'main'))
+    f.fire(d.jj.store, join('refs', 'heads', 'main'))
     expect(events).toContainEqual({ kind: 'invalidated', project: repo, what: 'refs' })
     rw.dispose()
+  })
+})
+
+describe.skipIf(!jjExe)(`colocation changed while the real watch holds the repository (jj ${TESTED_JJ.version}), HI-3033`, () => {
+  // Windows refuses to move a folder with a handle open beneath it: the store's own watch must let jj move the store.
+  it.each([false, true] as const)('colocated at the start: %s. Changed and changed back, the watch following each time', async (colocated) => {
+    const h = harness()
+    const { repo } = h.repo(`move${colocated ? 'c' : 'n'}`, colocated)
+    const d = await jjContextOf(repo, h.runner)
+    if (!('jj' in d)) throw new Error(JSON.stringify(d))
+    const events: ObserveEvent[] = []
+    const rw = jjRepoWatch(repo, (e) => void events.push(e), { intervalMs: 0, where: { jjRepo: d.jj.jjRepo, store: d.jj.store, root: d.jj.root } })
+    try {
+      expect(rw.open()).toBe(2)
+      let store = d.jj.store
+      for (const cmd of colocated ? ['disable', 'enable'] : ['enable', 'disable']) {
+        // jj's own command, run as the user would: it fails (Access is denied) while a handle is held below the store.
+        h.jj(repo, 'git', 'colocation', cmd)
+        expect(existsSync(join(repo, '.git'))).toBe(cmd === 'enable')
+        const now = await jjContextOf(repo, h.runner)
+        if (!('jj' in now)) throw new Error(JSON.stringify(now))
+        expect(now.jj.store.toLowerCase()).not.toBe(store.toLowerCase())
+        store = now.jj.store
+        // The next tick follows the store (re-armed on it: every retained bundle due).
+        events.length = 0
+        rw.tick()
+        await until(() => events.some((e) => e.kind === 'invalidated' && e.what === 'retained:*'), HUNG_MS)
+        expect(rw.open()).toBe(2)
+        // Colocated, a bookmark moved by jj writes its Git ref, which reaches the watch on the store's new folder (not
+        // colocated, jj 0.47 writes no Git ref for a bookmark: nothing to see there).
+        if (cmd === 'enable') {
+          events.length = 0
+          h.jj(repo, 'bookmark', 'set', 'main', '-r', '@', '--allow-backwards')
+          await until(() => events.some((e) => e.kind === 'invalidated' && e.what === 'refs'), HUNG_MS)
+        }
+      }
+    } finally {
+      rw.dispose()
+    }
   })
 })

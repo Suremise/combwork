@@ -1,9 +1,11 @@
 // A jj project's repository watch for reconciliation (HI-2882's J9b2, design HI-2882/s7 §3, s13 §3): every jj operation
 // (in any workspace: a slot's commit or amend included) and every raw Git ref change schedules a run, so nothing the
 // reconciler must see waits for a bookmark move. A fixed number of subscriptions per project, whatever the repository
-// holds: one watch on the operation heads, one recursive watch on the store's refs (Windows: one handle for the tree),
-// one on the store's folder for `packed-refs` alone, and one minute's timer that re-arms what is missing or closed and
-// rescans. Its events, all scoped to this project's store:
+// holds: one watch on the operation heads, one recursive watch on the store's folder itself (Windows: one handle for the
+// tree; its refs and `packed-refs` read from its events, the rest dropped), and one minute's timer that re-arms what is
+// missing or closed and rescans. No handle is opened below the store (HI-3033): Windows refuses to move a folder with
+// one open beneath it, and `jj git colocation enable` and `disable` move the store. Its events, all scoped to this
+// project's store:
 // - `folderMoved` (the project, its old and new single operation head) for a new operation;
 // - `invalidated` `refs` for any branch ref's change (a raw Git move included): a run, with nothing read on main (HR1's
 //   round 1: no file loop there; jj's reconciliation needs no line, its operations and its records say what to do);
@@ -84,7 +86,7 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
   /** A detection or store check under way: one at a time, the next tick asks again if it answered nothing. */
   let asking = false
   let head: string | null = null
-  const subs = new Map<'ops' | 'refs' | 'store', WatchHandle>()
+  const subs = new Map<'ops' | 'store', WatchHandle>()
   const emit = (e: ObserveEvent): void => {
     if (!closed) onChange(e)
   }
@@ -98,24 +100,28 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
     head = now
     emit({ kind: 'folderMoved', project, folder: project, from, to: now })
   }
-  const onRef = (file: string | null): void => {
+  /**
+   * An event in the store (its path relative to it). Events lost (none named), `packed-refs`, or `refs` itself (gone and
+   * back): every retained bundle due and a run. A branch ref: a run. A change under a retained bundle's pins: that bundle.
+   * The rest (objects, the index, logs) says nothing here.
+   */
+  const onStore = (file: string | null): void => {
     const f = (file ?? '').split(/[\\/]/).join('/')
-    const m = /^cw\/jj-integrated\/([^/]+)\/(\d+)\/([^/]+)\//.exec(f)
+    if (!f || f === 'packed-refs' || f === 'refs') {
+      invalidate('retained:*')
+      invalidate('refs')
+      return
+    }
+    const m = /^refs\/cw\/jj-integrated\/([^/]+)\/(\d+)\/([^/]+)\//.exec(f)
     if (m) invalidate(`retained:${m[1]}:${m[2]}:${m[3]}`)
-    if (!f || f.startsWith('heads/') || f === 'heads') invalidate('refs')
+    if (f.startsWith('refs/heads/') || f === 'refs/heads') invalidate('refs')
   }
   /** Opens what is missing (or closed), its folder there; a re-arm marks every retained bundle due once. */
   const arm = (): void => {
     if (closed || !where) return
-    const want: [key: 'ops' | 'refs' | 'store', dir: string, recursive: boolean, fn: (f: string | null) => void][] = [
+    const want: [key: 'ops' | 'store', dir: string, recursive: boolean, fn: (f: string | null) => void][] = [
       ['ops', join(where.jjRepo, 'op_heads', 'heads'), false, () => readHead()],
-      ['refs', join(where.store, 'refs'), true, onRef],
-      ['store', where.store, false, (f) => {
-        if (f === 'packed-refs' || f === null) {
-          invalidate('retained:*')
-          invalidate('refs')
-        }
-      }]
+      ['store', where.store, true, onStore]
     ]
     let rearmed = false
     for (const [key, dir, recursive, fn] of want) {
@@ -145,7 +151,7 @@ export function jjRepoWatch(project: string, onChange: (e: ObserveEvent) => void
   const moveTo = (next: Where): void => {
     const was = where!
     where = next
-    const keys: ('ops' | 'refs' | 'store')[] = samePath(was.jjRepo, next.jjRepo) ? ['refs', 'store'] : ['ops', 'refs', 'store']
+    const keys: ('ops' | 'store')[] = samePath(was.jjRepo, next.jjRepo) ? ['store'] : ['ops', 'store']
     for (const k of keys) {
       subs.get(k)?.close()
       subs.delete(k)
