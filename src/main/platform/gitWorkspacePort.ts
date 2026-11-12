@@ -5,14 +5,15 @@
 
 import { randomBytes } from 'crypto'
 import { dirname, join, resolve } from 'path'
-import { lstat, readdir, readFile, rm as removeTree } from 'original-fs/promises'
-import { samePlace } from '../fsutil'
+import { existsSync, renameSync } from 'original-fs'
+import { readFile, rm as removeTree } from 'original-fs/promises'
 import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
 import { clearSubmoduleCheckouts, GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
 import { gitFilesExec } from './gitModulesRun'
+import { asideOf, entryIdSync, linksTo, provedSync, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
 
 /** A git command's answer as a step's: done, or git's own words. */
@@ -40,41 +41,63 @@ async function prunable(repo: string): Promise<string[]> {
   return out
 }
 
+/** Tests: a synchronous step right before a registration is moved aside (dropRegistration), as HI-3046's hooks. */
+export const registrationSeams: { beforeAside?: (entry: string) => void } = {}
+
 /**
  * HI-3069: the one registration (`<common>/worktrees/<id>`) whose gitdir names `folder`, dropped while that folder is
- * absent: never a repository-wide prune, which would also drop another worktree gone meanwhile (moved, say, and needing
- * its registration for Repair). Found by its gitdir (relative ones from the entry itself); left, saying why, when several
- * name the folder, it is locked, or the folder exists; its gitdir and the folder's absence read again right before it
- * goes. Nothing else is touched.
+ * absent, never by a repository-wide prune (which would also drop another worktree gone meanwhile, needing its
+ * registration for Repair). On HI-3046's owned-entry proof (jjGitLink.ts), its receipt taken now: the entry's file id
+ * and birth time, `worktrees`' own, its `gitdir` and `commondir` bytes. Proved synchronously (in place, physically in
+ * the store, not `locked`, the folder absent: only ENOENT or ENOTDIR counts as absent, any other error as doubt), moved
+ * aside out of `worktrees` atomically with nothing awaited between, proved again on what was moved (a reused name, a new
+ * entry: other ids), and only then removed. Anything that doesn't prove it is left: put back under its name when what
+ * was moved isn't it and the name is free, else left aside, said so. Nothing else is touched.
  */
 async function dropRegistration(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }> {
-  const r = await git(repo, ['rev-parse', '--git-common-dir'])
+  const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   if (!r.ok) return { left: gitErrorLine(r.err) }
-  const root = join(resolve(repo, r.out.trim()), 'worktrees')
-  const names = await readdir(root).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? [] : e))
-  if (names instanceof Error) return { left: names.message }
-  const registered = async (entry: string): Promise<string | null> => {
-    const g = (await readFile(join(entry, 'gitdir'), 'utf8').catch(() => '')).trim()
-    return g ? dirname(resolve(entry, g)) : null
+  const store = r.out.trim()
+  const links = await linksTo(store, folder)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (!links) return { left: 'worktrees unreadable' } // i18n-ignore: a log line's detail, never shown
+  if (!links.length) return 'none'
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (links.length > 1) return { left: `${links.length} registrations name it` } // i18n-ignore: a log line's detail, never shown
+  const entry = links[0]
+  const [gitdir, commondir] = await Promise.all(['gitdir', 'commondir'].map((f) => readFile(join(entry, f), 'utf8').catch(() => null)))
+  const entryId = entryIdSync(entry)
+  const worktreesId = entryIdSync(worktreesOf(store))
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (gitdir === null || commondir === null || !entryId || !worktreesId) return { left: 'unreadable' } // i18n-ignore: a log line's detail, never shown
+  const receipt: GitLinkReceipt = { store, folder, workspace: '', generation: '', entry, entryId, worktreesId, gitdir, commondir }
+  // Synchronous from here to the move: nothing can be awaited between the proof and the rename.
+  const before = provedSync(receipt, entry, 'entry')
+  if (before) return { left: before }
+  const aside = asideOf(store, randomBytes(8).toString('hex'))
+  registrationSeams.beforeAside?.(entry)
+  try {
+    renameSync(entry, aside)
+  } catch (e) {
+    return { left: e instanceof Error ? e.message : String(e) }
   }
-  const mine: string[] = []
-  for (const n of names) {
-    const entry = join(root, n)
-    const at = await registered(entry)
-    if (at && samePlace(at, folder)) mine.push(entry)
+  const after = provedSync(receipt, aside, 'aside')
+  if (after) {
+    // What was moved isn't the entry proved (replaced between the proof and the move): back under its name if still free.
+    if (!existsSync(entry)) {
+      try {
+        renameSync(aside, entry)
+        return { left: after }
+      } catch {
+        /* left aside */
+      }
+    }
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    return { left: `${after}, left at ${aside}` } // i18n-ignore: a log line's detail, never shown
   }
-  if (!mine.length) return 'none'
+  const e = await removeTree(aside, { recursive: true }).then(() => null, (x: Error) => x.message)
   // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
-  if (mine.length > 1) return { left: `${mine.length} registrations name it` } // i18n-ignore: a log line's detail, never shown
-  const entry = mine[0]
-  const absent = async (): Promise<boolean> => (await lstat(folder).catch(() => null)) === null
-  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
-  if ((await lstat(join(entry, 'locked')).catch(() => null)) !== null) return { left: 'locked' } // i18n-ignore: a log line's detail, never shown
-  const again = await registered(entry)
-  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
-  if (!again || !samePlace(again, folder) || !(await absent())) return { left: 'changed meanwhile' } // i18n-ignore: a log line's detail, never shown
-  const e = await removeTree(entry, { recursive: true, force: true }).then(() => null, (x: Error) => x.message)
-  return e ? { left: e } : 'dropped'
+  return e ? { left: `${e}, left at ${aside}` } : 'dropped' // i18n-ignore: a log line's detail, never shown
 }
 
 /** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */

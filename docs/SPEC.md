@@ -3338,8 +3338,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   absence checked again right before the record goes, so a folder restored meanwhile is `changed`, nothing removed;
   then Git's one registration of that absent folder (a colocated jj workspace's, `<common>/worktrees/<id>` whose
   gitdir names it, a relative one read from the entry) is dropped by the project's port (`dropRegistration`), never by
-  a repository-wide prune, which would also drop another worktree gone meanwhile (HR1's round 1); left, logged, when
-  several name the folder, it is locked, or its gitdir or the folder's absence changed when read again just before.
+  a repository-wide prune, which would also drop another worktree gone meanwhile (HR1's round 1). It is dropped on
+  HI-3046's owned-entry proof (`jjGitLink.ts`), its receipt taken then: the entry's file id and birth time, `worktrees`'
+  own, its `gitdir` and `commondir` bytes; proved synchronously (in place, physically in the store, not `locked`, the
+  folder absent, absence only on ENOENT or ENOTDIR, any other error a doubt), moved aside out of `worktrees` with
+  nothing awaited between, proved again on what was moved (a name reused meanwhile is another entry), then removed
+  (HR2's round 2). Anything unproved is left, logged: put back under its name when what was moved isn't it.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that
