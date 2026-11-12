@@ -128,9 +128,9 @@ export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: Plat
           )}
           {store.detached && store.detached.length > 0 && (
             <ul data-vc-store-detached="">
-              {store.detached.map((d) => (
-                <li key={d.project} className="caution">
-                  <Icon name="warning" /> {tr(M.detached, { project: d.project, head: d.head })}
+              {store.detached.map((x) => (
+                <li key={x.project} className="caution">
+                  <Icon name="warning" /> {tr(M.detached, { project: x.project, head: x.head })}
                 </li>
               ))}
             </ul>
