@@ -75,8 +75,11 @@ export const PLATFORM_TEXT = PLATFORM_NAME
 
 const CHOICES: PlatformId[] = ['none', 'git', 'jj']
 
-/** The refusals a switch between Git and jj shows with its lists (HI-2799), rather than as a notice. */
-const DETAILED = new Set<SwitchRefusal['why']>(['gates', 'fallback', 'drain', 'memberDrain', 'otherWorkspace', 'switching'])
+/**
+ * The refusals a switch between Git and jj shows with its lists (HI-2799), rather than as a notice. `memberNoJj`
+ * (HI-3034): the group listed beside the project named, and Check Again once it is None.
+ */
+const DETAILED = new Set<SwitchRefusal['why']>(['gates', 'fallback', 'drain', 'memberDrain', 'memberNoJj', 'otherWorkspace', 'switching'])
 
 /**
  * Asks before switching a project's version control (§16.6.5's warning), then switches it, from its next card: refused
