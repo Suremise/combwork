@@ -6,7 +6,7 @@ import { appendFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { tempDir } from './tempDir'
-import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
+import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, neverConnected, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
 import { gitTree } from '../src/main/workflow/mergeQueue'
 import type { CandidateHost } from '../src/main/platform/integration'
 
@@ -172,5 +172,28 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     expect(sh(project, 'rev-parse', '--symbolic-full-name', 'feature/0000@{upstream}')).toBe('refs/remotes/origin/main')
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     expect(objects(project) - before).toBe(3)
+  })
+})
+
+describe('a publication that never reached the remote (HI-3091)', () => {
+  it("git's words for no repository, no connection or no sign-in: never connected", () => {
+    for (const err of [
+      "fatal: 'C:/x/origin.git' does not appear to be a git repository\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.",
+      "fatal: unable to access 'https://example.invalid/r.git/': Could not resolve host: example.invalid",
+      "fatal: unable to access 'https://example.invalid/r.git/': Failed to connect to example.invalid port 443 after 21 ms: Connection refused",
+      "remote: Invalid username or password.\nfatal: Authentication failed for 'https://example.invalid/r.git/'",
+      'git@example.invalid: Permission denied (publickey).\nfatal: Could not read from remote repository.',
+      "remote: Repository not found.\nfatal: repository 'https://example.invalid/r.git/' not found"
+    ]) expect(neverConnected(err), err).toBe(true)
+  })
+
+  it('a connection lost once the push was under way, or anything else: not (unknown, asked)', () => {
+    for (const err of [
+      'Writing objects: 100% (3/3), 250 bytes | 250.00 KiB/s, done.\nfatal: the remote end hung up unexpectedly\nfatal: Could not read from remote repository.',
+      "error: RPC failed; curl 56 Recv failure: Connection reset by peer\nfatal: unable to access 'https://example.invalid/r.git/': Recv failure",
+      'send-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly',
+      'error: failed to push some refs',
+      ''
+    ]) expect(neverConnected(err), err).toBe(false)
   })
 })

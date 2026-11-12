@@ -3,7 +3,7 @@
 // merges, what the queue is doing with it, worked out from the card's facts and the queue's order (queueOrder: its
 // entries in the order they were requested, and the one testing now). One order for every place that says it: a card
 // read, a lane's next, a refusal's next step, and the window's queue model (#1353, queueControls.ts's queueView).
-import { openEntry, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
+import { openEntry, QUEUE_PUBLISH_GATE, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
 import { CAME_BACK, type QueueQueued, type QueueStep, type QueueTesting } from '../../shared/workflow/queue'
 import type { CardRecord } from './factStore'
 import type { PauseReason, QueueStepInfo } from './mergeQueue'
@@ -31,6 +31,7 @@ const Q = {
   waitsMergeChoice: agentMsg({ id: 'queue.paused.mergeChoice', text: 'it moves on once the user chooses, in For you, how Combwork merges this project (merge style and commit message)', note: "What a queue paused for the project's merge style waits for (#1406)." }),
   waitsStuck: agentMsg({ id: 'queue.paused.stuck', text: 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)', note: 'What a queue paused on an interrupted advance waits for (#1406): Decide in For you, or Resume once settled.' }),
   waitsPublish: agentMsg({ id: 'queue.paused.publish', text: 'it moves on once the user says whether its push reached the remote (their answer in For you), or Resume finds it there', note: 'What a queue paused on an unknown publication waits for (HI-1183, follow mode): Approve or Decline in For you; Resume looks at the remote again.' }),
+  waitsPublishAnswered: agentMsg({ id: 'queue.paused.publishAnswered', text: 'the user has answered whether its push reached the remote; it moves on as the queue takes up that answer', note: "HI-3091: a queue still paused on an unknown publication whose For you question the user has answered (nothing left to ask): the queue's next run settles it." }),
   waitsFix: agentMsg({ id: 'queue.paused.fix', text: 'it moves on once the user fixes what stopped it and resumes it', note: "What a queue paused on a step that needs the user waits for (#1406): git's error, a push (G18, #1179), then Resume." }),
   waitsFolder: agentMsg({ id: 'queue.paused.folder', text: 'it moves on once the user puts right the folder {target} is checked out in and resumes it', note: 'What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch.' }),
   waitsRules: agentMsg({ id: 'queue.paused.rules', text: 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)', note: "What a queue paused while workflow rules weren't enforced waits for (#1406): Combwork resumes it once they are." }),
@@ -89,7 +90,7 @@ export type QueueState =
   /** The queue's entry now, at its step (null: another Combwork runs the queue, or its advance is recovered, step unknown). */
   | { state: 'testing'; target: string; step: QueueStep | null }
   /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
-  | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true }
+  | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true; answered?: true }
   /** Back from the queue to its builder: a conflict, red checks, a hook (`failure`: what came back, as recorded). */
   | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed']; about?: ReturnedForward }
   /** Left the queue: it isn't approved any more (its pass stale, or a decision since). */
@@ -113,7 +114,7 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
     const on = open.state === 'open' ? wf.queueWaitingOn(card.id) : []
     if (on.length) return { state: 'waiting', target: open.target, on }
     const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string; stuck?: unknown } | null
-    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}) }
+    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}), ...(publishAnswered(wf, pause) ? { answered: true as const } : {}) }
     return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
   }
   // Approved with a stale pass, never queued (HI-1763: HI-1737 sat so, its lane paused, nobody told): said, with what to do.
@@ -181,7 +182,10 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     testing = { ...named(store.card(n.number)), entry: n.entry, revision: n.revision, expected: n.expected, step: n.step, started: n.started, run: live.run }
   } else {
     // Another Combwork's run: its first entry that isn't waiting for a blocker (HI-2709: the queue goes on without those).
-    const begun = open.find((o) => o.state === 'started') ?? (store.queueLease(target) && !live.running ? open.find((o) => !wf.queueWaitingOn(o.card.id).length) : undefined)
+    // HI-3091: a begun entry the queue is paused on isn't being merged (an unknown publication waiting for the user's
+    // answer, an interrupted advance): it is shown with the pause, never as "moving the target to its merge now".
+    const pausedOn = store.queuePause(target)?.card ?? null
+    const begun = open.find((o) => o.state === 'started' && o.card.key !== pausedOn) ??(store.queueLease(target) && !live.running ? open.find((o) => !wf.queueWaitingOn(o.card.id).length) : undefined)
     if (begun) {
       const d = begun.f.data as FactData['IntegrationRequested']
       const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started
@@ -227,6 +231,7 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
     // HI-1183: the remote's refusal, and follow mode's remote put right (what it tracks, its address, a sign-in, a pull).
     case 'pushRefused':
     case 'publishRefused':
+    case 'publishFailed':
     case 'noUpstream':
     case 'remoteAmbiguous':
     case 'remoteUnsupported':
@@ -245,11 +250,21 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
   }
 }
 
+/**
+ * HI-3091: a pause on an unknown publication whose For you question is closed (the user answered it): the card it paused
+ * on has no open publish question. Any other pause: false.
+ */
+function publishAnswered(wf: Workflow, pause: { reason: PauseReason; card: string }): boolean {
+  if (pause.reason !== 'publishUnknown') return false
+  const on = wf.store.cardByKey(pause.card)
+  return !!on && !wf.state(on).requests.some((r) => r.gate === QUEUE_PUBLISH_GATE)
+}
+
 /** A paused queue's "it moves on once …" for agents: what the pause waits for, never a step of the agent's own. */
 function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
   switch (pauseWait(q.reason, q.stuck)) {
     case 'answer':
-      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : q.reason === 'publishUnknown' ? say(Q.waitsPublish) : say(Q.waitsStuck)
+      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : q.reason === 'publishUnknown' ? say(q.answered ? Q.waitsPublishAnswered : Q.waitsPublish) : say(Q.waitsStuck)
     case 'fix':
       return say(Q.waitsFix)
     case 'folder':

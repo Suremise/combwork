@@ -262,9 +262,10 @@ export interface QueueStepInfo {
  * has several push URLs, or none), `remoteUnsupported` (a shallow repository, or nowhere safe to keep the snapshot),
  * `fetchFailed` (git's words), `remoteDiverged` (the local target has commits its remote lacks), `publishUnknown` (a
  * publication's outcome unknown and the remote not showing it: For you asks), `publishRefused` (the project's pre-push
- * hook or the remote refused the publication: nothing published, the card queued again).
+ * hook or the remote refused the publication: nothing published, the card queued again), `publishFailed` (HI-3091: the
+ * publication never reached the remote, git's words kept: nothing sent, the card queued again; Resume tests it again).
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'pushRefused' | 'mergeChoice' | 'focusedSkip' | 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported' | 'fetchFailed' | 'remoteDiverged' | 'publishUnknown' | 'publishRefused'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'pushRefused' | 'mergeChoice' | 'focusedSkip' | 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported' | 'fetchFailed' | 'remoteDiverged' | 'publishUnknown' | 'publishRefused' | 'publishFailed'
 
 /**
  * G18 (#1179): the push of a target Combwork owes after merging into it, as store meta per target: the merge's result, its
@@ -867,6 +868,15 @@ export class MergeQueue {
     if ('refused' in reply) {
       await this.unpublished(card, entry, target, 'pushRefused')
       return { pause: 'publishRefused', message: reply.refused }
+    }
+    if ('failed' in reply) {
+      // HI-3091 (Darren's decision): it never reached the remote (offline, a refused sign-in, a moved repository): a
+      // failed push, never asked about as one that may have arrived. The remote looked at all the same (one it shows
+      // after all is Done); else nothing published, the card queued again, and the queue paused with git's words until
+      // Resume, which tests and publishes it again once the remote answers.
+      if ((await this.verifyPublished(card, entry.id, snap, result)) === 'published') return 'done'
+      await this.unpublished(card, entry, target, 'notPublished')
+      return { pause: 'publishFailed', message: reply.failed }
     }
     const v = await this.verifyPublished(card, entry.id, snap, result)
     if (v === 'published') return 'done'
