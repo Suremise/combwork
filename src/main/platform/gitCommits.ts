@@ -52,13 +52,15 @@ export interface CommitStream {
   traced: boolean
   children: CommitChild[]
   open: CommitChild | null
+  /** HI-3021: when git started `open` (its `child_start` event's time, Unix ms); none when unreadable. */
+  openStarted?: number
   git: string
   /** All the text, every source's, in order, without the events: what a message shows. */
   text: string
 }
 
 /** A trace2 event: a complete JSON record with the fields its kind needs; anything else is text, whatever it looks like. */
-type TraceEvent = { event: string; sid: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
+type TraceEvent = { event: string; sid: string; time: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
 
 function traceEvent(s: string): TraceEvent | null {
   let v: unknown
@@ -93,6 +95,8 @@ function splitTraceLine(line: string): { text: string; ev: TraceEvent | null } {
 export function readCommitStream(err: string): CommitStream {
   const children: CommitChild[] = []
   const byId = new Map<number, CommitChild>()
+  // HI-3021: when git started each child (its `child_start` event's time).
+  const started = new Map<CommitChild, number>()
   let open: CommitChild | null = null
   // The child that exited last, while no other has started since: git's text then is also its `after`.
   let last: CommitChild | null = null
@@ -125,6 +129,8 @@ export function readCommitStream(err: string): CommitStream {
       const argv = ev.argv ?? []
       const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
       const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '', after: '' }
+      const at = Date.parse(ev.time)
+      if (Number.isFinite(at)) started.set(c, at)
       children.push(c)
       byId.set(ev.child_id, c)
       open = c
@@ -138,7 +144,8 @@ export function readCommitStream(err: string): CommitStream {
       }
     }
   })
-  return { traced: top !== null, children, open, git: own, text }
+  const openStarted = open ? started.get(open) : undefined
+  return { traced: top !== null, children, open, git: own, text, ...(openStarted !== undefined ? { openStarted } : {}) }
 }
 
 export const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?.trim()).filter(Boolean).join('\n')

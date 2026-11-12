@@ -6031,10 +6031,14 @@ touched:
   after it made one is said with that stash, kept. **Bounded** (HI-3021): a commit or stash still running after two
   minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
-  running), then the `index.lock` it left removed when proved its own (made after that git started and before its
-  bound came; a git started since makes a later one, left alone), the intent-to-add entries taken out, and the
-  refusal saying so (*Git didn't finish the commit in 120 seconds …*), naming any stash made by then and a lock it
-  couldn't prove its own for the user to delete. **Any number of files** (HI-2983): the paths go to git on its input
+  running). The commit runs with git's trace (`GIT_TRACE2_EVENT=2`, readCommitStream); its `index.lock` is removed
+  only when proved its own (HR2 on HI-3021: a time alone proves nothing, as another program can take the lock once
+  git gives it up): the child running when git was ended is one git runs only while holding the lock (pre-commit,
+  prepare-commit-msg, commit-msg, the signer), and the lock was made after git started and no later than that child,
+  checked again as it is moved aside. A commit ended after it was made (in post-commit: the branch moved) is made, and
+  said so; the intent-to-add entries are taken out, and the refusal says what happened (*Git didn't finish the commit
+  in 120 seconds …*). A stash takes and gives up the lock step by step, so nothing proves one its own: never removed.
+  A lock left is named in the refusal for the user to delete, and any stash made by then. **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters

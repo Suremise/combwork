@@ -298,15 +298,52 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'add', 'a.txt')
   })
 
-  it("the lock is removed only when proved its own: made after the command started and before its bound came", async () => {
+  it("ended in post-commit, another program's lock taken meanwhile (HR2's round 1): the commit is made, that lock left alone", async () => {
+    const dir = tempDir('cw-folderchanges-post-')
+    const marker = join(dir, 'post-commit started')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    // The commit is made and git has given its lock up; then post-commit runs past the bound.
+    writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n: > "${marker.replace(/\\/g, '/')}"\n"${process.execPath.replace(/\\/g, '/')}" -e 'setTimeout(() => {}, 30000)'\n`)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const before = head()
+    const done = settle('commit', ['a.txt'])
+    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 20_000 })
+    // Another program takes the index lock and holds it, open, while git still runs.
+    const fs = await import('fs')
+    const fd = fs.openSync(lockPath(), 'wx')
+    try {
+      fs.writeSync(fd, 'not Combwork\'s')
+      const result = await done
+      expect(result.made).toBe(head())
+      expect(head()).not.toBe(before)
+      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
+      expect(readFileSync(lockPath(), 'utf8')).toBe("not Combwork's")
+    } finally {
+      fs.closeSync(fd)
+      rmSync(lockPath(), { force: true })
+    }
+  })
+
+  it('which children prove the lock its own: those git runs only while holding it', () => {
+    expect(changes.lockHeldSince({ open: null, openStarted: 5 })).toBeUndefined()
+    for (const name of ['pre-commit', 'prepare-commit-msg', 'commit-msg']) expect(changes.lockHeldSince({ open: { kind: 'hook', name, text: '', after: '' }, openStarted: 5 })).toBe(5)
+    expect(changes.lockHeldSince({ open: { kind: 'signer', text: '', after: '' }, openStarted: 7 })).toBe(7)
+    // After the lock is given up, or before it's taken (fsmonitor, a filter): nothing proved.
+    for (const name of ['post-commit', 'post-index-change', 'reference-transaction']) expect(changes.lockHeldSince({ open: { kind: 'hook', name, text: '', after: '' }, openStarted: 5 })).toBeUndefined()
+    expect(changes.lockHeldSince({ open: { kind: 'other', text: '', after: '' }, openStarted: 5 })).toBeUndefined()
+    // No time read for it: nothing proved.
+    expect(changes.lockHeldSince({ open: { kind: 'hook', name: 'pre-commit', text: '', after: '' } })).toBeUndefined()
+  })
+
+  it("the lock is removed only when proved its own: made after the command started and no later than the child git ran holding it", async () => {
     writeFileSync(lockPath(), '')
     const born = (await import('fs')).statSync(lockPath()).birthtimeMs
     // Made before the command started (another git's): left.
     expect(await changes.clearOwnLock(lockPath(), born + 1, born + 10_000)).toBe(false)
-    // Made once the bound had come (a git started after the end): left.
-    expect(await changes.clearOwnLock(lockPath(), born - 10_000, born)).toBe(false)
+    // Made after the child holding git's lock started (another git's, once git's was gone): left.
+    expect(await changes.clearOwnLock(lockPath(), born - 10_000, born - 1)).toBe(false)
     expect(existsSync(lockPath())).toBe(true)
-    // Made while it ran: removed.
+    // Made in between: git's own, removed.
     expect(await changes.clearOwnLock(lockPath(), born - 1, born + 10_000)).toBe(true)
     expect(existsSync(lockPath())).toBe(false)
     // None there: nothing left.

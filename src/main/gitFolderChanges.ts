@@ -8,14 +8,15 @@
 // (`commit --only`, `stash push`): a path whose removal from Git is staged while its file is still in the folder (Files'
 // Stop Tracking, `git rm --cached`), which either would put back, is refused by name before anything runs (HI-2982;
 // Darren, 11 Nov 2026).
-import { lstat, unlink } from 'original-fs/promises'
+import { link, lstat, rename, unlink } from 'original-fs/promises'
 import { join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { changingFolder, inFolder } from './folderFence'
-import { INDEX_BUSY, git, gitErrorLine, type GitResult } from './git'
+import { INDEX_BUSY, git, gitErrorLine } from './git'
+import { readCommitStream, type CommitStream } from './platform/gitCommits'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
@@ -62,9 +63,6 @@ const FENCE = {
  */
 export const folderChangesBounds = { actMs: 120_000 }
 
-/** A commit's or stash's outcome: git's, and when it was ended at its bound, the index lock it left that wasn't proved its own. */
-type ActResult = GitResult & { lockLeft?: string }
-
 /** HI-3021: the index lock of the folder's own index (a linked worktree's is its own), as an absolute path; null when git can't say. */
 async function indexLockOf(folder: string): Promise<string | null> {
   const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index.lock'])
@@ -72,37 +70,73 @@ async function indexLockOf(folder: string): Promise<string | null> {
 }
 
 /**
- * HI-3021: removes `lock` when it is the one Combwork's own git left, ended at its bound (on Windows a git ended from
- * outside never removes it, and every git after fails on it): made after that git started (`from`) and before its bound
- * came (`until`), when it was still running. A git started after the end makes a later one, left alone; none of
- * Combwork's own runs there meanwhile (the repository lock and the folder's fence). True when no lock is left.
+ * HI-3021: the hooks `git commit` runs while it holds the index lock: it takes the lock (prepare_index) before them, and
+ * gives it up only once the commit is made and the branch moved, before post-commit. The signer runs within it too.
  */
-export async function clearOwnLock(lock: string, from: number, until: number): Promise<boolean> {
-  const s = await lstat(lock).catch((e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? null : undefined))
-  if (s === null) return true
-  if (!s?.isFile() || s.birthtimeMs < from || s.birthtimeMs >= until) return false
-  log.warn(`Removing the index lock ${userText(lock)} that Combwork's own git left when it was ended at its bound`)
-  return unlink(lock).then(
-    () => true,
-    (e: NodeJS.ErrnoException) => e?.code === 'ENOENT'
-  )
+const LOCK_HELD_HOOKS = new Set(['pre-commit', 'prepare-commit-msg', 'commit-msg'])
+
+/**
+ * HI-3021: when the commit's trace proves its git held the index lock as it was ended: the child running then (`open`)
+ * is one git runs only while holding it (LOCK_HELD_HOOKS, or the signer), so the lock was git's from before that child
+ * started until git was ended, and no other git could make one meanwhile. That child's start, or undefined: nothing proved.
+ */
+export function lockHeldSince(s: Pick<CommitStream, 'open' | 'openStarted'>): number | undefined {
+  const open = s.open
+  if (!open || s.openStarted === undefined) return undefined
+  return open.kind === 'signer' || (open.kind === 'hook' && LOCK_HELD_HOOKS.has(open.name ?? '')) ? s.openStarted : undefined
 }
 
 /**
- * A commit or stash, bounded by `folderChangesBounds.actMs`, with no prompt waited on. At the bound git's whole tree is
- * ended (git.ts) and the index lock it left removed when proved its own (clearOwnLock); one that isn't is `lockLeft`.
+ * HI-3021: removes `lock` when it is proved the one Combwork's own git left when it was ended at its bound (on Windows a
+ * git ended from outside never removes it, and every git after fails on it): git held its lock from before `heldSince`
+ * until it was ended (lockHeldSince), so the lock made after that git started (`from`) and no later than `heldSince` is
+ * that one. Any other (made before, or since: another git's, perhaps still running) is left. It is moved aside first and
+ * removed only if it is still the file checked, else put back. True when no lock is left.
  */
-async function actGit(folder: string, args: string[], input: string): Promise<ActResult> {
-  const lock = await indexLockOf(folder)
-  const bound = folderChangesBounds.actMs
-  const from = Date.now()
-  const r = await git(folder, args, undefined, input, { env: quietEnv(), timeout: bound })
-  if (!r.timedOut || !lock || (await clearOwnLock(lock, from, from + bound))) return r
-  return { ...r, lockLeft: lock }
+export async function clearOwnLock(lock: string, from: number, heldSince: number): Promise<boolean> {
+  const s = await lstat(lock, { bigint: true }).catch((e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? null : undefined))
+  if (s === null) return true
+  if (!s?.isFile() || Number(s.birthtimeMs) < from || Number(s.birthtimeMs) > heldSince) return false
+  const aside = `${lock}.combwork-${process.pid}-${Date.now()}`
+  const moved = await rename(lock, aside).then(
+    () => true,
+    () => false
+  )
+  if (!moved) return lstat(lock).then(
+    () => false,
+    (e: NodeJS.ErrnoException) => e?.code === 'ENOENT'
+  )
+  const t = await lstat(aside, { bigint: true }).catch(() => null)
+  if (t && t.ino === s.ino && t.birthtimeNs === s.birthtimeNs) {
+    log.warn(`Removed the index lock ${userText(lock)} that Combwork's own git held when it was ended at its bound`)
+    await unlink(aside).catch(() => undefined)
+    return true
+  }
+  // Not the one checked: back where it was, never over a newer one.
+  await link(aside, lock).then(
+    () => unlink(aside),
+    () => undefined
+  )
+  return false
+}
+
+/** HI-3021: the index lock still there after a commit or stash ended at its bound (`lock`), once Combwork's own was taken away: its path, or null. */
+async function lockLeftAfter(lock: string | null, from: number, heldSince: number | undefined): Promise<string | null> {
+  if (!lock || (heldSince !== undefined && (await clearOwnLock(lock, from, heldSince)))) return null
+  return lstat(lock).then(
+    () => lock,
+    (e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? null : lock)
+  )
 }
 
 /** HI-3021: what a commit or stash ended at its bound says: the bound, and the lock left when there is one. */
-const timedOutParams = (r: ActResult): { seconds: number; lockLeft: string; lock: string } => ({ seconds: Math.round(folderChangesBounds.actMs / 1000), lockLeft: r.lockLeft ? 'yes' : 'no', lock: r.lockLeft ?? '' })
+const timedOutParams = (lockLeft: string | null): { seconds: number; lockLeft: string; lock: string } => ({ seconds: Math.round(folderChangesBounds.actMs / 1000), lockLeft: lockLeft ? 'yes' : 'no', lock: lockLeft ?? '' })
+
+/** The branch's commit now (null: none yet, or unreadable). */
+async function headNow(folder: string): Promise<string | null> {
+  const r = await git(folder, ['rev-parse', '-q', '--verify', 'HEAD'])
+  return r.ok ? r.out.trim() || null : null
+}
 
 /** The environment of these commits: no prompt is ever waited on (a passphrase, credentials, a credential manager). */
 const quietEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' })
@@ -221,16 +255,29 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
     const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked))
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
-  const r = await actGit(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], pathsIn(files))
+  const lock = await indexLockOf(folder)
+  const before = await headNow(folder)
+  const from = Date.now()
+  // GIT_TRACE2_EVENT=2: git's trace on its stderr (readCommitStream), which says what ran when the bound ended it (HI-3021).
+  const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: { ...quietEnv(), GIT_TRACE2_EVENT: '2' }, timeout: folderChangesBounds.actMs })
+  const stream = readCommitStream(r.err)
   if (!r.ok) {
+    // HI-3021: ended at its bound after the commit was made (in post-commit): it is made, the branch moved, its lock given up.
+    const now = r.timedOut ? await headNow(folder) : null
+    if (now && now !== before) {
+      log.warn(`A commit in ${userText(folder)} was ended at its bound after it was made (${now}), in ${userText(stream.open?.name ?? 'git')}`)
+      return now
+    }
+    // Ended at its bound: its own lock taken away first, so the index can be put back.
+    const lockLeft = r.timedOut ? await lockLeftAfter(lock, from, lockHeldSince(stream)) : null
     // The files as they were: the intent-to-add entries this call made taken out again (the working tree never touched).
     if (untracked.length) {
       const undo = await git(folder, ['reset', '--quiet', ...PATHS_IN], undefined, pathsIn(untracked))
       // HI-3021: one that couldn't be undone (the index locked) is said in the log: the file stays, listed added.
       if (!undo.ok) log.warn(`The intent-to-add entries of a refused commit in ${userText(folder)} weren't taken out: ${userText(gitErrorLine(undo.err))}`)
     }
-    if (r.timedOut) throw combworkError(M.commitTimedOut, timedOutParams(r))
-    throw failed(M.commitFailed, `${r.err}\n${r.out}`)
+    if (r.timedOut) throw combworkError(M.commitTimedOut, timedOutParams(lockLeft))
+    throw failed(M.commitFailed, `${stream.text}\n${r.out}`)
   }
   const head = await git(folder, ['rev-parse', 'HEAD'])
   return head.out.trim()
@@ -271,13 +318,15 @@ async function stashTop(folder: string): Promise<string | null> {
  */
 async function setAsidePaths(folder: string, files: string[], message: string): Promise<string> {
   const before = await stashTop(folder)
-  const r = await actGit(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], pathsIn(files))
+  const lock = await indexLockOf(folder)
+  const r = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: folderChangesBounds.actMs })
   const after = await stashTop(folder)
   const made = after && after !== before ? after : null
   if (!r.ok && r.timedOut) {
-    // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
+    // HI-3021: ended at its bound, part way: the stash it made by then named, kept. Nothing proves an index lock there
+    // its own (a stash takes and gives it up step by step), so one left is named for the user, never removed.
     if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended at its bound: ${made}`)
-    throw combworkError(M.stashTimedOut, { ...timedOutParams(r), made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' })
+    throw combworkError(M.stashTimedOut, { ...timedOutParams(await lockLeftAfter(lock, 0, undefined)), made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' })
   }
   if (!r.ok) {
     if (made) {
