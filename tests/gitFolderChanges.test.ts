@@ -249,7 +249,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const node = `"${process.execPath.replace(/\\/g, '/')}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${pids.replace(/\\/g, '/')}"`
     return `#!/bin/sh\n${node} &\n${node}\n`
   }
-  const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((n) => n > 0) : [])
+  const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((pid) => pid > 0) : [])
   let bound = 0
   beforeEach(() => {
     bound = changes.folderChangesBounds.actMs
