@@ -2665,7 +2665,10 @@ merges under jj.
   for a non-colocated jj repository the store its `.jj` names, HI-2896)
   whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
   of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
-  `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
+  `groupChanged`. Refused, each with its list and Check Again reading it afresh (HI-3105: also when refused only as Switch
+  is pressed, the warning having been read clear: the check is read again and the refused dialog shows its lists, never
+  a refusal pointing at a list the dialog doesn't have; and back to Git, a fallback read that only raced jj's operation
+  head moving, `unknown` `moved`, is made again up to three times before it is shown): `drain` (active or paused lanes, cards
   in flight, a member's merge queue with work, open slot leases, unfreed copy leases, and (HI-3069) each slot kept for
   a card, `drain.kept`, that isn't of the platform switched to: it could never be lent back after the switch, so its
   card is started and finished first; one already of that platform, left by a switch made before this, never refuses

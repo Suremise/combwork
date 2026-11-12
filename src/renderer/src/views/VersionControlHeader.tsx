@@ -106,6 +106,10 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
     notify('error', tr(t.m, t.values))
     return false
   }
+  // HI-3105: a switch of the repository refused as Switch is pressed (what its warning lists changed since it was read):
+  // the check is read again, and when that refuses with lists, this dialog gives way to the refused one showing them
+  // (as Check Again does), never a refusal pointing at a list the dialog doesn't have.
+  let reread = false
   const ok = await confirm({
     title: tr(S.title, { project: project.name, platform: names.to }),
     message: tr(S.what, names),
@@ -113,9 +117,19 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
     content: <SwitchDetails project={project} check={check} names={names} />,
     confirmLabel: tr(S.confirm),
     run: async () => {
-      await call('workflow:setPlatform', project.path, to, { expected: from, ...(check.store ? { token: check.store.token } : {}) })
+      try {
+        await call('workflow:setPlatform', project.path, to, { expected: from, ...(check.store ? { token: check.store.token } : {}) })
+      } catch (e) {
+        const again = check.store ? await call('workflow:checkPlatform', project.path, to).catch(() => null) : null
+        if (again?.refused && again.store && DETAILED.has(again.refused.why)) {
+          reread = true
+          return
+        }
+        throw e
+      }
     }
   })
+  if (reread) return switchPlatform(project, from, to)
   if (ok) notify('success', tr(S.done, { project: project.name, platform: names.to }))
   return ok
 }

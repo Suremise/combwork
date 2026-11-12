@@ -308,6 +308,28 @@ const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly st
  * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
  */
 export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Promise<FallbackProblem[]> {
+  return retryMoved(() => fallbackOnce(path, runner))
+}
+
+/** How many times a fallback read that raced a moving operation head is made (HI-3105). */
+const MOVED_TRIES = 3
+
+/**
+ * HI-3105: a fallback read that only raced jj's operation head moving (its own work after a put-back, the user's command:
+ * its sole problem `unknown` `moved`) made again, at most `tries` times in all, before it is shown as a problem; any other
+ * answer is the answer at once.
+ */
+export async function retryMoved(read: () => Promise<FallbackProblem[]>, tries = MOVED_TRIES): Promise<FallbackProblem[]> {
+  let problems: FallbackProblem[] = []
+  for (let attempt = 0; attempt < tries; attempt++) {
+    problems = await read()
+    if (!(problems.length === 1 && problems[0].code === 'unknown' && /^moved\b/.test(problems[0].detail))) return problems
+  }
+  return problems
+}
+
+/** One fallback read (fallbackOf's). */
+async function fallbackOnce(path: string, runner: JjRunner): Promise<FallbackProblem[]> {
   // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
   const d = await pinnedContextOf(path, runner)
   if ('jjUnknown' in d && d.jjUnknown === 'heads') return [{ code: 'heads', n: Number(d.detail) || 0 }]

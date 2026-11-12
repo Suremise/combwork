@@ -284,6 +284,29 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     void q
   })
 
+  it('HI-3105: a fallback read that only raced a moving operation head is read again; anything else is the answer at once', async () => {
+    const moved = [{ code: 'unknown' as const, detail: 'moved' }]
+    const ready: { code: 'notExported'; name: string }[] = []
+    const seq = (answers: unknown[]) => {
+      let i = 0
+      const read = async () => answers[Math.min(i++, answers.length - 1)] as never
+      return { read, count: () => i }
+    }
+    const a = seq([moved, moved, ready])
+    expect(await ss.retryMoved(a.read)).toEqual([])
+    expect(a.count()).toBe(3)
+    const b = seq([moved, moved, moved, ready])
+    expect(await ss.retryMoved(b.read)).toEqual(moved)
+    expect(b.count()).toBe(3)
+    const other = [{ code: 'unknown' as const, detail: 'heads: 2' }]
+    const c = seq([other, ready])
+    expect(await ss.retryMoved(c.read)).toEqual(other)
+    expect(c.count()).toBe(1)
+    const d = seq([[{ code: 'notExported', name: 'main' }]])
+    expect(await ss.retryMoved(d.read)).toEqual([{ code: 'notExported', name: 'main' }])
+    expect(d.count()).toBe(1)
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!
