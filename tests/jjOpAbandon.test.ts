@@ -185,4 +185,29 @@ describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-309
     expect(await v.recover()).toMatchObject({ ok: false, why: 'provenance' })
     expect((v.h.journals.of('rec').read() as { phase: string }).phase).toBe('restored')
   })
+  // HR1's round 2: stopped after its record, an edit made meanwhile, stopped again after the retry's record: the next
+  // Recover… still finishes, the late edit kept and recorded.
+  it.each([true, false])('stopped after its record twice, an edit made between: Recover… still finishes, that edit kept (colocated: %s)', async (colocated) => {
+    const w = await abandoned(colocated)
+    const stopping = { ...w.h.port, recordLeftOut: async (...a: Parameters<typeof w.h.port.recordLeftOut>) => {
+      await w.h.port.recordLeftOut(...a)
+      throw new Error('Combwork stopped')
+    } }
+    await expect(w.recover({ port: stopping })).rejects.toThrow('Combwork stopped')
+    const first = w.h.journals.of('rec').read() as { recordFrom?: string; recorded?: string }
+    writeFileSync(join(w.slot, 'late.txt'), 'written between the stops\n')
+    await expect(w.recover({ port: stopping })).rejects.toThrow('Combwork stopped')
+    const second = w.h.journals.of('rec').read() as { phase: string; recordFrom?: string; recorded?: string }
+    expect(second.phase).toBe('restored')
+    expect(second.recordFrom).not.toBe(first.recordFrom)
+    expect(second.recorded).toMatch(/^[0-9a-f]{40}$/)
+    const done = await w.recover()
+    expect(done).toMatchObject({ ok: true })
+    expect(w.h.journals.of('rec').read()).toBeNull()
+    expect(readFileSync(join(w.slot, 'wip.txt'), 'utf8')).toBe('an edit jj has not recorded\n')
+    expect(readFileSync(join(w.slot, 'late.txt'), 'utf8')).toBe('written between the stops\n')
+    expect(w.h.jj(w.slot, '--ignore-working-copy', 'file', 'list', '-r', '@')).toMatch(/late\.txt/)
+    expect(w.status(w.slot)).toMatch(/^ok: /)
+    expect(w.h.jj(w.slot, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'divergent')).toBe('false')
+  })
 })
