@@ -95,6 +95,11 @@ export interface JjCandidateStepDeps {
 const tellGivenUp = (log: ((what: string) => void) | undefined, was: JjAttemptRecord, now: JjAttemptRecord): void => {
   if ((now.givenUp?.length ?? 0) > (was.givenUp?.length ?? 0)) log?.(`${now.attempt}: step ${now.givenUp!.at(-1)} given up (its base operation past the walk)`) // i18n-ignore: a log line, English
 }
+/** HI-3045: a drop's hidden commits' successors it left alone, as the user's or unclassifiable, named in the log. */
+const tellKeptSuccessors = (log: ((what: string) => void) | undefined, d: JjDropped): void => {
+  const kept = d.dropped.keptSuccessors
+  if (kept?.length) log?.(`${d.record.attempt}: successors left alone: ${kept.map((k) => `${k.commit.slice(0, 12)} (${k.why})`).join(', ')}`) // i18n-ignore: a log line, English
+}
 
 export interface JjCandidateOffer {
   attempt: string
@@ -152,6 +157,7 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
       continue
     }
     // A drop held back (a working copy or a bookmark on it) settles nothing: dropped again later (HI-2990).
+    tellKeptSuccessors(deps.log, d)
     const st = dropState(d)
     await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })
   }
@@ -200,6 +206,7 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
     if (e.record.result && deps.park && !(await deps.park(e.record.result, e.record.expected))) continue
     const d = await dropJjAttempt(cleanUp, e.record, e.fp.target)
     if (isInterrupted(d)) return { unknown: `drop:${d.interrupted.why}` }
+    tellKeptSuccessors(deps.log, d)
     const st = dropState(d)
     await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })
   }
@@ -283,6 +290,7 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
       } else unresolved = true
       continue
     }
+    tellKeptSuccessors(deps.log, d)
     const st = dropState(d)
     if (!st) unresolved = true
     await deps.save({ ...e, record: d.record, ...(st ? { state: st } : {}) })

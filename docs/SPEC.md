@@ -3632,6 +3632,16 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   empty `jj interdiff` from the attempt's commit and its description and author unchanged (HR1's round 1: rebased, never
   edited; a change of the user's to its files or its metadata stays theirs). It is
   journalled into the attempt's commits and pinned before the guarded abandon, as the attempt's own.
+  **Only jj's automatic rebase** (HI-3045, design HI-3045/s15): a successor is adopted only when the operation that made
+  it (`jj evolog`'s, one read) rebased it as a descendant of something it **rewrote in place**. The successors one
+  operation made are decided together. For each root (one with a parent outside the attempt), each outside parent is the
+  same commit or that parent's change rewritten by that operation with its own parents the same changes (a describe,
+  metaedit, squash-into, amend, absorb), at least one so rewritten, and each inside parent is that commit's successor
+  there. Anything else is the user's own operation (their `jj rebase -r/-s/-b` of the candidate or its revision, onto
+  the moved target say, meaning to set the target onto it) or ambiguous, and stays. An operation with several parents
+  (concurrent history) or with the root as its parent (history abandoned below it) can't be classified: kept, and the
+  drop finishes (`keptSuccessors`, logged); a read that fails interrupts the drop with nothing adopted, read again on
+  the next pass. Reads only until every group is decided; none at all without a hidden commit with a successor.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:

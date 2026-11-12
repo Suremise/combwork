@@ -778,6 +778,93 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   })
 })
 
+// HI-3045 (design HI-3045/s15): a candidate's successor is adopted only when jj's automatic rebase made it, its outside
+// parent rewritten in place (HI-2990's case, above: `jj describe -r @-` under a merge candidate). The user's own commands
+// on it here, each through the runtime as the repository watch runs it; a squash into the card's revision (T5: its
+// contents change, so the card's own rules stop first here) and the operation-level cases (reads, concurrent or cut
+// history, a failed read) are jjCandidatesReal's.
+describe.skipIf(!jjExe)(`the user's own operations on a candidate are theirs (jj ${TESTED_JJ.version}), HI-3045`, { timeout: REAL_JJ_MS }, () => {
+  /** The card's candidate built and shown (in `style`), the target then moved by someone else's commit. */
+  async function offered(style: 'merge' | 'rebase', two = false) {
+    const w = await world(false, { candidates: true, oneSlot: true })
+    const { card, P } = two ? await approvedTwo(w) : await approved(w)
+    if (style === 'rebase') reapply(w, card, { style: 'rebase' })
+    const jjp = new JjPlatform(w.wf)
+    await jjp.reconcile(w.wf.store.card(card.id), {})
+    const cycle = w.wf.state(card).cycle
+    const first = shown(w, card, cycle)!.offer!
+    onTarget(w, 'theirs.txt', 'theirs\n')
+    return { w, card, P, jjp, cycle, first }
+  }
+  /** As `approved`, with two commits of work: a rebase candidate of two commits. */
+  async function approvedTwo(w: World) {
+    const a = w.slots['slot-a']
+    const card = await started(w, 'jj work')
+    const st = w.wf.state(card).started!
+    w.store.tx((tx) => tx.append(card.id, { kind: 'SlotPrepared', actor: 'combwork', source: 'recorded', data: { lease: st.lease!, line: st.line!, revision: st.base! } } as never))
+    for (const n of ['one', 'two']) {
+      writeFileSync(join(a.folder, `${n}.txt`), `${n}\n`)
+      w.h.jj(a.folder, 'commit', '-m', `jj work ${n}`)
+    }
+    const P = w.h.id(a.folder, `${a.identity.workspace}@-`)
+    moved(await w.wf.submit(card.key, B1, { summary: 'done' }))
+    await w.runPins(card.id)
+    moved(await w.wf.startReview(card.key, R1))
+    moved(await w.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    return { card, P }
+  }
+  const changeOf = (w: World, commit: string): string => w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', commit, '-T', 'change_id').trim()
+  const settle = async (o: Awaited<ReturnType<typeof offered>>): Promise<void> => {
+    for (let i = 0; i < 2; i++) await o.jjp.reconcile(o.w.wf.store.card(o.card.id), {})
+  }
+
+  it("T1: the user rebases a rebase candidate onto the moved target: theirs kept, and setting main onto it integrates the card", async () => {
+    const o = await offered('rebase')
+    o.w.h.jj(o.w.repo, '--ignore-working-copy', 'rebase', '-r', o.first.change, '-d', 'main')
+    const mine = ofChange(o.w, o.first.change)
+    expect(mine).toHaveLength(1)
+    await settle(o)
+    expect(ofChange(o.w, o.first.change)).toEqual(mine)
+    // Their next command works on it: no "Revision … doesn't exist".
+    o.w.h.jj(o.w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', o.first.change)
+    await settle(o)
+    expect(o.w.store.facts(o.card.id).some((f) => f.kind === 'Integrated')).toBe(true)
+    expect(o.w.wf.state(o.card).stage).toBe('done')
+  })
+
+  it('T2: a branch rebase of a two-commit candidate (-b): both kept, the tip too though its parent is a rewrite', async () => {
+    const o = await offered('rebase', true)
+    const root = o.w.h.jj(o.w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${o.first.result}-`, '-T', 'commit_id').trim()
+    const rootChange = changeOf(o.w, root)
+    o.w.h.jj(o.w.repo, '--ignore-working-copy', 'rebase', '-b', o.first.change, '-d', 'main')
+    const tip = ofChange(o.w, o.first.change)
+    const base = ofChange(o.w, rootChange)
+    expect(tip).toHaveLength(1)
+    expect(base).toHaveLength(1)
+    await settle(o)
+    expect(ofChange(o.w, o.first.change)).toEqual(tip)
+    expect(ofChange(o.w, rootChange)).toEqual(base)
+  })
+
+  it("T3: the card's revision moved (-s) under a merge candidate: its parent moved, not rewritten in place, so kept", async () => {
+    const o = await offered('merge')
+    o.w.h.jj(o.w.repo, '--ignore-working-copy', 'rebase', '-s', o.P, '-d', 'main')
+    const mine = ofChange(o.w, o.first.change)
+    expect(mine).toHaveLength(1)
+    await settle(o)
+    expect(ofChange(o.w, o.first.change)).toEqual(mine)
+  })
+
+  it("T6: the card's revision and the candidate rebased together (-r 'P | candidate'): both moved, so kept", async () => {
+    const o = await offered('merge')
+    o.w.h.jj(o.w.repo, '--ignore-working-copy', 'rebase', '-r', `${o.P} | ${o.first.change}`, '-d', 'main')
+    const mine = ofChange(o.w, o.first.change)
+    expect(mine).toHaveLength(1)
+    await settle(o)
+    expect(ofChange(o.w, o.first.change)).toEqual(mine)
+  })
+})
+
 /** Of the card's attempts' commits, those still in the user's log that main doesn't reach (HI-2990: none once settled). */
 function left(w: World, card: { key: string }, cycle: number): string[] {
   const ids = [...new Set(entries(w, card, cycle).flatMap((e) => e.record.commits))]
