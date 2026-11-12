@@ -622,7 +622,7 @@ export class MergeQueue {
   /** After an entry's merge, the push of its target it owes (G18), before the next entry; its outcome stays the merge's. */
   private async thenPush(target: string, o: QueueOutcome | null): Promise<QueueOutcome | null> {
     // G21 (HI-1183): a published merge's local catch-up first (its pause, if any, is saved: the outcome stays the merge's).
-    if (o?.outcome === 'integrated' && (await this.settleCatchUp(target))) return o
+    if (o?.outcome === 'integrated' && (await this.settleCatchUp(target, o.entry))) return o
     if (o?.outcome === 'integrated') await this.settlePush(target)
     return o
   }
@@ -1013,8 +1013,9 @@ export class MergeQueue {
    * note), then a fresh one from the local head as it is now (another ancestor of the result gets its own journalled
    * plan). Not checked out: a compare-and-swap. Checked out: the advance's conditions, files and ref, journalled. A
    * condition pauses the queue naming the merged card; the user's edits and ref changes are never overwritten.
+   * `published`: the entry this run has just published (HI-3041: its catch-up needn't ask the remote again).
    */
-  private async settleCatchUp(target: string): Promise<QueueOutcome | null> {
+  private async settleCatchUp(target: string, published?: string): Promise<QueueOutcome | null> {
     for (let i = 0; i < 3; i++) {
       const c = catchUpOf(this.wf.store.meta(catchUpKey(target)))
       if (!c) return null
@@ -1024,7 +1025,7 @@ export class MergeQueue {
         return null
       }
       const folder = c.folder
-      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder)) : await this.catchUpFresh(target, c)
+      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder)) : await this.catchUpFresh(target, c, c.entry !== published)
       if (r !== 'again') return r
     }
     return null
@@ -1074,7 +1075,8 @@ export class MergeQueue {
     return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
   }
 
-  private async catchUpFresh(target: string, c: CatchUp): Promise<QueueOutcome | null | 'again'> {
+  /** `look`: whether the remote is asked before the local target is brought to the result (HI-3041; not right after publishing it). */
+  private async catchUpFresh(target: string, c: CatchUp, look: boolean): Promise<QueueOutcome | null | 'again'> {
     const I = this.catchUpPort(c)!
     const h = this.host({})
     const local = await I.targetHead(this.project, target)
@@ -1100,6 +1102,10 @@ export class MergeQueue {
       if ((await this.remoteHas(target, c)) === false) return done()
       return this.catchUpPause(target, c, 'remoteDiverged', [target])
     }
+    // HI-3041 (HR1's round 1): behind it too, an owed catch-up taken up again (not the one right after its publication)
+    // asks the remote first: a result it no longer has is never brought into the local target; the catch-up ends as
+    // above. Unknown: caught up as before (the remote had it when it was published).
+    if (look && (await this.remoteHas(target, c)) === false) return done()
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null

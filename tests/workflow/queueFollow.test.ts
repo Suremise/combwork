@@ -561,6 +561,32 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
   })
 
+  it('HI-3041 (HR1): the published merge taken off the remote while the local target is still behind it, its catch-up owed: never brought in locally; ended, marked left, the next card merged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const result = e.wf.state(a).integrated!.result
+    const before = sh(e.project, 'rev-parse', `${result}^1`)
+    expect(head(e.project)).toBe(before)
+    // The remote reset to the merge's parent (the published merge dropped); the local main still behind the result.
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'reset', '-q', '--hard', before)
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    del(join(e.project, 'a.txt'))
+    const b = await queued(e, 'B', 'b.txt')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(contains(e.project, result)).toBe(false)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(contains(bare, e.wf.state(b).integrated!.result)).toBe(true)
+    expect(contains(e.project, e.wf.state(b).integrated!.result)).toBe(true)
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
   it('HI-3041 (2b): a published merge undone on the remote and locally is marked as having left, as with a push; on the remote still, behind is not left', { timeout: GIT_HEAVY_MS * 2 }, async () => {
     const { reconcile } = await import('../../src/main/workflow/reconcile')
     const marks: Record<string, unknown> = {}
