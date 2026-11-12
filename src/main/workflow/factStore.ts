@@ -436,6 +436,14 @@ export class FactStore {
     return this.records("project = ? AND archived = 0 AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') NOT IN ('todo', 'done')", [this.scope.project])
   }
 
+  /**
+   * This project's cards (not archived) not Done, Todo included, in number order (HI-3000: a branch pair's open forward
+   * or resolution), read without the Done ones, as cardsInFlight is.
+   */
+  cardsOpen(): CardRecord[] {
+    return this.records("project = ? AND archived = 0 AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') <> 'done'", [this.scope.project])
+  }
+
   /** This project's cards (not archived) in a stage, by number (#1443: whom each card in Review has reviewing it). */
   cardsAt(stage: StageId): number[] {
     return this.conn.read((db) => (db.prepare('SELECT number FROM cards WHERE project = ? AND archived = 0 AND (stage = ? OR (stage IS NULL AND col = ?)) ORDER BY number').all(this.scope.project, stage, STAGE_CATEGORY[stage]) as { number: number }[]).map((r) => r.number))

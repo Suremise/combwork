@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, other {另有 # 个}}",
   "board.queue.forward": "更新到最新…",
   "board.queue.forwardAlready": "已在将 {to} 更新到 {from} 的最新状态",
+  "board.queue.forwardResolving": "{card} 正在解决此合并：“更新到最新”会等它完成",
   "board.queue.forwardAskConfirm": "加入队列",
   "board.queue.forwardAskMessage": "{from} 的当前状态会通过 {to} 的合并队列、经过合并前检查，以合并提交合并到 {to}。{from} 本身不变。如果出现冲突或检查失败，其卡片会退回，由你选择“重试合并”或“移出”。",
   "board.queue.forwardAskTitle": "要将 {to} 更新到 {from} 的最新状态吗？",

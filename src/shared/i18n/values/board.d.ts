@@ -705,6 +705,7 @@ interface CombworkMessageValues {
   'board.queue.forwardChooseMessage': { to: string | number }
   'board.queue.forwardChooseTitle': { to: string | number }
   'board.queue.forwardFailed': undefined
+  'board.queue.forwardResolving': { card: string | number }
   'board.queue.forwardUpToDate': { to: string | number; from: string | number }
   'board.queue.inVersionControl': undefined
   'board.queue.merged': { card: string | number; result: string | number }
