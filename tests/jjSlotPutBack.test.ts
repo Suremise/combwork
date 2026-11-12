@@ -7,11 +7,13 @@
 // - card 1 again: slot-a back (main moved meanwhile), prepared from its old base, its commit kept;
 // - two take-backs at once: one lent; the generation changed, or the binding not the card's any more: refused naming
 //   the slot, never a fresh one, and still kept;
+// - an edit not committed yet beside the work, made before the put-back or in the kept slot afterwards: kept with it, and
+//   given back with it (HR1's round 1);
 // - a transient detach refusal (the fence): left as it was, not kept;
 // - main moved onto the work: ready again, the record gone.
 // Skipped without the fetched jj (npm run jj:fetch).
 
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -58,7 +60,7 @@ function world(colocated: boolean) {
 type World = ReturnType<typeof world>
 
 /** Card 1 lent a slot, prepared there on main, a commit made and submitted, put back: the slot, its commit and its base. */
-async function putBackWithWork(w: World): Promise<{ name: string; folder: string; ws: string; store: string; generation: string; R: string; base: string }> {
+async function putBackWithWork(w: World, beforePutBack?: (folder: string) => void): Promise<{ name: string; folder: string; ws: string; store: string; generation: string; R: string; base: string }> {
   const lent = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
   if (!lent.ok) throw new Error(`not lent: ${JSON.stringify(lent)}`)
   const row = w.store.slot(lent.slot.name)!
@@ -70,6 +72,7 @@ async function putBackWithWork(w: World): Promise<{ name: string; folder: string
   const R = w.h.id(row.folder, `${ws}@-`)
   // Submitted, then returned and put back (its binding records the submitted commit, what its integration is proved by).
   expect(await w.port.submitted(row.folder, jjLineKey(ws, 1, 1), [R], row.identity, 1)).toBe(true)
+  beforePutBack?.(row.folder)
   await w.pool.release(lent.lease.id, 'putBack')
   await w.pool.refresh()
   return { name: row.name, folder: row.folder, ws, store: row.identity!.store, generation: row.identity!.generation, R, base }
@@ -144,6 +147,29 @@ describe.skipIf(!jjExe)(`a jj card put back with committed work (jj ${TESTED_JJ.
       expect(w.store.slot(a.name)?.state).toBe('dirty')
       expect(w.store.openLease(a.name)).toBeNull()
       expect(w.pool.keptCard(a.name)).toBe(1)
+      expect(w.store.slots().map((s) => s.name)).toEqual([a.name])
+    })
+
+    it.each(['before it is put back', 'in the kept slot afterwards'] as const)("an edit not committed yet beside the work (%s): the card's own, kept with it and given back (HR1's round 1)", async (when) => {
+      const w = world(colocated)
+      const edit = (folder: string): void => writeFileSync(join(folder, 'half.txt'), 'half done\n')
+      // (a) the edit made before the put-back: the slot is dirty when it is settled, kept for the card all the same.
+      const a = await putBackWithWork(w, when === 'before it is put back' ? edit : undefined)
+      expect(w.store.slot(a.name)?.state).toBe('dirty')
+      expect(w.store.openLease(a.name)).toBeNull()
+      expect(w.pool.keptCard(a.name)).toBe(1)
+      // (b) the edit made in the slot once it is kept.
+      if (when === 'in the kept slot afterwards') edit(a.folder)
+      // Never another card's: refused by name, its folder as it was.
+      expect(await w.pool.lend({ card: 2, agent: 'a-2', slot: a.name }, { target: 'main' })).toMatchObject({ ok: false, refusal: { why: 'notReady', slot: a.name } })
+      // Card 1 again: the same slot, prepared from its old base (the carry), its commit and its edit kept.
+      const again = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+      expect(again).toMatchObject({ ok: true, slot: { name: a.name } })
+      if (!again.ok) return
+      expect(await w.pool.prepare(again.lease.id, { line: jjLineKey(a.ws, 1, 2), base: a.base, install: false, target: 'main' })).toMatchObject({ ok: true })
+      expect(await w.port.line(a.folder)).toBe(jjLineKey(a.ws, 1, 2))
+      expect(w.h.jj(a.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${a.R} & ::${a.ws}@`, '-T', 'commit_id').trim()).toBe(a.R)
+      expect(readFileSync(join(a.folder, 'half.txt'), 'utf8')).toBe('half done\n')
       expect(w.store.slots().map((s) => s.name)).toEqual([a.name])
     })
 

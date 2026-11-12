@@ -3257,7 +3257,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   base and work. Refused at either step (busy, another generation, another binding, the folder gone, another slot
   asked for), the lend is refused naming the slot (`slot.refusal.kept`), the slot kept as it was, never a fresh
   slot instead. Once its work is in the target (or the user moves the card to Done, HI-2924), the next settle's
-  detach succeeds and the slot is ready again, its record deleted; removal deletes it too. Lanes keep their lease
+  detach succeeds and the slot is ready again, its record deleted; removal deletes it too. With an edit not committed
+  yet beside the work (HR1's round 1), the slot settles dirty and no detach is asked: it is kept for the card all the
+  same while the port says its binding is still that card's (`heldFor`), and a take-back checks that ownership first,
+  before any clean check, the card's edits then carried by its preparation (HI-2981). Lanes keep their lease
   across a put-back, so this is a card lease's only; Git's slots have no such answer.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the

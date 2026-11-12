@@ -1951,6 +1951,17 @@ export class SlotPool {
           } else if (now !== null) {
             to = now
             if (now === 'ready') held = 'forget'
+            // Its card's own work with an edit not committed yet beside it (HR1's round 1): left dirty, so no detach is
+            // asked; kept for that card all the same while the slot's binding is still that card's (read through the
+            // port), so its next start gets the slot, its commits and its edit back. Anyone else's or unknown: as before.
+            else if (now === 'dirty') {
+              const lastLease = this.store.lastLease(s.name)
+              const port = this.portOf(s)
+              if (lastLease?.kind === 'card' && lastLease.card !== null && s.identity && port.heldFor && (await port.heldFor(s.folder, s.identity, lastLease.card))) {
+                held = { card: lastLease.card, generation: s.identity.generation }
+                log.info(`${userText(s.name)} is kept for #${lastLease.card}: its work, an edit not committed yet included, is still in it`)
+              }
+            }
           }
           // Busy: owed. Decided (ready, dirty, gone, or a refusal for good, which waits for the next event): not owed. The
           // listing failed (null): as it was.
@@ -2551,18 +2562,20 @@ export class SlotPool {
             const busy = await held()
             if (busy) return busy
           }
-          const d = await this.dirtyOwned(slot, token)
+          // Taken back by its card (HI-2995): its binding still that card's at the folder's generation, read through the
+          // port under this operation, before anything else; anything else keeps it as it was, refused, never lent as
+          // free. What is in it then is that card's own (its commits, and an edit not committed yet: HR1's round 1), so
+          // it isn't refused as unclean: the card's preparation carries it (HI-2981).
+          if (reclaim && !(lease.card !== null && (await this.portOf(slot).heldFor?.(slot.folder, slot.identity ?? null, lease.card)))) {
+            this.keptWhy.set(name, T.keptStale)
+            return await pass('dirty', 'keptStale')
+          }
+          const d = reclaim ? [] : await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) return await pass('dirty', 'notClean')
           // Held (a session in it, or a process: a file or folder in it open): passed over, saying what holds it.
           if (!records) {
             const busy = await held()
             if (busy) return busy
-          }
-          // Taken back by its card (HI-2995): its binding still that card's at the folder's generation, read through the
-          // port under this operation; anything else keeps it as it was, refused, never lent as free.
-          if (reclaim && !(lease.card !== null && (await this.portOf(slot).heldFor?.(slot.folder, slot.identity ?? null, lease.card)))) {
-            this.keptWhy.set(name, T.keptStale)
-            return await pass('dirty', 'keptStale')
           }
         }
       }
