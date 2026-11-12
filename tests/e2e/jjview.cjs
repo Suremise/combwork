@@ -372,6 +372,18 @@ function jjRepo(dir, o = {}) {
     await answered()
     check('…and loose still shows its history, Refresh enabled, not Reading…', (await looseShows(looseHist)) && !/Reading…/.test(await text(looseHist)), await text(looseHist))
     await shoot(page.locator('.vc-view'), 'history-after-switch')
+
+    // --- While a switch's read is out (HI-3038): back to shop with its read slowed, its History shows Reading…, never
+    // loose's rows relabelled as shop's, from the switch until shop's own read answers. Sampled while the read is out,
+    // not polled for the state that ends it.
+    const hist1 = await settled('jj:history')
+    await slowNext('jj:history=3000*1')
+    await page.getByText('shop', { exact: true }).first().click()
+    check('switched back to shop', !!(await until(async () => (await head.textContent())?.includes(shop), HUNG_MS)), await text(head))
+    await answered()
+    const during = await text(shopHist)
+    check("…while shop's slowed read is out, its History shows Reading…, not loose's history", (await settled('jj:history')) === hist1 && /Reading…/.test(during) && !/main work/.test(during), `${during} (answered ${(await settled('jj:history')) - hist1})`)
+    check("…then shop's own", !!(await until(async () => /feature/.test(await text(shopHist)) && !(await shopHist.locator('[data-action="jj-refresh"]').isDisabled()), HUNG_MS)), await text(shopHist))
     await slowNext('')
 
     // --- Back to Git: refused while jj's state can't go back, then made.
