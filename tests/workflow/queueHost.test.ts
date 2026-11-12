@@ -6,6 +6,11 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { endHolderWatches, holderWatchState, kickQueue, setHolderWatch, startQueueHosts, stopQueueHosts } from '../../src/main/workflow/queueHost'
 import { emit } from '../../src/main/events'
+import { catchUpKey, catchUpOf } from '../../src/main/workflow/mergeQueue'
+import { memoryTransportStore } from '../../src/main/workflow/transportSnapshots'
+import { tempDir } from '../tempDir'
+import { execFileSync } from 'child_process'
+import { join } from 'path'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { WorkspaceService } from '../../src/main/workspace'
 
@@ -380,6 +385,32 @@ describe("a workspace's merge queues start as it opens, or once its board is upg
     startQueueHosts()
     emit({ type: 'workspace-changed', workspace: null })
     await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
+  })
+
+  it('HI-3089: a target whose only work is an owed catch-up (stopped between its files and its ref) is run as it opens, and the catch-up finished', async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [], followRemote: true }))
+    const bare = join(tempDir('host-remote-'), 'origin.git').replace(/\\/g, '/')
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
+    sh(e.project, 'remote', 'add', 'origin', bare)
+    sh(e.project, 'push', '-q', '-u', 'origin', 'main')
+    const card = e.wf.createCard({ title: 'A' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'a.txt': 'A\n' }, `${card.key}: A`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    await expect(e.queue({ transport: memoryTransportStore(), hooks: { beforeCatchUpRef: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))?.phase).toBe('ref')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  a.txt')
+    ctx.wf = e.wf
+    ctx.folder = `${e.home}/queue`
+    ctx.open = [{ path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}), info: () => ({ projects: [{ path: e.project, name: 'project', platform: 'git' }] }) } as unknown as WorkspaceService]
+    startQueueHosts()
+    emit({ type: 'workspace-changed', workspace: null })
+    await vi.waitFor(() => expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull(), HUNG)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(sh(bare, 'rev-parse', 'main'))
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    expect(e.store.queuePause('main')).toBeNull()
   })
 
   it('stopping the hosts stops following upgrades', () => {
