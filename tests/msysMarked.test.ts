@@ -141,12 +141,10 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     const { top, child } = await tree()
     const marked = lone()
     const unrelated = lone()
-    await vi.waitFor(() => expect([alive(marked), alive(unrelated)]).toEqual([true, true]))
-    // Its second read "began" before `late` started: `late` can't be the process that MSYS pid named then.
-    const before = Date.now()
-    await new Promise<void>((res) => setTimeout(res, 50))
     const late = lone()
-    const out = ['a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, `b 5 ${marked} ${at(Date.now() + 1000)}`, `b 6 ${late} ${at(before)}`, 'end'].join('\n')
+    // `late`'s second read "began" a minute before it started: it can't be the process that MSYS pid named then.
+    // `marked`'s began after everything here started.
+    const out = ['a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, `b 5 ${marked} ${at(Date.now() + 1000)}`, `b 6 ${late} ${at(Date.now() - 60_000)}`, 'end'].join('\n')
     const why: string[] = []
     await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => ({ out }) })
     await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: 10_000 })

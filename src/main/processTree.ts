@@ -172,11 +172,11 @@ export function boundedOutput(file: string, args: string[], o: { timeoutMs: numb
       c = execFile(file, args, { windowsHide: true, shell: false, env: o.env, timeout: o.timeoutMs, maxBuffer: o.maxBuffer, encoding: 'utf8' }, (err, stdout) => {
         if (!err) return res({ out: String(stdout) })
         const e = err as Error & { code?: unknown; killed?: boolean }
-        const why = e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? 'its output passed the cap' : e.killed ? 'it ran past its time limit' : typeof e.code === 'number' ? `it exited with ${e.code}` : `it couldn't run (${String(e.code ?? 'error')})`
+        const why = e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? 'its output passed the cap' : e.killed ? 'it ran past its time limit' : typeof e.code === 'number' ? `it exited with ${e.code}` : `it couldn't run (${String(e.code ?? 'error')})` // i18n-ignore: for the log
         res({ error: why, ...(c?.pid ? { pid: c.pid } : {}) })
       })
     } catch (e) {
-      res({ error: `it couldn't run (${(e as Error).message})` })
+      res({ error: `it couldn't run (${(e as Error).message})` }) // i18n-ignore: for the log
     }
   })
 }
@@ -207,13 +207,13 @@ export async function endTreeAsync(child: ChildProcess, platform = process.platf
   if (child.exitCode !== null || child.signalCode !== null) return
   if (platform === 'win32' && child.pid) {
     // Searched before the listing: a match's process must still be the one listed (msysMatches).
-    const found = msys ? await (msys.discover ?? findMsysMarked)(msys).catch((e: Error) => ({ error: `it couldn't run (${e.message})` })) : null
+    const found = msys ? await (msys.discover ?? findMsysMarked)(msys).catch((e: Error) => ({ error: `it couldn't run (${e.message})` })) : null // i18n-ignore: for the log
     const list = parseProcessList(await powershell(LIST_PS))
     let extra: ListedProcess[] = []
     if (msys && found) {
       const matches = 'out' in found ? msysMatches(found.out, list) : null
       if (matches) extra = matches
-      else msys.onIncomplete?.('error' in found ? found.error : 'its answer was malformed')
+      else msys.onIncomplete?.('error' in found ? found.error : 'its answer was malformed') // i18n-ignore: for the log
     }
     const tree = treesToEnd(list, child.pid, extra)
     if (tree.length && pidsOf(await powershell(endListedPs(tree))).includes(child.pid)) return
