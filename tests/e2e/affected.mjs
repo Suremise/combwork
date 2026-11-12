@@ -1162,10 +1162,10 @@ const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ..
  */
 export function unchangedSince(cwd, base) {
   try {
-    const quiet = (args) => execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd, env: runContext.baseEnv(), stdio: 'ignore' })
-    quiet(['diff', '--quiet', '--no-ext-diff', `${base}...HEAD`, '--'])
-    quiet(['diff', '--quiet', '--no-ext-diff', 'HEAD', '--'])
-    return git(cwd, ['ls-files', '-z', '--others', '--exclude-standard']) === ''
+    // Two git processes: the committed diff, then the index, the working tree and the untracked at once (status, which
+    // takes no lock of the index for it).
+    execFileSync('git', ['diff', '--quiet', '--no-ext-diff', `${base}...HEAD`, '--'], { cwd, env: runContext.baseEnv(), stdio: 'ignore' })
+    return execFileSync('git', ['--no-optional-locks', 'status', '--porcelain', '-z', '--untracked-files=normal'], { cwd, encoding: 'utf8', env: runContext.baseEnv() }) === ''
   } catch {
     // git diff --quiet exits 1 for a difference: not unchanged (and an error is no proof of it either).
     return false
