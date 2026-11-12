@@ -45,7 +45,7 @@ import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
 import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
-import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
+import { laneRunsWith, lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
@@ -261,7 +261,9 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   if (!agent || !takesCards(agentWorkflowRole(agent))) return null
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   const pool = await poolFor(ws, projectPath)
-  const lane = card.lane ?? null
+  // Its lane's slot only when that lane's builder starts it (HI-3117): a lane card given to another agent is that agent's
+  // work (HI-1821), started in a slot of its own, never refused for the lane's lease nor lent one on the lane's behalf.
+  const lane = card.lane && laneRunsWith(ws, card.lane, 'builder', builder) ? card.lane : null
   // A slot kept for this card (HI-2995: put back with its committed work), read once to choose where it goes; each
   // placement's own write is the authority (HI-3032): the card is placed only there, by any of the ways below.
   const kept = pool.keptSlotFor(card.id)

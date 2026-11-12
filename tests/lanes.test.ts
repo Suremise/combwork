@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
+import { allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -223,10 +223,15 @@ describe('a lane against the board', () => {
     expect([v.builder.name, v.reviewer?.name]).toEqual(['Builder One', 'R1'])
   })
 
-  it('all Done (gone cards aside) ends it; Passed is not merged', () => {
+  it('all Done (gone cards aside) ends it; Passed is not merged; every card gone or held elsewhere ends it too (HI-3117)', () => {
     expect(allDone(laneView(rec(), new Map([[1, card(1, 'done')], [2, null], [3, card(3, 'done')]])).cards)).toBe(true)
     expect(allDone(laneView(rec(), new Map([[1, card(1, 'done')], [2, card(2, 'passed')], [3, card(3, 'done')]])).cards)).toBe(false)
-    expect(allDone(laneView(rec(), new Map()).cards)).toBe(false)
+    // Every card gone (archived): nothing left to do, so it ends rather than holding its builder for good.
+    expect(allDone(laneView(rec(), new Map()).cards)).toBe(true)
+    // A card given to another agent (held elsewhere) is that agent's: the lane doesn't wait for it to end.
+    const of = { lane: 'lane-1', builder: 'b1' }
+    expect(allDone([laneCard(1, card(1, 'done'), of), laneCard(2, card(2, 'todo', { agent: 'b9' }), of)])).toBe(true)
+    expect(allDone([laneCard(1, card(1, 'done'), of), laneCard(2, card(2, 'todo', { agent: 'b1' }), of)])).toBe(false)
   })
 
   it('in a line: its pair, state, cards and id', () => {

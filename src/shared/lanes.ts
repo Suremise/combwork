@@ -597,8 +597,12 @@ export function laneStatusText(s: LaneStatus): string {
   }
 }
 
-/** Whether every card of a lane is merged (Done), so the lane has ended. Gone cards don't count against it. */
-export const allDone = (cards: readonly LaneCard[]): boolean => cards.some((c) => c.column === 'done') && cards.every((c) => c.column === 'done' || c.column === 'gone')
+/**
+ * Whether a lane has no card of its own left to do, so it ends: each card merged (Done), gone (archived, deleted, moved
+ * to another project) or held elsewhere (HI-3117: given to another agent, HI-1821). A lane whose cards are all gone
+ * ends too, rather than holding its builder and slot with nothing to do.
+ */
+export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.elsewhere)
 
 /**
  * The lanes listed (the window's panel, the Agent API without `all`): running ones, and ended ones until their builder
