@@ -21,6 +21,7 @@ const { advanced } = await import('../src/main/advanced')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { allOff } = await import('../src/shared/workflow/options')
 const { idleOwnWatchOf } = await import('../src/main/idleWatch')
+const { giveUnseen } = await import('../src/main/cardFreshness')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -78,7 +79,8 @@ describe("the card watch's nudge on the board (HI-2285)", () => {
     // Answered: nothing waits again.
     await inWorkspace(w, () => tasks.answerTask(card, forYou(w).items[0].request, { outcome: 'answered', reply: 'The local one' }))
     expect(await idleOwnWatchOf(w, 'a1', [card])).toBe(card)
-    // Submitted (in Review): it waits on the reviewer.
+    // Submitted (in Review): it waits on the reviewer. Its builder has the answer first (a submit before is refused, HI-2854).
+    await inWorkspace(w, () => giveUnseen(w, 'a1', card, 'p'))
     writeFileSync(join(wt, 'b.txt'), 'b\n')
     git(wt, 'add', '-A')
     git(wt, 'commit', '-qm', 'b')

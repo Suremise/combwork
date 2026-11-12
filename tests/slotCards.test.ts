@@ -161,7 +161,12 @@ vi.mock('../src/main/lanes', async (orig) => ({
   ...(await orig<object>()),
   rawLanes: async () => (state.lanes ? state.lanes() : []),
   lanesWaitingForSlot: async () => (state.waitingLooks++, state.waiting),
-  setLaneSlotWait: async (_ws: unknown, lane: string) => void state.calls.push(`lane ${lane} waits no more`)
+  // A lane that waits no more is no longer among those waiting, as in lanes.ts (HI-3101: a pass run again after it, such
+  // as a held slot's retry landing during it, would otherwise lend it a slot again).
+  setLaneSlotWait: async (_ws: unknown, lane: string) => {
+    state.calls.push(`lane ${lane} waits no more`)
+    state.waiting = (state.waiting as { id: string }[]).filter((l) => l.id !== lane)
+  }
 }))
 vi.mock('../src/main/laneStart', async (orig) => ({
   ...(await orig<object>()),
@@ -1481,7 +1486,8 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
   it("a lane waiting for a slot whose lend is under way as Combwork quits isn't started: it keeps the slot and its wait for the next start", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
-    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    // With its cards, as every lane has (HI-3032's pass reads its first card still to do).
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
     let lends = 0
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))

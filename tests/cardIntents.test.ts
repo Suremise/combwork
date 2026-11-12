@@ -726,9 +726,13 @@ describe('a card by intent (#1267)', () => {
     const reviewerNow = () => inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
     expect(await reviewerNow()).toEqual({ id: 'a3', name: 'Other (p)' })
-    await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
-    expect(await reviewerNow()).toBeNull()
-    expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+    // Under the lanes' lock (HI-3101): the lanes' next look (300 ms after the start's write) abandons a lane whose agent
+    // is gone, and the card's last reviewer is its reviewer again (the next test); held, that look waits for this.
+    await lanes.withLanesLock(w, async () => {
+      await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
+      expect(await reviewerNow()).toBeNull()
+      expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+    })
   })
 
   it("Combwork's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
