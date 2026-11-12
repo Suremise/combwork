@@ -330,6 +330,8 @@ export const catchUpPaused = (catchUp: string | null, pause: { card: string } | 
 
 /** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
 export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
+/** HI-3041: an owed catch-up's look at the remote, one per target (never an entry's: those go with their card). */
+export const catchUpPin = (target: string): string => `refs/cw/catch-up/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`
 
 /**
  * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
@@ -1091,7 +1093,13 @@ export class MergeQueue {
     // Commits the remote lacks (the user's, since): left as they are, never forced or merged by Combwork, and the catch-up
     // still owed (HI-2988: dropping it left the published merge out of the local target, all looking well): paused
     // `remoteDiverged`, naming the published card, until the user brings the local target in line with its remote.
-    if (!behind) return this.catchUpPause(target, c, 'remoteDiverged', [target])
+    if (!behind) {
+      // HI-3041: unless the remote no longer has the result either (a force-push took the published merge off it): then
+      // there is nothing to catch up to, and the catch-up ends (the reconciler marks the card as having left its target,
+      // and the queue goes on); a pause there could never be put right. Unknown: paused as before.
+      if ((await this.remoteHas(target, c)) === false) return done()
+      return this.catchUpPause(target, c, 'remoteDiverged', [target])
+    }
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null
@@ -1105,6 +1113,23 @@ export class MergeQueue {
       if (await I.swap(h, target, local, c.to)) return done()
       return 'again'
     })
+  }
+
+  /**
+   * HI-3041: whether the remote still has an owed catch-up's result, fetched now into the target's own catch-up pin
+   * (overwritten each time, as slots' `refs/cw/fetch/<target>`). Null when it can't tell (no transport, a destination
+   * that pauses, a failed fetch, an unreadable history).
+   */
+  private async remoteHas(target: string, c: CatchUp): Promise<boolean | null> {
+    const I = this.catchUpPort(c)!
+    if (!I.destination || !I.fetchHead) return null
+    const h = this.host({})
+    const d = await I.destination(h, target)
+    if (isAgain(d) || 'pause' in d) return null
+    const f = await I.fetchHead(h, d.snapshot, catchUpPin(target))
+    if ('failed' in f) return null
+    const has = await I.contains(this.project, c.to, f.head)
+    return isUnknown(has) ? null : has
   }
 
   /** A checked-out target's catch-up from `c.from` (the local head now), under the lock and the folder's fence. */

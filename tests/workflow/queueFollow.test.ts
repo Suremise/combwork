@@ -533,6 +533,43 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(e.store.facts(a.id).some((f) => f.kind === 'LeftTarget')).toBe(false)
   })
 
+  it('HI-3041: the published merge taken off the remote while its catch-up is owed: ended once the local target is in line, the card marked as having left, the next card merged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const before = sh(e.project, 'rev-parse', `${e.wf.state(a).integrated!.result}^1`)
+    // A teammate force-pushes main without the merge (another commit in its place).
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'config', 'user.email', 'other@example.com')
+    sh(other, 'config', 'user.name', 'Other')
+    sh(other, 'reset', '-q', '--hard', before)
+    commit(other, { 'rewrite.txt': 'rewrite\n' }, 'rewrite')
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    // The user brings the local main in line with its remote, as the pause asks.
+    del(join(e.project, 'a.txt'))
+    sh(e.project, 'fetch', '-q', 'origin')
+    sh(e.project, 'reset', '-q', '--hard', 'origin/main')
+    expect(head(e.project)).toBe(head(bare))
+    const b = await queued(e, 'B', 'b.txt')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(contains(bare, e.wf.state(b).integrated!.result)).toBe(true)
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041: while the remote still has the result, a local commit of the user’s still pauses remoteDiverged (the remote looked at, not trusted away)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, queue, a } = await caughtOnAFile()
+    del(join(e.project, 'a.txt'))
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine')
+    queue().resume('main')
+    expect(await queue().drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'remoteDiverged' }])
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+  })
+
   /** A published, Done; Combwork stopped (a crash, a lost lease) after journalling its catch-up's plan, before moving files. */
   async function stoppedBeforeItsFiles() {
     const f = following({}, { checkedOut: true })
