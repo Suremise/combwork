@@ -73,6 +73,9 @@ describe('the forward request (HI-2679)', () => {
     const wf = (await workflowFor(w, repo))!
     const s = wf.state(wf.store.card(card!.number))
     expect(s).toMatchObject({ stage: 'merging', forward: { from: 'main', to: '1.2.0', source: git(repo, 'rev-parse', 'main'), by: 'assistant' } })
+    // HI-3084: queued, the window's queue names it a forward, so Remove's confirmation says it ends in Done.
+    const listed = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')
+    expect(listed?.queued).toMatchObject([{ card: card!.number, forward: { from: 'main', to: '1.2.0' } }])
     // The same pair again while it is open: that card, nothing new.
     const again = await ask('main', '1.2.0')
     expect(again).toMatchObject({ queued: false, card: { number: card!.number } })
