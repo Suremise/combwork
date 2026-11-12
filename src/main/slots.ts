@@ -94,6 +94,7 @@ export interface KeptAcross {
 }
 
 /** A version control's name in agent text. */
+// agent-protocol: product names, the same in every dialect
 const VC_NAME: Record<string, string> = { git: 'Git', jj: 'jj', none: 'None' } // i18n-ignore: product names, agent-facing
 
 /** HI-3069: the kept refusal for a slot made under another version control than `now`, naming its way on. */
