@@ -507,6 +507,14 @@
       "card": "plain"
     }
   },
+  "service.forward.unreadable": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "what": "plain",
+      "detail": "select"
+    }
+  },
   "service.fsutil.keptBusy": {
     "placeholders": {
       "file": "plain"

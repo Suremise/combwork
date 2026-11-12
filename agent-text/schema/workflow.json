@@ -1493,6 +1493,11 @@
       "target": "plain"
     }
   },
+  "workflow.unreadable.tracking": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
   "workflow.unreadable.uncommitted": {
     "placeholders": {
       "folder": "plain"

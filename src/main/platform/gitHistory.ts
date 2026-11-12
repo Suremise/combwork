@@ -87,7 +87,8 @@ export const gitHistory: HistoryPort = {
     if (!remote || !merge || remote === '.' || !merge.startsWith('refs/heads/')) return unknown(U.tracking, { branch: line })
     const d = await destinationOf(h, line)
     if (isAgain(d)) return withDetail(unknown(U.tracking, { branch: line }), d.again.message)
-    if ('pause' in d) return withDetail(unknown(d.pause === 'noUpstream' ? U.tracking : U.remoteSetup, d.pause === 'noUpstream' ? { branch: line } : { target: line }), d.files?.join(', '))
+    // A remote git doesn't know is its tracking's; several push addresses or a shallow repository, the remote's setup.
+    if ('pause' in d) return withDetail(d.pause === 'noUpstream' ? unknown(U.tracking, { branch: line }) : unknown(U.remoteSetup, { target: line }), d.files?.join(', '))
     const f = await fetchHeadOf(h, d.snapshot, pin, timeoutMs)
     return 'failed' in f ? withDetail(unknown(U.remoteHead, { branch: d.snapshot.ref.replace(/^refs\/heads\//, ''), endpoint: d.snapshot.display, target: line }), f.failed) : f.head
   },
