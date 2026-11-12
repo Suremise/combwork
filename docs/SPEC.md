@@ -6775,8 +6775,9 @@ the Assistant waiting on the reply; pinned at `refs/cw/forward/<branch>`; no che
 - **"Up to date"** is said only when the head of the remote branch `to` tracks, fetched too, has the source: a local `to`
   holding it unpublished doesn't count, and one behind its remote isn't asked. The card's base is where the source and
   that head meet. The queue then tests on `to`'s remote head as for any card (step 1 above).
-- **A branch that tracks none** (neither `branch.<b>.remote` nor `branch.<b>.merge` set: `main` set up without an
-  upstream, say) is read locally, as with G21 off. Tracking set up any other way (one of the two settings only, another
+- **A branch that tracks none** (neither `branch.<b>.remote` nor `branch.<b>.merge` set, as git says it, exit 1: `main`
+  set up without an upstream, say) is read locally, as with G21 off; a setting set to nothing is set (HR2's round 1).
+  Tracking set up any other way (one of the two settings only, either set to nothing, another
   local branch, `.`, a merge ref that isn't a branch, a remote git doesn't know, several push addresses, a shallow
   repository), a setting git can't read, or a fetch that fails refuses the request with nothing queued, saying what
   couldn't be read and git's words (`service.forward.unreadable`): never the local head instead.

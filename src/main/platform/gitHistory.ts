@@ -77,13 +77,18 @@ export const gitHistory: HistoryPort = {
   },
   async trackedHead(repo, line, pin, timeoutMs) {
     const h = projectHost(repo)
-    const get = async (key: string) => configRead(await h.run(repo, ['config', '--get', key]))
+    // A setting's value, or null only for git's own "not set" (exit 1, answered): a key set to nothing is set (HR2's round 1).
+    const get = async (key: string): Promise<string | null | { failed: string }> => {
+      const r = await h.run(repo, ['config', '--get', key])
+      if (!r.timedOut && !r.notRun && !r.signal && r.code === 1 && !r.out.trim()) return null
+      return configRead(r)
+    }
     const remote = await get(`branch.${line}.remote`)
-    if (typeof remote !== 'string') return withDetail(unknown(U.tracking, { branch: line }), remote.failed)
+    if (remote !== null && typeof remote !== 'string') return withDetail(unknown(U.tracking, { branch: line }), remote.failed)
     const merge = await get(`branch.${line}.merge`)
-    if (typeof merge !== 'string') return withDetail(unknown(U.tracking, { branch: line }), merge.failed)
-    if (!remote && !merge) return 'untracked'
-    // Half set, another local branch ('.'), or not a branch: never taken for "tracks none".
+    if (merge !== null && typeof merge !== 'string') return withDetail(unknown(U.tracking, { branch: line }), merge.failed)
+    if (remote === null && merge === null) return 'untracked'
+    // Half set, set to nothing, another local branch ('.'), or not a branch: never taken for "tracks none".
     if (!remote || !merge || remote === '.' || !merge.startsWith('refs/heads/')) return unknown(U.tracking, { branch: line })
     const d = await destinationOf(h, line)
     if (isAgain(d)) return withDetail(unknown(U.tracking, { branch: line }), d.again.message)

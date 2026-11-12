@@ -182,7 +182,11 @@ describe('HI-3126: a forward under follow mode reads the remotes', () => {
     ['half of it', [['config', '--unset', 'branch.main.merge']]],
     ['another local branch', [['config', 'branch.main.remote', '.'], ['config', 'branch.main.merge', 'refs/heads/1.2.0']]],
     ['a merge ref that isn’t a branch', [['config', 'branch.main.merge', 'refs/tags/v1']]],
-    ['a remote that isn’t there', [['config', 'branch.main.remote', 'gone']]]
+    ['a remote that isn’t there', [['config', 'branch.main.remote', 'gone']]],
+    // HR2's round 1: a key set to nothing is set, never "tracks none" (git config --get answers it, exit 0).
+    ['both set to nothing', [['config', 'branch.main.remote', ''], ['config', 'branch.main.merge', '']]],
+    ['the remote set to nothing, the merge unset', [['config', 'branch.main.remote', ''], ['config', '--unset', 'branch.main.merge']]],
+    ['the merge set to nothing, the remote unset', [['config', '--unset', 'branch.main.remote'], ['config', 'branch.main.merge', '']]]
   ])('tracking set up any other way is refused, nothing queued: %s', async (_what, steps) => {
     const { w, repo } = await project()
     for (const s of steps) git(repo, ...s)
@@ -190,9 +194,12 @@ describe('HI-3126: a forward under follow mode reads the remotes', () => {
     expect(await cards(w, repo)).toBe(0)
   })
 
-  it("the destination's tracking too", async () => {
+  it.each([
+    ['another local branch', [['config', 'branch.1.2.0.remote', '.']]],
+    ['both set to nothing', [['config', 'branch.1.2.0.remote', ''], ['config', 'branch.1.2.0.merge', '']]]
+  ])("the destination's tracking too: %s", async (_what, steps) => {
     const { w, repo } = await project()
-    git(repo, 'config', 'branch.1.2.0.remote', '.')
+    for (const s of steps) git(repo, ...s)
     await expect(ask(w, repo)).rejects.toThrow(/couldn’t read which remote branch 1\.2\.0 tracks/)
     expect(await cards(w, repo)).toBe(0)
   })
