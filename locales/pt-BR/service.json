@@ -236,6 +236,7 @@
   "service.laneEdit.done": "{card} já está concluído.",
   "service.laneEdit.ended": "{lane} foi encerrada: os cartões dela não podem mais ser alterados.",
   "service.laneEdit.fixedPlace": "Cartões já iniciados ou concluídos mantêm o lugar: {card} só pode ir depois deles.",
+  "service.laneEdit.full": "Uma raia pode ter no máximo {max, number} cartões, e {lane} já tem esse tanto: tire um primeiro.",
   "service.laneEdit.invalid": "O Combwork não consegue fazer essa alteração nos cartões de uma raia.",
   "service.laneEdit.keptWork": "{card} guarda trabalho de um início anterior (um branch, um slot ou uma execução): ele fica onde está. Continue-o pelo próprio cartão.",
   "service.laneEdit.noQueued": "{lane} não tem alteração pendente para cancelar.",

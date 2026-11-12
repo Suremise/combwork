@@ -919,6 +919,11 @@
     "note": "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes) to a place before a card that's already in progress, in review, approved or done ({card}: the card moved or added, its key).",
     "audience": "both"
   },
+  "service.laneEdit.full": {
+    "text": "A lane can have at most {max, number} cards, and {lane} has that many already: take one off first.",
+    "note": "HI-3061: an error adding a card to a lane, or moving one to it from another lane (Progress → Lanes): the lane already has the most cards a lane can have ({max}, 50). {lane} is its builder / reviewer (B1 / R1).",
+    "audience": "both"
+  },
   "service.laneEdit.invalid": {
     "text": "That change of a lane’s cards isn’t one Combwork can make.",
     "note": "HI-2898: an error, a change of a lane's cards sent by the window (Progress → Lanes) was malformed (a mistake in Combwork, or a window from another version). Rarely seen.",

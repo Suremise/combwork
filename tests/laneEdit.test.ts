@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { LaneEdit, LaneEditResult } from '../src/shared/types'
+import { LANE_MAX_CARDS } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 
 const base = tempDir('cw-lane-edit-')
@@ -294,6 +295,35 @@ describe('editLanes (HI-2898)', () => {
     await expect(edit({ op: 'add', lane: l.id, rev: 0, card: d, at: 0 })).rejects.toThrow(/depends on/)
     await edit({ op: 'add', lane: l.id, rev: 0, card: d, at: 1 })
     expect((await raw(l.id)).cards).toEqual([a, d, b, c])
+  })
+
+  it('refuses a card added or moved here past the most cards a lane has, saving nothing (HI-3061)', async () => {
+    const full: number[] = []
+    for (let i = 0; i < LANE_MAX_CARDS; i++) full.push(await make(`F${i}`))
+    const [extra, t] = [await make('Extra'), await make('T', { agent: 'b2' })]
+    const l = await start('b1', full)
+    const other = await start('b2', [t])
+    // Between cards: refused in place, naming the limit; the lane still reads, as it was.
+    await expect(edit({ op: 'add', lane: l.id, rev: 0, card: extra })).rejects.toThrow(`at most ${LANE_MAX_CARDS} cards, and B1 / R1 has that many`)
+    await expect(edit({ op: 'transfer', card: t, from: { lane: other.id, rev: 0 }, to: { lane: l.id, rev: 0 } })).rejects.toThrow(/at most 50 cards/)
+    expect((await lane(l.id)).cards.map((x) => x.number)).toEqual(full)
+    expect((await raw(l.id)).listRev ?? 0).toBe(0)
+    expect((await raw(other.id)).cards).toEqual([t])
+    expect((await card(t)).agent).toBe('b2')
+    // A card in flight, a reorder queued: the add is refused, and the queued reorder kept.
+    await doing(full[0], 'b1')
+    const moved = await edit({ op: 'move', lane: l.id, rev: 0, card: full[5], to: 1 })
+    const queued = [...(await raw(l.id)).pending!]
+    expect(queued).toHaveLength(LANE_MAX_CARDS)
+    await expect(edit({ op: 'add', lane: l.id, rev: moved.lanes[0].rev, card: extra })).rejects.toThrow(/at most 50 cards/)
+    const rec = await raw(l.id)
+    expect(rec.pending).toEqual(queued)
+    expect(rec.listRev).toBe(moved.lanes[0].rev)
+    expect((await lane(l.id)).cards.map((x) => x.number)).toEqual(full)
+    // One taken off, one fits again.
+    const off = await edit({ op: 'remove', lane: l.id, rev: rec.listRev!, card: full[9] })
+    await edit({ op: 'add', lane: l.id, rev: off.lanes[0].rev, card: extra })
+    expect((await raw(l.id)).pending).toHaveLength(LANE_MAX_CARDS)
   })
 
   it('refuses a card keeping work from an earlier start', async () => {

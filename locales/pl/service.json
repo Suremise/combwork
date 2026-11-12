@@ -236,6 +236,7 @@
   "service.laneEdit.done": "Karta {card} jest już gotowa.",
   "service.laneEdit.ended": "Tor {lane} się zakończył: jego kart nie można już zmieniać.",
   "service.laneEdit.fixedPlace": "Karty już rozpoczęte lub ukończone zachowują swoje miejsca: karta {card} może trafić tylko za nie.",
+  "service.laneEdit.full": "Tor może mieć najwyżej {max, number} kart, a tor {lane} ma ich już tyle: najpierw usuń jedną.",
   "service.laneEdit.invalid": "Combwork nie może wprowadzić takiej zmiany kart toru.",
   "service.laneEdit.keptWork": "Karta {card} ma zachowaną pracę z wcześniejszego rozpoczęcia (gałąź, slot lub uruchomienie): zostaje tam, gdzie jest. Kontynuuj ją zamiast tego z jej karty.",
   "service.laneEdit.noQueued": "Tor {lane} nie ma oczekującej zmiany do anulowania.",

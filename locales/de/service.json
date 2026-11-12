@@ -236,6 +236,7 @@
   "service.laneEdit.done": "{card} ist bereits erledigt.",
   "service.laneEdit.ended": "{lane} ist beendet: Ihre Karten können nicht mehr geändert werden.",
   "service.laneEdit.fixedPlace": "Bereits begonnene oder fertige Karten behalten ihren Platz: {card} kann nur danach kommen.",
+  "service.laneEdit.full": "Eine Lane kann höchstens {max, number} Karten haben, und {lane} hat schon so viele: Nimm zuerst eine heraus.",
   "service.laneEdit.invalid": "Diese Änderung der Karten einer Lane kann Combwork nicht vornehmen.",
   "service.laneEdit.keptWork": "{card} hat Arbeit von einem früheren Start (einen Branch, einen Slot oder einen Lauf): Sie bleibt, wo sie ist. Setze sie stattdessen über ihre Karte fort.",
   "service.laneEdit.noQueued": "{lane} hat keine geplante Änderung, die verworfen werden könnte.",

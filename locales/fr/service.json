@@ -236,6 +236,7 @@
   "service.laneEdit.done": "La carte {card} est déjà terminée.",
   "service.laneEdit.ended": "Le couloir {lane} a pris fin : ses cartes ne peuvent plus être modifiées.",
   "service.laneEdit.fixedPlace": "Les cartes déjà démarrées ou terminées gardent leur place : la carte {card} ne peut venir qu’après elles.",
+  "service.laneEdit.full": "Un couloir peut avoir au plus {max, number} cartes, et le couloir {lane} en a déjà autant : retire-en une d’abord.",
   "service.laneEdit.invalid": "Combwork ne peut pas faire cette modification des cartes d’un couloir.",
   "service.laneEdit.keptWork": "La carte {card} garde du travail d’un démarrage précédent (une branche, un emplacement ou une exécution) : elle reste où elle est. Poursuis-la plutôt depuis sa carte.",
   "service.laneEdit.noQueued": "Le couloir {lane} n’a aucune modification en attente à annuler.",
