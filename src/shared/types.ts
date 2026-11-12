@@ -4005,6 +4005,11 @@ export interface FolderChangesDone {
   message: string
   /** The commit made, or the stash's object (`git stash list` shows it). */
   made: string
+  /**
+   * HI-3059: made, but its paths' entries weren't all taken into the real index afterwards (that step failed, or another
+   * git staged one of them meanwhile and its staging was kept): what the user should check. The commit or stash stands.
+   */
+  warning?: Text
 }
 
 /** HI-2944: a target's folder with uncommitted changes, as a start finds it (warned of, never refused). */
