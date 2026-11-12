@@ -539,14 +539,16 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     const view = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')!
     expect(view.forward?.behind.find((b) => b.from === 'main')).toMatchObject({ resolving: { card: rc, key } })
     // HR1's round 1: the lookup reads the open cards alone (the Done forward never folded), once per listing, not per pair.
+    const tasks = await import('../src/main/tasks')
     const folded = vi.spyOn(wf, 'state')
     const reads = vi.spyOn(wf.store, 'cardsOpen')
     try {
       expect(controls.openPairs(wf).get('main\n1.2.0')?.id).toBe(rc)
-      expect(folded.mock.calls.map(([c]) => c.id)).toEqual([rc])
+      expect(folded.mock.calls.map(([c]) => (c as { id: number }).id)).toEqual([rc])
       folded.mockClear()
       reads.mockClear()
-      await inWorkspace(w, () => store.boardWrite(w, async () => undefined))
+      // A board change, so the listing is made afresh (not its cached view): one read of the open cards for it.
+      await inWorkspace(w, () => tasks.createTask({ title: 'something else', project: 'p' }, user))
       await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
       expect(reads).toHaveBeenCalledTimes(1)
     } finally {
@@ -554,7 +556,6 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
       reads.mockRestore()
     }
     // Done (here by the user's move, nothing to merge): the pair is open again, and a request makes a new forward.
-    const tasks = await import('../src/main/tasks')
     await inWorkspace(w, () => tasks.moveTask(rc, 'done', { confirm: true, reason: 'resolved elsewhere' }))
     const after = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')!
     expect(after.forward?.behind.find((b) => b.from === 'main')?.resolving).toBeUndefined()
