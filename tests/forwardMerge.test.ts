@@ -566,7 +566,12 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect(await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))).toMatchObject({ queued: true })
   })
 
-  it('HI-3040: a resolution returned for its direction takes the override from a forward request, and its same revision merges', async () => {
+  /**
+   * HI-3040: trunk the default (no main or master yet), checked out; the project merges into 1.2.0 and lists trunk. The
+   * forward of trunk into 1.2.0 conflicts, is resolved on a builder, reviewed and approved; main is made meanwhile (git's
+   * default now, so trunk into 1.2.0 reads unordered), and the queue returns it for its direction.
+   */
+  async function returnedForDirection() {
     // trunk the default (no main or master yet), checked out; the project merges into 1.2.0 and lists trunk.
     const { w, repo } = await conflicting({ target: '1.2.0', otherTargets: ['trunk'], preChecks: [], mergeChecks: [] } as unknown as Parameters<typeof project>[1])
     git(repo, 'branch', '-m', 'main', 'trunk')
@@ -581,7 +586,7 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     const source = wf.state(wf.store.card(rc)).resolves!.source
     // The builder works in the project folder (no slots here), on a branch of its own from 1.2.0.
     git(repo, 'checkout', '-q', '-b', 'resolve', '1.2.0')
-    const started =(await as(() => wf.start(`#${rc}`, agentActor('b1')))) as { data?: { folder?: string } }
+    const started = (await as(() => wf.start(`#${rc}`, agentActor('b1')))) as { data?: { folder?: string } }
     const folder = started.data!.folder!
     expect(wf.state(wf.store.card(rc)).started).toMatchObject({ target: '1.2.0', base: git(repo, 'rev-parse', '1.2.0') })
     try {
@@ -607,11 +612,16 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'direction', transient: false }])
     // Its same revision can't go back in yet.
     expect(JSON.stringify(await as(() => wf.submit(`#${rc}`, agentActor('b1'), { summary: 'again' })))).toContain('requeue.allowed')
+    const wakes = () => (inWorkspace(w, () => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'wake' ORDER BY id").all(rc))) as { payload: string }[]).map((r) => JSON.parse(r.payload) as { agent: string; why: string })
+    return { w, repo, wf, rc, as, agentActor, folder, revision, dest, override, recorded, wakes }
+  }
+
+  it('HI-3040: a resolution returned for its direction takes the override from a forward request, and its same revision merges', async () => {
+    const { w, repo, wf, rc, as, agentActor, revision, dest, override, recorded, wakes } = await returnedForDirection()
     // A project agent can't record it; the Assistant's guard withdrawn as it writes: nothing kept.
     await expect(override(agent)).rejects.toThrow(/Only the user or the Assistant/)
     // The Assistant's guard withdrawn at its 1st, 2nd, … check, the last inside the override's own write: each refused,
     // no fact and no wake left; the first try that gets past every check records it (nothing made), its builder told.
-    const wakes = () => (inWorkspace(w, () => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'wake' ORDER BY id").all(rc))) as { payload: string }[]).map((r) => JSON.parse(r.payload) as { agent: string; why: string })
     const woken = wakes().length
     const before = wf.store.cards().length
     let refused = 0
@@ -646,6 +656,41 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect(last, JSON.stringify(last)).toMatchObject([{ outcome: 'integrated' }])
     expect(git(repo, 'rev-parse', '1.2.0')).not.toBe(dest)
     expect(git(repo, 'merge-base', '--is-ancestor', revision, '1.2.0')).toBe('')
+  })
+
+  it('HI-3040 (HR3 round 1): its direction reading forward again, the explicit request still lets that revision back in, and it merges', async () => {
+    const { w, repo, wf, rc, as, agentActor, revision, override, recorded, wakes } = await returnedForDirection()
+    // The default repaired: main gone again, trunk checked out, so trunk into 1.2.0 reads forward.
+    git(repo, 'checkout', '-q', 'trunk')
+    git(repo, 'branch', '-D', 'main')
+    const woken = wakes().length
+    expect(await override(user)).toMatchObject({ queued: false, overridden: true, card: { number: rc } })
+    expect(recorded()).toBe(1)
+    // No override of the direction recorded (none needed): only that entry's requeue.
+    const s = wf.state(wf.store.card(rc))
+    expect(s.resolves?.override).toBeUndefined()
+    expect(s.overrideEntry).toBe(s.entries.at(-1)!.id)
+    expect(wakes().slice(woken)).toEqual([expect.objectContaining({ agent: 'b1', why: expect.stringContaining('Submit the same revision again') })])
+    // Asked again: nothing more written.
+    expect(await override(assistant)).toMatchObject({ queued: false, card: { number: rc } })
+    expect(recorded()).toBe(1)
+    expect(await as(() => wf.submit(`#${rc}`, agentActor('b1'), { summary: 'again' }))).toMatchObject({ ok: true, data: { requeued: true } })
+    expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'integrated' }])
+    expect(git(repo, 'merge-base', '--is-ancestor', revision, '1.2.0')).toBe('')
+  })
+
+  it('HI-3040 (HR3 round 1): moved back to Review after its direction return: refused, no fact, no wake', async () => {
+    const { wf, rc, as, override, recorded, wakes } = await returnedForDirection()
+    await as(() => wf.move(`#${rc}`, 'review', 'user', { confirm: true, reason: 'look at it again' }))
+    const s = wf.state(wf.store.card(rc))
+    expect(s.stage).toBe('review')
+    // Its direction failure still its last entry.
+    expect(s.entries.at(-1)?.failure?.reason).toBe('direction')
+    const woken = wakes().length
+    for (const by of [user, assistant]) await expect(override(by)).rejects.toThrow(/without an override, so the override wasn’t applied to it/)
+    expect(recorded()).toBe(0)
+    expect(wakes()).toHaveLength(woken)
+    expect(wf.state(wf.store.card(rc)).overrideEntry).toBeNull()
   })
 
   it("is the user's or the Assistant's, only on a returned forward; one board change, never two cards", async () => {

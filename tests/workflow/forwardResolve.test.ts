@@ -8,7 +8,7 @@ import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { forwardOf, MERGE_COMMIT, rulesBaseId } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
-import type { CardState, FactData, QueueEntry } from '../../src/shared/workflow/facts'
+import { overridableEntry, type CardState, type FactData, type QueueEntry } from '../../src/shared/workflow/facts'
 import { GUARD_FNS } from '../../src/shared/workflow/guards'
 import type { Ruleset } from '../../src/shared/workflow/compile'
 import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
@@ -347,6 +347,26 @@ describe('the override recorded on a resolution returned for its direction lets 
   it('no override, or one bound to another entry: the ordinary rules (not transient: refused)', () => {
     expect(allowed(atCap, null)).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
     expect(allowed(atCap, 'e3')).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
+  })
+
+  it('who can take it (overridableEntry, HR3 round 1): only back in Active for that failure, its entry the latest submission’s', () => {
+    const last = atCap.at(-1)!
+    const base = { stage: 'active', resolves: { forward: 'AM-1', from: 'main', to: '1.2.0', source: 'abc', by: 'user' }, entries: atCap, latest: { id: 1, revision: 'abc1234' }, overrideEntry: null } as unknown as CardState
+    const at = (o: Partial<CardState>, withOverride = true) => overridableEntry({ ...base, ...o }, 'main', '1.2.0', withOverride)
+    expect(at({})).toBe(last)
+    // Moved back to Review (or anywhere but Active) after it: no.
+    for (const stage of ['review', 'approved', 'merging', 'done'] as const) expect(at({ stage })).toBeNull()
+    // A newer submission since (a new revision, reviewed and failed back to Active, say): its entry isn't that one's.
+    expect(at({ latest: { id: 99, revision: 'def5678' } as CardState['latest'] })).toBeNull()
+    expect(at({ latest: { id: 1, revision: 'def5678' } as CardState['latest'] })).toBeNull()
+    // Another pair, an override already, a failure for another reason, an entry open: no.
+    expect(overridableEntry(base, 'trunk', '1.2.0', true)).toBeNull()
+    expect(at({ resolves: { ...base.resolves!, override: { by: 'user', dir: 'unknown', why: 'unordered' } } })).toBeNull()
+    expect(at({ entries: [...atCap.slice(0, -1), entry('e4', 5, failed('e4', 'checks', true))] })).toBeNull()
+    expect(at({ entries: [...atCap, entry('e5', 6, { state: 'open' })] })).toBeNull()
+    // Let back in already: again only to add the direction's override (it reading against again), never the requeue twice.
+    expect(at({ overrideEntry: 'e4' }, false)).toBeNull()
+    expect(at({ overrideEntry: 'e4' }, true)).toBe(last)
   })
 
   it('used: once its requeue has an entry of its own, the binding never matches again (its transient return at the cap is refused)', () => {

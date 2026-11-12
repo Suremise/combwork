@@ -425,9 +425,10 @@ export interface FactData {
   /**
    * HI-3040: the user's explicit override of the release path's direction, recorded on a resolution the queue returned
    * for its direction (`entry`: that failed entry's id), by a forward request with the override for its pair. Sets the
-   * resolution's `override`, and lets its same revision go back in once, as a requeue bound to that entry.
+   * resolution's `override` (none when the direction reads forward again: only the requeue then), and lets its same
+   * revision go back in once, as a requeue bound to that entry.
    */
-  ResolutionOverride: { override: ForwardOverride; entry: string; by: 'user' | 'assistant' }
+  ResolutionOverride: { override?: ForwardOverride; entry: string; by: 'user' | 'assistant' }
   /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its
@@ -787,7 +788,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'ResolutionOverride': {
         const d = f.data as FactData['ResolutionOverride']
         if (!s.resolves) break
-        s.resolves = { ...s.resolves, override: d.override }
+        if (d.override) s.resolves = { ...s.resolves, override: d.override }
         s.overrideEntry = d.entry
         break
       }
@@ -960,6 +961,22 @@ export function approvedByUser(s: CardState, gate?: string): boolean {
 
 /** The open queue entry, if any (open or started: not yet with an outcome). */
 export const openEntry = (s: CardState): QueueEntry | undefined => s.entries.find((e) => e.state === 'open' || e.state === 'started')
+
+/**
+ * HI-3040: the entry a resolution of `from` into `to` can take the user's override for now, or null: back in Active for
+ * its direction (its last entry `failed` for `direction`, none open), that entry its latest submission's (its revision,
+ * after it), no override recorded on it yet. `withOverride`: the request overrides the direction too (else it only lets
+ * that entry's revision back in, the direction reading forward again): one already let back in takes it still.
+ */
+export function overridableEntry(s: CardState, from: string, to: string, withOverride: boolean): QueueEntry | null {
+  const r = s.resolves
+  const last = s.entries.at(-1)
+  if (!r || r.from !== from || r.to !== to || r.override || !last || !s.latest) return null
+  if (s.stage !== 'active' || last.state !== 'failed' || last.failure?.reason !== 'direction' || openEntry(s)) return null
+  if (last.seq < s.latest.id || last.revision !== s.latest.revision) return null
+  if (s.overrideEntry === last.id && !withOverride) return null
+  return last
+}
 
 /**
  * Unchanged requeues after transient failures since the last new revision (`requeue.allowed`, §16.5.3). A hold or the
