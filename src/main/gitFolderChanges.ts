@@ -351,8 +351,8 @@ async function madeByThis(folder: string, now: string, before: string | null, ta
   const parent = await git(folder, ['rev-parse', '-q', '--verify', `${now}^`])
   if (before === null ? parent.ok : !parent.ok || parent.out.trim() !== before) return 'no'
   // The newest entries: a post-commit hook can move HEAD again after it (a checkout), never before it.
-  const log = await git(folder, ['reflog', '-n', '50', '--format=%H%x00%gs', 'HEAD'])
-  const rows = log.ok ? log.out.split('\n').filter(Boolean) : []
+  const reflog = await git(folder, ['reflog', '-n', '50', '--format=%H%x00%gs', 'HEAD'])
+  const rows = reflog.ok ? reflog.out.split('\n').filter(Boolean) : []
   if (!rows.length) return 'unknown'
   return rows.some((row) => row.startsWith(`${now}\0${tag}: `)) ? 'yes' : 'no'
 }
@@ -520,7 +520,7 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
   // HI-3075: this commit's own reflog action, how it is told from another git's once ended at its bound (madeByThis).
-  const tag = `commit (combwork:${randomUUID()})`
+  const tag = `commit (combwork:${randomUUID()})` // i18n-ignore: git's reflog action, in the repository (English, as git's own)
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
     const commitEnv = { ...env, GIT_REFLOG_ACTION: tag }
     const r = byIndex ? await commitByIndex(folder, commitEnv, files, message, byIndex) : await commitOnly(folder, commitEnv, copy, files, untracked, message)
