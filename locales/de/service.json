@@ -241,6 +241,7 @@
   "service.laneEdit.full": "Eine Lane kann höchstens {max, number} Karten haben, und {lane} hat schon so viele: Nimm zuerst eine heraus.",
   "service.laneEdit.invalid": "Diese Änderung der Karten einer Lane kann Combwork nicht vornehmen.",
   "service.laneEdit.keptWork": "{card} hat Arbeit von einem früheren Start (einen Branch, einen Slot oder einen Lauf): Sie bleibt, wo sie ist. Setze sie stattdessen über ihre Karte fort.",
+  "service.laneEdit.lastCard": "{card} ist die letzte Karte, die {lane} noch zu erledigen hat, und eine Lane behält mindestens eine: Um die Lane zu stoppen, beende sie („Lane beenden“ oder „Lane aufgeben…“ in ihrem Menü).",
   "service.laneEdit.noQueued": "{lane} hat keine geplante Änderung, die verworfen werden könnte.",
   "service.laneEdit.notOnLane": "{card} ist nicht mehr in dieser Lane.",
   "service.laneEdit.notQueued": "{card} hat begonnen oder ist nicht mehr offen: Nur Karten, die noch auf ihre Reihe warten, können verschoben oder herausgenommen werden.",

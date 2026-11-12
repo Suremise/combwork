@@ -967,6 +967,10 @@
     "defaultMessage": "{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.",
     "description": "HI-2898: an error adding a card ({card}, its key) to a lane, or moving it to another lane (Progress → Lanes): it was started before and its work is kept (a branch, a slot lent for it, or a run in progress), so Combwork won't hand it to another builder from here."
   },
+  "service.laneEdit.lastCard": {
+    "defaultMessage": "{card} is the last card {lane} has to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu).",
+    "description": "HI-3066: an error taking a card ({card}, its key) off a lane, or moving it to another lane (Progress → Lanes): it is the lane's last card not Done, and a lane always keeps one. {lane} is the lane's builder / reviewer (B1 / R1). End Lane and Abandon Lane… are the lane's menu items: as they're translated there."
+  },
   "service.laneEdit.noQueued": {
     "defaultMessage": "{lane} has no queued change to cancel.",
     "description": "HI-2898: an error cancelling a lane's queued change (Progress → Lanes: a change of its cards waiting for its card in progress to be Done) when it has none any more. {lane} is its builder / reviewer."

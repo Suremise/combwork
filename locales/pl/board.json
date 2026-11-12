@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Odrzuć",
   "board.laneEdit.done": "{op, select, move {Przesunięto kartę {card} w torze {lane}} add {Dodano kartę {card} do toru {lane}} remove {Usunięto kartę {card} z toru {lane}} transfer {Przeniesiono kartę {card} do toru {lane}} cancel {Anulowano oczekującą zmianę toru {lane}} other {Cofnięto}}",
   "board.laneEdit.handle": "Przeciągnij, aby przesunąć kartę {card}, albo naciśnij Alt+Up i Alt+Down; Delete ją usuwa",
+  "board.laneEdit.lastCard": "Karta {card} to ostatnia karta do zrobienia w torze, a tor zachowuje co najmniej jedną: aby zatrzymać tor, zakończ go („Zakończ tor” lub „Porzuć tor…” w jego menu)",
   "board.laneEdit.leftOut": "{n, plural, one {Karta {cards} zostaje tam, gdzie jest: nie może teraz wrócić do toru.} few {Karty {cards} zostają tam, gdzie są: nie mogą teraz wrócić do toru.} many {Karty {cards} zostają tam, gdzie są: nie mogą teraz wrócić do toru.} other {Karty {cards} zostają tam, gdzie są: nie mogą teraz wrócić do toru.}}",
   "board.laneEdit.locked": "Karta {card} jest w toku: zachowuje swoje miejsce",
   "board.laneEdit.moveHere": "Przenieś tutaj",

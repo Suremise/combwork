@@ -309,6 +309,36 @@ describe('editLanes (HI-2898)', () => {
     })
   })
 
+  it("refuses taking off, or moving away, a lane's last card to do, saving nothing (HI-3066, Darren's decision A)", async () => {
+    const [a, b, x] = [await make('A'), await make('B'), await make('X')]
+    const l = await start('b1', [a])
+    const to = await start('b2', [x])
+    await doing(x, 'b2')
+    const before = await raw(l.id)
+    // Its only card, waiting: refused in place, naming the lane by its builder / reviewer; the lane still reads.
+    await expect(edit({ op: 'remove', lane: l.id, rev: 0, card: a })).rejects.toThrow(/is the last card B1 \/ R1 has to do, and a lane keeps at least one: to stop the lane, end it/)
+    await expect(edit({ op: 'transfer', card: a, from: { lane: l.id, rev: 0 }, to: { lane: to.id, rev: 0 } })).rejects.toThrow(/last card B1 \/ R1 has to do/)
+    expect((await lane(l.id)).cards.map((c) => c.number)).toEqual([a])
+    expect([(await raw(l.id)).listRev ?? 0, (await raw(l.id)).state]).toEqual([before.listRev ?? 0, 'active'])
+    expect((await raw(to.id)).cards).toEqual([x])
+    expect(resumed).toEqual([])
+    // With another card to do, either can come off.
+    await edit({ op: 'add', lane: l.id, rev: 0, card: b })
+    const r = await edit({ op: 'remove', lane: l.id, rev: (await raw(l.id)).listRev!, card: b })
+    expect((await raw(l.id)).cards).toEqual([a])
+    // Its other cards Done, the last one to do: refused too (the lane would end at once, its Undo refused).
+    const [d1, d2, todo] = [await make('D1'), await make('D2'), await make('Todo')]
+    const m = await start('b3', [d1, d2, todo])
+    for (const n of [d1, d2]) {
+      await doing(n, 'b3')
+      await run(() => tasks.updateTask(n, { column: 'done' }, user))
+    }
+    await lanes.refresh(w)
+    await expect(edit({ op: 'remove', lane: m.id, rev: (await raw(m.id)).listRev ?? 0, card: todo })).rejects.toThrow(/last card B3 \/ R1 has to do/)
+    expect([(await raw(m.id)).state, (await raw(m.id)).cards]).toEqual(['active', [d1, d2, todo]])
+    expect(r.undo).not.toBeNull()
+  })
+
   it('removes a queued card back to the board, and undoes it', async () => {
     const [a, b] = [await make('A'), await make('B')]
     const l = await start('b1', [a, b])
@@ -403,15 +433,16 @@ describe('editLanes (HI-2898)', () => {
   it('refuses a card added or moved here past the most cards a lane has, saving nothing (HI-3061)', async () => {
     const full: number[] = []
     for (let i = 0; i < LANE_MAX_CARDS; i++) full.push(await make(`F${i}`))
-    const [extra, t] = [await make('Extra'), await make('T', { agent: 'b2' })]
+    const [extra, t, t2] = [await make('Extra'), await make('T', { agent: 'b2' }), await make('T2')]
     const l = await start('b1', full)
-    const other = await start('b2', [t])
+    // Two cards: Move here of a lane's last card to do is refused for that first (HI-3066).
+    const other = await start('b2', [t, t2])
     // Between cards: refused in place, naming the limit; the lane still reads, as it was.
     await expect(edit({ op: 'add', lane: l.id, rev: 0, card: extra })).rejects.toThrow(`at most ${LANE_MAX_CARDS} cards, and B1 / R1 has that many`)
     await expect(edit({ op: 'transfer', card: t, from: { lane: other.id, rev: 0 }, to: { lane: l.id, rev: 0 } })).rejects.toThrow(/at most 50 cards/)
     expect((await lane(l.id)).cards.map((x) => x.number)).toEqual(full)
     expect((await raw(l.id)).listRev ?? 0).toBe(0)
-    expect((await raw(other.id)).cards).toEqual([t])
+    expect((await raw(other.id)).cards).toEqual([t, t2])
     expect((await card(t)).agent).toBe('b2')
     // A card in flight, a reorder queued: the add is refused, and the queued reorder kept.
     await doing(full[0], 'b1')

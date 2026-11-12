@@ -241,6 +241,7 @@
   "service.laneEdit.full": "Uma raia pode ter no máximo {max, number} cartões, e {lane} já tem esse tanto: tire um primeiro.",
   "service.laneEdit.invalid": "O Combwork não consegue fazer essa alteração nos cartões de uma raia.",
   "service.laneEdit.keptWork": "{card} guarda trabalho de um início anterior (um branch, um slot ou uma execução): ele fica onde está. Continue-o pelo próprio cartão.",
+  "service.laneEdit.lastCard": "{card} é o último cartão pendente de {lane}, e uma raia mantém pelo menos um: para parar a raia, encerre-a (Encerrar raia ou Abandonar raia… no menu dela).",
   "service.laneEdit.noQueued": "{lane} não tem alteração pendente para cancelar.",
   "service.laneEdit.notOnLane": "{card} não está mais nesta raia.",
   "service.laneEdit.notQueued": "{card} já começou ou não está mais a fazer: só cartões que ainda esperam a vez podem ser movidos ou tirados.",

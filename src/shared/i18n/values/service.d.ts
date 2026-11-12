@@ -243,6 +243,7 @@ interface CombworkMessageValues {
   'service.laneEdit.full': { max: number; lane: string | number }
   'service.laneEdit.invalid': undefined
   'service.laneEdit.keptWork': { card: string | number }
+  'service.laneEdit.lastCard': { card: string | number; lane: string | number }
   'service.laneEdit.noQueued': { lane: string | number }
   'service.laneEdit.notOnLane': { card: string | number }
   'service.laneEdit.notQueued': { card: string | number }

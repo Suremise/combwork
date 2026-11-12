@@ -241,6 +241,7 @@
   "service.laneEdit.full": "レーンに置けるカードは最大{max, number}枚で、{lane}はすでにその数に達しています。先に1枚外してください。",
   "service.laneEdit.invalid": "そのレーンのカードの変更は、Combworkでは行えません。",
   "service.laneEdit.keptWork": "{card}には以前の開始時の作業（ブランチ、スロット、または実行）が残っているため、そのままの位置に置かれます。代わりにそのカードから続けてください。",
+  "service.laneEdit.lastCard": "{card}は{lane}に残る最後の未完了カードです。レーンには少なくとも1枚のカードが残ります。レーンを止めるには、終了してください（メニューの「レーンを終了」または「レーンを中止…」）。",
   "service.laneEdit.noQueued": "{lane}には取り消す保留中の変更がありません。",
   "service.laneEdit.notOnLane": "{card}はもうこのレーンにありません。",
   "service.laneEdit.notQueued": "{card}は開始済みか、もう未着手ではありません。移動したり外したりできるのは、順番を待っているカードだけです。",

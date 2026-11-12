@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Dismiss",
   "board.laneEdit.done": "{op, select, move {Moved {card} in {lane}} add {Added {card} to {lane}} remove {Took {card} off {lane}} transfer {Moved {card} to {lane}} cancel {Cancelled the queued change of {lane}} other {Undone}}",
   "board.laneEdit.handle": "Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off",
+  "board.laneEdit.lastCard": "{card} is the lane’s last card to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu)",
   "board.laneEdit.leftOut": "{n, plural, one {{cards} stays where it is: it can’t come back to the lane now.} other {{cards} stay where they are: they can’t come back to the lane now.}}",
   "board.laneEdit.locked": "{card} is under way: it keeps its place",
   "board.laneEdit.moveHere": "Move Here",
