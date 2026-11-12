@@ -20,6 +20,7 @@ import { lstat, readdir, readFile, realpath, rm as removeTree } from 'original-f
 import { isAbsolute, join, relative, resolve, sep } from 'path'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
 import { git } from '../git'
+import { gitDirSync } from './git'
 import type { GitFilesStatus } from '../../shared/types'
 import type { WorkspaceFilesExec, WorkspaceFilesOutcome, WorkspaceFilesStep, WorkspaceToolRun } from './workspacePort'
 
@@ -385,9 +386,14 @@ export async function removeLeftSubmodules(x: GitFilesExec, folder: string, gitD
  * clean one (its ignored files with it, as `git submodule deinit` does); its commits stay in the clone either way.
  */
 export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, folder: string, revisions: string[], o?: { keepChanged?: boolean }): Promise<string | null> {
-  const dirR = await x.git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
-  if (!dirR.ok) return firstLine(dirR)
-  const gitDir = dirR.out.trim()
+  // HI-3102: the git dir read from the folder's `.git` with no git process where it can be (the queue clears its folder on
+  // every pass, and most have no submodule to drop); git is asked only where it can't.
+  let gitDir = gitDirSync(folder)
+  if (!gitDir) {
+    const dirR = await x.git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
+    if (!dirR.ok) return firstLine(dirR)
+    gitDir = dirR.out.trim()
+  }
   for (const mod of await privateModules(gitDir)) {
     const owned = await ownedModule(gitDir, mod)
     if (!owned) continue
