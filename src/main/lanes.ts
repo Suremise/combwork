@@ -844,10 +844,18 @@ function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] 
   })
 }
 
-/** Checked under the board's lock (#1270): the lane's cards are still all Done (gone ones aside), else nothing is saved. */
+/**
+ * Checked under the board's lock (#1270): the lane still has no card of its own left to do (allDone: each Done, gone, or
+ * held elsewhere, HI-3117, as stillBetweenCards reads an owner), else nothing is saved.
+ */
 const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
   const places = placesOf(ws, l, cards)
-  if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
+  const owners = cardOwnersNow(ws, cards)
+  const others = (n: number): boolean => {
+    const o = owners.get(n)
+    return o?.agent ? o.agent !== l.builder.id : !!o?.lane && o.lane !== l.id
+  }
+  if (!places.every((c, i) => c === 'done' || c === 'gone' || others(cards[i]))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
 }
 
 /**
@@ -1631,7 +1639,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
       // Combwork owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, say(A.abandonNotOurs))
-      if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone').map((c) => cardRef(c.number)).join(', ') })))
+      if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.elsewhere).map((c) => cardRef(c.number)).join(', ') })))
       // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
       const given = on && o.agent ? null : (o.mergeCommit ?? null)
       if (!o.abandoned && allDone(v.cards)) {

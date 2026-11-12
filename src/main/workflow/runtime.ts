@@ -3251,6 +3251,8 @@ export class Workflow {
     if (!card.lane) return null
     const l = this.lane(card.lane)
     if (!l || l.ended) return null
+    // Given to another agent (HI-3117): that agent's work, never waiting on the lane's cards before it.
+    if (!this.laneOwn(l.id, card.id)) return null
     const now = this.laneNow(l)
     let open: number | undefined
     // Never on another agent's card (HI-1821).
@@ -3465,7 +3467,8 @@ export class Workflow {
         const l = this.lane(card.lane)
         if (!l || l.ended) return
         const cards = l.pending ?? l.cards
-        if (!cards.every((c) => this.laneDone(c))) return
+        // A card given to another agent (HI-3117, HI-1821) isn't the lane's to wait for, as lanes.ts's allDone reads it.
+        if (!cards.every((c) => this.laneDone(c) || !this.laneOwn(l.id, c))) return
         const results = cards.map((c) => this.state(c).integrated?.result ?? null)
         this.saveLane({ ...l, ended: true, current: null })
         this.store.deliver({ action: id, kind: 'laneEnded', target: l.id, payload: { results } })

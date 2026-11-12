@@ -223,6 +223,8 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       }
       const lane = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c3.number], by: 'B1 (alpha)' })
       outputs.leftOut = lane.note ?? ''
+      // While c1 is still its own (HI-3117: once B2's lane below owns it, B1's lane has none left and may end).
+      outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
       outputs.stays = await start({ cards: [c2.number], ownBuilder: true })
       outputs.shared = await start({ builder: 'b2', reviewer: 'r1', cards: [c1.number] })
       outputs.fresh = (await lanes.freshCardsNote(w, [c2.number], 'B9', 0, null)) ?? ''
@@ -232,7 +234,6 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       outputs.joinedFirst = await said(lanes.joinLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c2.number], by: 'R1 (alpha)' }))
       outputs.endNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b3' }))
       outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
-      outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
       outputs.nextNone = await said(lanes.laneNext(w, 'alpha', 'g1'))
       await lanes.endLane(w, lane.lane.id, { abandoned: true })
       outputs.nextAbandoned = await said(lanes.laneNext(w, 'alpha', 'b1'))
