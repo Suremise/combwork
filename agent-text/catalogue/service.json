@@ -349,6 +349,11 @@
     "note": "HI-2944: an error from Commit or Set aside: an agent holds files or a run works in the folder ({folder}, a path); {what} names the first file or run's folder; nothing was done.",
     "audience": "both"
   },
+  "service.folderChanges.caseRename": {
+    "text": "{from} is renamed to {to}, a change of letter case only, which Git can't set aside. Commit it instead, or rename it back yourself.",
+    "note": "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {from} (a path) was renamed to {to} (the same path in other letter case); git's stash fails on such a rename, so nothing was done. Commit works for it.",
+    "audience": "both"
+  },
   "service.folderChanges.changed": {
     "text": "The changes in {folder} aren't the ones shown any more. Look again.",
     "note": "HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.",
@@ -412,6 +417,11 @@
   "service.folderChanges.readFailed": {
     "text": "Git could not read the folder's changes: {why}",
     "note": "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.removedForFolder": {
+    "text": "{file} was removed from Git, and a folder of that name is in its place with changes that weren't shown: setting the removal aside would take them too. Commit the removal instead, or use git stash yourself.",
+    "note": "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name now holds changed files not in the list shown; git's stash would take those too, so nothing was done. Keep git stash as it is: a command.",
     "audience": "both"
   },
   "service.folderChanges.stashFailed": {

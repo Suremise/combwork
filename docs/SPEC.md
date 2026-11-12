@@ -6071,7 +6071,15 @@ touched:
   stat failing otherwise refuses too), *"<file> is staged for removal from Git:
   commit it yourself in Git; Combwork won't add it back."* `commit --only` takes each path from the folder, so it put
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
-  over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
+  over it. Files' Commit it refuses `.gitignore` in that state the same way. Only a file of exactly that name counts
+  (HI-3024): each part of the path as its folder lists it, so a case-only rename's old side (`b.txt`, which Windows'
+  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file. Git's partial commit
+  takes neither ("will not add file alias"; "does not have a commit checked out"), so such a Commit is built in the
+  private index instead (`commitByIndex`): every other staged change taken back to HEAD there, the removed paths
+  `rm --cached`, the rest `add -A`, then a plain commit, each step bounded: the same commit, HEAD with the paths as
+  the folder has them. Set aside refuses a case-only rename by name (*b.txt is renamed to B.txt, a change of letter
+  case only, which Git can't set aside …*: git's stash fails on it after making the stash), and a removal whose path
+  is now a folder holding changes not shown (the stash would take them too). Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
   its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named

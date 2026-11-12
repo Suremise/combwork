@@ -4,7 +4,7 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -465,6 +465,79 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(head()).toBe(before)
     expect(lines()).toEqual(['?? new.txt', 'M a.txt'])
     expect(leftovers()).toEqual([])
+  })
+})
+
+// HI-3024: a case-only rename's old side, and a removed file whose path is now a folder, were taken for files the user
+// stopped tracking but kept (Windows' lstat finds `b.txt` as `B.txt`, and finds a folder): "staged for removal". And
+// git's own partial commit can't take either.
+describe('a case-only rename, and a removal replaced by a folder (HI-3024)', () => {
+  const tree = (): string[] => sh(proj, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').filter(Boolean).sort()
+  const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
+
+  it('a case-only rename: Commit commits it (the new name alone in HEAD), another staged change left staged and out of the commit', async () => {
+    sh(proj, 'mv', 'b.txt', 'B.txt')
+    writeFileSync(join(proj, 'a.txt'), 'staged, not shown\n')
+    sh(proj, 'add', 'a.txt')
+    expect(lines()).toEqual(['M  a.txt', 'R  b.txt -> B.txt'])
+    const was = tree()
+    const done = await settle('commit', ['B.txt'])
+    expect(done.files.sort()).toEqual(['B.txt', 'b.txt'])
+    expect(done.made).toBe(head())
+    expect(tree()).toEqual(was.map((p) => (p === 'b.txt' ? 'B.txt' : p)).sort())
+    expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('a')
+    expect(lines()).toEqual(['M  a.txt'])
+  })
+
+  it("a case-only rename of a folder, with an edit: Commit takes the folder's content as it is", async () => {
+    commit(proj, { 'lib/one.txt': 'one\n' }, 'lib')
+    // git mv can't change a folder's case on Windows ("renaming 'lib' to 'Lib/lib' failed"): renamed on disk, then staged.
+    renameSync(join(proj, 'lib'), join(proj, 'lib-'))
+    renameSync(join(proj, 'lib-'), join(proj, 'Lib'))
+    sh(proj, 'rm', '-r', '-q', '--cached', 'lib')
+    sh(proj, 'add', 'Lib')
+    expect(status()).toMatch(/^R {2}lib\/one\.txt -> Lib\/one\.txt$/m)
+    writeFileSync(join(proj, 'Lib', 'one.txt'), 'one, edited\n')
+    await settle('commit', ['Lib/one.txt'])
+    expect(tree()).toContain('Lib/one.txt')
+    expect(tree()).not.toContain('lib/one.txt')
+    expect(sh(proj, 'show', 'HEAD:Lib/one.txt')).toBe('one, edited')
+    expect(lines()).toEqual([])
+  })
+
+  it('a case-only rename: Set Aside refused saying what it is, nothing set aside or changed', async () => {
+    sh(proj, 'mv', 'b.txt', 'B.txt')
+    const was = status()
+    await expect(settle('setAside', ['B.txt'])).rejects.toThrow(/^b\.txt is renamed to B\.txt, a change of letter case only, which Git can't set aside/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(status()).toBe(was)
+  })
+
+  it('a removed file whose path is now a folder: never called a kept file; Commit commits the removal alone, the folder left untracked', async () => {
+    sh(proj, 'rm', '-q', 'b.txt')
+    mkdirSync(join(proj, 'b.txt'))
+    writeFileSync(join(proj, 'b.txt', 'x.txt'), 'x\n')
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D  b.txt'])
+    const before = head()
+    const was = tree()
+    await settle('commit', ['b.txt'])
+    expect(head()).not.toBe(before)
+    expect(tree()).toEqual(was.filter((p) => p !== 'b.txt'))
+    expect(lines()).toEqual(['?? b.txt/x.txt'])
+    expect(read('b.txt/x.txt')).toBe('x\n')
+  })
+
+  it('a removed file whose path is now a folder: Set Aside refused while the folder has a change not shown; with it shown, both set aside', async () => {
+    sh(proj, 'rm', '-q', 'b.txt')
+    mkdirSync(join(proj, 'b.txt'))
+    writeFileSync(join(proj, 'b.txt', 'x.txt'), 'x\n')
+    await expect(settle('setAside', ['b.txt'])).rejects.toThrow(/^b\.txt was removed from Git, and a folder of that name is in its place with changes that weren't shown/)
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(read('b.txt/x.txt')).toBe('x\n')
+    await settle('setAside', ['b.txt', 'b.txt/x.txt'])
+    expect(sh(proj, 'show', '--format=', '--name-only', 'refs/stash^3')).toBe('b.txt/x.txt')
+    expect(read('b.txt')).toBe('b\n')
+    expect(lines()).toEqual([])
   })
 })
 

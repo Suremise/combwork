@@ -296,6 +296,12 @@
       "what": "plain"
     }
   },
+  "service.folderChanges.caseRename": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "service.folderChanges.changed": {
     "placeholders": {
       "folder": "plain"
@@ -360,6 +366,11 @@
   "service.folderChanges.readFailed": {
     "placeholders": {
       "why": "plain"
+    }
+  },
+  "service.folderChanges.removedForFolder": {
+    "placeholders": {
+      "file": "plain"
     }
   },
   "service.folderChanges.stashFailed": {

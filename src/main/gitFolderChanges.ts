@@ -47,6 +47,8 @@ const M = {
   stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
+  caseRename: msg({ id: 'service.folderChanges.caseRename', defaultMessage: "{from} is renamed to {to}, a change of letter case only, which Git can't set aside. Commit it instead, or rename it back yourself.", description: "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {from} (a path) was renamed to {to} (the same path in other letter case); git's stash fails on such a rename, so nothing was done. Commit works for it." }),
+  removedForFolder: msg({ id: 'service.folderChanges.removedForFolder', defaultMessage: "{file} was removed from Git, and a folder of that name is in its place with changes that weren't shown: setting the removal aside would take them too. Commit the removal instead, or use git stash yourself.", description: "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name now holds changed files not in the list shown; git's stash would take those too, so nothing was done. Keep git stash as it is: a command." }),
   unmerged: msg({ id: 'service.folderChanges.unmerged', defaultMessage: "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.", description: "HI-3025: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: the file ({file}, a path) has a conflict git hasn't had resolved (after a git stash pop that conflicted, say); committing it would put its conflict markers into the commit, so nothing was done. Keep git add as it is: a command." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
   submoduleInside: msg({ id: 'service.folderChanges.submoduleInside', defaultMessage: '{folder} is a submodule whose changes are inside it, so Combwork can\'t commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.', description: "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done." }),
@@ -258,6 +260,8 @@ interface Changed {
   deleted?: boolean
   from?: string
   unmerged?: boolean
+  /** HI-3024: a change staged (porcelain's X column), a rename's both sides included. */
+  staged?: boolean
 }
 
 /** Porcelain v1's states of a path in conflict (git's `git status` short format). */
@@ -274,7 +278,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const deleted = c.deleted || was?.deleted
     const from = c.from ?? was?.from
     const unmerged = c.unmerged || was?.unmerged
-    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}) })
+    const staged = c.staged || was?.staged
+    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}), ...(staged ? { staged } : {}) })
   }
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
@@ -284,10 +289,10 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const path = e.slice(3)
     if (xy[0] === 'R' || xy[0] === 'C') {
       const from = parts[++i]
-      put(path, { untracked: false, from })
-      if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true })
+      put(path, { untracked: false, from, staged: true })
+      if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true, staged: true })
     } else if (UNMERGED.has(xy)) put(path, { untracked: false, unmerged: true })
-    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D' })
+    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?' })
   }
   return out
 }
@@ -341,16 +346,12 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
  * A refused commit leaves the real index as it was, intent-to-add entries never in it. Never given a path whose removal
  * is staged while its file is still in the folder (settleChanges and commitIgnore refuse it first, keptDeleted).
  */
-async function commitPaths(folder: string, files: string[], untracked: string[], message: string): Promise<string> {
+async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }): Promise<string> {
   // What the branch was, to tell a commit made before the bound ended git (a post-commit hook); unreadable, nothing runs.
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
   return withPrivateIndex(folder, M.commitFailed, async (env, copy) => {
-    if (untracked.length) {
-      const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), { env })
-      if (!add.ok) throw failed(M.commitFailed, add.err)
-    }
-    const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
+    const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, files, untracked, message)
     // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read, moved, and proved this
     // commit's says so (HR2's round 3: another git can commit meanwhile, the real index being free).
     const now = r.ok || r.timedOut ? await headOf(folder) : undefined
@@ -366,6 +367,35 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   })
 }
 
+/** The commit as git's own partial commit makes it, in the private index: untracked paths as intent-to-add first. */
+async function commitOnly(folder: string, env: NodeJS.ProcessEnv, files: string[], untracked: string[], message: string): Promise<GitResult> {
+  if (untracked.length) {
+    const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), { env })
+    if (!add.ok) throw failed(M.commitFailed, add.err)
+  }
+  return git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
+}
+
+/**
+ * HI-3024: the commit built in the private index, for what git's partial commit can't take (a case-only rename: "will
+ * not add file alias"; a removal whose path is now a folder): every other staged change taken back to HEAD there
+ * (`staged`), the removed paths taken out of it, the rest added as they are in the folder, then a plain commit of it.
+ * The same commit `commit --only` makes: HEAD with `files` as the folder has them. Each step bounded, as the private
+ * index is Combwork's own to leave.
+ */
+async function commitByIndex(folder: string, env: NodeJS.ProcessEnv, files: string[], message: string, by: { removed: string[]; staged: string[] }): Promise<GitResult> {
+  const bound = { env, timeout: folderChangesBounds.actMs }
+  const step = async (args: string[], paths: string[]): Promise<GitResult | null> => {
+    if (!paths.length) return null
+    const r = await git(folder, [...args, ...PATHS_IN], undefined, pathsIn(paths), bound)
+    return r.ok ? null : r
+  }
+  const added = files.filter((p) => !by.removed.includes(p))
+  const failedStep = (await step(['reset', '-q'], by.staged)) ?? (await step(['rm', '--cached', '-q', '--ignore-unmatch'], by.removed)) ?? (await step(['add', '-A'], added))
+  if (failedStep) return failedStep
+  return git(folder, ['commit', '--quiet', '-m', message], undefined, undefined, bound)
+}
+
 /**
  * A path in `files` whose removal from Git is staged while its file is still in the folder (HI-2982), refused by name
  * before Commit or Set Aside runs: `commit --only` takes each path from the folder, so it would put the file back into
@@ -373,19 +403,41 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
  * refuses that after making the stash, every time; listed untracked too, the file is replaced, kept only in a stash
  * that can't be popped over the copy). Null when there is none.
  */
-async function keptDeleted(folder: string, files: string[], now: Map<string, Changed>): Promise<string | null> {
-  for (const p of files) {
-    const c = now.get(p)
-    if (!c?.deleted) continue
-    // Absent only when the system says so (HR2's round 5): any other stat failure (EPERM, EACCES, I/O) refuses, as git
-    // could still read the file and add it back.
-    const absent = await lstat(join(folder, p)).then(
-      () => false,
-      (e: NodeJS.ErrnoException) => e?.code === 'ENOENT' || e?.code === 'ENOTDIR'
-    )
-    if (!absent) return p
+async function keptDeleted(removed: Map<string, Removed>): Promise<string | null> {
+  return [...removed].find(([, k]) => k === 'file')?.[0] ?? null
+}
+
+/**
+ * HI-3024: what is in the folder where a path whose index entry is gone (`deleted`) was: `absent`; `file`, a file of
+ * exactly that name (Stop Tracking's kept file, HI-2982); `folder`, a folder now in its place; or `alias`, another
+ * name in another letter case (Windows' folders don't tell `b.txt` from `B.txt`: a case-only rename's old side).
+ */
+type Removed = 'absent' | 'file' | 'folder' | 'alias'
+
+/** Removed's answer for each path of `files` whose index entry is gone. */
+async function removedIn(folder: string, files: string[], now: Map<string, Changed>): Promise<Map<string, Removed>> {
+  const out = new Map<string, Removed>()
+  for (const p of files) if (now.get(p)?.deleted) out.set(p, await onDisk(folder, p))
+  return out
+}
+
+async function onDisk(folder: string, rel: string): Promise<Removed> {
+  // Absent only when the system says so (HR2's round 5): any other stat failure (EPERM, EACCES, I/O) is a file, as git
+  // could still read it and add it back.
+  const s = await lstat(join(folder, rel)).then(
+    (st) => st,
+    (e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' || e?.code === 'ENOTDIR' ? null : undefined)
+  )
+  if (s === null) return 'absent'
+  if (s === undefined) return 'file'
+  // Each part of the path, as its folder lists it: one only in another letter case is another name (an unreadable
+  // folder counts as the name being there).
+  const parts = rel.split('/')
+  for (let i = 0; i < parts.length; i++) {
+    const names = await readdir(join(folder, ...parts.slice(0, i))).catch(() => null)
+    if (names && !names.includes(parts[i])) return names.some((n) => n.toLowerCase() === parts[i].toLowerCase()) ? 'alias' : 'absent'
   }
-  return null
+  return s.isDirectory() ? 'folder' : 'file'
 }
 
 /** The stash ref's object now (null: no stash). */
@@ -470,13 +522,25 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A submodule changed only inside it (HI-3023): its commit unchanged, git has nothing of it to commit or stash here.
         const sub = files.find((p) => inside.includes(p))
         if (sub) throw combworkError(M.submoduleInside, { folder: sub })
-        const kept = await keptDeleted(folder, files, now)
+        const removed = await removedIn(folder, files, now)
+        const kept = await keptDeleted(removed)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
+        if (action === 'setAside') {
+          // HI-3024: git's stash can't set aside a case-only rename (it fails after making the stash, the old name
+          // "already exists"), nor a removal whose path is now a folder without taking the folder's files, shown or not.
+          const alias = [...removed].find(([, k]) => k === 'alias')?.[0]
+          if (alias) throw combworkError(M.caseRename, { from: alias, to: [...now].find(([, c]) => c.from === alias)?.[0] ?? alias })
+          const replaced = [...removed].find(([p, k]) => k === 'folder' && [...now.keys()].some((q) => q.startsWith(`${p}/`) && !files.includes(q)))?.[0]
+          if (replaced) throw combworkError(M.removedForFolder, { file: replaced })
+        }
         // Set aside: always exactly the paths shown, never the whole folder's (HR1's round 1: a change made after this
         // read, never shown, would go into the stash and off the disk); only as many as git's own commands can be given
         // (HI-2983), refused before any stash is made.
         if (action === 'setAside' && files.reduce((n, p) => n + stashPathCost(p), 0) > STASH_PATHS_MAX) throw combworkError(M.tooManyToSetAside, { count: files.length, folder })
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message) : await setAsidePaths(folder, files, message)
+        // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
+        // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
+        const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => c.staged && !files.includes(p)).map(([p]) => p) } : undefined
+        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
       }),
@@ -528,7 +592,7 @@ export async function commitIgnore(projectPath: string): Promise<FolderChangesDo
         if (!now.has(file)) throw combworkError(M.nothing, { file })
         const message = 'Update .gitignore' // i18n-ignore: the commit's message, in the repository (English, as Combwork's other commits)
         if (now.get(file)?.unmerged) throw combworkError(M.unmerged, { file })
-        const kept = await keptDeleted(repo.top, [file], now)
+        const kept = await keptDeleted(await removedIn(repo.top, [file], now))
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         const made = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
         log.info(`Committed .gitignore in ${userText(repo.top)} on ${userText(branch)}`)
