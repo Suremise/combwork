@@ -146,7 +146,7 @@ const TARGET = 'integration'
     check('…an override that isn’t the boolean true is refused (400)', loose.status === 400 && /override is true or left out/.test(JSON.stringify(loose.body)), JSON.stringify(loose.body))
     const overridden = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: true })
     const fwdCard = overridden.body?.card
-    check('…with override true it is queued, the override on its card', overridden.status === 200 && overridden.body?.queued === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
+    check('…with override true it is queued, the override on its card, and its reply says so (HI-3087)', overridden.status === 200 && overridden.body?.queued === true && overridden.body?.overridden === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
     const fwdActions = await h.inv('assistant:actions')
     check('…its action says it overrode the direction', fwdActions.some((x) => x.ok && x.kind === 'queue-forward' && /with the user’s override of the release path’s direction/.test(x.text)), JSON.stringify(fwdActions.map((x) => [x.kind, x.text])))
     // --- HI-2927: an old target's queue with a pause (1.0.0: not a target, nothing in it) stays live, so it can be resumed.
@@ -183,9 +183,16 @@ const TARGET = 'integration'
     await q.openByTitle(h.page, clashCard)
     await until(async () => (await cardDialog.count()) === 1, HUNG_MS)
     const part = cardDialog.locator('.card-work-queue')
-    const offered = await until(async () => ((await part.locator('[data-forward-next]').count()) === 1 && (await part.locator('[data-action="resolve-forward"]').count()) === 1 && (await part.locator('[data-action="retry"]').count()) === 1 ? true : null), HUNG_MS)
-    check('…its Work section says it waits for you, with Retry merge and Resolve on a Builder…', !!offered, (await part.innerText().catch(() => '')).replace(/\s+/g, ' '))
+    const offered = await until(async () => ((await part.locator('[data-forward-next]').count()) === 1 && (await part.locator('[data-action="resolve-forward"]').count()) === 1 && (await part.locator('[data-action="retry"]').count()) === 1 && (await part.locator('[data-action="remove-forward"]').count()) === 1 ? true : null), HUNG_MS)
+    check('…its Work section says it waits for you, with Retry merge, Resolve on a Builder… and Remove from Queue… (HI-3084)', !!offered, (await part.innerText().catch(() => '')).replace(/\s+/g, ' '))
     await q.folderHelpers(fx).themes(h.page, cardDialog.locator('.card-work'), 'queuecontrols-forward-returned')
+    // HI-3084: Remove from Queue… asks first, saying it ends in Done with nothing merged (no builder to send it back to).
+    await part.locator('[data-action="remove-forward"]').click()
+    const removeAsk = h.page.locator('.dialog').filter({ hasText: 'It ends in Done and nothing is merged' })
+    const asked = await until(async () => ((await removeAsk.count()) === 1 ? (await removeAsk.innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
+    check('…Remove from Queue… asks first: it ends in Done, nothing merged, never "back to Approved"', !!asked && asked.includes(`${TARGET} isn't brought up to date with main`) && !/Approved|builder is told/.test(asked), asked)
+    await removeAsk.getByRole('button', { name: 'Cancel', exact: true }).click()
+    check('…cancelled, the forward stays as it was', !!(await until(async () => ((await removeAsk.count()) === 0 ? true : null), HUNG_MS)) && (await column(clashCard)) === 'doing')
     await part.locator('[data-action="resolve-forward"]').click()
     const ask = h.page.locator('.dialog').filter({ hasText: 'a new card is made on integration for a builder' })
     check('…it asks first, saying what happens', !!(await until(async () => (await ask.count()) === 1, HUNG_MS)))

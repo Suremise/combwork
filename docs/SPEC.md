@@ -3284,7 +3284,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   preparation publishes the new key with the old base and submitted commits, no jj write. What the card left in the
   folder uncommitted is its own and stays (HI-2981): the pool's dirty refusal is skipped when the port's `carries`
   says the preparation carries the slot's binding (`carriesBinding`, the same test the preparation makes), as Git's
-  same branch skips it; any other preparation over uncommitted edits is refused as before. On another target it is
+  same branch skips it; any other preparation over uncommitted edits is refused as before. A carry is never of a stale
+  workspace (HI-3095: the card's commit rewritten elsewhere while its slot was kept, a rebase say): the preparation
+  reads the folder's staleness at the pinned head it carries at (`staleAt`) and refuses `stale` (unknown: refused too),
+  so the start says `slot.prepare.stale` with Recover… (`SlotPrepareFailed`'s `stale`) before any agent runs there, and
+  nothing in the folder changes: an edit not recorded yet stays for Recover… to keep aside, where a builder's
+  `jj workspace update-stale` would have dropped it. On another target it is
   refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
   recovered.
 - **A card lease ended with the card's committed work in its slot** (HI-2995; design HI-2995/s12): put back, or
@@ -3314,6 +3319,20 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   removal's operation (still `gone`, its folder still absent, the same record at the slot's generation, the platform's
   fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the newest
   `endRev` recorded for its card there, a failed take-back's lease recording none), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
+  **Its workspace forgotten by the user** (HI-3097: `jj workspace forget` outside Combwork, its folder left): still
+  `gone` (jj doesn't list it), told apart by its folder being there: the start says `slot.kept.forgotten`, Slots and
+  copies "Kept for <card>, but jj no longer lists its workspace" (`keptGone.forgotten`), and Remove…'s confirmation
+  says the folder goes whole to the Recycle Bin. Remove… carries the mode the user confirmed (`slots:removeKept`'s
+  `forgotten`): the folder there and forgotten, or missing; a folder in the other state now, at the first read or under
+  the removal's operation, is `changed` (HR2's round 1: a missing-folder confirmation never trashes a folder put back
+  meanwhile). `removeKeptGone`'s read then only makes it eligible (the folder there, `present` false); the removal (`remove`'s `keptForgotten`, this action's only) keeps the session, in-flight and
+  process guards on every attempt and waives only dirty and unmerged, which jj can't read of a forgotten workspace. The
+  port (`remove`'s `forgotten`) proves it afresh on every attempt, inside the store's lock, fail-closed: exactly one
+  operation head, whose listing names no such workspace nor any at the folder; the folder the recorded workspace by its
+  files alone (`owns`) and the existing pre-trash checks; the pool's fence; then, nothing awaited, the same single head
+  as the trash starts (`moved` otherwise). Never journalled, never resumed: a failed trash leaves the slot `gone` and
+  kept, and the next Remove… proves it all again. A colocated slot's Git worktree receipt is dropped only after the
+  trash, by HI-3046's checks. Remaking the workspace in place isn't offered (jj can't add one at an existing folder).
   **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
   own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
   started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an
@@ -5923,6 +5942,17 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
   the user's or the Assistant's three choices (Retry merge, Resolve on a builder, Remove from queue), never a builder's
   `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it", on the board too (its
   work badge's `forwardWait`, `stalledReason`'s): only Remove from queue for one returned for its direction (HI-2959).
+  Its Work section offers what those name (HI-3084, `ForwardChoices` from the same `forwardWaitOf`): Retry merge…,
+  Resolve on a Builder… and Remove from Queue…, for one returned or declined alike, and Remove from Queue… alone for one
+  returned for its direction. Remove's confirmation, there and on a queued forward in the queue's card (its
+  `QueueQueued.forward`), says it ends in Done with nothing merged, never that it goes back to Approved.
+- the user's and the Assistant's moves of it go only where it stays a forward (HI-3086, `forwardMoves`, the runtime's
+  `move` and the board's drop columns, `moveColumns`): On Hold and back to where it was, back into Active (out of the
+  queue, for Retry merge or Resolve on a builder), and Done (nothing merged); a Done one stays Done. Todo (the project's
+  rules now), a start or a Done one reopened (a new `Started` drops `forward`: an ordinary card on the project's default
+  target) and a drag on past where it was (a builder's submit and review) are refused (`move.notFromHere`, naming its
+  own ways on), nothing written. Back from On Hold to Merging it is queued again as a forward (`enqueueForward`), with
+  the commit its latest attempt froze (a Retry's too), never the source's head then.
 
 **Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
 to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
@@ -5968,8 +5998,10 @@ revision again; `requeue.allowed` lets that
 revision back in once, bound to that failed entry (whatever transient requeues counted; its new entry uses it up), and
 the override, kept on its `ForwardResolution` from then on, bypasses the direction alone. A resolution in any other
 state is refused as before (`openNoOverride`). A direct forward's way stays Remove from queue, then the request again
-with the override (a new card). Not covered: a project folder switched to another branch that isn't a version, with no
-main or master, makes git name that branch the default, which reads as a real answer (follow-up).
+with the override (a new card). The same rule (`forwardNow`, workflow/forwardNow.ts) decides Retry merge and Resolve on
+a builder (HI-3085): the folder switched, or a default branch that can't be read, holds them back saying to check the
+recorded branch out (`folderSwitched`) or to put the folder on its branch (`defaultUnread`), nothing written; only a
+real answer against the release path's direction refuses them with Remove from queue as the way on (`directionRetry`).
 
 Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
 `source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
@@ -6134,7 +6166,9 @@ touched:
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Only a file of exactly that name counts
   (HI-3024): each part of the path as its folder lists it, so a case-only rename's old side (`b.txt`, which Windows'
-  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file. Git's partial commit
+  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file; the same goes for a file
+  deleted without the deletion staged (HI-3076: ` D b.txt` beside `?? b.txt/x.txt`, which git's stash took with the
+  folder's files and its partial commit refused alike). Git's partial commit
   takes neither ("will not add file alias"; "does not have a commit checked out"), so such a Commit is built in the
   private index instead (`commitByIndex`): every other staged change, and every other path in conflict (HR1: a plain
   commit refuses an index with one; the real index keeps it), taken back to HEAD there, the removed paths
@@ -6199,12 +6233,15 @@ touched:
   can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
-  is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
-  round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its
-  message this one's, and its tree's entries for the paths the private index's; HEAD unreadable before
-  the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
-  unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
-  then. **Any number of files** (HI-2983): the paths go to git on its input
+  is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
+  more proof), even one made before its post-commit hook was ended: the real index being free, another git can commit
+  meanwhile (HR2's round 3), and a hook's own git, which inherits everything the commit's has, can move HEAD or commit
+  before or after the commit's write (HR2's rounds 1-3 on HI-3075), so nothing proves which made the commit now there.
+  HEAD unreadable before the commit refuses it before anything runs (an unborn branch is not unreadable). The refusal
+  says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by then; *the files and
+  the index are as they were* only while HEAD is where it started. HEAD moved (or unreadable), it names where HEAD is
+  now and that the index was left as it was, for the user to settle (*The branch moved meanwhile, to …, and Combwork
+  can't tell that it is this commit … Check git log and git status*). **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
@@ -6643,7 +6680,12 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
    holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
    folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
-   cleared, which let the reconciler mark the card `LeftTarget`). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
+   cleared, which let the reconciler mark the card `LeftTarget`), its files never rolled back while any of them is as
+   the user's new head has it (HI-3090: a commit of some or all of what the catch-up had staged had its files rolled
+   back under it, a staged deletion left in the folder; what is still staged is kept as it is). A recorded step whose listed files are all as they were before it (the user's
+   `git reset --hard` or `git stash` after a stop, or the folder switched to another branch before anything moved),
+   which the table reads as its terminal state, has nothing of it left: its phase dropped, it is looked at again as a
+   fresh one (HI-3090: paused needing the user, with no command, over a clean folder). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
    (`QueuePauseInfo.catchUp`, `catchUpPaused`): its folder's changes are offered Set Aside only (stashed "before
    bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
    local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card
@@ -8834,7 +8876,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     here, the local day): in the Lanes tab, a running lane's open cards show its working list (its queued list when it
     has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down, on its row or
     its key or ×; HI-2970: inside the opened cards they never move the lane, which takes them on its own row only), comes off
-    with × or Delete (back to the board, never deleted); Add Card… searches the project's Todo cards by key or title, and
+    with × or Delete (back to the board, never deleted; HI-3068: a held Delete takes one card, its repeats ignored, and
+    the focus moves to the next card's row, or the lane's, only once the lane shows it off: another update of the lane
+    meanwhile leaves it waiting, and a refused or skipped edit, a move too, leaves it where it was, `QueueFocus`); Add Card… searches the project's Todo cards by key or title, and
     a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
     (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
     on hold, another agent's) keeps its places in every edit; the card in flight shows a lock. Over a row of that start,
@@ -8858,7 +8902,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
       from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
       board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
-      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      or undo (HI-3064) left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
       revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
       Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its

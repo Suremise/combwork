@@ -317,6 +317,12 @@
       "seconds": "number"
     }
   },
+  "service.folderChanges.commitTimedOutMoved": {
+    "placeholders": {
+      "seconds": "number",
+      "head": "select"
+    }
+  },
   "service.folderChanges.deletedKept": {
     "placeholders": {
       "file": "plain"
@@ -431,6 +437,13 @@
       "target": "plain"
     }
   },
+  "service.forward.defaultUnread": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "service.forward.direction": {
     "placeholders": {
       "to": "plain",
@@ -445,6 +458,13 @@
       "why": "select",
       "to": "plain",
       "from": "plain"
+    }
+  },
+  "service.forward.folderSwitched": {
+    "placeholders": {
+      "card": "plain",
+      "now": "plain",
+      "was": "plain"
     }
   },
   "service.forward.missing": {

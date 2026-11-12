@@ -454,20 +454,28 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n: > "${fwd(marker)}"\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
   }
 
-  it('ended in post-commit, after the commit was made: made, said so, the index taken in (new and edited files committed, nothing left changed)', async () => {
+  // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, even one made before its post-commit hook
+  // was ended: a hook's own git can move HEAD or commit too, and nothing proves which made it. HEAD moved: said so, with
+  // where it is now; the index left as it was, for the user to settle.
+  const moved = (sha: string): string => `The branch moved meanwhile, to ${sha.slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`
+
+  it('ended in post-commit, after the commit was made: not credited; said with where HEAD moved, never "as they were"; the index as it was', async () => {
     slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
     const before = head()
-    const done = await settle('commit', ['a.txt', 'new.txt'])
-    expect(done.made).toBe(head())
+    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
     expect(head()).not.toBe(before)
-    expect(committed()).toEqual(['a.txt', 'new.txt'])
-    expect(lines()).toEqual([])
+    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    expect(String(err)).toContain(moved(head()))
+    expect(String(err)).not.toMatch(/as they were/)
+    // Nothing taken into the index: a.txt and new.txt as they were in it before.
+    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+    expect(sh(proj, 'ls-files', 'new.txt')).toBe('')
     expect(leftovers()).toEqual([])
   })
 
-  it("ended in post-commit while another program holds the real index's lock (HR2's rounds 1 and 2): made, said so, that lock never touched", async () => {
+  it("ended in post-commit while another program holds the real index's lock (HR2's rounds 1 and 2): said with where HEAD moved, that lock never touched", async () => {
     const marker = join(tempDir('cw-folderchanges-post-'), 'started')
     slowPostCommit(marker)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
@@ -481,8 +489,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       fs.writeSync(fd, "not Combwork's")
       const err = await done
       expect(head()).not.toBe(before)
-      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
-      expect(String(err)).toMatch(new RegExp(`Git made the commit \\(${head().slice(0, 12)}\\), but Combwork couldn't update the index`))
+      expect(String(err)).toContain(moved(head()))
       expect(readFileSync(lockPath(), 'utf8')).toBe("not Combwork's")
       expect(leftovers()).toEqual([])
     } finally {
@@ -506,6 +513,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(theirs).not.toBe(before)
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    // HI-3075: HEAD moved, so never "as they were": where it is now, and that it isn't proved this commit.
+    expect(String(err)).toContain(`The branch moved meanwhile, to ${theirs.slice(0, 12)}, and Combwork can't tell that it is this commit`)
+    expect(String(err)).not.toMatch(/as they were/)
     expect(head()).toBe(theirs)
     expect(sh(proj, 'log', '-1', '--format=%s')).toBe('theirs')
     // a.txt neither committed nor staged as if it were.
@@ -542,6 +552,43 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(lines()).toEqual([])
     expect(existsSync(lockPath())).toBe(false)
   })
+
+  // HI-3075: a commit-msg hook that rewrites the message (Gerrit's Change-Id), the commit ended in post-commit: "as they
+  // were" was said though HEAD moved. Now never said once HEAD moved, and whatever moved it is never credited.
+  it('a commit whose message a hook rewrote, ended in post-commit: said with where HEAD moved, never "as they were"', async () => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "\\nChange-Id: I0123456789\\n" >> "$1"\n')
+    slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    const before = head()
+    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
+    expect(head()).not.toBe(before)
+    expect(sh(proj, 'log', '-1', '--format=%B')).toContain('Change-Id: I0123456789')
+    expect(String(err)).toContain(moved(head()))
+    expect(String(err)).not.toMatch(/as they were/)
+    expect(leftovers()).toEqual([])
+  })
+
+  // HR2's rounds 1-3: a hook's own git moving HEAD or committing, before or after the commit's write, then hanging.
+  for (const [name, hook, body] of [
+    ['a post-commit hook that moves HEAD to an older commit of the same parent', 'post-commit', 'git reset -q --soft "$B"'],
+    ['a pre-commit hook that moves HEAD to an older commit of the same parent, before any commit is written', 'pre-commit', 'git reset -q --soft "$B"'],
+    ["a pre-commit hook that makes a commit of its own with this commit's message in it", 'pre-commit', 'git commit -q --allow-empty --no-verify -m "Commit changes before merging AB-1, by the hook"']
+  ] as const)
+    it(`…${name}, then hangs: never credited; said with where HEAD moved, the index as it was`, async () => {
+      const before = head()
+      const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', hook), `#!/bin/sh\nB=${b}\n${body}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+      expect(head()).not.toBe(before)
+      expect(err).toBeInstanceOf(Error)
+      expect(String(err)).toContain(moved(head()))
+      expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+      expect(leftovers()).toEqual([])
+    })
 
   // HI-3074: a pre-commit hook's `git add` goes into what git commits, not the private index, so the index taken from the
   // private index left the folder changed (a formatter: `MM a.txt`) or a removal invented (a generated file: `D gen.txt`).
@@ -850,6 +897,81 @@ describe('a case-only rename, and a removal replaced by a folder (HI-3024)', () 
     expect(read('b.txt/x.txt')).toBe('x\n')
     expect(existsSync(join(proj, 'b.txt', 'late.txt'))).toBe(false)
     expect(lines()).toEqual(['?? b.txt/x.txt', 'D  b.txt'])
+  })
+
+  // HI-3076: the same with the deletion not staged (` D b.txt`): HI-3024's handling missed it, so Set Aside took the
+  // folder's files, shown or not, into a stash that couldn't be popped, and Commit failed every time.
+  const fileToFolder = (): void => {
+    rmSync(join(proj, 'b.txt'))
+    mkdirSync(join(proj, 'b.txt'))
+    writeFileSync(join(proj, 'b.txt', 'x.txt'), 'x\n')
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D b.txt'])
+  }
+
+  it('a deleted file (not staged) whose path is now a folder: Set Aside refused by name, shown alone or with the folder, a late file never reached, nothing changed', async () => {
+    fileToFolder()
+    for (const shown of [['b.txt'], ['b.txt', 'b.txt/x.txt']]) {
+      lateFile = 'b.txt/late.txt'
+      await expect(settle('setAside', shown)).rejects.toThrow(/^b\.txt was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too/)
+      lateFile = null
+    }
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(read('b.txt/x.txt')).toBe('x\n')
+    expect(existsSync(join(proj, 'b.txt', 'late.txt'))).toBe(false)
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D b.txt'])
+  })
+
+  for (const shown of [['b.txt'], ['b.txt', 'b.txt/x.txt']])
+    it(`a deleted file (not staged) whose path is now a folder: Commit of ${shown.join(' and ')} works`, async () => {
+      fileToFolder()
+      const was = tree()
+      await settle('commit', shown)
+      expect(tree()).toEqual(shown.length === 1 ? was.filter((p) => p !== 'b.txt') : [...was.filter((p) => p !== 'b.txt'), 'b.txt/x.txt'].sort())
+      expect(lines()).toEqual(shown.length === 1 ? ['?? b.txt/x.txt'] : [])
+      expect(read('b.txt/x.txt')).toBe('x\n')
+    })
+
+  // HR1's round 1: a staged rename whose new side was then deleted and replaced by a folder (`RD b.txt`).
+  const renamedToFolder = (): void => {
+    sh(proj, 'mv', 'a.txt', 'b2.txt')
+    rmSync(join(proj, 'b2.txt'))
+    mkdirSync(join(proj, 'b2.txt'))
+    writeFileSync(join(proj, 'b2.txt', 'x.txt'), 'x\n')
+    expect(sh(proj, 'status', '--porcelain=v1', '--untracked-files=all').split('\n').map((l) => l.trimEnd()).sort()).toEqual(['?? b2.txt/x.txt', 'RD a.txt -> b2.txt'])
+  }
+
+  it("a staged rename's new side deleted, a folder in its place (RD): Set Aside refused by name, shown alone or with the folder, a late file never reached, nothing changed", async () => {
+    renamedToFolder()
+    const before = status()
+    for (const shown of [['b2.txt'], ['b2.txt', 'b2.txt/x.txt']]) {
+      lateFile = 'b2.txt/late.txt'
+      await expect(settle('setAside', shown)).rejects.toThrow(/^b2\.txt was removed from Git, and a folder of that name is in its place/)
+      lateFile = null
+    }
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(read('b2.txt/x.txt')).toBe('x\n')
+    expect(existsSync(join(proj, 'b2.txt', 'late.txt'))).toBe(false)
+    expect(status()).toBe(before)
+  })
+
+  it("a staged rename's new side deleted, a folder in its place (RD): Commit works, a.txt's removal committed, the folder's file as shown", async () => {
+    renamedToFolder()
+    const was = tree()
+    await settle('commit', ['b2.txt', 'b2.txt/x.txt'])
+    expect(tree()).toEqual([...was.filter((p) => p !== 'a.txt'), 'b2.txt/x.txt'].sort())
+    expect(lines()).toEqual([])
+    expect(read('b2.txt/x.txt')).toBe('x\n')
+  })
+
+  it('a deleted file (not staged) with nothing in its place: Set Aside and Commit as before (git\'s ordinary deletion)', async () => {
+    rmSync(join(proj, 'b.txt'))
+    await settle('setAside', ['b.txt'])
+    expect(lines()).toEqual([])
+    sh(proj, 'stash', 'pop', '-q')
+    expect(lines()).toEqual(['D b.txt'])
+    await settle('commit', ['b.txt'])
+    expect(tree()).not.toContain('b.txt')
+    expect(lines()).toEqual([])
   })
 
   it("a case-only rename beside another file in conflict (HR1's round 1): Commit commits the rename, the other file's conflict kept in the index and on disk", async () => {

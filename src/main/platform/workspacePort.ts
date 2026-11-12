@@ -291,9 +291,12 @@ export interface WorkspacePort {
   // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
   /**
    * The workspace at `folder` removed by the tool, which refuses one with changes; `force` only for a check or review
-   * copy, which holds nobody's work (its build outputs go with it).
+   * copy, which holds nobody's work (its build outputs go with it). `forgotten` (jj's, HI-3097: the user's Remove… of a
+   * kept slot whose workspace was forgotten outside Combwork): the folder trashed whole, its changes unread, only while
+   * proved afresh, with nothing awaited before the trash starts, that the store lists no such workspace (by name or root)
+   * at its single, unchanged operation head and the folder is still the recorded workspace; nothing journalled.
    */
-  remove(repo: string, folder: string, o?: { force?: boolean; identity?: WorkspaceIdentity | null; journal?: WorkspaceJournal; fence?: WorkspaceFence }): Promise<WorkspaceStep>
+  remove(repo: string, folder: string, o?: { force?: boolean; identity?: WorkspaceIdentity | null; journal?: WorkspaceJournal; fence?: WorkspaceFence; forgotten?: boolean }): Promise<WorkspaceStep>
 
   // A card's line, once merged (§16.10.1).
   /** The line deleted only from `at` (compare and swap). */

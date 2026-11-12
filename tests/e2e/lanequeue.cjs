@@ -284,6 +284,17 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('…and the focus goes to the next card’s row', !!(await until(async () => (await focused()).card === String(last), HUNG_MS)), JSON.stringify(await focused()))
   await page.keyboard.press('Control+z')
   check('Ctrl+Z straight after puts it back', !!(await until(async () => (await listOf(la)) === before, HUNG_MS)), `${await listOf(la)} (was ${before})`)
+  // Delete held down (HI-3068): its repeats (key-downs before the key-up, as key repeat sends them) take nothing more off,
+  // and the focus moves on only once the card is off.
+  await until(async () => (await rows(la)).join() === before, HUNG_MS)
+  await row(la, penult).focus()
+  for (let i = 0; i < 6; i++) await page.keyboard.down('Delete')
+  await page.keyboard.up('Delete')
+  const one = before.split(',').map(Number).filter((n) => n !== penult).join()
+  check('Delete held down takes one card off', !!(await until(async () => (await listOf(la)) === one && (await focused()).card === String(last), HUNG_MS)), `${await listOf(la)} ${JSON.stringify(await focused())}`)
+  check('…and only that one: the next card stays', (await listOf(la)) === one && (await row(la, last).count()) === 1, await listOf(la))
+  await page.keyboard.press('Control+z')
+  check('…one Ctrl+Z puts it back', !!(await until(async () => (await listOf(la)) === before, HUNG_MS)), `${await listOf(la)} (was ${before})`)
 
   // --- Ended today: a lane that ended shows there, collapsed, and opens to its cards, read only.
   const e1 = await make('Ended lane card', 'todo', b3.id)

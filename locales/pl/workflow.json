@@ -648,5 +648,8 @@
   "workflow.slots.removeKeptTitle": "Usunąć {slot}?",
   "workflow.slots.removeKeptMessage": "Karta {card} zacznie wtedy od nowa od swojego celu, w innym slocie. Praca zatwierdzona tutaj zostaje w magazynie jj{commit, select, none {.} other {: jej ostatni commit to {commit}.}}",
   "workflow.slots.removedKept": "Slot {slot} został usunięty.",
-  "workflow.slots.notRemovedKept": "Slot {slot} nie został usunięty: {why, select, changed {zmienił się po wyświetleniu listy (jego folder wrócił albo został utworzony ponownie)} busy {coś w nim teraz pracuje} other {Combwork go zachował}}."
+  "workflow.slots.notRemovedKept": "Slot {slot} nie został usunięty: {why, select, changed {zmienił się po wyświetleniu listy (jego folder wrócił albo został utworzony ponownie)} busy {coś w nim teraz pracuje} other {Combwork go zachował}}.",
+  "workflow.slots.keptForgottenFor": "Zachowany dla karty {card}, ale jj nie wymienia już jego workspace’u",
+  "workflow.slots.removeForgottenMessage": "Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim. Karta {card} zacznie wtedy od nowa od swojego celu, w innym slocie. Praca zatwierdzona tutaj zostaje w magazynie jj{commit, select, none {.} other {: jej ostatni commit to {commit}.}}",
+  "workflow.slots.state.forgotten": "Niewymieniony przez jj"
 }

@@ -343,6 +343,10 @@
     "defaultMessage": "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. The files and the index are as they were.",
     "description": "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is."
   },
+  "service.folderChanges.commitTimedOutMoved": {
+    "defaultMessage": "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.",
+    "description": "HI-3075: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands."
+  },
   "service.folderChanges.deletedKept": {
     "defaultMessage": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
     "description": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves."
@@ -435,6 +439,10 @@
     "defaultMessage": "you",
     "description": "HI-2679: who asked for a forward merge, in its card’s description: the user."
   },
+  "service.forward.defaultUnread": {
+    "defaultMessage": "{card} waits: Combwork can’t read which branch is this repository’s default now (with no main or master, it is the branch the project folder has checked out), so it can’t tell whether {from} into {to} goes the release path’s way. Put the project folder on its branch, then try again.",
+    "description": "HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key) bringing branch {to} up to date with {from}: git couldn’t name the default branch (the project folder on no branch, say). Nothing changed. Branch names stay as they are."
+  },
   "service.forward.description": {
     "defaultMessage": "Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.",
     "description": "HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there."
@@ -446,6 +454,10 @@
   "service.forward.directionRetry": {
     "defaultMessage": "{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.",
     "description": "HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there."
+  },
+  "service.forward.folderSwitched": {
+    "defaultMessage": "{card} waits: the project folder has {now} checked out, so git names {now} the default branch (this repository has no main or master), and it was {was} when {card}’s direction was checked. Check out {was} in the project folder, then try again.",
+    "description": "HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key, such as HI-12): in a repository with no main or master, git names the project folder’s checked-out branch as the default, and the folder was switched from {was} to {now} since the card’s direction was checked. Nothing changed. Branch names stay as they are."
   },
   "service.forward.missing": {
     "defaultMessage": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",

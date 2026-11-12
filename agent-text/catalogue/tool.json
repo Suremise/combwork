@@ -485,8 +485,8 @@
     "text": "action must be list, pause, resume, remove, retry or resolve"
   },
   "tool.queue.reply.forward": {
-    "text": "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}",
-    "note": "HI-2679: cw_queue forward's reply."
+    "text": "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue{overridden, select, yes {, with the user's override of the release path's direction} other {}}.} other {{overridden, select, yes {Recorded on {card}, which resolves bringing {to} up to date with {from}: its builder is told to submit the same revision again, which goes back into {to}'s queue once.} other {{card} is bringing {to} up to date with {from} already.}}}}}}",
+    "note": "HI-2679: cw_queue forward's reply. HI-3087: overridden yes when the request's override was applied: on the new card it queued, or recorded on a forward's resolution the queue returned for its direction (nothing made, its builder woken)."
   },
   "tool.queue.reply.resolve": {
     "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged.",

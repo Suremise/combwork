@@ -390,6 +390,47 @@ const onDb = (fn) => {
     check('…removed: the slot gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot), HUNG_MS)) && id(shop, keptCommit) === keptCommit, JSON.stringify(await inv('slots:list', shop)))
     check('…said so', !!(await until(async () => (await text(page.locator('.toasts'))).includes(`${slot} is removed.`), HUNG_MS)), await text(page.locator('.toasts')))
 
+    // HI-3097: card 2 again in a new slot, put back with a commit, its workspace then forgotten by the user (its folder
+    // left, an edit in it): Slots and copies says jj no longer lists it, with Remove…; confirmed (the Recycle Bin named),
+    // the folder goes, its commit stays in jj's store.
+    const givenCount = () => (fs.existsSync(appLog) ? (fs.readFileSync(appLog, 'utf8').match(new RegExp(given.source, 'g')) ?? []).length : 0)
+    const givenBefore = givenCount()
+    const started4 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 afresh' }).catch((e) => ({ error: String(e) }))
+    // Lent and prepared for card 2 (B1 given it there), as above: only then is a commit there card 2's work.
+    const w4 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      const lent = v?.folder && v.workspace ? (await inv('slots:list', shop)).find((s) => s.folder.toLowerCase() === v.folder.toLowerCase() && s.state === 'lent' && s.lease?.card === n2) : null
+      return lent && givenCount() > givenBefore ? v : null
+    }, HUNG_MS)
+    check('card 2 started afresh in a slot, given to B1 there', !!w4, JSON.stringify({ started4, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
+    const slot4 = path.basename(w4.folder)
+    fs.writeFileSync(path.join(w4.folder, 'fourth.txt'), 'fourth\n')
+    jj(w4.folder, 'commit', '-m', 'fourth work')
+    const forgotCommit = jj(w4.folder, 'log', '--no-graph', '-r', `${w4.workspace}@-`, '-T', 'commit_id').trim()
+    const back4 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back, then forgotten' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    check('card 2 put back: kept for it', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot4 && s.keptFor === n2 && s.state === 'dirty' && !s.lease) ?? null, HUNG_MS)), JSON.stringify({ back4, slots: await inv('slots:list', shop) }))
+    jj(shop, 'workspace', 'forget', w4.workspace)
+    fs.writeFileSync(path.join(w4.folder, 'edit.txt'), 'not committed\n')
+    const forgotRow = await until(async () => {
+      await inv('slots:test', shop, { op: 'tidy' })
+      return (await inv('slots:list', shop)).find((s) => s.name === slot4 && s.state === 'gone' && s.keptFor === n2 && s.keptGone?.forgotten) ?? null
+    }, HUNG_MS)
+    check('its workspace forgotten: gone, its folder there, still kept for card 2', !!forgotRow && fs.existsSync(w4.folder), JSON.stringify(await inv('slots:list', shop)))
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    check('Slots and copies: kept, not listed by jj (never "Folder missing"), with Remove…', !!(await until(async () => (await row.locator('[data-action="remove-kept"]').count()) === 1 && /Not listed by jj/.test(await text(row)) && !/Folder missing/.test(await text(row)) && /but jj no longer lists its workspace/.test(await text(row)), HUNG_MS)), await text(row))
+    await row.scrollIntoViewIfNeeded()
+    await shoot(row, 'slot-kept-forgotten')
+    await inEach(row, 'slot-kept-forgotten', (cat) => (cat['workflow.slots.keptForgottenFor'] ?? '').split('{card}').pop().replace(/^[\s:：、，]+/, '').slice(0, 12))
+    await row.locator('[data-action="remove-kept"]').click()
+    const askForgot = page.locator('.dialog').filter({ hasText: `Remove ${slot4}?` })
+    check('…the confirmation names the Recycle Bin, the card and its last commit', !!(await until(async () => (await askForgot.count()) === 1 && /Recycle Bin/.test(await text(askForgot)) && (await text(askForgot)).includes(key2) && (await text(askForgot)).includes(forgotCommit.slice(0, 7)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(askForgot, 'remove-forgotten-confirm')
+    await askForgot.getByRole('button', { name: 'Remove', exact: true }).click()
+    check('…removed: the slot and its folder gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot4) && !fs.existsSync(w4.folder), HUNG_MS)) && id(shop, forgotCommit) === forgotCommit, JSON.stringify(await inv('slots:list', shop)))
+
   } finally {
     await app.close().catch(() => undefined)
   }

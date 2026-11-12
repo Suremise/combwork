@@ -19,7 +19,8 @@ import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
 import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
-import { forwardDirection, forwardPermitted, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
+import { forwardDirection, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
+import { forwardNow, type ForwardPair } from './forwardNow'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
@@ -29,7 +30,7 @@ import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
 import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
-import { lineHistory } from '../platform/historyPorts'
+import { historyFor, lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
@@ -530,12 +531,25 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
     const rec = wf?.store.cards().find((c) => c.id === n)
     const f = rec ? wf!.state(rec).forward : null
     if (!f) continue
-    const d = forwardDirection(f.from, f.to, await defaultBranch(ws, p.path))
-    if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec!.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
+    await mayGoNow(wf!, rec!, p.path, f)
     const head = await lineHistory().lineHead(p.path, f.from)
     return head && !isUnknown(head) ? { source: head } : null
   }
   return null
+}
+
+/**
+ * HI-3085: Retry merge's and Resolve on a builder's direction check, the queue's own (forwardNow, HI-3049): throws
+ * ForwardRefused when forward `f` can't go now, saying why. Against the release path's direction it never goes without
+ * the user's override; the project folder switched to another branch (no main or master) or a default branch that can't
+ * be read is only for now, and says what to do, never to remove the card.
+ */
+async function mayGoNow(wf: Workflow, rec: CardRecord, projectPath: string, f: ForwardPair): Promise<void> {
+  const now = await forwardNow(historyFor(wf.rulesetOf(rec).options.platform), projectPath, f)
+  if (now.ok) return
+  if (now.is === 'direction') throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(now.d) }), { kind: 'invalid' })
+  if (now.is === 'switched') throw new ForwardRefused(withValues(FORWARD_TEXT.folderSwitched, { card: rec.key, now: now.now, was: now.was }), { kind: 'conflict' })
+  throw new ForwardRefused(withValues(FORWARD_TEXT.defaultUnread, { card: rec.key, from: f.from, to: f.to }), { kind: 'conflict' })
 }
 
 /** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
@@ -554,6 +568,8 @@ const FORWARD_TEXT = {
   raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
   direction: msg({ id: 'service.forward.direction', defaultMessage: '{to} isn’t brought up to date with {from}: {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Nothing was queued. {dir, select, backward {Bring {from} up to date with {to} instead, or, if you mean it, ask the Assistant with your explicit override.} other {If you mean it, ask the Assistant with your explicit override.}}', description: 'HI-2892: a forward merge refused: it would bring branch {to} up to date with branch {from} against the release path’s direction (forward merges go from a release, or main, into the next version). {why} says why (select: translate each; keep the keys): {to} is an older version, {to} is the repository’s default branch (main), the two names are the same version, or Combwork can’t order them. {dir}: backward (the reverse is the right way) or other. Branch names stay as they are.' }),
   directionRetry: msg({ id: 'service.forward.directionRetry', defaultMessage: '{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.', description: 'HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there.' }),
+  folderSwitched: msg({ id: 'service.forward.folderSwitched', defaultMessage: '{card} waits: the project folder has {now} checked out, so git names {now} the default branch (this repository has no main or master), and it was {was} when {card}’s direction was checked. Check out {was} in the project folder, then try again.', description: 'HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key, such as HI-12): in a repository with no main or master, git names the project folder’s checked-out branch as the default, and the folder was switched from {was} to {now} since the card’s direction was checked. Nothing changed. Branch names stay as they are.' }),
+  defaultUnread: msg({ id: 'service.forward.defaultUnread', defaultMessage: '{card} waits: Combwork can’t read which branch is this repository’s default now (with no main or master, it is the branch the project folder has checked out), so it can’t tell whether {from} into {to} goes the release path’s way. Put the project folder on its branch, then try again.', description: 'HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key) bringing branch {to} up to date with {from}: git couldn’t name the default branch (the project folder on no branch, say). Nothing changed. Branch names stay as they are.' }),
   openNoOverride: msg({ id: 'service.forward.openNoOverride', defaultMessage: '{card} is bringing {to} up to date with {from} already, without an override, so the override wasn’t applied to it: remove it from the queue first, then ask again.', description: 'HI-2892: a forward merge asked with the user’s explicit override while a card ({card}: its key) for the same pair of branches ({from} into {to}) is open already, made without one: nothing changed.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
@@ -657,10 +673,9 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   // HI-2892, as Retry: only in the release path's direction as it reads now, unless its own request recorded the user's
   // override; one returned for its direction is ended by Remove from queue alone, never handed to a builder.
   const f = wf.state(rec).forward!
+  await mayGoNow(wf, rec, projectPath, f)
   // HI-3049: the default branch as it reads now, recorded on the resolution with the direction it gave.
   const main = await defaultBranch(ws, projectPath)
-  const d = forwardDirection(f.from, f.to, main)
-  if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
   const back = wf.returnedForward(rec)
   if (!back) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: rec.key }), { kind: 'conflict' })
   const by = actor.kind === 'assistant' ? 'assistant' : 'user'

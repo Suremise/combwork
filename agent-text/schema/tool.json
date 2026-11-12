@@ -555,7 +555,8 @@
       "to": "plain",
       "from": "plain",
       "queued": "select",
-      "card": "plain"
+      "card": "plain",
+      "overridden": "select"
     }
   },
   "tool.queue.reply.resolve": {

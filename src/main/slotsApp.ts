@@ -27,7 +27,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, folderThere, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -987,10 +987,11 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // the pool works on the slot or it owes a settle (HI-2912, slotStaleView.ts): its last answer for that folder.
       const jj = s.platform === 'jj'
       const stale = jj ? await view.staleOf(s.name) : false
-      // Kept for a card (HI-2995), dirty; or with its folder gone (HI-3032): its record, for Remove….
+      // Kept for a card (HI-2995), dirty; or with its folder gone (HI-3032), or there but its workspace no longer listed
+      // (HI-3097, `forgotten`): its record, for Remove….
       const record = jj && (s.state === 'dirty' || s.state === 'gone') ? pool.keptRecord(s.name) : null
       const keptFor = record?.card ?? null
-      const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name) } : null
+      const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
       return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}) }
     })
   )
@@ -1000,9 +1001,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
  * A slot kept for a card with its folder gone, removed by the user (HI-3032, Slots and copies' Remove…): only the one the
  * window showed (`generation`, `card`), checked again under the removal (SlotPool.removeKeptGone).
  */
-export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, name: string, card: number, generation: string): Promise<{ ok: true } | { ok: false; why: string }> {
+export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, name: string, card: number, generation: string, forgotten: boolean): Promise<{ ok: true } | { ok: false; why: string }> {
   const pool = await poolFor(ws, projectPath)
-  const r = await pool.removeKeptGone(name, { card, generation })
+  const r = await pool.removeKeptGone(name, { card, generation }, forgotten)
   if (r.ok) return r
   log.info(`Slot ${userText(name)}, kept for #${card}, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
   return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }

@@ -43,6 +43,8 @@ export interface QueueQueued {
   at: string
   /** HI-2709: the cards it waits for (keys), blocked by them while they aren't Done: the queue goes on without it. */
   waitingOn?: string[]
+  /** HI-3084: a forward merge's branches (HI-2679): removed, it ends in Done, nothing merged, and its confirmation says so. */
+  forward?: { from: string; to: string }
 }
 
 /** An entry's outcome, kept for the panel: merged (with the result), returned to its builder (why, the log, the files), cancelled. */

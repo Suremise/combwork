@@ -289,7 +289,7 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   if ('dry' in written) return { slot: written.dry.name, folder: written.dry.folder, lease: '', fresh: false }
   if ('lease' in written) return leaseAt(pool, written.lease)
   if (o.dry) {
-    const preview = pool.keptPreview(card.id)
+    const preview = await pool.keptPreview(card.id)
     if (preview) return 'wait' in preview ? preview : { slot: preview.slot.name, folder: preview.slot.folder, lease: '', fresh: false }
     return couldLend(pool, projectPath, builder)
   }

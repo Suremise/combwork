@@ -499,6 +499,7 @@ interface CombworkMessageValues {
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
   'workflow.slots.keptFor': { card: string | number }
+  'workflow.slots.keptForgottenFor': { card: string | number }
   'workflow.slots.keptGoneFor': { card: string | number }
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
@@ -522,6 +523,7 @@ interface CombworkMessageValues {
   'workflow.slots.recoveredPutBack': { n: number }
   'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
+  'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
   'workflow.slots.removeKept': undefined
   'workflow.slots.removeKeptMessage': { card: string | number; commit: string }
   'workflow.slots.removeKeptTitle': { slot: string | number }
@@ -536,6 +538,7 @@ interface CombworkMessageValues {
   'workflow.slots.stale': undefined
   'workflow.slots.state.creating': undefined
   'workflow.slots.state.dirty': undefined
+  'workflow.slots.state.forgotten': undefined
   'workflow.slots.state.gone': undefined
   'workflow.slots.state.kept': undefined
   'workflow.slots.state.lent': undefined

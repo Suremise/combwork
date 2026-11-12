@@ -87,6 +87,7 @@ interface CombworkMessageValues {
   'service.folderChanges.changed': { folder: string | number }
   'service.folderChanges.commitFailed': { why: string | number }
   'service.folderChanges.commitTimedOut': { seconds: number }
+  'service.folderChanges.commitTimedOutMoved': { seconds: number; head: string }
   'service.folderChanges.deletedKept': { file: string | number }
   'service.folderChanges.detached': { folder: string | number }
   'service.folderChanges.indexBusy': undefined
@@ -110,9 +111,11 @@ interface CombworkMessageValues {
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
+  'service.forward.defaultUnread': { card: string | number; from: string | number; to: string | number }
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
   'service.forward.direction': { to: string | number; from: string | number; why: string; dir: string }
   'service.forward.directionRetry': { card: string | number; why: string; to: string | number; from: string | number }
+  'service.forward.folderSwitched': { card: string | number; now: string | number; was: string | number }
   'service.forward.missing': { unknown: string; branch: string | number }
   'service.forward.noGit': undefined
   'service.forward.notAgents': undefined

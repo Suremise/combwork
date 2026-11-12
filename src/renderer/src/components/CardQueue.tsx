@@ -5,13 +5,14 @@ import { pauseText, returnCheck, returnRun, returnWhy, stepText } from '@shared/
 import { approveNote, QUEUE_ADVANCE_GATE } from '@shared/workflow/facts'
 import { APPROVE_NOTE } from '@shared/workflow/texts'
 import type { QueueRecent, QueueStuck, QueueView } from '@shared/workflow/queue'
-import { approveAnswer, declineAnswer, type ForYouAnswer, type WorkView } from '@shared/workflow/workView'
+import { approveAnswer, declineAnswer, forwardWaitOf, type ForwardWait, type ForYouAnswer, type WorkView } from '@shared/workflow/workView'
 import type { ConflictFile, ConflictsRecord } from '@shared/workflow/conflicts'
 import type { ProgressRun, TaskCard } from '@shared/types'
 import { attempt } from '../actions'
 import { call, callShared } from '../api'
 import { useForYou } from '../forYou'
 import { showQueueRun } from '../queueSource'
+import { removeFromQueue } from '../queueRemove'
 import { confirm, notify, prompt, useStore } from '../store'
 import { timeAgo } from '../util'
 import { FolderChangeButtons } from './FolderChangeButtons'
@@ -52,6 +53,8 @@ const M = {
   retryUsed: msg({ id: 'board.workQueue.retryUsed', defaultMessage: 'Retry merge was used for this revision: a new revision goes to the queue once it is submitted and passes review.', description: "The card dialog's Work section, on a card the merge queue returned after a Retry merge: Retry merge works once per revision, so it isn't offered again; the next way back into the queue is a new revision through review. Glossary: revision." }),
   retryConfirm: msg({ id: 'board.workQueue.retryConfirm', defaultMessage: 'Retry merge', description: 'The button confirming Retry merge. Keep it short.' }),
   retryFailed: msg({ id: 'board.workQueue.retryFailed', defaultMessage: "Couldn't retry the merge", description: "An error's title: Retry merge failed (the card dialog); its message says why." }),
+  forwardRemoveOnly: msg({ id: 'board.workQueue.forwardRemoveOnly', defaultMessage: 'No agent works on a forward merge: it waits for you. It went against the release path’s direction ({from} into {to}), so it can’t be merged or handed to a builder: Remove from queue ends it, nothing merged.', description: "HI-3084: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned because it would merge against the release path's direction (an older version from a newer one, say): only Remove from queue ends it. Remove from queue is a command: as translated there." }),
+  remove: msg({ id: 'board.workQueue.remove', defaultMessage: 'Remove from Queue…', description: "HI-3084: a button in the card dialog's Work section on a forward merge card the merge queue returned (or whose merge was declined): ends it in Done, nothing merged (asks first). Title case, as the window's buttons." }),
   forwardNext: msg({ id: 'board.workQueue.forwardNext', defaultMessage: 'No agent works on a forward merge: it waits for you. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} by hand; Remove from queue ends it, nothing merged.', description: "HI-2959: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned with a conflict or a red check: no agent may act on it, so the user (or the Assistant) chooses. Retry merge, Resolve on a builder and Remove from queue are commands: as translated there." }),
   resolve: msg({ id: 'board.workQueue.resolve', defaultMessage: 'Resolve on a Builder…', description: "HI-2959: a button in the card dialog's Work section on a forward merge card the merge queue returned: ends it and makes an ordinary card for an agent (a builder) to do the merge by hand and resolve its conflict (asks first). Title case, as the window's buttons." }),
   resolveTitle: msg({ id: 'board.workQueue.resolveTitle', defaultMessage: 'Resolve {card} on a builder?', description: "HI-2959: title of the confirmation before Resolve on a builder ({card}: the forward merge card's key)." }),
@@ -122,6 +125,8 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
   const runs = useStore((s) => s.progressRuns)
   const forYou = useForYou().byCard.get(card.number) ?? []
   const advance = forYou.find((i) => i.gate === QUEUE_ADVANCE_GATE)
+  // HI-3084: a forward merge back from the queue (returned or declined), waiting for the user's choice.
+  const fwait = forwardWaitOf(w)
   const stuck = queue?.paused?.stuck && queue.paused.card?.toLowerCase() === card.key?.toLowerCase() ? queue.paused.stuck : null
   // Asked to show it (For you's link): once its state is read, into view, the keyboard on its first button.
   const part = useRef<HTMLDivElement>(null)
@@ -199,6 +204,7 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
           )}
         </div>
       )}
+      {fwait && q && <ForwardChoices card={card} wait={fwait} revision={short(q.revision)} />}
       {advance && <Advance card={card} request={advance.request} target={q?.target ?? target ?? ''} />}
       {queue?.paused && open && !stuck && <Paused queue={queue} projectPath={projectPath!} />}
       {stuck && <Stuck stuck={stuck} target={queue!.target} short={short} projectPath={projectPath ?? ''} />}
@@ -206,11 +212,31 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
   )
 }
 
+/**
+ * HI-2959, HI-3084: a forward merge that came back (returned, or its advance declined: Ask each time) waits for the user,
+ * no agent working on it: what its texts name. Retry merge (each time) and Resolve on a builder, and Remove from queue,
+ * which ends it, nothing merged; against the release path's direction Remove alone.
+ */
+function ForwardChoices({ card, wait, revision }: { card: TaskCard; wait: ForwardWait; revision: string }) {
+  const key = card.key ?? `#${card.number}`
+  return (
+    <>
+      <div className="card-work-queue-actions" data-forward-choices="">
+        {!wait.removeOnly && <RetryButton card={card} revision={revision} context="returned" />}
+        {!wait.removeOnly && <ResolveButton card={card} from={wait.from} to={wait.to} revision={revision} />}
+        <button type="button" className="btn small" data-action="remove-forward" onClick={() => void removeFromQueue(card.number, key, { from: wait.from, to: wait.to })}>
+          <Icon name="close" /> {tr(M.remove)}
+        </button>
+      </div>
+      <div className="faint card-work-queue-line" data-forward-next="">
+        {tr(wait.removeOnly ? M.forwardRemoveOnly : M.forwardNext, { from: wait.from, to: wait.to })}
+      </div>
+    </>
+  )
+}
+
 /** A return: why (the files for a conflict, the check by name), the output's last lines and Show log, Retry merge. */
 function Returned({ card, q, queue, short, runs, stage, retried, forward }: { card: TaskCard; q: NonNullable<WorkView['queue']>; queue: QueueView | null; short: (id: string) => string; runs: readonly ProgressRun[]; stage: WorkView['stage']; retried: boolean; forward: WorkView['forward'] }) {
-  // HI-2959: a forward merge (no builder) may be retried each time, or handed to a builder; against the release path's
-  // direction only Remove ends it.
-  const forwardChoices = !!forward && stage === 'active' && q.failure !== 'direction'
   const [all, setAll] = useState(false)
   const recent: QueueRecent = { card: card.number, key: card.key ?? '', title: card.title, entry: q.entry, outcome: 'returned', at: q.at ?? '', ...(q.failure ? { reason: q.failure } : {}), ...(q.transient ? { transient: true } : {}), ...(q.files ? { files: q.files } : {}), ...(q.check ? { check: q.check } : {}), ...(q.logPath ? { logPath: q.logPath } : {}) }
   const run = queue ? returnRun(queue, recent, runs) : null
@@ -256,15 +282,10 @@ function Returned({ card, q, queue, short, runs, stage, retried, forward }: { ca
             <Icon name="output" /> {all && !run?.logPath ? tr(M.hideLog) : tr(M.showLog)}
           </button>
         )}
-        {/* Once per revision, from Active (HI-1667: as the runtime allows it): not offered again once used since its submission. */}
-        {stage === 'active' && (forward ? forwardChoices : !retried) && <RetryButton card={card} revision={short(q.revision)} context="returned" />}
-        {forwardChoices && <ResolveButton card={card} from={forward.from} to={forward.to} revision={short(q.revision)} />}
+        {/* Once per revision, from Active (HI-1667: as the runtime allows it): not offered again once used since its submission.
+            A forward merge's choices are its own (ForwardChoices). */}
+        {stage === 'active' && !forward && !retried && <RetryButton card={card} revision={short(q.revision)} context="returned" />}
       </div>
-      {forwardChoices && (
-        <div className="faint card-work-queue-line" data-forward-next="">
-          {tr(M.forwardNext, { from: forward.from, to: forward.to })}
-        </div>
-      )}
       {stage === 'active' && retried && !forward && <div className="faint card-work-queue-line" data-retry-used="">{tr(M.retryUsed)}</div>}
     </div>
   )

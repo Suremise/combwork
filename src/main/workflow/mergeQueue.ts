@@ -25,13 +25,13 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
-import { forwardDirection, forwardPermitted } from '../../shared/workflow/forwardOrder'
+import { forwardNow } from './forwardNow'
 import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
-import { FOR_YOU, UNREADABLE, workflowText } from '../../shared/workflow/texts'
+import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
 import type { HistoryPort } from '../platform/history'
-import { isUnknown, unknown, type Maybe, type Unknown } from '../platform/types'
+import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
@@ -1061,7 +1061,27 @@ export class MergeQueue {
         await this.setCatchUp(target, c.to, null)
         return null
       }
-      if (f.found === 'requeue') {
+      // HI-3090: nor are its files rolled back under a commit the user made since. The table's rollback has every listed
+      // file staged as the result; one of them also as the local target has it now was changed by the user's commits
+      // (the listed files are those the result changes), so the user committed some or all of what the catch-up had
+      // staged (HR1's round 1: `git commit --only` of one of them). The whole-tree rollback would delete that file under
+      // their commit: its phase dropped instead, it is looked at again as a fresh one (paused `remoteDiverged` over the
+      // user's commit), anything left staged kept as it is, at the result.
+      const committed = f.found === 'rollback' && local ? await this.asIn(I, h, folder, c.files, local, 'some') : false
+      if (committed === null) return null
+      if (f.found === 'requeue' || committed) {
+        await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+        return 'again'
+      }
+    }
+    // HI-3090: a terminal state whose files are all as they were before the catch-up (the user's `git reset --hard` or
+    // `git stash` after a stop, or a folder switched to another branch before anything moved): nothing of it is left, and
+    // the advance's table can't say so (its phase `ref` expects the files moved). A catch-up's card is Done and published,
+    // so it is simply looked at again as a fresh one, never paused needing the user to put right what is already right.
+    if (f.found === 'stuck') {
+      const untouched = await this.asIn(I, h, folder, c.files, c.from, 'every')
+      if (untouched === null) return null
+      if (untouched) {
         await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
         return 'again'
       }
@@ -1094,6 +1114,20 @@ export class MergeQueue {
       return this.catchUpConfirm(target, c, folder)
     }
     return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
+  }
+
+  /**
+   * HI-3090: whether every (or some) listed file of a catch-up is, in the folder's index and working copy, as `commit`
+   * has it (nothing staged or changed against it); null when that can't be read. No list journalled: false (nothing to
+   * tell by). An empty list (a result that changes no file, as a forward merge after a release may: HR2's round 2): every
+   * one of none is as it was, and none is some.
+   */
+  private async asIn(I: IntegrationPort, h: ReturnType<MergeQueue['host']>, folder: string, files: string[] | undefined, commit: string, how: 'every' | 'some'): Promise<boolean | null> {
+    if (!files) return false
+    if (!files.length) return how === 'every'
+    const sd = await I.sides(h, folder, files, commit, commit)
+    if (!sd) return null
+    return how === 'every' ? sd.every((x) => x.side === 'expected') : sd.some((x) => x.side === 'expected')
   }
 
   /** `look`: whether the remote is asked before the local target is brought to the result (HI-3041; not right after publishing it). */
@@ -1654,30 +1688,12 @@ export class MergeQueue {
   private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean | Again> {
     const f = s.forward ?? s.resolves
     if (!f) return true
-    if (f.override) return true
-    const alone = forwardDirection(f.from, f.to, null)
-    if (alone.dir !== 'unknown' || alone.why !== 'unordered') return forwardPermitted(alone, f.override)
-    const H = this.history(card, s)
-    const none = (): Again => again(gitSaid(unknown(UNREADABLE.defaultBranch, { folder: this.project })))
-    const d = await H.defaultTarget(this.project).catch(() => null)
-    if (!d) return none()
-    if (isUnknown(d)) return again(gitSaid(d))
-    const there = await H.lineHead(this.project, d).catch(() => null)
-    if (there && isUnknown(there)) return again(gitSaid(there))
-    if (!there) return none()
-    if (forwardPermitted(forwardDirection(f.from, f.to, d), f.override)) return true
-    // HI-3049: no main or master, so the default named is only the branch the project folder has checked out; another
-    // than the one recorded at the request (or Resolve), which still exists, is the folder switched, not the release
-    // path changed: no answer, as HI-3040's. A main or master made since, or the recorded one gone, still returns it.
-    const was = f.defaultBranch
-    if (!was || was === d) return false
-    const main = await H.mainLine(this.project).catch(() => unknown(UNREADABLE.defaultBranch, { folder: this.project }))
-    if (isUnknown(main)) return again(gitSaid(main))
-    if (main !== null) return false
-    const kept = await H.lineHead(this.project, was).catch(() => unknown(UNREADABLE.line, { branch: was }))
-    if (isUnknown(kept)) return again(gitSaid(kept))
-    if (!kept) return false
-    return again(`${this.project} has ${d} checked out, so git names it the default branch (there is no main or master); it was ${was} when ${card.key}'s direction was checked. Check out ${was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
+    // HI-3085: the rule the window's and the Assistant's Retry merge and Resolve on a builder use too (forwardNow).
+    const now = await forwardNow(this.history(card, s), this.project, f)
+    if (now.ok) return true
+    if (now.is === 'direction') return false
+    if (now.is === 'unknown') return again(gitSaid(now.u))
+    return again(`${this.project} has ${now.now} checked out, so git names it the default branch (there is no main or master); it was ${now.was} when ${card.key}'s direction was checked. Check out ${now.was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
   }
 
   private history(card: CardRecord, s?: CardState): HistoryPort {

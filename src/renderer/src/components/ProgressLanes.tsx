@@ -5,7 +5,7 @@ import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shar
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages, TaskCard } from '@shared/types'
-import { addedPlace, droppedPlace, nudgedPlace, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
+import { addedPlace, droppedPlace, nudgedPlace, QueueFocus, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
 import { dayBounds, dayKey } from '@shared/laneDay'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
@@ -964,13 +964,22 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
   const [picking, setPicking] = useState(false)
   const [said, setSaid] = useState('')
   const ref = useRef<HTMLOListElement>(null)
-  const refocus = useRef<number | null>(null)
-  useLayoutEffect(() => {
-    const n = refocus.current
+  /**
+   * Where the focus goes after an edit asked from a row (HI-3068): only for that edit, once the lane is drawn showing it
+   * (QueueFocus: a row taken off in that same render, HI-3020; a move only once made), never for anyone else's change.
+   */
+  const focus = useRef<QueueFocus | null>(null)
+  focus.current ??= new QueueFocus()
+  const focusOn = (n: number | 'lane' | null): void => {
     if (n === null) return
-    refocus.current = null
-    ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)?.focus({ preventScroll: true })
-  }, [l])
+    const to = n === 'lane' ? ref.current?.closest<HTMLElement>('.progress-lane') : ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)
+    to?.focus({ preventScroll: true })
+  }
+  const shown = list.join()
+  useLayoutEffect(() => {
+    focusOn(focus.current!.due(shown ? shown.split(',').map(Number) : []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focusOn reads only refs
+  }, [l, shown])
   const reset = (): void => {
     setDragCard(null)
     setDropBefore(undefined)
@@ -1021,29 +1030,32 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
   }
   /**
    * Takes a card off from its row (Delete or ×). Its row goes, and the focus with it to the page's body, where Ctrl+Z
-   * (the Lanes tab's) no longer hears it (HI-3020): so the focus moves first to the next card's row, or the lane's own row
-   * when none comes after it.
+   * (the Lanes tab's) no longer hears it (HI-3020): so the focus moves to the next card's row, or the lane's own row when
+   * none comes after it. Only once the lane shows it made (HI-3068): moved before, a second Delete (or a held one) took
+   * the next card off too, and a refused one left the focus on a card it never asked about.
    */
   const takeOff = (n: number, row: HTMLElement | null): void => {
     if (!edit) return
     let next = row?.nextElementSibling ?? null
     while (next && !next.matches('.progress-lane-queue-row.movable')) next = next.nextElementSibling
-    const to = next instanceof HTMLElement ? next : row?.closest<HTMLElement>('.progress-lane')
-    to?.focus({ preventScroll: true })
-    void edit.run(removing(n))
+    const to = next instanceof HTMLElement && next.dataset.card ? Number(next.dataset.card) : 'lane'
+    const id = focus.current!.ask('off', n, to)
+    void edit.run(removing(n)).then((o) => focus.current!.settled(id, o === 'made'))
   }
   const nudge = (n: number, by: -1 | 1): void => {
     const label = cardLabelOf({ tasks }, n)
     if (!edit || nudgedPlace(rows, n, by) === null) return setSaid(tr(EDIT.stuck, { card: label }))
-    refocus.current = n
+    const id = focus.current!.ask('move', n)
     // One place on from where it is when its turn comes (HI-2932: two quick presses, two places), and said once made:
     // a refused move is never announced as made.
     void edit
       .run((cur, r, rev) => {
         const to = nudgedPlace(r, n, by)
+        if (to !== null) focus.current!.aim(id, to)
         return to === null ? null : { op: 'move', lane: cur.id, rev: rev(cur.id), card: n, to }
       })
       .then((o) => {
+        focusOn(focus.current!.settled(id, o === 'made'))
         if (o === 'skipped') return setSaid(tr(EDIT.stuck, { card: label }))
         if (o !== 'made') return
         const after = laneNow(l.id)
@@ -1101,7 +1113,8 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                       } else if (e.target === e.currentTarget && e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault()
                         e.stopPropagation()
-                        takeOff(c.number, e.currentTarget)
+                        // Held down, one card (HI-3068): the key's repeats take nothing more off.
+                        if (!e.repeat) takeOff(c.number, e.currentTarget)
                       }
                     }
                   }

@@ -12,6 +12,7 @@ import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
 import { FolderChangeButtons } from './FolderChangeButtons'
+import { removeFromQueue } from '../queueRemove'
 import { Icon, Tooltip } from './ui'
 
 /**
@@ -166,7 +167,7 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
                   </span>
                 ) : null}
                 <RevisionButton revision={q.revision} />
-                <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key)}>
+                <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key, q.forward)}>
                   {tr(msg({ id: 'board.queue.remove', defaultMessage: 'Remove', description: "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short." }))}
                 </button>
               </li>
@@ -291,17 +292,6 @@ export function RevisionButton({ revision, short = shortRevision }: { revision: 
       <code>{s}</code>
     </button>
   )
-}
-
-/** Remove from queue, after asking: the card goes back to Approved and its builder is told; it isn't merged. */
-async function removeFromQueue(n: number, key: string): Promise<void> {
-  const ok = await confirm({
-    title: tr(msg({ id: 'board.queue.removeTitle', defaultMessage: 'Remove {card} from the merge queue?', description: "Title of the confirmation before Remove from queue ({card}: the card's key). Glossary 2.5: merge queue." }), { card: key }),
-    message: tr(msg({ id: 'board.queue.removeMessage', defaultMessage: "It goes back to Approved and isn't merged. Its builder is told. To merge it later, requeue it from the card.", description: "The confirmation before Remove from queue (Progress panel). Approved is a stage (glossary 2.2)." })),
-    confirmLabel: tr(msg({ id: 'board.queue.removeConfirm', defaultMessage: 'Remove from queue', description: 'The button confirming Remove from queue. Keep it short.' }))
-  })
-  if (!ok) return
-  await attempt(tr(msg({ id: 'board.queue.removeFailed', defaultMessage: "Couldn't remove the card from the queue", description: "An error's title: Remove from queue failed (Progress panel); its message says why (its merge has begun, say)." })), () => call('queue:remove', n, ''))
 }
 
 /**
