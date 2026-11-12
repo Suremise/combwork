@@ -343,6 +343,8 @@ describe('a commit or stash past its bound (HI-3021)', () => {
   const sleeper = (pids: string): string => `sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" >> "${fwd(pids)}"`
   const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((pid) => pid > 0) : [])
   const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
+  /** Combwork's own git (GIT_PREFIX: no optional locks, no index refresh), as the queue's advance runs it. */
+  const realGit = async (cwd: string, args: string[]): Promise<GitResult> => (await import('../src/main/git')).git(cwd, args)
   let bound = 0
   beforeEach(() => {
     bound = changes.folderChangesBounds.actMs
@@ -587,6 +589,48 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const done = await settle('commit', ['a.txt'])
     expect(done.made).toBe(head())
     expect(lines()).toEqual([])
+  })
+
+  // HI-3056: the entries taken in had empty stat data, so the queue's advance (`read-tree -m -u`, which trusts stat data)
+  // refused them as "not uptodate" and the paused merge paused again as the target moving.
+  for (const action of ['commit', 'setAside'] as const)
+    it(`${action === 'commit' ? 'Commit' : 'Set Aside'} leaves the paths it took in fresh: the merge's advance (read-tree -m -u) goes through at once`, async () => {
+      sh(proj, 'switch', '-q', '-c', 'incoming')
+      commit(proj, { 'a.txt': 'incoming content\n' }, 'incoming')
+      sh(proj, 'switch', '-q', 'main')
+      writeFileSync(join(proj, 'a.txt'), 'the user\'s change\n')
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      await settle(action, ['a.txt', 'new.txt'])
+      const r = await realGit(proj, ['read-tree', '-m', '-u', 'HEAD', 'incoming'])
+      expect(r.err).toBe('')
+      expect(r.ok).toBe(true)
+      expect(read('a.txt')).toBe('incoming content\n')
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+    })
+
+  it('the refresh of what was taken in runs no hook and is bounded: a clean filter past its bound ended, the entries taken in as they are, the commit said made', async () => {
+    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
+    // Slow only for the real index's refresh (the scratch): the private commit's own clean runs at once.
+    writeFileSync(filter, `#!/bin/sh\ncase "$GIT_INDEX_FILE" in\n*.take)\n${slowScript(pids).split('\n').slice(1).join('\n')}\n;;\nesac\ncat\n`)
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    gitCalls = []
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
+    const refresh = gitCalls.filter((c) => c.args.includes('add') && c.args.includes('--refresh'))
+    gitCalls = null
+    expect(refresh).toHaveLength(1)
+    expect(refresh[0].timeout).toBe(changes.folderChangesBounds.actMs)
+    expect(refresh[0].args).toContain('core.fsmonitor=false')
+    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    sh(proj, 'config', '--unset', 'filter.slow.clean')
+    expect(lines()).toEqual([])
+    expect(existsSync(lockPath())).toBe(false)
+    expect(leftovers()).toEqual([])
   })
 
   it("HI-3053 (HR1's round 1): the paths another git changed found in one pass, never a scan per path: 50,000 selected", () => {

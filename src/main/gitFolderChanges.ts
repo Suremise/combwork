@@ -216,8 +216,17 @@ async function takeEntries(folder: string, index: string, copy: string, files: s
     // the repository's (noHooks), so it waits only on git's own work. Off main's thread (git's worker). The scratch is
     // Combwork's own, so its lock is too.
     const r = await git(folder, [...quiet.args, 'update-index', '-z', '--index-info'], undefined, input, { env: { ...process.env, GIT_INDEX_FILE: scratch } })
-    // Their stat data stays empty, so git compares their content once more: refreshing it could run a filter unbounded.
     if (!r.ok) return { ok: false, why: gitErrorLine(r.err) || r.err.trim() }
+    // HI-3056: their stat data is empty after --index-info, and what trusts it (the queue's `read-tree -m -u`) refuses
+    // them as "not uptodate". Refreshed in the scratch (`add --refresh`, only these paths, noHooks): a clean filter may
+    // run to compare content, so it is bounded, which is safe as the scratch and its lock are Combwork's own (an ended
+    // git leaves the scratch whole, written by rename or not at all). Failed or ended, they go in as they are.
+    const present = new Set(from.entries.map(pathOf))
+    const refresh = [...taken].filter((p) => present.has(p))
+    if (refresh.length) {
+      const fresh = await git(folder, [...quiet.args, 'add', '--refresh', ...PATHS_IN], undefined, pathsIn(refresh), { env: { ...quietEnv(), GIT_INDEX_FILE: scratch }, timeout: folderChangesBounds.actMs })
+      if (!fresh.ok) log.warn(`The index entries taken in ${userText(folder)} weren't refreshed${fresh.timedOut ? ' (ended at its bound)' : ''}: ${userText(gitErrorLine(fresh.err) || fresh.err.trim())}`)
+    }
     await rename(scratch, lock)
     // A git reading the index can hold it open a moment (Windows refuses the rename then): tried again briefly.
     for (let t = 1; !renamed; t++) {

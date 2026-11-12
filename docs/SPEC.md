@@ -6140,8 +6140,12 @@ touched:
   removes an `index.lock` it didn't make: what git leaves is the copy's, removed with the copy and every file git named after it (a
   stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
   or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
-  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in; their stat
-  data left empty rather than refreshed, which could run a filter unbounded); every other entry is left. **Another
+  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in); every
+  other entry is left. **Their stat data refreshed** (HI-3056): `--index-info` leaves it empty, and what trusts it
+  refused them (the queue's advance, `read-tree -m -u`: *Entry … not uptodate*, so the paused merge paused again as
+  the target moving after a Commit). So the new index is refreshed for those paths alone (`add --refresh`, noHooks),
+  bounded as the commit is (a clean filter may run to compare content), in the scratch file the new index is written
+  to before it goes in (below); ended or failed, the entries go in unrefreshed and it is logged. **Another
   git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
   `git add` of a path being committed can land before that step. So the step takes the real index's lock as git does
   (`index.lock`, made only if none is there; tried again briefly while another git holds it, and only that lock ever
