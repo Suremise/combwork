@@ -532,6 +532,23 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     expect(await memberRow(p)).toEqual(rowP)
   })
 
+  it.each([
+    ['reads as no repository (Mercurial found in it)', (q: string) => mkdirSync(join(q, '.hg'))],
+    ["can't be read (a .git file naming nothing)", (q: string) => writeFileSync(join(q, '.git'), 'gitdir: ./nowhere\n')]
+  ] as const)("HI-3071 (HR1's round 1): while only Q %s, P's switch back to Git still waits for Q's jj work", async (_what, hide) => {
+    const { w, p, q } = await members(false)
+    await leaseOk(w, q, 'jj')
+    hide(q)
+    await ss.mapStores(w)
+    const back = await sw.checkPlatformSwitch(w, p, 'git')
+    expect(back.refused).toEqual({ why: 'drain' })
+    expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['q'])
+    await expect(sw.setPlatform(w, p, 'git', { expected: 'jj', token: back.store!.token })).rejects.toThrow()
+    expect(await platformIn(w, p)).toBe('jj')
+    rmSync(join(q, '.hg'), { recursive: true, force: true })
+    rmSync(join(q, '.git'), { force: true })
+  })
+
   it('paused after its begin, then after its drain: nothing of the project is admitted, the other member is told to try again', async () => {
     const { w, p, q } = await members(true)
     for (const point of ['afterBegin', 'afterDrain'] as const) {

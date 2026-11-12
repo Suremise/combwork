@@ -17,6 +17,7 @@
 // shows (reconcile); recovery (`recoverFences`) does the same for a switch whose owner is gone, under the same lock.
 
 import { createHash, randomUUID } from 'crypto'
+import { lstat } from 'original-fs/promises'
 import { basename, dirname, join } from 'path'
 import { listLanes, rawLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
@@ -77,10 +78,16 @@ async function storeRead(path: string): Promise<string | 'none' | 'unknown'> {
   }
   const root = d.platform === 'git' || d.platform === 'jj' ? d.root : null
   if (!root) return 'none'
-  return commonGitDir(root).then(
-    (s) => storeKey(s),
-    () => 'unknown' as const
-  )
+  const s = await commonGitDir(root).catch(() => null)
+  // A store whose folder isn't a git folder (a `.git` file naming a missing one, read textually: HR1's round 1) proves
+  // nothing about where the project is: unknown, never another repository.
+  return s && (await gitDirThere(s)) ? storeKey(s) : 'unknown'
+}
+
+/** Whether a common git dir is there as one: a folder holding HEAD and objects (read; any failure counts as not). */
+async function gitDirThere(dir: string): Promise<boolean> {
+  const [head, objects] = await Promise.all([lstat(join(dir, 'HEAD')).catch(() => null), lstat(join(dir, 'objects')).catch(() => null)])
+  return !!head && !!objects?.isDirectory()
 }
 
 /** What a project's project.json holds of what a switch changes (its platform as in force). */
@@ -132,11 +139,13 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
     if (!cfg) continue
     const from = platformIdOf(p.path, cfg.platform)
     if (!isSelf) {
-      // HI-3071: a project read as on another repository is outside the group; one whose repository can't be read now
-      // stays in it while it is a member of this store's fence (never left undrained by one failed read).
+      // HI-3071: a project read as on another repository is outside the group; one whose repository can't be read now,
+      // or reads as none (its `.git` away a moment: HR1's round 1), stays in it while it is a member of this store's
+      // fence, as `mapStores` keeps it one (never left undrained by one failed read). Its membership itself unreadable:
+      // the switch is refused (`switching`), never decided without it.
       const s = await storeRead(p.path)
       const id = projectIdOf(cfg, p.path)
-      if (s === 'unknown' ? memberStoreOrNull(ws, id) !== store : s !== store) continue
+      if (s === 'unknown' || s === 'none' ? memberStoreOf(ws, id) !== store : s !== store) continue
     }
     if (!isSelf && from === 'none') {
       bystanders.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from })
@@ -519,15 +528,6 @@ export async function recoverFences(ws: WorkspaceService): Promise<void> {
  * The fence store of a project that is a member of one (HI-2974), null when it is in none. An unreadable member row or
  * fence refuses (`switching`: fail closed), never falls through to an unfenced switch.
  */
-/** A project's fence store, or null when it is no member or the board's record can't be read. */
-function memberStoreOrNull(ws: WorkspaceService, id: string): string | null {
-  try {
-    return memberStoreOf(ws, id)
-  } catch {
-    return null
-  }
-}
-
 export function memberStoreOf(ws: WorkspaceService, id: string): string | null {
   const m = boardRead(ws, (db) => membershipOf(metaOf(db), id))
   if (m === 'unreadable') throw refusalError({ why: 'switching' }) // i18n-ignore: a code or SQL, never shown as text

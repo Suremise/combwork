@@ -2714,9 +2714,10 @@ merges under jj.
   Only the participants are reconciled and take a new `current`. A member read on another repository, or no longer a
   project of the workspace, leaves its fence at the next refresh (`dropMember`), never while it takes part in a
   switch under way. HI-3071: a member whose repository can't be read at that refresh (git failing, jj's files
-  unreadable: `storeRead`'s `unknown`) or reads as none (its `.git` moved away a moment) stays a member, its mapping
-  unchanged too; and a switch's group keeps such a member while it can't be read, so it is drained and switched with
-  the rest rather than left outside.
+  unreadable, or a store that isn't a git folder, as a `.git` file naming a missing one: `storeRead`'s `unknown`) or
+  reads as none (its `.git` moved away a moment) stays a member, its mapping unchanged too; and a switch's group keeps
+  such a member, unknown or none, while it is this store's member (HR1's round 1), so it is drained and switched with
+  the rest rather than left outside; its membership itself unreadable refuses the switch (`switching`).
   **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
   (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
   The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
