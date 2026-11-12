@@ -650,9 +650,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
 
   it("another git writing the real index during every refresh (HR3's round 1): made again a few times, then taken in under the lock unrefreshed; each of its writes kept, the commit made", async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    let n = 0
+    let writes = 0
     beforeRefresh = (cwd) => {
-      writeFileSync(join(cwd, 'b.txt'), `staged by another git ${++n}\n`)
+      writeFileSync(join(cwd, 'b.txt'), `staged by another git ${++writes}\n`)
       sh(cwd, 'add', 'b.txt')
     }
     gitCalls = []
