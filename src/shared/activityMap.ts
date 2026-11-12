@@ -350,8 +350,14 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
       if (!stations.shell.here.includes(a.key)) stations.shell.here.push(a.key)
     }
   }
-  // Each station's last label: its newest call's (Shell keeps a running process's name).
-  const sorted = all.slice().sort((x, y) => (Date.parse(y.at ?? '') || 0) - (Date.parse(x.at ?? '') || 0))
+  // Each station's last label: its newest call's (Shell keeps a running process's name). Calls sharing a time (parallel
+  // calls, a script's, which all carry its time) or with none keep their transcript's order, the later first (HI-3029):
+  // each agent's calls are oldest first in `all`.
+  const time = (c: MapCall): number => Date.parse(c.at ?? '') || 0
+  const sorted = all
+    .map((c, i) => ({ c, i, t: time(c) }))
+    .sort((x, y) => y.t - x.t || y.i - x.i)
+    .map((x) => x.c)
   for (const c of sorted) {
     const s = stations[c.station]
     if (s.last || s.lastKind) continue
