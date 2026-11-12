@@ -8846,7 +8846,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     meanwhile leaves it waiting, and a refused or skipped edit, a move too, leaves it where it was, `QueueFocus`). A
     lane keeps a card to do (HI-3066, Darren 12 Nov, decision A): its last card not Done can't be taken off nor moved
     away by Move here, refused in place naming the lane and saying to end it (End Lane, Abandon Lane…), nothing saved,
-    and its × is turned off with that as its tooltip (a list of none was saved but never read back: the lane vanished,
+    and its ×'s tooltip says so (not turned off: a turned-off button shows no tooltip; a click shows the refusal) (a list of none was saved but never read back: the lane vanished,
     its Undo refused; one of Done cards only ended it at once). Add Card… searches the project's Todo cards by key or title, and
     a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
     (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
