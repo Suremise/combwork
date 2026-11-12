@@ -5928,7 +5928,8 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
   queue, for Retry merge or Resolve on a builder), and Done (nothing merged); a Done one stays Done. Todo (the project's
   rules now), a start or a Done one reopened (a new `Started` drops `forward`: an ordinary card on the project's default
   target) and a drag on past where it was (a builder's submit and review) are refused (`move.notFromHere`, naming its
-  own ways on), nothing written.
+  own ways on), nothing written. Back from On Hold to Merging it is queued again as a forward (`enqueueForward`), with
+  the commit its latest attempt froze (a Retry's too), never the source's head then.
 
 **Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
 to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
