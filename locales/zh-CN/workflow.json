@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "正在准备",
   "workflow.slots.state.dirty": "还留有更改",
   "workflow.slots.state.gone": "文件夹缺失",
+  "workflow.slots.state.kept": "保存着一张卡片的提交",
   "workflow.slots.state.lent": "使用中",
   "workflow.slots.state.ready": "就绪",
   "workflow.slots.state.removing": "正在移除",

@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "En préparation",
   "workflow.slots.state.dirty": "Contient encore des modifications",
   "workflow.slots.state.gone": "Dossier manquant",
+  "workflow.slots.state.kept": "Contient les commits d’une carte",
   "workflow.slots.state.lent": "Utilisé",
   "workflow.slots.state.ready": "Prêt",
   "workflow.slots.state.removing": "En cours de retrait",

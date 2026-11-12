@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "Configurándose",
   "workflow.slots.state.dirty": "Tiene cambios pendientes",
   "workflow.slots.state.gone": "Falta la carpeta",
+  "workflow.slots.state.kept": "Contiene los commits de una tarjeta",
   "workflow.slots.state.lent": "En uso",
   "workflow.slots.state.ready": "Listo",
   "workflow.slots.state.removing": "Quitándose",

@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "W przygotowaniu",
   "workflow.slots.state.dirty": "Zawiera pozostawione zmiany",
   "workflow.slots.state.gone": "Brak folderu",
+  "workflow.slots.state.kept": "Zawiera commity karty",
   "workflow.slots.state.lent": "W użyciu",
   "workflow.slots.state.ready": "Gotowy",
   "workflow.slots.state.removing": "W trakcie usuwania",

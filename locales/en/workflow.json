@@ -2091,6 +2091,10 @@
     "defaultMessage": "Folder missing",
     "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it)."
   },
+  "workflow.slots.state.kept": {
+    "defaultMessage": "Holds a card’s commits",
+    "description": "HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files."
+  },
   "workflow.slots.state.lent": {
     "defaultMessage": "In use",
     "description": "A slot’s state in the list under “Slots and copies”: lent to a card or a lane."

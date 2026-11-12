@@ -524,6 +524,7 @@ interface CombworkMessageValues {
   'workflow.slots.state.creating': undefined
   'workflow.slots.state.dirty': undefined
   'workflow.slots.state.gone': undefined
+  'workflow.slots.state.kept': undefined
   'workflow.slots.state.lent': undefined
   'workflow.slots.state.ready': undefined
   'workflow.slots.state.removing': undefined

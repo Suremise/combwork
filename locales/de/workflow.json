@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "Wird eingerichtet",
   "workflow.slots.state.dirty": "Enthält noch Änderungen",
   "workflow.slots.state.gone": "Ordner fehlt",
+  "workflow.slots.state.kept": "Enthält die Commits einer Karte",
   "workflow.slots.state.lent": "Belegt",
   "workflow.slots.state.ready": "Bereit",
   "workflow.slots.state.removing": "Wird entfernt",

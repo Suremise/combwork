@@ -522,6 +522,7 @@
   "workflow.slots.state.creating": "Being set up",
   "workflow.slots.state.dirty": "Has changes left in it",
   "workflow.slots.state.gone": "Folder missing",
+  "workflow.slots.state.kept": "Holds a card’s commits",
   "workflow.slots.state.lent": "In use",
   "workflow.slots.state.ready": "Ready",
   "workflow.slots.state.removing": "Being removed",

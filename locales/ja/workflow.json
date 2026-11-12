@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "準備中",
   "workflow.slots.state.dirty": "変更が残っている",
   "workflow.slots.state.gone": "フォルダーがない",
+  "workflow.slots.state.kept": "カードのコミットを保持",
   "workflow.slots.state.lent": "使用中",
   "workflow.slots.state.ready": "準備済み",
   "workflow.slots.state.removing": "削除中",

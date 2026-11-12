@@ -511,6 +511,7 @@
   "workflow.slots.state.creating": "Sendo preparado",
   "workflow.slots.state.dirty": "Tem alterações pendentes",
   "workflow.slots.state.gone": "Pasta ausente",
+  "workflow.slots.state.kept": "Contém os commits de um cartão",
   "workflow.slots.state.lent": "Em uso",
   "workflow.slots.state.ready": "Pronto",
   "workflow.slots.state.removing": "Sendo removido",
