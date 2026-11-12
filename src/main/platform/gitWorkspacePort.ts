@@ -5,13 +5,15 @@
 
 import { randomBytes } from 'crypto'
 import { dirname, join, resolve } from 'path'
-import { readFile } from 'original-fs/promises'
+import { existsSync, renameSync } from 'original-fs'
+import { readFile, rm as removeTree } from 'original-fs/promises'
 import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
 import { clearSubmoduleCheckouts, GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
 import { gitFilesExec } from './gitModulesRun'
+import { asideOf, entryIdSync, linksTo, provedSync, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
 
 /** A git command's answer as a step's: done, or git's own words. */
@@ -31,10 +33,71 @@ async function prunable(repo: string): Promise<string[]> {
   const common = (await git(repo, ['rev-parse', '--git-common-dir'])).out.trim()
   const out: string[] = []
   for (const m of `${r.out}\n${r.err}`.matchAll(/^Removing worktrees\/([^:]+):/gm)) {
-    const gitdir = await readFile(join(resolve(repo, common), 'worktrees', m[1], 'gitdir'), 'utf8').catch(() => '')
-    out.push(gitdir.trim() ? dirname(resolve(gitdir.trim())) : `(${m[1]})`)
+    const entry = join(resolve(repo, common), 'worktrees', m[1])
+    const gitdir = await readFile(join(entry, 'gitdir'), 'utf8').catch(() => '')
+    // A relative gitdir (git's worktree.useRelativePaths, or a colocated jj workspace's, HI-3069) is the entry's own.
+    out.push(gitdir.trim() ? dirname(resolve(entry, gitdir.trim())) : `(${m[1]})`)
   }
   return out
+}
+
+/** Tests: a synchronous step right before a registration is moved aside (dropRegistration), as HI-3046's hooks. */
+export const registrationSeams: { beforeAside?: (entry: string) => void } = {}
+
+/**
+ * HI-3069: the one registration (`<common>/worktrees/<id>`) whose gitdir names `folder`, dropped while that folder is
+ * absent, never by a repository-wide prune (which would also drop another worktree gone meanwhile, needing its
+ * registration for Repair). On HI-3046's owned-entry proof (jjGitLink.ts), its receipt taken now: the entry's file id
+ * and birth time, `worktrees`' own, its `gitdir` and `commondir` bytes. Proved synchronously (in place, physically in
+ * the store, not `locked`, the folder absent: only ENOENT or ENOTDIR counts as absent, any other error as doubt), moved
+ * aside out of `worktrees` atomically with nothing awaited between, proved again on what was moved (a reused name, a new
+ * entry: other ids), and only then removed. Anything that doesn't prove it is left: put back under its name when what
+ * was moved isn't it and the name is free, else left aside, said so. Nothing else is touched.
+ */
+async function dropRegistration(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }> {
+  const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  if (!r.ok) return { left: gitErrorLine(r.err) }
+  const store = r.out.trim()
+  const links = await linksTo(store, folder)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (!links) return { left: 'worktrees unreadable' } // i18n-ignore: a log line's detail, never shown
+  if (!links.length) return 'none'
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (links.length > 1) return { left: `${links.length} registrations name it` } // i18n-ignore: a log line's detail, never shown
+  const entry = links[0]
+  const [gitdir, commondir] = await Promise.all(['gitdir', 'commondir'].map((f) => readFile(join(entry, f), 'utf8').catch(() => null)))
+  const entryId = entryIdSync(entry)
+  const worktreesId = entryIdSync(worktreesOf(store))
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (gitdir === null || commondir === null || !entryId || !worktreesId) return { left: 'unreadable' } // i18n-ignore: a log line's detail, never shown
+  const receipt: GitLinkReceipt = { store, folder, workspace: '', generation: '', entry, entryId, worktreesId, gitdir, commondir }
+  // Synchronous from here to the move: nothing can be awaited between the proof and the rename.
+  const before = provedSync(receipt, entry, 'entry')
+  if (before) return { left: before }
+  const aside = asideOf(store, randomBytes(8).toString('hex'))
+  registrationSeams.beforeAside?.(entry)
+  try {
+    renameSync(entry, aside)
+  } catch (e) {
+    return { left: e instanceof Error ? e.message : String(e) }
+  }
+  const after = provedSync(receipt, aside, 'aside')
+  if (after) {
+    // What was moved isn't the entry proved (replaced between the proof and the move): back under its name if still free.
+    if (!existsSync(entry)) {
+      try {
+        renameSync(aside, entry)
+        return { left: after }
+      } catch {
+        /* left aside */
+      }
+    }
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    return { left: `${after}, left at ${aside}` } // i18n-ignore: a log line's detail, never shown
+  }
+  const e = await removeTree(aside, { recursive: true }).then(() => null, (x: Error) => x.message)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  return e ? { left: `${e}, left at ${aside}` } : 'dropped' // i18n-ignore: a log line's detail, never shown
 }
 
 /** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */
@@ -82,6 +145,7 @@ export const gitWorkspacePort: WorkspacePort = {
   copyIgnored: (repo, folder, patterns) => copyIgnored(repo, folder, patterns),
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
+  dropRegistration,
   prepare: async (folder, line, base, o) => {
     const cleared = await clearSlotSubmodules(folder, base ?? `refs/heads/${line}`)
     if (cleared) return { ok: false, err: cleared }

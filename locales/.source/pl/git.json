@@ -444,6 +444,7 @@
   "git.vc.store.gates": "What this repository uses, checked for jj:",
   "git.vc.store.group": "{n, plural, one {This project switches:} other {These projects share this repository and switch together:}}",
   "git.vc.store.heads": "jj has {n, plural, =0 {no readable operation head} one {# operation head} other {# operation heads}}: let jj reconcile them first.",
+  "git.vc.store.kept": "{project}: {card}’s committed work, kept in slot {slot} for when it starts again: start {card} and finish it",
   "git.vc.store.lane": "{project}: lane “{name}” (builder {builder})",
   "git.vc.store.laneUnnamed": "{project}: a lane (builder {builder})",
   "git.vc.store.limit": "{gate}: {why}",

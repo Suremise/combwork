@@ -239,6 +239,11 @@ export interface WorkspacePort {
   files?: WorkspaceFiles
   /** Registrations of workspaces whose folders are gone dropped (callers check `prunable` first where others may need theirs). */
   prune(repo: string): Promise<void>
+  /**
+   * HI-3069: the one registration naming `folder`, dropped only while that folder is absent, and no other: `dropped`,
+   * `none` (nothing registers it), or why it was left (several name it, it is locked, the folder is back, a read failed).
+   */
+  dropRegistration?(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }>
 
   // Preparation.
   /**

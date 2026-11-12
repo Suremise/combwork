@@ -475,6 +475,7 @@
   "git.vc.store.conflictedBookmark": "书签 {name} 有冲突：请用 jj 解决。",
   "git.vc.store.conflictedCommit": "提交 {commit} 中存有冲突：请用 jj 解决。",
   "git.vc.store.copy": "{project}：{kind, select, review {评审副本} other {检查副本}} {copy}",
+  "git.vc.store.kept": "{project}：{card} 已提交的工作保留在槽位 {slot} 中，供其再次开始时使用：请开始 {card} 并完成它",
   "git.vc.store.drain": "此仓库上仍有内容在运行（全部结束后才会切换）：",
   "git.vc.store.fallback": "切换回 Git 之前：",
   "git.vc.store.fallbackUnknown": "无法读取仓库（{detail}）。",

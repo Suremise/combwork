@@ -30,7 +30,7 @@ import { locksSettled } from './lockRecord'
 import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { Workflow, type SlotForStart } from './runtime'
+import { Workflow, type KeptAcross, type SlotForStart } from './runtime'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
@@ -79,6 +79,8 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
 export interface SlotStarts {
   leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
+  /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross), else null. */
+  keptAcross?: (ws: WorkspaceService, project: string, card: number) => Promise<KeptAcross | null>
   /**
    * After #1441's migration: an agent's adopted worktree (its carried slot) while what it is kept for (the lane running at
    * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
@@ -212,6 +214,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // jj's card work (HI-2868), composed once for the project while slots run.

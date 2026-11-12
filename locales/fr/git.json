@@ -475,6 +475,7 @@
   "git.vc.store.conflictedBookmark": "Le signet {name} est en conflit : résous-le avec jj.",
   "git.vc.store.conflictedCommit": "Le commit {commit} stocke des conflits : résous-les avec jj.",
   "git.vc.store.copy": "{project} : {kind, select, review {copie de relecture} other {copie de vérification}} {copy}",
+  "git.vc.store.kept": "{project} : le travail commité de {card}, gardé dans l’emplacement {slot} pour son prochain démarrage : démarre {card} et termine-la",
   "git.vc.store.drain": "Encore en cours sur ce dépôt (le changement attend que tout soit terminé) :",
   "git.vc.store.fallback": "Avant de revenir à Git :",
   "git.vc.store.fallbackUnknown": "Impossible de lire le dépôt ({detail}).",

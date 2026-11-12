@@ -445,6 +445,7 @@ interface CombworkMessageValues {
   'git.vc.store.gates': undefined
   'git.vc.store.group': { n: number }
   'git.vc.store.heads': { n: number }
+  'git.vc.store.kept': { project: string | number; card: string | number; slot: string | number }
   'git.vc.store.lane': { project: string | number; name: string | number; builder: string | number }
   'git.vc.store.laneUnnamed': { project: string | number; builder: string | number }
   'git.vc.store.limit': { gate: string | number; why: string | number }

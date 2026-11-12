@@ -22,7 +22,7 @@ const lanes = await import('../src/main/lanes')
 const sw = await import('../src/main/workflow/platformSwitch')
 const ss = await import('../src/main/workflow/storeSwitch')
 const { workflowFor } = await import('../src/main/workflow/service')
-const { SlotStore } = await import('../src/main/slots')
+const { heldKey, SlotStore } = await import('../src/main/slots')
 const { CopyStore } = await import('../src/main/copies')
 const { boardConn } = await import('../src/main/slotsApp')
 const { metaOf } = await import('../src/main/platform/fenceAdmit')
@@ -364,6 +364,91 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     expect(back.refused).toEqual({ why: 'drain' })
     expect(back.store?.group.map((g) => g.name).sort()).toEqual(['p', 'q'])
     expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['p', 'p'])
+  })
+
+  const keptFolders = new Map<string, string>()
+  /**
+   * HI-3069: a slot of P's kept for a card (put back with commits, HI-2995): a jj slot lent and ended, its kept record
+   * written as the pool writes it. `as`: the platform its row is of (one left by a switch made before this fix).
+   */
+  async function keptSlot(w: WS, dir: string, card: number, as: 'git' | 'jj'): Promise<string> {
+    const r = await lease(w, dir, (await platformIn(w, dir)) === 'jj' ? 'jj' : 'git')
+    if (!r.ok) throw new Error(JSON.stringify(r.refusal))
+    // Its folder there, as a kept slot's is (the lease's row alone makes none).
+    mkdirSync(r.slot.folder, { recursive: true })
+    keptFolders.set(r.slot.name, r.slot.folder)
+    const slots = new SlotStore(boardConn(w), await idOf(w, dir))
+    await slots.end(r.lease.id, 'putBack')
+    const id = await idOf(w, dir)
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare('UPDATE slots SET platform = ? WHERE project = ? AND name = ?').run(as, id, r.slot.name)
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(heldKey(id, r.slot.name), JSON.stringify({ card, generation: 'g1' }))
+      })
+    )
+    return r.slot.name
+  }
+
+  it('HI-3069: a jj slot kept for a card refuses the switch back to Git, named; once it is gone, the switch goes', async () => {
+    const { w, p, q } = await members(false)
+    const slot = await keptSlot(w, p, 77, 'jj')
+    expect(new SlotStore(boardConn(w), await idOf(w, p)).openLeases()).toEqual([])
+    const check = await sw.checkPlatformSwitch(w, q, 'git')
+    expect(check.refused).toEqual({ why: 'drain' })
+    expect(check.store?.drain.kept).toEqual([{ project: 'p', slot, card: 77 }])
+    expect(check.store?.drain.slots).toEqual([])
+    await expect(sw.setPlatform(w, q, 'git', { expected: 'jj', token: check.store!.token })).rejects.toThrow()
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+    // To None too (P's own switch out of the fence): the kept slot could never be lent back there either.
+    expect((await sw.checkPlatformSwitch(w, p, 'none')).refused).toEqual({ why: 'memberDrain' })
+    // Its card finished (the record gone): the switch goes.
+    const pid = await idOf(w, p)
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('DELETE FROM board_meta WHERE key = ?').run(heldKey(pid, slot))))
+    const after = await sw.checkPlatformSwitch(w, q, 'git')
+    expect(after.refused).toBeNull()
+    expect(after.store?.drain.kept).toEqual([])
+  })
+
+  it('HI-3069: a jj slot kept while the repository is already on Git (switched before the fix) never refuses the switch back to jj', async () => {
+    const { w, p, q } = await members(true)
+    const slot = await keptSlot(w, p, 78, 'jj')
+    const check = await sw.checkPlatformSwitch(w, q, 'jj')
+    expect(check.store?.drain.kept).toEqual([])
+    expect(check.refused).toBeNull()
+    // Its slot is still kept: the switch back is its way on.
+    expect(new SlotStore(boardConn(w), await idOf(w, p)).keptSlots()).toEqual([{ slot, card: 78, platform: 'jj' }])
+  })
+
+  it.each(['project', 'slots'] as const)('HI-3069: a card whose jj slot was kept before a switch to Git (made before the fix) is refused at its start, cards in the %s folder, naming the way on', async (folder) => {
+    const { w, p } = await members(true)
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder } } }), { existing: true })
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Kept card', project: 'p' }, user))
+    const wf = (await workflowFor(w, p))!
+    expect(wf.rulesetOf(wf.store.card(card.number)).options.folder).toBe(folder)
+    const slot = await keptSlot(w, p, card.number, 'jj')
+    const { poolFor } = await import('../src/main/slotsApp')
+    const service = await import('../src/main/workflow/service')
+    service.setSlotStarts({ leaseFor: async () => null, unused: async () => undefined, keptAcross: async (ws, project, cardId) => (await poolFor(ws, project)).keptAcross(cardId) })
+    try {
+      const fresh = (await workflowFor(w, p))!
+      const r = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, agentActor('b-p')))
+      expect(r).toMatchObject({ refused: true, rule: 'platform.keptAcross' })
+      expect(JSON.stringify(r)).toContain(`kept in slot ${slot}, a jj slot from before the repository switched to Git`)
+      expect(JSON.stringify(r)).toContain('Switch the repository back to jj')
+      // The user's start too: never across it, in any folder.
+      const byUser = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user'))
+      expect(byUser).toMatchObject({ refused: true, rule: 'platform.keptAcross' })
+      // Its folder deleted since: the way on is Remove… (HR1's round 3: worded from the folder now, not the row).
+      rmSync(keptFolders.get(slot)!, { recursive: true, force: true })
+      const gone = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, agentActor('b-p')))
+      expect(gone).toMatchObject({ refused: true, rule: 'platform.keptAcross' })
+      expect(JSON.stringify(gone)).toContain('Its folder is gone')
+      expect(JSON.stringify(gone)).toContain('Remove…')
+      // Another card starts as before.
+      expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.keptAcross' })
+    } finally {
+      service.setSlotStarts(null)
+    }
   })
 
   it('paused after its begin, then after its drain: nothing of the project is admitted, the other member is told to try again', async () => {

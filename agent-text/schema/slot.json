@@ -155,6 +155,13 @@
   "slot.kept.other": {
     "placeholders": {}
   },
+  "slot.kept.platform": {
+    "placeholders": {
+      "platform": "plain",
+      "now": "plain",
+      "gone": "select"
+    }
+  },
   "slot.kept.stale": {
     "placeholders": {}
   },

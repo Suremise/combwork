@@ -475,6 +475,7 @@
   "git.vc.store.conflictedBookmark": "El marcador {name} está en conflicto: resuélvelo con jj.",
   "git.vc.store.conflictedCommit": "El commit {commit} guarda conflictos: resuélvelos con jj.",
   "git.vc.store.copy": "{project}: {kind, select, review {copia de revisión} other {copia de comprobación}} {copy}",
+  "git.vc.store.kept": "{project}: el trabajo confirmado de {card}, reservado en el slot {slot} para cuando vuelva a empezar: inicia {card} y termínala",
   "git.vc.store.drain": "Aún en ejecución en este repositorio (el cambio espera a que todo termine):",
   "git.vc.store.fallback": "Antes de volver a Git:",
   "git.vc.store.fallbackUnknown": "No se pudo leer el repositorio ({detail}).",

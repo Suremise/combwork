@@ -632,6 +632,8 @@
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} no puede empezar con estas reglas: su proyecto usa ahora {platform}.",
   "workflow.refused.platform.changed.next": "Vuelve a iniciarla: entonces se comprueba con las reglas de {platform}.",
+  "workflow.refused.platform.keptAcross.message": "{card} no puede empezar: su trabajo confirmado de antes de devolverla está reservado en el slot {slot}, un slot de {platform} de antes de que el repositorio cambiara a {now}.",
+  "workflow.refused.platform.keptAcross.next": "{gone, select, yes {Falta su carpeta, así que no queda nada con lo que seguir: quita el slot (Control de versiones → Slots y copias, Quitar…) y {card} empezará de cero desde su destino.} other {Vuelve a cambiar el repositorio a {platform} para seguir con {card} en ese slot.}}",
   "workflow.refused.platform.switching.message": "{card} no puede empezar ahora: se está cambiando el control de versiones de su repositorio.",
   "workflow.refused.platform.switching.next": "Inténtalo de nuevo en un momento, cuando el cambio haya terminado.",
   "workflow.refused.start.platformReady.message": "{card} no puede empezar: las tarjetas aún no se ejecutan en un proyecto jj.",

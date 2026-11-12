@@ -632,6 +632,8 @@
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "Karta {card} nie może wystartować według tych reguł: projekt używa teraz opcji {platform}.",
   "workflow.refused.platform.changed.next": "Uruchom ją ponownie: zostanie wtedy sprawdzona według reguł opcji {platform}.",
+  "workflow.refused.platform.keptAcross.message": "Karta {card} nie może wystartować: jej zatwierdzona praca sprzed odłożenia jest zachowana w slocie {slot}, slocie {platform} sprzed przełączenia repozytorium na {now}.",
+  "workflow.refused.platform.keptAcross.next": "{gone, select, yes {Brak jego folderu, więc nie zostało nic, z czym można kontynuować: usuń slot (Kontrola wersji → Sloty i kopie, Usuń…), a karta {card} zacznie od nowa od swojego celu.} other {Przełącz repozytorium z powrotem na {platform}, aby kontynuować kartę {card} w tym slocie.}}",
   "workflow.refused.platform.switching.message": "Karta {card} nie może teraz wystartować: kontrola wersji jej repozytorium jest właśnie przełączana.",
   "workflow.refused.platform.switching.next": "Spróbuj za chwilę, gdy przełączenie się zakończy.",
   "workflow.refused.start.platformReady.message": "Karta {card} nie może wystartować: karty jeszcze nie działają w projekcie jj.",

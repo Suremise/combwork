@@ -632,6 +632,8 @@
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card}は、このルールでは開始できません。プロジェクトは現在{platform}を使っています。",
   "workflow.refused.platform.changed.next": "もう一度開始してください。{platform}のルールで確認されます。",
+  "workflow.refused.platform.keptAcross.message": "{card}は開始できません。戻す前にコミットした作業が、リポジトリが{now}に切り替わる前の{platform}のスロット {slot} に保持されています。",
+  "workflow.refused.platform.keptAcross.next": "{gone, select, yes {そのフォルダーがないため、続けられるものは残っていません。スロットを削除すると（バージョン管理 → スロットとコピー、削除…）、{card}はターゲットから新しく始まります。} other {{card}をそのスロットで続けるには、リポジトリを{platform}に戻してください。}}",
   "workflow.refused.platform.switching.message": "{card}は今は開始できません。このリポジトリのバージョン管理を切り替え中です。",
   "workflow.refused.platform.switching.next": "切り替えが終わってから、もう一度お試しください。",
   "workflow.refused.start.platformReady.message": "{card}は開始できません。jjのプロジェクトではまだカードを実行できません。",

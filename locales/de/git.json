@@ -475,6 +475,7 @@
   "git.vc.store.conflictedBookmark": "Bookmark {name} hat einen Konflikt: Löse ihn mit jj auf.",
   "git.vc.store.conflictedCommit": "Commit {commit} speichert Konflikte: Löse sie mit jj auf.",
   "git.vc.store.copy": "{project}: {kind, select, review {Review-Kopie} other {Check-Kopie}} {copy}",
+  "git.vc.store.kept": "{project}: die committete Arbeit von {card}, in Slot {slot} für ihren nächsten Start aufbewahrt: Starte {card} und schließe sie ab",
   "git.vc.store.drain": "Läuft noch auf diesem Repository (der Wechsel wartet, bis alles beendet ist):",
   "git.vc.store.fallback": "Vor dem Zurückwechseln zu Git:",
   "git.vc.store.fallbackUnknown": "Das Repository konnte nicht gelesen werden ({detail}).",

@@ -2662,7 +2662,10 @@ merges under jj.
   whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
   of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
   `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
-  in flight, a member's merge queue with work, open slot leases, unfreed copy leases), `otherWorkspace` (the store is a
+  in flight, a member's merge queue with work, open slot leases, unfreed copy leases, and (HI-3069) each slot kept for
+  a card, `drain.kept`, that isn't of the platform switched to: it could never be lent back after the switch, so its
+  card is started and finished first; one already of that platform, left by a switch made before this, never refuses
+  the switch back to it; a member's switch to None counts every kept slot), `otherWorkspace` (the store is a
   project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
@@ -3342,6 +3345,26 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
   for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
   card's record goes; the binding unreadable, for the recorded card as before.
+  **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
+  store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
+  platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,
+  the builder's own worktree), is refused before its folder is chosen (`platform.keptAcross`, the runtime's
+  `keptAcross`), naming the way on by its folder as read then, not the row's `gone` (a folder restored since, or an
+  unlisted jj workspace's, HI-3097; absent only on ENOENT or ENOTDIR, unreadable never worded as gone, HR1's round 3):
+  its folder there, switching the repository back to the slot's
+  platform (Remove… refuses a slot whose commits aren't in the target, and nothing removes it by force); its folder
+  gone, **Remove…**. The pool's own lend and dry start say the same (`slot.kept.platform`), never `slot.kept.busy`.
+  That Remove… forgets only Combwork's record (`recordOnly`): the fence asked to admit the project's platform now, no
+  journal resumed, nothing asked of the slot's own platform's port, the session and in-flight guards, and the folder's
+  absence checked again right before the record goes, so a folder restored meanwhile is `changed`, nothing removed;
+  then Git's one registration of that absent folder (a colocated jj workspace's, `<common>/worktrees/<id>` whose
+  gitdir names it, a relative one read from the entry) is dropped by the project's port (`dropRegistration`), never by
+  a repository-wide prune, which would also drop another worktree gone meanwhile (HR1's round 1). It is dropped on
+  HI-3046's owned-entry proof (`jjGitLink.ts`), its receipt taken then: the entry's file id and birth time, `worktrees`'
+  own, its `gitdir` and `commondir` bytes; proved synchronously (in place, physically in the store, not `locked`, the
+  folder absent, absence only on ENOENT or ENOTDIR, any other error a doubt), moved aside out of `worktrees` with
+  nothing awaited between, proved again on what was moved (a name reused meanwhile is another entry), then removed
+  (HR2's round 2). Anything unproved is left, logged: put back under its name when what was moved isn't it.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that
