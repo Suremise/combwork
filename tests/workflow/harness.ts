@@ -2,6 +2,7 @@
 // store in a file of its own, and a Workflow over them, with wakes and notifications captured. Scenarios (SPEC §16.18)
 // drive it as agents and the user would, and read the facts.
 import { execFileSync } from 'child_process'
+import { createRequire } from 'module'
 import { cpSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
@@ -24,6 +25,7 @@ export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
 const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid']
+const runContext = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 /**
  * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
@@ -55,7 +57,7 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
   for (const [f, c] of Object.entries(files)) put(cwd, f, c)
   sh(cwd, 'add', '-A')
   const who = opts.email ? ['-c', `user.email=${opts.email}`] : []
-  const env = opts.at === undefined ? {} : { env: { ...process.env, GIT_COMMITTER_DATE: `@${Math.floor(opts.at / 1000)} +0000` } }
+  const env = opts.at === undefined ? {} : { env: { ...runContext.baseEnv(), GIT_COMMITTER_DATE: `@${Math.floor(opts.at / 1000)} +0000` } }
   execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe', ...env })
   return sh(cwd, 'rev-parse', 'HEAD')
 }
