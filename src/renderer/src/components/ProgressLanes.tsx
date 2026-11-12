@@ -5,7 +5,7 @@ import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shar
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import type { LaneCard, LaneEdit, LaneInfo, LaneStatus, ProgressRun, ProjectStages, TaskCard } from '@shared/types'
-import { addedPlace, droppedPlace, nudgedPlace, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
+import { addedPlace, droppedPlace, nudgedPlace, QueueFocus, queueRows, type BoardCard, type QueueRow } from '@shared/laneQueueEdit'
 import { dayBounds, dayKey } from '@shared/laneDay'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
@@ -964,19 +964,19 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
   const [picking, setPicking] = useState(false)
   const [said, setSaid] = useState('')
   const ref = useRef<HTMLOListElement>(null)
-  /** The row (its card) or the lane's own row ('lane') the focus goes to once the lane shows an edit made here. */
-  const refocus = useRef<number | 'lane' | null>(null)
+  /**
+   * Where the focus goes after an edit asked from a row (HI-3068): only once the lane is drawn showing that edit, in the
+   * same render (HI-3020: a row taken off never leaves it on the page's body); an update that doesn't show it leaves it
+   * waiting, and an edit not made drops it.
+   */
+  const focus = useRef(new QueueFocus())
+  const shown = list.join()
   useLayoutEffect(() => {
-    const n = refocus.current
+    const n = focus.current.due(shown ? shown.split(',').map(Number) : [])
     if (n === null) return
-    refocus.current = null
     const to = n === 'lane' ? ref.current?.closest<HTMLElement>('.progress-lane') : ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)
     to?.focus({ preventScroll: true })
-  }, [l])
-  /** An edit asked here that wasn't made (refused, or nothing to do): the focus it would have moved stays (HI-3068). */
-  const keepFocus = (o: EditOutcome, n: number | 'lane' | null): void => {
-    if (o !== 'made' && refocus.current === n) refocus.current = null
-  }
+  }, [l, shown])
   const reset = (): void => {
     setDragCard(null)
     setDropBefore(undefined)
@@ -1036,13 +1036,13 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
     let next = row?.nextElementSibling ?? null
     while (next && !next.matches('.progress-lane-queue-row.movable')) next = next.nextElementSibling
     const to = next instanceof HTMLElement && next.dataset.card ? Number(next.dataset.card) : 'lane'
-    refocus.current = to
-    void edit.run(removing(n)).then((o) => keepFocus(o, to))
+    const id = focus.current.ask('off', n, list, to)
+    void edit.run(removing(n)).then((o) => focus.current.settled(id, o === 'made'))
   }
   const nudge = (n: number, by: -1 | 1): void => {
     const label = cardLabelOf({ tasks }, n)
     if (!edit || nudgedPlace(rows, n, by) === null) return setSaid(tr(EDIT.stuck, { card: label }))
-    refocus.current = n
+    const id = focus.current.ask('move', n, list)
     // One place on from where it is when its turn comes (HI-2932: two quick presses, two places), and said once made:
     // a refused move is never announced as made.
     void edit
@@ -1051,7 +1051,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
         return to === null ? null : { op: 'move', lane: cur.id, rev: rev(cur.id), card: n, to }
       })
       .then((o) => {
-        keepFocus(o, n)
+        focus.current.settled(id, o === 'made')
         if (o === 'skipped') return setSaid(tr(EDIT.stuck, { card: label }))
         if (o !== 'made') return
         const after = laneNow(l.id)

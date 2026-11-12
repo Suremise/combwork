@@ -1,7 +1,7 @@
 // Progress → Lanes' editable queue (HI-2898): the window's working list, which rows keep their places, and where a
 // nudge or a drop puts a card. Main checks each edit again; this only decides what the window offers.
 import { describe, expect, it } from 'vitest'
-import { addedPlace, droppedPlace, fixedRows, newerLanes, nudgedPlace, ownRunAfter, queueRows, revisionToName, type QueueLane } from '../src/shared/laneQueueEdit'
+import { addedPlace, droppedPlace, fixedRows, newerLanes, nudgedPlace, ownRunAfter, QueueFocus, queueRows, revisionToName, type QueueLane } from '../src/shared/laneQueueEdit'
 import type { LaneCard } from '../src/shared/types'
 
 const lc = (number: number, column: LaneCard['column'], over: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...over })
@@ -104,5 +104,51 @@ describe('the revision an edit asked in turn names (HI-2932)', () => {
     expect(run).toEqual({ base: 8, now: 9 })
     expect(revisionToName(6, 9, run)).toBe(6)
     expect(revisionToName(8, 9, run)).toBe(9)
+  })
+})
+
+describe('QueueFocus: the focus moves once the edit asked shows, never before (HI-3068)', () => {
+  it('a card taken off: the next row once its row is gone, the lane when none follows', () => {
+    const f = new QueueFocus()
+    f.ask('off', 3, [1, 2, 3, 4], 4)
+    expect(f.due([1, 2, 3, 4])).toBeNull()
+    expect(f.due([1, 2, 4])).toBe(4)
+    expect(f.due([1, 2])).toBeNull()
+    f.ask('off', 4, [1, 2, 4], 'lane')
+    expect(f.due([1, 2])).toBe('lane')
+    // The row it would go to taken off meanwhile too: the lane.
+    f.ask('off', 1, [1, 2], 2)
+    expect(f.due([5])).toBe('lane')
+  })
+
+  it("HR1's round 1: another update while the edit waits, then refused: the focus stays, and no later update acts on it", () => {
+    const f = new QueueFocus()
+    const id = f.ask('off', 3, [1, 2, 3, 4], 4)
+    // Another window or an agent changes the lane while the edit waits (what makes main refuse it): its edit doesn't show.
+    expect(f.due([1, 2, 5, 3, 4])).toBeNull()
+    f.settled(id, false)
+    // Later updates, the card going too by someone else's change: nothing of the dropped intent.
+    expect(f.due([1, 2, 5, 4])).toBeNull()
+    expect(f.due([1])).toBeNull()
+  })
+
+  it('a move refused or skipped drops its intent; one made focuses the card once its place shows', () => {
+    const f = new QueueFocus()
+    const a = f.ask('move', 2, [1, 2, 3])
+    expect(f.due([1, 2, 3, 4])).toBeNull()
+    f.settled(a, false)
+    expect(f.due([1, 3, 2])).toBeNull()
+    const b = f.ask('move', 2, [1, 3, 2])
+    expect(f.due([1, 2, 3])).toBe(2)
+    f.settled(b, true)
+    expect(f.due([2, 1, 3])).toBeNull()
+  })
+
+  it('only the latest intent counts: an older edit answered late never drops a newer one', () => {
+    const f = new QueueFocus()
+    const older = f.ask('off', 2, [1, 2, 3], 3)
+    f.ask('off', 3, [1, 2, 3], 'lane')
+    f.settled(older, false)
+    expect(f.due([1, 2])).toBe('lane')
   })
 })

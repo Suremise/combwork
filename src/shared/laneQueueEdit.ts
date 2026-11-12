@@ -121,3 +121,37 @@ export function droppedPlace(rows: readonly QueueRow[], card: number | null, bef
   const to = from < at ? at - 1 : at
   return to === from ? null : to
 }
+
+/**
+ * Where the focus goes after an edit asked from a lane's rows (HI-3068), once that edit shows, never before: a card taken
+ * off (`off`) moves it to `to` (the next card's row, or the lane's own row) once the card's row is gone; a card moved
+ * (`move`) keeps it on the card's row once it shows in another place (its row is drawn again). An intent is the latest
+ * one asked; an update of the lane that doesn't show it (another window's change, an agent's) leaves it waiting, and one
+ * whose edit wasn't made (refused, or nothing to do) is dropped by its own id, so no later update acts on it.
+ */
+export class QueueFocus {
+  private intent: { id: number; kind: 'off' | 'move'; card: number; at: number; to: number | 'lane' } | null = null
+  private seq = 0
+
+  /** An edit asked of `card` at place `at` in `list`; returns its id. */
+  ask(kind: 'off' | 'move', card: number, list: readonly number[], to: number | 'lane' = card): number {
+    this.intent = { id: ++this.seq, kind, card, at: list.indexOf(card), to }
+    return this.seq
+  }
+
+  /** The edit `id` answered: not made, its intent goes (if it is still the latest). */
+  settled(id: number, made: boolean): void {
+    if (!made && this.intent?.id === id) this.intent = null
+  }
+
+  /** The lane drawn with `list`: the row (a card) or the lane ('lane') to focus now, or null while its edit doesn't show. */
+  due(list: readonly number[]): number | 'lane' | null {
+    const i = this.intent
+    if (!i) return null
+    const at = list.indexOf(i.card)
+    if (i.kind === 'off' ? at >= 0 : at === i.at) return null
+    this.intent = null
+    if (i.kind === 'move') return at >= 0 ? i.card : null
+    return i.to !== 'lane' && list.includes(i.to) ? i.to : 'lane'
+  }
+}
