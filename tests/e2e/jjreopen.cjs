@@ -182,6 +182,16 @@ const onDb = (fn) => {
     check(`after the restart, the move on main is observed within seconds: not in main yet (${took} ms)`, !!seen && took < PROMPT_MS, JSON.stringify({ before, record: record(), took, log: lib.combworkLogLines(userData).slice(since).filter((l) => /workflow|reconcil|jj/i.test(l)).slice(-40) }))
     const waiting = ((await inv('jj:waiting', shop)) ?? []).find((x) => x.card === n)
     check('…Waiting shows it', waiting?.contained?.state === 'notYet', JSON.stringify(waiting))
+    // The move's run goes on after the observation: it builds the card's candidate on main's new head. A run the reads
+    // ask for meanwhile waits for it, so the bound below would cover the rest of that run too (HI-3016: 23 s of it under
+    // load). Its candidate on the new head is that run's last step for the card: the reads start once Waiting shows it.
+    // (--ignore-working-copy: no snapshot, so this read is no operation of its own, asking for no run.)
+    const mainNow = jj(shop, '--ignore-working-copy', 'log', '-r', 'main', '--no-graph', '-T', 'commit_id').trim()
+    const rebuilt = await until(async () => {
+      const x = ((await inv('jj:waiting', shop)) ?? []).find((r) => r.card === n)
+      return x?.candidate?.state === 'ready' && x.candidate.expected === mainNow ? x : null
+    }, HUNG_MS)
+    check('…and its candidate on main as moved', !!rebuilt, JSON.stringify({ mainNow, waiting: await inv('jj:waiting', shop) }))
 
     // --- Waiting read over and over (jjlane's poll, every 200 ms) while the card has no observation: each read asks for a
     // run, and the asks never put it off (HI-2914: each one restarted the debounce, so none ran while the reads went on).
