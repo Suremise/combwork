@@ -6269,14 +6269,20 @@ touched:
   copy was taken; and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
   there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
   as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
-  in, and the refusal names the commit or stash made and the path kept (*Git made the commit (…), but another git
+  in, and the result's warning names the commit or stash made and the path kept (*Git made the commit (…), but another git
   command staged a.txt meanwhile, so Combwork kept that staging as it was …*). That step runs nothing of the repository's (HR2's rounds 3 and
   4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
   as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
   can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
-  the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
-  is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
+  the commit (…), but Combwork couldn't update the index for those files afterwards …*). **Made with a warning, never
+  a failure** (HI-3059): from the moment git has made the commit or stash, it is done: either of those two is a warning
+  on the result (`FolderChangesDone.warning`), not an error, and the window titles it as made (*Committed 1 file on
+  main, with a warning*, *Set 2 files aside on main, with a warning*, a warning notification), the warning under it;
+  never *Could not commit*. On a paused merge the queue is then resumed as after any Commit or Set aside: Resume's own
+  check of the folder decides (the index left differing from the commit, staged by another git, keeps it paused,
+  naming the file), never the warning itself. Should git also fail after making a stash (its own error, which names
+  the stash, is said), the warning is in the log. Nothing made: the real index is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
   more proof), even one made before its post-commit hook was ended: the real index being free, another git can commit
   meanwhile (HR2's round 3), and a hook's own git, which inherits everything the commit's has, can move HEAD or commit
   before or after the commit's write (HR2's rounds 1-3 on HI-3075), so nothing proves which made the commit now there.

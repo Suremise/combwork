@@ -13,6 +13,7 @@ import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
 import { msysBinFor } from '../src/main/gitWorker'
+import { englishText } from '../src/shared/advanced'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -687,11 +688,13 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       sh(cwd, 'add', 'a.txt')
       writeFileSync(join(cwd, 'a.txt'), 'later unstaged text\n')
     }
-    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
+    // HI-3059: made, with the warning (never thrown: the window titles it as made).
+    const done = await settle('commit', ['a.txt', 'new.txt'])
     expect(afterMade).toBeNull()
     expect(committed()).toEqual(['a.txt', 'new.txt'])
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('content Combwork commits')
-    expect(String(err)).toContain(`Git made the commit (${head().slice(0, 12)}), but another git command staged a.txt meanwhile`)
+    expect(done.made).toBe(head())
+    expect(englishText(done.warning!)).toContain(`Git made the commit (${head().slice(0, 12)}), but another git command staged a.txt meanwhile`)
     // The other git's staging kept, never written over; new.txt taken in; b.txt still staged as it was.
     expect(sh(proj, 'show', ':a.txt')).toBe('concurrently staged snapshot')
     expect(read('a.txt')).toBe('later unstaged text\n')
@@ -708,16 +711,35 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       writeFileSync(join(cwd, 'a.txt'), 'concurrently staged snapshot\n')
       sh(cwd, 'add', 'a.txt')
     }
-    const err = await settle('setAside', ['a.txt', 'b.txt']).catch((e: Error) => e)
+    const done = await settle('setAside', ['a.txt', 'b.txt'])
     expect(afterMade).toBeNull()
     const made = sh(proj, 'rev-parse', 'refs/stash')
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('set aside')
-    expect(String(err)).toContain(`Git set the changes aside in a stash (${made.slice(0, 12)}), but another git command staged a.txt meanwhile`)
+    expect(done.made).toBe(made)
+    expect(englishText(done.warning!)).toContain(`Git set the changes aside in a stash (${made.slice(0, 12)}), but another git command staged a.txt meanwhile`)
     expect(sh(proj, 'show', ':a.txt')).toBe('concurrently staged snapshot')
     expect(lines()).toEqual(['M  a.txt'])
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
   })
+
+  // HI-3059: the index step failing after the commit or stash is made (another git holding the real index's lock
+  // throughout): made all the same, with the warning, never thrown as a failure.
+  for (const action of ['commit', 'setAside'] as const)
+    it(`${action === 'commit' ? 'Commit' : 'Set Aside'}: its entries not taken in (the real index locked by another git throughout) is made, with the warning`, async () => {
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      afterMade = () => writeFileSync(lockPath(), '')
+      try {
+        const done = await settle(action, ['a.txt'])
+        expect(afterMade).toBeNull()
+        const made = action === 'commit' ? head() : sh(proj, 'rev-parse', 'refs/stash')
+        expect(done.made).toBe(made)
+        expect(englishText(done.warning!)).toContain(`${action === 'commit' ? 'Git made the commit' : 'Git set the changes aside in a stash'} (${made.slice(0, 12)}), but Combwork couldn't update the index for those files afterwards`)
+      } finally {
+        rmSync(lockPath(), { force: true })
+      }
+      expect(leftovers()).toEqual([])
+    })
 
   it('a shown path another git staged to the same entry it had (nothing changed) is taken in as usual: made, nothing said', async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
@@ -725,6 +747,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     afterMade = (cwd) => void sh(cwd, 'add', 'b.txt')
     const done = await settle('commit', ['a.txt'])
     expect(done.made).toBe(head())
+    expect(done.warning).toBeUndefined()
     expect(lines()).toEqual([])
   })
 

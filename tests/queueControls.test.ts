@@ -358,6 +358,34 @@ describe('Commit and Set aside on a paused merge (HI-2944)', () => {
     expect(host.kicked).toEqual([])
   })
 
+  // HI-3059: made with a warning (its index step), the commit stands: the merge goes on or stays paused by Resume's own
+  // check of the folder, as after any commit, never held by the warning itself.
+  it('a commit made with a warning: the folder clean, the merge goes on; its index left changed, it stays paused naming the file', async () => {
+    const WARNING = { lines: ['a warning from the index step'] }
+    const warned = (after?: (folder: string) => void) => ({
+      ...gitRepoOps,
+      settleChanges: async (...a: Parameters<typeof gitRepoOps.settleChanges>) => {
+        const done = await gitRepoOps.settleChanges(...a)
+        after?.(done.folder)
+        return { ...done, warning: WARNING }
+      }
+    })
+    const clean = await paused()
+    const r = await clean.settle('commit', ['a.txt'], undefined, warned())
+    expect(r).toMatchObject({ resumed: true, done: { action: 'commit', warning: WARNING } })
+    expect(clean.wf.store.queuePause('main')).toBeNull()
+    host.kicked.length = 0
+    // As when another git staged the path meanwhile (indexKept): the folder's index differs from the commit.
+    const staged = await paused()
+    const r2 = await staged.settle('commit', ['a.txt'], undefined, warned((folder) => {
+      writeFileSync(join(folder, 'a.txt'), 'staged by another git meanwhile\n')
+      git(folder, 'add', 'a.txt')
+    }))
+    expect(r2.resumed).toBe(false)
+    expect(staged.wf.store.queuePause('main')?.files).toEqual(['a.txt'])
+    expect(host.kicked).toEqual([])
+  })
+
   it('a paused file left changed: the merge stays paused, naming it', async () => {
     const { wf, settle } = await paused(['a.txt', 'c.txt'])
     const r = await settle('commit', ['a.txt'])

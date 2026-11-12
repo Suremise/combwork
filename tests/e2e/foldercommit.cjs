@@ -150,10 +150,22 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     const second = toast('Added /notes/ to .gitignore')
     await waitHung(async () => (await second.getByRole('button', { name: 'Commit It' }).count()) === 1)
     const at = git('rev-parse', 'HEAD')
+    // HI-3059: another git stages .gitignore once the commit is made, before Combwork takes its entries in (a post-commit
+    // hook staging through the real index): the commit stands, and the window says so, with the warning.
+    const hook = path.resolve(fx.alpha, git('rev-parse', '--git-path', 'hooks'), 'post-commit')
+    fs.mkdirSync(path.dirname(hook), { recursive: true })
+    fs.writeFileSync(hook, '#!/bin/sh\nunset GIT_INDEX_FILE\nprintf "/staged-meanwhile/\\n" >> .gitignore\ngit add .gitignore\n')
     await second.getByRole('button', { name: 'Commit It' }).click()
     check('Commit It: .gitignore alone committed, keep.txt still changed', !!(await waitHung(() => git('rev-parse', 'HEAD') !== at || null)) && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)
     check('…the line committed as written', git('show', 'HEAD:.gitignore').replace(/\r\n/g, '\n').endsWith('/reference/\n/notes/'), git('show', 'HEAD:.gitignore'))
-    git('checkout', '--', 'keep.txt')
+    const madeWarned = toast('Committed 1 file on main, with a warning')
+    check('…another git staged .gitignore meanwhile: titled as committed, with a warning', !!(await waitHung(async () => (await madeWarned.count()) === 1)), await page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
+    check('…saying the commit was made and that staging kept', /Git made the commit \([0-9a-f]{12}\), but another git command staged \.gitignore meanwhile/.test(await madeWarned.innerText()), await madeWarned.innerText())
+    check('…never as a failure', (await toast('Could not commit').count()) === 0)
+    await f.themes(page, madeWarned, 'foldercommit-commit-it-warning')
+    fs.rmSync(hook)
+    git('reset', '-q', '--', '.gitignore')
+    git('checkout', '--', '.gitignore', 'keep.txt')
 
     // --- HI-2988: a catch-up's pause (follow mode: the card merged and on the remote already, main behind it), seeded
     // with Combwork closed as such a pause is stored: the catch-up owed for main names the paused card. The paused merge
