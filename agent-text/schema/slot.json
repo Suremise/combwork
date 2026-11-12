@@ -144,11 +144,22 @@
   "slot.kept.gone": {
     "placeholders": {}
   },
+  "slot.kept.lane": {
+    "placeholders": {
+      "other": "plain"
+    }
+  },
   "slot.kept.other": {
     "placeholders": {}
   },
   "slot.kept.stale": {
     "placeholders": {}
+  },
+  "slot.kept.written": {
+    "placeholders": {
+      "agent": "plain",
+      "other": "plain"
+    }
   },
   "slot.laneEnd.merged": {
     "placeholders": {

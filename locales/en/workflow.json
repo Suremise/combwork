@@ -1983,6 +1983,10 @@
     "defaultMessage": "Kept for {card}: its committed work isn’t in the target yet",
     "description": "HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it."
   },
+  "workflow.slots.keptGoneFor": {
+    "defaultMessage": "Kept for {card}, but its folder is missing",
+    "description": "HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it."
+  },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
     "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12)."
@@ -2010,6 +2014,10 @@
   "workflow.slots.notRecovered": {
     "defaultMessage": "{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
     "description": "A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys."
+  },
+  "workflow.slots.notRemovedKept": {
+    "defaultMessage": "{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.",
+    "description": "HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys."
   },
   "workflow.slots.off": {
     "defaultMessage": "Off",
@@ -2066,6 +2074,22 @@
   "workflow.slots.release": {
     "defaultMessage": "Release…",
     "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
+  },
+  "workflow.slots.removeKept": {
+    "defaultMessage": "Remove…",
+    "description": "HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again."
+  },
+  "workflow.slots.removeKeptMessage": {
+    "defaultMessage": "{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
+    "description": "HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."
+  },
+  "workflow.slots.removeKeptTitle": {
+    "defaultMessage": "Remove {slot}?",
+    "description": "HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name."
+  },
+  "workflow.slots.removedKept": {
+    "defaultMessage": "{slot} is removed.",
+    "description": "HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name."
   },
   "workflow.slots.reviewCopies": {
     "defaultMessage": "Reviewers review in review copies",

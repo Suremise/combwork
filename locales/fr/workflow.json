@@ -640,5 +640,11 @@
   "workflow.summary.jj.pair": "Un agent relecteur valide chaque carte après les vérifications rapides, puis tu l’intègres toi-même.",
   "workflow.summary.jj.solo": "Chaque carte dans son propre workspace jj, sans relecture : tu intègres le travail toi-même.",
   "workflow.summary.jj.team": "Un agent relecteur, puis toi, vérifiez chaque carte après les vérifications rapides et les tests, puis tu l’intègres toi-même.",
-  "workflow.value.finish.userIntegrates": "Tu l’intègres toi-même"
+  "workflow.value.finish.userIntegrates": "Tu l’intègres toi-même",
+  "workflow.slots.keptGoneFor": "Gardé pour {card}, mais son dossier est manquant",
+  "workflow.slots.removeKept": "Supprimer…",
+  "workflow.slots.removeKeptTitle": "Supprimer {slot} ?",
+  "workflow.slots.removeKeptMessage": "{card} repart alors de sa cible, dans un autre slot. Le travail commité ici reste dans le stockage de jj{commit, select, none {.} other { : son dernier commit est {commit}.}}",
+  "workflow.slots.removedKept": "{slot} est supprimé.",
+  "workflow.slots.notRemovedKept": "{slot} n’a pas été supprimé : {why, select, changed {il a changé après l’affichage de la liste (son dossier est revenu, ou il a été recréé)} busy {quelque chose y travaille en ce moment} other {Combwork l’a gardé}}."
 }

@@ -14,7 +14,8 @@
 //   recovered (not stale any more), its Recover… gone; an edit the update also changed is written beside its file, and
 //   what Recover… did shows in a window naming that copy (HI-2996);
 // - the next card starts in that same slot (HI-2906); put back with a commit there, the slot is kept for it (Slots and
-//   copies: Kept for, in every language), and started again it gets that slot back with its commit (HI-2995);
+//   copies: Kept for, in every language), and started again it gets that slot back with its commit (HI-2995); put back
+//   again and its folder deleted, the row says so with Remove…, which, confirmed, removes it, its commit kept (HI-3032);
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
 // both themes.
@@ -356,6 +357,38 @@ const onDb = (fn) => {
       return v?.folder && v.workspace && v.folder.toLowerCase() === w1.folder.toLowerCase() ? v : null
     }, HUNG_MS)
     check('card 2 started again: the same slot back, with its commit', !!w3 && jj(w1.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${keptCommit} & ::${w1.workspace}@`, '-T', 'commit_id').trim() === keptCommit, JSON.stringify({ started3, w3, slots: await inv('slots:list', shop) }))
+
+    // HI-3032: put back again and its folder deleted: Slots and copies says it is kept but its folder is missing, with
+    // Remove…; confirmed (the work's last commit named), the slot goes and its commit stays in jj's store.
+    const key2 = (await card(n2)).key
+    const back3 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back again' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    check('card 2 put back again: kept for it', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot && s.keptFor === n2 && s.state === 'dirty' && !s.lease) ?? null, HUNG_MS)), JSON.stringify({ back3, slots: await inv('slots:list', shop) }))
+    const goneRow = await until(async () => {
+      try {
+        fs.rmSync(w1.folder, { recursive: true, force: true })
+      } catch {
+        return null // a file still open there for a moment (Windows): tried again
+      }
+      // A pool's look (its refresh) sees the folder gone.
+      await inv('slots:test', shop, { op: 'tidy' })
+      return (await inv('slots:list', shop)).find((s) => s.name === slot && s.state === 'gone' && s.keptFor === n2 && s.keptGone) ?? null
+    }, HUNG_MS)
+    check('its folder deleted: gone, still kept for card 2, its work recorded', !!goneRow && goneRow.keptGone.commit === keptCommit, JSON.stringify(await inv('slots:list', shop)))
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    check('Slots and copies: kept, folder missing, with Remove…', !!(await until(async () => (await row.locator('[data-action="remove-kept"]').count()) === 1 && /Folder missing/.test(await text(row)) && /but its folder is missing/.test(await text(row)), HUNG_MS)), await text(row))
+    await row.scrollIntoViewIfNeeded()
+    await shoot(row, 'slot-kept-gone')
+    await inEach(row, 'slot-kept-gone', (cat) => cat['workflow.slots.removeKept'])
+    await row.locator('[data-action="remove-kept"]').click()
+    const askRemove = page.locator('.dialog').filter({ hasText: `Remove ${slot}?` })
+    check('…the confirmation names the card and its last commit', !!(await until(async () => (await askRemove.count()) === 1 && (await text(askRemove)).includes(key2) && (await text(askRemove)).includes(keptCommit.slice(0, 7)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(askRemove, 'remove-kept-confirm')
+    await askRemove.getByRole('button', { name: 'Remove', exact: true }).click()
+    check('…removed: the slot gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot), HUNG_MS)) && id(shop, keptCommit) === keptCommit, JSON.stringify(await inv('slots:list', shop)))
+    check('…said so', !!(await until(async () => (await text(page.locator('.toasts'))).includes(`${slot} is removed.`), HUNG_MS)), await text(page.locator('.toasts')))
 
   } finally {
     await app.close().catch(() => undefined)

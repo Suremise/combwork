@@ -497,6 +497,7 @@ interface CombworkMessageValues {
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
   'workflow.slots.keptFor': { card: string | number }
+  'workflow.slots.keptGoneFor': { card: string | number }
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
   'workflow.slots.levelInherit': undefined
@@ -504,6 +505,7 @@ interface CombworkMessageValues {
   'workflow.slots.noSlots': undefined
   'workflow.slots.none': undefined
   'workflow.slots.notRecovered': { slot: string | number; why: string }
+  'workflow.slots.notRemovedKept': { slot: string | number; why: string }
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
@@ -518,6 +520,10 @@ interface CombworkMessageValues {
   'workflow.slots.recoveredPutBack': { n: number }
   'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
+  'workflow.slots.removeKept': undefined
+  'workflow.slots.removeKeptMessage': { card: string | number; commit: string }
+  'workflow.slots.removeKeptTitle': { slot: string | number }
+  'workflow.slots.removedKept': { slot: string | number }
   'workflow.slots.reviewCopies': undefined
   'workflow.slots.reviewCopiesDesc': undefined
   'workflow.slots.saveFailed': undefined
