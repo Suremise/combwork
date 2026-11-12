@@ -2711,9 +2711,12 @@ merges under jj.
   in the switch's own `finally`, still under the lock, from each member's disk (`readKeptJson`): forward when every
   member shows its after, else those showing after written back to their before (read back), the rest untouched, and
   **stuck** (left switching, its admissions refused, said in the log) when a member shows neither or can't be read.
-  Only the participants are reconciled and take a new `current`. A member that is on another repository, none, or no
-  longer a project of the workspace leaves its fence at the next refresh (`dropMember`), never while it takes part in a
-  switch under way.
+  Only the participants are reconciled and take a new `current`. A member read on another repository, or no longer a
+  project of the workspace, leaves its fence at the next refresh (`dropMember`), never while it takes part in a
+  switch under way. HI-3071: a member whose repository can't be read at that refresh (git failing, jj's files
+  unreadable: `storeRead`'s `unknown`) or reads as none (its `.git` moved away a moment) stays a member, its mapping
+  unchanged too; and a switch's group keeps such a member while it can't be read, so it is drained and switched with
+  the rest rather than left outside.
   **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
   (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
   The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
