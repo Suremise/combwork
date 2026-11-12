@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project} (jetzt {platform})",
   "git.vc.store.notExported": "Bookmark {name} ist in Git nicht dasselbe: Führe jj git export aus oder prüfe es.",
   "git.vc.store.queue": "{project}: seine Merge-Warteschlange",
+  "git.vc.store.stuck": "Combwork wurde beendet, während {projects} zwischen Git und jj gewechselt wurde, und kann an ihren Einstellungen nicht erkennen, in welche Richtung der Wechsel abzuschließen ist: {changed} wurde geändert oder kann nicht gelesen werden. Bis sie ihre Versionsverwaltung von vor oder nach dem Wechsel zeigen, startet auf ihrem Repository nichts.",
+  "git.vc.store.stuckTitle": "Ein Wechsel der Versionsverwaltung konnte nicht abgeschlossen werden",
   "git.vc.store.slot": "{project}: Slot {slot}, verliehen an {agent}",
   "git.vc.store.stock": "Die eigenen Standardeinstellungen von Git for Windows (sein LFS-Filter, der Diff-Treiber für Office-Dokumente) zählen nicht: nur was das Repository oder deine eigenen Git-Einstellungen verwenden.",
   "git.vc.store.toGit": "Combwork lässt .jj an seinem Platz: Entferne es mit jj, wenn du es nicht mehr willst.",

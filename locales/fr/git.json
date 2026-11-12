@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project} (actuellement {platform})",
   "git.vc.store.notExported": "Le signet {name} n’est pas le même dans Git : lance jj git export, ou vérifie-le.",
   "git.vc.store.queue": "{project} : sa file de fusion",
+  "git.vc.store.stuck": "Combwork s’est arrêté pendant le basculement de {projects} entre Git et jj, et ne peut pas savoir d’après leurs réglages dans quel sens le terminer : {changed} a été modifié ou ne peut pas être lu. Tant qu’ils n’indiquent pas leur gestion de versions d’avant ou d’après le basculement, rien ne démarre sur leur dépôt.",
+  "git.vc.store.stuckTitle": "Un changement de gestion de versions n’a pas pu être terminé",
   "git.vc.store.slot": "{project} : emplacement {slot}, prêté à {agent}",
   "git.vc.store.stock": "Les réglages par défaut de Git for Windows (son filtre LFS, le pilote de diff des documents Office) ne comptent pas : seul compte ce qu’utilisent le dépôt ou tes propres réglages Git.",
   "git.vc.store.toGit": "Combwork laisse .jj en place : supprime-le avec jj si tu n’en veux plus.",

@@ -1811,6 +1811,14 @@
     "defaultMessage": "Git for Windows’ own default settings (its LFS filter, the diff driver for Office documents) don’t count: only what the repository or your own Git settings use.",
     "description": "Under the gates in the warning before switching to jj (HI-2872): Git for Windows’ stock system settings are ignored. Keep Git for Windows (a product’s name) and LFS."
   },
+  "git.vc.store.stuck": {
+    "defaultMessage": "Combwork stopped while switching {projects} between Git and jj, and can’t tell from their settings which way to finish: {changed} changed or can’t be read. Until they show their version control from before or after the switch, nothing starts on their repository.",
+    "description": "HI-3073: a notice’s message. {projects} names the projects that were switching; {changed}, those whose project settings were changed by hand meanwhile or can’t be read. Keep Git and jj."
+  },
+  "git.vc.store.stuckTitle": {
+    "defaultMessage": "A version control switch couldn’t be finished",
+    "description": "HI-3073: a notice’s title. A switch between Git and jj was cut short (Combwork closed or crashed during it), and Combwork couldn’t settle it from the projects’ files, so the repository stays switching."
+  },
   "git.vc.store.toGit": {
     "defaultMessage": "Combwork leaves .jj in place: remove it with jj if you no longer want it.",
     "description": "In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj."

@@ -12,7 +12,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
-import { composeConfigEnv, forgetGitLfsVersion, gitFilesNeeded, gitFilesUse, insidePath, prepareGitFiles, resolveSubmoduleUrl, type GitFilesExec } from '../src/main/platform/gitModules'
+import { clearSubmoduleCheckouts, composeConfigEnv, forgetGitLfsVersion, gitFilesNeeded, gitFilesUse, insidePath, prepareGitFiles, resolveSubmoduleUrl, type GitFilesExec } from '../src/main/platform/gitModules'
 import { gitFilesExec } from '../src/main/platform/gitModulesRun'
 import { gitIntegration } from '../src/main/platform/gitIntegration'
 import type { CandidateHost } from '../src/main/platform/integration'
@@ -708,5 +708,17 @@ describe("HI-3027: the queue's folder, its submodule set up by the files step, a
     expect(out, JSON.stringify(out)).toHaveProperty('result')
     expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
     expect(existsSync(join(folder, 'libs', 's', '.git'))).toBe(true)
+  })
+
+  it("HI-3102: the folder's git dir is read from its .git with no git process; git is asked only where that can't be read", async () => {
+    const p = repo('q3102')
+    const folder = worktree(p)
+    const seen: { cwd: string; args: string[] }[] = []
+    expect(await clearSubmoduleCheckouts(exec({ seen }), folder, ['HEAD'])).toBeNull()
+    expect(seen).toEqual([])
+    const inner = join(folder, 'inner')
+    mkdirSync(inner)
+    expect(await clearSubmoduleCheckouts(exec({ seen }), inner, ['HEAD'])).toBeNull()
+    expect(seen.map((s) => s.args.join(' '))).toEqual(['rev-parse --path-format=absolute --absolute-git-dir'])
   })
 })

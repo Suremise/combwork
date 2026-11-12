@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -288,6 +288,24 @@ describe('which lanes are listed and kept', () => {
     expect(laneName('  lanes\nand   loops ')).toBe('lanes and loops')
     expect(laneName('')).toBeNull()
   })
+
+  it('a lane name is cut to LANE_NAME_MAX UTF-16 units, never inside a character, and a lane is never dropped for its name (HI-3119)', () => {
+    const long = 'n'.repeat(103)
+    expect(laneName(long)).toBe(`${'n'.repeat(LANE_NAME_MAX - 1)}…`)
+    expect(laneName('n'.repeat(LANE_NAME_MAX))).toBe('n'.repeat(LANE_NAME_MAX))
+    // An emoji (two units) straddling the cut is left out whole, not split into a lone surrogate.
+    const emoji = laneName(`${'n'.repeat(LANE_NAME_MAX - 2)}😀${'n'.repeat(10)}`)!
+    expect(emoji).toBe(`${'n'.repeat(LANE_NAME_MAX - 2)}…`)
+    expect(emoji.length).toBeLessThanOrEqual(LANE_NAME_MAX)
+    const fits = laneName(`${'n'.repeat(LANE_NAME_MAX - 3)}😀${'n'.repeat(10)}`)!
+    expect(fits).toBe(`${'n'.repeat(LANE_NAME_MAX - 3)}😀…`)
+    expect(fits.length).toBe(LANE_NAME_MAX)
+    // Saved longer (by a build before this, or by hand): the lane reads, its name cut.
+    expect(readLane({ ...rec(), name: long })).toEqual({ ...rec(), name: laneName(long) })
+    expect(readLane({ ...rec(), name: '' })).toEqual({ ...rec(), name: null })
+    expect(readLane({ ...rec(), name: 42 })).toEqual({ ...rec(), name: null })
+    expect(readLanes({ lanes: [{ ...rec(), name: long }] })).toHaveLength(1)
+  })
 })
 
 describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
@@ -392,6 +410,20 @@ describe('the lanes service', () => {
     expect(listed.some((l) => l.id === a.lane.id)).toBe(false)
     expect((await lanes.listLanes(w, { all: true })).some((l) => l.id === a.lane.id)).toBe(true)
     await lanes.endLane(w, c.lane.id, { abandoned: true })
+  })
+
+  it('a lane started with a name over LANE_NAME_MAX is saved with it cut, and stays listed; so does one renamed to one (HI-3119)', async () => {
+    await rulesOff()
+    const [c1, c2] = [await make('Long 1'), await make('Long 2')]
+    const long = 'Lane '.repeat(21).trim()
+    const a = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [c1.number], name: long, by: 'B1 (alpha)' })
+    expect(a.lane.name).toBe(laneName(long))
+    expect((await lanes.listLanes(w)).find((l) => l.id === a.lane.id)?.name).toBe(laneName(long))
+    const emoji = `${'n'.repeat(LANE_NAME_MAX - 2)}😀 more`
+    const b = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [c1.number, c2.number], name: emoji, by: 'B1 (alpha)' })
+    expect([b.did, b.lane.id, b.lane.name]).toEqual(['updated', a.lane.id, laneName(emoji)])
+    expect((await lanes.listLanes(w)).find((l) => l.id === a.lane.id)?.name).toBe(laneName(emoji))
+    await lanes.endLane(w, a.lane.id, { abandoned: true })
   })
 
   it("a lane started without rounds or wait takes the project's workflow options as they resolve, else the workspace's; given ones win, and a lane keeps what it started with (#412, HI-1766)", async () => {

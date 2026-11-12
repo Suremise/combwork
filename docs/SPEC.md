@@ -2724,6 +2724,11 @@ merges under jj.
   the rest rather than left outside; its membership itself unreadable refuses the switch (`switching`).
   **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
   (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
+  HI-3073: the owner records its process's start time beside its pid (as slots record their holders, the same probe),
+  so a pid the system has since given another program isn't taken for it: alive only while a process with that id
+  started then runs; a probe that can't tell counts as alive (fail closed); a fence recorded without a start time (an
+  older one) by its pid alone, as before. A switch left **stuck** (by recovery or by a failed switch's own settle) is
+  said in a notice as well as the log, once per switch, naming its projects and those changed or unreadable.
   The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
   isn't fenced, as the queue isn't beyond the repository lock.
 - **Tests**: `tests/platformFence.test.ts` (the rules on a map), `tests/storeSwitch.test.ts` (two projects on one store,
@@ -4674,7 +4679,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and the new branch's head is never read, so it is made before the branch exists): the window applies the one it showed
   after the start, the Assistant the one offered in the reply (`offerRetarget`), so a fresh preview with equal heads
   never widens it. The Assistant: `cw_branch` (`create`: `POST /v1/git/branch`, from a ref, never switching;
-  `nextVersion`: `POST /v1/workflow/next-version`), through its change boundary (Control agents), recorded for undo: the
+  `nextVersion`: `POST /v1/workflow/next-version`, naming the release it starts from as it read it, `from`, required
+  as the dialog sends it, so a retried or repeated request is refused once the project has moved on, HI-3114), through its change boundary (Control agents), recorded for undo: the
   two options as setting changes and the branch as a `setting` change whose target is `branch:<name>` (the board's
   change kinds are fixed by its schema, which older Combworks read), undone only while the branch is still at its
   commit and nothing uses it, G7b, a lane, a slot or a card included (`undoBranch`, in the repository lock, the turn of

@@ -203,6 +203,15 @@ describe('Start the next version (HI-2807)', () => {
     expect((await options(w, repo)).target).toBe('1.3.0')
   })
 
+  it('HI-3114: asked twice as the Agent API asks (the release named, no commit), starts it once and refuses the second', async () => {
+    const { w, repo } = await project()
+    const ask = () => inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    expect(await ask()).toMatchObject({ name: '1.4.0', from: '1.3.0' })
+    await expect(ask()).rejects.toThrow(/is 1\.4\.0 now, not 1\.3\.0/)
+    expect(hasBranch(repo, '1.5.0')).toBe(false)
+    expect((await options(w, repo)).target).toBe('1.4.0')
+  })
+
   it('keeps the branch and says so when it moved before the save’s refusal could take it back', async () => {
     const { w, repo } = await project()
     const plan = await inWorkspace(w, () => nv.nextVersionPlan(w, repo))

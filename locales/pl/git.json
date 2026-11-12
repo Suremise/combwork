@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project} (teraz {platform})",
   "git.vc.store.notExported": "Zakładka {name} nie jest taka sama w Gicie: uruchom jj git export lub to sprawdź.",
   "git.vc.store.queue": "{project}: jego kolejka scalania",
+  "git.vc.store.stuck": "Combwork zatrzymał się podczas przełączania {projects} między Gitem a jj i po ich ustawieniach nie może ustalić, w którą stronę je dokończyć: {changed} zmieniono lub nie da się odczytać. Dopóki nie pokażą kontroli wersji sprzed albo po przełączeniu, na ich repozytorium nic się nie uruchomi.",
+  "git.vc.store.stuckTitle": "Nie udało się dokończyć przełączenia kontroli wersji",
   "git.vc.store.slot": "{project}: slot {slot}, użyczony agentowi {agent}",
   "git.vc.store.stock": "Domyślne ustawienia samego Git for Windows (jego filtr LFS, sterownik diff dla dokumentów Office) się nie liczą: liczy się tylko to, czego używa repozytorium lub Twoje własne ustawienia Git.",
   "git.vc.store.toGit": "Combwork zostawia .jj na miejscu: usuń go za pomocą jj, jeśli już go nie chcesz.",
