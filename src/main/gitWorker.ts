@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'original-fs'
 import { delimiter, join } from 'path'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import { treeEnding } from './processTree'
 
 /**
  * Git's worker (HI-1783): a thread of its own that starts Combwork's git processes, so their starts (CreateProcess blocks the
@@ -79,19 +80,37 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     let held = false
     let exited = false
     let quiet: ReturnType<typeof setTimeout> | undefined
+    // HI-3021: the time limit ends git's whole tree (a hook, a signer, git's own children), not git.exe alone as
+    // execFile's own would: those ran on, and on Windows a git ended alone never removes the index.lock it holds. The
+    // outcome comes once the tree has gone, so what the caller does next (a lock removed, the index put back) meets
+    // none of it. A program of Git Bash's own a hook starts (its `sleep`) is outside Windows' process tree (MSYS's exec
+    // leaves no parent behind), so no tree walk finds it; native ones (node, npm, python, gpg) are in it.
+    let timedOut = false
+    let bound: ReturnType<typeof setTimeout> | undefined
+    const ending = treeEnding()
     const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
-    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
+    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
+      clearTimeout(bound)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
-      res({
-        stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
-        stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
-        error: e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
-        // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
-        cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
-        ...(held ? { held } : {})
-      })
+      ending.after(() =>
+        res({
+          stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
+          stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
+          // Ended at its limit: said as execFile's own time limit says it (killed, SIGTERM), whatever exit the end gave.
+          error: timedOut ? { code: null, killed: true, signal: 'SIGTERM' } : e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
+          // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
+          cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
+          ...(held ? { held } : {})
+        })
+      )
     })
+    if (m.timeout)
+      bound = setTimeout(() => {
+        if (child.exitCode !== null || child.signalCode !== null) return
+        timedOut = true
+        ending.end(child)
+      }, m.timeout)
     // Closing them ends the call as their closing would have: execFile answers with what was read.
     const waitQuiet = (): void => {
       if (!exited) return

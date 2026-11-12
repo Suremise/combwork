@@ -306,6 +306,11 @@
       "why": "plain"
     }
   },
+  "service.folderChanges.commitTimedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
   "service.folderChanges.deletedKept": {
     "placeholders": {
       "file": "plain"
@@ -318,6 +323,13 @@
   },
   "service.folderChanges.indexBusy": {
     "placeholders": {}
+  },
+  "service.folderChanges.indexNotTaken": {
+    "placeholders": {
+      "action": "select",
+      "made": "plain",
+      "why": "plain"
+    }
   },
   "service.folderChanges.midOperation": {
     "placeholders": {
@@ -359,6 +371,13 @@
     "placeholders": {
       "stash": "plain",
       "why": "plain"
+    }
+  },
+  "service.folderChanges.stashTimedOut": {
+    "placeholders": {
+      "seconds": "number",
+      "made": "select",
+      "stash": "plain"
     }
   },
   "service.folderChanges.tooManyToSetAside": {

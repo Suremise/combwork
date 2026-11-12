@@ -223,7 +223,16 @@ const acquire = async (w: World): Promise<QueueRunner> => {
 }
 
 /** An fsmonitor hook (a test-owned node script) that writes its pid and waits for ever: a `status` that blocks in it. */
-function blockingHook(signal: AbortSignal): { args: string[]; ready: Promise<Listed> } {
+function blockingHook(signal: AbortSignal): { args: string[]; ready: Promise<Listed>; pidFile: string } {
+  const h = unobservedHook(signal)
+  const ready = identifyHook(h.pidFile, h.since)
+  observing.push(ready)
+  void ready.catch(() => {}) // Its owner or afterEach observes the rejection, even if the test fails first.
+  return { args: h.args, ready, pidFile: h.pidFile }
+}
+
+/** blockingHook's hook, not identified: one its git ends with it (HI-3021), told gone by its pid file (goneByFile). */
+function unobservedHook(signal: AbortSignal): { args: string[]; pidFile: string; since: number } {
   // A timed-out test body can resume when cleanup ends its pending git. It must not start another fixture afterward.
   signal.throwIfAborted()
   const since = Date.now()
@@ -232,10 +241,7 @@ function blockingHook(signal: AbortSignal): { args: string[]; ready: Promise<Lis
   const hook = join(dir, 'hook.cjs')
   writeFileSync(hook, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)\n`)
   const fwd = (p: string): string => p.replace(/\\/g, '/')
-  const ready = identifyHook(pidFile, since)
-  observing.push(ready)
-  void ready.catch(() => {}) // Its owner or afterEach observes the rejection, even if the test fails first.
-  return { args: ['-c', `core.fsmonitor="${fwd(process.execPath)}" "${fwd(hook)}"`, 'status', '--porcelain'], ready }
+  return { args: ['-c', `core.fsmonitor="${fwd(process.execPath)}" "${fwd(hook)}"`, 'status', '--porcelain'], pidFile, since }
 }
 
 /** What a result says, for comparing two (its bytes as bytes). */
@@ -336,23 +342,25 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
       const w = world()
       const runner = await acquire(w)
       try {
-        const plainHook = blockingHook(signal)
+        // HI-3021: the worker's bound ends git's whole tree before it answers, the hook with it.
+        const plainHook = unobservedHook(signal)
         const plainRead = git(w.project, plainHook.args, undefined, undefined, { timeout: 3000 })
         reading.push(plainRead)
+        const plain = await plainRead
+        await goneByFile(plainHook.pidFile)
+        const hook = blockingHook(signal)
+        const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 }))
+        reading.push(hostedRead)
         if (delayedEnumeration) {
           const list = windowsProbe.list
-          // Hold the actual snapshot until the launcher has exited, with no sleep and the same real Git timeout.
+          // Hold the actual snapshot until the launcher has exited (the host's bound ends git; its hook, in the lease's
+          // job, runs on until the release), with no sleep and the same real Git timeout.
           vi.spyOn(windowsProbe, 'list').mockImplementationOnce(async () => {
-            await plainRead
+            await hostedRead
             return list()
           })
         }
         // Start observing immediately; cleanup also handles the launcher exiting before the asynchronous snapshot.
-        await plainHook.ready
-        const plain = await plainRead
-        const hook = blockingHook(signal)
-        const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 }))
-        reading.push(hostedRead)
         const left = await hook.ready
         const viaHost = await hostedRead
         expect(shape(viaHost)).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM', timedOut: true })
