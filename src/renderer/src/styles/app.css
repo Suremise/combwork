@@ -13996,6 +13996,15 @@ button.progress-card-key:hover {
 .progress-queue-paused .progress-queue-text {
   flex: 1 1 160px;
 }
+/* HI-3000: the card resolving a pair, under that pair's behind line, indented to its text. */
+.progress-queue-resolving {
+  flex-wrap: wrap;
+  align-items: center;
+  padding-left: 20px;
+}
+.progress-queue-resolving .progress-queue-text {
+  flex: 1 1 140px;
+}
 /* HI-2944: Commit and Set Aside on a merge paused on uncommitted changes (the queue card, a card's Work section). */
 .folder-change-buttons,
 .card-work-queue-actions {

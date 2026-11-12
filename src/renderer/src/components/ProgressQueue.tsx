@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { shortRevision } from '@shared/progress'
 import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnCheck, returnedText, returnRun, returnWhy, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
 import type { MergeSlotInfo, ProgressRun } from '@shared/types'
@@ -188,22 +188,22 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
         </div>
       )}
       {behind.map((b) => (
-        <div key={`behind:${b.from}`} className="progress-queue-line progress-queue-behind" data-behind={b.from}>
-          <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
-            <span>
-              <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
-            </span>
-          </Tooltip>
-          {b.resolving && (
-            <>
-              <span className="faint" data-resolving={b.resolving.key}>
-                {' · '}
-                {tr(FORWARD_T.resolving, { card: b.resolving.key })}
+        <Fragment key={`behind:${b.from}`}>
+          <div className="progress-queue-line progress-queue-behind" data-behind={b.from}>
+            <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
+              <span>
+                <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
               </span>
+            </Tooltip>
+          </div>
+          {/* HI-3000: the card resolving this pair, on its own line under it: no Bring Up to Date for the pair meanwhile. */}
+          {b.resolving && (
+            <div className="progress-queue-line progress-queue-resolving" data-resolving={b.resolving.key} data-resolving-from={b.from}>
+              <span className="progress-queue-text faint">{tr(FORWARD_T.resolving, { card: b.resolving.key })}</span>
               <CardButton keyOf={b.resolving.key} />
-            </>
+            </div>
           )}
-        </div>
+        </Fragment>
       ))}
       {behind.some((b) => b.commits !== null && !b.resolving) && (
         <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
