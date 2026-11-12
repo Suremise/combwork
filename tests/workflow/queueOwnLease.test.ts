@@ -141,7 +141,11 @@ describe("HI-3120: this Combwork's own stale queue lease", { timeout: 120_000 },
     expect(store.queueLease('main')).toBeNull()
   })
 
-  it('a runner asked to release while it is acquired gives its lease up and never goes live', async () => {
+  // The first write takes the lease (HR3's round 1 finding: a close while it waits); the second is startJob's.
+  it.each([
+    ['the lease is taken', 1],
+    ['its job is made', 2]
+  ])('a runner asked to release while %s gives its lease up and never goes live', async (_at, at) => {
     const ws = join(tempDir('cw-ownlease-'), 'ws')
     const project = gitRepo(join(ws, 'project'))
     const dismiss = admitted(ws)
@@ -152,14 +156,14 @@ describe("HI-3120: this Combwork's own stale queue lease", { timeout: 120_000 },
       closeBoard(ws)
       dismiss()
     }
-    // The second write (startJob's) held until the close has asked for the release.
+    // That write held until the close has asked for the release.
     let n = 0
     let letGo!: () => void
     const gate = new Promise<void>((res) => (letGo = res))
     let reach!: () => void
     const reached = new Promise<void>((res) => (reach = res))
     const locked = async <T>(fn: () => T): Promise<T> => {
-      if (++n === 2) {
+      if (++n === at) {
         reach()
         await gate
       }
@@ -171,6 +175,7 @@ describe("HI-3120: this Combwork's own stale queue lease", { timeout: 120_000 },
     await releaseQueueRunners((r) => r.cfg.workspace === ws)
     letGo()
     const got = await acquiring
+    if (got.ok) await got.runner.release()
     expect(got.ok).toBe(false)
     expect(queueRunners()).toHaveLength(0)
     expect(store.queueLease('main')).toBeNull()

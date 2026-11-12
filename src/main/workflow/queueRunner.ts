@@ -153,8 +153,15 @@ const live = new Set<QueueRunner>()
  * release couldn't write, its workspace closed under it): it is taken over, as one of a process that has ended.
  */
 const owned = new Set<string>()
-/** HI-3120: runners being acquired (lease taken, not yet live): a workspace closing asks them to give their lease up. */
-const starting = new Set<QueueRunner>()
+/**
+ * HI-3120: the acquisitions under way, each registered as it is asked for (before its first wait) until it ends: a
+ * workspace closing asks those it picks to give their lease up (`releaseAsked`) rather than go live, whichever of
+ * its waits the acquisition is at.
+ */
+type Acquisition = Pick<QueueRunner, 'cfg' | 'project' | 'target'> & { releaseAsked: boolean }
+const starting = new Set<Acquisition>()
+/** What a runner a workspace closing asked to release says, from acquire (logged by the queue's host). */
+const CLOSED_WHILE_STARTING = 'its workspace closed while it started' // i18n-ignore: a reason, logged
 const selves = new WeakMap<ProcessProbe, Promise<{ pid: number; started: number }>>()
 const selfOf = (probe: ProcessProbe): Promise<{ pid: number; started: number }> => {
   let s = selves.get(probe)
@@ -202,6 +209,17 @@ export class QueueRunner {
    * every earlier runner's duties for the target (`settle`) before it is returned.
    */
   static async acquire(cfg: RunnerConfig): Promise<Acquired> {
+    // Registered before anything waits, so a close asked for at any point of it reaches it.
+    const a: Acquisition = { cfg, project: cfg.project, target: cfg.target, releaseAsked: false }
+    starting.add(a)
+    try {
+      return await QueueRunner.acquireAs(cfg, a)
+    } finally {
+      starting.delete(a)
+    }
+  }
+
+  private static async acquireAs(cfg: RunnerConfig, a: Acquisition): Promise<Acquired> {
     const probe = cfg.probe ?? defaultProbe()
     const me = await selfOf(probe)
     const store = cfg.store
@@ -210,6 +228,7 @@ export class QueueRunner {
       // This process's own lease: held while a runner here owns it (never taken from itself), else stale (HI-3120).
       const own = !!now && now.pid === me.pid && (now.started === me.started || !now.started || !me.started)
       if (now && (own ? owned.has(now.lease) : (await probe.alive(now.pid, now.started)) !== false)) return { ok: false, heldBy: holderOf(now) }
+      if (a.releaseAsked) return { ok: false, heldBy: null, problem: CLOSED_WHILE_STARTING }
       const lease = randomBytes(8).toString('hex')
       const token = randomBytes(16).toString('hex')
       const at = new Date().toISOString()
@@ -227,26 +246,25 @@ export class QueueRunner {
       if (now && own) log.info(`Took over the merge queue for ${userText(cfg.target)} from an earlier runner of this Combwork that no longer runs`)
       else if (now) log.info(`Took over the merge queue for ${userText(cfg.target)} from ${userText(now.profile)} (process ${now.pid} has ended)`)
       const runner = new QueueRunner(cfg, lease, token, join(cfg.root, queueFolderName(cfg.project, cfg.target, lease)))
-      starting.add(runner)
       try {
+        // Asked to release while the lease was taken: given up as a failed start's (below), nothing started.
+        if (a.releaseAsked) throw new LeaseLost(cfg.target)
         const problem = await runner.startJob()
         if (problem) {
           log.warn(`The merge queue for ${userText(cfg.target)} can't run: its job couldn't be made (${userText(problem)})`)
-          starting.delete(runner)
           runner.stop()
           await locked(cfg, () => store.dropQueueLease(lease, token)).finally(() => owned.delete(lease))
           return { ok: false, heldBy: null, problem }
         }
-        starting.delete(runner)
-        // Its workspace closed while it started (HI-3120): its lease given up as a failed start's, never live.
-        if (runner.releaseAsked) throw new LeaseLost(cfg.target)
+        // Its workspace closed while it started (HI-3120): its lease given up as a failed start's, never live. No wait
+        // between this and live.add, so a close after it finds it live.
+        if (a.releaseAsked) throw new LeaseLost(cfg.target)
         live.add(runner)
         const paused = await runner.settle()
         await runner.settleFolders()
         runner.startRenewal()
         return { ok: true, runner, ...(paused !== null ? { paused } : {}) }
       } catch (e) {
-        starting.delete(runner)
         // A failed set-up (a write that failed, the lease lost) gives its lease up, by its own token (a successor's is
         // never touched), once its job is closed: a retry, in this Combwork or another, can take it at once. Its job's duty
         // goes with it once closing it has ended what was in it (kill on close) and its journal holds nothing; else it
@@ -624,8 +642,6 @@ export class QueueRunner {
     return (this.releasing = withoutGitRoute(() => this.releaseOnce()).finally(() => owned.delete(this.lease)))
   }
 
-  /** HI-3120: asked to give its lease up while it is being acquired (its workspace closing): it never goes live. */
-  releaseAsked = false
 
   private async releaseOnce(): Promise<void> {
     this.stop()
@@ -965,8 +981,8 @@ export function queueRunners(): QueueRunner[] {
 }
 
 /** Releases this Combwork's runners (all, or those `which` picks): a workspace closing, Combwork quitting, a project removed. */
-export async function releaseQueueRunners(which: (r: QueueRunner) => boolean = () => true): Promise<void> {
-  // HI-3120: one still being acquired gives its lease up as its start ends, rather than going live.
-  for (const r of starting) if (which(r)) r.releaseAsked = true
+export async function releaseQueueRunners(which: (r: Pick<QueueRunner, 'cfg' | 'project' | 'target'>) => boolean = () => true): Promise<void> {
+  // HI-3120: an acquisition under way gives its lease up (or takes none) as it goes on, rather than going live.
+  for (const a of starting) if (which(a)) a.releaseAsked = true
   await Promise.all(queueRunners().filter(which).map((r) => r.release().catch((e) => log.warn(`releasing the merge queue for ${userText(r.target)}`, e))))
 }
