@@ -339,6 +339,29 @@ describe('editLanes (HI-2898)', () => {
     expect(r.undo).not.toBeNull()
   })
 
+  it("takes off a card not started before one on hold or another agent's, and undoes it; moves still keep its place (HI-3067)", async () => {
+    for (const hold of [{ column: 'hold' as const }, { agent: 'b2' }]) {
+      const [a, b, c, x] = [await make('A'), await make('B'), await make('C'), await make('X')]
+      const l = await start('b1', [a, b, c])
+      await run(() => tasks.updateTask(b, hold, user))
+      // A sits in the fixed start (before B, which isn't waiting its turn): a move of it is still refused.
+      await expect(edit({ op: 'move', lane: l.id, rev: 0, card: a, to: 2 })).rejects.toThrow(/keep their places/)
+      // Taken off: made, between cards at once; the rest keeps its order.
+      const r = await edit({ op: 'remove', lane: l.id, rev: 0, card: a })
+      expect((await raw(l.id)).cards).toEqual([b, c])
+      // Its undo puts it back where it was, inside the fixed start.
+      await edit({ op: 'undo', undo: r.undo! })
+      expect((await raw(l.id)).cards).toEqual([a, b, c])
+      // Move here takes it off the same way, onto another lane.
+      const to = await start('b3', [x])
+      await doing(x, 'b3')
+      await edit({ op: 'transfer', card: a, from: { lane: l.id, rev: (await raw(l.id)).listRev! }, to: { lane: to.id, rev: 0 } })
+      expect((await raw(l.id)).cards).toEqual([b, c])
+      expect((await raw(to.id)).pending ?? (await raw(to.id)).cards).toEqual([x, a])
+      for (const id of [l.id, to.id]) await lanes.endLane(w, id, { abandoned: true })
+    }
+  })
+
   it('removes a queued card back to the board, and undoes it', async () => {
     const [a, b] = [await make('A'), await make('B')]
     const l = await start('b1', [a, b])
