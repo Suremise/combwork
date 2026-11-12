@@ -6177,10 +6177,13 @@ touched:
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
   is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
-  round 3: the real index being free, another git can commit meanwhile), by nothing a hook can change (HI-3075: a
-  commit-msg hook rewrites the message, a pre-commit hook stages more): its parent the HEAD it started from, and HEAD's
-  reflog naming it with this commit's own reflog action (`GIT_REFLOG_ACTION=commit (combwork:<uuid>)`, which only git
-  writes; `git reflog` shows it so). HEAD unreadable before
+  round 3: the real index being free, another git can commit meanwhile), not by its message or tree (HI-3075: a
+  commit-msg hook rewrites the message, a pre-commit hook stages more) but by the move git wrote making it: the commit
+  runs with its own reflog action (`GIT_REFLOG_ACTION=commit (combwork:<uuid>)`; `git reflog` shows it so), and the
+  **first** entry of HEAD's reflog carrying it must move HEAD from the HEAD it started from to the commit now there,
+  whose parent that is. A hook's own git inherits the action (HR2's round 1: a post-commit `git reset` to an older
+  commit of the same parent writes it too), but only after the commit's own entry, so such a move is never taken
+  for the commit. HEAD unreadable before
   the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
   unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
   then; *the files and the index are as they were* only while HEAD is where it started. HEAD moved and not proved this

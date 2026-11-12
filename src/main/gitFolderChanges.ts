@@ -342,19 +342,26 @@ export function sameEntries(a: readonly string[], b: readonly string[]): boolean
 
 /**
  * HI-3021 (HR2's round 3): whether `now`, HEAD after a commit ended at its bound, is the commit this one made, not one
- * another git made meanwhile (the real index is free while the commit runs). HI-3075: by nothing a hook can change
- * (a commit-msg hook rewrites the message, a pre-commit hook stages more, HI-3074): its parent is the HEAD it started
- * from (none on an unborn branch), and HEAD's reflog names `now` with this commit's own reflog action (`tag`, given as
- * GIT_REFLOG_ACTION, which only git writes). `unknown`: the reflog can't say (none kept, or unreadable).
+ * another git made meanwhile (the real index is free while the commit runs). HI-3075: not by its message or tree (a
+ * commit-msg hook rewrites the message, a pre-commit hook stages more, HI-3074) but by the move git wrote making it: the
+ * commit runs with its own reflog action (`tag`, GIT_REFLOG_ACTION), and the **first** entry of HEAD's reflog carrying
+ * it must move HEAD from the HEAD it started from (none on an unborn branch) to `now`, whose parent that is. HR2's round
+ * 1: a hook's own git inherits the action (a post-commit `git reset` to another commit writes it too), but only after
+ * the commit's own entry, so a later move is never taken for the commit. `unknown`: the reflog can't say (none kept, or
+ * unreadable).
  */
 async function madeByThis(folder: string, now: string, before: string | null, tag: string): Promise<'yes' | 'no' | 'unknown'> {
   const parent = await git(folder, ['rev-parse', '-q', '--verify', `${now}^`])
   if (before === null ? parent.ok : !parent.ok || parent.out.trim() !== before) return 'no'
-  // The newest entries: a post-commit hook can move HEAD again after it (a checkout), never before it.
-  const reflog = await git(folder, ['reflog', '-n', '50', '--format=%H%x00%gs', 'HEAD'])
-  const rows = reflog.ok ? reflog.out.split('\n').filter(Boolean) : []
-  if (!rows.length) return 'unknown'
-  return rows.some((row) => row.startsWith(`${now}\0${tag}: `)) ? 'yes' : 'no'
+  // The reflog file itself, for each move's old and new commit (`old new who when\tmessage`), oldest first.
+  const where = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'logs/HEAD'])
+  const text = where.ok && where.out.trim() ? await readFile(where.out.trim(), 'utf8').catch(() => null) : null
+  const moves = (text ?? '').split('\n').filter((l) => l.includes('\t'))
+  if (!moves.length) return 'unknown'
+  const first = moves.find((l) => l.slice(l.indexOf('\t') + 1).startsWith(`${tag}: `))
+  if (!first) return 'no'
+  const [from, to] = first.split(' ')
+  return (before === null ? /^0+$/.test(from) : from === before) && to === now ? 'yes' : 'no'
 }
 
 /** HI-3074: what a commit leaves the index: its paths (those shown, and every path it changed) and its entries for them. */

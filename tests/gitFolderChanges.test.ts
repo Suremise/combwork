@@ -568,6 +568,24 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(leftovers()).toEqual([])
   })
 
+  it("…a post-commit hook that moves HEAD to an older commit of the same parent, its git inheriting the reflog action (HR2's round 1): never taken for this commit; said with where HEAD moved", async () => {
+    // B: a commit that already exists, on the same parent as the one Combwork is about to make.
+    const before = head()
+    const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\ngit reset -q --soft ${b}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+    expect(head()).toBe(b)
+    // The hook's reset carries the action too: proof that HR2's case is what ran.
+    expect(sh(proj, 'reflog', '-1', '--format=%gs')).toMatch(/^commit \(combwork:[0-9a-f-]+\): updating HEAD$/)
+    expect(err).toBeInstanceOf(Error)
+    expect(String(err)).toContain(`The branch moved meanwhile, to ${b.slice(0, 12)}, and Combwork can't tell that it is this commit`)
+    // Not taken from B: the index as it was (a.txt unstaged against the commit Combwork made, which is B's parent's child).
+    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+    expect(leftovers()).toEqual([])
+  })
+
   it('…with no reflog kept (core.logAllRefUpdates=false): not proved, so said with where HEAD moved, never "as they were"; the index left as it was', async () => {
     sh(proj, 'config', 'core.logAllRefUpdates', 'false')
     rmSync(join(proj, '.git', 'logs'), { recursive: true, force: true })
