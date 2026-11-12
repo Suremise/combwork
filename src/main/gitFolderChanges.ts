@@ -10,7 +10,7 @@
 // Darren, 11 Nov 2026). The commit or stash runs against a private copy of the index (HI-3021), so a hook, filter or
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
-import { copyFile, lstat, open, readdir, rename, rm } from 'original-fs/promises'
+import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { agentMsg, say } from '../shared/agentText'
@@ -119,25 +119,30 @@ async function removePrivateIndex(copy: string): Promise<void> {
   const dir = dirname(copy)
   const own = basename(copy)
   const names = await readdir(dir).catch(() => [] as string[])
-  for (const name of names.filter((n) => n === own || n.startsWith(`${own}.`))) {
-    for (let t = 1; ; t++) {
-      const e = await rm(join(dir, name), { force: true }).then(
-        () => null,
-        (err: NodeJS.ErrnoException) => err
-      )
-      if (!e) break
-      if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM')) {
-        log.warn(`A private index's file wasn't removed (${userText(name)}): ${userText(e.message)}`)
-        break
-      }
-      await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
+  for (const name of names.filter((n) => n === own || n.startsWith(`${own}.`))) await removeOwn(join(dir, name))
+}
+
+/** One of the private index's files removed, tried again briefly while a process just ended still holds it. False: it is still there. */
+async function removeOwn(file: string): Promise<boolean> {
+  for (let t = 1; ; t++) {
+    const e = await rm(file, { force: true }).then(
+      () => null,
+      (err: NodeJS.ErrnoException) => err
+    )
+    if (!e) return true
+    if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM')) {
+      log.warn(`A private index's file wasn't removed (${userText(basename(file))}): ${userText(e.message)}`)
+      return false
     }
+    await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
   }
 }
 
 /** How many times the real index is tried while another git holds it, and how long between (INDEX_BUSY). */
 const TAKE_TRIES = 10
 const TAKE_RETRY_MS = 100
+/** HI-3056: how many times the new index is made again while another git keeps writing the real one. */
+const PREPARE_TRIES = 3
 
 /** takeEntries' answer: `kept`, the paths whose real entries another git changed meanwhile, left as it made them. */
 type Taken = { ok: true; kept: string[] } | { ok: false; why: string }
@@ -159,7 +164,7 @@ function byPath(entries: readonly string[]): Map<string, string> {
 
 /**
  * HI-3053: the paths of `files` whose entries in `now` aren't those in `was` (each an `ls-files -s` listing), in
- * `files`' order. Linear in the entries (it runs on main's thread while the real index's lock is held).
+ * `files`' order. Linear in the entries (it runs on main's thread, as the entries are taken in).
  */
 export function changedPaths(files: readonly string[], was: readonly string[], now: readonly string[]): string[] {
   const a = byPath(was)
@@ -171,10 +176,16 @@ export function changedPaths(files: readonly string[], was: readonly string[], n
  * HI-3021: the real index's entries for `files` made what git left them in the private index `copy`: each path's
  * entries removed, then each of the copy's put in. Every other entry is left. HI-3053: the real index is free while the
  * commit or stash runs, so another git can stage one of `files` meanwhile (the user's `git add`): a path whose real
- * entries aren't `was` (as the copy was taken) any more keeps them, never written over, and is answered `kept`. The
- * check and the write are one step under the real index's own lock, taken as git takes it (`index.lock`, made only if
- * none is there): its new content written into a scratch copy by `update-index --index-info`, then the scratch put in
- * as the lock and the lock renamed onto the index, as git commits a lock. Another git holding it is waited on briefly.
+ * entries aren't `was` (as the copy was taken) any more keeps them, never written over, and is answered `kept`.
+ *
+ * HI-3056 (HR3's round 1): the new index is made in a scratch file beside the copy before the real index is locked, from
+ * the real index's bytes as read then (`build`): the taken entries written by `update-index --index-info`, then their
+ * stat data refreshed (`add --refresh`, which may run a clean filter, so bounded; the scratch is Combwork's own, so an
+ * ended git leaves nothing of the real index's). Only then is the real index's own lock taken, as git takes it
+ * (`index.lock`, made only if none is there; another git holding it waited on briefly), and, the index still exactly
+ * those bytes, the scratch is put in as the lock and the lock renamed onto the index, as git commits a lock: nothing but
+ * Combwork's own file steps while the lock is held. Another git wrote the index meanwhile: made again from its new bytes,
+ * a few times; still moving, the entries are made under the lock unrefreshed (git's own work alone, no filter).
  */
 async function takeEntries(folder: string, index: string, copy: string, files: string[], was: readonly string[]): Promise<Taken> {
   const from = await entriesIn(folder, files, copy)
@@ -183,57 +194,110 @@ async function takeEntries(folder: string, index: string, copy: string, files: s
   const none = '0'.repeat(fmt.out.trim() === 'sha256' ? 64 : 40)
   const quiet = await noHooks(folder, copy)
   if (!quiet.ok) return quiet
+  // Named after the private index, so removed with it whatever happens here.
+  const scratch = `${copy}.take`
   const lock = `${index}.lock`
-  // Never another program's lock: only one made here (`wx`), and only that one removed.
-  let held = false
-  for (let t = 1; !held; t++) {
-    const e = await open(lock, 'wx').then(
-      async (h) => {
-        await h.close()
-        return null
-      },
-      (err: NodeJS.ErrnoException) => err
-    )
-    if (!e) held = true
-    else if (e.code !== 'EEXIST' || t >= TAKE_TRIES) return { ok: false, why: e.code === 'EEXIST' ? `Unable to create '${lock}': File exists` : e.message } // i18n-ignore: git's own (English) words for a held lock
-    else await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
-  }
-  let renamed = false
-  try {
-    const now = await entriesIn(folder, files, index)
+  const present = new Set(from.entries.map(pathOf))
+
+  /** The new index made in the scratch (which holds the real index as it was read): which paths are kept, and whether anything is to be written. */
+  const build = async (fresh: boolean): Promise<{ ok: true; kept: string[]; write: boolean } | { ok: false; why: string }> => {
+    const now = await entriesIn(folder, files, scratch)
     if (!now.ok) return now
     const kept = changedPaths(files, was, now.entries)
     const keptSet = new Set(kept)
     const taken = new Set(files.filter((p) => !keptSet.has(p)))
-    if (!taken.size) return { ok: true, kept }
-    // Named after the private index, so removed with it whatever happens here.
-    const scratch = `${copy}.take`
-    await copyFile(index, scratch).catch((e: NodeJS.ErrnoException) => {
-      if (e?.code !== 'ENOENT') throw e
-    })
+    if (!taken.size) return { ok: true, kept, write: false }
     const input = [...[...taken].map((p) => `0 ${none}\t${p}`), ...from.entries.filter((e) => taken.has(pathOf(e)))].map((l) => `${l}\0`).join('')
-    // HR2's round 4: never bounded, so never ended part way (on Windows an ended git leaves its lock): it runs nothing of
-    // the repository's (noHooks), so it waits only on git's own work. Off main's thread (git's worker). The scratch is
-    // Combwork's own, so its lock is too.
+    // HR2's round 4: it runs nothing of the repository's (noHooks), so it waits only on git's own work: never bounded,
+    // as under the lock (the fallback) an ended git must never be what holds it up. Off main's thread (git's worker).
     const r = await git(folder, [...quiet.args, 'update-index', '-z', '--index-info'], undefined, input, { env: { ...process.env, GIT_INDEX_FILE: scratch } })
-    // Their stat data stays empty, so git compares their content once more: refreshing it could run a filter unbounded.
     if (!r.ok) return { ok: false, why: gitErrorLine(r.err) || r.err.trim() }
-    await rename(scratch, lock)
-    // A git reading the index can hold it open a moment (Windows refuses the rename then): tried again briefly.
-    for (let t = 1; !renamed; t++) {
-      const e = await rename(lock, index).then(
-        () => null,
+    // HI-3056: their stat data is empty after --index-info, and what trusts it (the queue's `read-tree -m -u`) refuses
+    // them as "not uptodate". Only these paths; failed or ended, they go in as they are.
+    const refresh = [...taken].filter((p) => present.has(p))
+    if (fresh && refresh.length) {
+      const f = await git(folder, [...quiet.args, 'add', '--refresh', ...PATHS_IN], undefined, pathsIn(refresh), { env: { ...quietEnv(), GIT_INDEX_FILE: scratch }, timeout: folderChangesBounds.actMs })
+      if (!f.ok) log.warn(`The index entries taken in ${userText(folder)} weren't refreshed${f.timedOut ? ' (ended at its bound)' : ''}: ${userText(gitErrorLine(f.err) || f.err.trim())}`)
+    }
+    if (!fresh && refresh.length) log.warn(`The index in ${userText(folder)} kept changing: its entries taken in unrefreshed`)
+    return { ok: true, kept, write: true }
+  }
+
+  /** The real index as git last wrote it (null: none yet). */
+  const indexBytes = (): Promise<Buffer | null> => readFile(index).catch((e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? null : Promise.reject(e)))
+  /**
+   * The scratch made the real index's bytes (none: no scratch, which git reads as an empty index). A refresh ended at its
+   * bound leaves the scratch's lock (on Windows an ended git never removes it): Combwork's own by its name, removed.
+   */
+  const startFrom = async (bytes: Buffer | null): Promise<void> => {
+    if (!(await removeOwn(`${scratch}.lock`)) || !(await removeOwn(scratch))) throw new Error(`Combwork couldn't remove ${scratch}`) // i18n-ignore: stands in for git's own (English) words
+    if (bytes) await writeFile(scratch, bytes)
+  }
+
+  /** `fn` under the real index's lock: only one made here (`wx`), and only that one removed, unless it became the index. */
+  const locked = async <T>(fn: (publish: () => Promise<void>) => Promise<T>): Promise<T | { ok: false; why: string }> => {
+    for (let t = 1; ; t++) {
+      const e = await open(lock, 'wx').then(
+        async (h) => {
+          await h.close()
+          return null
+        },
         (err: NodeJS.ErrnoException) => err
       )
-      if (!e) renamed = true
-      else if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM' && e.code !== 'EACCES')) return { ok: false, why: e.message }
-      else await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
+      if (!e) break
+      if (e.code !== 'EEXIST' || t >= TAKE_TRIES) return { ok: false, why: e.code === 'EEXIST' ? `Unable to create '${lock}': File exists` : e.message } // i18n-ignore: git's own (English) words for a held lock
+      await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
     }
-    return { ok: true, kept }
+    let renamed = false
+    const publish = async (): Promise<void> => {
+      await rename(scratch, lock)
+      // A git reading the index can hold it open a moment (Windows refuses the rename then): tried again briefly.
+      for (let t = 1; ; t++) {
+        const e = await rename(lock, index).then(
+          () => null,
+          (err: NodeJS.ErrnoException) => err
+        )
+        if (!e) {
+          renamed = true
+          return
+        }
+        if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e
+        await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
+      }
+    }
+    try {
+      return await fn(publish)
+    } finally {
+      if (!renamed) await rm(lock, { force: true }).catch((e: Error) => log.warn(`The index lock Combwork took wasn't removed: ${userText(e.message)}`))
+    }
+  }
+
+  try {
+    for (let t = 1; t <= PREPARE_TRIES; t++) {
+      const base = await indexBytes()
+      await startFrom(base)
+      const built = await build(true)
+      if (!built.ok) return built
+      if (!built.write) return { ok: true, kept: built.kept }
+      const done = await locked(async (publish) => {
+        const now = await indexBytes()
+        if (base === null ? now !== null : now === null || !base.equals(now)) return false
+        await publish()
+        return true
+      })
+      if (done !== true && done !== false) return done
+      if (done) return { ok: true, kept: built.kept }
+    }
+    // Still moving: made under the lock from the index as it is then, with git's own work alone.
+    return await locked(async (publish): Promise<Taken> => {
+      await startFrom(await indexBytes())
+      const built = await build(false)
+      if (!built.ok) return built
+      if (built.write) await publish()
+      return { ok: true, kept: built.kept }
+    })
   } catch (e) {
     return { ok: false, why: (e as Error)?.message ?? String(e) }
-  } finally {
-    if (!renamed) await rm(lock, { force: true }).catch((e: Error) => log.warn(`The index lock Combwork took wasn't removed: ${userText(e.message)}`))
   }
 }
 
