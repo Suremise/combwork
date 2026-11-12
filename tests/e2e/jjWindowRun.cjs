@@ -342,7 +342,9 @@ const onDb = (fn) => {
     await inv('session:stop', shop, b1.id)
     const keptRow = await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot && s.keptFor === n2 && s.state === 'dirty' && !s.lease) ?? null, HUNG_MS)
     check('card 2 put back with its commit: the slot kept for it, no lease', !!keptRow, JSON.stringify({ back2, slots: await inv('slots:list', shop) }))
+    // Slots and copies reads its list as it opens: opened again (it was still open from the stale slot above).
     await toProject()
+    await section('jjRepo')
     await section('workflow')
     check('Slots and copies: Kept for card 2', !!(await until(async () => (await row.locator(`[data-kept-for="${n2}"]`).count()) === 1, HUNG_MS)), await text(row))
     await row.scrollIntoViewIfNeeded()
