@@ -245,6 +245,13 @@
       "reason": "plain"
     }
   },
+  "runtime.wake.resolutionOverride": {
+    "placeholders": {
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "runtime.wake.reviewerAsks": {
     "placeholders": {
       "card": "plain",

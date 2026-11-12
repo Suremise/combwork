@@ -5899,8 +5899,21 @@ branch, as a card made before HI-2985 stored none: setting its Merges into to `t
 Its direction is checked at each queue attempt as a forward's is (HI-2998, `forwardAllowed`: `from` into `to` with the
 default branch as it reads then, or the override its forward's request recorded, carried on its `ForwardResolution`):
 the default branch or the branches changed since Resolve so that it no longer reads forward, it is returned to its
-builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
-only a new forward request with the user's override merges that pair.
+builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user.
+When the names alone don't decide the direction (two versions do) and the default branch can't be read or named at
+that attempt (git unable to answer, a detached project folder with no main or master), or its head can't be read, that
+is no answer (HI-3040): the entry goes round as any unreadable read does (`readFailed`), then pauses `needsYou` saying
+so, never comes back for good on it. The user's way on (HI-3040): a forward request for the pair with the override
+(`override: true`), made while the resolution is back in Active for its direction (`overridableEntry`: its last entry
+`failed` for `direction` and its latest submission's, none open, no override yet), records it on the resolution
+(`ResolutionOverride` {override?, entry, by}, checked again in its own write with the caller's guard; nothing else made;
+no `override` when the direction reads forward again, only the requeue) and wakes its builder to submit the same
+revision again; `requeue.allowed` lets that
+revision back in once, bound to that failed entry (whatever transient requeues counted; its new entry uses it up), and
+the override, kept on its `ForwardResolution` from then on, bypasses the direction alone. A resolution in any other
+state is refused as before (`openNoOverride`). A direct forward's way stays Remove from queue, then the request again
+with the override (a new card). Not covered: a project folder switched to another branch that isn't a version, with no
+main or master, makes git name that branch the default, which reads as a real answer (follow-up).
 
 Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
 `source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
@@ -6097,13 +6110,19 @@ touched:
   as after a `git stash pop` that conflicted), since `commit --only` would add it markers and all, marking it
   resolved (*… is in conflict in Git: resolve it there first …*; Files' Commit it refuses `.gitignore` so too); an untracked repository of its own inside the folder (git lists it whole, `nested/`),
   never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
-  submodule, yourself*). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  submodule, yourself*). And a registered submodule whose only changes are inside it (HI-3023: nothing staged, its
+  recorded commit the one checked out, edited or untracked files in it; porcelain v2 `S.M.`, `S..U`), which neither
+  `commit --only` nor `stash push` has anything of (they failed with git's *On branch main*, nothing said): *… is a
+  submodule whose changes are inside it … Commit them or set them aside inside …*. `WorktreeNow.insideOnly` names
+  such submodules; they stay in `dirty` (work held in the folder, for every check of a clean folder). Its new commit
+  made inside is a change of the folder like any other. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
   file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
 - **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a
   lane's (`cw_lane start`) read the target's folder (the adapter's `targetChanges`; Git only) and, when it has
-  uncommitted changes, warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
+  uncommitted changes (never a submodule changed only inside it, HI-3023: nothing there to commit or set aside, and a
+  merge pauses on it only if it changes that submodule's commit), warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
   notification in the project's window (five paths, then how many more) with **Commit**, **Set Aside** (on all the
   files found) and **Show Changes**; once a minute for the same folder and files (64 remembered). Never a refusal: git
   may merge over files the card doesn't touch. **Only where a merge is to come** (HI-2984, `targetChangesApply`): the

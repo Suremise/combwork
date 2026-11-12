@@ -391,6 +391,10 @@
     "defaultMessage": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.",
     "description": "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command."
   },
+  "service.folderChanges.submoduleInside": {
+    "defaultMessage": "{folder} is a submodule whose changes are inside it, so Combwork can't commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.",
+    "description": "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done."
+  },
   "service.folderChanges.tooManyToSetAside": {
     "defaultMessage": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
     "description": "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command."

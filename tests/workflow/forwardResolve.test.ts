@@ -8,7 +8,9 @@ import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { forwardOf, MERGE_COMMIT, rulesBaseId } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { returnedComment } from '../../src/main/workflow/queueState'
-import type { FactData } from '../../src/shared/workflow/facts'
+import { overridableEntry, type CardState, type FactData, type QueueEntry } from '../../src/shared/workflow/facts'
+import { GUARD_FNS } from '../../src/shared/workflow/guards'
+import type { Ruleset } from '../../src/shared/workflow/compile'
 import { forwardWaitOf, type WorkView } from '../../src/shared/workflow/workView'
 import { historyOf } from '../../src/main/platform/historyPorts'
 import type { ForwardOverride } from '../../src/shared/workflow/forwardOrder'
@@ -223,8 +225,11 @@ describe("a resolution whose direction no longer reads forward at its merge (HI-
     moved(await e.wf.submit(made.key, B1, { summary: 'merged' }))
     moved(await e.wf.startReview(made.key, R1))
     moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
-    // Checked at Resolve, forward then; the default branch changes before its merge (here: main deleted).
+    // Checked at Resolve, forward then; the default branch changes before its merge (here: main deleted, and trunk, made
+    // and checked out in the project folder, is git's default now: main into 1.2.0 reads unknown).
     sh(e.project, 'branch', '-D', 'main')
+    sh(e.project, 'checkout', '-q', '-b', 'trunk')
+    expect(await historyOf('git')!.defaultTarget(e.project)).toBe('trunk')
     return { e, made, fwd }
   }
 
@@ -245,6 +250,128 @@ describe("a resolution whose direction no longer reads forward at its merge (HI-
   it("merges when its forward's request recorded the user's override", { timeout: GIT_HEAVY_MS }, async () => {
     const { e, made } = await approvedThenMainGone({ by: 'user', dir: 'unknown', why: 'unordered' })
     expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+  })
+})
+
+describe('a default branch that can’t be read or named at the merge is no answer (HI-3040)', () => {
+  /** A resolution of `from` into 1.2.0, resolved on a builder, reviewed and approved; `from` the default branch. */
+  async function approvedResolution(e: Env, from: string) {
+    const card = e.wf.createCard({ title: `Bring 1.2.0 up to date with ${from}` })
+    const source = head(e, from)
+    moved(await e.wf.forwardStart(card.key, { from, to: '1.2.0', source, base: sh(e.project, 'merge-base', from, '1.2.0') }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0')))
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const back = e.wf.returnedForward(e.wf.store.card(card.id))!
+    const made = e.wf.createCard({ title: `Resolve: bring 1.2.0 up to date with ${from}`, target: back.to })
+    moved(await e.wf.markForwardResolution(made.key, { forward: card.key, from: back.from, to: back.to, source: back.source }, 'user'))
+    moved(await e.wf.resolveForward(card.key, { entry: back.entry, resolver: made.key }, 'merge by hand', 'user'))
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const folder = started.data!.folder as string
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict, resolved by hand
+    }
+    commit(folder, { 'fix.txt': 'the 1.2.0 version, with the release fix\n' }, `Merge ${from} into 1.2.0, resolved`)
+    moved(await e.wf.submit(made.key, B1, { summary: `merged ${from}` }))
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    return made
+  }
+
+  it('trunk the default (no main or master), the project folder detached at the merge: paused saying so, not returned; back on trunk, resumed, merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    sh(e.project, 'branch', '-m', 'main', 'trunk')
+    sh(e.project, 'checkout', '-q', 'trunk')
+    expect(await historyOf('git')!.defaultTarget(e.project)).toBe('trunk')
+    const made = await approvedResolution(e, 'trunk')
+    // The user looks at a commit in the project folder meanwhile: git names no default branch.
+    sh(e.project, 'checkout', '-q', '--detach')
+    const dest = head(e, '1.2.0')
+    const out = await e.queue().drain('1.2.0')
+    expect(out).toMatchObject([{ card: made.key, outcome: 'paused', reason: 'needsYou' }])
+    expect(e.queue().paused('1.2.0')).toMatchObject({ reason: 'needsYou', card: made.key, message: expect.stringContaining('the default branch of') })
+    expect(head(e, '1.2.0')).toBe(dest)
+    expect(e.wf.state(made).stage).toBe('merging')
+    expect(e.wf.store.facts(made.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+    // Back on trunk and resumed: the same approved revision merges.
+    sh(e.project, 'checkout', '-q', 'trunk')
+    e.queue().resume('1.2.0')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+  })
+
+  it('one unreadable read of the default branch: the entry goes round and merges', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    const made = await approvedResolution(e, 'main')
+    const H = historyOf('git')!
+    const real = H.defaultTarget
+    let reads = 0
+    H.defaultTarget = async (repo) => (reads++ === 0 ? { unknown: true as const, what: 'the default branch', detail: 'fatal: unable to read HEAD' } : real(repo))
+    try {
+      expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    } finally {
+      H.defaultTarget = real
+    }
+    expect(reads).toBeGreaterThan(1)
+  })
+
+  it('two versions: decided by their names, the default branch never read', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    sh(e.project, 'branch', '1.1.0', 'main')
+    const made = await approvedResolution(e, '1.1.0')
+    const H = historyOf('git')!
+    const real = H.defaultTarget
+    let reads = 0
+    H.defaultTarget = async (repo) => (reads++, real(repo))
+    try {
+      expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    } finally {
+      H.defaultTarget = real
+    }
+    expect(reads).toBe(0)
+  })
+})
+
+describe('the override recorded on a resolution returned for its direction lets its revision back in once (HI-3040)', () => {
+  const entry = (id: string, seq: number, o: Partial<QueueEntry> = {}): QueueEntry => ({ id, seq, revision: 'abc1234', target: '1.2.0', state: 'failed', phases: [], ...o })
+  const failed = (id: string, reason: 'direction' | 'checks', transient: boolean): Partial<QueueEntry> => ({ failure: { entry: id, revision: 'abc1234', target: '1.2.0', reason, transient } as QueueEntry['failure'] })
+  const allowed = (entries: QueueEntry[], overrideEntry: string | null) =>
+    GUARD_FNS['requeue.allowed']({ card: { key: 'AM-2', kind: 'code', labels: [], blocked: null }, state: { latest: { id: 1 }, entries, overrideEntry } as unknown as CardState, ruleset: {} as Ruleset, agent: null, revision: 'abc1234' })
+  // Two transient requeues used already (the limit), then the direction return.
+  const atCap = [entry('e1', 2, failed('e1', 'checks', true)), entry('e2', 3, { requeue: 'transient', ...failed('e2', 'checks', true) }), entry('e3', 4, { requeue: 'transient', ...failed('e3', 'checks', true) }), entry('e4', 5, { requeue: 'transient', ...failed('e4', 'direction', false) })]
+
+  it('bound to the direction-failed entry: allowed, whatever transient requeues counted', () => {
+    expect(allowed(atCap, 'e4')).toBeNull()
+  })
+
+  it('no override, or one bound to another entry: the ordinary rules (not transient: refused)', () => {
+    expect(allowed(atCap, null)).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
+    expect(allowed(atCap, 'e3')).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueNotTransient' } })
+  })
+
+  it('who can take it (overridableEntry, HR3 round 1): only back in Active for that failure, its entry the latest submission’s', () => {
+    const last = atCap.at(-1)!
+    const base = { stage: 'active', resolves: { forward: 'AM-1', from: 'main', to: '1.2.0', source: 'abc', by: 'user' }, entries: atCap, latest: { id: 1, revision: 'abc1234' }, overrideEntry: null } as unknown as CardState
+    const at = (o: Partial<CardState>, withOverride = true) => overridableEntry({ ...base, ...o }, 'main', '1.2.0', withOverride)
+    expect(at({})).toBe(last)
+    // Moved back to Review (or anywhere but Active) after it: no.
+    for (const stage of ['review', 'approved', 'merging', 'done'] as const) expect(at({ stage })).toBeNull()
+    // A newer submission since (a new revision, reviewed and failed back to Active, say): its entry isn't that one's.
+    expect(at({ latest: { id: 99, revision: 'def5678' } as CardState['latest'] })).toBeNull()
+    expect(at({ latest: { id: 1, revision: 'def5678' } as CardState['latest'] })).toBeNull()
+    // Another pair, an override already, a failure for another reason, an entry open: no.
+    expect(overridableEntry(base, 'trunk', '1.2.0', true)).toBeNull()
+    expect(at({ resolves: { ...base.resolves!, override: { by: 'user', dir: 'unknown', why: 'unordered' } } })).toBeNull()
+    expect(at({ entries: [...atCap.slice(0, -1), entry('e4', 5, failed('e4', 'checks', true))] })).toBeNull()
+    expect(at({ entries: [...atCap, entry('e5', 6, { state: 'open' })] })).toBeNull()
+    // Let back in already: again only to add the direction's override (it reading against again), never the requeue twice.
+    expect(at({ overrideEntry: 'e4' }, false)).toBeNull()
+    expect(at({ overrideEntry: 'e4' }, true)).toBe(last)
+  })
+
+  it('used: once its requeue has an entry of its own, the binding never matches again (its transient return at the cap is refused)', () => {
+    const after = [...atCap, entry('e5', 6, { requeue: 'transient', ...failed('e5', 'checks', true) })]
+    expect(allowed(after, 'e4')).toMatchObject({ rule: 'requeue.allowed', values: { cause: 'requeueLimit' } })
   })
 })
 

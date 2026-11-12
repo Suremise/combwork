@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -363,6 +363,7 @@ const W = {
   aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
   inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
   failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
+  resolutionOverride: agentMsg({ id: 'runtime.wake.resolutionOverride', text: '{card}: the user’s override of the release path’s direction is recorded on it, so its merge may bring {to} up to date with {from}. Submit the same revision again (cw_submit): it goes back into the merge queue once, as approved.', note: 'HI-3040: the builder’s wake when the user (or the Assistant on their explicit request) recorded an override on a forward merge’s resolution the queue returned for its direction. {from} and {to}: branch names.' }),
   staleSubmit: agentMsg({ id: 'runtime.wake.stale', text: 'stale: submit again', note: "The builder's wake when its pass went stale at the verdict (its line moved)." }),
   focusedSkip: agentMsg({ id: 'runtime.wake.focusedSkip', text: '{card}: its reviewer {merge, select, yes {accepted} other {declined}} the focused tests its merge skipped ({why})', note: "The builder's wake for its reviewer's cw_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason." }),
   answered: agentMsg({ id: 'runtime.wake.answered', text: '{card}: the user {answer, select, approved {approved} declined {declined} other {answered}} "{question}"', note: "An answer's wake: what the user did with a question. {answer}: approved, declined or another answer. {question}: the question, quoted short (#1626); what they chose or noted follows." }),
@@ -2976,6 +2977,31 @@ export class Workflow {
       const now = w.state()
       if (now.started || now.stage !== 'todo' || now.resolves) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: '' } } as GuardRefusal // i18n-ignore: intent names
       w.fact('ForwardResolution', { ...d, by }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-3040: the user's override recorded on a forward merge's resolution the queue returned for its direction, by a
+   * forward request with the override for its pair (queueControls' forwardMerge, the user's or the Assistant's alone).
+   * Only while, read in this write, it can take it (`overridableEntry`: back in Active for its direction, that entry its
+   * latest submission's, no override yet). `d.override` none: the direction reads forward again, so only the requeue.
+   * Its builder is woken to submit the same revision again, which `requeue.allowed` lets back in once. Refused
+   * (`move.notFromHere`) otherwise, nothing written.
+   */
+  async overrideResolution(ref: unknown, d: { from: string; to: string; override?: ForwardOverride }, by: 'user' | 'assistant', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, null, by, (w) => {
+      guard?.()
+      const now = w.state()
+      const last = overridableEntry(now, d.from, d.to, !!d.override)
+      if (!last) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('ResolutionOverride', { ...(d.override ? { override: d.override } : {}), entry: last.id, by }) // i18n-ignore: a fact's kind and codes, not text
+      this.wake(w, now.started?.builder, stored(W.resolutionOverride, { card: card.key, from: d.from, to: d.to }))
       return null
     })
     if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
