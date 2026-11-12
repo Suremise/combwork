@@ -330,6 +330,8 @@ export const catchUpPaused = (catchUp: string | null, pause: { card: string } | 
 
 /** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
 export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
+/** HI-3041: an owed catch-up's look at the remote, one per target (never an entry's: those go with their card). */
+export const catchUpPin = (target: string): string => `refs/cw/catch-up/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`
 
 /**
  * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
@@ -620,7 +622,7 @@ export class MergeQueue {
   /** After an entry's merge, the push of its target it owes (G18), before the next entry; its outcome stays the merge's. */
   private async thenPush(target: string, o: QueueOutcome | null): Promise<QueueOutcome | null> {
     // G21 (HI-1183): a published merge's local catch-up first (its pause, if any, is saved: the outcome stays the merge's).
-    if (o?.outcome === 'integrated' && (await this.settleCatchUp(target))) return o
+    if (o?.outcome === 'integrated' && (await this.settleCatchUp(target, o.entry))) return o
     if (o?.outcome === 'integrated') await this.settlePush(target)
     return o
   }
@@ -1011,8 +1013,9 @@ export class MergeQueue {
    * note), then a fresh one from the local head as it is now (another ancestor of the result gets its own journalled
    * plan). Not checked out: a compare-and-swap. Checked out: the advance's conditions, files and ref, journalled. A
    * condition pauses the queue naming the merged card; the user's edits and ref changes are never overwritten.
+   * `published`: the entry this run has just published (HI-3041: its catch-up needn't ask the remote again).
    */
-  private async settleCatchUp(target: string): Promise<QueueOutcome | null> {
+  private async settleCatchUp(target: string, published?: string): Promise<QueueOutcome | null> {
     for (let i = 0; i < 3; i++) {
       const c = catchUpOf(this.wf.store.meta(catchUpKey(target)))
       if (!c) return null
@@ -1022,13 +1025,14 @@ export class MergeQueue {
         return null
       }
       const folder = c.folder
-      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder)) : await this.catchUpFresh(target, c)
+      const look = c.entry !== published
+      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder, look)) : await this.catchUpFresh(target, c, look)
       if (r !== 'again') return r
     }
     return null
   }
 
-  private async catchUpRecorded(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null | 'again'> {
+  private async catchUpRecorded(target: string, c: CatchUp, folder: string, look: boolean): Promise<QueueOutcome | null | 'again'> {
     const I = this.catchUpPort(c)!
     const h = this.host({})
     const f = await I.recoveryState(h, { target, expected: c.from, result: c.to, files: c.files ?? [], folder, phase: c.phase! })
@@ -1064,6 +1068,14 @@ export class MergeQueue {
     }
     if (f.found === 'rollback') return this.catchUpRollback(target, c, folder)
     if (f.found === 'swap') {
+      // HI-3041 (HR2's round 2): its files moved before a stop, the ref not yet: the remote asked first, as a fresh one
+      // is. Gone from it: the files back by the recovery table's rollback, then looked at again (and ended). Unknown:
+      // left as it is, still owed, asked again at the next look.
+      if (look) {
+        const there = await this.remoteHas(target, c)
+        if (there === null) return null
+        if (!there) return this.catchUpRollback(target, c, folder)
+      }
       await this.cfg.hooks?.beforeCatchUpRef?.(c.entry)
       this.stillHolds(target)
       if (!(await I.swap(h, target, c.from, c.to))) return this.catchUpRollback(target, c, folder)
@@ -1072,7 +1084,8 @@ export class MergeQueue {
     return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
   }
 
-  private async catchUpFresh(target: string, c: CatchUp): Promise<QueueOutcome | null | 'again'> {
+  /** `look`: whether the remote is asked before the local target is brought to the result (HI-3041; not right after publishing it). */
+  private async catchUpFresh(target: string, c: CatchUp, look: boolean): Promise<QueueOutcome | null | 'again'> {
     const I = this.catchUpPort(c)!
     const h = this.host({})
     const local = await I.targetHead(this.project, target)
@@ -1091,7 +1104,22 @@ export class MergeQueue {
     // Commits the remote lacks (the user's, since): left as they are, never forced or merged by Combwork, and the catch-up
     // still owed (HI-2988: dropping it left the published merge out of the local target, all looking well): paused
     // `remoteDiverged`, naming the published card, until the user brings the local target in line with its remote.
-    if (!behind) return this.catchUpPause(target, c, 'remoteDiverged', [target])
+    if (!behind) {
+      // HI-3041: unless the remote no longer has the result either (a force-push took the published merge off it): then
+      // there is nothing to catch up to, and the catch-up ends (the reconciler marks the card as having left its target,
+      // and the queue goes on); a pause there could never be put right. Unknown: paused as before.
+      if ((await this.remoteHas(target, c)) === false) return done()
+      return this.catchUpPause(target, c, 'remoteDiverged', [target])
+    }
+    // HI-3041 (HR1's round 1): behind it too, an owed catch-up taken up again (not the one right after its publication)
+    // asks the remote first: a result it no longer has is never brought into the local target; the catch-up ends as
+    // above. Unknown (HR2's round 2): nothing moved, still owed, asked again at the next look; only a remote seen
+    // holding it lets the local target be brought there.
+    if (look) {
+      const there = await this.remoteHas(target, c)
+      if (there === null) return null
+      if (!there) return done()
+    }
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null
@@ -1105,6 +1133,23 @@ export class MergeQueue {
       if (await I.swap(h, target, local, c.to)) return done()
       return 'again'
     })
+  }
+
+  /**
+   * HI-3041: whether the remote still has an owed catch-up's result, fetched now into the target's own catch-up pin
+   * (overwritten each time, as slots' `refs/cw/fetch/<target>`). Null when it can't tell (no transport, a destination
+   * that pauses, a failed fetch, an unreadable history).
+   */
+  private async remoteHas(target: string, c: CatchUp): Promise<boolean | null> {
+    const I = this.catchUpPort(c)!
+    if (!I.destination || !I.fetchHead) return null
+    const h = this.host({})
+    const d = await I.destination(h, target)
+    if (isAgain(d) || 'pause' in d) return null
+    const f = await I.fetchHead(h, d.snapshot, catchUpPin(target))
+    if ('failed' in f) return null
+    const has = await I.contains(this.project, c.to, f.head)
+    return isUnknown(has) ? null : has
   }
 
   /** A checked-out target's catch-up from `c.from` (the local head now), under the lock and the folder's fence. */

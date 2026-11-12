@@ -196,6 +196,55 @@ const TARGET = 'integration'
     check('…an ordinary card for a builder, in Todo, linked, saying what to merge', !!made && made.column === 'todo' && !made.agent && made.description.includes('git merge ') && made.description.includes('clash.txt') && (await h.facts(made.number)).some((f) => f.kind === 'ForwardResolution' && f.data.from === 'main' && f.data.to === TARGET), JSON.stringify(made && { column: made.column, title: made.title }))
     const again = await api(assistant, 'POST', '/v1/queue/resolve', { card: `#${clashCard}`, reason: 'again' })
     check('…the Assistant\'s Resolve of it again is refused (409), nothing made', again.status === 409 && (await h.inv('tasks:list')).filter((c) => c.links?.includes(clashCard)).length === 1, JSON.stringify(again.body))
+    // --- HI-3037: a resolution the queue returns without the commit it resolves (HI-2999) says why in words in the window,
+    // in English and in German, never the code "resolution". Submitting one without that commit is refused, so the queue's
+    // own check is reached only past that ("however it got here"): this one merges the commit, is approved while the queue
+    // is paused, and then a git replace object gives its merge commit no second parent, as git itself reads it, before
+    // the queue looks. Deleted at once after.
+    const source = (await h.facts(made.number)).find((f) => f.kind === 'ForwardResolution')?.data?.source
+    const resolver = await q.agent(fx, h, 'BR')
+    const gitAs = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, ...args])
+    let replaced = null
+    try {
+      await h.inv('queue:pause', fx.alpha, TARGET)
+      const res = await q.approveCard(fx, h, resolver, reviewer, made.number, 'Resolve clash', { 'clash.txt': 'resolved\n' }, {
+        afterStart: (b) => {
+          // Its conflict in clash.txt is what the commit resolves: merge exits 1 on it, MERGE_HEAD kept for the commit.
+          try {
+            gitAs(b.folder, ['merge', '--no-commit', '--no-ff', source])
+          } catch {}
+        }
+      })
+      const parents = lib.git(fx.alpha, ['rev-list', '--parents', '-n', '1', res.revision]).trim().split(/\s+/)
+      check('HI-3037: the resolution merges the commit it resolves, submitted and passed', !!source && parents.length === 3 && parents.includes(source) && res.steps.submit.status === 200 && res.steps.verdict.status === 200, JSON.stringify({ source, parents, submit: res.steps.submit, verdict: res.steps.verdict.status }))
+      const hidden = gitAs(fx.alpha, ['commit-tree', `${res.revision}^{tree}`, '-p', parents[1], '-m', 'Resolve clash (its merge hidden)']).trim()
+      gitAs(fx.alpha, ['replace', res.revision, hidden])
+      replaced = res.revision
+      await h.inv('queue:resume', fx.alpha, TARGET)
+      const resBack = await until(async () => ((await column(made.number)) === 'doing' ? (await h.facts(made.number)).findLast((f) => f.kind === 'IntegrationFailed')?.data ?? null : null), HUNG_MS)
+      check('…the queue returns it to its builder as a resolution without that commit', resBack?.reason === 'resolution', JSON.stringify(resBack))
+    } finally {
+      if (replaced) gitAs(fx.alpha, ['replace', '-d', replaced])
+    }
+    await q.openByTitle(h.page, made.number)
+    await until(async () => (await cardDialog.count()) === 1, HUNG_MS)
+    const resPart = cardDialog.locator('.card-work-queue')
+    const resText = async () => (await resPart.innerText().catch(() => '')).replace(/\s+/g, ' ')
+    const english = await until(async () => ((await resText()).includes('the commit it resolves was copied, not merged') ? resText() : null), HUNG_MS)
+    check('…its Work section says why in words', !!english && !/: resolution\b/.test(english), await resText())
+    await q.folderHelpers(fx).themes(h.page, cardDialog.locator('.card-work'), 'queuecontrols-resolution-returned')
+    const base = (await h.inv('app:info')).language
+    const speak = (language) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    const deDir = path.join(lib.ROOT, 'locales', 'de')
+    await speak({ ...base, code: 'de', locale: 'de', messages: Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8')))) })
+    try {
+      const german = await until(async () => ((await resText()).includes('der aufgelöste Commit wurde kopiert, nicht gemergt') ? resText() : null), HUNG_MS)
+      check('…and in German', !!german && !/: resolution\b/.test(german), await resText())
+      await cardDialog.locator('.card-work').screenshot({ path: path.join(fx.shots, 'queuecontrols-resolution-returned-de-dark.png') })
+    } finally {
+      await speak(base)
+    }
+    await h.page.keyboard.press('Escape')
     // --- HI-2893: main taken out of Other branches, its queue holding nothing, is a past branch's: left out of
     // GET /v1/queue and listed with past=true, marked; named, it is listed as it is.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })

@@ -40,7 +40,7 @@ afterAll(() => useGitWorker(null))
  * `started`. It writes its pid, and ends when the test asks (a stop file) or, should the test run die, after its own
  * bound. Ended when the test finishes, passed, failed or timed out, and waited for until it has gone.
  */
-function holding(): { args: string[]; running: () => boolean } {
+function holding(foreground = false): { args: string[]; running: () => boolean; started: () => boolean } {
   const dir = tempDir('cw-git-holder-')
   const fwd = (p: string): string => p.replace(/\\/g, '/')
   const script = join(dir, 'holder.cjs')
@@ -58,7 +58,8 @@ setInterval(() => { if (fs.existsSync(path.join(dir, 'stop')) || Date.now() > bo
       return false
     }
   }
-  const args = ['-c', `alias.hold=!"${fwd(process.execPath)}" "${fwd(script)}" "${fwd(dir)}" & echo started`, 'hold']
+  // `foreground`: git waits on it (HI-3021: a hook, a signer), rather than exiting with it left running.
+  const args = ['-c', `alias.hold=!"${fwd(process.execPath)}" "${fwd(script)}" "${fwd(dir)}"${foreground ? '' : ' & echo started'}`, 'hold']
   let asked = false
   onTestFinished(async () => {
     writeFileSync(join(dir, 'stop'), '')
@@ -82,7 +83,8 @@ setInterval(() => { if (fs.existsSync(path.join(dir, 'stop')) || Date.now() > bo
     running: () => {
       const p = pid()
       return p !== null && alive(p)
-    }
+    },
+    started: () => pid() !== null
   }
 }
 
@@ -118,6 +120,19 @@ describe("git's worker (HI-1783)", () => {
     const r = await git(repo, ['hash-object', '--stdin'], undefined, undefined, { timeout: 300 })
     expect(r).toMatchObject({ ok: false, timedOut: true })
   })
+
+  it('at its time limit ends what git started too, before it answers (HI-3021)', async () => {
+    // Git waiting on a process of its own (its shell, then node), as on a hook: execFile's limit ended git.exe alone.
+    for (const route of [join(tmp, 'none.cjs'), bundle]) {
+      useGitWorker(route)
+      const h = holding(true)
+      const r = await git(repo, h.args, undefined, undefined, { env: gitEnv(), timeout: 5000 })
+      expect(r).toMatchObject({ ok: false, timedOut: true })
+      // It had started (it writes its pid first): ended, not never begun.
+      expect(h.started()).toBe(true)
+      await vi.waitFor(() => expect(h.running()).toBe(false), { timeout: HUNG_MS })
+    }
+  }, HUNG_MS * 3)
 
   it('answers many commands at once, each with its own', async () => {
     useGitWorker(bundle)

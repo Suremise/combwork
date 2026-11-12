@@ -4029,7 +4029,7 @@ that can't be written fails the change whole.
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `InTarget` (observed) | revision, target, submission (its `Submitted` fact) | A card in Review whose submitted change is in its target already: the **already in main** mark; it stays in Review (§16.4.4) [HI-2709]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
-| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again: the mark cleared (HI-2988). |
+| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again, or whose own change is (merged back by hand, by the test that marks it left: HI-3041): the mark cleared (HI-2988). |
 | `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
 | `Refused` | intent or move, rule, message ids, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
@@ -6049,10 +6049,33 @@ touched:
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
-  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
-  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked` with those paths, named
+  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
+  its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
-  after it made one is said with that stash, kept. **Any number of files** (HI-2983): the paths go to git on its input
+  after it made one is said with that stash, kept. **Bounded** (HI-3021): a commit or stash still running after two
+  minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
+  timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
+  running). **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
+  `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
+  (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too), so the real index and its lock
+  are never held while a hook, filter or signer runs, and the user's own `git add` works meanwhile. Combwork never
+  removes an `index.lock`: what git leaves is the copy's, removed with the copy and every file git named after it (a
+  stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
+  or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
+  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in, tried
+  again briefly while another git holds the index; their stat data left empty rather than refreshed, which could run
+  a filter unbounded); every other entry is left. That step runs nothing of the repository's (HR2's rounds 3 and
+  4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
+  as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
+  can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
+  holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
+  the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
+  is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
+  round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its
+  message this one's, and its tree's entries for the paths the private index's; HEAD unreadable before
+  the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
+  unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
+  then. **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
@@ -6461,7 +6484,15 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
    A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
    pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with
-   nothing said). A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
+   nothing said). Before that pause the remote is fetched (into `refs/cw/catch-up/<target>`): when it no longer has the
+   result either (a force-push took the published merge off it), the catch-up ends, the queue goes on and the
+   reconciler marks the card `LeftTarget` (HI-3041: paused, it could never be put right); unknown (a failed fetch),
+   paused as above. A local target behind the result is asked about the same way before it is brought there, unless
+   the catch-up is the one right after this run published the result: one the remote no longer has is never brought
+   into the local target, and the catch-up ends; unknown, nothing moves and it stays owed, asked again at the next
+   look (only a remote seen holding the result lets it go on). A recorded step about to swap the ref (its files moved
+   before a stop) asks the same: gone, its files go back by the table's rollback and the catch-up then ends; unknown,
+   it is left as it is, still owed. A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
    table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
    holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
    folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
@@ -6470,7 +6501,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
    local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card
    published to the remote (its `IntegrationStarted.publish`, or integrated by outside while following) `LeftTarget`
-   while its catch-up is owed or the local target is behind its result.
+   while its catch-up is owed, or while the local target is behind its result and the remote still has it (HI-3041,
+   Darren's decision: undone on the remote too, it is marked as with a push after merging; the remote's branch fetched,
+   sealed, into `refs/cw/reconcile/<target>`, its head kept a minute per target; unreadable, nothing is recorded and the
+   pass is retried).
 
 **Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
