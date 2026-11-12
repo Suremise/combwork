@@ -931,6 +931,38 @@ describe('a case-only rename, and a removal replaced by a folder (HI-3024)', () 
       expect(read('b.txt/x.txt')).toBe('x\n')
     })
 
+  // HR1's round 1: a staged rename whose new side was then deleted and replaced by a folder (`RD b.txt`).
+  const renamedToFolder = (): void => {
+    sh(proj, 'mv', 'a.txt', 'b2.txt')
+    rmSync(join(proj, 'b2.txt'))
+    mkdirSync(join(proj, 'b2.txt'))
+    writeFileSync(join(proj, 'b2.txt', 'x.txt'), 'x\n')
+    expect(sh(proj, 'status', '--porcelain=v1', '--untracked-files=all').split('\n').map((l) => l.trimEnd()).sort()).toEqual(['?? b2.txt/x.txt', 'RD a.txt -> b2.txt'])
+  }
+
+  it("a staged rename's new side deleted, a folder in its place (RD): Set Aside refused by name, shown alone or with the folder, a late file never reached, nothing changed", async () => {
+    renamedToFolder()
+    const before = status()
+    for (const shown of [['b2.txt'], ['b2.txt', 'b2.txt/x.txt']]) {
+      lateFile = 'b2.txt/late.txt'
+      await expect(settle('setAside', shown)).rejects.toThrow(/^b2\.txt was removed from Git, and a folder of that name is in its place/)
+      lateFile = null
+    }
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(read('b2.txt/x.txt')).toBe('x\n')
+    expect(existsSync(join(proj, 'b2.txt', 'late.txt'))).toBe(false)
+    expect(status()).toBe(before)
+  })
+
+  it("a staged rename's new side deleted, a folder in its place (RD): Commit works, a.txt's removal committed, the folder's file as shown", async () => {
+    renamedToFolder()
+    const was = tree()
+    await settle('commit', ['b2.txt', 'b2.txt/x.txt'])
+    expect(tree()).toEqual([...was.filter((p) => p !== 'a.txt'), 'b2.txt/x.txt'].sort())
+    expect(lines()).toEqual([])
+    expect(read('b2.txt/x.txt')).toBe('x\n')
+  })
+
   it('a deleted file (not staged) with nothing in its place: Set Aside and Commit as before (git\'s ordinary deletion)', async () => {
     rmSync(join(proj, 'b.txt'))
     await settle('setAside', ['b.txt'])

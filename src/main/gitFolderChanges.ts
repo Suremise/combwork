@@ -437,7 +437,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const path = e.slice(3)
     if (xy[0] === 'R' || xy[0] === 'C') {
       const from = parts[++i]
-      put(path, { untracked: false, from, staged: true })
+      // HR1's round 1 (HI-3076): a staged rename's new side deleted since (`RD`) is gone too.
+      put(path, { untracked: false, from, staged: true, gone: xy[1] === 'D' })
       if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true, staged: true })
     } else if (UNMERGED.has(xy)) put(path, { untracked: false, unmerged: true })
     else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?', gone: xy[1] === 'D' })
