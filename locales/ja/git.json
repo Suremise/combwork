@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project}（現在は{platform}）",
   "git.vc.store.notExported": "ブックマーク{name}がGit側と一致しません。jj git exportを実行するか、確認してください。",
   "git.vc.store.queue": "{project}：そのマージキュー",
+  "git.vc.store.stuck": "Combworkは{projects}をGitとjjの間で切り替えている途中で停止したため、設定からどちらの方向に完了すべきか判断できません。{changed}が変更されたか、読み取れません。切り替え前または切り替え後のバージョン管理が設定に示されるまで、そのリポジトリでは何も開始されません。",
+  "git.vc.store.stuckTitle": "バージョン管理の切り替えを完了できませんでした",
   "git.vc.store.slot": "{project}：スロット{slot}（{agent}に貸出中）",
   "git.vc.store.stock": "Git for Windows自体の既定の設定（LFSフィルター、Office文書用のdiffドライバー）は数えません。数えるのは、リポジトリやご自身のGit設定が使っているものだけです。",
   "git.vc.store.toGit": "Combworkは.jjをそのまま残します。不要な場合はjjで削除してください。",

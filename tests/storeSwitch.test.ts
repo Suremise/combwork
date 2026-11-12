@@ -31,6 +31,7 @@ const { commonGitDir, heldStoreKeys, storeKeyOf } = await import('../src/main/re
 const { withFolderRepoLocks } = await import('../src/main/platform/repoPorts')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { projectPlatform } = await import('../src/main/platform/registry')
+const notify = await import('../src/main/notify')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -301,6 +302,88 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await platformIn(w, p)).toBe('none')
     expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'platform.switching' })
     void q
+  })
+
+  /** A switch of P and Q begun by a Combwork that died, its owner as given; P written to jj before it died. */
+  async function deadSwitch(owner: { pid: number; started?: number }) {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    const storeId = storeKey(await commonGitDir(p))
+    const before = { p: await w.projectConfig(p), q: await w.projectConfig(q) }
+    const snap = (c: typeof before.p) => ({ platform: c.platform as 'git', ...(c.workflow ? { workflow: JSON.parse(JSON.stringify(c.workflow)) as unknown } : {}) })
+    const after = (c: typeof before.p) => ({ platform: 'jj' as const, platformFound: 'jj', ...(c.workflow ? { workflow: { ...(c.workflow as object), platform: 'jj' } } : {}) })
+    const [ip, iq] = [await idOf(w, p), await idOf(w, q)]
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => beginSwitch(metaOf(db), storeId, [{ id: ip, path: p, before: snap(before.p), after: after(before.p) }, { id: iq, path: q, before: snap(before.q), after: after(before.q) }], { token: 'dead', profile: 'gone', ...owner })))
+    return { w, p, q }
+  }
+
+  it('HI-3073: its owner recorded with its start time, its pid since given to another living process: recovered as dead (the real probe)', async () => {
+    // This test's parent is alive, but it didn't start at the recorded time: not the switch's owner.
+    const { w, p, q } = await deadSwitch({ pid: process.ppid, started: 1 })
+    expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.switching' })
+    await ss.recoverFences(w)
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled' })
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'git'])
+    expect(await startCard(w, q, 'q')).not.toMatchObject({ rule: 'platform.switching' })
+  })
+
+  it.each([
+    ['running, started then', true],
+    ["can't be told (the probe unreadable)", null]
+  ] as const)('HI-3073: its owner %s: the switch is left as it is, its owner’s (fail closed)', async (_what, alive) => {
+    const asked: [number, number][] = []
+    ss.storeSwitchSeams.processes = { alive: async (pid, started) => (asked.push([pid, started]), alive) }
+    try {
+      const { w, p } = await deadSwitch({ pid: process.ppid, started: 1234 })
+      await ss.recoverFences(w)
+      expect(asked).toContainEqual([process.ppid, 1234])
+      expect(await fenceOf(w, p)).toMatchObject({ state: 'switching' })
+    } finally {
+      ss.storeSwitchSeams.processes = undefined
+    }
+  })
+
+  it('HI-3073: a switch whose owner is gone and that can’t be settled is said in a notice, once, naming its projects', async () => {
+    const sent: string[] = []
+    const win = { isDestroyed: () => false, webContents: { id: 9, send: (...a: unknown[]) => void sent.push(JSON.stringify(a)) } }
+    notify.setNotifyHost({ focused: () => ({ win: win as never, workspacePath: 'x', projectPath: null }), fallback: () => win as never, workspaceOf: () => 'x' })
+    try {
+      const { w, p } = await deadSwitch({ pid: 2 ** 22 + 9 })
+      // P edited by hand meanwhile: neither its before nor its after, so the switch stays stuck.
+      await w.mutateProjectConfig(p, () => ({ platform: 'none' }), { existing: true })
+      await ss.recoverFences(w)
+      expect(await fenceOf(w, p)).toMatchObject({ state: 'switching' })
+      const told = sent.filter((x) => x.includes('A version control switch couldn’t be finished'))
+      expect(told).toHaveLength(1)
+      expect(told[0]).toContain('Combwork stopped while switching p and q between Git and jj')
+      expect(told[0]).toMatch(/p changed or can’t be read/)
+      await ss.recoverFences(w)
+      expect(sent.filter((x) => x.includes('A version control switch couldn’t be finished'))).toHaveLength(1)
+      // HR1's round 1: workspace A closed, then another workspace on the same repository (its own board), its own stuck
+      // switch at the same generation: told too, once, naming its own projects.
+      await disposeWorkspaceService(w)
+      opened.splice(opened.indexOf(w), 1)
+      const ws2 = join(p, '..', 'nested-ws')
+      const [r, t] = [join(ws2, 'r'), join(ws2, 't')]
+      for (const d of [r, t]) mkdirSync(join(d, '.combwork'), { recursive: true })
+      for (const [dir, id] of [[r, 'r'], [t, 't']] as const) writeFileSync(join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, id, platform: 'git', agents: [], workflow: { platform: 'git', preset: 'solo', options: {} } }))
+      const w2 = createWorkspaceService()
+      await w2.open(ws2)
+      opened.push(w2)
+      const storeId = storeKey(await commonGitDir(r))
+      expect(storeId).toBe(storeKey(await commonGitDir(p)))
+      const cfg2 = { r: await w2.projectConfig(r), t: await w2.projectConfig(t) }
+      const snap2 = (c: typeof cfg2.r) => ({ platform: 'git' as const, ...(c.workflow ? { workflow: JSON.parse(JSON.stringify(c.workflow)) as unknown } : {}) })
+      await store.boardWrite(w2, async () => store.boardWriteOp(w2, (db) => beginSwitch(metaOf(db), storeId, [{ id: cfg2.r.id!, path: r, before: snap2(cfg2.r), after: { platform: 'jj', platformFound: 'jj' } }, { id: cfg2.t.id!, path: t, before: snap2(cfg2.t), after: { platform: 'jj', platformFound: 'jj' } }], { token: 'dead2', pid: 2 ** 22 + 11, profile: 'gone' })))
+      await w2.mutateProjectConfig(r, () => ({ platform: 'none' }), { existing: true })
+      await ss.recoverFences(w2)
+      const both = sent.filter((x) => x.includes('A version control switch couldn’t be finished'))
+      expect(both).toHaveLength(2)
+      expect(both[1]).toContain('Combwork stopped while switching r and t between Git and jj')
+      await ss.recoverFences(w2)
+      expect(sent.filter((x) => x.includes('A version control switch couldn’t be finished'))).toHaveLength(2)
+    } finally {
+      notify.setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
+    }
   })
 })
 

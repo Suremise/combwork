@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project} (ahora {platform})",
   "git.vc.store.notExported": "El marcador {name} no es el mismo en Git: ejecuta jj git export o revísalo.",
   "git.vc.store.queue": "{project}: su cola de fusión",
+  "git.vc.store.stuck": "Combwork se detuvo mientras cambiaba {projects} entre Git y jj, y no puede saber por su configuración en qué sentido terminarlo: {changed} cambió o no se puede leer. Hasta que muestren su control de versiones de antes o de después del cambio, no empieza nada en su repositorio.",
+  "git.vc.store.stuckTitle": "No se pudo terminar un cambio de control de versiones",
   "git.vc.store.slot": "{project}: slot {slot}, prestado a {agent}",
   "git.vc.store.stock": "La configuración predeterminada de Git for Windows (su filtro LFS, el controlador de diff para documentos de Office) no cuenta: solo lo que usan el repositorio o tu propia configuración de Git.",
   "git.vc.store.toGit": "Combwork deja .jj en su sitio: elimínalo con jj si ya no lo quieres.",

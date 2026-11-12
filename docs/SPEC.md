@@ -2724,6 +2724,11 @@ merges under jj.
   the rest rather than left outside; its membership itself unreadable refuses the switch (`switching`).
   **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
   (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
+  HI-3073: the owner records its process's start time beside its pid (as slots record their holders, the same probe),
+  so a pid the system has since given another program isn't taken for it: alive only while a process with that id
+  started then runs; a probe that can't tell counts as alive (fail closed); a fence recorded without a start time (an
+  older one) by its pid alone, as before. A switch left **stuck** (by recovery or by a failed switch's own settle) is
+  said in a notice as well as the log, once per switch, naming its projects and those changed or unreadable.
   The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
   isn't fenced, as the queue isn't beyond the repository lock.
 - **Tests**: `tests/platformFence.test.ts` (the rules on a map), `tests/storeSwitch.test.ts` (two projects on one store,

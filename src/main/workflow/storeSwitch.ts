@@ -42,12 +42,14 @@ import { readKeptJson } from '../fsutil'
 import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { SlotStore } from '../slots'
 import { CopyStore } from '../copies'
-import { boardConn } from '../slotsApp'
+import { boardConn, holder } from '../slotsApp'
+import { tell } from '../notify'
+import { fmt, msg, tr } from '../../shared/i18n'
 import { assessJj, REPO_GATES } from '../platform/jjCompat'
 import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows, pinnedContextOf } from '../platform/jjViews'
 import { isJjUnknown, JjReads } from '../platform/jjReads'
 import { jjRunner, type JjRunner } from '../platform/jjRunner'
-import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, membershipOf, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
+import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, membershipOf, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type FenceOwner, type Meta, type Snap } from '../platform/platformFence'
 import { metaOf, projectIdOf } from '../platform/fenceAdmit'
 
 const log = createLogger('workflow')
@@ -397,6 +399,8 @@ export const storeSwitchSeams: {
   write?: (path: string, partial: Partial<ProjectConfig>) => Promise<void>
   /** The repository's own checks (jj's confirmation, the gates, the fallback), stood in for by the fence's tests; the real-jj tests run them. */
   repo?: { ready?: (path: string, store: string) => Promise<SwitchRefusal | null>; gates?: (path: string, store: string) => Promise<GateCheck[]>; fallback?: (path: string) => Promise<FallbackProblem[]> }
+  /** HI-3073: the processes' probe (this process's id and start, whether one is still running), slots' own by default. */
+  processes?: { self?: () => Promise<{ pid: number; started: number }>; alive?: (pid: number, started: number) => Promise<boolean | null> }
 } = {}
 
 /**
@@ -430,7 +434,7 @@ async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId
     const after: Snap = { platform: to, platformFound: foundKey(mDetected), ...(before.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(setKept(cfg.workflow!, to))) as unknown } : {}) }
     begin.push({ id: m.id, path: m.path, before, after })
   }
-  const owner = { token: randomUUID(), pid: process.pid, profile: ws.path ?? '' }
+  const owner = await fenceOwner(ws)
   ACTIVE.add(owner.token)
   let fence: Fence | null = null
   try {
@@ -484,6 +488,7 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
   const r = reconcile(f, disk)
   if ('stuck' in r) {
     log.warn(`The platform switch of ${userText(store)} can't be settled: ${r.stuck.map((id) => userText(id)).join(', ')} changed by hand meanwhile or unreadable; their work stays refused until they show their before or after`)
+    tellStuck(ws, store, f, r.stuck)
     return 'stuck'
   }
   if ('back' in r) {
@@ -494,6 +499,7 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
       const now = await diskSnap(m.path)
       if (!now || JSON.stringify(now) !== JSON.stringify(b)) {
         log.warn(`Rolling back the platform switch of ${userText(store)}: ${userText(m.path)} doesn't read back as before; its work stays refused`)
+        tellStuck(ws, store, f, [id])
         return 'stuck'
       }
     }
@@ -503,12 +509,27 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
   return 'forward' in r ? 'forward' : 'back'
 }
 
-/** Whether a fence's owner may still be switching: this process's own switch, or another process still alive. */
-function ownerLive(f: Fence): boolean {
+/** A switch's owner: this process, by its id and (HI-3073) its start time, as slots record their holders'. */
+async function fenceOwner(ws: WorkspaceService): Promise<FenceOwner> {
+  const self = await (storeSwitchSeams.processes?.self ?? holder.self)().catch(() => ({ pid: process.pid, started: 0 }))
+  return { token: randomUUID(), pid: process.pid, profile: ws.path ?? '', ...(self.started > 0 ? { started: self.started } : {}) }
+}
+
+/**
+ * Whether a fence's owner may still be switching: this process's own switch, or another process still alive. HI-3073:
+ * one recorded with its start time is that process only while a process with its id started then is running (a pid
+ * the system gave another program since isn't it); a probe that can't tell counts as alive (fail closed). One
+ * recorded before that (no start time): its id alone, as before.
+ */
+async function ownerLive(f: Fence): Promise<boolean> {
   const o = f.owner
   if (!o) return false
   if (ACTIVE.has(o.token)) return true
   if (o.pid === process.pid) return false
+  if (o.started !== undefined) {
+    const alive = await (storeSwitchSeams.processes?.alive ?? holder.alive)(o.pid, o.started).catch(() => null)
+    return alive !== false
+  }
   try {
     process.kill(o.pid, 0)
     return true
@@ -517,10 +538,31 @@ function ownerLive(f: Fence): boolean {
   }
 }
 
+/** The stuck switches already told to the user, by workspace, store and generation (once each). */
+const toldStuck = new Set<string>()
+
+const STUCK = {
+  title: msg({ id: 'git.vc.store.stuckTitle', defaultMessage: 'A version control switch couldn’t be finished', description: 'HI-3073: a notice’s title. A switch between Git and jj was cut short (Combwork closed or crashed during it), and Combwork couldn’t settle it from the projects’ files, so the repository stays switching.' }),
+  message: msg({ id: 'git.vc.store.stuck', defaultMessage: 'Combwork stopped while switching {projects} between Git and jj, and can’t tell from their settings which way to finish: {changed} changed or can’t be read. Until they show their version control from before or after the switch, nothing starts on their repository.', description: 'HI-3073: a notice’s message. {projects} names the projects that were switching; {changed}, those whose project settings were changed by hand meanwhile or can’t be read. Keep Git and jj.' })
+}
+
+/** HI-3073: a switch recovery left stuck, said once in a notice (beside the log), naming its projects. */
+function tellStuck(ws: WorkspaceService, store: string, f: Fence, stuck: readonly string[]): void {
+  // Per workspace too (HR1's round 1): each workspace's board keeps its own fences and generations, so two on the same
+  // repository at generation 1 are two switches, each said in its own workspace.
+  const key = `${(ws.path ?? '').toLowerCase()} ${store} ${f.generation}`
+  if (toldStuck.has(key)) return
+  toldStuck.add(key)
+  const name = (id: string): string => ws.info()?.projects.find((p) => p.path.toLowerCase() === f.members[id]?.path.toLowerCase())?.name ?? basename(f.members[id]?.path ?? id)
+  const parts = Object.entries(f.members).filter(([, m]) => participates(f, m)).map(([id]) => id)
+  const first = parts.map((id) => f.members[id]?.path).find(Boolean) ?? null
+  tell({ kind: 'warning', level: 'error', title: tr(STUCK.title), message: tr(STUCK.message, { projects: fmt.list(parts.map(name)), changed: fmt.list(stuck.map(name)) }), apiTitle: STUCK.title.defaultMessage, projectPath: first, id: `platform-stuck:${store}` })
+}
+
 /** Recovery of one store (s20 §2): its switching fence settled from the disks, unless its owner is live. Caller holds the lock. */
 async function recoverStore(ws: WorkspaceService, store: string): Promise<void> {
   const f = boardRead(ws, (db) => readFence(metaOf(db), store))
-  if (!f || typeof f !== 'object' || f.state !== 'switching' || ownerLive(f)) return
+  if (!f || typeof f !== 'object' || f.state !== 'switching' || (await ownerLive(f))) return
   await settleFromDisk(ws, store, f.generation)
 }
 
@@ -533,7 +575,7 @@ export async function recoverFences(ws: WorkspaceService): Promise<void> {
   for (const row of rows) {
     const store = row.key.slice('platform_fence:'.length)
     const f = boardRead(ws, (db) => readFence(metaOf(db), store))
-    if (!f || typeof f !== 'object' || f.state !== 'switching' || ownerLive(f)) continue
+    if (!f || typeof f !== 'object' || f.state !== 'switching' || (await ownerLive(f))) continue
     const paths = Object.values(f.members).map((m) => m.path)
     await withFolderRepoLocks(paths, () => workflowWrite(() => recoverStore(ws, store)), { quiet: true }).catch((e) => log.warn(`recovering the platform switch of ${userText(store)}`, e))
   }
@@ -589,7 +631,7 @@ export async function memberSwitch(ws: WorkspaceService, path: string, name: str
   if (from === to) return { from, to }
   const before = snapOf(cfg, path)
   const after: Snap = { platform: to, platformFound: foundKey(now.detected), ...(cfg.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(setKept(cfg.workflow, to))) as unknown } : {}) }
-  const owner = { token: randomUUID(), pid: process.pid, profile: ws.path ?? '' }
+  const owner = await fenceOwner(ws)
   ACTIVE.add(owner.token)
   let fence: Fence | null = null
   try {

@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project} (agora {platform})",
   "git.vc.store.notExported": "O bookmark {name} não é igual no Git: execute jj git export ou confira.",
   "git.vc.store.queue": "{project}: sua fila de merge",
+  "git.vc.store.stuck": "O Combwork parou enquanto trocava {projects} entre Git e jj e não consegue saber pelas configurações em que sentido concluir: {changed} mudou ou não pode ser lido. Até que mostrem o controle de versão de antes ou de depois da troca, nada começa no repositório deles.",
+  "git.vc.store.stuckTitle": "Não foi possível concluir uma troca de controle de versão",
   "git.vc.store.slot": "{project}: slot {slot}, cedido a {agent}",
   "git.vc.store.stock": "As configurações padrão do próprio Git for Windows (seu filtro LFS, o driver de diff para documentos do Office) não contam: só o que o repositório ou suas próprias configurações do Git usam.",
   "git.vc.store.toGit": "O Combwork deixa o .jj onde está: remova-o com o jj se não o quiser mais.",
