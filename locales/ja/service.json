@@ -78,6 +78,7 @@
   "service.folderChanges.detached": "{folder}はブランチ上にないため、Combworkはそこでコミットしません。",
   "service.folderChanges.indexBusy": "別のgitコマンドがリポジトリを使用中です。少し待ってからもう一度お試しください。",
   "service.folderChanges.indexNotTaken": "{action, select, commit {Gitはコミット（{made}）を作成しました} other {Gitは変更をスタッシュ（{made}）に退避しました}}が、Combworkはその後これらのファイルのインデックスを更新できませんでした: {why}。更新されるまで、git statusではインデックス上で変更ありと表示されることがあります。gitコマンドが何も実行されていないときに、これらに対してgit resetを実行してください。",
+  "service.folderChanges.indexKept": "{action, select, commit {Gitはコミット（{made}）を作成しました} other {Gitは変更をスタッシュ（{made}）に退避しました}}が、その間に別のgitコマンドが{file}{others, plural, =0 {} other {と他 # 件のファイル}}をステージしたため、Combworkはそのステージ内容をそのまま残しました。続ける前にgit statusを確認してください。",
   "service.folderChanges.midOperation": "{folder}でGitが{state, select, merge {マージ} rebase {リベース} cherryPick {チェリーピック} other {リバート}}の途中です。先に完了するか中止してください。",
   "service.folderChanges.moved": "{target}がチェックアウトされている場所がその間に変わりました。もう一度確認してください。",
   "service.folderChanges.nestedRepo": "{folder}はこのリポジトリ内にある独立したGitリポジトリのため、Combworkはコミットも退避もしません。自分で.gitignoreに追加するか、サブモジュールとして追加してください。",

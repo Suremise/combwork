@@ -78,6 +78,7 @@
   "service.folderChanges.detached": "{folder} 不在任何分支上，因此 Combwork 不会在那里提交。",
   "service.folderChanges.indexBusy": "另一个 git 命令正在使用该仓库。请稍后重试。",
   "service.folderChanges.indexNotTaken": "{action, select, commit {Git 已完成提交（{made}）} other {Git 已将更改搁置到储藏（{made}）中}}，但 Combwork 随后未能为这些文件更新索引：{why}。在更新之前，git status 可能会将它们显示为索引中有更改：请在没有任何 git 命令运行时，对它们运行 git reset。",
+  "service.folderChanges.indexKept": "{action, select, commit {Git 已完成提交（{made}）} other {Git 已将更改搁置到储藏（{made}）中}}，但在此期间另一个 git 命令暂存了 {file}{others, plural, =0 {} other {及另外 # 个文件}}，因此 Combwork 保留了这些暂存内容，未作改动。继续之前请先查看 git status。",
   "service.folderChanges.midOperation": "Git 正在 {folder} 中进行{state, select, merge {合并} rebase {变基} cherryPick {拣选（cherry-pick）} other {还原（revert）}}。请先完成或中止该操作。",
   "service.folderChanges.moved": "检出 {target} 的位置在此期间发生了变化。请重新查看。",
   "service.folderChanges.nestedRepo": "{folder} 是位于此仓库内的独立 Git 仓库，因此 Combwork 不会提交或搁置它。请自己将它添加到 .gitignore，或作为子模块添加。",

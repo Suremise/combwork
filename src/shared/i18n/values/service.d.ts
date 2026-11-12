@@ -90,6 +90,7 @@ interface CombworkMessageValues {
   'service.folderChanges.deletedKept': { file: string | number }
   'service.folderChanges.detached': { folder: string | number }
   'service.folderChanges.indexBusy': undefined
+  'service.folderChanges.indexKept': { action: string; made: string | number; file: string | number; others: number }
   'service.folderChanges.indexNotTaken': { action: string; made: string | number; why: string | number }
   'service.folderChanges.midOperation': { state: string; folder: string | number }
   'service.folderChanges.moved': { target: string | number }
