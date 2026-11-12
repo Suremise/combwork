@@ -229,9 +229,11 @@ export interface TransportSnapshot {
 /**
  * A publication's reply (HI-1183): `pushed`; `atResult` (the remote was at the result already, so the lease never
  * applied); `stale` (the lease or a fast-forward refused it before anything was written: the remote moved); `refused`
- * (the remote refused it: a hook, a protected branch; nothing written); `unknown` (anything else: it may have been published).
+ * (the remote refused it: a hook, a protected branch; nothing written); `failed` (HI-3091: it never reached the remote, as
+ * git says plainly: offline, a refused sign-in, a moved repository; nothing sent); `unknown` (anything else: it may have
+ * been published).
  */
-export type PublishReply = 'pushed' | 'atResult' | { stale: string } | { refused: string } | { unknown: string }
+export type PublishReply = 'pushed' | 'atResult' | { stale: string } | { refused: string } | { failed: string } | { unknown: string }
 
 /** An advance begun into a checked-out target, as its journal recorded it. */
 export interface BegunAdvance {

@@ -246,6 +246,15 @@ export async function prePushOf(h: CandidateHost, snap: TransportSnapshot, lease
 }
 
 /**
+ * HI-3091: git's words for a push that never reached the remote: before any ref was advertised, so nothing was sent
+ * (a path that isn't a repository, a host that can't be resolved or reached, a refused sign-in or key, a repository not
+ * found). `TRANSFER_BEGUN`: words of a connection lost once the push was under way, which keep a reply unknown.
+ */
+const NEVER_CONNECTED = /does not appear to be a git repository|Could not read from remote repository|Could not resolve host|Failed to connect to|Connection refused|Connection timed out|Authentication failed|Permission denied \(publickey|Repository not found|unable to access '/i
+const TRANSFER_BEGUN = /hung up|RPC failed|unexpected disconnect|Writing objects|send-pack|pack-objects|early EOF/i
+export const neverConnected = (err: string): boolean => NEVER_CONNECTED.test(err) && !TRANSFER_BEGUN.test(err)
+
+/**
  * The publication: `result` over exactly `lease` at the snapshot's endpoint and ref, in the sealed context, with no hook
  * (it ran in the project). `--force-with-lease=<ref>:<lease>` with one explicit refspec: the remote takes it only while
  * its ref is exactly `lease`, and the update is a fast-forward because the queue proved `lease` is an ancestor of
@@ -266,6 +275,9 @@ export function publishOf(h: CandidateHost, snap: TransportSnapshot, lease: stri
       if (/\[remote rejected\]/i.test(line!)) return { refused: words }
       if (/\[rejected\]|stale info|non-fast-forward|fetch first/i.test(line!)) return { stale: words }
     }
+    // HI-3091 (Darren's decision): no ref line, and git says plainly it never reached the remote (no repository there, no
+    // connection, no sign-in), with nothing of a transfer begun: failed, nothing sent. Anything else stays unknown.
+    if (!line && !r.ok && neverConnected(r.err)) return { failed: words }
     return { unknown: words }
   })
 }

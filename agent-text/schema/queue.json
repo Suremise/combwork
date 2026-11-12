@@ -271,6 +271,9 @@
   "queue.paused.publish": {
     "placeholders": {}
   },
+  "queue.paused.publishAnswered": {
+    "placeholders": {}
+  },
   "queue.paused.resume": {
     "placeholders": {}
   },

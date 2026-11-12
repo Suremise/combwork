@@ -6648,6 +6648,13 @@ each secret value of the snapshot, its URL's query values included). Where it ca
      fast-forward (someone pushed meanwhile): the entry fails (`targetMoved`), is queued again and tested from step 1,
      toward the 3-retests pause. The remote's own refusal (`[remote rejected]`): `publishRefused` with its words, which
      name a protected branch only when the remote does.
+   - **Never connected** (HI-3091, Darren's decision, 12 Nov): no ref line, and git's words say plainly it never reached
+     the remote (no repository at that address, a host it couldn't resolve or reach, a refused sign-in or key, a
+     repository not found), with nothing of a transfer begun (no "hung up", "RPC failed", "Writing objects"…:
+     `neverConnected`, gitTransport.ts). A failed push, not an unknown one: the remote is looked at all the same (there,
+     Done); else nothing was published, the entry fails (`notPublished`) and is queued again, and the queue pauses
+     `publishFailed` with git's words. Resume tests and publishes it again once the remote answers (still unreachable,
+     its fetch pauses `fetchFailed`). Never asked in For you as a push that may have arrived.
    - **Unknown** (a timeout, a signal, an error after the send began, a lost acknowledgement, or a crash or lost lease
      in phase `push`): verified at the snapshot's endpoint (a fresh fetch). There, Done. Anything else (absent, even
      exactly at `onto`, moved, deleted, unreadable, or the snapshot missing or not matching its digest): paused

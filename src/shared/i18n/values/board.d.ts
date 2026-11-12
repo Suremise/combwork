@@ -729,6 +729,7 @@ interface CombworkMessageValues {
   'board.queue.pause.needsYou': undefined
   'board.queue.pause.noUpstream': { target: string | number }
   'board.queue.pause.other': { reason: string | number }
+  'board.queue.pause.publishFailed': { card: string | number; target: string | number }
   'board.queue.pause.publishRefused': { card: string | number; target: string | number }
   'board.queue.pause.publishUnknown': { card: string | number; target: string | number }
   'board.queue.pause.pushFailed': { card: string | number; target: string | number }

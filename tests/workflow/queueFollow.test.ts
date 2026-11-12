@@ -2,7 +2,7 @@
 // a bare repository of its own as the remote (never a real remote): the fetch before each test merge, the publication as
 // an exact compare-and-swap at the remote, the sealed transport, unknown publications, and the local target's catch-up.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { execFileSync } from 'child_process'
 import { B1, commit, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
@@ -14,6 +14,7 @@ import { FactStore } from '../../src/main/workflow/factStore'
 import { pushLogKey, pushLogOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { memoryTransportStore } from '../../src/main/workflow/transportSnapshots'
+import { queueLine, queueOrder, queueStateOf } from '../../src/main/workflow/queueState'
 import { QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
@@ -302,6 +303,73 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect((await queue({ git }).drain('main')).map((o) => o.outcome)).toContain('integrated')
     expect(pushes).toBe(1)
     expect(e.wf.state(a).stage).toBe('done')
+  })
+
+  it('HI-3091: a push that never reached the remote (gone between the fetch and the push) pauses publishFailed with git’s words, never asked as unknown; back, Resume publishes it', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, transport, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    const onto = head(bare)
+    const away = `${bare}.away`
+    const out = await queue({ hooks: { beforePublish: () => renameSync(bare, away) } }).drain('main')
+    expect(out.at(-1)).toMatchObject({ card: a.key, outcome: 'paused', reason: 'publishFailed' })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'publishFailed', card: a.key, message: expect.stringMatching(/does not appear to be a git repository|Could not read from remote repository/) })
+    expect(e.wf.state(a).requests.some((r) => r.gate === QUEUE_PUBLISH_GATE)).toBe(false)
+    expect(e.wf.state(a).stage).not.toBe('done')
+    renameSync(away, bare)
+    expect(head(bare)).toBe(onto)
+    const q = restarted(e, transport)
+    q.resume('main')
+    expect((await q.drain('main')).map((o) => o.outcome)).toContain('integrated')
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).not.toBe(onto)
+  })
+
+  it('HI-3091: what agents are told of an unknown publication: the card paused (not "moving main now"), and once answered, the one behind it says so', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    const b = await queued(e, 'B', 'b.txt')
+    const onto = head(bare)
+    let lose = true
+    const git = gitWith(async (args, run) => {
+      if (args[0] !== 'push' || !lose) return run()
+      lose = false
+      const r = await run()
+      sh(bare, 'update-ref', 'refs/heads/main', onto)
+      return { ...r, ok: false, code: -1, timedOut: true }
+    })
+    expect((await queue({ git }).drain('main')).at(-1)).toMatchObject({ card: a.key, reason: 'publishUnknown' })
+    const line = (id: number) => queueLine(queueStateOf(e.wf, e.store.card(id))!)
+    expect(queueOrder(e.wf, 'main').testing).toBeNull()
+    expect(queueStateOf(e.wf, e.store.card(a.id))).toMatchObject({ state: 'paused', reason: 'publishUnknown', card: a.key })
+    expect(line(a.id)).not.toMatch(/moving main to its merge/)
+    expect(line(a.id)).toMatch(/whether its push reached the remote \(their answer in For you\)/)
+    expect(line(b.id)).toMatch(/whether its push reached the remote \(their answer in For you\)/)
+    const req = e.wf.state(a).requests.find((r) => r.gate === QUEUE_PUBLISH_GATE)!
+    moved(await e.wf.answer(a.key, req.request, 'approved'))
+    // Answered, the queue not run yet: nobody is told it waits for an answer already given.
+    expect(line(b.id)).toMatch(/the user has answered whether its push reached the remote/)
+  })
+
+  it('HI-3091 (HR1): the same with a queue lease recorded and no live run here (another Combwork’s, or an interrupted runner’s): A still paused, never testing', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    const onto = head(bare)
+    let lose = true
+    const git = gitWith(async (args, run) => {
+      if (args[0] !== 'push' || !lose) return run()
+      lose = false
+      const r = await run()
+      sh(bare, 'update-ref', 'refs/heads/main', onto)
+      return { ...r, ok: false, code: -1, timedOut: true }
+    })
+    expect((await queue({ git }).drain('main')).at(-1)).toMatchObject({ card: a.key, reason: 'publishUnknown' })
+    const at = new Date().toISOString()
+    expect(e.store.takeQueueLease({ target: 'main', lease: 'lb', token: 'tb', profile: 'Combwork-B', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)).toBe(true)
+    expect(e.store.queueLease('main')).not.toBeNull()
+    expect(e.wf.queueLive('main').running).toBeFalsy()
+    expect(queueOrder(e.wf, 'main').testing).toBeNull()
+    expect(queueStateOf(e.wf, e.store.card(a.id))).toMatchObject({ state: 'paused', reason: 'publishUnknown', card: a.key })
+    expect(queueLine(queueStateOf(e.wf, e.store.card(a.id))!)).toMatch(/whether its push reached the remote \(their answer in For you\)/)
   })
 
   it('declined (it wasn’t published): the card is tested and published again', { timeout: GIT_HEAVY_MS }, async () => {
