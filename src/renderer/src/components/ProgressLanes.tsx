@@ -1019,6 +1019,19 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
     // Placed by the card it goes before, when its turn comes (HR1's round 1: two quick drops keep their order).
     edit.add(n, before)
   }
+  /**
+   * Takes a card off from its row (Delete or ×). Its row goes, and the focus with it to the page's body, where Ctrl+Z
+   * (the Lanes tab's) no longer hears it (HI-3020): so the focus moves first to the next card's row, or the lane's own row
+   * when none comes after it.
+   */
+  const takeOff = (n: number, row: HTMLElement | null): void => {
+    if (!edit) return
+    let next = row?.nextElementSibling ?? null
+    while (next && !next.matches('.progress-lane-queue-row.movable')) next = next.nextElementSibling
+    const to = next instanceof HTMLElement ? next : row?.closest<HTMLElement>('.progress-lane')
+    to?.focus({ preventScroll: true })
+    void edit.run(removing(n))
+  }
   const nudge = (n: number, by: -1 | 1): void => {
     const label = cardLabelOf({ tasks }, n)
     if (!edit || nudgedPlace(rows, n, by) === null) return setSaid(tr(EDIT.stuck, { card: label }))
@@ -1088,7 +1101,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                       } else if (e.target === e.currentTarget && e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault()
                         e.stopPropagation()
-                        void edit.run(removing(c.number))
+                        takeOff(c.number, e.currentTarget)
                       }
                     }
                   }
@@ -1113,7 +1126,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                   {time.merged.slice(0, 7)}
                 </button>
               )}
-              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={() => void edit.run(removing(c.number))} />}
+              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={(e) => takeOff(c.number, e.currentTarget.closest('li'))} />}
             </li>
           )
         })}

@@ -261,16 +261,29 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   await moved.getByRole('button', { name: 'Undo' }).click()
   check('Undo puts both lanes back, and its agent', !!(await until(async () => (await listOf(lb)) === [c1, c2].join() && !(await listOf(la)).split(',').map(Number).includes(c2) && (await card(c2))?.agent === b2.id, HUNG_MS)), `${await listOf(la)} / ${await listOf(lb)} / ${(await card(c2))?.agent} ${JSON.stringify(await page.locator('.toast').allInnerTexts())}`)
 
-  // --- × takes a card off (back to the board), and Ctrl+Z in the tab puts it back.
+  // --- × takes a card off (back to the board), and Ctrl+Z in the tab, pressed straight after, puts it back: the focus
+  // stays in the lane (HI-3020), on the lane's row when no card's row comes after the one taken off.
+  // The lane's last two cards wait their turn (A4, then the card dropped from the board above).
   const before = await listOf(la)
+  const [penult, last] = before.split(',').map(Number).slice(-2)
+  const focused = () => page.evaluate(() => ({ card: document.activeElement?.getAttribute('data-card') ?? '', lane: document.activeElement?.getAttribute('data-lane') ?? '', tag: document.activeElement?.tagName ?? '' }))
+  check('the lane’s last two cards wait their turn', !!(await row(la, penult).getAttribute('class'))?.includes('movable') && (await row(la, last).getAttribute('class'))?.includes('movable'), before)
   await clearToasts()
-  await row(la, a4).hover()
-  await row(la, a4).locator('.progress-lane-queue-remove').click()
-  check('× takes a card off the lane', !!(await until(async () => !(await listOf(la)).split(',').map(Number).includes(a4), HUNG_MS)), await listOf(la))
-  check('…it stays on the board, in Todo', (await card(a4))?.column === 'todo' && !(await card(a4))?.archived)
-  await lane(la).locator('.progress-lane-top').click()
+  await row(la, last).hover()
+  await row(la, last).locator('.progress-lane-queue-remove').click()
+  check('× takes a card off the lane', !!(await until(async () => !(await listOf(la)).split(',').map(Number).includes(last), HUNG_MS)), await listOf(la))
+  check('…it stays on the board, in Todo', (await card(last))?.column === 'todo' && !(await card(last))?.archived)
+  check('…and the focus goes to the lane’s row (no card after it)', !!(await until(async () => (await focused()).lane === la, HUNG_MS)), JSON.stringify(await focused()))
   await page.keyboard.press('Control+z')
-  check('Ctrl+Z in the tab puts it back', !!(await until(async () => (await listOf(la)) === before, HUNG_MS)), `${await listOf(la)} (was ${before})`)
+  check('Ctrl+Z straight after puts it back', !!(await until(async () => (await listOf(la)) === before, HUNG_MS)), `${await listOf(la)} (was ${before})`)
+  // Delete on a row: the focus goes to the next card's row, and Ctrl+Z straight after puts the card back.
+  check('…its row shows again', !!(await until(async () => (await rows(la)).join() === before, HUNG_MS)), JSON.stringify(await rows(la)))
+  await row(la, penult).focus()
+  await page.keyboard.press('Delete')
+  check('Delete on a row takes its card off', !!(await until(async () => !(await listOf(la)).split(',').map(Number).includes(penult), HUNG_MS)), await listOf(la))
+  check('…and the focus goes to the next card’s row', !!(await until(async () => (await focused()).card === String(last), HUNG_MS)), JSON.stringify(await focused()))
+  await page.keyboard.press('Control+z')
+  check('Ctrl+Z straight after puts it back', !!(await until(async () => (await listOf(la)) === before, HUNG_MS)), `${await listOf(la)} (was ${before})`)
 
   // --- Ended today: a lane that ended shows there, collapsed, and opens to its cards, read only.
   const e1 = await make('Ended lane card', 'todo', b3.id)
