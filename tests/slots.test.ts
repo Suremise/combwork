@@ -21,6 +21,11 @@ import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
+import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
+import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
+import { unknown } from '../src/main/platform/types'
+import { UNREADABLE } from '../src/shared/workflow/texts'
+import type { WorkspacePort } from '../src/main/platform/workspacePort'
 
 /** A read of one folder refused (#1500's guard: a skills folder that can't be listed), set by a test and cleared after. */
 const fault = vi.hoisted(() => ({ readdir: null as string | null }))
@@ -103,7 +108,7 @@ afterEach(async () => {
 })
 
 /** A workspace with a combwork.db and a project repository on main (git-ignoring warm/ and node_modules/), and its pool. */
-function world(o: { setup?: string; builders?: number } = {}): World {
+function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = {}): World {
   const ws = join(tempDir('slots-'), 'ws')
   const project = gitRepo(join(ws, 'project'))
   commit(project, { '.gitignore': 'warm/\nnode_modules/\n.env\n' }, 'ignore')
@@ -158,7 +163,8 @@ function world(o: { setup?: string; builders?: number } = {}): World {
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
       looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
-      now: () => clock.now
+      now: () => clock.now,
+      ...(o.port ? { workspaces: o.port } : {})
     })
     return { pool, store }
   }
@@ -1410,6 +1416,53 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
     }
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
     expect(await w.pool.lend({ agent: 'a1', lane: 'lane-2' })).toMatchObject({ ok: true, slot: { name: 'slot-a' } })
+  })
+})
+
+describe("HI-3003: a slot's failures in its platform's words", { timeout: 90_000 }, () => {
+  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged), or in jj's (JJ_SAYS).
+  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch', says?: WorkspacePort['says']): WorkspacePort => ({
+    ...gitWorkspacePort,
+    ...(says ? { says } : {}),
+    ...(what === 'line' ? { line: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
+    ...(what === 'files' ? { dirty: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
+    ...(what === 'lineHead' ? { lineHead: async (repo: string, line: string) => (line === 'cw/AM/AM-1-one' ? unknown(UNREADABLE.branchedOffTarget) : gitWorkspacePort.lineHead(repo, line)) } : {}),
+    ...(what === 'switch' ? { prepare: async () => ({ ok: false, err: 'refused (test)\nmore' }) } : {})
+  })
+  const errorOf = async (port: WorkspacePort): Promise<string> => {
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const out = await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base: sh(w.project, 'rev-parse', 'main'), install: false })
+    if (!('error' in out)) throw new Error(`expected an error, got ${JSON.stringify(out)}`)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    return out.error
+  }
+
+  it("Git's wording is unchanged", async () => {
+    expect(await errorOf(failing('line'))).toBe("git couldn't read slot-a's branch")
+    expect(await errorOf(failing('files'))).toBe("git couldn't read slot-a's files")
+    expect(await errorOf(failing('lineHead'))).toBe("git couldn't read cw/AM/AM-1-one")
+    expect(await errorOf(failing('switch'))).toBe('git switch: refused (test)')
+  })
+
+  it("a port with jj's words: each failed preparation names no git, branch or switch", async () => {
+    const said = [await errorOf(failing('line', JJ_SAYS)), await errorOf(failing('files', JJ_SAYS)), await errorOf(failing('lineHead', JJ_SAYS)), await errorOf(failing('switch', JJ_SAYS))]
+    expect(said).toEqual(["jj couldn't read slot-a's workspace", "jj couldn't read slot-a's files", "jj couldn't read cw/AM/AM-1-one", "jj couldn't prepare slot-a for the card: refused (test)"])
+    for (const s of said) expect(s).not.toMatch(/\bgit\b|branch|switch/i)
+  })
+
+  it("a slot's setup that can't read its target: Git's words as before, jj's naming no git", async () => {
+    const setupError = async (says?: WorkspacePort['says']): Promise<unknown> => {
+      const w = world({ builders: 1, port: { ...gitWorkspacePort, ...(says ? { says } : {}), lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
+      return w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })
+    }
+    expect(await setupError()).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
+    expect(await setupError(JJ_SAYS)).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "jj couldn't read main" } })
+  })
+
+  it("jj's words cover every word a port may give, and none names git, a branch, a switch or a worktree", () => {
+    expect(Object.keys(JJ_SAYS).sort()).toEqual(['branchUnread', 'createFailed', 'filesUnread', 'lineUnread', 'noTarget', 'notListed', 'removeFailed', 'switchFailed'])
+    for (const m of Object.values(JJ_SAYS)) expect(m!.text).not.toMatch(/\bgit\b|branch|switch|worktree/i)
   })
 })
 

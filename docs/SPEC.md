@@ -3169,7 +3169,13 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
 - **A failed preparation** (HI-2913) is recorded as `SlotPrepareFailed { lease, slot, why, stale }`, written only while
   the same cycle and lease are current and unprepared; the card's Work section then says it hasn't started in that slot
   yet and why (a stale jj workspace: with Recover…), until a `SlotPrepared` for the lease. A stale jj workspace's refusal
-  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable.
+  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable. **Every failure in jj's words**
+  (HI-3003): the pool's failures that name Git's tool or terms (a branch or files unreadable, a line or target unread,
+  `git switch`, `git worktree add`, a folder git doesn't list, `git worktree remove`, no target branch) are each a
+  `SlotWord`, said in the port's own message where it gives one (`WorkspacePort.says`), else in the pool's (Git's,
+  unchanged). jj's port gives all of them (`JJ_SAYS`, `slot.jj.*`: "jj couldn't prepare slot-a for the card: …", "jj
+  workspace add: …", "no target bookmark"), so a jj slot's agent is never told of git, branches or switch, nor led to
+  run git there. No code compares the platform's id for it.
 - **A jj lane's builder between cards** (HI-2913): jj's record needs no session in the slot and the folder's rename
   probe quiet, and a lane's builder stays in its slot. Before a jj card's preparation, under the folder's fence
   (`changingFolder`: nothing typed or started there), slotCards' `freeSlotOfBuilder` ends only the builder's own run in

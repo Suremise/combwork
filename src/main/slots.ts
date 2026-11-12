@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { isJjLineKey } from './platform/jjSlotPrep'
@@ -132,6 +132,12 @@ const T = {
   noBranch: agentMsg({ id: 'slot.check.noBranch', text: 'no {target}', note: "Why Combwork can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name." }),
   noBase: agentMsg({ id: 'slot.check.noBase', text: 'no merge base with {target}', note: "Why Combwork can't tell whether a slot's work is merged: it shares no history with its target branch." })
 }
+
+/** HI-3003: the pool's own words (Git's) for what a port may word its own way (WorkspacePort.says). */
+const POOL_WORDS: Record<SlotWord, AgentMsg> = { branchUnread: T.branchUnread, filesUnread: T.filesUnread, lineUnread: T.gitRead, switchFailed: T.switchFailed, createFailed: T.worktreeAdd, notListed: T.notListed, removeFailed: T.removeFailed, noTarget: T.noTarget }
+
+/** A failure as `port` words it (HI-3003: jj's in jj's terms), else in the pool's own words. */
+const sayFor = (port: WorkspacePort, word: SlotWord, values?: AgentValues): string => sayStored(port.says?.[word] ?? POOL_WORDS[word], values)
 
 export type SlotState = 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
 export type LeaseKind = 'card' | 'lane' | 'carried'
@@ -2439,7 +2445,7 @@ export class SlotPool {
         if (there === null) return await pass(slot.state, 'cantList')
         if (!there) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
-          if (await folderThere(slot.folder)) return await fail(sayStored(T.notListed))
+          if (await folderThere(slot.folder)) return await fail(sayFor(this.port, 'notListed'))
           await this.store.fenced(name, token, () => undefined)
           await this.port.prune(this.deps.project)
           made = true
@@ -2472,9 +2478,9 @@ export class SlotPool {
       await this.store.fenced(name, token, () => undefined)
       if (made) {
         const at = target ? await this.port.lineHead(this.deps.project, target) : await this.port.head(this.deps.project)
-        if (isUnknown(at) || !at) return await fail(sayStored(T.gitRead, { what: target ?? 'HEAD' }))
+        if (isUnknown(at) || !at) return await fail(sayFor(this.port, 'lineUnread', { what: target ?? 'HEAD' }))
         const r = await this.port.create(this.deps.project, slot.folder, at, { skipSmudge: this.gitFilesOn(opts) })
-        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: this.port.errorLine(r.err) || 'failed' }))
+        if (!r.ok) return await fail(sayFor(this.port, 'createFailed', { error: this.port.errorLine(r.err) || 'failed' }))
         // Its identity where the platform records one (HI-2795: jj's store, name, creation generation), in a fenced write.
         if (this.port.identity) {
           const id = await this.port.identity(slot.folder)
@@ -2577,7 +2583,7 @@ export class SlotPool {
         const on = await this.port.line(slot.folder)
         if (isUnknown(on)) {
           await end()
-          return { error: sayStored(T.branchUnread, { slot: name }) }
+          return { error: sayFor(this.port, 'branchUnread', { slot: name }) }
         }
         const there = on === p.line
         const inPlace = !!p.inPlace
@@ -2599,13 +2605,13 @@ export class SlotPool {
             if (isUnknown(d) && d.detail === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
             // Something still in the folder when jj's record was asked (HI-2913: a session or process): not now, never a failure.
             if (isUnknown(d) && (d.detail === 'busy' || d.detail === JJ_REFUSED.fence)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
-            return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
+            return { error: isUnknown(d) ? sayFor(this.port, 'filesUnread', { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
         const had = there ? null : await this.port.lineHead(slot.folder, p.line)
         if (isUnknown(had)) {
           await end()
-          return { error: sayStored(T.gitRead, { what: p.line }) }
+          return { error: sayFor(this.port, 'lineUnread', { what: p.line }) }
         }
         // A line made before (a card started again) is switched to, which can change files: that waits for its builder.
         if (inPlace && had) {
@@ -2662,7 +2668,7 @@ export class SlotPool {
             const err = r.err.trim()
             if (this.port.platform === 'jj' && (err === JJ_REFUSED.fence || err === JJ_REFUSED.uncertain)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
             if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
-            return { error: sayStored(T.switchFailed, { error: err.split(/\r?\n/)[0] || 'failed' }) }
+            return { error: sayFor(this.port, 'switchFailed', { slot: name, error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)
           files = await filesNeed()
@@ -2892,7 +2898,7 @@ export class SlotPool {
         const removeIt = async (): Promise<SlotKept | null> => {
           const r = port.identity ? await port.remove(this.deps.project, slot.folder, { identity: slot.identity ?? null, journal: this.removalJournal(name), fence: { still: () => this.store.fenced(name, token, () => true).catch(() => false) } }) : await port.remove(this.deps.project, slot.folder)
           if (r.ok) return null
-          const refused: SlotKept = { why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayStored(T.removeFailed) }
+          const refused: SlotKept = { why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayFor(port, 'removeFailed') }
           // A removal part done (HI-2795: forgotten, not yet trashed) keeps its journal and the slot out of the pool.
           if (!this.removalJournal(name).read()) return await keep(refused)
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, 'dirty', {}, { op: null })).catch((e) => {
@@ -2979,7 +2985,7 @@ export class SlotPool {
     const head = await port.head(s.folder)
     if (isUnknown(head)) return { why: 'cantCheck', detail: head.what }
     let target = s.target ?? (await this.defaultTarget())
-    if (!target) return { why: 'cantCheck', detail: sayStored(T.noTarget) }
+    if (!target) return { why: 'cantCheck', detail: sayFor(port, 'noTarget') }
     let t = await port.lineHead(this.deps.project, target)
     // HI-2928: a free slot's own target deleted since it waited there (gone, not unreadable): it is checked against the
     // default target instead, so work in it that isn't there still keeps it (unmerged), and a slot with none is freed.
