@@ -141,6 +141,9 @@
   "slot.kept.busy": {
     "placeholders": {}
   },
+  "slot.kept.forgotten": {
+    "placeholders": {}
+  },
   "slot.kept.gone": {
     "placeholders": {}
   },
