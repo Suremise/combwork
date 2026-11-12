@@ -18,6 +18,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const lanes = await import('../src/main/lanes')
+const { laneTarget } = await import('../src/main/laneTarget')
 const form = await import('../src/main/workflow/optionsForm')
 const retarget = await import('../src/main/workflow/retarget')
 const gitRepoMod = await import('../src/main/gitRepo')
@@ -281,7 +282,7 @@ describe('a lane left on the release by Start the next version (HI-3113)', () =>
     // Its ruleset id marks no other target: it was started on the project's own.
     const wf = (await workflowFor(w, repo))!
     expect(wf.lane(started.lane.id)?.ruleset).not.toContain('~target:')
-    expect(lanes.laneTarget(w, { project: 'p', ruleset: wf.lane(started.lane.id)!.ruleset! })).toBe('1.3.0')
+    expect(laneTarget(w, { project: 'p', ruleset: wf.lane(started.lane.id)!.ruleset! })).toBe('1.3.0')
     // The window's and cw_lane's reading: its Merges into named, now that it isn't the project's own.
     expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.target).toBe('1.3.0')
     // Counted as using 1.3.0: the release can't be taken out from under it.

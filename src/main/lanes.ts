@@ -20,7 +20,8 @@ import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
-import { laneTargetOf, otherThanOwn, targetedOf } from '../shared/workflow/compile'
+import { otherThanOwn, targetedOf } from '../shared/workflow/compile'
+import { laneTarget } from './laneTarget'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -1293,20 +1294,6 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
   }
   throw new LaneError(400, withValues(M.targetNotListed, { hasTargets: t ? 'yes' : 'no', target: typeof raw === 'string' ? raw.trim() : '', default: t?.default ?? '', hasOthers: t?.others.length ? 'yes' : 'no', others: fmt.list(t?.others ?? []) })) // i18n-ignore: select keys
 }
-
-/**
- * A lane's Merges into (HI-3113): the branch its work merges into, marked or as its recorded ruleset names it
- * (`laneTargetOf`), null without one. Compare with the project's own through `otherThanOwn`.
- */
-export function laneTarget(ws: WorkspaceService, l: Pick<LaneRecord, 'project' | 'ruleset'>): string | null {
-  return laneTargetOf(l.ruleset, storedRulesets(ws, l.project))
-}
-
-/** A project's recorded rulesets' options by id (HI-3113), as `laneTargetOf` and `laneOptions` read them. */
-export const storedRulesets =
-  (ws: WorkspaceService, project: string) =>
-  (id: string): { target?: string | null } | null =>
-    ws.path ? FactStore.forBoard(ws, { project, key: '' }).ruleset(id).options : null
 
 /**
  * HI-2556: a lane is one target: refused when a card of `cards` has its own Merges into (the board's `target`) and it isn't
