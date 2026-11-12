@@ -8853,7 +8853,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
       from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
       board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
-      left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      or undo (HI-3064) left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
       revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
       Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its

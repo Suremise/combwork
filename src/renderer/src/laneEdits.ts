@@ -149,6 +149,12 @@ export async function undoLaneEdit(id?: string, workspace?: string): Promise<voi
     // In turn with the edits (HI-2932), so its read of the lanes lands in order too.
     const r = await inTurn(async () => {
       const done = await call('lanes:edit', { op: 'undo', undo: l.undo })
+      // The undo's revision is this window's own too (HI-3064), as an edit's is: the next quick edit names the lane's
+      // revision now rather than being refused as changed meanwhile.
+      for (const s of done.lanes) {
+        const from = l.undo.lanes.find((x) => x.before.lane === s.lane)?.rev
+        if (from !== undefined) own.set(s.lane, ownRunAfter(own.get(s.lane), from, s.rev))
+      }
       await reload()
       return done
     })
