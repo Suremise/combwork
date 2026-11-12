@@ -236,6 +236,7 @@
   "service.laneEdit.done": "{card}はすでに完了しています。",
   "service.laneEdit.ended": "{lane}は終了しています。そのカードはもう変更できません。",
   "service.laneEdit.fixedPlace": "開始済みまたは終了済みのカードは位置が変わりません。{card}はそれらの後ろにしか置けません。",
+  "service.laneEdit.full": "レーンに置けるカードは最大{max, number}枚で、{lane}はすでにその数に達しています。先に1枚外してください。",
   "service.laneEdit.invalid": "そのレーンのカードの変更は、Combworkでは行えません。",
   "service.laneEdit.keptWork": "{card}には以前の開始時の作業（ブランチ、スロット、または実行）が残っているため、そのままの位置に置かれます。代わりにそのカードから続けてください。",
   "service.laneEdit.noQueued": "{lane}には取り消す保留中の変更がありません。",

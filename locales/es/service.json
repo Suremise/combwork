@@ -236,6 +236,7 @@
   "service.laneEdit.done": "{card} ya está en Hecho.",
   "service.laneEdit.ended": "{lane} ha terminado: sus tarjetas ya no se pueden cambiar.",
   "service.laneEdit.fixedPlace": "Las tarjetas ya empezadas o terminadas conservan su lugar: {card} solo puede ir después de ellas.",
+  "service.laneEdit.full": "Un carril puede tener como máximo {max, number} tarjetas, y {lane} ya tiene esa cantidad: quita una primero.",
   "service.laneEdit.invalid": "Combwork no puede hacer ese cambio en las tarjetas de un carril.",
   "service.laneEdit.keptWork": "{card} conserva trabajo de un inicio anterior (una rama, un slot o una ejecución): se queda donde está. Continúala desde su tarjeta.",
   "service.laneEdit.noQueued": "{lane} no tiene ningún cambio pendiente que cancelar.",

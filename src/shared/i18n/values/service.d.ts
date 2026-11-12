@@ -238,6 +238,7 @@ interface CombworkMessageValues {
   'service.laneEdit.done': { card: string | number }
   'service.laneEdit.ended': { lane: string | number }
   'service.laneEdit.fixedPlace': { card: string | number }
+  'service.laneEdit.full': { max: number; lane: string | number }
   'service.laneEdit.invalid': undefined
   'service.laneEdit.keptWork': { card: string | number }
   'service.laneEdit.noQueued': { lane: string | number }

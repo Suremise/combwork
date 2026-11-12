@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { running, type LaneRecord } from '../shared/lanes'
+import { LANE_MAX_CARDS, running, type LaneRecord } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { foldCard } from '../shared/workflow/facts'
 import { targetOfRulesetId } from '../shared/workflow/compile'
@@ -46,6 +46,7 @@ const M = {
   done: msg({ id: 'service.laneEdit.done', defaultMessage: '{card} is Done already.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's already Done." }),
   notTodo: msg({ id: 'service.laneEdit.notTodo', defaultMessage: '{card} isn’t in To do: only cards not started yet join a lane.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's in progress, in review, approved or on hold. To do is the board's column of cards not started (as the board names it)." }),
   onLane: msg({ id: 'service.laneEdit.onLane', defaultMessage: '{card} is on the lane of {builder}: take it off there first, or use Move here.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it. Move here is the button beside this message that moves it: as it's translated there." }),
+  full: msg({ id: 'service.laneEdit.full', defaultMessage: 'A lane can have at most {max, number} cards, and {lane} has that many already: take one off first.', description: "HI-3061: an error adding a card to a lane, or moving one to it from another lane (Progress → Lanes): the lane already has the most cards a lane can have ({max}, 50). {lane} is its builder / reviewer (B1 / R1)." }),
   already: msg({ id: 'service.laneEdit.already', defaultMessage: '{card} is on this lane already.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes) that already has it." }),
   kept: msg({ id: 'service.laneEdit.keptWork', defaultMessage: '{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.', description: "HI-2898: an error adding a card ({card}, its key) to a lane, or moving it to another lane (Progress → Lanes): it was started before and its work is kept (a branch, a slot lent for it, or a run in progress), so Combwork won't hand it to another builder from here." }),
   dependency: msg({ id: 'service.laneEdit.dependency', defaultMessage: '{card} depends on {dep}, which would come after it: put {dep} first.', description: "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes): {card} (a key) depends on {dep} (a key: it's blocked by it), and the change would put {dep} later in the lane." }),
@@ -327,6 +328,9 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
       // Checked under the board's lock, before anything is written, on the board as it is now.
       for (const x of p.lanes) {
         const was = working(x.lane)
+        // A lane holds at most LANE_MAX_CARDS (HI-3061): a list past it would be saved but never read back (readLane drops
+        // the lane, or its queued change), so an edit growing one past it is refused here, before anything is written.
+        if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!)
         keepsFixed(ws, x.lane, was, x.next, p.card)

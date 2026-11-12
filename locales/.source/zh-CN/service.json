@@ -236,6 +236,7 @@
   "service.laneEdit.done": "{card} is Done already.",
   "service.laneEdit.ended": "{lane} has ended: its cards can’t be changed any more.",
   "service.laneEdit.fixedPlace": "Cards already started or finished keep their places: {card} can only go after them.",
+  "service.laneEdit.full": "A lane can have at most {max, number} cards, and {lane} has that many already: take one off first.",
   "service.laneEdit.invalid": "That change of a lane’s cards isn’t one Combwork can make.",
   "service.laneEdit.keptWork": "{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.",
   "service.laneEdit.noQueued": "{lane} has no queued change to cancel.",

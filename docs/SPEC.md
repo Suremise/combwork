@@ -8794,7 +8794,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       Every check is made again at the write, under
       the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
       facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
-      before a card of the list it depends on, where it wasn't), and the fixed start. These are the window's refusals:
+      before a card of the list it depends on, where it wasn't), the fixed start, and the most cards a lane has
+      (`LANE_MAX_CARDS`, 50, as `cw_lane start`'s; HI-3061: a longer list was saved but never read back, the lane or
+      its queued change lost). These are the window's refusals:
       `cw_lane start` keeps its own rules.
     - **One board change:** the lanes and the card assignment an edit makes are saved in one transaction
       (`mutateInBoard`, `saveTableInBoard`), the lanes' stale-read check kept. A card brought into a lane (Add, Move
