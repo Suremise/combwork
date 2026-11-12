@@ -434,7 +434,13 @@ export class GitPlatform implements PlatformAdapter {
       files = c.files
       key = c.key
     }
-    if (!revision || revision === base || !files.length) {
+    // HI-3082: a forward's resolution whose merge commit changes no file (the destination's side kept, or a merge that
+    // came back for a check and changes nothing) is still work to review: the merge brings the source into the
+    // destination's history, the very thing the resolution is for. Only when the source is new since its base; what
+    // can't be read refuses as unknown, never taken as either.
+    const brings = s.resolves && revision && base && revision !== base && !files.length ? await this.bringsSource(s.resolves.source, base, revision) : false
+    if (isUnknown(brings)) return { ok: false, refusal: unknownRefusal(card, brings, 'submit') }
+    if (!revision || revision === base || (!files.length && !brings)) {
       // Whether its folder has changes says which next step fits (HI-2227): commit them, or a card needing none is no-code.
       // In a shared folder, other agents' recorded changes aren't this card's.
       if (args.predicted) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
@@ -468,6 +474,14 @@ export class GitPlatform implements PlatformAdapter {
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
     const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
+  }
+
+  /** HI-3082: whether `revision` brings `source` into the history `base` lacks (merged since the card's base). */
+  private async bringsSource(source: string, base: string, revision: string): Promise<Maybe<boolean>> {
+    const inRevision = await G.isAncestor(this.project, source, revision)
+    if (isUnknown(inRevision) || !inRevision) return inRevision
+    const inBase = await G.isAncestor(this.project, source, base)
+    return isUnknown(inBase) ? inBase : !inBase
   }
 
   /** The combined change of a shared-folder card's own commits, applied in order (§16.3.2). */

@@ -120,7 +120,7 @@ interface CombworkMessageValues {
   'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number; sources: string | number }
   'service.forward.openNoOverride': { card: string | number; to: string | number; from: string | number }
   'service.forward.raced': undefined
-  'service.forward.resolveDescription': { forward: string | number; from: string | number; source: string | number; to: string | number; files: string }
+  'service.forward.resolveDescription': { forward: string | number; from: string | number; source: string | number; to: string | number; why: string; files: string; check: string }
   'service.forward.resolveRaced': { card: string | number }
   'service.forward.resolveTitle': { to: string | number; from: string | number }
   'service.forward.title': { to: string | number; from: string | number }

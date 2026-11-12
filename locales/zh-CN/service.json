@@ -107,7 +107,7 @@
   "service.forward.notTargets": "无法将 {from} 合入 {to}：{to} 必须是此项目合并工作的分支（{targets}），{from} 必须是 {sources} 中的另一个分支。",
   "service.forward.openNoOverride": "{card} 已在不带例外放行的情况下将 {to} 更新到 {from} 的最新状态，因此例外放行未应用到它：请先将其移出队列，再重新请求。",
   "service.forward.raced": "更新合并的卡片在加入队列时发生了变化，因此未再执行任何操作：请查看卡片，如有需要再请求一次。",
-  "service.forward.resolveDescription": "{forward} 尝试将 {from}（{source}）合并到 {to}，但被退回{files, select, none {。} other {：{files} 中有冲突。}}“交给构建者解决”结束了它，并创建了这张卡片，由构建者完成这次合并。\n\n在这张卡片的分支（从 {to} 创建）中：`git merge {source}`，解决冲突，提交合并并送审。无论项目的合并方式如何，它都会以合并提交合并到 {to}，使 {to} 保留 {from} 的历史。",
+  "service.forward.resolveDescription": "{forward} 尝试将 {from}（{source}）合并到 {to}，但被退回{why, select, conflict {{files, select, none {：有冲突。} other {：{files} 中有冲突。}}} checks {{check, select, none {：一项合并检查失败。} other {：合并检查 {check} 失败。}}} other {。}}“交给构建者解决”结束了它，并创建了这张卡片，由构建者完成这次合并。\n\n在这张卡片的分支（从 {to} 创建）中：`git merge {source}`{why, select, conflict {，解决冲突} checks {，修复导致检查失败的问题} other {}}，提交合并并送审，即使这次合并没有改动任何文件。无论项目的合并方式如何，它都会以合并提交合并到 {to}，使 {to} 保留 {from} 的历史。",
   "service.forward.resolveRaced": "在交给构建者的过程中 {card} 发生了变化（重试、移出或另一次解决），因此未创建任何内容：请查看卡片，如有需要再请求一次。",
   "service.forward.resolveTitle": "解决：将 {to} 更新到 {from} 的最新状态",
   "service.forward.title": "将 {to} 更新到 {from} 的最新状态",

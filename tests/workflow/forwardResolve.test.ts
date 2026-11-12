@@ -465,6 +465,61 @@ describe('a resolution carries the commit it resolves, merged (HI-2999)', () => 
   })
 })
 
+describe('a resolution whose merge changes no file is still submitted (HI-3082)', () => {
+  /** The returned forward's source merged on the resolution's line, its conflict resolved by keeping 1.2.0's side. */
+  function keepOurs(folder: string, source: string, trailer?: string): string {
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict, resolved by keeping the destination's version
+    }
+    const merged = commit(folder, { 'fix.txt': 'the 1.2.0 version\n' }, 'Merge main into 1.2.0, keeping 1.2.0’s fix.txt', trailer ? { trailer } : {})
+    expect(sh(folder, 'rev-list', '--parents', '-n', '1', merged).split(' ').length).toBe(3)
+    expect(sh(folder, 'rev-parse', `${merged}^{tree}`)).toBe(sh(folder, 'rev-parse', '1.2.0^{tree}'))
+    return merged
+  }
+
+  it('in its own slot: submitted, reviewed and merged, the source in 1.2.0 and its file as 1.2.0 had it', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting()
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    keepOurs(started.data!.folder as string, source)
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, kept 1.2.0’s fix.txt' }))
+    expect(e.wf.state(made).stage).toBe('review')
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    expect(sh(e.project, 'merge-base', '--is-ancestor', source, '1.2.0')).toBe('')
+    expect(sh(e.project, 'show', '1.2.0:fix.txt')).toBe('the 1.2.0 version')
+  })
+
+  it('in the project folder: submitted', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ folder: 'project', finish: 'committed', slotsUpToDate: false })
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    keepOurs(e.project, source, made.key)
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, kept 1.2.0’s fix.txt' }))
+    expect(e.wf.state(made).stage).toBe('review')
+  })
+
+  it('a commit that changes nothing and doesn’t bring the source is still nothing to review', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting()
+    const { card: fwd } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    sh(started.data!.folder as string, 'commit', '-q', '--allow-empty', '-m', 'nothing')
+    const r = await e.wf.submit(made.key, B1, { summary: 'nothing' })
+    expect(isRefusal(r) && r.rule).toBe('submit.empty')
+    expect(e.wf.state(made).stage).toBe('active')
+  })
+})
+
 describe('an ancestry read that fails never lets a resolution through (HI-2999, HR2 round 1)', () => {
   /** git's isAncestor answering `as` (unknown, as git.ts gives for a merge-base failure other than exit 1; throwing; true) until restored. */
   const ancestry = (as: 'unknown' | 'throws' | true) => {
