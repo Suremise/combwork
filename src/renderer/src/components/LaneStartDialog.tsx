@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AgentInfo, LaneStartInfo, ProjectInfo } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
+import { LANE_NAME_MAX } from '@shared/lanes'
 import { cardLabel } from '@shared/projectKeys'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { call } from '../api'
@@ -322,7 +323,7 @@ export function LaneStartDialog() {
             </select>
           )}
           <label htmlFor="lane-start-name">{tr(M.name)}</label>
-          <input id="lane-start-name" className="input" value={name} disabled={waiting} maxLength={200} onChange={(e) => setName(e.target.value)} />
+          <input id="lane-start-name" className="input" value={name} disabled={waiting} maxLength={LANE_NAME_MAX}onChange={(e) => setName(e.target.value)} />
           <label htmlFor="lane-start-note">{tr(M.note)}</label>
           <textarea id="lane-start-note" className={cx('input', 'lane-start-note')} rows={3} value={note} disabled={waiting} maxLength={4000} onChange={(e) => setNote(e.target.value)} />
         </div>

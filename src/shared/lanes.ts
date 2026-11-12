@@ -641,7 +641,8 @@ export function readLane(v: unknown): LaneRecord | null {
   if (!['active', 'ended', 'abandoned'].includes(v.state as string)) return null
   if (!text(v.startedBy, 200) || !time(v.startedAt) || !time(v.updatedAt) || !(v.endedAt === null || time(v.endedAt))) return null
   if (v.state !== 'active' && v.endedAt === null) return null
-  if (!(v.name === null || text(v.name, LANE_NAME_MAX)) || !(v.mergeCommit === null || text(v.mergeCommit, 64))) return null
+  // Its name is cut, never a reason to drop the lane (HI-3119: one saved longer than the reader allowed vanished).
+  if (!(v.mergeCommit === null || text(v.mergeCommit, 64))) return null
   // Its snapshot, kept only when every card of it reads back (else it reads from the board, as before #512).
   const frozen = Array.isArray(v.frozen) && v.frozen.length === cards.length ? v.frozen.map(cardOf) : null
   const snapshot = frozen?.every((c, i) => c && c.number === cards[i]) ? (frozen as LaneCard[]) : null
@@ -651,7 +652,7 @@ export function readLane(v: unknown): LaneRecord | null {
   return {
     id: v.id,
     project: v.project,
-    name: v.name as string | null,
+    name: laneName(v.name),
     builder,
     reviewer,
     cards: cards as number[],
@@ -704,12 +705,21 @@ export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback:
   return Math.round(v)
 }
 
-/** A lane's name from untrusted arguments: one line, trimmed, cut to LANE_NAME_MAX (null: none). */
+/**
+ * A lane's name from untrusted arguments: one line, trimmed, cut to LANE_NAME_MAX (null: none). Measured in UTF-16 units,
+ * as the dialog's maxLength and readLane measure it (HI-3119), and cut between characters, never inside one.
+ */
 export function laneName(v: unknown): string | null {
   if (typeof v !== 'string') return null
-  const t = [...v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()]
-  if (!t.length) return null
-  return t.length > LANE_NAME_MAX ? `${t.slice(0, LANE_NAME_MAX - 1).join('')}…` : t.join('')
+  const t = v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return null
+  if (t.length <= LANE_NAME_MAX) return t
+  let cut = ''
+  for (const ch of t) {
+    if (cut.length + ch.length > LANE_NAME_MAX - 1) break
+    cut += ch
+  }
+  return `${cut.trimEnd()}…`
 }
 
 /** A wait in a few words: "6 h", "90 min". */

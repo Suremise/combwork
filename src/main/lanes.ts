@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -1318,6 +1318,8 @@ function unknownReviewerRefusal(name: string, project: string, lane: LaneRecord)
 
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
   refuseWhileTeamPaused(ws)
+  // Its name as the reader keeps it (HI-3119): every way in (the window, cw_lane, the API) saves at most LANE_NAME_MAX.
+  const named = laneName(s.name)
   const builder = await agentIn(ws, s.project, s.builder)
   if (!builder) throw new LaneError(404, say(A.unknownBuilder))
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
@@ -1412,7 +1414,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         ...(reviewer !== undefined ? { reviewer } : {}),
         ...(s.rounds !== undefined ? { rounds: s.rounds } : {}),
         ...(s.waitMinutes !== undefined ? { waitMinutes: s.waitMinutes } : {}),
-        ...(s.name !== undefined && s.name !== null ? { name: s.name } : {}),
+        ...(named !== null ? { name: named } : {}),
         updatedAt: t
       })
       // Its brief under the same lock (HI-1795): kept unless the start gives one; a queued list change keeps it too.
@@ -1444,7 +1446,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const rec: LaneRecord = {
       id: newId(),
       project: s.project,
-      name: s.name ?? carried?.name ?? null,
+      name: named ?? carried?.name ?? null,
       builder,
       reviewer: reviewer ?? null,
       cards: cards.filter((n) => !done.includes(n)),
