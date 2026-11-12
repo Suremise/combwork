@@ -4590,7 +4590,14 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
-  never an empty name (HI-2825). A card set to one of the project's other targets keeps it through any later change of
+  never an empty name (HI-2825). A card put back with no target of its own keeps the one its line was made from
+  (`Started.target`) while that line (its own, built in a slot) holds history the target it would follow lacks, work or
+  not (HI-3112, `keptLineTarget`): its start (the git platform's `startTarget` and `start`, so the evidence, the slot
+  lent, the plan and `Started.target` agree) carries the line on there, said so (`slotMove`'s `carried`); a change of
+  G7's preview keeps it (`line`) and `referencesTo` counts it, read against the destination (an untouched line is in its
+  own branch, never in the new one); setting it back to that branch is accepted, its line kept. Unreadable, it is kept
+  (`cantCheck`, counted) and its start refused; in a lane merging elsewhere its start is refused (`platform.keptLine`).
+  Its line gone, or all of it in the new target, it follows. A card set to one of the project's other targets keeps it through any later change of
   G7, even to that branch; `cw_update_task`'s reply says so, and how to follow G7 instead (change it first, then clear
   the card's), HI-3017: setting cards before their project pinned them unnoticed. `cw_create_task` with such a target
   says the same (HI-3043), and the reply says the target as stored, so a forward's resolution pinned to G7's own
