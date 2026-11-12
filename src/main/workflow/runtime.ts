@@ -2625,10 +2625,18 @@ export class Workflow {
           if (this.leavesNobody(to, by, opts)) w.fact('Override', { rules: ['move.doingNobody'], move: `${from}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
           // A card that was queued (Merging, or Approved under Combwork merges) is queued again.
           const requeue = to === was && (was === 'merging' || (was === 'approved' && r.options.finish === 'combworkMerges' && !s.stale && !notApproved(s, r, card.labels)))
-          w.move(requeue ? 'approved' : was, 'user')
-          if (requeue) this.enqueue(w)
-          // The trip to On Hold retired the gate's request (it belongs to its stage): asked again, if still unmet.
-          else this.reask(w)
+          // HI-3086 (HR2's round 1): a forward merge has no submission: its attempt again, the commit that attempt froze
+          // (its latest entry's, a Retry's too), never the source's head now nor an ordinary entry with no revision.
+          const fw = w.state().forward
+          if (requeue && fw) {
+            w.move('approved', 'user')
+            this.enqueueForward(w, w.state().entries.at(-1)?.revision || fw.source)
+          } else {
+            w.move(requeue ? 'approved' : was, 'user')
+            if (requeue) this.enqueue(w)
+            // The trip to On Hold retired the gate's request (it belongs to its stage): asked again, if still unmet.
+            else this.reask(w)
+          }
           return null
         })
         if (out) return this.refuse(card, by, 'move', out)

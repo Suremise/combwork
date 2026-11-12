@@ -279,6 +279,42 @@ describe('a forward merge goes only where it stays one (HI-3086)', () => {
     expect(e.wf.returnedForward(e.wf.store.card(card.id))).not.toBeNull()
   })
 
+  it('queued, On Hold and back to Merging (HR2’s round 1): its attempt again with the commit it froze, not the source’s head now; merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    const { card, source } = await forward(e)
+    moved(await e.wf.move(card.key, 'hold', 'user'))
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toEqual(['hold', 'merging', 'active', 'done'])
+    // The source moves on meanwhile: the attempt resumed is the one frozen.
+    sh(e.project, 'checkout', '-q', 'main')
+    commit(e.project, { 'later.txt': 'later\n' }, 'a later commit on main')
+    sh(e.project, 'checkout', '-q', '--detach')
+    moved(await e.wf.move(card.key, 'merging', 'user', { confirm: true }))
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'merging', forward: { from: 'main', to: '1.2.0', source } })
+    expect(s.entries.map((x) => [x.state, x.revision])).toEqual([['cancelled', source], ['open', source]])
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: card.key, outcome: 'integrated' }])
+    expect(sh(e.project, 'rev-list', '--parents', '-n', '1', '1.2.0').split(' ')[2]).toBe(source)
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  it('after a Retry, On Hold and back resumes the Retry’s frozen commit', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    const { card, source } = await forward(e)
+    // Taken out (back into Active), then Retried with a newer source: that attempt's commit is the one resumed.
+    moved(await e.wf.move(card.key, 'active', 'user', { confirm: true }))
+    sh(e.project, 'checkout', '-q', 'main')
+    const newer = commit(e.project, { 'newer.txt': 'newer\n' }, 'newer on main')
+    sh(e.project, 'checkout', '-q', '--detach')
+    moved(await e.wf.retryMerge(card.key, 'again', 'user', undefined, { source: newer }))
+    moved(await e.wf.move(card.key, 'hold', 'user'))
+    sh(e.project, 'checkout', '-q', 'main')
+    commit(e.project, { 'newest.txt': 'newest\n' }, 'newest on main')
+    sh(e.project, 'checkout', '-q', '--detach')
+    moved(await e.wf.move(card.key, 'merging', 'user', { confirm: true }))
+    expect(e.wf.state(card).entries.at(-1)).toMatchObject({ state: 'open', revision: newer })
+    expect(newer).not.toBe(source)
+  })
+
   it('an ordinary card is moved as before', { timeout: GIT_HEAVY_MS }, async () => {
     const e = project()
     const card = e.wf.createCard({ title: 'ordinary' })
