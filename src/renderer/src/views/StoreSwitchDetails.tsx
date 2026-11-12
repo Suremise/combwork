@@ -38,6 +38,7 @@ const M = {
   notExported: msg({ id: 'git.vc.store.notExported', defaultMessage: 'Bookmark {name} isn’t the same in Git: run jj git export, or check it.', description: 'Why a jj project can’t go back to Git yet (HI-2799): a bookmark and its Git branch differ. Keep jj git export (a command).' }),
   conflictedCommit: msg({ id: 'git.vc.store.conflictedCommit', defaultMessage: 'Commit {commit} stores conflicts: resolve them with jj.', description: 'Why a jj project can’t go back to Git yet (HI-2799): a commit on a bookmark stores unresolved conflicts. {commit} is a short id. Keep jj.' }),
   fallbackUnknown: msg({ id: 'git.vc.store.fallbackUnknown', defaultMessage: 'Couldn’t read the repository ({detail}).', description: 'Why a jj project can’t go back to Git yet (HI-2799): jj couldn’t be read. {detail} is a short code, kept in English.' }),
+  detached: msg({ id: 'git.vc.store.detached', defaultMessage: '{project}: its folder is on no branch (its head is detached at {head}), and stays so after the switch. Check out the branch its work goes on there (git switch) before its cards start in the project folder.', description: 'HI-3104: a hint in the warning before switching back to Git: a project’s folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it). Combwork doesn’t check one out; a card started in that folder is refused until the user does. {head} is a short commit id. git switch is a command: keep it.' }),
   toGit: msg({ id: 'git.vc.store.toGit', defaultMessage: 'Combwork leaves .jj in place: remove it with jj if you no longer want it.', description: 'In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj.' })
 }
 
@@ -124,6 +125,15 @@ export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: Plat
                 ))}
               </ul>
             </>
+          )}
+          {store.detached && store.detached.length > 0 && (
+            <ul data-vc-store-detached="">
+              {store.detached.map((d) => (
+                <li key={d.project} className="caution">
+                  <Icon name="warning" /> {tr(M.detached, { project: d.project, head: d.head })}
+                </li>
+              ))}
+            </ul>
           )}
           <p className="hint">{tr(M.toGit)}</p>
         </>

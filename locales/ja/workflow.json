@@ -635,6 +635,8 @@
   "workflow.refused.platform.changed.next": "もう一度開始してください。{platform}のルールで確認されます。",
   "workflow.refused.platform.noTarget.message": "{card}は開始できません。プロジェクトで、作業のマージ先となるターゲットのブックマークが選ばれていません。",
   "workflow.refused.platform.noTarget.next": "バージョン管理 → ワークフロー（マージ先）で選んでから、もう一度開始してください。",
+  "workflow.refused.platform.detachedFolder.message": "{card}は開始できません。プロジェクトフォルダーがどのブランチにもありません（HEADが{head}で切り離されています）。そのため、ビルダーがコミットしたものはどのブランチにも属しません。",
+  "workflow.refused.platform.detachedFolder.next": "{has, select, yes {プロジェクトフォルダーでそのブランチをチェックアウトしてから（git switch {branch}）、もう一度開始してください。} other {プロジェクトフォルダーでブランチをチェックアウトしてから（既存のものは git switch、新しいものは git switch -c）、もう一度開始してください。}}",
   "workflow.refused.platform.keptAcross.message": "{card}は開始できません。戻す前にコミットした作業が、リポジトリが{now}に切り替わる前の{platform}のスロット {slot} に保持されています。",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {そのフォルダーがないため、続けられるものは残っていません。スロットを削除すると（バージョン管理 → スロットとコピー、削除…）、{card}はターゲットから新しく始まります。} other {{card}をそのスロットで続けるには、リポジトリを{platform}に戻してください。}}",
   "workflow.refused.platform.switching.message": "{card}は今は開始できません。このリポジトリのバージョン管理を切り替え中です。",

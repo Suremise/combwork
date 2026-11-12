@@ -145,4 +145,6 @@ export interface StoreSwitch {
   unsupported?: Gate[]
   /** Back to Git: what isn't ready. */
   fallback?: FallbackProblem[]
+  /** HI-3104: to a platform whose folders check out a branch, each member whose folder is on none now (head detached). */
+  detached?: { project: string; head: string }[]
 }

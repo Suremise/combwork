@@ -225,6 +225,65 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(JSON.stringify(r)).not.toContain('Provider Setup')
   })
 
+  describe('HI-3104: a Git start in a project folder on no branch', () => {
+    const wsOf = (p: string) => join(p, '..')
+    it('detached, its branch proved: refused naming it; checked out: it starts', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      const head = git(wsOf(p), 'rev-parse', '--short=7', 'HEAD')
+      const r = await startCard(w, p, 'p')
+      expect(r).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+      expect(JSON.stringify(r)).toContain(`the project folder is on no branch (its head is detached at ${head})`)
+      expect(JSON.stringify(r)).toContain('Check out its branch in the project folder (git switch main)')
+      git(wsOf(p), 'checkout', '-q', 'main')
+      expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.detachedFolder' })
+    })
+
+    it('detached with no local branch to name: the general instruction, never a guessed branch', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      git(wsOf(p), 'branch', '-q', '-D', 'main')
+      const r = await startCard(w, p, 'p')
+      expect(r).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+      expect(JSON.stringify(r)).toContain('Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c)')
+      expect(JSON.stringify(r)).not.toMatch(/git switch (main|undefined|null|HEAD)\b/)
+    })
+
+    it('a no-code card, and a slots start waiting for a slot: never refused for the project folder’s head', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      const noCode = await inWorkspace(w, () => tasks.createTask({ title: 'Look only', project: 'p', kind: 'no-code' }, user))
+      const wf = (await workflowFor(w, p))!
+      expect(await store.boardWrite(w, async () => wf.start(`#${noCode.number}`, agentActor('b-p')))).not.toMatchObject({ rule: 'platform.detachedFolder' })
+      await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder: 'slots' } } }), { existing: true })
+      const service = await import('../src/main/workflow/service')
+      service.setSlotStarts({ leaseFor: async () => ({ wait: 'every slot is in use' }), unused: async () => undefined })
+      try {
+        const busy = await startCard(w, p, 'p')
+        expect(busy).not.toMatchObject({ rule: 'platform.detachedFolder' })
+        // As before this card (the provisional plan's target is the folder's line, none when detached, so the evidence
+        // read first differs: evidence.changed, carded separately); never the detached refusal.
+        expect(busy).toMatchObject({ refused: true, rule: 'evidence.changed' })
+        git(wsOf(p), 'checkout', '-q', 'main')
+        expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'start.slotAvailable' })
+      } finally {
+        service.setSlotStarts(null)
+      }
+    })
+  })
+
+  it('HI-3104: the switch back to Git lists each member whose folder is on no branch, with its head', async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect((await sw.checkPlatformSwitch(w, p, 'git')).store?.detached).toBeUndefined()
+    git(join(p, '..'), 'checkout', '-q', '--detach')
+    const head = git(join(p, '..'), 'rev-parse', '--short=7', 'HEAD')
+    const back = await sw.checkPlatformSwitch(w, p, 'git')
+    expect(back.store?.detached?.map((d) => [d.project, d.head]).sort()).toEqual([['p', head], ['q', head]])
+    expect(back.refused).toBeNull()
+    void q
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

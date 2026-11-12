@@ -635,6 +635,8 @@
   "workflow.refused.platform.changed.next": "Vuelve a iniciarla: entonces se comprueba con las reglas de {platform}.",
   "workflow.refused.platform.noTarget.message": "{card} no puede empezar: su proyecto no tiene elegido un bookmark de destino, en el que se fusiona su trabajo.",
   "workflow.refused.platform.noTarget.next": "Elige uno en Control de versiones → Flujo de trabajo (El trabajo se fusiona en) y vuelve a iniciarla.",
+  "workflow.refused.platform.detachedFolder.message": "{card} no puede empezar: la carpeta del proyecto no está en ninguna rama (su HEAD está separado en {head}), así que lo que su builder confirme no estaría en ninguna.",
+  "workflow.refused.platform.detachedFolder.next": "{has, select, yes {Cambia a su rama en la carpeta del proyecto (git switch {branch}) y vuelve a iniciarla.} other {Cambia a una rama en la carpeta del proyecto (una existente con git switch o una nueva con git switch -c) y vuelve a iniciarla.}}",
   "workflow.refused.platform.keptAcross.message": "{card} no puede empezar: su trabajo confirmado de antes de devolverla está reservado en el slot {slot}, un slot de {platform} de antes de que el repositorio cambiara a {now}.",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {Falta su carpeta, así que no queda nada con lo que seguir: quita el slot (Control de versiones → Slots y copias, Quitar…) y {card} empezará de cero desde su destino.} other {Vuelve a cambiar el repositorio a {platform} para seguir con {card} en ese slot.}}",
   "workflow.refused.platform.switching.message": "{card} no puede empezar ahora: se está cambiando el control de versiones de su repositorio.",

@@ -17,6 +17,7 @@ import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
 import * as G from './git'
+import { listWorktreesOrNull } from '../worktrees'
 import type { Disposable, ObserveEvent } from './history'
 import { historyFor, observePort } from './historyPorts'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -147,7 +148,7 @@ export class GitPlatform implements PlatformAdapter {
     }
     // A no-code card takes no slot (HI-2335): it changes nothing, so it starts where its agent is (`project`: no folder
     // of its own, its agent left where it runs, a lane's kept slot included), as with no slot here. Code cards go on.
-    if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.start(card, { ...o, folder: 'project' })
+    if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.projectPlan(card, o, false)
     if (o.folder === 'slots' && this.wf.cfg.slotFor) {
       // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
       // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
@@ -156,7 +157,9 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(target)) return target
       const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
       if (!got || 'wait' in got) {
-        const here = await this.start(card, { ...o, folder: 'project' })
+        // A slot waited for: the plan is provisional, the card isn't built in the project folder (HR2's HI-3104 design:
+        // never refused for that folder's head). No slot here at all: it is built there, so its head is checked.
+        const here = await this.projectPlan(card, o, !got)
         return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
       }
       // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
@@ -185,12 +188,41 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(line)) return line
       return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line, base, target }
     }
+    return this.projectPlan(card, o, true)
+  }
+
+  /**
+   * A start in the project folder: its line the folder's branch, its base the folder's head. HI-3104: `built` (the card is
+   * built there: a code card, not a provisional plan while a slot is waited for) and the folder on no branch (a detached
+   * head, as a colocated jj repository leaves it) is refused `platform.detachedFolder`: its commits would be on none.
+   * An unreadable branch or head stays unknown, never taken for detached.
+   */
+  private async projectPlan(card: CardRecord, o: WorkflowOptions, built: boolean): Promise<Maybe<StartPlan>> {
     const line = await G.branch(this.project)
     const base = await G.head(this.project)
     if (isUnknown(line)) return line
     if (isUnknown(base)) return base
+    if (built && card.kind !== 'no-code' && line === null && base) return this.detachedRefusal(card, o, base)
     // Committed is done: the target is the line the folder works on.
     return { folder: 'project', line, base, target: o.finish === 'committed' ? line : card.target || o.target || line }
+  }
+
+  /**
+   * HI-3104: why a start in a detached project folder is refused, and the branch to check out when one is proved usable
+   * (HR2's design: never a guess): the card's or project's target, else the default branch, only when it is a local
+   * branch and no other worktree has it checked out. Else no branch named: the next step says to choose or make one.
+   */
+  private async detachedRefusal(card: CardRecord, o: WorkflowOptions, head: string): Promise<Unknown> {
+    const named = card.target || o.target || (await G.defaultBranch(this.project).catch(() => null))
+    let branch = ''
+    if (typeof named === 'string' && named) {
+      const at = await G.lineHead(this.project, named).catch(() => null)
+      const trees = await listWorktreesOrNull(this.project).catch(() => null)
+      const elsewhere = !trees || trees.some((t) => t.branch === named && !samePath(t.path, this.project))
+      if (typeof at === 'string' && at && !elsewhere) branch = named
+    }
+    const u = unknown(UNREADABLE.head, { where: this.project })
+    return { ...u, rule: 'platform.detachedFolder', ruleValues: { head: head.slice(0, 7), branch, has: branch ? 'yes' : 'no' } }
   }
 
   /**

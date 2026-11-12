@@ -824,6 +824,18 @@
       "platform": "plain"
     }
   },
+  "workflow.refused.platform.detachedFolder.message": {
+    "placeholders": {
+      "card": "plain",
+      "head": "plain"
+    }
+  },
+  "workflow.refused.platform.detachedFolder.next": {
+    "placeholders": {
+      "has": "select",
+      "branch": "plain"
+    }
+  },
   "workflow.refused.platform.jjRefused.message": {
     "placeholders": {
       "why": "select",

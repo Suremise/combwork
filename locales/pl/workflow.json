@@ -635,6 +635,8 @@
   "workflow.refused.platform.changed.next": "Uruchom ją ponownie: zostanie wtedy sprawdzona według reguł opcji {platform}.",
   "workflow.refused.platform.noTarget.message": "Karta {card} nie może wystartować: jej projekt nie ma wybranej docelowej zakładki (bookmark), do której scalana jest jego praca.",
   "workflow.refused.platform.noTarget.next": "Wybierz ją w Kontrola wersji → Przepływ pracy (Praca jest scalana do), a potem uruchom kartę ponownie.",
+  "workflow.refused.platform.detachedFolder.message": "Karta {card} nie może wystartować: folder projektu nie jest na żadnej gałęzi (jego HEAD jest odłączony przy {head}), więc to, co zatwierdzi jej builder, nie byłoby na żadnej.",
+  "workflow.refused.platform.detachedFolder.next": "{has, select, yes {Przełącz folder projektu na jej gałąź (git switch {branch}), a potem uruchom kartę ponownie.} other {Przełącz folder projektu na gałąź (istniejącą przez git switch albo nową przez git switch -c), a potem uruchom kartę ponownie.}}",
   "workflow.refused.platform.keptAcross.message": "Karta {card} nie może wystartować: jej zatwierdzona praca sprzed odłożenia jest zachowana w slocie {slot}, slocie {platform} sprzed przełączenia repozytorium na {now}.",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {Brak jego folderu, więc nie zostało nic, z czym można kontynuować: usuń slot (Kontrola wersji → Sloty i kopie, Usuń…), a karta {card} zacznie od nowa od swojego celu.} other {Przełącz repozytorium z powrotem na {platform}, aby kontynuować kartę {card} w tym slocie.}}",
   "workflow.refused.platform.switching.message": "Karta {card} nie może teraz wystartować: kontrola wersji jej repozytorium jest właśnie przełączana.",
