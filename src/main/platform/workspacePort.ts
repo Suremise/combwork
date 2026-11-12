@@ -261,6 +261,11 @@ export interface WorkspacePort {
    */
   heldFor?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<boolean>
   /**
+   * The card the folder's binding names at the folder's generation (HI-3057: a lane that took a kept slot back and went on
+   * to another card leaves the slot bound to that card), or null: none, or it can't tell. Git has none.
+   */
+  heldCard?(folder: string, identity: WorkspaceIdentity | null): Promise<number | null>
+  /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
    * HI-3031: and only while every commit past `base` was made since `since` (the lease's start, ISO): a free slot waits

@@ -2,10 +2,11 @@
 // kept slot). On the real jj, through the pool, as jjSlotPutBack.test.ts:
 // - A: the take-back's install fails once: the slot is kept (dirty, still the card's), and the card's next start gets it;
 // - B: the Combwork taking it back is gone mid-way and another takes the operation over: kept, and given back the same;
-// - D: its folder gone, seen by a refresh first: the card's start says so ("its folder is gone").
+// - D: its folder gone, seen by a refresh first: the card's start says so ("its folder is gone");
+// - C2: a lane that took it back and went on to another card keeps that card's work for that card (HI-3057).
 // Skipped without the fetched jj (npm run jj:fetch).
 
-import { renameSync, rmSync, writeFileSync } from 'fs'
+import { readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
@@ -204,5 +205,47 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     expect(w.store.slot(a.name)?.state).toBe('dirty')
     expect(w.pool.keptCard(a.name)).toBe(1)
     expect(await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })).toMatchObject({ ok: true, slot: { name: a.name } })
+  })
+
+  // HI-3057 (HI-3051's hunt): the lane goes on to card 2 in the slot it took back for card 1, whose work then reaches main.
+  // Card 2's work, committed (submitted), committed with an edit beside it, or only an edit, is kept for card 2, which
+  // gets the slot back with it; card 1 then starts in another slot.
+  it.each([
+    [true, 'committed'],
+    [false, 'committed'],
+    [true, 'committed+edit'],
+    [false, 'committed+edit'],
+    [true, 'edit'],
+    [false, 'edit']
+  ] as const)('C2: a lane gone on to its next card keeps that card\'s work for it (colocated: %s, %s)', async (colocated, work) => {
+    const w = world(colocated)
+    const a = await putBackWithWork(w, false)
+    const lane = await w.pool.lend({ lane: 'lane-1', agent: 'a-1', startsCard: 1 }, { target: 'main' })
+    expect(lane).toMatchObject({ ok: true, slot: { name: a.name } })
+    if (!lane.ok) throw new Error('lane refused')
+    w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', a.R)
+    const row = w.store.slot(a.name)!
+    const ws = row.identity!.workspace
+    expect(await w.pool.prepare(lane.lease.id, { line: jjLineKey(ws, 2, 1), base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+    let R2: string | null = null
+    if (work !== 'edit') {
+      writeFileSync(join(a.folder, 'two.txt'), 'two\n')
+      w.h.jj(a.folder, 'commit', '-m', 'card 2 work')
+      R2 = w.h.id(a.folder, '@-')
+      expect(await w.port.submitted(a.folder, jjLineKey(ws, 2, 1), [R2], row.identity, 1)).toBe(true)
+    }
+    if (work !== 'committed') writeFileSync(join(a.folder, 'edit.txt'), 'not committed\n')
+    await w.pool.release(lane.lease.id, 'laneEnded')
+    await w.pool.refresh()
+    expect(w.store.slot(a.name)?.state).toBe('dirty')
+    expect(w.pool.keptCard(a.name)).toBe(2)
+    expect(w.pool.keptSlotFor(1)).toBeNull()
+    // Card 1 (its work in main) starts elsewhere; card 2 gets its slot back, its work in it.
+    const one = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+    expect(one).toMatchObject({ ok: true })
+    expect(one.ok && one.slot.name).not.toBe(a.name)
+    expect(await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })).toMatchObject({ ok: true, slot: { name: a.name } })
+    if (R2) expect(w.h.id(a.folder, '@-')).toBe(R2)
+    if (work !== 'committed') expect(readFileSync(join(a.folder, 'edit.txt'), 'utf8')).toBe('not committed\n')
   })
 })
