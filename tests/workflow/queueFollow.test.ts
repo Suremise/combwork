@@ -638,6 +638,56 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
   })
 
+  it('HI-3055: a journalled catch-up (phase ref) whose remote read fails holds the next card, its journal kept and paused fetchFailed; read again, finished, then the next card', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, transport, queue } = following({}, { checkedOut: true })
+    const a = await queued(e, 'A', 'a.txt')
+    await expect(queue({ hooks: { beforeCatchUpRef: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    const journal = catchUpOf(e.store.meta(catchUpKey('main')))
+    expect(journal?.phase).toBe('ref')
+    const b = await queued(e, 'B', 'b.txt')
+    let first = true
+    const git = gitWith(async (args, run) => {
+      if (first && args[0] === 'fetch') {
+        first = false
+        return { ok: false, code: 128, out: '', err: 'temporary remote read failure' }
+      }
+      return run()
+    })
+    const out = await restarted(e, transport, { git }).drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toEqual(journal)
+    expect(out.at(-1)).toMatchObject({ card: a.key, outcome: 'paused', reason: 'fetchFailed' })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'fetchFailed', card: a.key, message: expect.stringContaining('temporary remote read failure') })
+    expect(e.wf.state(b).stage).not.toBe('done')
+    expect(head(bare)).toBe(e.wf.state(a).integrated!.result)
+    // Resumed, the remote read: A's journal finishes its ref, then B is merged and caught up.
+    queue().resume('main')
+    await queue().drain('main')
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+    expect(contains(e.project, e.wf.state(a).integrated!.result)).toBe(true)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it('HI-3055: an owed catch-up behind the result whose remote can’t be read holds the next card (fetchFailed); read again, caught up, then the next card', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    del(join(e.project, 'a.txt'))
+    const b = await queued(e, 'B', 'b.txt')
+    sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'fetchFailed', card: a.key })
+    expect(e.wf.state(b).stage).not.toBe('done')
+    sh(e.project, 'remote', 'set-url', 'origin', bare)
+    queue().resume('main')
+    await queue().drain('main')
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+    expect(contains(e.project, e.wf.state(a).integrated!.result)).toBe(true)
+  })
+
   it('HI-3041 (2b): a published merge undone on the remote and locally is marked as having left, as with a push; on the remote still, behind is not left', { timeout: GIT_HEAVY_MS * 2 }, async () => {
     const { reconcile } = await import('../../src/main/workflow/reconcile')
     const marks: Record<string, unknown> = {}
