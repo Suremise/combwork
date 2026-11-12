@@ -646,5 +646,8 @@
   "workflow.slots.removeKeptTitle": "移除 {slot}？",
   "workflow.slots.removeKeptMessage": "之后 {card} 会在另一个槽位中从它的目标重新开始。它在这里提交的工作仍保留在 jj 的存储中{commit, select, none {。} other {：最后一个提交是 {commit}。}}",
   "workflow.slots.removedKept": "{slot} 已移除。",
-  "workflow.slots.notRemovedKept": "{slot} 未移除：{why, select, changed {列表显示后它已改变（它的文件夹回来了，或它被重新创建）} busy {现在有工作正在其中进行} other {Combwork 保留了它}}。"
+  "workflow.slots.notRemovedKept": "{slot} 未移除：{why, select, changed {列表显示后它已改变（它的文件夹回来了，或它被重新创建）} busy {现在有工作正在其中进行} other {Combwork 保留了它}}。",
+  "workflow.slots.keptForgottenFor": "为 {card} 保留，但 jj 已不再列出它的工作区",
+  "workflow.slots.removeForgottenMessage": "它的文件夹会原样移到回收站，包括其中的所有更改。之后 {card} 会在另一个槽位中从它的目标重新开始。它在这里提交的工作仍保留在 jj 的存储中{commit, select, none {。} other {：最后一个提交是 {commit}。}}",
+  "workflow.slots.state.forgotten": "未被 jj 列出"
 }

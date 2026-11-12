@@ -139,6 +139,10 @@
     "text": "something works in it now",
     "note": "HI-2995: why a kept slot (slot.refusal.kept) is not lent back now: an operation, a session or a process holds it."
   },
+  "slot.kept.forgotten": {
+    "text": "jj no longer lists its workspace (forgotten outside Combwork), though its folder is still there: the user can remove it with Remove… under Slots and copies",
+    "note": "HI-3097: why a kept slot (slot.refusal.kept) can't be lent back: its jj workspace was forgotten (jj workspace forget, outside Combwork), its folder left in place. Remove… is the window's button."
+  },
   "slot.kept.gone": {
     "text": "its folder is gone",
     "note": "HI-2995: why a kept slot (slot.refusal.kept) can't be lent back: its folder was deleted."

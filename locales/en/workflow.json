@@ -1983,6 +1983,10 @@
     "defaultMessage": "Kept for {card}: its committed work isn’t in the target yet",
     "description": "HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it."
   },
+  "workflow.slots.keptForgottenFor": {
+    "defaultMessage": "Kept for {card}, but jj no longer lists its workspace",
+    "description": "HI-3097: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), but its jj workspace was forgotten outside Combwork (jj workspace forget), its folder left in place, so the card can’t get it back. Remove… beside it ends it."
+  },
   "workflow.slots.keptGoneFor": {
     "defaultMessage": "Kept for {card}, but its folder is missing",
     "description": "HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it."
@@ -2075,6 +2079,10 @@
     "defaultMessage": "Release…",
     "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
   },
+  "workflow.slots.removeForgottenMessage": {
+    "defaultMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
+    "description": "HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."
+  },
   "workflow.slots.removeKept": {
     "defaultMessage": "Remove…",
     "description": "HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again."
@@ -2130,6 +2138,10 @@
   "workflow.slots.state.dirty": {
     "defaultMessage": "Has changes left in it",
     "description": "A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean."
+  },
+  "workflow.slots.state.forgotten": {
+    "defaultMessage": "Not listed by jj",
+    "description": "HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it)."
   },
   "workflow.slots.state.gone": {
     "defaultMessage": "Folder missing",
