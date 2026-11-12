@@ -72,8 +72,8 @@
     "note": "HI-2944: a list of paths cut at three, and how many more there are."
   },
   "runtime.start.slotMove": {
-    "text": "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
-    "note": "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now."
+    "text": "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
+    "note": "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)."
   },
   "runtime.start.slotWait": {
     "text": "{card} waits for a slot: {why}",

@@ -868,6 +868,19 @@
       "platform": "plain"
     }
   },
+  "workflow.refused.platform.keptLine.message": {
+    "placeholders": {
+      "card": "plain",
+      "kept": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.keptLine.next": {
+    "placeholders": {
+      "kept": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.refused.platform.noTarget.message": {
     "placeholders": {
       "card": "plain"

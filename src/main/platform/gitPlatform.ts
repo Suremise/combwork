@@ -15,6 +15,7 @@ import type { CardRecord } from '../workflow/factStore'
 import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
+import { keptLineTarget } from '../workflow/keptLine'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
 import * as G from './git'
 import { listWorktreesOrNull } from '../worktrees'
@@ -153,7 +154,8 @@ export class GitPlatform implements PlatformAdapter {
       // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
       // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
       // the user's start across it works where the agent is). No slot here (the rules off): where the agent is, as P3.
-      const target = card.target || o.target || (await G.defaultBranch(this.project))
+      // HI-3112: a card put back keeps the branch its line was made from (`slotTarget`), here as in `startTarget`.
+      const target = await this.slotTarget(card, o)
       if (isUnknown(target)) return target
       const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
       if (!got || 'wait' in got) {
@@ -176,10 +178,10 @@ export class GitPlatform implements PlatformAdapter {
       const base = had && had !== th ? await G.mergeBase(this.project, had, th) : th
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line, b: target })
-      return { folder: got.folder, line, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh }
+      return { folder: got.folder, line, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh, ...(had ? { carried: true } : {}) }
     }
     if (o.folder === 'slots') {
-      const target = card.target || o.target || (await G.defaultBranch(this.project))
+      const target = await this.slotTarget(card, o)
       if (isUnknown(target)) return target
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
@@ -226,6 +228,27 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   /**
+   * A slotted start's target (HI-3112): the card's own, else the branch its line was made from while a put-back card's
+   * line holds history the target it would follow lacks (`keptLineTarget`: its work, or the old branch's commits, which
+   * a reuse on the new target would merge there), else G7's (a lane's: its Merges into), else the default branch. A lane
+   * card whose kept branch isn't its lane's is refused (`platform.keptLine`): the lane's target stays its cards'. Unknown
+   * when the line or a head can't be read: never started on a guess.
+   */
+  private async slotTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<string>> {
+    const follows = card.target || o.target || (await G.defaultBranch(this.project))
+    if (isUnknown(follows) || card.target) return follows
+    const kept = await keptLineTarget(this.project, this.wf.state(card), card, this.wf.cfg.projectKey, follows)
+    if (kept === 'unknown') {
+      const line = await this.lineFor(card)
+      return unknown(UNREADABLE.contains, { revision: isUnknown(line) ? card.key : line, target: follows })
+    }
+    if (!kept) return follows
+    const lane = card.lane ? this.wf.lane(card.lane) : null
+    if (lane && !lane.ended && kept.target !== follows) return { ...unknown(UNREADABLE.target, { target: kept.target }), rule: 'platform.keptLine', ruleValues: { kept: kept.target, target: follows } }
+    return kept.target
+  }
+
+  /**
    * The target `start` plans on, by its rule (#1401): with the builder's worktree (`own`), the card's, G7's, the
    * worktree's base, else the repository's default branch; slots, the card's, G7's, else the default branch; in the
    * project folder, the card's or G7's, or the line the folder works on (always, when finishing is a commit). Kept
@@ -234,7 +257,7 @@ export class GitPlatform implements PlatformAdapter {
   async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
     const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
     if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
-    if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
+    if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return this.slotTarget(card, o)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
   }
