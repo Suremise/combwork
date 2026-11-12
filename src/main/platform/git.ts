@@ -6,7 +6,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
-import { access, readFile } from 'original-fs/promises'
+import { access, lstat, readFile } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
@@ -734,21 +734,33 @@ async function rebasingBranch(folder: string): Promise<Maybe<string | null>> {
   const own = gitDirSync(folder)
   let paths = own ? [join(own, 'rebase-merge', 'head-name'), join(own, 'rebase-apply', 'head-name')] : null
   if (!paths) {
-    // A worktree whose folder is gone (prunable: a test merge's copy just removed) has nothing under way in it.
-    if (!existsSync(folder)) return null
+    // A worktree whose folder is gone (prunable: a test merge's copy just removed) has nothing under way in it. HR1's
+    // round 1: only a folder the system says isn't there; one it can't look at is unknown, never "no rebase".
+    const there = await lstat(folder).then(
+      () => true,
+      (e: NodeJS.ErrnoException) => (absent(e) ? false : e)
+    )
+    if (there === false) return null
+    if (there !== true) return withDetail(unknown(U.worktrees, { folder }), there.message)
     const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'rebase-merge/head-name', '--git-path', 'rebase-apply/head-name'])
     if (!r.ok) return withDetail(unknown(U.worktrees, { folder }), r.err)
     paths = lines(r.out).map((l) => l.trim())
   }
   for (const p of paths) {
+    // HR1's round 1: no marker only when the system says it isn't there; a marker it can't read (denied, I/O) is
+    // unknown, so the branch is never taken for one checked out nowhere and moved under a rebase.
     const name = await readFile(p, 'utf8').then(
       (t) => t.trim(),
-      () => ''
+      (e: NodeJS.ErrnoException) => (absent(e) ? '' : e)
     )
+    if (typeof name !== 'string') return withDetail(unknown(U.worktrees, { folder }), name.message)
     if (name.startsWith('refs/heads/')) return name.slice(11)
   }
   return null
 }
+
+/** A file-system error that says the path isn't there (rather than that it couldn't be looked at). */
+const absent = (e: NodeJS.ErrnoException | undefined): boolean => e?.code === 'ENOENT' || e?.code === 'ENOTDIR'
 
 /** Makes a card's folder: a worktree on a new line from `base` (§16.10, the spike's stand-in for slots). */
 export async function isolate(repo: string, folder: string, line: string, base: string): Promise<Maybe<string>> {

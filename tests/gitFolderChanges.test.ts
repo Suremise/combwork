@@ -32,7 +32,22 @@ vi.mock('original-fs/promises', async (original) => {
     lstat: (async (p: string, o?: unknown) => {
       if (failLstatOf && String(p).replace(/\\/g, '/').endsWith(`/${failLstatOf}`)) throw Object.assign(new Error(`EPERM: operation not permitted, lstat '${p}'`), { code: 'EPERM' })
       return real.lstat(p, o as Parameters<typeof real.lstat>[1])
-    }) as typeof real.lstat
+    }) as typeof real.lstat,
+    readFile: (async (p: string, o?: unknown) => {
+      if (failReadOf && String(p).replace(/\\/g, '/').endsWith(`/${failReadOf}`)) throw Object.assign(new Error(`EACCES: permission denied, open '${p}'`), { code: 'EACCES' })
+      return real.readFile(p, o as Parameters<typeof real.readFile>[1])
+    }) as typeof real.readFile
+  }
+})
+/** HI-3081 (HR1's round 1): a read of a path ending so refused (EACCES), though the file is there. */
+let failReadOf: string | null = null
+// A folder failLstatOf denies is denied to existsSync too, which answers false for any error (as Windows does for a
+// folder that can't be looked at): what HR1's round 1 found taken for a folder that's gone.
+vi.mock('original-fs', async (original) => {
+  const real = await original<typeof import('fs')>()
+  return {
+    ...real,
+    existsSync: ((p: string) => (failLstatOf && String(p).replace(/\\/g, '/').endsWith(`/${failLstatOf}`) ? false : real.existsSync(p))) as typeof real.existsSync
   }
 })
 /** HI-3022: a file written just before the next `checkout-index` (a rename's old side put back) runs. */
@@ -152,6 +167,7 @@ beforeEach(() => {
   beforeRestore = null
   failStashAfter = false
   failLstatOf = null
+  failReadOf = null
   lateFile = null
   afterMade = null
   beforeRefresh = null
@@ -1189,6 +1205,40 @@ describe('the folder and its state, checked under the lock', () => {
     const after = await checkouts(proj)
     if (isUnknown(after)) throw new Error('unknown')
     expect(norm(after.main)).toBe(norm(proj))
+  })
+
+  // HR1's round 1: only "not there" is absence; a marker or a folder that can't be read is unknown, never "no rebase".
+  it("a rebase under way whose marker can't be read (denied): unknown, so the branch is never taken for one checked out nowhere; Commit refused, nothing done", async () => {
+    rebaseStopped()
+    expect(existsSync(join(proj, '.git', 'rebase-merge', 'head-name'))).toBe(true)
+    failReadOf = 'rebase-merge/head-name'
+    try {
+      const where = await checkouts(proj)
+      expect(isUnknown(where)).toBe(true)
+      const before = sh(proj, 'rev-parse', 'refs/heads/main')
+      await expect(settle('commit', ['a.txt'])).rejects.toThrow()
+      expect(sh(proj, 'rev-parse', 'refs/heads/main')).toBe(before)
+    } finally {
+      failReadOf = null
+    }
+  })
+
+  it("a detached worktree whose .git can't say where its git dir is, its folder there but not readable: unknown; one whose folder is gone: nothing under way (prunable)", async () => {
+    const wt = join(tempDir('cw-folderchanges-wt-'), 'detached-wt')
+    sh(proj, 'worktree', 'add', '-q', '--detach', wt)
+    // No `.git` file: gitDirSync can't say, so the folder itself is looked at.
+    rmSync(join(wt, '.git'))
+    failLstatOf = 'detached-wt'
+    try {
+      expect(isUnknown(await checkouts(proj))).toBe(true)
+    } finally {
+      failLstatOf = null
+    }
+    rmSync(wt, { recursive: true, force: true })
+    const where = await checkouts(proj)
+    if (isUnknown(where)) throw new Error('unknown')
+    expect(norm(where.main)).toBe(norm(proj))
+    sh(proj, 'worktree', 'prune')
   })
 
   it('a detached HEAD with no rebase under way: not counted as any branch checked out (as before)', async () => {
