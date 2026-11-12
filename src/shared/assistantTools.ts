@@ -182,17 +182,25 @@ export const WORKFLOW_TOOL_STAGES: Readonly<Record<string, { stages: readonly st
   cw_report_merge: { stages: ['approved', 'merging'], under: (o) => o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked' }
 }
 
+/** A stage cards in flight are in, with the rules those cards themselves work under (HI-3014). */
+export interface HeldStage {
+  stage: string
+  sets: readonly WorkflowToolOptions[]
+}
+
 /**
- * The tools hidden for a project's workflow (HI-2694): those no option set allows and no card's stage keeps under one of
- * them, sorted. `sets`: the project's options now and every ruleset its cards in flight and running lanes still work
- * under; `stages`: the stages its cards in flight are in. No set (nothing known): nothing hidden.
+ * The tools hidden for a project's workflow (HI-2694): those no option set allows and no card's stage keeps under that
+ * card's own rules, sorted. `sets`: the project's options now and every ruleset its cards in flight and running lanes
+ * still work under; `held`: the stages its cards in flight are in, each with its cards' own rulesets (HI-3014: never
+ * another set's, so a Solo card moved into Approved can't borrow the merge report from a not-checked set it isn't under).
+ * No set (nothing known): nothing hidden.
  */
-export function hiddenForWorkflow(sets: readonly WorkflowToolOptions[], stages: Iterable<string> = []): string[] {
+export function hiddenForWorkflow(sets: readonly WorkflowToolOptions[], held: Iterable<HeldStage> = []): string[] {
   if (!sets.length) return []
-  const at = new Set(stages)
+  const at = [...held]
   const kept = (name: string): boolean => {
     const keep = WORKFLOW_TOOL_STAGES[name]
-    return !!keep && keep.stages.some((s) => at.has(s)) && sets.some(keep.under)
+    return !!keep && at.some((h) => keep.stages.includes(h.stage) && h.sets.some(keep.under))
   }
   return Object.entries(WORKFLOW_TOOLS)
     .filter(([name, usable]) => !sets.some(usable) && !kept(name))
