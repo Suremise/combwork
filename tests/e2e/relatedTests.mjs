@@ -737,6 +737,8 @@ export function workerEntriesOf(configText) {
  * files, related Vitest's list. Never throws: anything it can't work out keeps every related test, saying why.
  */
 export function narrowRelatedInTree({ cwd, base, paths, related }) {
+  // Nothing related, nothing to narrow (HI-3002): the whole tree's import graph isn't read for none.
+  if (!related.length) return { keep: [], dropped: [], why: [] }
   try {
     const revs = { base: gitRevision(cwd, base), head: gitRevision(cwd, null) }
     const git = (args) => execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd, encoding: 'utf8', env: runContext.baseEnv(), maxBuffer: 512 * 1024 * 1024 })

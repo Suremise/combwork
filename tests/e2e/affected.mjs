@@ -1155,6 +1155,23 @@ function listVitestRelated(cwd, base) {
 
 const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd, encoding: 'utf8', env: runContext.baseEnv(), maxBuffer: 512 * 1024 * 1024 })
 
+/**
+ * Whether the checkout has nothing `vitest list --changed <base>` could relate (HI-3002): no commit since the base's
+ * merge base with HEAD changed a file, nothing staged or unstaged, no untracked file (what Vitest's changed files are:
+ * the committed diff since `base...HEAD`, the index and working tree, and the untracked). Anything unreadable: false.
+ */
+export function unchangedSince(cwd, base) {
+  try {
+    const quiet = (args) => execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd, env: runContext.baseEnv(), stdio: 'ignore' })
+    quiet(['diff', '--quiet', '--no-ext-diff', `${base}...HEAD`, '--'])
+    quiet(['diff', '--quiet', '--no-ext-diff', 'HEAD', '--'])
+    return git(cwd, ['ls-files', '-z', '--others', '--exclude-standard']) === ''
+  } catch {
+    // git diff --quiet exits 1 for a difference: not unchanged (and an error is no proof of it either).
+    return false
+  }
+}
+
 /** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
 async function pickCli() {
   const cwd = process.cwd()
@@ -1181,8 +1198,10 @@ async function pickCli() {
   const added = paths.filter((p) => !atBase.has(p))
   const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
   const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
-  // Vitest's related tests, narrowed to those loading a file that names what changed (relatedTests.mjs, HI-2677).
-  const related = narrowRelatedInTree({ cwd, base, paths, related: listVitestRelated(cwd, base) })
+  // Vitest's related tests, narrowed to those loading a file that names what changed (relatedTests.mjs, HI-2677). A
+  // checkout with no change since the base has none for Vitest to relate: its start (seconds, more under load) is
+  // skipped (HI-3002).
+  const related = narrowRelatedInTree({ cwd, base, paths, related: unchangedSince(cwd, base) ? [] : listVitestRelated(cwd, base) })
   const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: related.keep, units })
   for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
