@@ -393,12 +393,16 @@ const onDb = (fn) => {
     // HI-3097: card 2 again in a new slot, put back with a commit, its workspace then forgotten by the user (its folder
     // left, an edit in it): Slots and copies says jj no longer lists it, with Remove…; confirmed (the Recycle Bin named),
     // the folder goes, its commit stays in jj's store.
+    const givenCount = () => (fs.existsSync(appLog) ? (fs.readFileSync(appLog, 'utf8').match(new RegExp(given.source, 'g')) ?? []).length : 0)
+    const givenBefore = givenCount()
     const started4 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 afresh' }).catch((e) => ({ error: String(e) }))
+    // Lent and prepared for card 2 (B1 given it there), as above: only then is a commit there card 2's work.
     const w4 = await until(async () => {
       const v = await inv('tasks:work', n2)
-      return v?.folder && v.workspace ? v : null
+      const lent = v?.folder && v.workspace ? (await inv('slots:list', shop)).find((s) => s.folder.toLowerCase() === v.folder.toLowerCase() && s.state === 'lent' && s.lease?.card === n2) : null
+      return lent && givenCount() > givenBefore ? v : null
     }, HUNG_MS)
-    check('card 2 started afresh in a slot', !!w4, JSON.stringify({ started4, slots: await inv('slots:list', shop) }))
+    check('card 2 started afresh in a slot, given to B1 there', !!w4, JSON.stringify({ started4, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
     const slot4 = path.basename(w4.folder)
     fs.writeFileSync(path.join(w4.folder, 'fourth.txt'), 'fourth\n')
     jj(w4.folder, 'commit', '-m', 'fourth work')
