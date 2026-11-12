@@ -361,6 +361,11 @@
       "why": "plain"
     }
   },
+  "service.folderChanges.submoduleInside": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.tooManyToSetAside": {
     "placeholders": {
       "count": "number",
