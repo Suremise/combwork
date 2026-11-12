@@ -465,7 +465,8 @@
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
   },
   "tool.queue.arg.reason": {
-    "text": "remove, retry: the user's reason, recorded with the override."
+    "text": "remove, retry, resolve: the user's reason, recorded with the override.",
+    "note": "HI-3004: resolve takes it too."
   },
   "tool.queue.arg.target": {
     "text": "The target branch."
@@ -474,7 +475,8 @@
     "text": "Your project's merge queues, one per target branch, merging approved cards in turn: what tests now, what waits, recent outcomes, whether paused."
   },
   "tool.queue.description.assistant": {
-    "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved), retry (a returned card) and resolve (a returned forward merge: ends it and makes a card for a builder to merge it by hand). remove, retry and resolve take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "A project's merge queues, one per target branch, merging approved cards in turn: list, pause, resume, remove (back to Approved), retry (a returned card), resolve (a returned forward merge: a card to merge it by hand). remove, retry and resolve take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}",
+    "note": "HI-3004: within 300 characters (replysize); what each action does is in tools.md."
   },
   "tool.queue.error.action": {
     "text": "action must be list"

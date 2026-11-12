@@ -113,6 +113,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 - `list` (`target` narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom.
 - The Assistant's `pause`: the queue stops before its next card; one being checked finishes its checks and waits, unmerged. `resume`: it runs again; while what paused it is still there (a target checked out, the rules off), it stays paused and says so.
 - `remove` (`card`, `reason`): out of the queue, back to Approved, never merged, its builder woken; refused once its merge has begun. `retry`: queues a card the queue returned (its approved revision, unchanged) once more. Both take the user's reason, recorded with the override.
+- `resolve` (`card`, `reason`), on a forward merge the queue returned (a conflict): ends it (Done, nothing merged) and makes an ordinary card on its destination, linked to it, for a builder to merge it by hand and resolve the conflict. It takes the user's reason too.
 - `retarget`, once Work merges into moved on: `from` (the finished target) and `target` (the new one) preview the Todo cards and free slots that can follow; with the user's OK, `preview` and `items` move them.
 - At Look and advise, only `list` works.
 
