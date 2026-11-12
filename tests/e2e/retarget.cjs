@@ -274,6 +274,50 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('…its history says it moved with its branch and work kept', hist9.some((x) => /Moved from 1\.2\.0 to integration, its branch and work kept/.test(x)), JSON.stringify(hist9.slice(-3)))
     const sub9 = await q.act(fx, h, b9, n9, 'submit', { summary: 'In flight: ready' })
     check('…and it submits, merging into integration', sub9.status === 200, JSON.stringify(sub9.body))
+
+    // --- HI-3113: a lane started on the project's own, 1.3.0 (no branch of its own named), then Start the next version
+    // from the dialog: the lane stays on 1.3.0, its header says "into 1.3.0", and 1.3.0 can't be taken out of Other
+    // branches work can merge into while it uses it. Screenshots in both themes.
+    git(fx.alpha, 'branch', '1.3.0', 'integration')
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { target: '1.3.0', otherTargets: ['integration'] }) })
+    const [b11, r11] = [await q.agent(fx, h, 'B11'), await q.agent(fx, h, 'R11')]
+    const n11 = (await inv('tasks:create', { title: 'On the release', project: 'alpha' })).number
+    const lane11 = (await inv('lanes:start', fx.alpha, { builder: b11.id, reviewer: r11.id, cards: [n11] })).lane
+    check('HI-3113: a lane started on the project’s own 1.3.0 names no branch of its own', !!lane11?.id && !lane11.target, JSON.stringify(lane11?.target))
+    await waitHung(async () => (await page.locator('[data-action="next-version"]').count()) === 1 && !(await page.locator('[data-action="next-version"]').isDisabled()))
+    await page.locator('[data-action="next-version"]').click()
+    const nv = page.locator('.dialog', { hasText: 'Start the next version' })
+    await waitHung(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.4.0')
+    await nv.getByRole('button', { name: 'Start', exact: true }).click()
+    const started11 = await waitHung(async () => ((await inv('workflow:form', fx.alpha))?.options?.target === '1.4.0' ? true : null)).catch(() => null)
+    check('…Start the next version from the dialog: work merges into 1.4.0', !!started11, JSON.stringify((await inv('workflow:form', fx.alpha))?.options))
+    const panel = page.locator('.progress-panel')
+    if (!(await panel.count())) await page.locator('.progress-rail').click()
+    await panel.locator('.progress-tab[data-tab="lanes"]').click()
+    const top11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"] .progress-lane-top`)
+    const into = await waitHung(async () => ((await top11.locator('[data-lane-target="1.3.0"]').count()) === 1 ? true : null)).catch(() => null)
+    check('…the lane stays on 1.3.0, and its header says "into 1.3.0"', !!into, await text(top11))
+    const row11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"]`)
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await row11.screenshot({ path: path.join(fx.shots, `retarget-lane-left-on-release-${t}.png`) }).catch(() => undefined)
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    // 1.3.0 taken out of Other branches in the tab: refused, naming the lane's builder; still listed.
+    const others = form.locator('.workflow-option[data-option="otherTargets"] input')
+    await others.fill('integration')
+    await others.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    const refusal = await waitHung(async () => {
+      if (await save.isVisible().catch(() => false)) await save.getByRole('button', { name: 'Save', exact: true }).click().catch(() => undefined)
+      const t = await text(page.locator('body'))
+      return /1\.3\.0 can’t be taken out of Other branches work can merge into while these use it: B11/.test(t) ? t : null
+    }).catch(() => null)
+    await page.screenshot({ path: path.join(fx.shots, 'retarget-release-in-use.png') }).catch(() => undefined)
+    check('…taking 1.3.0 out of Other branches is refused while the lane uses it, naming B11', !!refusal, (await text(page.locator('body'))).slice(-600))
+    check('…and 1.3.0 is still listed', ((await inv('workflow:form', fx.alpha))?.options?.otherTargets ?? []).includes('1.3.0'), JSON.stringify((await inv('workflow:form', fx.alpha))?.options?.otherTargets))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
