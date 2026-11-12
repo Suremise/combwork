@@ -370,8 +370,12 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   return cfg
 }
 
-/** The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
-const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
+/**
+ * The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d); and,
+ * following the remote, `beforePublish`: in phase push with nothing sent, so the restart finds an unknown publication
+ * the remote lacks and asks For you (HI-3088's window check).
+ */
+const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback', 'beforePublish']
 let raced = false
 
 /**
