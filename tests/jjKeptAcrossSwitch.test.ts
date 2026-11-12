@@ -4,6 +4,7 @@
 // and names the way on (switch back; with its folder gone, remove it), and Remove… of one whose folder is gone forgets
 // only Combwork's record, its folder's absence checked again under the removal: one restored meanwhile is `changed`.
 // Real jj, the real SlotPool (setup as tests/jjSlotKeptTakeBack.test.ts).
+import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -107,6 +108,26 @@ describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back t
     expect(again.ok && (again.slot.platform ?? 'git')).toBe('git')
   })
 
+  it("Remove… with its folder gone while the user's own worktree goes missing during it: only the slot's registration dropped", async () => {
+    let other = ''
+    const { pool, store, row, repo } = await keptThenGit({
+      // Asked under the removal's operation, between its checks and the record going: the user's worktree moved aside.
+      inFlight: async () => {
+        if (other && existsSync(other)) execFileSync('cmd', ['/c', 'move', other, `${other}-moved`], { stdio: 'ignore' })
+        return false
+      }
+    })
+    other = join(repo, '..', 'users-own')
+    execFileSync('git', ['worktree', 'add', '-q', '--detach', other, 'HEAD'], { cwd: repo, stdio: 'ignore' })
+    rmSync(row.folder, { recursive: true, force: true })
+    await pool.refresh()
+    expect(await pool.removeKeptGone(row.name, pool.keptRecord(row.name)!)).toEqual({ ok: true })
+    expect(store.slot(row.name)).toBeNull()
+    const listed = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8' }).toLowerCase()
+    expect(listed).toContain(other.split('\\').join('/').toLowerCase())
+    expect(listed).not.toContain(row.folder.split('\\').join('/').toLowerCase())
+  })
+
   it('Remove… with its folder gone, restored while the removal runs: changed, nothing removed or trashed, still kept', async () => {
     let restore: (() => void) | null = null
     const { pool, store, row } = await keptThenGit({
@@ -146,5 +167,45 @@ describe("HI-3069: git's prunable worktrees with a relative gitdir", () => {
     g(repo, 'worktree', 'add', '-q', '--relative-paths', '--detach', wt, 'HEAD')
     rmSync(wt, { recursive: true, force: true })
     expect((await gitWorkspacePort.prunable(repo)).map((p) => p.toLowerCase())).toEqual([wt.toLowerCase()])
+  })
+})
+
+describe("HI-3069: dropping one worktree registration, never a prune (HR1's round 1)", () => {
+  const g = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  /** A repository with two worktrees, slot-a (relative paths: as a colocated jj workspace registers) and the user's. */
+  function twoWorktrees(): { repo: string; slot: string; mine: string } {
+    const base = tempDir('dropreg-')
+    const repo = join(base, 'project')
+    mkdirSync(repo, { recursive: true })
+    g(repo, 'init', '-q', '-b', 'main')
+    writeFileSync(join(repo, 'a.txt'), 'a\n')
+    g(repo, 'add', 'a.txt')
+    g(repo, 'commit', '-q', '-m', 'one')
+    const slot = join(base, 'slots', 'slot-a')
+    const mine = join(base, 'mine')
+    g(repo, 'worktree', 'add', '-q', '--relative-paths', '--detach', slot, 'HEAD')
+    g(repo, 'worktree', 'add', '-q', '--detach', mine, 'HEAD')
+    return { repo, slot, mine }
+  }
+  const listed = (repo: string): string[] => g(repo, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => l.slice(9).toLowerCase())
+  const has = (repo: string, p: string): boolean => listed(repo).includes(p.split('\\').join('/').toLowerCase())
+
+  it("another worktree gone too (moved aside): only the slot's registration goes, the other's stays for Repair", async () => {
+    const { repo, slot, mine } = twoWorktrees()
+    rmSync(slot, { recursive: true, force: true })
+    execFileSync('cmd', ['/c', 'move', mine, `${mine}-moved`], { stdio: 'ignore' })
+    expect(await gitWorkspacePort.dropRegistration!(repo, slot)).toBe('dropped')
+    expect(has(repo, slot)).toBe(false)
+    expect(has(repo, mine)).toBe(true)
+  })
+
+  it('the folder there, locked, or not registered: left, nothing dropped', async () => {
+    const { repo, slot } = twoWorktrees()
+    expect(await gitWorkspacePort.dropRegistration!(repo, slot)).toEqual({ left: 'changed meanwhile' })
+    g(repo, 'worktree', 'lock', slot)
+    rmSync(slot, { recursive: true, force: true })
+    expect(await gitWorkspacePort.dropRegistration!(repo, slot)).toEqual({ left: 'locked' })
+    expect(has(repo, slot)).toBe(true)
+    expect(await gitWorkspacePort.dropRegistration!(repo, join(repo, '..', 'nowhere'))).toBe('none')
   })
 })

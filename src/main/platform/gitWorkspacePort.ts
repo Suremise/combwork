@@ -5,7 +5,8 @@
 
 import { randomBytes } from 'crypto'
 import { dirname, join, resolve } from 'path'
-import { readFile } from 'original-fs/promises'
+import { lstat, readdir, readFile, rm as removeTree } from 'original-fs/promises'
+import { samePlace } from '../fsutil'
 import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
@@ -37,6 +38,43 @@ async function prunable(repo: string): Promise<string[]> {
     out.push(gitdir.trim() ? dirname(resolve(entry, gitdir.trim())) : `(${m[1]})`)
   }
   return out
+}
+
+/**
+ * HI-3069: the one registration (`<common>/worktrees/<id>`) whose gitdir names `folder`, dropped while that folder is
+ * absent: never a repository-wide prune, which would also drop another worktree gone meanwhile (moved, say, and needing
+ * its registration for Repair). Found by its gitdir (relative ones from the entry itself); left, saying why, when several
+ * name the folder, it is locked, or the folder exists; its gitdir and the folder's absence read again right before it
+ * goes. Nothing else is touched.
+ */
+async function dropRegistration(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }> {
+  const r = await git(repo, ['rev-parse', '--git-common-dir'])
+  if (!r.ok) return { left: gitErrorLine(r.err) }
+  const root = join(resolve(repo, r.out.trim()), 'worktrees')
+  const names = await readdir(root).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? [] : e))
+  if (names instanceof Error) return { left: names.message }
+  const registered = async (entry: string): Promise<string | null> => {
+    const g = (await readFile(join(entry, 'gitdir'), 'utf8').catch(() => '')).trim()
+    return g ? dirname(resolve(entry, g)) : null
+  }
+  const mine: string[] = []
+  for (const n of names) {
+    const entry = join(root, n)
+    const at = await registered(entry)
+    if (at && samePlace(at, folder)) mine.push(entry)
+  }
+  if (!mine.length) return 'none'
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (mine.length > 1) return { left: `${mine.length} registrations name it` } // i18n-ignore: a log line's detail, never shown
+  const entry = mine[0]
+  const absent = async (): Promise<boolean> => (await lstat(folder).catch(() => null)) === null
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if ((await lstat(join(entry, 'locked')).catch(() => null)) !== null) return { left: 'locked' } // i18n-ignore: a log line's detail, never shown
+  const again = await registered(entry)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (!again || !samePlace(again, folder) || !(await absent())) return { left: 'changed meanwhile' } // i18n-ignore: a log line's detail, never shown
+  const e = await removeTree(entry, { recursive: true, force: true }).then(() => null, (x: Error) => x.message)
+  return e ? { left: e } : 'dropped'
 }
 
 /** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */
@@ -84,6 +122,7 @@ export const gitWorkspacePort: WorkspacePort = {
   copyIgnored: (repo, folder, patterns) => copyIgnored(repo, folder, patterns),
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
+  dropRegistration,
   prepare: async (folder, line, base, o) => {
     const cleared = await clearSlotSubmodules(folder, base ?? `refs/heads/${line}`)
     if (cleared) return { ok: false, err: cleared }

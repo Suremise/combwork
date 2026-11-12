@@ -3336,8 +3336,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   That Remove… forgets only Combwork's record (`recordOnly`): the fence asked to admit the project's platform now, no
   journal resumed, nothing asked of the slot's own platform's port, the session and in-flight guards, and the folder's
   absence checked again right before the record goes, so a folder restored meanwhile is `changed`, nothing removed;
-  then Git's registration of that absent folder (a colocated jj workspace's) is pruned by the project's port only when
-  it is all `git worktree prune` would drop (another worktree's link kept for Repair).
+  then Git's one registration of that absent folder (a colocated jj workspace's, `<common>/worktrees/<id>` whose
+  gitdir names it, a relative one read from the entry) is dropped by the project's port (`dropRegistration`), never by
+  a repository-wide prune, which would also drop another worktree gone meanwhile (HR1's round 1); left, logged, when
+  several name the folder, it is locked, or its gitdir or the folder's absence changed when read again just before.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that

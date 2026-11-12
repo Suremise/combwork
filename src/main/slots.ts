@@ -3183,11 +3183,12 @@ export class SlotPool {
           for (const card of this.store.cardsOf(slot.name)) if (await this.deps.inFlight?.(card)) return await keep({ why: 'inFlight', card })
           if (!(await o.recordOnly(slot, token))) return await keep({ why: 'busy', state: from })
           await this.store.fenced(name, token, (db) => this.forgetIn(db, slot, this.hasPort(slot) ? this.portOf(slot) : null))
-          // A colocated jj workspace is registered with Git too: that registration of its absent folder dropped by the
-          // project's own platform now, only when it is all a prune would drop (another worktree's link kept for Repair),
-          // so a slot made under its name later isn't refused as "missing but already registered".
-          const others = (await this.port.prunable(this.deps.project).catch(() => null))?.filter((p) => !samePlace(p, slot.folder))
-          if (others && !others.length && !(await folderThere(slot.folder))) await this.port.prune(this.deps.project).catch(() => undefined)
+          // A colocated jj workspace is registered with Git too: that one registration of its absent folder dropped by the
+          // project's platform now (HR1's round 1: never a repository-wide prune, which would drop another worktree gone
+          // meanwhile), so a slot made under its name later isn't refused as "missing but already registered". Left as it
+          // is when it can't be proved this folder's alone (logged): the slot's record goes all the same.
+          const dropped = await this.port.dropRegistration?.(this.deps.project, slot.folder).catch((e: Error) => ({ left: e.message }))
+          if (dropped && typeof dropped === 'object') log.info(`Slot ${userText(name)}'s registration left: ${userText(dropped.left)}`)
           log.info(`Forgot slot ${userText(name)} (${userText(slot.folder)}), its folder gone and its platform switched from`)
           return null
         }
