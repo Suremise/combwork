@@ -400,8 +400,10 @@ export class GitPlatform implements PlatformAdapter {
       const line = s.started!.line
       // Its branch unreadable while its head was read (HR2's round 2: G.heads reads each on its own when its single read
       // fails): not known to be on its line, so refused as unknown rather than let through.
-      if (line && isUnknown(on)) return { ok: false, refusal: unknownRefusal(card, on, 'submit') }
-      if (line && on !== line) return { ok: false, refusal: { rule: 'platform.offLine', values: { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7) } } } // i18n-ignore: codes
+      if (line) {
+        if (isUnknown(on)) return { ok: false, refusal: unknownRefusal(card, on, 'submit') }
+        if (on !== line) return { ok: false, refusal: { rule: 'platform.offLine', values: { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7) } } } // i18n-ignore: codes
+      }
       const mismatch = args.revision ? await notTheHead(folder, args.revision, h) : null
       if (mismatch) return { ok: false, refusal: mismatch }
       revision = h
