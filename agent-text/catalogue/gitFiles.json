@@ -3,6 +3,10 @@
     "text": "submodule {name}'s path {path} isn't a folder inside this one",
     "note": "A slot's or copy's setup error (HI-1182): .gitmodules gives a submodule a path that is empty, absolute or goes outside the folder. {name} is its name, {path} the path."
   },
+  "gitFiles.error.clearStray": {
+    "text": "submodule {name}: the files left in {path} couldn't be removed: {error}",
+    "note": "A copy's setup error (HI-3080): a submodule's folder held only files an earlier run left (ignored build output, say), and Combwork couldn't remove them before setting the submodule up. {name} is the submodule's name, {path} its folder, {error} the system's words."
+  },
   "gitFiles.error.doubtfulLeft": {
     "text": "the folder of removed submodule {path} isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away",
     "note": "A copy's setup error (HI-1182): a submodule its revision no longer has left a folder that Combwork can't be sure it cloned itself, so it removes nothing and the copy isn't handed over. {path} is the folder."

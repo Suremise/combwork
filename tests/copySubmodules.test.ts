@@ -4,7 +4,7 @@
 // Git port's reset now removes the copy's own submodule checkouts the revision doesn't keep first; their clones stay,
 // and a later lease back at the submodule's revision sets it up again.
 import { execFileSync, spawn } from 'child_process'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -100,5 +100,44 @@ describe("HI-3028: a copy reset from a submodule to ordinary files at its path",
     expect(readFileSync(join(f, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
     expect(existsSync(join(f, 'libs', 's', '.git'))).toBe(true)
     expect(g(f, 'status', '--porcelain')).toBe('')
+  })
+})
+
+describe('HI-3080: a copy reset from ordinary files to a submodule at their path, an earlier run having left ignored files there', { timeout: 120_000 }, () => {
+  /** A copy leased at the vendored revision, a run's ignored output left in libs/s (and `more` there too), returned. */
+  async function leftOver(more?: (dir: string) => void): Promise<{ pool: CopyPool; at1: string; f: string }> {
+    const { pool, at1, at2 } = project()
+    const r = await pool.leaseCopy({ kind: 'check', card: 1, revision: at2, agent: 'a1', ref: null })
+    if (!r.ok) throw new Error(JSON.stringify(r.refusal))
+    const f = r.copy.folder
+    // Ignored by the repository's own exclude file, as a project's .gitignore would: a reset's `clean -fd` keeps them.
+    const common = g(f, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+    mkdirSync(join(common, 'info'), { recursive: true })
+    writeFileSync(join(common, 'info', 'exclude'), 'out/\n*.log\n')
+    mkdirSync(join(f, 'libs', 's', 'out'), { recursive: true })
+    writeFileSync(join(f, 'libs', 's', 'out', 'built.js'), 'x\n')
+    writeFileSync(join(f, 'libs', 's', 'test.log'), 'log\n')
+    more?.(join(f, 'libs', 's'))
+    await pool.returnCopy(r.lease.id, 'runEnded')
+    return { pool, at1, f }
+  }
+
+  it('leased at the submodule revision: the leftovers cleared and the submodule set up, again on the next lease', async () => {
+    const { pool, at1, f } = await leftOver()
+    expect(await leased(pool, 2, at1)).toBe(f)
+    expect(readFileSync(join(f, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
+    expect(existsSync(join(f, 'libs', 's', 'out'))).toBe(false)
+    expect(existsSync(join(f, 'libs', 's', 'test.log'))).toBe(false)
+    expect(g(f, 'status', '--porcelain')).toBe('')
+    expect(await leased(pool, 3, at1, true)).toBe(f)
+    expect(readFileSync(join(f, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
+  })
+
+  it("a repository among the leftovers: nothing removed, the folder named as one Combwork didn't set up", async () => {
+    const { pool, at1, f } = await leftOver((dir) => g(dir, 'init', '-q', 'nested'))
+    const r = await pool.leaseCopy({ kind: 'check', card: 2, revision: at1, agent: 'a1', ref: null })
+    expect(JSON.stringify(r)).toContain("libs/s holds files or a repository Combwork didn't set up")
+    expect(existsSync(join(f, 'libs', 's', 'out', 'built.js'))).toBe(true)
+    expect(existsSync(join(f, 'libs', 's', 'nested', '.git'))).toBe(true)
   })
 })

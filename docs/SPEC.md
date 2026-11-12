@@ -8140,7 +8140,11 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   be missing, empty or this worktree's own clone (its `.git` file naming `<worktree git dir>/modules/<name>`, whose
   `core.worktree` is that folder, by real paths, no link on the way, and that clone itself strictly inside the
   worktree's `modules` folder with no link from there down to it); anything else stops the step, naming it, and
-  nothing is touched. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
+  nothing is touched. Except in a copy or the queue's folder (HI-3080): a folder holding only what an earlier run left
+  there (a revision had ordinary files at that path; their ignored build output outlives the reset's `clean -fd`, and
+  git's clean skips a path the index holds as a gitlink) is removed first, but only when, within bounds (depth 64,
+  200,000 entries), nothing in it is named `.git` and nothing is a link, the path's way down included; a failed
+  removal stops the step, saying so, and anything else is named as above. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
   work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
   resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the
   environment, before whatever the run's environment carries, so the user's still win; a URL override, `active = false`
