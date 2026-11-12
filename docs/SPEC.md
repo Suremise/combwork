@@ -6102,7 +6102,8 @@ touched:
   `COMBWORK_RUN=<marker>` in its environment, which what it starts inherits; at its end, that Git's own `sh.exe` is
   asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly
   that entry, and each is ended with the tree, only while it is provably the process MSYS named (the same winpid
-  before and after the read, a start no later than the second read, the usual start-time check when ended). A search
+  before and after the read, listed afterwards with a start no later than the time taken before the search's first
+  read, the usual start-time check when ended). A search
   that fails ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
   and (as for native programs) one whose parent had exited and that carries no marker. **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
   `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it

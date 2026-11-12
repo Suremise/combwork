@@ -43,31 +43,42 @@ const p = (pid: number, started: number, parent = 0): ListedProcess => ({ pid, p
  * forked sh.exe, another Windows process), then the shell exits, leaving the sleep's Windows parent gone.
  */
 const SLEEPER = 'sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" > "$1"; exit 0'
-/** A `b` line's time for `ms` (Unix ms), as $EPOCHREALTIME prints it. */
-const at = (ms: number): string => `${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}000`
+/** The `t` line for `ms` (Unix ms), as $EPOCHREALTIME prints it. */
+const at = (ms: number): string => `t ${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}000`
+/** A search's output: its time taken before any read (`t`), its lines, `end`. */
+const said = (t: number, ...lines: string[]): string => [at(t), ...lines, 'end'].join('\n')
 
 describe('msysMatches: which marked MSYS programs are ended (HI-3047)', () => {
   const list = [p(100, 1000), p(200, 1000), p(300, 5000), p(400, 1000), p(500, 2000, 100), p(600, 500, 100)]
-  it('a match with the same winpid around the read, in the listing, started no later than the second read: taken', () => {
-    expect(msysMatches(['a 7 100', 'm 7 100', `b 7 100 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([p(100, 1000)])
+  it('a match with the same winpid around the read, in the listing, started before the search: taken', () => {
+    expect(msysMatches(said(3000, 'a 7 100', 'm 7 100', 'b 7 100'), list)).toEqual([p(100, 1000)])
   })
   it('an MSYS program without the marker: nothing', () => {
-    expect(msysMatches(['a 7 100', 'a 8 200', `b 7 100 ${at(3000)}`, `b 8 200 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'a 7 100', 'a 8 200', 'b 7 100', 'b 8 200'), list)).toEqual([])
   })
   it('its pid named another winpid before or after the read (exec, or the pid given out again): nothing', () => {
-    expect(msysMatches(['a 7 400', 'm 7 100', `b 7 100 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
-    expect(msysMatches(['a 7 100', 'm 7 100', `b 7 400 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
-    expect(msysMatches(['m 7 100', `b 7 100 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
-    expect(msysMatches(['a 7 100', 'm 7 100', 'end'].join('\n'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'a 7 400', 'm 7 100', 'b 7 100'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'a 7 100', 'm 7 100', 'b 7 400'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'm 7 100', 'b 7 100'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'a 7 100', 'm 7 100'), list)).toEqual([])
   })
-  it('its winpid not listed, or listed with a later start (another process with that pid by then): nothing', () => {
-    expect(msysMatches(['a 7 900', 'm 7 900', `b 7 900 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
-    expect(msysMatches(['a 7 300', 'm 7 300', `b 7 300 ${at(3000)}`, 'end'].join('\n'), list)).toEqual([])
+  it('its winpid not listed, or listed with a start after the search began: nothing', () => {
+    expect(msysMatches(said(3000, 'a 7 900', 'm 7 900', 'b 7 900'), list)).toEqual([])
+    expect(msysMatches(said(3000, 'a 7 300', 'm 7 300', 'b 7 300'), list)).toEqual([])
+  })
+  it("HR2's round 1: the marked process exits after its environment's read and both its ids go to a new process before the last read: the new one, started during the search, is never taken", () => {
+    // The search began at 2000; every id agrees in all three reads, but the process listed with them started at 2500.
+    const replaced = [p(100, 2500)]
+    expect(msysMatches(said(2000, 'a 7 100', 'm 7 100', 'b 7 100'), replaced)).toEqual([])
+    // The original, started before the search, still listed: taken.
+    expect(msysMatches(said(2000, 'a 7 100', 'm 7 100', 'b 7 100'), [p(100, 500)])).toEqual([p(100, 500)])
   })
   it('malformed or cut short: null (the search incomplete), never a guess', () => {
-    expect(msysMatches(['a 7 100', 'm 7 100'].join('\n'), list)).toBeNull()
-    expect(msysMatches(['a 7 100', 'm 7 x', `b 7 100 ${at(3000)}`, 'end'].join('\n'), list)).toBeNull()
-    expect(msysMatches(['a 7 100', 'COMBWORK_RUN=abc', 'end'].join('\n'), list)).toBeNull()
+    expect(msysMatches([at(3000), 'a 7 100', 'm 7 100'].join('\n'), list)).toBeNull()
+    expect(msysMatches(['a 7 100', 'm 7 100', 'b 7 100', 'end'].join('\n'), list)).toBeNull()
+    expect(msysMatches(said(3000, 'a 7 100', 'm 7 x', 'b 7 100'), list)).toBeNull()
+    expect(msysMatches(said(3000, 'a 7 100', 'COMBWORK_RUN=abc'), list)).toBeNull()
+    expect(msysMatches(said(3000, 'a 7 100', at(3000)), list)).toBeNull()
     expect(msysMatches('', list)).toBeNull()
   })
   it("each match's own tree is ended too, children first, each once; an older orphan with its pid as parent left alone", () => {
@@ -141,14 +152,15 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     }
   }, 60_000)
 
-  it('a match outside the tree is ended with it; an unrelated process, and one the answer names but started after its read, are not', async () => {
+  it('a match outside the tree is ended with it; an unrelated process, and one the answer names but started after the search began, are not', async () => {
     const { top, child } = await tree()
     const marked = lone()
     const unrelated = lone()
+    // The search "began" as `marked` started (its listed start, from identify); `late` starts after that listing.
+    const began = spawned.find((s) => s.pid === marked)!.started
     const late = lone()
-    // `late`'s second read "began" a minute before it started: it can't be the process that MSYS pid named then.
-    // `marked`'s began after everything here started.
-    const out = ['a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, `b 5 ${marked} ${at(Date.now() + 1000)}`, `b 6 ${late} ${at(Date.now() - 60_000)}`, 'end'].join('\n')
+    expect(spawned.find((s) => s.pid === late)!.started).toBeGreaterThan(began)
+    const out = said(began, 'a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, 'b 5 ' + marked, 'b 6 ' + late)
     const why: string[] = []
     await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => ({ out }) })
     await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: 10_000 })

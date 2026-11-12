@@ -119,44 +119,48 @@ export const MSYS_FIND_BOUNDS = { timeoutMs: 3000, maxBuffer: 1024 * 1024 }
 /**
  * The script findMsysMarked runs in that Git's sh.exe, the marker as `$1` (argv, never put into the script). Builtins
  * only (for, read, [, echo, cd), no command substitution, pipe, subshell or background job: it starts no process, so
- * ending the shell at its bound leaves nothing behind. Three passes over `/proc`: each MSYS pid's winpid (`a`); the pids
- * with an environment entry exactly `COMBWORK_RUN=$1`, compared whole, NUL-separated (`m`); each pid's winpid again, with
- * the time just before it was read (`b`, `$EPOCHREALTIME`); then `end`. It prints ids and times only.
+ * ending the shell at its bound leaves nothing behind. First the time, before any read (`t`, `$EPOCHREALTIME`); then three
+ * passes over `/proc`: each MSYS pid's winpid (`a`); the pids with an environment entry exactly `COMBWORK_RUN=$1`,
+ * compared whole, NUL-separated (`m`); each pid's winpid again (`b`); then `end`. It prints ids and the time only.
  */
 export const MSYS_FIND_SCRIPT = [
   'cd /proc || exit 3',
+  'echo "t $EPOCHREALTIME"',
   'for d in [0-9]*; do read -r w < "$d/winpid" && echo "a $d $w"; done 2>/dev/null',
   `for d in [0-9]*; do while IFS= read -r -d '' e; do if [ "$e" = "${RUN_MARK_VAR}=$1" ]; then read -r w < "$d/winpid" && echo "m $d $w"; break; fi; done < "$d/environ"; done 2>/dev/null`,
-  'for d in [0-9]*; do t=$EPOCHREALTIME; read -r w < "$d/winpid" && echo "b $d $w $t"; done 2>/dev/null',
+  'for d in [0-9]*; do read -r w < "$d/winpid" && echo "b $d $w"; done 2>/dev/null',
   'echo end'
 ].join('\n')
 
 /**
  * The processes of `list` that MSYS_FIND_SCRIPT's output says carry the marker, or null when the output is malformed or
  * cut short (the search incomplete). A match counts only when its MSYS pid named the same winpid in the reads before and
- * after the environment's (the program that carried the marker is the one with that winpid), and that winpid is in
- * `list` with a start no later than the time its second read began (so it was that process then, and the same one,
- * alive, when `list` was read after). Anything else adds nothing.
+ * after the environment's, and that winpid is in `list` (read after the search) with a start no later than the time
+ * taken before any read (HR2's round 1): that process then ran, with that pid, from before the first read until the
+ * listing, so it is the one each read named, the one whose environment carried the marker. A program that started during
+ * the search, or a pid given to another process since, adds nothing; so does anything else.
  */
 export function msysMatches(out: string, list: ListedProcess[]): ListedProcess[] | null {
   const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  if (lines.at(-1) !== 'end') return null
+  const t = /^t (\d+)(?:\.(\d{1,6}))?$/.exec(lines[0] ?? '')
+  if (!t || lines.at(-1) !== 'end') return null
+  const bound = Number(t[1]) * 1000 + Math.floor(Number((t[2] ?? '0').padEnd(6, '0')) / 1000)
   const before = new Map<number, number>()
-  const after = new Map<number, { win: number; at: number }>()
+  const after = new Map<number, number>()
   const matched: [number, number][] = []
-  for (const l of lines.slice(0, -1)) {
-    const m = /^(?:([am]) (\d+) (\d+)|b (\d+) (\d+) (\d+)(?:\.(\d{1,6}))?)$/.exec(l)
+  for (const l of lines.slice(1, -1)) {
+    const m = /^([amb]) (\d+) (\d+)$/.exec(l)
     if (!m) return null
-    if (m[1] === 'a') before.set(Number(m[2]), Number(m[3]))
-    else if (m[1] === 'm') matched.push([Number(m[2]), Number(m[3])])
-    else after.set(Number(m[4]), { win: Number(m[5]), at: Number(m[6]) * 1000 + Math.floor(Number((m[7] ?? '0').padEnd(6, '0')) / 1000) })
+    const [pid, win] = [Number(m[2]), Number(m[3])]
+    if (m[1] === 'a') before.set(pid, win)
+    else if (m[1] === 'm') matched.push([pid, win])
+    else after.set(pid, win)
   }
   const found: ListedProcess[] = []
   for (const [pid, win] of matched) {
-    const b = after.get(pid)
-    if (before.get(pid) !== win || b?.win !== win) continue
+    if (before.get(pid) !== win || after.get(pid) !== win) continue
     const p = list.find((x) => x.pid === win)
-    if (p && p.started <= b.at && !found.includes(p)) found.push(p)
+    if (p && p.started <= bound && !found.includes(p)) found.push(p)
   }
   return found
 }
