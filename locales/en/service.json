@@ -435,6 +435,10 @@
     "defaultMessage": "you",
     "description": "HI-2679: who asked for a forward merge, in its card’s description: the user."
   },
+  "service.forward.defaultUnread": {
+    "defaultMessage": "{card} waits: Combwork can’t read which branch is this repository’s default now (with no main or master, it is the branch the project folder has checked out), so it can’t tell whether {from} into {to} goes the release path’s way. Put the project folder on its branch, then try again.",
+    "description": "HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key) bringing branch {to} up to date with {from}: git couldn’t name the default branch (the project folder on no branch, say). Nothing changed. Branch names stay as they are."
+  },
   "service.forward.description": {
     "defaultMessage": "Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.",
     "description": "HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there."
@@ -446,6 +450,10 @@
   "service.forward.directionRetry": {
     "defaultMessage": "{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.",
     "description": "HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there."
+  },
+  "service.forward.folderSwitched": {
+    "defaultMessage": "{card} waits: the project folder has {now} checked out, so git names {now} the default branch (this repository has no main or master), and it was {was} when {card}’s direction was checked. Check out {was} in the project folder, then try again.",
+    "description": "HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key, such as HI-12): in a repository with no main or master, git names the project folder’s checked-out branch as the default, and the folder was switched from {was} to {now} since the card’s direction was checked. Nothing changed. Branch names stay as they are."
   },
   "service.forward.missing": {
     "defaultMessage": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
