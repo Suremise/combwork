@@ -17,6 +17,14 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Maybe } from './types'
 import type { ChildProcess, SpawnOptions } from 'child_process'
 import type { GitFilesStatus } from '../../shared/types'
+import type { AgentMsg } from '../../shared/agentText'
+
+/**
+ * HI-3003: the slot pool's words for a workspace's failures that name the platform's tool or terms (Git's worktree,
+ * branch, switch): a platform that words them its own way gives its messages in `says`, with the same values (`slot`,
+ * `what`, `error`); the pool's own (Git's) are said otherwise.
+ */
+export type SlotWord = 'branchUnread' | 'filesUnread' | 'lineUnread' | 'switchFailed' | 'createFailed' | 'notListed' | 'removeFailed' | 'noTarget'
 
 /**
  * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
@@ -189,6 +197,8 @@ export interface WorkspaceFiles {
  */
 export interface WorkspacePort {
   platform: WorkspacePlatform
+  /** HI-3003: the pool's failures in this platform's words (SlotWord); absent, or a word left out: the pool's own. */
+  says?: Partial<Record<SlotWord, AgentMsg>>
 
   // Inspection: no side effects on the repository.
   /** The store's workspaces, the project's own folder included; null when they can't be listed (never an empty list). */
@@ -250,6 +260,13 @@ export interface WorkspacePort {
    * False whenever it can't tell. Git has none.
    */
   heldFor?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<boolean>
+  /**
+   * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
+   * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
+   * Refused by the tool otherwise (the head not past `base`, the line there already). Git's only: absent, the pool waits
+   * for the slot's builder and prepares it as before.
+   */
+  branchHere?(folder: string, line: string, base: string): Promise<WorkspaceStep>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

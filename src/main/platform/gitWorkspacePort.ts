@@ -3,6 +3,7 @@
 // recreation ran themselves before (or delegates to the module that did: worktrees.ts, platform/git.ts), with the same
 // argv, folder, bounds and parsing, so no git command is added, dropped or reordered (tests/slotTraces.test.ts).
 
+import { randomBytes } from 'crypto'
 import { dirname, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import { git, gitErrorLine } from '../git'
@@ -39,6 +40,12 @@ async function prunable(repo: string): Promise<string[]> {
 /** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */
 const smudge = (o?: CheckoutOptions): { env?: NodeJS.ProcessEnv } => (o?.skipSmudge ? { env: { ...process.env, ...SKIP_SMUDGE } } : {})
 
+/**
+ * HI-3010: a hooks folder no hook can be in, for one command: a new name under the folder's `.git` (a worktree's `.git`
+ * is a file, so nothing can be under it; a repository's own `.git` has no such random name). Never made.
+ */
+export const noHooks = (folder: string): string => join(folder, '.git', `combwork-no-hooks-${randomBytes(8).toString('hex')}`)
+
 export const gitWorkspacePort: WorkspacePort = {
   platform: 'git',
   list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch })) ?? null,
@@ -63,6 +70,16 @@ export const gitWorkspacePort: WorkspacePort = {
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
   prepare: (folder, line, base, o) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o))),
+  // HI-3010: the head past `base` first (git's own exit, no words, when it isn't), then the line made where HEAD is now
+  // (no start point: a commit meanwhile is on it, and no file changes). Its builder may be at work, so no hook runs
+  // (HR1's round 1: a post-checkout or reference-transaction hook can change files): for this command only, hooks are
+  // looked for where none can be and fsmonitor is off; the repository's settings are never written.
+  branchHere: async (folder, line, base) => {
+    const past = await git(folder, ['merge-base', '--is-ancestor', base, 'HEAD'])
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // i18n-ignore: a log line's detail, never shown
+    return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
+  },
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
   resetTo: async (folder, revision, o) => {
     const co = await git(folder, ['checkout', '--detach', '--force', revision], undefined, undefined, smudge(o))

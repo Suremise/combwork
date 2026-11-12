@@ -253,9 +253,10 @@ export const DECISION_ANSWERS_MAX = 20
  * `pushRefused` and `notPublished` (HI-1183, follow mode): the publication was refused (the project's pre-push hook, or the
  * remote: a hook, a protected branch) before anything was written, or the user said an unknown one wasn't published;
  * both transient, the card queued again. `direction` (HI-2892): a forward merge against the release path's direction with no
- * override recorded for its pair, never merged (forwardOrder.ts).
+ * override recorded for its pair, never merged (forwardOrder.ts). `resolution` (HI-2999): a forward's resolution whose
+ * revision lacks the commit it resolves (cherry-picked or copied, not merged), never merged.
  */
-export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished' | 'direction'
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished' | 'direction' | 'resolution'
 
 /**
  * Why the queue returned a card for its focused tests (G20, HI-1367), with `IntegrationFailed.focused`: none chosen for

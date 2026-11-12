@@ -1361,8 +1361,16 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
   const st = cycle.started
   const builder = l.agent
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id) || !!pool.lease(l.id)?.to
+  // HI-3010: the card's line first made in place, whatever its builder is doing, where that changes no file (a Git slot
+  // detached at the card's base, as a lane's slot waits between cards): a builder told of the card another way (a wake,
+  // a message) and already at work commits on its line, never on a detached head this preparation would leave behind
+  // once the card moved on. Its answer is taken as any other's; a retry (what is left: files, install, a switch) waits
+  // for its builder below, as before.
+  let inPlace = !isJjLineKey(st.line)
   for (;;) {
-    if (!(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
+    if (!inPlace && !(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
+    const tried = inPlace
+    inPlace = false
     wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
     const card = current(wf, n, cycle.seq, l.id)
     if (!card) return null
@@ -1379,8 +1387,9 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         base: st.base!,
         install,
         ...(st.target ? { target: st.target } : {}),
-        // At the boundary: the card still this cycle's, the rules on, its builder quiet.
+        // At the boundary: the card still this cycle's, the rules on, its builder quiet (in place: the first two only).
         ready: async () => (gone() ? 'the card moved on, or the rules are off' : quiet(projectPath, builder) ? null : 'its builder is busy'), // i18n-ignore: why a preparation waits, for the log
+        ...(tried ? { inPlace: async () => (gone() ? 'the card moved on, or the rules are off' : null) } : {}), // i18n-ignore: why a preparation waits, for the log
         // A jj card's preparation takes its store's lock itself, rechecking its fence and the folder's quiet inside it
         // (HI-2866: the lock isn't re-entrant, and a non-colocated project folder has no Git of its own to lock).
         around: isJjLineKey(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
@@ -1415,6 +1424,8 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       void import('./laneStart').then((m) => m.briefAfterFailedPrepare(ws, projectPath, n, builder)).catch((e) => log.warn(`#${n}'s lane brief after its slot failed`, e))
       return null
     }
+    // Not in place: on at once to the wait for its builder.
+    if (tried) continue
     // Not now (busy, not quiet at the boundary): looked at again at the next change.
     log.info(`Slot ${userText(st.slot)} for #${n}: not yet (${userText(r.retry)})`)
     await new Promise((res) => setTimeout(res, 2000))

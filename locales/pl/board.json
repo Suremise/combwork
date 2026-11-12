@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, one {# inny} few {# inne} many {# innych} other {# innego}}",
   "board.queue.forward": "Zaktualizuj…",
   "board.queue.forwardAlready": "{to} jest już aktualizowana względem {from}",
+  "board.queue.forwardResolving": "Karta {card} to rozwiązuje: „Zaktualizuj” czeka na nią",
   "board.queue.forwardAskConfirm": "Dodaj do kolejki",
   "board.queue.forwardAskMessage": "{from} w obecnym stanie zostanie scalona z {to} przez kolejkę scalania {to}, ze sprawdzeniami przed scaleniem, jako commit scalający. Sama {from} się nie zmienia. Jeśli wystąpi konflikt lub sprawdzenie się nie powiedzie, jej karta wróci, a Ty wybierzesz Ponów scalanie albo Usuń.",
   "board.queue.forwardAskTitle": "Zaktualizować {to} względem {from}?",

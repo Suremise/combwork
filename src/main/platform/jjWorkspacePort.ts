@@ -30,7 +30,8 @@ import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey } from './jjFileGate'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
-import type { OwnedWrite, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import type { OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import { agentMsg, type AgentMsg } from '../../shared/agentText'
 import { carriesBinding, chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
 /** Why a jj workspace step was refused (a protocol code: the pool words what it shows). */
@@ -56,6 +57,21 @@ export const JJ_REFUSED = {
   notBound: "the slot isn't bound to that card's preparation", // i18n-ignore: as above
   journal: "the preparation's record can't be read" // i18n-ignore: as above
 } as const
+
+/**
+ * HI-3003: the slot pool's failures in jj's words (WorkspacePort.says): a jj slot's agent was told of git, branches and
+ * `git switch`, none of which apply in a jj workspace, and may then have run git there.
+ */
+export const JJ_SAYS: Partial<Record<SlotWord, AgentMsg>> = {
+  branchUnread: agentMsg({ id: 'slot.jj.workspaceUnread', text: "jj couldn't read {slot}'s workspace", note: "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't read the slot's workspace (what it is bound to). The jj counterpart of slot.prepare.branchUnread: names no git or branch." }),
+  filesUnread: agentMsg({ id: 'slot.jj.filesUnread', text: "jj couldn't read {slot}'s files", note: "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't say whether its working copy has changes. The jj counterpart of slot.prepare.filesUnread." }),
+  lineUnread: agentMsg({ id: 'slot.jj.lineUnread', text: "jj couldn't read {what}", note: "HI-3003: a jj slot's setup or preparation error: jj couldn't read the card's line or the target bookmark. {what} is its name. The jj counterpart of slot.error.gitRead." }),
+  switchFailed: agentMsg({ id: 'slot.jj.prepareFailed', text: "jj couldn't prepare {slot} for the card: {error}", note: "HI-3003: why a jj slot couldn't be prepared for its card: jj refused or failed the step that puts its workspace on the card's base. {error} is jj's first line, else failed. The jj counterpart of slot.prepare.switchFailed: names no git or switch." }),
+  createFailed: agentMsg({ id: 'slot.jj.workspaceAdd', text: 'jj workspace add: {error}', note: "HI-3003: a jj slot's setup error: `jj workspace add` failed. {error} is jj's first line, else failed. The jj counterpart of slot.error.worktreeAdd." }),
+  notListed: agentMsg({ id: 'slot.jj.notListed', text: 'its folder is there but jj does not list it as a workspace', note: "HI-3003: a jj slot's setup error: its folder exists but isn't a workspace jj knows, so Combwork leaves it alone. The jj counterpart of slot.error.notListed." }),
+  removeFailed: agentMsg({ id: 'slot.jj.forgetFailed', text: 'jj workspace forget failed', note: "HI-3003: why a jj slot is kept, not removed: jj's removal of its workspace refused and said nothing. The jj counterpart of slot.remove.failed." }),
+  noTarget: agentMsg({ id: 'slot.jj.noTarget', text: 'no target bookmark', note: "HI-3003: why Combwork can't tell whether a jj slot's work is in its target: the project has no target bookmark (Version Control → Workflow's Work merges into). The jj counterpart of slot.check.noTarget." })
+}
 
 /** A colocation change under a jj workspace since its context was read (HI-2896): refused inside the store's lock, nothing written. */
 export class JjStoreChanged extends Error {
@@ -820,6 +836,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
 
   const port: JjWorkspacePort = {
     platform: 'jj',
+    says: JJ_SAYS,
     nameFor: (repo, folder) => nameFor(createHash('sha256').update(resolve(repo).toLowerCase()).digest('hex').slice(0, 8), folder),
     pinned,
     jj,

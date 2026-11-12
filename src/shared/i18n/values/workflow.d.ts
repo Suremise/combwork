@@ -291,6 +291,8 @@ interface CombworkMessageValues {
   'workflow.refused.evidence.changed.next': undefined
   'workflow.refused.forward.notAgents.message': { card: string | number }
   'workflow.refused.forward.notAgents.next': undefined
+  'workflow.refused.forward.resolutionSource.message': { card: string | number; from: string | number; to: string | number; revision: string | number; source: string | number }
+  'workflow.refused.forward.resolutionSource.next': { source: string | number }
   'workflow.refused.forward.resolutionTarget.message': { card: string | number; from: string | number; to: string | number; target: string | number }
   'workflow.refused.forward.resolutionTarget.next': { to: string | number }
   'workflow.refused.integrate.approved.message': { card: string | number; revision: string | number; why: string | number }
@@ -364,6 +366,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.changed.next': { platform: string | number }
   'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; base: string | number; commit: string | number; other: string | number; max: number }
   'workflow.refused.platform.jjRefused.next': { why: string }
+  'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
+  'workflow.refused.platform.offLine.next': { where: string; line: string | number; on: string | number }
   'workflow.refused.platform.switching.message': { card: string | number }
   'workflow.refused.platform.switching.next': undefined
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
@@ -446,6 +450,7 @@ interface CombworkMessageValues {
   'workflow.rule.approval.given': undefined
   'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
+  'workflow.rule.forward.resolutionSource': undefined
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined
   'workflow.rule.integrate.upToDate': undefined

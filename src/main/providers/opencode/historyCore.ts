@@ -1,5 +1,5 @@
 import { spawn as spawnChild, type ChildProcess } from 'child_process'
-import { endTree } from '../../progressReporters/wrapper'
+import { endTreeAsync } from '../../processTree'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
@@ -221,8 +221,12 @@ export interface CoreDeps {
   /** A GET to the run's own server: plainLocalGet's answer (tests: a fake server). */
   get: (url: string, headers: Record<string, string>, signal: AbortSignal, maxBytes: number) => Promise<{ status: number; body: string }>
   spawn: (file: string, args: string[], opts: { env: Record<string, string>; cwd?: string; verbatim?: boolean }) => ChildProcess
-  /** Ends a process and what it started, by identity (cw-progress's endTree, #603/#655). */
-  endTree: (child: ChildProcess) => void
+  /**
+   * Begins ending a process and what it started, by identity (#603/#655), without blocking: off the thread (HI-3009), as
+   * this core runs on main's when its worker's script is missing. Its export settles on the process's close, as before;
+   * a shutdown waits for the teardown it returns (the worker is ended after it).
+   */
+  endTree: (child: ChildProcess) => unknown
   now: () => number
   /** Renames a written temp file over a mirror (tests: one that fails as Windows does while a reader holds the mirror). */
   rename?: (from: string, to: string) => void
@@ -243,7 +247,7 @@ const pauseSync = (ms: number): void => void Atomics.wait(new Int32Array(new Sha
 const defaultDeps: CoreDeps = {
   get: (url, headers, signal, maxBytes) => plainLocalGet(url, headers, signal, maxBytes),
   spawn: (file, args, o) => spawnChild(file, args, { env: o.env, cwd: o.cwd, windowsHide: true, windowsVerbatimArguments: !!o.verbatim, stdio: ['ignore', 'pipe', 'pipe'] }),
-  endTree: (child) => endTree(child),
+  endTree: (child) => endTreeAsync(child).catch(() => undefined),
   now: () => Date.now()
 }
 
@@ -263,7 +267,27 @@ export class HistoryCore {
   /** Queued jobs, oldest first: at most one per session and kind. */
   private queue: Job[] = []
   private running = { refresh: 0, export: 0, limits: 0, discover: 0 }
-  private children = new Set<ChildProcess>()
+  /**
+   * Each export's process, and its tree's teardown once one began (HI-3009: endTree doesn't block, so it is awaited): kept
+   * until that teardown is over, so a shutdown still finds, and waits for, one whose root has already closed.
+   */
+  private children = new Map<ChildProcess, Promise<void> | null>()
+
+  /** Begins ending `child`'s tree once (endTree), or the teardown already begun: settles once it is over, never rejects. */
+  private endChild(child: ChildProcess): Promise<void> {
+    let t = this.children.get(child)
+    if (!t) {
+      t = (async () => {
+        try {
+          await this.deps.endTree(child)
+        } catch {
+          // ended as far as it could be
+        }
+      })()
+      this.children.set(child, t)
+    }
+    return t
+  }
   /** Each session's export under way, by session key: removeRoot waits for its root's. */
   private exporting = new Map<string, Promise<void>>()
   private inflight = new Set<Promise<unknown>>()
@@ -416,7 +440,9 @@ export class HistoryCore {
         this.closed = true
         this.queue = []
         for (const run of [...this.runs.values()]) this.dropRun(run)
-        for (const c of this.children) this.deps.endTree(c)
+        // Their trees ended before the reply, a teardown already begun awaited too: the worker is terminated after it
+        // (history.ts, stop).
+        await Promise.all([...this.children.keys()].map((c) => this.endChild(c)))
         this.children.clear()
         return true
     }
@@ -722,14 +748,14 @@ export class HistoryCore {
         out.close()
         return reject(new Failed('exit', e instanceof Error ? e.message : String(e))) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       }
-      this.children.add(child)
+      this.children.set(child, null)
       let bytes = 0
       let stderr = ''
       let why: Failed | null = null
       const kill = (f: Failed): void => {
         if (why) return
         why = f
-        this.deps.endTree(child)
+        void this.endChild(child)
       }
       const timer = setTimeout(() => kill(new Failed('timeout', `the export took over ${Math.round(this.bounds.exportMs / 1000)} s`)), this.bounds.exportMs) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       const watch = setInterval(() => {
@@ -746,7 +772,15 @@ export class HistoryCore {
       const done = (code: number | null, err?: Error): void => {
         clearTimeout(timer)
         clearInterval(watch)
-        this.children.delete(child)
+        // Settled once its tree's teardown, if one began, is over (HI-3009): an export's end, and so a root's removal and a
+        // shutdown, still come after its processes have gone.
+        const teardown = this.children.get(child) ?? Promise.resolve()
+        void teardown.then(() => {
+          this.children.delete(child)
+          settle(code, err)
+        })
+      }
+      const settle = (code: number | null, err?: Error): void => {
         out.end(() => {
           if (why) return reject(why)
           if (err) return reject(new Failed('exit', err.message)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)

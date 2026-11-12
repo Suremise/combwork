@@ -703,6 +703,7 @@
   "board.queue.forwardChooseMessage": "The branch is merged into {to} as it is now, through {to}’s merge queue, with its merge checks. It doesn’t change itself.",
   "board.queue.forwardChooseTitle": "Bring {to} up to date with…",
   "board.queue.forwardFailed": "Couldn’t bring the branch up to date",
+  "board.queue.forwardResolving": "{card} is resolving it: Bring Up to Date waits for it",
   "board.queue.forwardUpToDate": "{to} already has everything of {from}",
   "board.queue.inVersionControl": "Queue in Version Control",
   "board.queue.merged": "{card} merged as {result}",

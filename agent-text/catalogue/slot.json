@@ -103,6 +103,38 @@
     "text": "its agent reviews now",
     "note": "As slot.hold.draining: the agent is reviewing."
   },
+  "slot.jj.filesUnread": {
+    "text": "jj couldn't read {slot}'s files",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't say whether its working copy has changes. The jj counterpart of slot.prepare.filesUnread."
+  },
+  "slot.jj.forgetFailed": {
+    "text": "jj workspace forget failed",
+    "note": "HI-3003: why a jj slot is kept, not removed: jj's removal of its workspace refused and said nothing. The jj counterpart of slot.remove.failed."
+  },
+  "slot.jj.lineUnread": {
+    "text": "jj couldn't read {what}",
+    "note": "HI-3003: a jj slot's setup or preparation error: jj couldn't read the card's line or the target bookmark. {what} is its name. The jj counterpart of slot.error.gitRead."
+  },
+  "slot.jj.noTarget": {
+    "text": "no target bookmark",
+    "note": "HI-3003: why Combwork can't tell whether a jj slot's work is in its target: the project has no target bookmark (Version Control → Workflow's Work merges into). The jj counterpart of slot.check.noTarget."
+  },
+  "slot.jj.notListed": {
+    "text": "its folder is there but jj does not list it as a workspace",
+    "note": "HI-3003: a jj slot's setup error: its folder exists but isn't a workspace jj knows, so Combwork leaves it alone. The jj counterpart of slot.error.notListed."
+  },
+  "slot.jj.prepareFailed": {
+    "text": "jj couldn't prepare {slot} for the card: {error}",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj refused or failed the step that puts its workspace on the card's base. {error} is jj's first line, else failed. The jj counterpart of slot.prepare.switchFailed: names no git or switch."
+  },
+  "slot.jj.workspaceAdd": {
+    "text": "jj workspace add: {error}",
+    "note": "HI-3003: a jj slot's setup error: `jj workspace add` failed. {error} is jj's first line, else failed. The jj counterpart of slot.error.worktreeAdd."
+  },
+  "slot.jj.workspaceUnread": {
+    "text": "jj couldn't read {slot}'s workspace",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't read the slot's workspace (what it is bound to). The jj counterpart of slot.prepare.branchUnread: names no git or branch."
+  },
   "slot.kept.busy": {
     "text": "something works in it now",
     "note": "HI-2995: why a kept slot (slot.refusal.kept) is not lent back now: an operation, a session or a process holds it."

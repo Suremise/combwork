@@ -16,7 +16,7 @@ import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { onOutputSettled, withLauncherEnv } from '../gitWorker'
 import { gitExe } from '../gitTool'
-import { endTree } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type IntegrationFailReason, type PublishFact, type QueueEntry } from '../../shared/workflow/facts'
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, readResults, reviewProved, standingFocusedRun, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
@@ -418,11 +418,13 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }
     let atTimeout: string | undefined
+    // At its bound the tree is ended off main's thread (HI-3009), and the result given once that teardown is over.
+    const ending = treeEnding()
     const timer = opts.timeoutMs
       ? setTimeout(() => {
           timedOut = true
           atTimeout = Buffer.concat(err).toString('utf8')
-          endTree(child)
+          ending.end(child)
         }, opts.timeoutMs)
       : undefined
     child.stdout?.on('data', (d: Buffer) => out.push(d))
@@ -432,7 +434,8 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
       if (settled) return
       settled = true
       clearTimeout(timer)
-      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim() || (signal ? endedBy('git', signal) : ''), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}), ...(signal ? { signal } : {}) })
+      const r: QueueGitResult = { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim() || (signal ? endedBy('git', signal) : ''), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}), ...(signal ? { signal } : {}) }
+      ending.after(() => res(r))
     }
     child.once('error', (e) => {
       err.push(Buffer.from(e.message))
@@ -1293,6 +1296,15 @@ export class MergeQueue {
       // comes back with why, whatever let it be queued (one from before, or the default branch changed since). HI-2998: and
       // so does a forward's resolution (Resolve on a builder), checked at Resolve, with its forward's override.
       if ((s.forward || s.resolves) && !(await this.forwardAllowed(card, s))) return this.returnCard(card, entry, entry.revision, target, 'direction', false)
+      // HI-2999: a resolution without the commit it resolves (cherry-picked, not merged), however it got here: back to its
+      // builder. Merged only once it reads true: unreadable, the entry goes round again, then pauses with git's text.
+      const has = s.resolves ? await this.wf.resolutionHasSource(this.wf.rulesetOf(card, s).options, s, s.approved?.revision ?? entry.revision) : true
+      if (has === false) return this.returnCard(card, entry, entry.revision, target, 'resolution', false)
+      if (has !== true) {
+        const o = await readFailed(again(has?.detail ?? has?.what))
+        if (o) return o
+        continue
+      }
       // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
       const blockers = this.wf.queueWaitingOn(card.id)
       if (blockers.length) return this.waiting(card, entry, blockers)

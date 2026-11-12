@@ -709,6 +709,16 @@
     "note": "HI-2679: the next step after an agent was refused acting on a forward-merge card.",
     "audience": "both"
   },
+  "workflow.refused.forward.resolutionSource.message": {
+    "text": "{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.",
+    "note": "HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "text": "In its branch, run git merge {source}, resolve the conflict, commit, and submit again.",
+    "note": "HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; \"git merge\" is a command, never translated) into the card’s branch.",
+    "audience": "both"
+  },
   "workflow.refused.forward.resolutionTarget.message": {
     "text": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
     "note": "HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12.",
@@ -825,8 +835,8 @@
     "audience": "both"
   },
   "workflow.refused.loop.noStep.next": {
-    "text": "Read the card: it may have been answered, or the card moved on.",
-    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.",
+    "text": "Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.",
+    "note": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.",
     "audience": "both"
   },
   "workflow.refused.loop.roundLimit.message": {
@@ -997,6 +1007,16 @@
   "workflow.refused.platform.jjRefused.next": {
     "text": "{why, select, tooLarge {Leave a file out deliberately with .gitignore, or raise jj's limit (jj config set --repo snapshot.max-new-file-size and a size in bytes) and commit it with jj commit, then submit again.} mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {Put the card back and start it again.} isolated {Run the check again without --isolated, in the card's slot.} recovered {Compare each copy with its original and keep what you want under the original name, then take the copies out of every commit of the work (jj squash or jj diffedit: deleting them in a later commit leaves them in its history) and submit again.} other {Look at the slot with jj, then try again.}}",
     "note": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore and jj config set --repo snapshot.max-new-file-size are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them).",
+    "audience": "both"
+  },
+  "workflow.refused.platform.offLine.message": {
+    "text": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",
+    "note": "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.offLine.next": {
+    "text": "{where, select, detached {Put the commits on the card's branch: git switch -c {line} if it doesn't exist yet, else git switch {line} and git cherry-pick the commits made off it. Then submit again.} other {Switch back with git switch {line}, and git cherry-pick there any commits of the card's made on {on}. Then submit again.}}",
+    "note": "HI-3010: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch). git switch -c, git switch and git cherry-pick are commands: keep them as they are. {line} and {on} are branch names.",
     "audience": "both"
   },
   "workflow.refused.platform.switching.message": {
@@ -1367,6 +1387,11 @@
   "workflow.rule.done.contained": {
     "text": "Combwork checks the merge",
     "note": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5).",
+    "audience": "both"
+  },
+  "workflow.rule.forward.resolutionSource": {
+    "text": "A resolution merges the commit it resolves",
+    "note": "A rule of the workflow, named where a move can’t check it (HI-2999): a card made by Resolve on a builder (it merges one branch into another by hand) must contain, merged, the commit that came back from the merge queue, not a copy of its changes.",
     "audience": "both"
   },
   "workflow.rule.integrate.approved": {

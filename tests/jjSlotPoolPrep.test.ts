@@ -595,6 +595,10 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
         expect(r1, JSON.stringify(r1)).toMatchObject({ error: expect.stringMatching(/isn't its last card's integrated work/) })
+        // HI-3003: in jj's words, naming no git, branch or switch (it said "git switch: …").
+        const said = (r1 as { error: string }).error
+        expect(said).toMatch(new RegExp(`^jj couldn't prepare ${row.name} for the card: `))
+        expect(said).not.toMatch(/\bgit\b|branch|switch/i)
         expect(await w.port.line(row.folder)).toBe(key1)
         expect(readFileSync(join(row.folder, 'two.txt'), 'utf8')).toBe('two\n')
         // That commit abandoned: the slot holds only card 1's commit, its copy in main, so it's prepared on main's head.

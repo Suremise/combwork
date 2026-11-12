@@ -103,6 +103,41 @@
   "slot.hold.reviews": {
     "placeholders": {}
   },
+  "slot.jj.filesUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.jj.forgetFailed": {
+    "placeholders": {}
+  },
+  "slot.jj.lineUnread": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "slot.jj.noTarget": {
+    "placeholders": {}
+  },
+  "slot.jj.notListed": {
+    "placeholders": {}
+  },
+  "slot.jj.prepareFailed": {
+    "placeholders": {
+      "slot": "plain",
+      "error": "plain"
+    }
+  },
+  "slot.jj.workspaceAdd": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "slot.jj.workspaceUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
   "slot.kept.busy": {
     "placeholders": {}
   },

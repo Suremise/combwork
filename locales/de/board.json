@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, one {# weitere} other {# weitere}}",
   "board.queue.forward": "Auf den neuesten Stand bringen…",
   "board.queue.forwardAlready": "{to} wird bereits auf den Stand von {from} gebracht",
+  "board.queue.forwardResolving": "{card} löst ihn gerade auf: „Auf den neuesten Stand bringen“ wartet darauf",
   "board.queue.forwardAskConfirm": "Einreihen",
   "board.queue.forwardAskMessage": "{from} wird im jetzigen Stand über die Merge-Warteschlange von {to} in {to} gemergt, mit ihren Merge-Checks, als Merge-Commit. {from} selbst ändert sich nicht. Gibt es einen Konflikt oder schlägt ein Check fehl, kommt die Karte zurück, damit du „Merge wiederholen“ oder „Entfernen“ wählst.",
   "board.queue.forwardAskTitle": "{to} auf den Stand von {from} bringen?",

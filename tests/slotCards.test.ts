@@ -85,7 +85,9 @@ const state = vi.hoisted(() => ({
   run: null as null | { run: string; starting: boolean },
   /** sessions.quit's stand-in (HI-2913): its answer, after asking the caller's fence. */
   quit: null as null | ((o: { fenced: () => boolean; ready?: () => string | null }) => 'sent' | 'held' | 'gone'),
-  quits: 0
+  quits: 0,
+  /** Its builder in a turn (lineUpdates.agentBusy, HI-3010): not quiet. */
+  working: false
 }))
 vi.mock('../src/main/agentFolders', async (orig) => ({
   ...(await orig<object>()),
@@ -147,7 +149,7 @@ vi.mock('../src/main/git', async (orig) => {
     }
   }
 })
-vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => false }))
+vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => state.working }))
 vi.mock('../src/main/tasks', async (orig) => ({ ...(await orig<object>()), getTask: async (n: number) => ({ number: n, key: `AM-${n}`, title: 'Placed', description: '', project: 'project', column: 'doing', labels: [], comments: [], history: [], blockedBy: [] }) }))
 vi.mock('../src/main/slotsApp', async (orig) => ({
   ...(await orig<object>()),
@@ -272,7 +274,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0 })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
 })
 
 /**
@@ -1731,6 +1733,72 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
     expect(at('await sessions.writersSettled(')).toBeLessThan(at('app.quit()'))
     const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
     expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
+  })
+})
+
+describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout: 60_000 }, () => {
+  it('the slot is on its line at once, with what its builder committed, and no hook runs; placed once its builder is free', async () => {
+    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    const { NOT_IN_PLACE } = await import('../src/main/slots')
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    // Hooks that change files, as a repository may have (HR1's round 1): neither may run beside a busy builder.
+    for (const hook of ['post-checkout', 'reference-transaction']) writeFileSync(join(e.project, '.git', 'hooks', hook), `#!/bin/sh\necho "changed by ${hook}" > builder.txt\n`)
+    const card = e.wf.createCard({ title: 'Next in the lane' })
+    // The lane's slot, detached at the target's head after its last card.
+    const slot = join(tempDir('slot-'), 'slot-a')
+    sh(e.project, 'worktree', 'add', '-q', '--detach', slot, 'main')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: false })
+    moved(await e.wf.start(card.key, B1))
+    const line = e.wf.state(card).started!.line!
+    // Its builder, told of the card another way, already at work: a commit on the detached head, an edit still open.
+    state.live = { cwd: slot, sessionId: 's1' }
+    state.working = true
+    const work = commit(slot, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', project: 'p', from: '', to: null, why: null, endRev: null }
+    state.lanes = async () => [{ id: 'lane-1', state: 'active', cards: [card.id] }]
+    // The pool as SlotPool.prepare answers (slots.test.ts proves it): in place, Git's branchHere; else its builder's quiet first.
+    const asked: string[] = []
+    state.pool = {
+      openLeases: () => [lease],
+      lease: () => lease,
+      prepare: async (_id: string, p: { line: string; base: string; ready?: () => Promise<string | null>; inPlace?: () => Promise<string | null> }) => {
+        asked.push(p.inPlace ? 'in place' : 'once quiet')
+        const notYet = await (p.inPlace ?? p.ready)?.()
+        if (notYet) return { retry: notYet }
+        if (!p.inPlace) return { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') }
+        const r = await gitWorkspacePort.branchHere!(slot, p.line, p.base)
+        return r.ok ? { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') } : { retry: NOT_IN_PLACE }
+      }
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(cycleIn(e.store.facts(card.id))?.prepared).toMatchObject({ line, revision: work }), { timeout: HUNG_MS })
+    expect(state.working).toBe(true)
+    expect(asked).toEqual(['in place'])
+    expect(sh(slot, 'branch', '--show-current')).toBe(line)
+    expect(sh(slot, 'rev-parse', 'HEAD')).toBe(work)
+    expect(readFileSync(join(slot, 'builder.txt'), 'utf8')).toBe('builder still editing\n')
+    expect(e.kinds(card.id)).not.toContain('BuilderPlaced')
+    // Its builder free: given the card there, once.
+    state.working = false
+    tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
+    await vi.waitFor(() => expect(e.kinds(card.id)).toContain('BuilderPlaced'), { timeout: HUNG_MS })
+    // Its work committed and submitted from the slot, on its line (the hooks gone first: its own commit would run them).
+    for (const hook of ['post-checkout', 'reference-transaction']) rmSync(join(e.project, '.git', 'hooks', hook))
+    commit(slot, {}, 'its edit', { trailer: card.key })
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+  })
+
+  it("the hooks are real: the same switch without Combwork's settings runs them (the test above isn't vacuous)", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    writeFileSync(join(e.project, '.git', 'hooks', 'post-checkout'), '#!/bin/sh\necho "changed by post-checkout" > builder.txt\n')
+    const slot = join(tempDir('slot-'), 'slot-a')
+    sh(e.project, 'worktree', 'add', '-q', '--detach', slot, 'main')
+    writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
+    sh(slot, 'switch', '-q', '-c', 'cw/AM/AM-9-plain')
+    expect(readFileSync(join(slot, 'builder.txt'), 'utf8')).toMatch(/changed by post-checkout/)
   })
 })
 

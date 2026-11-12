@@ -394,6 +394,16 @@ export class GitPlatform implements PlatformAdapter {
       const read = got ? null : await G.heads(folder, target)
       const h = got ? got.head! : read!.head
       if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
+      // HI-3010: its folder on the card's own line, or what it holds isn't what the card's line merges: work committed on
+      // a detached head (or another branch) passed review, then went stale at the merge, which reads the line.
+      const on = got ? got.line : read!.line
+      const line = s.started!.line
+      // Its branch unreadable while its head was read (HR2's round 2: G.heads reads each on its own when its single read
+      // fails): not known to be on its line, so refused as unknown rather than let through.
+      if (line) {
+        if (isUnknown(on)) return { ok: false, refusal: unknownRefusal(card, on, 'submit') }
+        if (on !== line) return { ok: false, refusal: { rule: 'platform.offLine', values: { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7) } } } // i18n-ignore: codes
+      }
       const mismatch = args.revision ? await notTheHead(folder, args.revision, h) : null
       if (mismatch) return { ok: false, refusal: mismatch }
       revision = h

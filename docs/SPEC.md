@@ -2346,7 +2346,8 @@ changes. Git's runner and worker are untouched.
     `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
     its command's the same way: listed with start times, children first, each ended only while its pid still names
     the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
-    that teardown. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
+    that teardown. The teardown is awaited (`endTreeAsync`, never `spawnSync`, HI-2997): a write runs on main's thread,
+    where a synchronous listing and ending held it about 2.4 s; the result still waits for it to finish. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
   - **Shutdown** (`shutdown(ms)`): ends every command under way, each one's tree, then jj's worker, within its bound;
     a command asked after it starts nothing. The J card that first runs jj for a project calls it as Combwork quits.
   - The bounds become Advanced settings with that card too.
@@ -3168,7 +3169,13 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
 - **A failed preparation** (HI-2913) is recorded as `SlotPrepareFailed { lease, slot, why, stale }`, written only while
   the same cycle and lease are current and unprepared; the card's Work section then says it hasn't started in that slot
   yet and why (a stale jj workspace: with Recover…), until a `SlotPrepared` for the lease. A stale jj workspace's refusal
-  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable.
+  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable. **Every failure in jj's words**
+  (HI-3003): the pool's failures that name Git's tool or terms (a branch or files unreadable, a line or target unread,
+  `git switch`, `git worktree add`, a folder git doesn't list, `git worktree remove`, no target branch) are each a
+  `SlotWord`, said in the port's own message where it gives one (`WorkspacePort.says`), else in the pool's (Git's,
+  unchanged). jj's port gives all of them (`JJ_SAYS`, `slot.jj.*`: "jj couldn't prepare slot-a for the card: …", "jj
+  workspace add: …", "no target bookmark"), so a jj slot's agent is never told of git, branches or switch, nor led to
+  run git there. No code compares the platform's id for it.
 - **A jj lane's builder between cards** (HI-2913): jj's record needs no session in the slot and the folder's rename
   probe quiet, and a lane's builder stays in its slot. Before a jj card's preparation, under the folder's fence
   (`changingFolder`: nothing typed or started there), slotCards' `freeSlotOfBuilder` ends only the builder's own run in
@@ -5109,7 +5116,7 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 |---|---|---|---|
 | **start** | The card's builder (or an agent given it) | card | Todo → Active. Replies with the folder (slot path), line, base and target. |
 | **put back** | The builder | card, why | Active → Todo; the slot is released. |
-| **submit** | The builder | card, summary (comment), revision (optional: default the card's revision: its folder's head for a card with its own line, its newest attributed commit in a shared folder, §16.3.2), note (required when the revision was already reviewed: what changed in the answer, if not the code), paths (None: the card's paths, pre-filled, with any unclaimed changes to add or leave, §16.3.3). "Submit" is always **submit for review**: it hands committed work over and never commits (Darren, HI-1618). Nothing committed is refused in git's words (`submit.empty`: "Nothing committed to review."), its next step by the card's folder (HI-2227): uncommitted changes are committed by an agent doing the card, while one asked only to submit it asks the user before committing (HI-2257, Darren's decision: both rules, said only in the refusal), and with none a card that needs no change is no-code, asked for with `cw_ask_user` (action noCode) or, already decided, `cw_ask_assistant`; and a None card with no file changed by `submit.unchanged`. followUp (HI-1832): from Review, its builder's commit the reviewer asked for | → Review, or → Finish without review, or → Merging after a queue failure; a follow-up stays in Review. |
+| **submit** | The builder | card, summary (comment), revision (optional: default the card's revision: its folder's head for a card with its own line, its newest attributed commit in a shared folder, §16.3.2), note (required when the revision was already reviewed: what changed in the answer, if not the code), paths (None: the card's paths, pre-filled, with any unclaimed changes to add or leave, §16.3.3). "Submit" is always **submit for review**: it hands committed work over and never commits (Darren, HI-1618). Nothing committed is refused in git's words (`submit.empty`: "Nothing committed to review."), its next step by the card's folder (HI-2227): uncommitted changes are committed by an agent doing the card, while one asked only to submit it asks the user before committing (HI-2257, Darren's decision: both rules, said only in the refusal), and with none a card that needs no change is no-code, asked for with `cw_ask_user` (action noCode) or, already decided, `cw_ask_assistant`; and a None card with no file changed by `submit.unchanged`. A Git card whose own folder isn't on its line (a detached head, another branch) is refused as `platform.offLine` (HI-3010), naming where it is and how to put the commits on the line: review would pass a head the merge never reads. followUp (HI-1832): from Review, its builder's commit the reviewer asked for | → Review, or → Finish without review, or → Merging after a queue failure; a follow-up stays in Review. |
 | **declare paths** | The builder (None) | card, paths | The card's paths (§16.3.3); replies with the pre-fill, the unclaimed changes and the current revision. |
 | **start review** | A reviewer | card, submission (optional: default the latest) | `ReviewStarted`; replies with the review copy's path, the revision, base and files. |
 | **verdict** | A reviewer | card, submission, pass/fail, kind of fail (content / explanation), comment | §16.7.2 |
@@ -5204,7 +5211,10 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
   outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
   a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
-  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is. For an answer
+  or `proceed`, nothing waiting (`loop.noStep`) and an earlier step named (`loop.staleStep`) are said before whose it is
+  (HI-3011): a design closes when its card leaves Doing (put back to To do), and the reviewer the pool gave it, answering
+  late, hears that nothing waits (its feedback goes on the card as a comment), not that it isn't its.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
   notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
   whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a
@@ -5847,6 +5857,20 @@ the default branch or the branches changed since Resolve so that it no longer re
 builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
 only a new forward request with the user's override merges that pair.
 
+Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
+`source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
+next forward conflict again) is refused (`forward.resolutionSource`, its next step `git merge <source>`). Read with the
+project's history port (`resolutionHasSource`: true, false, or unknown, never taken as either): unreadable (git failed
+or threw, a platform with no history) it is refused too (`platform.unknown`, naming that rule), submitted again once it
+reads. The queue reads it again at each attempt and merges only on true: false returns it to its builder (`resolution`,
+nothing merged), however it reached the queue; unreadable, the entry goes round again as another read git couldn't
+make (HI-2019), then pauses needs-you with git's text, nothing merged.
+
+While it is open (not Done), it is the pair's open work (HI-3000, `openPairs`: the board's open cards alone read and folded, `cardsOpen`, once per listing), as an open forward is: a forward
+request for `from` into `to` (the window's or the Assistant's) returns it and makes nothing, and the destination's queue
+card names it on that pair's behind line (`QueueForward.behind[].resolving`), offering no Bring Up to Date for that pair
+until it is Done.
+
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
 merge commit or squashed counts once, a rebased one per commit), kept by both heads (at most 64 pairs), null when a head
@@ -6107,6 +6131,14 @@ app's process, such as the Store's PowerShell, starts its children outside every
 as for agents; a process it follows is first written to the lease's journal (a file the supervisor flushes to disk),
 and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
 job and recorded in `combwork.db`.
+
+**Ending a tree never blocks main's thread** (HI-3009, after jj's HI-2997): a bound or a cancel that ends a command's
+whole tree (the runner's bounded commands, the queue's bounded git, a check's or a slot warming's command, a card's
+focused pick, the submodules and LFS step's git, an OpenCode export) lists and ends it with PowerShell runs it awaits
+(`treeEnding` over `endTreeAsync`, `processTree.ts`), never `spawnSync`, which held main's thread, and so every pane's
+typing, for about 2.4 s each time. What came after the tree ended still does: the result, a time-out's grace, an OpenCode
+worker's shutdown reply. Only cw-progress's own process keeps the blocking `endTree` (`tests/endTreeImports.test.ts`, in check:repo;
+`tests/treeEndingOffThread.test.ts` for each caller's behaviour).
 
 **The runner's git** (HI-2079): its git commands with no time bound (reads, and its writes in its own folder and refs)
 run in one **git host** per lease, a process put in the job and recorded as a launcher is, before it runs anything; each
@@ -7025,7 +7057,18 @@ Whether a conversation may resume there is its **hold** (none: it may):
     taken over once its holder is gone; only with no writer but the lease's own), under the folder's fence (#646: nothing
     typed into or started there meanwhile) and, for the switch, the repository's lock. The builder's quiet, the cycle and
     the rules are checked again at the boundary, inside the lock after any wait for it, before the files change (and
-    again before an install). A slot already on its line is prepared as it is. With
+    again before an install). A slot already on its line is prepared as it is. **In place first** (HI-3010): a Git slot
+    detached at the card's base or a commit past it (as a lane's slot waits between cards) gets the card's new line at
+    once, whatever its builder is doing, since that changes no file (`branchHere`: `merge-base --is-ancestor` with the
+    base, then `git switch -c` with no start point, so a commit made meanwhile is on the line; no hook runs, since a
+    post-checkout or reference-transaction hook could change files beside the builder: for that command alone
+    `core.hooksPath` names a folder that can't exist and `core.fsmonitor` is off, the repository's settings never
+    written); only the cycle and the
+    rules are checked at that boundary. What is left (a line made before, another line there, submodules and LFS files, an
+    install) waits for its builder as above. Before, a builder told of its lane's next card another way (a wake, the
+    Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its
+    submission moved the card on, the preparation gave up, and the line never existed (HI-2997: passed, then stale at
+    the merge). With
     **G15** on it installs again when the lock files differ from its last install (a run of "Combwork (slot slot-b)"); off,
     nothing is installed (a lend never reinstalls for a card). Then `SlotPrepared`, in a write that finds the cycle the
     same.
@@ -7504,7 +7547,13 @@ repeating them (#533) [note §8].
   (any merge into a branch), cw_lane and the builder's moves. **Usable if any set of rules still in force allows it**
   (`hiddenForWorkflow`): the project's options now, each distinct ruleset recorded on the facts of its cards out of Hold,
   Todo and Done (not archived), and its running lanes' (`cardWork.workRetained`, one snapshot), and kept by a card's stage
-  (Review keeps the review tools, Approved and Merging the merge report) whatever its rules say. Nothing hidden when the
+  (Review keeps the review tools, Approved and Merging the merge report) past what those options allow: the merge report
+  only where one of those sets finishes in a way its handler takes it (Combwork merges, the agent merges, not checked), so
+  an Approved card under You integrate or Committed is done keeps nothing (`WORKFLOW_TOOL_STAGES`' `under`; HI-3008: each
+  jj card's Approved restarted its builder, or asked to, for a tool it could never use). A stage keeps a tool only under
+  the rules of the cards in it (HI-3014: each card's own recorded rulesets, the project's options now for a card with none),
+  never another set's: a Solo card moved into Approved can't borrow the merge report from the project's not-checked
+  options, which it isn't under. Nothing hidden when the
   rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
   included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
   be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database

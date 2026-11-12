@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { isJjLineKey } from './platform/jjSlotPrep'
@@ -137,6 +137,12 @@ const T = {
   noBranch: agentMsg({ id: 'slot.check.noBranch', text: 'no {target}', note: "Why Combwork can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name." }),
   noBase: agentMsg({ id: 'slot.check.noBase', text: 'no merge base with {target}', note: "Why Combwork can't tell whether a slot's work is merged: it shares no history with its target branch." })
 }
+
+/** HI-3003: the pool's own words (Git's) for what a port may word its own way (WorkspacePort.says). */
+const POOL_WORDS: Record<SlotWord, AgentMsg> = { branchUnread: T.branchUnread, filesUnread: T.filesUnread, lineUnread: T.gitRead, switchFailed: T.switchFailed, createFailed: T.worktreeAdd, notListed: T.notListed, removeFailed: T.removeFailed, noTarget: T.noTarget }
+
+/** A failure as `port` words it (HI-3003: jj's in jj's terms), else in the pool's own words. */
+const sayFor = (port: WorkspacePort, word: SlotWord, values?: AgentValues): string => sayStored(port.says?.[word] ?? POOL_WORDS[word], values)
 
 export type SlotState = 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
 export type LeaseKind = 'card' | 'lane' | 'carried'
@@ -254,6 +260,9 @@ export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: fals
 /** What a card's preparation came to (#1438): done at a revision, not now (tried again), or not possible (why). */
 /** `stale` (HI-2913): the error is a stale jj workspace's, which the user's Recover… mends. */
 export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null; stale?: true }
+
+/** HI-3010: an in-place preparation's `retry` (the log's words): what is left waits for the slot's builder. */
+export const NOT_IN_PLACE = 'not in place: it waits for its builder' // agent-protocol: a log line's detail, never sent to an agent
 
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
@@ -2544,7 +2553,7 @@ export class SlotPool {
         }
         if (!there) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
-          if (await folderThere(slot.folder)) return await fail(sayStored(T.notListed))
+          if (await folderThere(slot.folder)) return await fail(sayFor(this.port, 'notListed'))
           await this.store.fenced(name, token, () => undefined)
           await this.port.prune(this.deps.project)
           made = true
@@ -2585,9 +2594,9 @@ export class SlotPool {
       await this.store.fenced(name, token, () => undefined)
       if (made) {
         const at = target ? await this.port.lineHead(this.deps.project, target) : await this.port.head(this.deps.project)
-        if (isUnknown(at) || !at) return await fail(sayStored(T.gitRead, { what: target ?? 'HEAD' }))
+        if (isUnknown(at) || !at) return await fail(sayFor(this.port, 'lineUnread', { what: target ?? 'HEAD' }))
         const r = await this.port.create(this.deps.project, slot.folder, at, { skipSmudge: this.gitFilesOn(opts) })
-        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: this.port.errorLine(r.err) || 'failed' }))
+        if (!r.ok) return await fail(sayFor(this.port, 'createFailed', { error: this.port.errorLine(r.err) || 'failed' }))
         // Its identity where the platform records one (HI-2795: jj's store, name, creation generation), in a fenced write.
         if (this.port.identity) {
           const id = await this.port.identity(slot.folder)
@@ -2670,8 +2679,13 @@ export class SlotPool {
    * own. `ready` is the caller's last word right before the slot's files change (its card still current, its builder
    * quiet): a reason, and nothing changes. A slot already on the line is prepared (a repeat changes nothing). `retry`:
    * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
+   *
+   * `inPlace` (HI-3010): only what changes no file, so its builder needn't be quiet (it may already be at work on the
+   * card): a slot detached at `base` or past it gets its new line where its head is (`branchHere`), and `inPlace` is
+   * that switch's last word instead of `ready`. Anything else (another line there, the line made before, its files or
+   * install due, a port without it) is `retry`, for the preparation that waits for its builder.
    */
-  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
+  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; inPlace?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
     const lease = this.store.lease(leaseId)
     if (!lease || lease.to) return { error: sayStored(T.leaseEnded) }
     const name = lease.slot
@@ -2686,13 +2700,20 @@ export class SlotPool {
         const on = await this.port.line(slot.folder)
         if (isUnknown(on)) {
           await end()
-          return { error: sayStored(T.branchUnread, { slot: name }) }
+          return { error: sayFor(this.port, 'branchUnread', { slot: name }) }
         }
         const there = on === p.line
+        const inPlace = !!p.inPlace
+        // In place (HI-3010): only a detached slot gets its line so; on another line, it waits for its builder.
+        if (inPlace && !there && (on !== null || !this.port.branchHere)) {
+          await end()
+          return { retry: NOT_IN_PLACE }
+        }
         // The same card started again in its own slot (HI-2981: jj gives each start a new key): what is in the folder is
         // that card's own uncommitted work, kept as on Git's same branch, never refused as another's.
-        const carried = !there && !!(await this.port.carries?.(slot.folder, p.line, p.base, { identity: slot.identity ?? null, ...(p.target ? { target: p.target } : {}) }))
-        if (!there && !carried) {
+        const carried = !there && !inPlace && !!(await this.port.carries?.(slot.folder, p.line, p.base, { identity: slot.identity ?? null, ...(p.target ? { target: p.target } : {}) }))
+        // In place, no file changes: what is in the folder is its builder's own work on this card, and stays as it is.
+        if (!there && !carried && !inPlace) {
           // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
           const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {
@@ -2701,13 +2722,18 @@ export class SlotPool {
             if (isUnknown(d) && d.detail === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
             // Something still in the folder when jj's record was asked (HI-2913: a session or process): not now, never a failure.
             if (isUnknown(d) && (d.detail === 'busy' || d.detail === JJ_REFUSED.fence)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
-            return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
+            return { error: isUnknown(d) ? sayFor(this.port, 'filesUnread', { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
         const had = there ? null : await this.port.lineHead(slot.folder, p.line)
         if (isUnknown(had)) {
           await end()
-          return { error: sayStored(T.gitRead, { what: p.line }) }
+          return { error: sayFor(this.port, 'lineUnread', { what: p.line }) }
+        }
+        // A line made before (a card started again) is switched to, which can change files: that waits for its builder.
+        if (inPlace && had) {
+          await end()
+          return { retry: NOT_IN_PLACE }
         }
         const hash = p.install ? await lockHash(slot.folder) : null
         // HI-1182: its submodules and LFS set up before every ready while the setting is on (a step that failed or was
@@ -2727,15 +2753,16 @@ export class SlotPool {
         // The caller's last word (its card current, the rules on, its builder quiet) and still this operation's, right
         // before the slot's files change: inside the caller's guard (the app's: the repository's lock, as merges and branch
         // deletions take it), after any wait for it, so nothing waited on stands in for a check made before it.
-        const last = async (): Promise<string | null> => {
-          const notYet = (await p.ready?.()) ?? null
+        const last = async (word = p.ready): Promise<string | null> => {
+          const notYet = (await word?.()) ?? null
           if (!notYet) await this.store.fenced(name, token, () => undefined)
           return notYet
         }
         if (!there) {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
-            const notYet = await last()
+            const notYet = await last(inPlace ? p.inPlace : p.ready)
             if (notYet) return { notYet }
+            if (inPlace) return this.port.branchHere!(slot.folder, p.line, p.base)
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
             const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
@@ -2748,19 +2775,30 @@ export class SlotPool {
           }
           if (!r.ok) {
             await end()
+            // In place (HI-3010): its head not past the base, say: the preparation that waits for its builder decides.
+            if (inPlace) {
+              log.info(`Slot ${userText(name)} not put on ${userText(p.line)} in place: ${userText(r.err.trim().split(/\r?\n/)[0] ?? '')}`)
+              return { retry: NOT_IN_PLACE }
+            }
             // jj's (HI-2913): quiet lost during its owned write, or a result to decide on the next pass, is a wait; a stale
             // workspace found there is said as itself.
             const err = r.err.trim()
             if (this.port.platform === 'jj' && (err === JJ_REFUSED.fence || err === JJ_REFUSED.uncertain)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
             if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
-            return { error: sayStored(T.switchFailed, { error: err.split(/\r?\n/)[0] || 'failed' }) }
+            return { error: sayFor(this.port, 'switchFailed', { slot: name, error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
-          log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}`)
+          log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)
           files = await filesNeed()
           if (typeof files === 'object') {
             await end()
             return { error: files.error }
           }
+        }
+        // In place, its files or install (which change files) wait for its builder: the slot is on its line meanwhile.
+        const due = inPlace && p.install ? await lockHash(slot.folder) : null
+        if (inPlace && (files || (due !== null && due !== slot.installHash))) {
+          await end()
+          return { retry: NOT_IN_PLACE }
         }
         if (files) {
           // It changes the slot's files too: the same last word first.
@@ -2977,7 +3015,7 @@ export class SlotPool {
         const removeIt = async (): Promise<SlotKept | null> => {
           const r = port.identity ? await port.remove(this.deps.project, slot.folder, { identity: slot.identity ?? null, journal: this.removalJournal(name), fence: { still: () => this.store.fenced(name, token, () => true).catch(() => false) } }) : await port.remove(this.deps.project, slot.folder)
           if (r.ok) return null
-          const refused: SlotKept = { why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayStored(T.removeFailed) }
+          const refused: SlotKept = { why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayFor(port, 'removeFailed') }
           // A removal part done (HI-2795: forgotten, not yet trashed) keeps its journal and the slot out of the pool.
           if (!this.removalJournal(name).read()) return await keep(refused)
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, 'dirty', {}, { op: null })).catch((e) => {
@@ -3064,7 +3102,7 @@ export class SlotPool {
     const head = await port.head(s.folder)
     if (isUnknown(head)) return { why: 'cantCheck', detail: head.what }
     let target = s.target ?? (await this.defaultTarget())
-    if (!target) return { why: 'cantCheck', detail: sayStored(T.noTarget) }
+    if (!target) return { why: 'cantCheck', detail: sayFor(port, 'noTarget') }
     let t = await port.lineHead(this.deps.project, target)
     // HI-2928: a free slot's own target deleted since it waited there (gone, not unreadable): it is checked against the
     // default target instead, so work in it that isn't there still keeps it (unmerged), and a slot with none is freed.

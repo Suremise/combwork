@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, other {ほか#件}}",
   "board.queue.forward": "最新にする…",
   "board.queue.forwardAlready": "{to}はすでに{from}で最新にする処理中です",
+  "board.queue.forwardResolving": "{card}が解決中です：「最新にする」はその完了を待ちます",
   "board.queue.forwardAskConfirm": "キューに追加",
   "board.queue.forwardAskMessage": "現在の{from}を、{to}のマージキューでマージ前のチェックを行い、マージコミットとして{to}にマージします。{from}自体は変わりません。競合するかチェックが失敗すると、カードが戻ってくるので、「マージを再試行」か「外す」を選んでください。",
   "board.queue.forwardAskTitle": "{to}を{from}で最新にしますか？",

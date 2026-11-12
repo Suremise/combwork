@@ -15,12 +15,17 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
+import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
+import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
+import { unknown } from '../src/main/platform/types'
+import { UNREADABLE } from '../src/shared/workflow/texts'
+import type { WorkspacePort } from '../src/main/platform/workspacePort'
 
 /** A read of one folder refused (#1500's guard: a skills folder that can't be listed), set by a test and cleared after. */
 const fault = vi.hoisted(() => ({ readdir: null as string | null }))
@@ -103,7 +108,7 @@ afterEach(async () => {
 })
 
 /** A workspace with a combwork.db and a project repository on main (git-ignoring warm/ and node_modules/), and its pool. */
-function world(o: { setup?: string; builders?: number } = {}): World {
+function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = {}): World {
   const ws = join(tempDir('slots-'), 'ws')
   const project = gitRepo(join(ws, 'project'))
   commit(project, { '.gitignore': 'warm/\nnode_modules/\n.env\n' }, 'ignore')
@@ -158,7 +163,8 @@ function world(o: { setup?: string; builders?: number } = {}): World {
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
       looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
-      now: () => clock.now
+      now: () => clock.now,
+      ...(o.port ? { workspaces: o.port } : {})
     })
     return { pool, store }
   }
@@ -478,7 +484,6 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
     // idle tidy removes it by that port; the Git slot stays.
     const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
-    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
     registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
     try {
       await w.pool.refresh()
@@ -1413,6 +1418,53 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
   })
 })
 
+describe("HI-3003: a slot's failures in its platform's words", { timeout: 90_000 }, () => {
+  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged), or in jj's (JJ_SAYS).
+  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch', says?: WorkspacePort['says']): WorkspacePort => ({
+    ...gitWorkspacePort,
+    ...(says ? { says } : {}),
+    ...(what === 'line' ? { line: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
+    ...(what === 'files' ? { dirty: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
+    ...(what === 'lineHead' ? { lineHead: async (repo: string, line: string) => (line === 'cw/AM/AM-1-one' ? unknown(UNREADABLE.branchedOffTarget) : gitWorkspacePort.lineHead(repo, line)) } : {}),
+    ...(what === 'switch' ? { prepare: async () => ({ ok: false, err: 'refused (test)\nmore' }) } : {})
+  })
+  const errorOf = async (port: WorkspacePort): Promise<string> => {
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const out = await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base: sh(w.project, 'rev-parse', 'main'), install: false })
+    if (!('error' in out)) throw new Error(`expected an error, got ${JSON.stringify(out)}`)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    return out.error
+  }
+
+  it("Git's wording is unchanged", async () => {
+    expect(await errorOf(failing('line'))).toBe("git couldn't read slot-a's branch")
+    expect(await errorOf(failing('files'))).toBe("git couldn't read slot-a's files")
+    expect(await errorOf(failing('lineHead'))).toBe("git couldn't read cw/AM/AM-1-one")
+    expect(await errorOf(failing('switch'))).toBe('git switch: refused (test)')
+  })
+
+  it("a port with jj's words: each failed preparation names no git, branch or switch", async () => {
+    const said = [await errorOf(failing('line', JJ_SAYS)), await errorOf(failing('files', JJ_SAYS)), await errorOf(failing('lineHead', JJ_SAYS)), await errorOf(failing('switch', JJ_SAYS))]
+    expect(said).toEqual(["jj couldn't read slot-a's workspace", "jj couldn't read slot-a's files", "jj couldn't read cw/AM/AM-1-one", "jj couldn't prepare slot-a for the card: refused (test)"])
+    for (const s of said) expect(s).not.toMatch(/\bgit\b|branch|switch/i)
+  })
+
+  it("a slot's setup that can't read its target: Git's words as before, jj's naming no git", async () => {
+    const setupError = async (says?: WorkspacePort['says']): Promise<unknown> => {
+      const w = world({ builders: 1, port: { ...gitWorkspacePort, ...(says ? { says } : {}), lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
+      return w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })
+    }
+    expect(await setupError()).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
+    expect(await setupError(JJ_SAYS)).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "jj couldn't read main" } })
+  })
+
+  it("jj's words cover every word a port may give, and none names git, a branch, a switch or a worktree", () => {
+    expect(Object.keys(JJ_SAYS).sort()).toEqual(['branchUnread', 'createFailed', 'filesUnread', 'lineUnread', 'noTarget', 'notListed', 'removeFailed', 'switchFailed'])
+    for (const m of Object.values(JJ_SAYS)) expect(m!.text).not.toMatch(/\bgit\b|branch|switch|worktree/i)
+  })
+})
+
 describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () => {
   const branch = (folder: string): string => sh(folder, 'branch', '--show-current')
 
@@ -1430,6 +1482,66 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     sh(r.slot.folder, 'switch', '-q', '--detach', 'main')
     expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-first', base: head, install: false })).toMatchObject({ ok: true })
     expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(work)
+  })
+
+  it("HI-3010: in place, a detached slot gets its new line where its head is, its builder's work kept, without asking whether it is quiet", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const base = sh(w.project, 'rev-parse', 'main')
+    sh(r.slot.folder, 'switch', '-q', '--detach', base)
+    // Its builder already at work on the card (a commit on the detached head, and an edit not committed yet).
+    commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work')
+    const work = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
+    // A repository's hook that changes files (HR1's round 1): never run beside a busy builder, wherever hooks are set.
+    const hooks = join(w.project, 'my-hooks')
+    mkdirSync(hooks, { recursive: true })
+    for (const dir of [join(w.project, '.git', 'hooks'), hooks]) writeFileSync(join(dir, 'post-checkout'), '#!/bin/sh\necho hook > wip.txt\n')
+    sh(w.project, 'config', 'core.hooksPath', hooks)
+    const busy = vi.fn(async () => 'its builder is busy')
+    const inPlace = vi.fn(async () => null)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-1-one')
+    expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(work)
+    expect(readFileSync(join(r.slot.folder, 'wip.txt'), 'utf8')).toBe('wip\n')
+    expect(busy).not.toHaveBeenCalled()
+    expect(inPlace).toHaveBeenCalledTimes(1)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    // Already on its line: prepared as it is.
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
+  })
+
+  it('HI-3010: in place, anything that would change files waits for its builder (retry), nothing changed', async () => {
+    const w = world({ builders: 1, setup: WRITE_ENV })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const inPlace = async (): Promise<null> => null
+    const old = sh(w.project, 'rev-parse', 'main')
+    commit(w.project, { 'b.txt': 'b\n' }, 'newer')
+    const base = sh(w.project, 'rev-parse', 'main')
+    // Detached at a commit before the card's base: switching would change files.
+    sh(r.slot.folder, 'switch', '-q', '--detach', old)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('')
+    expect(sh(w.project, 'branch', '--list', 'cw/AM/AM-1-one')).toBe('')
+    // On another line (the last card's).
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/AM/AM-0-zero', base)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-0-zero')
+    // The line made before (a card started again): switching to it can change files.
+    sh(r.slot.folder, 'switch', '-q', '--detach', base)
+    sh(w.project, 'branch', 'cw/AM/AM-1-one', old)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('')
+    // An install due: the line is made in place, the install waits for the preparation that waits for its builder.
+    commit(w.project, { 'package-lock.json': '{"v":9}\n' }, 'lock')
+    const locked = sh(w.project, 'rev-parse', 'main')
+    sh(r.slot.folder, 'switch', '-q', '--detach', locked)
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-2-two', base: locked, install: true, inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(r.slot.folder)).toBe('cw/AM/AM-2-two')
+    expect(w.runs.map((x) => x.what)).toEqual(['setup'])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-2-two', base: locked, install: true })).toMatchObject({ ok: true })
+    expect(w.runs.map((x) => x.what)).toEqual(['setup', 'install'])
   })
 
   it("a lane's next card in the same slot: G15 on installs again when the lock files changed; off, nothing is installed", async () => {
