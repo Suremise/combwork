@@ -46,6 +46,7 @@ const M = {
   done: msg({ id: 'service.laneEdit.done', defaultMessage: '{card} is Done already.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's already Done." }),
   notTodo: msg({ id: 'service.laneEdit.notTodo', defaultMessage: '{card} isn’t in To do: only cards not started yet join a lane.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's in progress, in review, approved or on hold. To do is the board's column of cards not started (as the board names it)." }),
   onLane: msg({ id: 'service.laneEdit.onLane', defaultMessage: '{card} is on the lane of {builder}: take it off there first, or use Move here.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it. Move here is the button beside this message that moves it: as it's translated there." }),
+  lastCard: msg({ id: 'service.laneEdit.lastCard', defaultMessage: '{card} is the last card {lane} has to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu).', description: "HI-3066: an error taking a card ({card}, its key) off a lane, or moving it to another lane (Progress → Lanes): it is the lane's last card not Done, and a lane always keeps one. {lane} is the lane's builder / reviewer (B1 / R1). End Lane and Abandon Lane… are the lane's menu items: as they're translated there." }),
   full: msg({ id: 'service.laneEdit.full', defaultMessage: 'A lane can have at most {max, number} cards, and {lane} has that many already: take one off first.', description: "HI-3061: an error adding a card to a lane, or moving one to it from another lane (Progress → Lanes): the lane already has the most cards a lane can have ({max}, 50). {lane} is its builder / reviewer (B1 / R1)." }),
   already: msg({ id: 'service.laneEdit.already', defaultMessage: '{card} is on this lane already.', description: "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes) that already has it." }),
   kept: msg({ id: 'service.laneEdit.keptWork', defaultMessage: '{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.', description: "HI-2898: an error adding a card ({card}, its key) to a lane, or moving it to another lane (Progress → Lanes): it was started before and its work is kept (a branch, a slot lent for it, or a run in progress), so Combwork won't hand it to another builder from here." }),
@@ -296,6 +297,15 @@ function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<s
   return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: { card: e.card, into: l, leaving: null }, undoCard: null, back: [], def }
 }
 
+/** Whether a lane's list has a card still to do: one not Done (one gone from the board or archived counts as none). */
+function hasWork(ws: WorkspaceService, list: readonly number[]): boolean {
+  const places = cardPlacesNow(ws, list)
+  return list.some((n) => {
+    const c = places.get(n)
+    return !!c && !c.archived && c.column !== 'done'
+  })
+}
+
 /** The columns of a card in flight: started and not Done. */
 const FLYING: ReadonlySet<string> = new Set(['doing', 'review', 'passed'])
 
@@ -387,6 +397,10 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!, { applied: true })
+        // A lane keeps a card to do (HI-3066, Darren's decision A): taking off, or moving away, its last one not Done is
+        // refused here, nothing saved. A list of none can't be read back (the lane vanished), and one of Done cards only
+        // ends the lane at once; ending it is End Lane's or Abandon Lane's.
+        if ((p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)) && !hasWork(ws, x.next)) refuse(ws, 409, M.lastCard, { card: cardRef(p.card!), lane: pairOf(x.lane) })
         keepsFixed(ws, x.lane, was, x.next, p.card)
         // An undo sets the applied list back too: its fixed start kept there as well.
         if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)

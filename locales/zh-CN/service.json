@@ -242,6 +242,7 @@
   "service.laneEdit.full": "一个通道最多可有 {max, number} 张卡片，{lane} 已经达到这个数量：请先移出一张。",
   "service.laneEdit.invalid": "Combwork 无法对通道的卡片做出这项更改。",
   "service.laneEdit.keptWork": "{card} 保留着之前开始时的工作（分支、槽位或运行）：它会留在原处。请改为从它的卡片继续。",
+  "service.laneEdit.lastCard": "{card} 是 {lane} 最后一张待完成的卡片，而通道至少要保留一张：要停止该通道，请结束它（在其菜单中选择“结束通道”或“放弃通道…”）。",
   "service.laneEdit.noQueued": "{lane} 没有可取消的待定更改。",
   "service.laneEdit.notOnLane": "{card} 已不在此通道中。",
   "service.laneEdit.notQueued": "{card} 已开始，或已不在待办中：只有仍在等待轮到的卡片才能移动或移出。",

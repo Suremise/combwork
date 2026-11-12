@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "閉じる",
   "board.laneEdit.done": "{op, select, move {{lane}内で{card}を移動しました} add {{card}を{lane}に追加しました} remove {{card}を{lane}から外しました} transfer {{card}を{lane}に移しました} cancel {{lane}の保留中の変更を取り消しました} other {元に戻しました}}",
   "board.laneEdit.handle": "ドラッグして{card}を移動するか、Alt+UpとAlt+Downを押します。Deleteで外します",
+  "board.laneEdit.lastCard": "{card}はこのレーンに残る最後の未完了カードです。レーンには少なくとも1枚のカードが残ります。レーンを止めるには、終了してください（メニューの「レーンを終了」または「レーンを中止…」）",
   "board.laneEdit.leftOut": "{n, plural, other {{cards}は今の場所に残ります。今はレーンに戻せません。}}",
   "board.laneEdit.locked": "{card}は作業中のため、位置は変わりません",
   "board.laneEdit.moveHere": "ここに移動",

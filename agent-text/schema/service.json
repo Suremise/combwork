@@ -937,6 +937,12 @@
       "card": "plain"
     }
   },
+  "service.laneEdit.lastCard": {
+    "placeholders": {
+      "card": "plain",
+      "lane": "plain"
+    }
+  },
   "service.laneEdit.noQueued": {
     "placeholders": {
       "lane": "plain"

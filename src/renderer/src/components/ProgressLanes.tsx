@@ -922,6 +922,7 @@ const removing =
 const EDIT = {
   handle: msg({ id: 'board.laneEdit.handle', defaultMessage: 'Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off', description: "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key." }),
   remove: msg({ id: 'board.laneEdit.remove', defaultMessage: 'Take {card} off the lane (it goes back to the board)', description: "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key." }),
+  lastCard: msg({ id: 'board.laneEdit.lastCard', defaultMessage: '{card} is the lane’s last card to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu)', description: "HI-3066: tooltip of the × on a lane's last card not Done (a click shows the same refusal) (Progress → Lanes): it can't be taken off, as a lane always keeps one. {card} is its key. End Lane and Abandon Lane… are the lane's menu items: as they're translated there." }),
   locked: msg({ id: 'board.laneEdit.locked', defaultMessage: '{card} is under way: it keeps its place', description: "HI-2898: tooltip of the lock on a lane's card in progress (Progress → Lanes): it can't be moved. {card} is its key." }),
   add: msg({ id: 'board.laneEdit.add', defaultMessage: 'Add Card…', description: "HI-2898: a button at the end of a lane's cards (Progress → Lanes): opens a search to add a card of the project to the lane. The … says more follows: keep it." }),
   search: msg({ id: 'board.laneEdit.search', defaultMessage: 'Find a card by key or title', description: "HI-2898: placeholder and accessible name of the search box that adds a card to a lane (Progress → Lanes, Add Card…)." }),
@@ -1081,6 +1082,9 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
           const label = cardLabelOf({ tasks }, c.number)
           const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Active} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
           const movable = !!edit && queued
+          // A lane keeps a card to do (HI-3066): its last one not Done can't be taken off. Its × says so as it's pointed at
+          // (a turned-off button shows no tooltip), and a click shows main's refusal in place.
+          const lastToDo = movable && !rows.some((r) => r.card.number !== c.number && r.card.column !== 'done')
           const underWay = !!edit && !queued && (c.column === 'doing' || c.column === 'review' || c.column === 'passed')
           return (
             <li
@@ -1139,7 +1143,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                   {time.merged.slice(0, 7)}
                 </button>
               )}
-              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={tr(EDIT.remove, { card: label })} onClick={(e) => takeOff(c.number, e.currentTarget.closest('li'))} />}
+              {movable && <IconButton icon="close" className="progress-lane-queue-remove" title={lastToDo ? tr(EDIT.lastCard, { card: label }) : tr(EDIT.remove, { card: label })} onClick={(e) => takeOff(c.number, e.currentTarget.closest('li'))} />}
             </li>
           )
         })}

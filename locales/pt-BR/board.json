@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Dispensar",
   "board.laneEdit.done": "{op, select, move {{card} movido em {lane}} add {{card} adicionado a {lane}} remove {{card} tirado de {lane}} transfer {{card} movido para {lane}} cancel {Alteração pendente de {lane} cancelada} other {Desfeito}}",
   "board.laneEdit.handle": "Arraste para mover {card}, ou pressione Alt+Up e Alt+Down; Delete o tira",
+  "board.laneEdit.lastCard": "{card} é o último cartão pendente da raia, e uma raia mantém pelo menos um: para parar a raia, encerre-a (Encerrar raia ou Abandonar raia… no menu dela)",
   "board.laneEdit.leftOut": "{n, plural, one {{cards} fica onde está: não pode voltar para a raia agora.} other {{cards} ficam onde estão: não podem voltar para a raia agora.}}",
   "board.laneEdit.locked": "{card} está em andamento: mantém o lugar",
   "board.laneEdit.moveHere": "Mover para cá",

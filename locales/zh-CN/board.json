@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "关闭",
   "board.laneEdit.done": "{op, select, move {已在 {lane} 中移动 {card}} add {已将 {card} 添加到 {lane}} remove {已将 {card} 移出 {lane}} transfer {已将 {card} 移到 {lane}} cancel {已取消 {lane} 的待定更改} other {已撤销}}",
   "board.laneEdit.handle": "拖动可移动 {card}，或按 Alt+Up 和 Alt+Down；按 Delete 可将其移出",
+  "board.laneEdit.lastCard": "{card} 是该通道最后一张待完成的卡片，而通道至少要保留一张：要停止该通道，请结束它（在其菜单中选择“结束通道”或“放弃通道…”）",
   "board.laneEdit.leftOut": "{n, plural, other {{cards} 留在原处：现在无法回到通道中。}}",
   "board.laneEdit.locked": "{card} 正在进行中：保持原位",
   "board.laneEdit.moveHere": "移到这里",

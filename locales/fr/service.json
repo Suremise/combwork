@@ -242,6 +242,7 @@
   "service.laneEdit.full": "Un couloir peut avoir au plus {max, number} cartes, et le couloir {lane} en a déjà autant : retire-en une d’abord.",
   "service.laneEdit.invalid": "Combwork ne peut pas faire cette modification des cartes d’un couloir.",
   "service.laneEdit.keptWork": "La carte {card} garde du travail d’un démarrage précédent (une branche, un emplacement ou une exécution) : elle reste où elle est. Poursuis-la plutôt depuis sa carte.",
+  "service.laneEdit.lastCard": "La carte {card} est la dernière carte à faire du couloir {lane}, et un couloir en garde au moins une : pour arrêter le couloir, termine-le (Terminer le couloir ou Abandonner le couloir… dans son menu).",
   "service.laneEdit.noQueued": "Le couloir {lane} n’a aucune modification en attente à annuler.",
   "service.laneEdit.notOnLane": "La carte {card} n’est plus dans ce couloir.",
   "service.laneEdit.notQueued": "La carte {card} a démarré, ou n’est plus à faire : seules les cartes qui attendent encore leur tour peuvent être déplacées ou retirées.",

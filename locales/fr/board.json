@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Masquer",
   "board.laneEdit.done": "{op, select, move {Carte {card} déplacée dans le couloir {lane}} add {Carte {card} ajoutée au couloir {lane}} remove {Carte {card} retirée du couloir {lane}} transfer {Carte {card} déplacée vers le couloir {lane}} cancel {Modification en attente du couloir {lane} annulée} other {Annulé}}",
   "board.laneEdit.handle": "Fais glisser pour déplacer la carte {card}, ou appuie sur Alt+Up et Alt+Down ; Suppr la retire",
+  "board.laneEdit.lastCard": "La carte {card} est la dernière carte à faire du couloir, et un couloir en garde au moins une : pour arrêter le couloir, termine-le (Terminer le couloir ou Abandonner le couloir… dans son menu)",
   "board.laneEdit.leftOut": "{n, plural, one {La carte {cards} reste où elle est : elle ne peut plus revenir dans le couloir pour l’instant.} many {Les cartes {cards} restent où elles sont : elles ne peuvent plus revenir dans le couloir pour l’instant.} other {Les cartes {cards} restent où elles sont : elles ne peuvent plus revenir dans le couloir pour l’instant.}}",
   "board.laneEdit.locked": "La carte {card} est en cours : elle garde sa place",
   "board.laneEdit.moveHere": "Déplacer ici",

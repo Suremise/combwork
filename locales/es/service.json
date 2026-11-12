@@ -242,6 +242,7 @@
   "service.laneEdit.full": "Un carril puede tener como máximo {max, number} tarjetas, y {lane} ya tiene esa cantidad: quita una primero.",
   "service.laneEdit.invalid": "Combwork no puede hacer ese cambio en las tarjetas de un carril.",
   "service.laneEdit.keptWork": "{card} conserva trabajo de un inicio anterior (una rama, un slot o una ejecución): se queda donde está. Continúala desde su tarjeta.",
+  "service.laneEdit.lastCard": "{card} es la última tarjeta pendiente de {lane}, y un carril conserva al menos una: para detener el carril, termínalo (Terminar carril o Abandonar carril… en su menú).",
   "service.laneEdit.noQueued": "{lane} no tiene ningún cambio pendiente que cancelar.",
   "service.laneEdit.notOnLane": "{card} ya no está en este carril.",
   "service.laneEdit.notQueued": "{card} ha empezado o ya no está pendiente: solo se pueden mover o quitar las tarjetas que aún esperan su turno.",

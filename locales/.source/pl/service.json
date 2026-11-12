@@ -242,6 +242,7 @@
   "service.laneEdit.full": "A lane can have at most {max, number} cards, and {lane} has that many already: take one off first.",
   "service.laneEdit.invalid": "That change of a lane’s cards isn’t one Combwork can make.",
   "service.laneEdit.keptWork": "{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.",
+  "service.laneEdit.lastCard": "{card} is the last card {lane} has to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu).",
   "service.laneEdit.noQueued": "{lane} has no queued change to cancel.",
   "service.laneEdit.notOnLane": "{card} isn’t on this lane any more.",
   "service.laneEdit.notQueued": "{card} has started, or isn’t to do any more: only cards still waiting their turn can be moved or taken off.",
