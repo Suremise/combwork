@@ -470,7 +470,8 @@ async function removeKeptSlot(projectPath: string, s: SlotView, card: (n: number
   const commit = kept.commit ? revisionShort('jj', kept.commit) : 'none' // i18n-ignore: a select key
   const message = tr(kept.forgotten ? T.removeForgottenMessage : T.removeKeptMessage, { card: card(s.keptFor), commit })
   if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message, confirmLabel: tr(T.removeKept).replace('…', '') }))) return
-  const r = await call('slots:removeKept', projectPath, s.name, s.keptFor, kept.generation).catch(() => ({ ok: false as const, why: '' }))
+  // The mode confirmed goes with it (HI-3097): a folder missing then but back now, or the reverse, is refused `changed`.
+  const r = await call('slots:removeKept', projectPath, s.name, s.keptFor, kept.generation, !!kept.forgotten).catch(() => ({ ok: false as const, why: '' }))
   reload()
   if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
   notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys

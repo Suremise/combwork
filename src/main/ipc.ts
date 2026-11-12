@@ -1073,7 +1073,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     // A stale jj slot recovered, the user's explicit action (HI-2866).
     'slots:recoverStale': (p, slot) => recoverStaleSlot(workspace, workspace.assertProject(p), String(slot)),
-    'slots:removeKept': (p, slot, card, generation) => removeKeptSlot(workspace, workspace.assertProject(p), String(slot), Number(card), String(generation)),
+    'slots:removeKept': (p, slot, card, generation, forgotten) => removeKeptSlot(workspace, workspace.assertProject(p), String(slot), Number(card), String(generation), forgotten === true),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),

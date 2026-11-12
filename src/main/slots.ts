@@ -3232,16 +3232,19 @@ export class SlotPool {
    * folder still absent, the same record at the slot's generation, the project's platform admitting it; then the removal's
    * own guards. `changed` when any of that no longer holds (the folder back, the slot made again, the record gone).
    */
-  async removeKeptGone(name: string, expect: SlotKeptFor): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
+  async removeKeptGone(name: string, expect: SlotKeptFor, forgotten = false): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
     const same = (s: Slot | null): boolean => {
       const rec = s ? this.store.keptRecord(s.name) : null
       return !!s && s.state === 'gone' && this.hasPort(s) && !!rec && rec.card === expect.card && rec.generation === expect.generation && s.identity?.generation === expect.generation
     }
     const seen = this.store.slot(name)
     if (!same(seen)) return { ok: false, why: 'changed' }
-    // HI-3097: its folder still there, jj no longer listing its workspace (forgotten outside Combwork). This read only
-    // makes it eligible: the port proves the absence again itself, right before the trash (`forgotten`).
-    const forgotten = await folderThere(seen!.folder)
+    // HI-3097: `forgotten`, the mode the user confirmed: its folder still there, jj no longer listing its workspace
+    // (forgotten outside Combwork; the confirmation said the folder goes to the Recycle Bin), else its folder missing.
+    // The folder as it is now must be that mode, here and again under the removal's operation: a folder missing when
+    // confirmed but back now (or the reverse) is `changed`, for the user to look again. This read only makes it
+    // eligible: the port proves the absence again itself, right before the trash.
+    if ((await folderThere(seen!.folder)) !== forgotten) return { ok: false, why: 'changed' }
     if (forgotten && (await this.present(seen!)) !== false) return { ok: false, why: 'changed' }
     let changed = false
     const kept = await this.remove(name, async (slot, token) => {

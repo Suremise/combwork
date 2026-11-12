@@ -1001,9 +1001,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
  * A slot kept for a card with its folder gone, removed by the user (HI-3032, Slots and copies' Remove…): only the one the
  * window showed (`generation`, `card`), checked again under the removal (SlotPool.removeKeptGone).
  */
-export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, name: string, card: number, generation: string): Promise<{ ok: true } | { ok: false; why: string }> {
+export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, name: string, card: number, generation: string, forgotten: boolean): Promise<{ ok: true } | { ok: false; why: string }> {
   const pool = await poolFor(ws, projectPath)
-  const r = await pool.removeKeptGone(name, { card, generation })
+  const r = await pool.removeKeptGone(name, { card, generation }, forgotten)
   if (r.ok) return r
   log.info(`Slot ${userText(name)}, kept for #${card}, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
   return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }

@@ -3311,8 +3311,10 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   **Its workspace forgotten by the user** (HI-3097: `jj workspace forget` outside Combwork, its folder left): still
   `gone` (jj doesn't list it), told apart by its folder being there: the start says `slot.kept.forgotten`, Slots and
   copies "Kept for <card>, but jj no longer lists its workspace" (`keptGone.forgotten`), and Remove…'s confirmation
-  says the folder goes whole to the Recycle Bin. `removeKeptGone`'s read then only makes it eligible (the folder
-  there, `present` false); the removal (`remove`'s `keptForgotten`, this action's only) keeps the session, in-flight and
+  says the folder goes whole to the Recycle Bin. Remove… carries the mode the user confirmed (`slots:removeKept`'s
+  `forgotten`): the folder there and forgotten, or missing; a folder in the other state now, at the first read or under
+  the removal's operation, is `changed` (HR2's round 1: a missing-folder confirmation never trashes a folder put back
+  meanwhile). `removeKeptGone`'s read then only makes it eligible (the folder there, `present` false); the removal (`remove`'s `keptForgotten`, this action's only) keeps the session, in-flight and
   process guards on every attempt and waives only dirty and unmerged, which jj can't read of a forgotten workspace. The
   port (`remove`'s `forgotten`) proves it afresh on every attempt, inside the store's lock, fail-closed: exactly one
   operation head, whose listing names no such workspace nor any at the folder; the folder the recorded workspace by its
