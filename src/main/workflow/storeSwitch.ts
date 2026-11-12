@@ -538,7 +538,7 @@ async function ownerLive(f: Fence): Promise<boolean> {
   }
 }
 
-/** The stuck switches already told to the user, by store and generation (once each). */
+/** The stuck switches already told to the user, by workspace, store and generation (once each). */
 const toldStuck = new Set<string>()
 
 const STUCK = {
@@ -548,7 +548,9 @@ const STUCK = {
 
 /** HI-3073: a switch recovery left stuck, said once in a notice (beside the log), naming its projects. */
 function tellStuck(ws: WorkspaceService, store: string, f: Fence, stuck: readonly string[]): void {
-  const key = `${store} ${f.generation}`
+  // Per workspace too (HR1's round 1): each workspace's board keeps its own fences and generations, so two on the same
+  // repository at generation 1 are two switches, each said in its own workspace.
+  const key = `${(ws.path ?? '').toLowerCase()} ${store} ${f.generation}`
   if (toldStuck.has(key)) return
   toldStuck.add(key)
   const name = (id: string): string => ws.info()?.projects.find((p) => p.path.toLowerCase() === f.members[id]?.path.toLowerCase())?.name ?? basename(f.members[id]?.path ?? id)

@@ -358,6 +358,29 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
       expect(told[0]).toMatch(/p changed or can’t be read/)
       await ss.recoverFences(w)
       expect(sent.filter((x) => x.includes('A version control switch couldn’t be finished'))).toHaveLength(1)
+      // HR1's round 1: workspace A closed, then another workspace on the same repository (its own board), its own stuck
+      // switch at the same generation: told too, once, naming its own projects.
+      await disposeWorkspaceService(w)
+      opened.splice(opened.indexOf(w), 1)
+      const ws2 = join(p, '..', 'nested-ws')
+      const [r, t] = [join(ws2, 'r'), join(ws2, 't')]
+      for (const d of [r, t]) mkdirSync(join(d, '.combwork'), { recursive: true })
+      for (const [dir, id] of [[r, 'r'], [t, 't']] as const) writeFileSync(join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, id, platform: 'git', agents: [], workflow: { platform: 'git', preset: 'solo', options: {} } }))
+      const w2 = createWorkspaceService()
+      await w2.open(ws2)
+      opened.push(w2)
+      const storeId = storeKey(await commonGitDir(r))
+      expect(storeId).toBe(storeKey(await commonGitDir(p)))
+      const cfg2 = { r: await w2.projectConfig(r), t: await w2.projectConfig(t) }
+      const snap2 = (c: typeof cfg2.r) => ({ platform: 'git' as const, ...(c.workflow ? { workflow: JSON.parse(JSON.stringify(c.workflow)) as unknown } : {}) })
+      await store.boardWrite(w2, async () => store.boardWriteOp(w2, (db) => beginSwitch(metaOf(db), storeId, [{ id: cfg2.r.id!, path: r, before: snap2(cfg2.r), after: { platform: 'jj', platformFound: 'jj' } }, { id: cfg2.t.id!, path: t, before: snap2(cfg2.t), after: { platform: 'jj', platformFound: 'jj' } }], { token: 'dead2', pid: 2 ** 22 + 11, profile: 'gone' })))
+      await w2.mutateProjectConfig(r, () => ({ platform: 'none' }), { existing: true })
+      await ss.recoverFences(w2)
+      const both = sent.filter((x) => x.includes('A version control switch couldn’t be finished'))
+      expect(both).toHaveLength(2)
+      expect(both[1]).toContain('Combwork stopped while switching r and t between Git and jj')
+      await ss.recoverFences(w2)
+      expect(sent.filter((x) => x.includes('A version control switch couldn’t be finished'))).toHaveLength(2)
     } finally {
       notify.setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
     }
