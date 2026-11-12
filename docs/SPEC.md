@@ -4679,7 +4679,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and the new branch's head is never read, so it is made before the branch exists): the window applies the one it showed
   after the start, the Assistant the one offered in the reply (`offerRetarget`), so a fresh preview with equal heads
   never widens it. The Assistant: `cw_branch` (`create`: `POST /v1/git/branch`, from a ref, never switching;
-  `nextVersion`: `POST /v1/workflow/next-version`), through its change boundary (Control agents), recorded for undo: the
+  `nextVersion`: `POST /v1/workflow/next-version`, naming the release it starts from as it read it, `from`, required
+  as the dialog sends it, so a retried or repeated request is refused once the project has moved on, HI-3114), through its change boundary (Control agents), recorded for undo: the
   two options as setting changes and the branch as a `setting` change whose target is `branch:<name>` (the board's
   change kinds are fixed by its schema, which older Combworks read), undone only while the branch is still at its
   commit and nothing uses it, G7b, a lane, a slot or a card included (`undoBranch`, in the repository lock, the turn of

@@ -5051,7 +5051,7 @@ module.exports.SCENARIOS = [
     setup: nextVersionSetup,
     after: nextVersionAfter,
     prompt: "We're done adding features to 1.3.0 in alpha. Start 1.4.0.",
-    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"}',
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha","from":"1.3.0"}',
     expect: (o, c) => {
       const s = nextVersionState(o, c)
       return [
@@ -5075,7 +5075,7 @@ module.exports.SCENARIOS = [
     prompt: "Start 1.4.0 for alpha, and move whatever can follow it over to 1.4.0: I've checked them, go ahead.",
     // A fake's script is fixed: it can't name the preview its cw_branch reply gives, so it asks cw_queue retarget by
     // branch, which only previews and moves nothing; the checks of the move are a model's (fakeSkips), never a fake run's.
-    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.3.0","target":"1.4.0"}',
+    fake: 'cw cw_branch {"action":"nextVersion","project":"alpha","from":"1.3.0"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.3.0","target":"1.4.0"}',
     expect: (o, c) => {
       const s = nextVersionState(o, c)
       const offered = callsWithReplies(o, 'cw_branch').map((x) => /\bpreview (rt-[\w-]+)/.exec(x.reply)?.[1]).filter(Boolean)

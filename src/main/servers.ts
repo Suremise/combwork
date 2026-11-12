@@ -97,7 +97,6 @@ import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
 import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
 import { NextVersionPartial, startNextVersion } from './workflow/nextVersion'
-import { projectTargets } from './workflow/targets'
 import { cardTargetSaid } from './cardTargetReply'
 import { withRepoLock } from './repoLock'
 import type { NextVersionResult } from '../shared/types'
@@ -2747,6 +2746,8 @@ route('POST', '/v1/git/branch', async ({ body }) => {
 })
 // HI-2807: Start the next version, as the window's dialog does it, in one hold: the branch made at the project's target's
 // head (pinned by `commit` when given), the target added to Other branches, Work merges into moved to the new branch.
+// `from` (required, HI-3114): Work merges into as the caller saw it, as the dialog sends it, so a retried or repeated
+// request is refused once the project has moved on rather than starting a second version from the first.
 // What can follow is offered as a retarget preview made before the branch existed, both going on (started cards and
 // running lanes stay), applied with /v1/workflow/retarget. Recorded for undo: the branch and the two options.
 route('POST', '/v1/workflow/next-version', async ({ body }) => {
@@ -2754,12 +2755,12 @@ route('POST', '/v1/workflow/next-version', async ({ body }) => {
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 250) : ''
-  const commit = typeof body?.commit === 'string' ? body.commit.trim().slice(0, 64) : ''
+  const from = branchStartArg({ ref: body?.from, commit: body?.commit })
+  if (!from) throw new HttpError(400, say(API.queue.nextVersionArgs))
   return assistantChange('agents', [API.change.nextVersion, { project: basename(p) }], { kind: 'next-version', project: basename(p) }, async (guard) => {
-    const from = commit ? { from: { ref: (await projectTargets(ws, p))?.default ?? '', commit } } : {}
     let r: NextVersionResult
     try {
-      r = await startNextVersion(ws, p, { name, ...from, check: guard, preview: true })
+      r = await startNextVersion(ws, p, { name, from, check: guard, preview: true })
     } catch (e) {
       // The branch kept after a refused save: recorded, so undo can still take it back.
       if (e instanceof NextVersionPartial) await noteChange(ws, branchChange(basename(p), e.branch.name, e.branch.commit))
