@@ -1071,6 +1071,31 @@ describe('a submodule changed only inside it', () => {
     expect(committed()).toEqual(['sub'])
     expect(status()).toBe('')
   })
+
+  // HI-3052: git's stash saves a submodule's new commit as its recorded one but never checks the old one out again, so
+  // the submodule stayed changed while Set Aside said it was set aside (an ordinary edit beside it made the stash).
+  for (const staged of [false, true])
+    it(`its new commit${staged ? ', staged,' : ''} can't be set aside: refused by name, alone or with an ordinary edit, nothing done; Commit takes both`, async () => {
+      writeFileSync(join(proj, 'sub', 's.txt'), 'new submodule commit\n')
+      sh(join(proj, 'sub'), 'commit', '-q', '-am', 'inside')
+      if (staged) sh(proj, 'add', 'sub')
+      writeFileSync(join(proj, 'a.txt'), 'ordinary edit\n')
+      const now = await worktreeNow(proj)
+      if (isUnknown(now)) throw new Error('unknown')
+      expect(now.submodules).toEqual(['sub'])
+      const before = [head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]
+      for (const shown of [['sub', 'a.txt'], ['sub']]) await expect(settle('setAside', shown)).rejects.toThrow(/^sub is a submodule now at another commit, which Git can't set aside\. Commit it instead/)
+      expect([head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]).toEqual(before)
+      // An ordinary edit alone is still set aside, the submodule left as it was.
+      await settle('setAside', ['a.txt'])
+      expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('ordinary edit')
+      expect(status().trim()).toBe(staged ? 'M  sub' : 'M sub')
+      sh(proj, 'stash', 'pop', '-q')
+      const done = await settle('commit', ['sub', 'a.txt'])
+      expect(done.made).toBe(head())
+      expect(committed()).toEqual(['a.txt', 'sub'])
+      expect(status()).toBe('')
+    })
 })
 
 describe("Files' Commit it", () => {

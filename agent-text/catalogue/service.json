@@ -449,6 +449,11 @@
     "note": "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done.",
     "audience": "both"
   },
+  "service.folderChanges.submoduleMoved": {
+    "text": "{folder} is a submodule now at another commit, which Git can't set aside. Commit it instead, or check out its recorded commit inside {folder} yourself.",
+    "note": "HI-3052: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say); git's stash can't put it back, so nothing was done. Commit works for it.",
+    "audience": "both"
+  },
   "service.folderChanges.tooManyToSetAside": {
     "text": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
     "note": "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command.",

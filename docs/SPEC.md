@@ -6176,7 +6176,11 @@ touched:
   `commit --only` nor `stash push` has anything of (they failed with git's *On branch main*, nothing said): *… is a
   submodule whose changes are inside it … Commit them or set them aside inside …*. `WorktreeNow.insideOnly` names
   such submodules; they stay in `dirty` (work held in the folder, for every check of a clean folder). Its new commit
-  made inside is a change of the folder like any other. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  made inside is a change of the folder like any other, for Commit; **Set Aside refuses it by name** (HI-3052): git's
+  stash records the new commit but never checks the recorded one out again, so the submodule stayed changed while Set
+  Aside said it was done (*… is a submodule now at another commit, which Git can't set aside. Commit it instead …*),
+  whether its new commit is staged or not, alone or shown with other files, before anything runs.
+  `WorktreeNow.submodules` names every changed submodule (porcelain v2's `S…`). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
   file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
