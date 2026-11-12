@@ -58,7 +58,7 @@ import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, laneEndHeldNow, poolFor, poolIfMade, setSlotFreed } from './slotsApp'
 import { brokerWorkingIn } from './agentProcesses'
-import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type PrepareResult, type RecoverOutcome, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
+import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type LeaseRequest, type PrepareResult, type RecoverOutcome, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
@@ -261,27 +261,38 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   const pool = await poolFor(ws, projectPath)
   const lane = card.lane ?? null
+  // A slot kept for this card (HI-2995: put back with its committed work), read once to choose where it goes; each
+  // placement's own write is the authority (HI-3032): the card is placed only there, by any of the ways below.
+  const kept = pool.keptSlotFor(card.id)
+  const req = lane ? { lane, agent: builder, startsCard: card.id } : { card: card.id, agent: builder }
   const held = lane ? pool.leaseOf({ lane }) : pool.leaseOf({ card: card.id })
   if (held && held.agent === builder) {
+    // Its lane already works in another slot: the card isn't started there without its work.
+    if (kept && held.slot !== kept.name) return { wait: pool.keptElsewhere(kept.name, 'lane', held.slot) }
     const at = leaseAt(pool, held)
     if (at) return at
   }
   if (held) return { wait: refusalText({ why: 'inUse', slot: held.slot, agent: held.agent, card: held.card, lane: held.lane }, name) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
   // The builder's own slot (#1441: its carried lease, kept for nothing now) taken over when it can be; else the card gets
-  // another slot, and the carried one stays protected.
-  const own = await carriedToHand(ws, projectPath, pool, builder, o.target)
+  // another slot, and the carried one stays protected. Never for a card with a kept slot (never the carried one).
+  const own = kept ? null : await carriedToHand(ws, projectPath, pool, builder, o.target)
   if (own) {
     if (o.dry) return { slot: own.slot.name, folder: own.slot.folder, lease: '', fresh: false }
-    const handed = await handOffCarried(ws, projectPath, pool, own, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder))
+    const handed = await handOffCarried(ws, projectPath, pool, own, req, name(builder))
     if (handed) return leaseAt(pool, handed)
   }
   // The slot its own run still writes in, its lease ended (HI-1762): taken over too, or waited for, never a second slot.
-  const written = await startOnWritten(ws, projectPath, pool, builder, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder), o.dry)
+  // With a kept slot elsewhere: waited for, then the kept slot lent.
+  const written = await startOnWritten(ws, projectPath, pool, builder, req, name(builder), o.dry, kept?.name)
   if ('wait' in written) return { wait: written.wait }
   if ('dry' in written) return { slot: written.dry.name, folder: written.dry.folder, lease: '', fresh: false }
   if ('lease' in written) return leaseAt(pool, written.lease)
-  if (o.dry) return couldLend(pool, projectPath, builder)
-  const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
+  if (o.dry) {
+    const preview = pool.keptPreview(card.id)
+    if (preview) return 'wait' in preview ? preview : { slot: preview.slot.name, folder: preview.slot.folder, lease: '', fresh: false }
+    return couldLend(pool, projectPath, builder)
+  }
+  const r = await pool.lend(req, { ...(o.target ? { target: o.target } : {}), install: false })
   // A lane's start refused for its slot held (HI-2468): what holds it kept for the lane's status; any other end forgets it.
   if (lane) {
     const busy = !r.ok && r.refusal.why === 'busy' ? r.refusal : null
@@ -633,7 +644,7 @@ function sameCheckout(folder: string, was: Checkout): boolean {
  * conversation goes on there. Null when it couldn't be (the slot or lease changed meanwhile): the caller lends another.
  * In the write, the slot is still the one decided on (its folder and making) with the same checkout (HI-1741).
  */
-async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string): Promise<SlotLease | null> {
   const host = (await ws.sessionScope(projectPath)).scope
   const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   const still = (s: Slot): boolean => samePlace(s.folder, own.slot.folder) && s.createdAt === own.slot.createdAt && (!own.checkout || sameCheckout(s.folder, own.checkout))
@@ -673,11 +684,13 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
  * it changed while it was taken; looked at again once): the start waits for it, never lent a second slot meanwhile. A
  * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
-async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
+async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string, dry = false, kept?: string): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
   const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: say(T.ownSlotWaits, { agent: agentName, slot: s.name, because }) })
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
     if (!slot) return { none: true }
+    // The card has a slot kept for it (HI-3032): its builder's run elsewhere is waited for, never taken over for it.
+    if (kept && slot.name !== kept) return { wait: pool.keptElsewhere(kept, 'written', slot.name, agentName) }
     // The takeover's own conditions, read (HI-1787): a dry start never advertises what the real one would refuse.
     const busy = await pool.writtenNotTakeable(slot.name, builder, slot.writer!.run)
     if (busy) return waitFor(slot, busy)
@@ -689,7 +702,7 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
   return still ? waitFor(still, say(T.changed)) : { none: true }
 }
 
-async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string): Promise<SlotLease | null> {
   const slot = writtenSlotOf(projectPath, pool, builder)
   const run = slot?.writer?.run
   if (!slot || !run) return null
@@ -1912,6 +1925,17 @@ export async function settleRenames(pool: SlotPool): Promise<void> {
 
 // --- Lanes.
 
+/** A lane's first card still to do (HI-3032: open, not archived), in its list's order; null with none. */
+function laneFirstCard(ws: WorkspaceService, cards: readonly number[]): number | null {
+  if (!cards.length) return null
+  try {
+    const open = boardRead(ws, (db) => new Set((db.prepare(`SELECT number FROM cards WHERE number IN (${cards.map(() => '?').join(', ')}) AND col <> 'done' AND archived = 0`).all(...cards) as { number: number }[]).map((r) => r.number))) // i18n-ignore: SQL
+    return cards.find((n) => open.has(n)) ?? null
+  } catch {
+    return null
+  }
+}
+
 /** A slot's folder, by its name (HI-2558: whether a lane's idle builder already works in its slot). */
 export async function slotFolderOf(ws: WorkspaceService, projectPath: string, slot: string): Promise<string> {
   return (await poolFor(ws, projectPath)).folderFor(slot)
@@ -1933,16 +1957,22 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
   const pool = await poolFor(ws, projectPath)
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
+  // Its first card still to do (HI-3032): a slot kept for it is the lane's, by the same ways a card's start places it
+  // (slotForStart), never another. The card goes with every placement's request, whatever this read found: each write
+  // decides by the kept record as it is then (one a refresh writes meanwhile included).
+  const first = laneFirstCard(ws, (await rawLanes(ws)).find((l) => l.id === lane)?.cards ?? [])
+  const kept = first !== null ? pool.keptSlotFor(first) : null
+  const req = { lane, agent: builder, ...(first !== null ? { startsCard: first } : {}) }
   // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
-  const own = await carriedToHand(ws, projectPath, pool, builder, target)
-  const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
+  const own = kept ? null : await carriedToHand(ws, projectPath, pool, builder, target)
+  const handed = own ? await handOffCarried(ws, projectPath, pool, own, req, name(builder)) : null
   if (handed) return { slot: handed.slot, lease: handed.id }
   // The slot its own run still writes in, its last lease ended (HI-1762), as a card's start does: taken, or waited for.
-  const written = await startOnWritten(ws, projectPath, pool, builder, { lane, agent: builder }, name(builder))
+  const written = await startOnWritten(ws, projectPath, pool, builder, req, name(builder), false, kept?.name)
   if ('wait' in written) return { waiting: written.wait }
   if ('lease' in written) return { slot: written.lease.slot, lease: written.lease.id }
   // Lent with the lane's target (#1627), so the slot records where its lines merge.
-  const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
+  const r = await pool.lend(req, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
@@ -2005,6 +2035,8 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
   for (const lane of waiting) {
     if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
+    let kept: Slot | null = null
+    let req: LeaseRequest = { lane: lane.id, agent: lane.builder.id }
     if (!lease) {
       // Its cards still to do all no-code by now (HI-2338): it takes no slot, and its agents start where they are.
       const { noCodeOnly, startWaitingLane } = await import('./laneStart')
@@ -2016,14 +2048,18 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
       }
       if (stopped()) return
       if (full) continue
+      // Its first card still to do, with a slot kept for it (HI-3032): that slot is the lane's, as in lendLaneSlot.
+      const first = laneFirstCard(ws, lane.cards)
+      kept = first !== null ? pool.keptSlotFor(first) : null
+      req = { lane: lane.id, agent: lane.builder.id, ...(first !== null ? { startsCard: first } : {}) }
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
-      const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
+      const own = kept ? null : await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return
-      lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
+      lease = own ? await handOffCarried(ws, projectPath, pool, own, req, lane.builder.name) : null
       if (stopped()) return
       // The slot its own run still writes in (HI-1762): taken, or this lane goes on waiting (never a second slot).
       if (!lease) {
-        const written = await startOnWritten(ws, projectPath, pool, lane.builder.id, { lane: lane.id, agent: lane.builder.id }, lane.builder.name)
+        const written = await startOnWritten(ws, projectPath, pool, lane.builder.id, req, lane.builder.name, false, kept?.name)
         if ('wait' in written) continue
         if ('lease' in written) lease = written.lease
       }
@@ -2040,7 +2076,7 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
         full = true
         continue
       }
-      const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
+      const r = await pool.lend(req, { install: false })
       if (!r.ok) {
         tried(lane.id, r.refusal)
         full = true

@@ -3274,7 +3274,27 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   yet beside the work (HR1's round 1), the slot settles dirty and no detach is asked: it is kept for the card all the
   same while the port says its binding is still that card's (`heldFor`), and a take-back checks that ownership first,
   before any clean check, the card's edits then carried by its preparation (HI-2981). Lanes keep their lease
-  across a put-back, so this is a card lease's only; Git's slots have no such answer.
+  across a put-back, so only a card lease ends kept; Git's slots have no such answer.
+  A take-back that fails (its setup or install), is interrupted (its Combwork gone, the operation taken over) or is
+  cut short by Combwork closing leaves the slot **kept as it was** (HI-3032): `dirty`, its record unchanged, the
+  failure's why on the slot (`warmError`, cleared by the next take-back that succeeds), its lease ended
+  `setupFailed`/`interrupted`; never `creating`, which nothing lends, settles or removes. A kept slot whose folder a
+  refresh found gone first (`gone`) refuses its card's start saying so (`slot.kept.gone`); Slots and copies shows it
+  as "Kept for <card>, but its folder is missing" with **Remove…**, the user's explicit removal (`slots:removeKept`,
+  `SlotPool.removeKeptGone`): only of the record the window showed (card and generation), checked again under the
+  removal's operation (still `gone`, its folder still absent, the same record at the slot's generation, the platform's
+  fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the newest
+  `endRev` recorded for its card there, a failed take-back's lease recording none), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
+  **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
+  own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
+  started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an
+  earlier read found, so a record a refresh writes meanwhile decides) takes the kept slot back as a card's lease
+  does, kind `lane`, the warm's ownership check asked for that card; the builder's carried slot is not handed over for
+  it, and both the hand-off's and the written slot's takeover writes refuse a card kept a slot elsewhere; the builder's
+  run still writing in another slot is waited for (`slot.kept.written`); a lane already holding another slot refuses
+  the card's start (`slot.kept.lane`), no slot swapped; a dry start answers the kept slot, or the kept refusal. A lane's
+  lease on a kept slot ending with the work still not in the target keeps it again for the recorded card (its
+  generation the slot's), never left lent with no lease.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that

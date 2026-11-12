@@ -640,5 +640,11 @@
   "workflow.summary.jj.pair": "Um agente revisor aprova cada cartão depois das verificações rápidas, e então você mesmo o integra.",
   "workflow.summary.jj.solo": "Cada cartão em seu próprio workspace jj, sem revisão: você mesmo integra o trabalho.",
   "workflow.summary.jj.team": "Um agente revisor e depois você verificam cada cartão depois das verificações rápidas e dos testes, e então você mesmo o integra.",
-  "workflow.value.finish.userIntegrates": "Você mesmo integra"
+  "workflow.value.finish.userIntegrates": "Você mesmo integra",
+  "workflow.slots.keptGoneFor": "Reservado para {card}, mas a pasta dele está ausente",
+  "workflow.slots.removeKept": "Remover…",
+  "workflow.slots.removeKeptTitle": "Remover {slot}?",
+  "workflow.slots.removeKeptMessage": "{card} então recomeça a partir do destino, em outro slot. O trabalho que ele commitou aqui fica no armazenamento do jj{commit, select, none {.} other {: o último commit é {commit}.}}",
+  "workflow.slots.removedKept": "{slot} foi removido.",
+  "workflow.slots.notRemovedKept": "{slot} não foi removido: {why, select, changed {ele mudou depois que a lista foi mostrada (a pasta voltou, ou ele foi criado de novo)} busy {algo está trabalhando nele agora} other {o Combwork o manteve}}."
 }

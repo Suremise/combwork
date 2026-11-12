@@ -640,5 +640,11 @@
   "workflow.summary.jj.pair": "クイックチェックの後、レビュアーエージェントが各カードを合格にし、その後ご自身で統合します。",
   "workflow.summary.jj.solo": "各カードは専用のjjワークスペースで作業し、レビューはなし。作業はご自身で統合します。",
   "workflow.summary.jj.team": "クイックチェックとテストの後、レビュアーエージェントとあなたが各カードを確認し、その後ご自身で統合します。",
-  "workflow.value.finish.userIntegrates": "ご自身で統合"
+  "workflow.value.finish.userIntegrates": "ご自身で統合",
+  "workflow.slots.keptGoneFor": "{card} 用に保持されていますが、フォルダーがありません",
+  "workflow.slots.removeKept": "削除…",
+  "workflow.slots.removeKeptTitle": "{slot}を削除しますか？",
+  "workflow.slots.removeKeptMessage": "{card} はその後、別のスロットでターゲットから新たに始まります。ここでコミットした作業は jj のストアに残ります{commit, select, none {。} other {（最後のコミットは {commit}）。}}",
+  "workflow.slots.removedKept": "{slot}を削除しました。",
+  "workflow.slots.notRemovedKept": "{slot}は削除されませんでした：{why, select, changed {一覧を表示した後に変わりました（フォルダーが戻ったか、作り直されました）} busy {今、何かが作業中です} other {Combworkが保持しました}}。"
 }

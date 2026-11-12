@@ -65,6 +65,12 @@ const T = {
   notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
   keptState: msg({ id: 'workflow.slots.state.kept', defaultMessage: 'Holds a card’s commits', description: 'HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files.' }),
   keptFor: msg({ id: 'workflow.slots.keptFor', defaultMessage: 'Kept for {card}: its committed work isn’t in the target yet', description: 'HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it.' }),
+  keptGoneFor: msg({ id: 'workflow.slots.keptGoneFor', defaultMessage: 'Kept for {card}, but its folder is missing', description: 'HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it.' }),
+  removeKept: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
+  removeKeptTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
+  removeKeptMessage: msg({ id: 'workflow.slots.removeKeptMessage', defaultMessage: '{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
+  removedKept: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name.' }),
+  notRemovedKept: msg({ id: 'workflow.slots.notRemovedKept', defaultMessage: '{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.', description: 'HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
@@ -96,7 +102,7 @@ const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? 'platform' : o)
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
   const l = s.lease
-  if (!l) return s.keptFor !== undefined ? tr(T.keptFor, { card: card(s.keptFor) }) : null
+  if (!l) return s.keptFor !== undefined ? tr(s.keptGone ? T.keptGoneFor : T.keptFor, { card: card(s.keptFor) }) : null
   if (l.kind === 'carried') return tr(T.carried, { agent: agentName(l.agent) })
   if (l.card !== null) return tr(T.lentCard, { agent: agentName(l.agent), card: card(l.card) })
   return tr(T.lentLane, { agent: agentName(l.agent) })
@@ -238,7 +244,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
                         <td>
-                          {s.keptFor !== undefined ? tr(T.keptState) : tr(T.state[s.state])}
+                          {s.keptFor !== undefined && !s.keptGone ? tr(T.keptState) : tr(T.state[s.state])}
                           {s.stale && (
                             <>
                               {' · '}
@@ -253,6 +259,11 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                           {s.stale && (
                             <button className="btn subtle small" data-action="recover" onClick={() => void recoverSlot(project.path, s, reload)}>
                               {tr(T.recover)}
+                            </button>
+                          )}
+                          {s.keptGone && s.keptFor !== undefined && (
+                            <button className="btn subtle small" data-action="remove-kept" onClick={() => void removeKeptSlot(project.path, s, card, reload)}>
+                              {tr(T.removeKept)}
                             </button>
                           )}
                           {s.writer?.held && (
@@ -447,6 +458,18 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
     okOnly: true,
     ...(paragraphs.length ? { content: <div data-recovered="">{paragraphs.map((p, i) => <p key={i}>{p}</p>)}</div> } : {})
   })
+}
+
+/** A slot kept for a card with its folder gone, removed (HI-3032, `slots:removeKept`): the user's action, after their confirmation. */
+async function removeKeptSlot(projectPath: string, s: SlotView, card: (n: number) => string, reload: () => void): Promise<void> {
+  const kept = s.keptGone
+  if (!kept || s.keptFor === undefined) return
+  const commit = kept.commit ? revisionShort('jj', kept.commit) : 'none' // i18n-ignore: a select key
+  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeKeptMessage, { card: card(s.keptFor), commit }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
+  const r = await call('slots:removeKept', projectPath, s.name, s.keptFor, kept.generation).catch(() => ({ ok: false as const, why: '' }))
+  reload()
+  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
+  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
 }
 
 /** The select key of a refused recovery's reason (the port's refusal text, English, never shown). */

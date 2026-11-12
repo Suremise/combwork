@@ -640,5 +640,11 @@
   "workflow.summary.jj.pair": "Agent recenzent zalicza każdą kartę po szybkich sprawdzeniach, a potem włączasz ją sam.",
   "workflow.summary.jj.solo": "Każda karta we własnym obszarze roboczym jj, bez recenzji: pracę włączasz sam.",
   "workflow.summary.jj.team": "Agent recenzent, a potem Ty sprawdzacie każdą kartę po szybkich sprawdzeniach i testach, a potem włączasz ją sam.",
-  "workflow.value.finish.userIntegrates": "Włączasz to sam"
+  "workflow.value.finish.userIntegrates": "Włączasz to sam",
+  "workflow.slots.keptGoneFor": "Zachowany dla karty {card}, ale brak jego folderu",
+  "workflow.slots.removeKept": "Usuń…",
+  "workflow.slots.removeKeptTitle": "Usunąć {slot}?",
+  "workflow.slots.removeKeptMessage": "Karta {card} zacznie wtedy od nowa od swojego celu, w innym slocie. Praca zatwierdzona tutaj zostaje w magazynie jj{commit, select, none {.} other {: jej ostatni commit to {commit}.}}",
+  "workflow.slots.removedKept": "Slot {slot} został usunięty.",
+  "workflow.slots.notRemovedKept": "Slot {slot} nie został usunięty: {why, select, changed {zmienił się po wyświetleniu listy (jego folder wrócił albo został utworzony ponownie)} busy {coś w nim teraz pracuje} other {Combwork go zachował}}."
 }

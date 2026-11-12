@@ -466,6 +466,8 @@ export interface CombworkRequests {
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** A stale jj slot recovered (HI-2866): the user's explicit action, with what it did (HI-2996); a protocol code when refused. */
   'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string }
+  /** HI-3032: a slot kept for a card with its folder gone, removed (Remove…): only that card's record at that generation. */
+  'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
   /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */
