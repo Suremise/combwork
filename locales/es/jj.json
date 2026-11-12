@@ -39,7 +39,7 @@
   "jj.integrate.checksStopped": "Sus comprobaciones de fusión se detuvieron ({check}). Vuelve a ejecutarlas para que se ofrezca.",
   "jj.integrate.checksWaiting": "Sus comprobaciones de fusión esperan una copia de comprobación libre.",
   "jj.integrate.head": "Esperando a que lo integres",
-  "jj.integrate.how": "Por ejemplo, cópialo sobre {target} y luego mueve {target} a la copia que muestra jj con jj bookmark set. Una copia deja el slot de la tarjeta como está; reubicar el commit reescribiría la copia de trabajo del slot y lo dejaría desactualizado.",
+  "jj.integrate.how": "Por ejemplo, copia sus commits sobre {target} y luego mueve {target} a la copia que muestra jj para el commit revisado, con jj bookmark set. Una copia deja el slot de la tarjeta como está; reubicar los commits reescribiría la copia de trabajo del slot y lo dejaría desactualizado.",
   "jj.integrate.noMerge": "Combwork no fusiona con jj: integra tú mismo el trabajo revisado con jj.",
   "jj.integrate.none": "Ninguna tarjeta está esperando.",
   "jj.integrate.notChecked": "Aún no se ha comprobado si está en {target}.",

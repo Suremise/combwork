@@ -39,7 +39,7 @@
   "jj.integrate.checksStopped": "Ses vérifications de fusion ont été arrêtées ({check}). Relance-les pour qu’il soit proposé.",
   "jj.integrate.checksWaiting": "Ses vérifications de fusion attendent une copie de vérification libre.",
   "jj.integrate.head": "En attente de ton intégration",
-  "jj.integrate.how": "Par exemple, copie-le sur {target}, puis déplace {target} vers la copie qu’affiche jj avec jj bookmark set. Une copie laisse l’emplacement de la carte tel quel ; rebaser le commit réécrirait la copie de travail de l’emplacement et le laisserait périmé.",
+  "jj.integrate.how": "Par exemple, copie ses commits sur {target}, puis déplace {target} vers la copie qu’affiche jj pour le commit relu, avec jj bookmark set. Une copie laisse l’emplacement de la carte tel quel ; rebaser les commits réécrirait la copie de travail de l’emplacement et le laisserait périmé.",
   "jj.integrate.noMerge": "Combwork ne fusionne pas sous jj : intègre toi-même le travail relu avec jj.",
   "jj.integrate.none": "Aucune carte n’attend.",
   "jj.integrate.notChecked": "Pas encore vérifié s’il est dans {target}.",

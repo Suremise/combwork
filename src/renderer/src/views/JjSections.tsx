@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
-import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard, type JjWaitingChecks } from '@shared/jjViews'
+import { integrateCommands, isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard, type JjWaitingChecks } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -41,7 +41,7 @@ const M = {
   integrate: msg({ id: 'jj.integrate.head', defaultMessage: 'Waiting for you to integrate', description: 'A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves.' }),
   integrateNone: msg({ id: 'jj.integrate.none', defaultMessage: 'No card is waiting.', description: 'Under “Waiting for you to integrate” (HI-2799) when no card has passed.' }),
   integrateCard: msg({ id: 'jj.integrate.card', defaultMessage: '{card} {title}: commit {commit} into {target}', description: 'A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into.' }),
-  integrateHow: msg({ id: 'jj.integrate.how', defaultMessage: 'For example, copy it onto {target}, then move {target} to the copy jj prints with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commit would rewrite the slot’s working copy and leave it stale.', description: 'Above a jj command suggested to integrate a passed card (HI-2913): copy it onto its target with jj duplicate, then move the target bookmark to the new commit jj prints. Why a copy: a rebase would rewrite the commit the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command).' }),
+  integrateHow: msg({ id: 'jj.integrate.how', defaultMessage: 'For example, copy its commits onto {target}, then move {target} to the copy jj prints for the reviewed commit, with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commits would rewrite the slot’s working copy and leave it stale.', description: 'Above a jj command suggested to integrate a passed card (HI-2913, HI-3094): copy all of its commits onto its target with jj duplicate (it prints a copy for each), then move the target bookmark to the copy of the reviewed commit (the card’s last). Why a copy: a rebase would rewrite the commits the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command).' }),
   notYet: msg({ id: 'jj.integrate.notYet', defaultMessage: 'Not in {target} as of {when}.', description: 'Under a passed jj card (HI-2869): Combwork last looked and its reviewed work wasn’t in its target bookmark ({target}) yet. {when} is how long ago it looked (already translated, such as “5 minutes ago”).' }),
   unknownContained: msg({ id: 'jj.integrate.unknown', defaultMessage: 'Couldn’t check whether it’s in {target} ({when}): {why, select, conflictedTarget {{target} is conflicted} divergentChange {its change is divergent} partialExport {{target} isn’t the same in Git} ambiguousRemote {it isn’t clear which remote {target} follows} notFetched {the remote has a commit Combwork hasn’t fetched} other {jj couldn’t read it}}.', description: 'Under a passed jj card (HI-2869): Combwork’s last look couldn’t say whether its reviewed work is in its target bookmark ({target}); never read as not integrated. {when}: how long ago (already translated). {why} picks the reason: keep the select keys.' }),
   notChecked: msg({ id: 'jj.integrate.notChecked', defaultMessage: 'Not checked yet whether it’s in {target}.', description: 'Under a passed jj card (HI-2869): Combwork hasn’t looked yet, since its review passed, whether its reviewed work is in its target bookmark ({target}).' }),
@@ -330,8 +330,12 @@ function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number 
                     {r.candidate?.state === 'signing' && <div className="hint" data-jj-candidate="signing">{tr(M.candidateSigning)}</div>}
                     {r.candidate?.state === 'unknown' && <div className="hint" data-jj-candidate="unknown">{tr(M.candidateUnknown, { why: r.candidate.why })}</div>}
                     <div className="hint">{tr(M.integrateHow, { target: r.target })}</div>
-                    <div><code className="mono jj-command" data-jj-command="">{`jj duplicate -r ${r.revision} --onto ${r.target}` /* i18n-ignore: a jj command, as typed */}</code></div>
-                    <div><code className="mono jj-command" data-jj-command="">{`jj bookmark set ${r.target} -r <copy>` /* i18n-ignore: a jj command, as typed (<copy>: the commit jj duplicate printed) */}</code></div>
+                    {/* HI-3094: every commit of the card (its base to the reviewed commit), never only the last. */}
+                    {integrateCommands(r, `<copy of ${commitShort(r.revision)}>` /* i18n-ignore: a placeholder in a jj command, as typed */).map((cmd) => (
+                      <div key={cmd}>
+                        <code className="mono jj-command" data-jj-command="">{cmd}</code>
+                      </div>
+                    ))}
                   </>
                 )}
                 <div className="faint" data-jj-contained={c ? c.state : 'none'}>

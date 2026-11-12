@@ -39,7 +39,7 @@
   "jj.integrate.checksStopped": "Suas verificações de merge foram paradas ({check}). Rode-as de novo para que ele seja oferecido.",
   "jj.integrate.checksWaiting": "Suas verificações de merge aguardam uma cópia de verificação livre.",
   "jj.integrate.head": "Aguardando você integrar",
-  "jj.integrate.how": "Por exemplo, copie-o sobre {target} e depois mova {target} para a cópia que o jj mostra com jj bookmark set. Uma cópia deixa o slot do card como está; rebasear o commit reescreveria a cópia de trabalho do slot e o deixaria desatualizado.",
+  "jj.integrate.how": "Por exemplo, copie os commits dele sobre {target} e depois mova {target} para a cópia que o jj mostra do commit revisado, com jj bookmark set. Uma cópia deixa o slot do card como está; rebasear os commits reescreveria a cópia de trabalho do slot e o deixaria desatualizado.",
   "jj.integrate.noMerge": "O Combwork não faz merge com o jj: integre você mesmo o trabalho revisado com o jj.",
   "jj.integrate.none": "Nenhum cartão está aguardando.",
   "jj.integrate.notChecked": "Ainda não verificado se está em {target}.",

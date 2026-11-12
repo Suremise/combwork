@@ -196,14 +196,16 @@ function givings(n) {
     }
     /** Runs a command as Waiting shows it, in the project folder (`<copy>` given): jj's output. */
     const runShown = (cmd, copy) => {
-      const words = cmd.replace('<copy>', copy ?? '<copy>').split(/\s+/)
+      const words = cmd.replace(/<copy[^>]*>/, copy ?? '<copy>').split(/\s+/)
       if (words[0] !== 'jj') throw new Error(`not a jj command: ${cmd}`)
       return jj(shop, ...words.slice(1))
     }
     /** Card n integrated exactly as Waiting shows: its copy onto main, then main moved to it. */
     const integrateAsShown = async (n, key, label, R, shot) => {
       const cmds = await shownCommands(n, shot)
-      check(`${label}: Waiting shows a copy onto main, then the bookmark (not a rebase)`, cmds.length === 2 && cmds[0] === `jj duplicate -r ${R} --onto main` && cmds[1] === 'jj bookmark set main -r <copy>', JSON.stringify(cmds))
+      // HI-3094: the card's whole chain, from its approved base to the reviewed commit; then the bookmark to that one's copy.
+      const base = (await inv('jj:waiting', shop)).find((r) => r.card === n)?.base
+      check(`${label}: Waiting shows a copy of the card's commits onto main, then the bookmark (not a rebase)`, !!base && cmds.length === 2 && cmds[0] === `jj duplicate -r ${base}..${R} --onto main` && new RegExp(`^jj bookmark set main -r <copy of ${R.slice(0, 8)}[0-9a-f]*>$`).test(cmds[1]), JSON.stringify({ cmds, base }))
       runShown(cmds[0])
       const copy = id(shop, `main+ & description(exact:${JSON.stringify(`${key}: ${label}\n`)}) & ~${R}`)
       runShown(cmds[1], copy)

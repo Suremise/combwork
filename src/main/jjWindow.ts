@@ -109,7 +109,7 @@ export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<str
           : c.state === 'unknown' && (c.misses ?? 1) >= CANDIDATE_MISSES
             ? { state: 'unknown', why: c.why ?? '', at: c.at }
             : null
-    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null, candidate })
+    out.push({ card: card.id, submission: s.latest.id, revision: s.approved.revision, base: s.approved.base, change: commitOf(s.latest.platform, 'changeId'), target, contained: matches && rec ? { state: rec.state, ...(rec.why ? { why: rec.why } : {}), at: rec.at } : null, candidate })
   }
   return out
 }

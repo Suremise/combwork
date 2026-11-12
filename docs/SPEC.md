@@ -2647,8 +2647,8 @@ merges under jj.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
-  and the commands to start from (HI-2913: `jj duplicate -r <commit> --onto <target>`, then `jj bookmark set <target> -r
-  <copy>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
+  and the commands to start from (HI-2913: `jj duplicate -r <base>..<commit> --onto <target>`, every commit of the card
+  (HI-3094: `JjWaitingCard.base`, the approved base), then `jj bookmark set <target> -r <copy of the reviewed commit>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
   slot stale and its lane's next card unprepared), and its last containment observation for exactly that
   approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,

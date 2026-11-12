@@ -207,6 +207,8 @@ export interface JjWaitingCard {
   card: number
   submission: number
   revision: string
+  /** HI-3094: the approved base: the card's commits are `base..revision`, all of them copied by the command shown. */
+  base: string
   /** Its change id (jj's), when the submission recorded one. */
   change: string | null
   target: string
@@ -260,4 +262,13 @@ export interface JjLeftover {
   path: string
   name?: string
   why: string
+}
+
+/**
+ * HI-3094: the two commands Waiting shows to integrate a passed jj card by hand: every commit of the card (its approved
+ * base to the reviewed commit, never only the last) copied onto its target, then the target moved to `copy`, the copy jj
+ * printed for the reviewed commit (in the window, a placeholder naming it). As typed: English, never a message.
+ */
+export function integrateCommands(r: { base: string; revision: string; target: string }, copy: string): [string, string] {
+  return [`jj duplicate -r ${r.base}..${r.revision} --onto ${r.target}`, `jj bookmark set ${r.target} -r ${copy}`] // i18n-ignore: jj commands, as typed
 }
