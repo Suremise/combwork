@@ -424,12 +424,15 @@ export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, fold
 /** Past this many entries, or this depth, a folder is never taken for leftovers (clearStrayFolder). */
 const STRAY_MAX_ENTRIES = 200_000
 const STRAY_MAX_DEPTH = 64
+/** Names a git dir has beside HEAD (lower case): any of them with a HEAD makes a folder a repository, bare or not. */
+const GIT_DIR_PARTS = new Set(['config', 'objects', 'refs', 'packed-refs', 'commondir', 'gitdir', 'index'])
 
 /**
  * HI-3080: a disposable folder's submodule path that holds only files an earlier run left (a revision had ordinary files
  * there, and a build's ignored output stayed after the reset's `clean -fd`), emptied so the submodule can be set up. git's
  * own clean skips a path the index holds as a gitlink, so it is removed here, but only when nothing in it is a repository
- * or a link: no `.git` at any depth, no symlink or junction on the way or inside, within the bounds above. Anything
+ * or a link: no `.git` at any depth, no folder that is a bare one (HEAD beside config, objects, refs…), no symlink or
+ * junction on the way or inside, within the bounds above. Anything
  * else is left as it is (the step then names it foreign). Null: emptied, or left; else the system's words.
  */
 async function clearStrayFolder(x: Pick<GitFilesExec, 'note'>, root: string, s: Submodule): Promise<string | null> {
@@ -440,6 +443,9 @@ async function clearStrayFolder(x: Pick<GitFilesExec, 'note'>, root: string, s: 
     if (depth > STRAY_MAX_DEPTH) return false
     const names = await readdir(dir).catch(() => null)
     if (!names) return false
+    // A bare repository (HR1's round 1) has no `.git`: its HEAD beside any other part of a git dir counts as one.
+    const lower = names.map((n) => n.toLowerCase())
+    if (lower.includes('head') && lower.some((n) => n !== 'head' && GIT_DIR_PARTS.has(n))) return false
     for (const n of names) {
       if (++seen > STRAY_MAX_ENTRIES || n.toLowerCase() === '.git') return false
       const st = await lstat(join(dir, n)).catch(() => null)

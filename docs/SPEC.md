@@ -8143,7 +8143,8 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   nothing is touched. Except in a copy or the queue's folder (HI-3080): a folder holding only what an earlier run left
   there (a revision had ordinary files at that path; their ignored build output outlives the reset's `clean -fd`, and
   git's clean skips a path the index holds as a gitlink) is removed first, but only when, within bounds (depth 64,
-  200,000 entries), nothing in it is named `.git` and nothing is a link, the path's way down included; a failed
+  200,000 entries), nothing in it is named `.git`, no folder in it is a bare repository (a HEAD beside config,
+  objects, refs or the like), and nothing is a link, the path's way down included; a failed
   removal stops the step, saying so, and anything else is named as above. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
   work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
   resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the

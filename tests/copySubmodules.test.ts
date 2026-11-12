@@ -140,4 +140,20 @@ describe('HI-3080: a copy reset from ordinary files to a submodule at their path
     expect(existsSync(join(f, 'libs', 's', 'out', 'built.js'))).toBe(true)
     expect(existsSync(join(f, 'libs', 's', 'nested', '.git'))).toBe(true)
   })
+
+  it('a bare repository among the leftovers (no .git in it): nothing removed, its refs and history kept', async () => {
+    let head = ''
+    const { pool, at1, f } = await leftOver((dir) => {
+      // A bare clone of a repository made elsewhere: only the bare one is in the folder, with no `.git` entry anywhere.
+      const work = gitRepo(join(tempDir('copy-sub-bare-'), 'work'))
+      head = commit(work, { 'w.txt': 'w\n' }, 'unique')
+      g(dir, 'clone', '-q', '--bare', work, join(dir, 'out', 'cache.git'))
+    })
+    const r = await pool.leaseCopy({ kind: 'check', card: 2, revision: at1, agent: 'a1', ref: null })
+    expect(JSON.stringify(r)).toContain("libs/s holds files or a repository Combwork didn't set up")
+    const bare = join(f, 'libs', 's', 'out', 'cache.git')
+    expect(g(bare, 'rev-parse', '--is-bare-repository')).toBe('true')
+    expect(g(bare, 'rev-parse', 'HEAD')).toBe(head)
+    expect(existsSync(join(f, 'libs', 's', 'test.log'))).toBe(true)
+  })
 })
