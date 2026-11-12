@@ -12,6 +12,7 @@ import { isRefusal, Workflow, type Reply, type WorkflowConfig } from '../../src/
 import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/workflow/mergeQueue'
 import type { QueueLive } from '../../src/main/workflow/queueState'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
+import type { PlatformId } from '../../src/shared/platform/descriptors'
 import { agentActor, agentOf, type Actor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
 import type { StoredText } from '../../src/shared/types'
@@ -102,7 +103,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'none' }, extra: { runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)

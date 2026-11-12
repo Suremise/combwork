@@ -27,7 +27,7 @@ export const refuseUnoffered = (channel: RepoOpChannel): void => void opsAt(chan
 type Handler<C extends CombworkChannel> = (...args: Parameters<CombworkRequests[C]>) => ReturnType<CombworkRequests[C]> | Promise<ReturnType<CombworkRequests[C]>>
 
 /** The handlers, as ipc.ts had them: the same argument checks, then the port (`worktrees:mergeBranch` stays ipc.ts'). */
-export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBranch' | 'agents:merge' | 'worktrees:mergeUnused'>]: Handler<C> } = {
+export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBranch' | 'agents:merge' | 'worktrees:mergeUnused' | 'queue:settleChanges'>]: Handler<C> } = {
   'git:switch': (p, branch) => opsAt('git:switch').switchLine(p, String(branch ?? '')),
   'git:createBranch': (p, name, stay, from) => opsAt('git:createBranch').createLine(p, String(name ?? ''), !!stay, branchStartArg(from)),
   'git:deleteBranches': (p, items, unmerged) => opsAt('git:deleteBranches').deleteLines(p, Array.isArray(items) ? items : [], !!unmerged),
@@ -50,5 +50,7 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   // The Files tab's ignore writes (HI-2743); its reads stay filesGit.ts'.
   'files:gitExclude': (p, items, target, ext) => opsAt('files:gitExclude').exclude(p, items, target, ext === true),
   'files:gitUntrack': (p, items) => opsAt('files:gitUntrack').untrack(p, items),
-  'files:gitInclude': (p, items) => opsAt('files:gitInclude').include(p, items)
+  'files:gitInclude': (p, items) => opsAt('files:gitInclude').include(p, items),
+  // HI-2944: Files' Commit it (queue:settleChanges is ipc.ts', with the queue's pause and resume).
+  'files:gitCommitIgnore': (p) => opsAt('files:gitCommitIgnore').commitIgnore(p)
 }

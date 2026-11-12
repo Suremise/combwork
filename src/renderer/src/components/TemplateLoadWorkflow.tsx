@@ -1,6 +1,7 @@
 import type { TemplateLoadWorkflow } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { PLATFORM_NAME } from '@shared/platform/switching'
+import type { PlatformId } from '@shared/platform/descriptors'
 import { optionTitle } from '@shared/workflow/optionTexts'
 import { optionValueText } from './WorkflowOptions'
 import { Icon } from './ui'
@@ -23,7 +24,7 @@ const M = {
 export const workflowBlocks = (w: TemplateLoadWorkflow | null, apply: boolean): string | null => (w?.needsGit && apply ? tr(M.needsGit) : null)
 
 /** The dropped sections' note (the Templates view says it too). */
-export const droppedText = (platforms: readonly ('none' | 'git')[]): string => tr(M.dropped, { count: platforms.length, platforms: fmt.list(platforms.map((p) => tr(PLATFORM_NAME[p]))) })
+export const droppedText = (platforms: readonly PlatformId[]): string => tr(M.dropped, { count: platforms.length, platforms: fmt.list(platforms.map((p) => tr(PLATFORM_NAME[p]))) })
 
 /**
  * The Load template dialog's Workflow part (HI-1910): whether to apply the template's workflow (ticked), and what it

@@ -85,8 +85,10 @@ import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from '
 import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type StallAgent } from './cardStall'
+import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { giveUnseen } from './cardFreshness'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -102,7 +104,7 @@ import type { NextVersionResult } from '../shared/types'
 import { lineRepoOps } from './platform/repoOpsPorts'
 import { branchStartArg } from '../shared/nextVersion'
 import type { Value } from './assistantChanges'
-import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resolveForward, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
@@ -120,7 +122,7 @@ import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
-import { detect, platformIdOf } from './platform/registry'
+import { detect, initialOf, platformIdOf } from './platform/registry'
 import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
@@ -716,7 +718,7 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : 'none'
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : d.platform === 'jj' ? say(API.project.vcsJj, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' }) : 'none'
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 
@@ -2442,7 +2444,9 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
     if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
-  const views = await queueViews(ws, p)
+  // HI-2893: of the live queues only: a past branch's is named or never picked. HI-2994: of those that hold or held
+  // something (an entry, an outcome, a pause, a card in flight), not each of the project's targets the listing has.
+  const views = (await queueViews(ws, p)).filter((x) => !x.past && (!!x.testing || x.queued.length > 0 || x.recent.length > 0 || !!x.paused || !!x.runBy || x.inFlight.length > 0))
   if (views.length === 1) return views[0].target
   throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
@@ -2464,7 +2468,9 @@ route('GET', '/v1/queue', async ({ query }) => {
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
   if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, apiSaid(API.queue.targetArg))
-  return (await queueViews(ws, p, target)).map(publicQueue)
+  // HI-2893: the project's targets' queues and any holding an entry; past branches' only with past=true, or one named.
+  const past = query.get('past') === 'true'
+  return (await queueViews(ws, p, target)).filter((v) => !v.past || past || !!target).map(publicQueue)
 })
 
 route('POST', '/v1/queue/pause', async ({ body }) => {
@@ -2684,13 +2690,31 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
   const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
   const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
   if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
-  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
-    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+  // HI-2892: the user's explicit override of the release path's direction, only as the JSON boolean true.
+  if (body?.override !== undefined && body.override !== true && body.override !== false) throw new HttpError(400, say(API.queue.overrideArg))
+  const override = body?.override === true
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to, override: override ? 'yes' : 'no' }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard, { override }).catch((e: unknown) => {
       throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
     })
     const made = 'upToDate' in r ? null : r
-    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+  })
+})
+// HI-2959: Resolve on a builder, on a forward merge the queue returned: the Assistant's (within Control agents, its
+// reason required) and the user's, never a project agent's or a script's.
+route('POST', '/v1/queue/resolve', async ({ body }) => {
+  notAgents([API.change.resolveForwardAny])
+  const ws = requireWorkspace()
+  const ref = intentRef(String(body?.card ?? ''))
+  const reason = textField(body, 'reason', true)
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', [API.change.resolveForward, { card: was?.key ?? `#${ref.n}` }], { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const r = await resolveForward(ws, ref.n, await taskActor(), reason, guard).catch((e: unknown) => {
+      throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
+    })
+    return { done: [API.done.forwardResolved, { card: cardName(r.card), forward: r.forward, from: r.from, to: r.to, source: r.source.slice(0, 12) }], act: { card: r.card.number, column: r.card.column, ...(was?.project ? { project: was.project } : {}) }, stays: UNDO_FINAL.forwardResolved, result: { card: r.card.number, key: r.card.key ?? null, forward: r.forward, from: r.from, to: r.to, source: r.source } }
   })
 })
 /** A git refusal as the Agent API answers it (HI-2807): its own status where it has a kind, else 409. */
@@ -3038,7 +3062,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c))
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c), c.column === 'doing' && !c.agent && c.project && workspace.path ? await forwardWaitOf(workspace, join(workspace.path, c.project), c.number) : null)
   }
   // A review whose reviewer has gone or isn't running (Combwork ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -3253,6 +3277,15 @@ route('GET', '/v1/tasks', async ({ query }) => {
   return query.get('history') === 'true' ? views : views.map(withoutHistory)
 })
 
+// HI-2854: a card's start task that carried the whole card, read with cw_inbox, is a full read of it as it was then: the
+// generations it was made at are received (never later ones), and the flag's baseline moves to when it was made.
+onCardTaskReceived((host, agentId, n, seen) => {
+  const agent = { projectPath: host, agentId }
+  if (lastCardRead(agent, n) < seen.at) noteCardRead(agent, n, seen.at)
+  const ws = workspaceFor(host)
+  if (ws) void recordDecisionsReceived(ws, agentId, n, seen.decisions, basename(host), seen.comments)
+})
+
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
   // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
@@ -3274,8 +3307,10 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     noteCardRead(me, view.number)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
+    // HI-2854: the user's comments too, only from a read that gave every comment it keeps in full (not comments=n or
+    // summary=true, which may leave one out).
     const ws = contextWorkspace()
-    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project)
+    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project, n === null && !summary ? seen.comments : undefined)
   }
   const lean = n === null ? view : newestComments(view, n)
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
@@ -3653,7 +3688,7 @@ async function platformOfCard(c: TaskCard): Promise<PlatformId> {
     const p = projectByName(c.project)
     return platformIdOf(p, (await workspace.projectConfig(p)).platform)
   } catch {
-    return detect(workspace.path!).platform
+    return initialOf(detect(workspace.path!))
   }
 }
 
@@ -3959,11 +3994,26 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   const ref = intentRef(param)
   const actor = await taskActor()
   if (actor.kind !== 'assistant') {
-    const { done: ran, card } = await runCardIntent(ref, actor, intent)
-    const done = await withLaneOrder(intent, card, ran)
+    const self = actor.kind === 'agent' ? actor.self : undefined
+    const { done: ran, card } = await runCardIntent(ref, actor, intent).catch(async (e: unknown) => {
+      // HI-2854: a submit refused for what its builder hasn't seen gives it those, in full, received with the refusal.
+      if (self && intent.kind === 'submit' && e instanceof tasks.WorkflowRefusedError && e.refusal.rule === 'submit.decisionsReceived') {
+        // The card, its facts and archive in one snapshot (HR2's round 1), still its own project's card (round 2: not one moved since).
+        const unread = await giveUnseen(requireWorkspace(), self.agentId, ref.n, self.project).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [] as string[]))
+        // Given in full: the reply flag's baseline moves too, so its next reply doesn't flag them again.
+        const me = agentCaller()
+        if (unread.length && me) noteCardRead(me, ref.n)
+        if (unread.length) throw new tasks.WorkflowRefusedError({ ...e.refusal, unread })
+      }
+      throw e
+    })
+    // HI-2854: the task Combwork started the card with is acked by its builder's start or submit of it (still recorded).
+    const me = agentCaller()
+    const acked = me && self && (intent.kind === 'start' || intent.kind === 'submit') ? await ackCardTask(me.projectPath, me.agentId, card).catch((err) => (log.warn('acking a card\'s task by its start or submit', err), [] as string[])) : []
+    // Said in the reply ("acked: m1"), so the agent doesn't call cw_inbox to ack it again.
+    const done = await withLaneOrder(intent, card, acked.length ? { ...ran, data: { ...ran.data, acked } } : ran)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
     // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
-    const self = actor.kind === 'agent' ? actor.self : undefined
     const watch = self ? await armIntentWatch(requireWorkspace(), self.agentId, card, { submit: intent.kind === 'submit', failed: intent.kind === 'verdict' && !intent.pass }) : null
     const out = watch ? { ...done, watch } : done
     // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.
@@ -4131,8 +4181,8 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   // An agent's plain number is refused, naming the card's key (S48), as for the intents.
   if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
   try {
-    const { card, id } = await askAssistant(ws, ref.n, actor, text)
-    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
+    const { card, id, waiting } = await askAssistant(ws, ref.n, actor, text)
+    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id, ...(waiting ? { waiting: true } : {}) }
   } catch (e) {
     if (e instanceof AskRefused) throw httpFrom(e.status, e)
     throw e
@@ -4583,7 +4633,10 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (!hasCapability(platformIdOf(caller.projectPath, cfg?.platform), 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  const platform = platformIdOf(caller.projectPath, cfg?.platform)
+  if (!hasCapability(platform, 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  // jj has slots but no check copies yet (HI-2868): refused before any copy is leased, the check run in the card's slot.
+  if (!hasCapability(platform, 'checkCopies')) throw new HttpError(400, apiSaid(API.check.noCopies))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

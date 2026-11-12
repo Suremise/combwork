@@ -23,6 +23,8 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // platform.changed (HI-2799): the version control the project uses now.
+  platform: 'jj',
   revision: 'a3f2c1d',
   reason: 'waits for the design',
   waitsFor: 'AM-3',
@@ -61,6 +63,14 @@ const SAMPLE: RefusalValues = {
   key: 'AM-12',
   earlier: 'AM-11',
   line: 'cw/b1',
+  // forward.resolutionTarget (HI-2985): the branches a Resolve card merges by hand.
+  from: 'cw/HI/HI-12-fix',
+  to: '1.5.0',
+  // forward.resolutionSource (HI-2999): the commit it resolves, in full.
+  source: '0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c',
+  // platform.offLine (HI-3010): where the card's folder is instead (a detached head is rendered on its own below).
+  where: 'other',
+  on: 'main',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
@@ -134,6 +144,20 @@ describe('the workflow text in every locale', () => {
       expect(b.message, code).toContain('b4c5d6e')
       expect(b.message, code).toContain('team@example.com')
       expect(b.next, code).toContain('git commit --amend --no-edit --reset-author')
+    }
+  })
+
+  it("renders both branches of platform.offLine's {where} select in every locale: a detached head at its commit, another branch by its name (HI-3010, HI-3006)", async () => {
+    const detached = { card: 'AM-12', line: 'cw/b1', where: 'detached', head: 'bd6ff9d', on: '' }
+    const other = { card: 'AM-12', line: 'cw/b1', where: 'other', head: '', on: 'main' }
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [a, b] = [refusalLines('platform.offLine', detached, WINDOW), refusalLines('platform.offLine', other, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(a.message, code).toContain('bd6ff9d')
+      expect(b.message, code).toContain('main')
+      expect(a.next, code).toContain('git switch -c cw/b1')
+      expect(a.next, code).not.toBe(b.next)
     }
   })
 

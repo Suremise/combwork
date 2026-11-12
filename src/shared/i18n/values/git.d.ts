@@ -79,6 +79,31 @@ interface CombworkMessageValues {
   'git.fetch.never': undefined
   'git.fetch.tip': undefined
   'git.form.enterName': undefined
+  'git.gate.advance.name': undefined
+  'git.gate.advance.why': undefined
+  'git.gate.attributes.name': undefined
+  'git.gate.attributes.why': undefined
+  'git.gate.hooks.name': undefined
+  'git.gate.hooks.why': undefined
+  'git.gate.lfs.name': undefined
+  'git.gate.lfs.why': undefined
+  'git.gate.plainGit.name': undefined
+  'git.gate.plainGit.why': undefined
+  'git.gate.publish.name': undefined
+  'git.gate.publish.why': undefined
+  'git.gate.relocation.name': undefined
+  'git.gate.relocation.why': undefined
+  'git.gate.sharedFolder.name': undefined
+  'git.gate.sharedFolder.why': undefined
+  'git.gate.signing.name': undefined
+  'git.gate.signing.why': undefined
+  'git.gate.submodules.name': undefined
+  'git.gate.submodules.why': undefined
+  'git.gitlink.binary': undefined
+  'git.gitlink.dirty': undefined
+  'git.gitlink.hideGit': undefined
+  'git.gitlink.showGit': undefined
+  'git.gitlink.summary': { change: string; path: string | number; from: string | number; to: string | number }
   'git.head.detachedAt': { commit: string | number }
   'git.head.noCommits': undefined
   'git.history.branch': undefined
@@ -195,6 +220,8 @@ interface CombworkMessageValues {
   'git.queue.none': undefined
   'git.queue.open': { card: string | number }
   'git.queue.outcome': undefined
+  'git.queue.past': { n: number }
+  'git.queue.pastTip': undefined
   'git.queue.reading': undefined
   'git.queue.region': undefined
   'git.queue.result': undefined
@@ -231,7 +258,10 @@ interface CombworkMessageValues {
   'git.remotes.pushesTo': { url: string | number }
   'git.remotes.url': undefined
   'git.repoLock.busy': { profile: string | number }
+  'git.repoLock.jjFolder': { folder: string | number }
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
+  'git.repoLock.order': undefined
+  'git.repoLock.unknownRepo': { root: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
   'git.repoOp.notOffered': undefined
@@ -239,12 +269,40 @@ interface CombworkMessageValues {
   'git.section.branches': undefined
   'git.section.changes': undefined
   'git.section.history': undefined
+  'git.section.jjBookmarks': undefined
+  'git.section.jjCompare': undefined
+  'git.section.jjConflicts': undefined
+  'git.section.jjHistory': undefined
+  'git.section.jjOperations': undefined
+  'git.section.jjRepo': undefined
   'git.section.queue': undefined
   'git.section.workflow': undefined
   'git.setup.howTo': undefined
   'git.setup.learnMore': undefined
   'git.setup.notRepo': { project: string | number }
   'git.setup.withoutGit': undefined
+  'git.signing.cantSign': { message: string | number }
+  'git.signing.checkAgain': undefined
+  'git.signing.checking': undefined
+  'git.signing.couldNotComplete': undefined
+  'git.signing.defaultKey': undefined
+  'git.signing.format': undefined
+  'git.signing.formatName': { format: string }
+  'git.signing.heading': undefined
+  'git.signing.howGpg': undefined
+  'git.signing.howSsh': undefined
+  'git.signing.key': undefined
+  'git.signing.limits': undefined
+  'git.signing.needsSomeone': undefined
+  'git.signing.no': undefined
+  'git.signing.notChecked': { why: string; path: string | number }
+  'git.signing.off': undefined
+  'git.signing.program': undefined
+  'git.signing.scope': { scope: string }
+  'git.signing.signs': undefined
+  'git.signing.unattended': undefined
+  'git.signing.unreadable': { message: string | number }
+  'git.signing.yes': undefined
   'git.state': { state: string }
   'git.status.aheadBehind': { ahead: number; behind: number }
   'git.status.noUpstream': undefined
@@ -328,6 +386,9 @@ interface CombworkMessageValues {
   'git.validate.wholeUrl': undefined
   'git.vc.choice': undefined
   'git.vc.fact.gone': undefined
+  'git.vc.fact.jj': { root: string | number; colocated: string }
+  'git.vc.fact.jjGone': undefined
+  'git.vc.fact.jjInGit': { root: string | number; git: string | number }
   'git.vc.fact.none': undefined
   'git.vc.fact.other': { vcs: string | number }
   'git.vc.fact.otherGit': { vcs: string | number }
@@ -337,14 +398,18 @@ interface CombworkMessageValues {
   'git.vc.initHint': undefined
   'git.vc.initOwnHint': undefined
   'git.vc.insideRepo': { root: string | number }
+  'git.vc.jj': undefined
   'git.vc.noCommitYet': undefined
   'git.vc.none': undefined
   'git.vc.notRepoYet': undefined
   'git.vc.offer.gitFound': { root: string | number }
+  'git.vc.offer.jjFound': { root: string | number }
+  'git.vc.offer.jjGone': { platform: string | number }
   'git.vc.offer.notNow': undefined
   'git.vc.offer.otherFound': { vcs: string | number }
   'git.vc.offer.repositoryGone': undefined
   'git.vc.offer.switchGit': undefined
+  'git.vc.offer.switchJj': undefined
   'git.vc.offer.switchNone': undefined
   'git.vc.previewTip': undefined
   'git.vc.sections': undefined
@@ -368,21 +433,61 @@ interface CombworkMessageValues {
   'git.vc.stepNotice.choose': undefined
   'git.vc.stepNotice.notNow': undefined
   'git.vc.stepNotice.text': { n: number; projects: string | number }
+  'git.vc.store.autocrlf': { command: string | number }
+  'git.vc.store.card': { project: string | number; card: string | number; title: string | number }
+  'git.vc.store.clear': { gate: string | number }
+  'git.vc.store.conflictedBookmark': { name: string | number }
+  'git.vc.store.conflictedCommit': { commit: string | number }
+  'git.vc.store.copy': { project: string | number; kind: string; copy: string | number }
+  'git.vc.store.drain': undefined
+  'git.vc.store.fallback': undefined
+  'git.vc.store.fallbackUnknown': { detail: string | number }
+  'git.vc.store.gates': undefined
+  'git.vc.store.group': { n: number }
+  'git.vc.store.heads': { n: number }
+  'git.vc.store.lane': { project: string | number; name: string | number; builder: string | number }
+  'git.vc.store.laneUnnamed': { project: string | number; builder: string | number }
+  'git.vc.store.limit': { gate: string | number; why: string | number }
+  'git.vc.store.member': { project: string | number; platform: string | number }
+  'git.vc.store.notExported': { name: string | number }
+  'git.vc.store.queue': { project: string | number }
+  'git.vc.store.slot': { project: string | number; slot: string | number; agent: string | number }
+  'git.vc.store.stock': undefined
+  'git.vc.store.toGit': undefined
+  'git.vc.store.toJj': undefined
+  'git.vc.store.unknown': { gate: string | number; what: string | number }
+  'git.vc.store.unsupported': undefined
+  'git.vc.store.uses': { gate: string | number; what: string | number }
   'git.vc.switch.changed': { platform: string | number }
+  'git.vc.switch.checkAgain': undefined
+  'git.vc.switch.close': undefined
   'git.vc.switch.confirm': undefined
   'git.vc.switch.done': { project: string | number; platform: string | number }
+  'git.vc.switch.drain': undefined
+  'git.vc.switch.fallback': undefined
   'git.vc.switch.fresh': { to: string | number; from: string | number }
+  'git.vc.switch.gates': undefined
   'git.vc.switch.gitFolder': undefined
+  'git.vc.switch.groupChanged': undefined
   'git.vc.switch.inFlight': { n: number; from: string | number }
+  'git.vc.switch.jjInGit': { root: string | number }
+  'git.vc.switch.jjNoGitCopy': undefined
+  'git.vc.switch.jjTool': { state: string }
+  'git.vc.switch.jjToolBack': { state: string }
+  'git.vc.switch.jjUnknown': { code: string | number }
   'git.vc.switch.lane': { name: string | number; builder: string | number }
   'git.vc.switch.laneUnnamed': { builder: string | number }
   'git.vc.switch.lanes': { n: number; from: string | number }
+  'git.vc.switch.memberDrain': undefined
   'git.vc.switch.noGit': undefined
+  'git.vc.switch.noJj': undefined
   'git.vc.switch.notSwitched': { project: string | number; error: string | number }
   'git.vc.switch.nothing': { to: string | number }
   'git.vc.switch.otherFound': { vcs: string | number }
+  'git.vc.switch.otherWorkspace': { workspace: string | number }
   'git.vc.switch.queue': undefined
   'git.vc.switch.restored': { to: string | number; from: string | number }
+  'git.vc.switch.switching': undefined
   'git.vc.switch.title': { project: string | number; platform: string | number }
   'git.vc.switch.what': { project: string | number; to: string | number; from: string | number }
   'git.vc.switchTip': { platform: string | number }

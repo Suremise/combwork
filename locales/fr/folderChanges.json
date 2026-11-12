@@ -1,0 +1,9 @@
+{
+  "folderChanges.commitFailed": "Impossible de commiter",
+  "folderChanges.committed": "{count, plural, one {# fichier commité} many {# fichiers commités} other {# fichiers commités}} sur {branch}.",
+  "folderChanges.resumed": "La fusion continue.",
+  "folderChanges.setAside": "{count, plural, one {# fichier mis de côté} many {# fichiers mis de côté} other {# fichiers mis de côté}} sur {branch}.",
+  "folderChanges.setAsideDetail": "Git les garde dans un stash nommé « {name} » : git stash pop les ramène.",
+  "folderChanges.setAsideFailed": "Impossible de mettre les modifications de côté",
+  "folderChanges.stillPaused": "La fusion reste suspendue : la raison est indiquée dessus."
+}

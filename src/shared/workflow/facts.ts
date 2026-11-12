@@ -7,8 +7,10 @@
 
 import type { ConflictsRecord } from './conflicts'
 import type { FocusedChoice, FocusedTest } from './focused'
+import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
+import type { ForwardOverride } from './forwardOrder'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
@@ -33,6 +35,8 @@ export interface FileChange {
   path: string
   /** git's letter (A, M, D, R…), or None's A / M / D against the card's start. */
   status: string
+  /** HI-2864: Git only, either side a submodule (mode 160000): what each side is, a gitlink's commit with it. */
+  gitlink?: { from: GitlinkSide; to: GitlinkSide }
 }
 
 /** None: a card's paths with their content hashes (never contents), §16.3.3. */
@@ -164,6 +168,22 @@ export const FOCUSED_SKIP_GATE = 'focusedSkip'
 export const SLOT_DIRTY_GATE = 'slotDirty'
 
 /**
+ * HI-1183: the merge queue's question when a follow-mode publication's outcome is unknown and the remote doesn't show it
+ * (§16.9.4): Approve, it was published (the card Done); Decline, it wasn't (tested again). Bound to the entry and result.
+ */
+export const QUEUE_PUBLISH_GATE = 'queuePublish'
+
+/** A follow-mode attempt's endpoint as a fact keeps it (HI-1183): never a credential. */
+export interface PublishFact {
+  remote: string
+  endpoint: string
+  ref: string
+  onto: string
+  snapshot: string
+  digest: string
+}
+
+/**
  * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
  * skip its review (HI-1734), each with the agent's suggested reason. One click does it as the user, with the reason, and
  * answers the question.
@@ -183,7 +203,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -229,7 +249,14 @@ export const decisionAnswers = (r: Pick<FactData['ApprovalRequested'], 'kind' | 
 /** The most requests one decision answers (HI-1932). */
 export const DECISION_ANSWERS_MAX = 20
 
-export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused'
+/**
+ * `pushRefused` and `notPublished` (HI-1183, follow mode): the publication was refused (the project's pre-push hook, or the
+ * remote: a hook, a protected branch) before anything was written, or the user said an unknown one wasn't published;
+ * both transient, the card queued again. `direction` (HI-2892): a forward merge against the release path's direction with no
+ * override recorded for its pair, never merged (forwardOrder.ts). `resolution` (HI-2999): a forward's resolution whose
+ * revision lacks the commit it resolves (cherry-picked or copied, not merged), never merged.
+ */
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused' | 'pushRefused' | 'notPublished' | 'direction' | 'resolution'
 
 /**
  * Why the queue returned a card for its focused tests (G20, HI-1367), with `IntegrationFailed.focused`: none chosen for
@@ -287,6 +314,13 @@ export interface FactData {
    * preparation is owed, and a pass of Combwork's (after a restart too) does it.
    */
   SlotPrepared: { lease: string; line: string; revision: string }
+  /**
+   * A card's slot couldn't be prepared for its start (HI-2913): `why` as Combwork told the builder (English), `stale` when
+   * the reason was a stale jj workspace (its Recover…). Written in a write that finds the card's start the same and not
+   * prepared; until a later `SlotPrepared` for the same lease, the card isn't started there (the window says not ready),
+   * and the user's Recover… of that slot is let through while its lease holds it.
+   */
+  SlotPrepareFailed: { lease: string; slot: string; why: string; stale: boolean }
   /** Its builder's placement in the slot claimed by a Combwork (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
@@ -318,8 +352,13 @@ export interface FactData {
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
-  IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
-  IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
+  /**
+   * `publish` (HI-1183, follow mode): the attempt's endpoint as it may be kept (the remote's name, its URL without
+   * credentials, the full ref), the remote's head it was tested on (`onto`), and its protected snapshot's id and digest
+   * (queueTransportStore.ts). Its phases are `prePush` and `push`, never `files`/`ref`: nothing local moves in it.
+   */
+  IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null; publish?: PublishFact }
+  IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' | 'prePush' | 'push' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
   /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
   /** `conflicts` (HI-1181): a conflict's files and hunks as the queue's folder had them, bounded (shared/workflow/conflicts.ts). */
@@ -336,7 +375,7 @@ export interface FactData {
    * original run, its agent its own).
    */
   FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string; acceptedBy?: string }
-  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[]; platform?: Record<string, unknown> }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
   /**
@@ -347,6 +386,8 @@ export interface FactData {
   InTarget: { revision: string; target: string; submission: number }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
+  /** HI-2988: a Done card marked `LeftTarget` whose result is in its target again: the mark cleared. */
+  BackInTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
   /** `why`: the agent's own reason, given with a put back (#1267). */
   /** `repair` (HI-1674): a card the board had in Done while its stage wasn't, brought into line when its workspace opens. */
@@ -371,7 +412,16 @@ export interface FactData {
    * head as asked (each attempt's own frozen commit is its entry's `revision`). Written right after its `Started` (whose
    * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
    */
-  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string }
+  /** HI-2892: `override`, the user's explicit choice of a pair against the release path's direction (forwardOrder.ts). */
+  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string; override?: ForwardOverride }
+  /**
+   * HI-2959: this card resolves a forward merge the queue returned (`forward`: its key), made for a builder by Resolve on
+   * a builder (the user's or the Assistant's): its work merges `from` at `source` (the returned attempt's frozen commit)
+   * into `to`. Written while it is in Todo, before its start, and kept over every cycle: its rules always merge it as a
+   * merge commit (`mergeCommitOf`), so the destination keeps the source's history. `override` (HI-2998): the forward's
+   * own request's (HI-2892), carried so the queue checks the resolution's direction at each attempt as the forward's.
+   */
+  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant'; override?: ForwardOverride }
   /**
    * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
    * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its
@@ -383,7 +433,13 @@ export interface FactData {
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
   Decision: { decision: string; generation: number; text: string; removed?: boolean }
-  DecisionsReceived: { agent: string; generation: number }
+  /**
+   * What an agent has received of the card: its decisions up to `generation`, and (HI-2854) the user's comments up to
+   * `comments` (a UserComment's generation), when the receipt covers them.
+   */
+  DecisionsReceived: { agent: string; generation: number; comments?: number }
+  /** HI-2854: a comment the user wrote on the card (its id), each a new comment generation: what cw_submit checks the builder has seen. */
+  UserComment: { comment: string; generation: number }
   /**
    * Paths the card's builder took Combwork's file locks on this cycle (#1481, G16: its own changes in a shared folder),
    * relative to the project folder with `/`: each only once a cycle, and only while the card is its builder's current one.
@@ -484,12 +540,18 @@ export interface CardState {
   generation: number
   /** The generation each agent has received. */
   received: Record<string, number>
+  /** HI-2854: the newest UserComment generation on the card (0: none). */
+  commentGeneration: number
+  /** HI-2854: the comment generation each agent has received. */
+  receivedComments: Record<string, number>
   /** The revision the latest submission's passes now cover (moved by carry-overs and the queue's updates), and its base. */
   approved: { revision: string | null; base: string | null } | null
   /** A content-stale pass (a new revision that isn't the same change), until the builder submits again or its line returns to the approved revision. */
   stale: FactData['Stale'] | null
   /** HI-2679: a forward merge's request (its `ForwardRequested`), this cycle's; null for every other card. */
   forward: FactData['ForwardRequested'] | null
+  /** HI-2959: the forward merge this card resolves (its `ForwardResolution`), over every cycle; null for every other card. */
+  resolves: FactData['ForwardResolution'] | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
@@ -556,9 +618,12 @@ export const emptyState = (): CardState => ({
   verdicts: [],
   generation: 0,
   received: {},
+  commentGeneration: 0,
+  receivedComments: {},
   approved: null,
   stale: null,
   forward: null,
+  resolves: null,
   staleSince: null,
   requests: [],
   made: {},
@@ -610,7 +675,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
         const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq, lines: s.lines })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -706,6 +771,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.forward = f.data as FactData['ForwardRequested']
         break
       }
+      case 'ForwardResolution': {
+        s.resolves = f.data as FactData['ForwardResolution']
+        break
+      }
       case 'Retargeted': {
         // HI-2753: its target from here on is the new one; its line, base, submissions and verdicts stay. Its latest
         // submission's base is the one with the new target (the same commits, checked as it was written).
@@ -768,6 +837,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'InTarget':
         s.marks.inTarget = f.data as FactData['InTarget']
         break
+      case 'BackInTarget':
+        delete s.marks.leftTarget
+        break
       case 'LeftTarget':
         s.marks.leftTarget = f.data as FactData['LeftTarget']
         break
@@ -814,8 +886,13 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'DecisionsReceived': {
         const d = f.data as FactData['DecisionsReceived']
         s.received[d.agent] = Math.max(s.received[d.agent] ?? 0, d.generation)
+        // Never back (HI-2854): a late receipt of an older read leaves a newer one as it is.
+        if (typeof d.comments === 'number') s.receivedComments[d.agent] = Math.max(s.receivedComments[d.agent] ?? 0, d.comments)
         break
       }
+      case 'UserComment':
+        s.commentGeneration = Math.max(s.commentGeneration, (f.data as FactData['UserComment']).generation)
+        break
       case 'LineRenamed': {
         // Its line is the new name from here on: reconciliation reads the branch by it, and never finds it gone (#1305).
         const d = f.data as FactData['LineRenamed']

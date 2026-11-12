@@ -26,7 +26,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 
 /** A hung run's bound: every step here waits for a condition, never for time. */
 const HUNG_MS = 30_000

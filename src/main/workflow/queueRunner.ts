@@ -30,7 +30,7 @@ import { GIT_PREFIX, withoutGitRoute } from '../git'
 import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
 import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
-import { endTree } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
 import { withoutWriteFence, type FactStore, type QueueLease, type QueueProc, type QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
@@ -334,7 +334,7 @@ export class QueueRunner {
    * nothing run, when the runner no longer holds (LeaseLost), its job has gone, or the launcher couldn't be put in the
    * job or recorded. The child is the launcher: its output and exit code are the command's.
    */
-  async spawn(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> & { input?: string } = {}): Promise<ChildProcess> {
+  async spawn(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments' | 'argv0'> & { input?: string } = {}): Promise<ChildProcess> {
     const { child, failed } = this.launch(what, command, args, opts)
     // Not started: nothing to record or end; the start's own error (it is told on the next tick), marked as a start that
     // definitely failed (HI-2020), apart from the lease, the job or the record failing.
@@ -356,9 +356,9 @@ export class QueueRunner {
   }
 
   /** Starts a command's launcher, waiting for its go-ahead, with its errors handled from the start. */
-  private launch(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
+  private launch(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments' | 'argv0'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
     if (!this.admits()) throw new LeaseLost(this.target)
-    const { child, after, before, nonce } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
+    const { child, after, before, nonce } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments, ...(opts.argv0 !== undefined ? { argv0: opts.argv0 } : {}) }, { cwd: opts.cwd as string | undefined, env: opts.env })
     this.nonces.set(child, nonce)
     // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
     // never left to the process's: the first is the start's error, later ones are logged.
@@ -418,7 +418,7 @@ export class QueueRunner {
    * Runs a command (spawn) to its end: its output and exit code. `timeoutMs`: once it has run that long its whole tree
    * is ended (#1350: a signer waiting for a passphrase), and the result says it timed out.
    */
-  async run(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
+  async run(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments' | 'argv0'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
     const { timeoutMs, ...spawnOpts } = opts
     let child: ChildProcess
     try {
@@ -435,11 +435,13 @@ export class QueueRunner {
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let timedOut = false
     let atTimeout: string | undefined
+    // At its bound the tree is ended off main's thread (HI-3009); the result waits for that teardown to be over.
+    const ending = treeEnding()
     const timer = timeoutMs
       ? setTimeout(() => {
           timedOut = true
           atTimeout = Buffer.concat(err).toString('utf8')
-          endTree(child)
+          ending.end(child)
         }, timeoutMs)
       : undefined
     // HI-2042: the launcher itself ended by a signal (no code) is kept as one, apart from its bound's.
@@ -455,6 +457,7 @@ export class QueueRunner {
       child.once('error', () => res(-1))
     })
     clearTimeout(timer)
+    await ending.ended()
     const stderr = Buffer.concat(err).toString('utf8').trim()
     // HI-2020: the launcher's own line (its nonce) when the command's start failed; a 127 without it is the command's.
     const nonce = this.nonces.get(child)

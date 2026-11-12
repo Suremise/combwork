@@ -215,6 +215,18 @@
     "defaultMessage": "Show Capture in Folder",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Developer category: shows a capture of the developer console's flight recorder in File Explorer. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
+  "shell.command.files.commitIgnore": {
+    "defaultMessage": "Commit .gitignore",
+    "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the notification after Exclude from Git (shared, in .gitignore) runs it from its Commit It button. Keep .gitignore: a file name."
+  },
+  "shell.command.folderChanges.settle": {
+    "defaultMessage": "Commit or Set Aside Changes",
+    "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes (when a card or lane starts) runs it by its name from its Commit and Set Aside buttons."
+  },
+  "shell.command.folderChanges.show": {
+    "defaultMessage": "Show Uncommitted Changes",
+    "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes runs it from its Show Changes button (the project's Version Control tab)."
+  },
   "shell.command.help.about": {
     "defaultMessage": "About {app}",
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name."
@@ -274,6 +286,10 @@
   "shell.command.hooks.adminSnippet": {
     "defaultMessage": "Claude Code Admin Snippet…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings so Combwork's hooks run where policy allows only managed hooks (HI-2777). The … says it opens a dialog first: keep it."
+  },
+  "shell.command.lanes.undoEdit": {
+    "defaultMessage": "Undo Lane Change",
+    "description": "HI-2898: a command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. It isn't in the menus or the palette: the notification after changing a lane's cards (Progress → Lanes) runs it by its name."
   },
   "shell.command.layout": {
     "defaultMessage": "Layout: {layout}",

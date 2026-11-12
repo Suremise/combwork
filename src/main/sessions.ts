@@ -1,14 +1,17 @@
+import { platformRuleKey } from '../shared/combworkGuidance'
+import { detect } from './platform/registry'
 import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
 import type { ActivityTask } from '../shared/activity'
 import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
+import { withSessionSigner, type SessionSigner } from './platform/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
@@ -74,7 +77,7 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
-import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { agentLaunchView, allAccounts, allConnections, checkAccount, getConnection, launchCli, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
 import { connectionSwitchDue } from '../shared/connectionLabel'
@@ -89,6 +92,7 @@ import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
+import { admitLaunch, endAdmission, setLiveFolders } from './launchHolds'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
@@ -1066,7 +1070,7 @@ export interface StartOptions {
   keepWatch?: boolean
   /** A new conversation's purpose (#1434): where the agent works for it (agentFolders.ts); its role's own when absent. */
   purpose?: FolderPurpose
-  /** Resume All and startup's resume (#1434): a conversation resumes only where it may now, never taking a free slot. */
+  /** Resume All, startup's and a switch's resume (#1434, HI-2920): a conversation resumes only where it may now, never taking a free slot. */
   auto?: boolean
   /**
    * HI-2540: the user was asked before this resume whether to start a new conversation instead of one that can't
@@ -1364,6 +1368,8 @@ class SessionManager {
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
   /** Combwork's bin folder (cw-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
+  /** Agents' signer (HI-2867, index.ts): cw-sign.exe and what it runs; null without a built launcher. */
+  signer: Omit<SessionSigner, 'timeoutMs'> | null = null
   combworkMcp: CombworkMcpProvider = () => null
   /** Combwork's guidance for agents (the combwork MCP server's instructions), for providers that need it at launch. */
   combworkGuidance: (projectPath: string) => Promise<string> = async () => ''
@@ -1790,13 +1796,17 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
+    // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
+    // switch to jj or back is told to a running agent at its next start.
+    // A jj repository with no Git working copy (HI-2896): its own variant, `jj-separate` (platformRuleKey).
+    if (mcpServers[TOOLS_SERVER] && !assistant && pc.platform === 'jj') mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: platformRuleKey('jj', detect(projectPath)) ?? 'jj' } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
     // account on the CLI's own home (Copilot's sign-in, a test home).
     // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
     // (decision A); Settings' old choice only where none is usable.
-    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, s)) : agentProvider(forAgent, s)
+    const cli = launchCli(forAgent, workspace.config, assistant)
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
@@ -2029,6 +2039,7 @@ class SessionManager {
       throw e
     } finally {
       this.starting.delete(id)
+      endAdmission(id)
       const slow = times.slowLine()
       if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
@@ -2139,6 +2150,8 @@ class SessionManager {
     const fa = folderAgent(agent)
     // The agent's own runs that have ended, their writers' releases still being written: its slot is theirs until then.
     await this.earlierWritersSettled(projectPath, agent.id, WRITER_SETTLE_MS)
+    // Stopped while it waited (HI-2920): it claims nothing.
+    this.assertStarting(liveId(projectPath, agent.id))
     try {
       const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
       // Its slot's writer is this run's from now: released once its processes are known to have ended, or its start is
@@ -2319,13 +2332,14 @@ class SessionManager {
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
     // nor a change of the agent's own re-points one. A new conversation of an agent with no CLI of its own (a new
-    // workspace's Assistant) follows Automatic: it waits until Combwork knows what is installed.
+    // workspace's Assistant: the first usable account's, HI-2899) waits until Combwork knows what is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
     times.mark('resumeProvider')
     this.assertStarting(id)
     if (!recorded && !agent.provider && autoProviderPending(config.settings)) await providerService.settle()
     this.assertStarting(id)
-    const providerId = recorded ?? agentProvider(agent, config.settings)
+    // HI-2899: the Assistant naming no CLI, the first usable account's (decision A), as its launch settings read it.
+    const providerId = recorded ?? launchCli(agent, workspace.path ? workspace.config : null, assistant)
     // At start, Combwork may still be looking for that CLI.
     await providerService.settle(providerId)
     times.mark('providerSettle')
@@ -2348,6 +2362,10 @@ class SessionManager {
     times.mark('folder')
     this.assertStarting(id)
     const cwd = place.cwd
+    // HI-2887: admitted in its folder now its folder is known, before anything is launched or prepared there: a folder
+    // held against launches (jj's control's making) makes it wait; its admission lasts until the start ends.
+    await admitLaunch(id, cwd, () => !!this.starting.get(id)?.cancelled)
+    this.assertStarting(id)
     if (!existsSync(cwd)) throw combworkError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
 
     if (existing?.archived) throw combworkError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
@@ -2692,7 +2710,9 @@ class SessionManager {
         }
         this.switchResuming.add(id)
         try {
-          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))
+          // Automatic (HI-2920): only where it may resume now, never taking a free slot by hand. Its run's card lease
+          // ended meanwhile (Done), a take would leave a carried lease no one runs under.
+          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, auto: true, ...(sessionId ? { resumeId: sessionId } : {}) }))
         } catch (e) {
           const slot = (e as { busySlot?: unknown }).busySlot
           if (typeof slot !== 'string' || !hostOpen()) throw e
@@ -3030,7 +3050,9 @@ class SessionManager {
       // Its temp folder's variables last, over the account's and server's (HI-2496): none set, the environment as before.
       // Without Combwork's tools (HI-2670), only what its hooks report status with: no project, agent or API variables,
       // no cw-progress on its PATH.
-      env: withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
+      // Its signer last (HI-2867): with Combwork's tools and the Advanced switch on, its commits sign through cw-sign,
+      // never waiting for a passphrase; entries of another Combwork's signer are dropped either way.
+      env: withSessionSigner(withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
         // Claude Code's hook commands (HI-2777: SessionStart, the admin snippet's status line) read where to post and the
         // auth file's header from these, so no command names a port or holds the token.
@@ -3047,7 +3069,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
-      }))), this.binDir), tempDir)
+      }))), this.binDir), tempDir), this.signer && policy.tools && advanced.get<boolean>(SIGN_FAIL_FAST) ? { ...this.signer, timeoutMs: advanced.number(SIGN_TIMEOUT) * 1000 } : null)
     }
     // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
     if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)
@@ -9213,6 +9235,8 @@ class SessionManager {
 }
 
 export const sessions = new SessionManager()
+// HI-2887: a hold against launches reads the live sessions' folders.
+setLiveFolders(() => sessions.liveStates().flatMap((s) => (s.cwd ? [s.cwd] : [])))
 // A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
 WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())

@@ -12,6 +12,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, Maybe } from './types'
+import type { TargetChanges } from '../../shared/types'
 
 /** What a start records of the platform: the card's folder, line, base and target (None: its manifests). */
 export interface StartPlan {
@@ -31,11 +32,13 @@ export interface StartPlan {
   deliverables?: Manifest
   /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */
   baselineGen?: number
+  /** What only this platform records of the start (`Started.platform`; jj's workspace and its identity, HI-2868). */
+  platform?: Record<string, unknown>
 }
 
 /** A submission's platform side: the revision with its fixed endpoints, key and files, and the guards' platform inputs. */
 export type SubmitPlan =
-  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[] }
+  | { ok: true; revision: string; base: string | null; key: string | null; files: FileChange[]; commits?: string[]; paths?: string[]; inputs: Partial<GuardInputs>; warnings: string[]; platform?: Record<string, unknown> }
   | { ok: false; refusal: GuardRefusal }
 
 /** What a finish needs from the platform, gathered before the transaction. */
@@ -124,6 +127,11 @@ export interface PlatformAdapter {
    */
   lineNow?(folder: string, target: string): Promise<Maybe<LineNow>>
   /**
+   * HI-2944: the folder a target is checked out in and its uncommitted files, for a start's warning (Git only; absent:
+   * no such folder). Null: checked out nowhere, clean, or unreadable (a warning, never a refusal).
+   */
+  targetChanges?(target: string): Promise<TargetChanges | null>
+  /**
    * Moves an agent's worktree's line to `to` (Git: `reset --keep`, which refuses to overwrite a local change), only from
    * `expect` (its line and head as checked): true; git's reason; or null when the line changed since (nothing moved).
    */
@@ -169,8 +177,25 @@ export interface PlatformAdapter {
    * content (None) or the platform can't say.
    */
   content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null>
+  /**
+   * How many times a start is gathered again from the top while only its fingerprint moved and its answer by content
+   * didn't (`content`), each pass reading everything afresh; absent: once (#1206's rule for every intent). jj's
+   * (HI-2916): any jj operation, Combwork's own included (a slot made, another detached), moves the head its fingerprint
+   * keeps, so a start beside them needs a few passes. Spent, the start is refused as evidence that changed.
+   */
+  readonly startGathers?: number
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
   observe(onChange: (e: ObserveEvent) => void): Disposable
+  /**
+   * Once per reconciliation run of the project, after its cards (HI-2882, jj's): the platform's own passes (jj's publish
+   * observations and retained bundles). `more`: work remains for a continuation run. Absent: nothing.
+   */
+  afterRun?(signal?: AbortSignal): Promise<{ more: boolean }>
+  /**
+   * Something its repository watch says may have changed, or its tick (HI-2882): `what` as the watch names it. Whether a
+   * reconciliation run is wanted for it. Absent: always.
+   */
+  invalidated?(what: string): Promise<boolean>
 }

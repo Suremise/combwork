@@ -21,6 +21,14 @@ import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunn
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
+import { quoteArgMsvc } from '../src/main/platform/signerRules'
+
+// HI-3009: PowerShell started with spawnSync (endTree's blocking listing and ending), recorded; everything else as it is.
+const { psSync } = vi.hoisted(() => ({ psSync: [] as string[] }))
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:child_process')>()
+  return { ...real, spawnSync: (...a: Parameters<typeof real.spawnSync>) => (/powershell/i.test(String(a[0])) && psSync.push(String(a[0])), real.spawnSync(...a)) }
+})
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -640,6 +648,19 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     await a.runner.release()
   })
 
+  const msysEcho = join('C:\\Program Files\\Git', 'usr', 'bin', 'echo.exe')
+  it.skipIf(!existsSync(msysEcho))("HI-2947: a command run verbatim gets its command line as given, its first word too: Git's MSYS2 echo keeps a quoted ', * and {", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'verbatim', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    try {
+      // The signing check's shape: words quoted as git quotes them, and the program's path (with its space) as argv0.
+      const r = await a.runner.run('testMerge', msysEcho, [quoteArgMsvc("C:\\Users\\O'Brien{a,b}*~")], { argv0: quoteArgMsvc(msysEcho), windowsVerbatimArguments: true, timeoutMs: 30_000 })
+      expect(r).toMatchObject({ ok: true, code: 0 })
+      expect(r.out.trim()).toBe("C:\\Users\\O'Brien{a,b}*~")
+    } finally {
+      await a.runner.release()
+    }
+  })
+
   it("HI-2042: a command ended by a signal is never code 1 (git's \"no\"): the launcher says so by its nonce; a real exit 1, and a look-alike line, stay the command's", async () => {
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'signal', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     // Released however the test ends (its job, and anything still in it, ended), so a failing check leaves nothing running.
@@ -757,9 +778,19 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     // The command (git's stand-in) starts a waiter (the signer's) and waits for it; neither ever ends by itself.
     const waiter = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`
     const parent = `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(waiter)}], { stdio: 'inherit' }); c.on('exit', () => process.exit(0))`
+    psSync.length = 0
     const r = await a.runner.run('testMerge', process.execPath, ['-e', parent], { timeoutMs: 5000 })
     expect(r).toMatchObject({ ok: false, timedOut: true })
+    // HI-3009: ended off main's thread (treeEnding), never with endTree's blocking PowerShell; the result once it was over.
+    expect(psSync).toEqual([])
     const pid = Number(readFileSync(pidFile, 'utf8'))
+    expect((() => {
+      try {
+        return process.kill(pid, 0)
+      } catch {
+        return false
+      }
+    })()).toBe(false)
     await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: 30_000, interval: 100 })
     await a.runner.release()
   })

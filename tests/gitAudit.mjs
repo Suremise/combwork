@@ -27,6 +27,8 @@ const GIT_FILES = new Set([
   'src/main/branchWatch',
   'src/main/branchMerge',
   'src/main/filesGit',
+  // HI-2944: Commit and Set aside of a target folder's changes (port 5's folderChanges, Git's implementation).
+  'src/main/gitFolderChanges',
   'src/main/worktrees',
   'src/main/unusedWorktrees',
   'src/main/repoLock',
@@ -179,6 +181,10 @@ export const EDGES = [
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
   { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
+  { file: 'src/main/platform/jjOperations', module: 'src/main/git', class: 'impl', names: ['git'], why: "an operation preview reads the colocated store's refs and HEAD to compare with jj's record (HI-2800, E8): read-only git calls, never an import" },
+  { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
+  { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
+  { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -193,6 +199,9 @@ export const EDGES = [
   { file: 'src/main/nameUpgradeProjects', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
   { file: 'src/main/platform/adapters', module: 'src/main/platform/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
   { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
+  { file: 'src/main/slotsApp', module: 'src/main/repoLock', class: 'common', names: ['takeStores'], why: "jj's store lock for its workspace port's writes (HI-2866): the repository lock's one owner (HI-2896), keyed by the store, every platform's" },
+  { file: 'src/main/slotsApp', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866): J2's recoverStale reads the workspace's files through git, read-only" },
+  { file: 'src/main/jjCards', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's card work composed with the app's deps (HI-2868): git on jj's Git-backed store (`--git-dir`): its pins, the named revision's resolution, J5's reads" },
   { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['git', 'readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
   { file: 'src/main/platform/repoContext', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "RepoFiles' ignore rule type: the Files tab's rule, Git's syntax" },
@@ -202,6 +211,7 @@ export const EDGES = [
   { file: 'src/main/platform/repoOpsPorts', module: 'src/main/platform/gitRepoOps', class: 'registry', names: ['gitRepoOps'], why: "the repository operations port's map (R3)" },
   { file: 'src/main/platform/repoPorts', module: 'src/main/platform/gitRepoPorts', class: 'registry', names: ['gitRepoPorts'], why: "the repository context port's map (R1)" },
   { file: 'src/main/platform/repoPorts', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "ignoredIn's rule type (RepoFiles)" },
+  { file: 'src/main/platform/repoPorts', module: 'src/main/repoLock', class: 'common', names: ['withStoreLocks'], why: "every context's store locked by the repository lock's one owner, whatever platform named it (HI-2896, s13 §2)" },
   { file: 'src/main/platform/repoReads', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoReads' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
   { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
@@ -263,7 +273,7 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 18 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792)" },
+  'src/main/ipc': { calls: { lineRepoReads: 19, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
   'src/main/projectAgents': { calls: { lineRepoOps: 1 }, why: "the 0.9 worktree merge through RepoOps (R3)" },
   'src/main/repoOpsIpc': { calls: { lineRepoOps: 1 }, why: "the window's repository operations (R3)" },
@@ -275,6 +285,7 @@ export const SEAMS = {
   'src/main/workflow/nextVersion': { calls: { lineRepoReads: 2, lineRepoOps: 2 }, why: "Start the next version: the window's repository reads and operations (R2, R3)" },
   'src/main/workflow/optionsForm': { calls: { lineHistory: 2 }, why: "the default target for kept targets and a changed form: reached with the project's path alone (HI-2792)" },
   'src/main/workflow/queueChecks': { calls: { lineHistory: 2 }, why: "the queue's check brackets (R6)" },
+  'src/main/workflow/queueChecksApp': { calls: { slotWorkspaces: 1 }, why: "the queue's folder's submodules and LFS step: a worktree made as slots are, their platform's (HI-1182)" },
   'src/main/workflow/queueControls': { calls: { lineHistory: 9, queueIntegration: 1 }, why: "forwarding, the default target and Resume's condition: the queue's controls name no card (R8, HI-2792)" },
   'src/main/workflow/queueHost': { calls: { queueIntegration: 2 }, why: "the host's pin clean-up (R8)" },
   'src/main/workflow/queueRunner': { calls: { queueIntegration: 2 }, why: "the runner's workspace removal (R8)" },
@@ -299,6 +310,10 @@ const SWITCH_HOME = /^src\/(shared\/platform\/descriptors|main\/platform\/(regis
  * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
  */
 export const SWITCHES = {
+  'src/main/copies': { n: 1, why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/slots': { n: 1, why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/workflow/platformSwitch': { n: 1, why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
+  'src/main/workflow/storeSwitch': { n: 1, why: "a project's repository store is read as Git's common directory (Git's, or colocated jj's): Git's data (HI-2799)" },
   'src/main/servers': { n: 1, why: "the project's status names what was found in Git's words for agents (`git at {root}`, api.project.vcsGit): Git-facing text" },
   'src/main/workflow/commitMessageStep': { n: 2, why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): historic, Git's data alone" },
   'src/renderer/src/views/VersionControl': { n: 1, why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },

@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot} 被另一个仍在运行的 Combwork（进程 {pid}）占用：请在那里释放，或先退出那个 Combwork。",
   "slots.setting.bad": "Combwork 没有这个槽位设置。",
   "slots.setting.badSize": "评审副本和检查副本的数量必须是 {min, number} 到 {max, number} 之间的整数。",
+  "slots.setting.badSwitch": "“设置子模块和 LFS”只能开启或关闭。",
   "slots.setting.badText": "槽位脚本或文件列表必须是不超过 {max, number} 个字符的文本。"
 }

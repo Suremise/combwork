@@ -61,7 +61,8 @@ export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg
     if (!byOptions.has(projectPath.toLowerCase())) byOptions.set(projectPath.toLowerCase(), off ? [] : hiddenForWorkflow([r.options]))
     // All off is really off (SPEC §16.6.4: cards move freely, Review included), so it hides nothing, as rules not enforced.
     const retained = off ? null : workRetained(ws, basename(projectPath))
-    hidden = retained && !retained.allOff ? hiddenForWorkflow([r.options, ...retained.options], retained.stages) : []
+    // A stage keeps a tool under its own cards' rules (HI-3014); a card with none recorded works under the options now.
+    hidden = retained && !retained.allOff ? hiddenForWorkflow([r.options, ...retained.options], retained.stages.map((h) => ({ stage: h.stage, sets: h.sets.length ? h.sets : [r.options] }))) : []
   } catch (e) {
     log.warn(`the tools ${userText(basename(projectPath))}'s workflow hides couldn't be read, so none are`, e)
     hidden = []

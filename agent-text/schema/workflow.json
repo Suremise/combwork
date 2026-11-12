@@ -8,6 +8,12 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "placeholders": {}
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "placeholders": {}
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "placeholders": {}
   },
@@ -113,6 +119,14 @@
       "folder": "plain"
     }
   },
+  "workflow.forYou.queuePublish": {
+    "placeholders": {
+      "card": "plain",
+      "result": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.forYou.queueStuck": {
     "placeholders": {
       "card": "plain",
@@ -149,6 +163,35 @@
       "kind": "select"
     }
   },
+  "workflow.jj.containment": {
+    "placeholders": {}
+  },
+  "workflow.jj.notYet": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.carryTarget": {
+    "placeholders": {
+      "slot": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.jj.start.inGit": {
+    "placeholders": {
+      "root": "plain"
+    }
+  },
+  "workflow.jj.start.noSlot": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.notWorkspace": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.slots": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.target": {
+    "placeholders": {}
+  },
   "workflow.move.answer": {
     "placeholders": {}
   },
@@ -168,6 +211,9 @@
     "placeholders": {}
   },
   "workflow.move.reportMerge": {
+    "placeholders": {}
+  },
+  "workflow.move.resolveOnBuilder": {
     "placeholders": {}
   },
   "workflow.move.retryMerge": {
@@ -236,6 +282,12 @@
   "workflow.option.folder.title": {
     "placeholders": {}
   },
+  "workflow.option.followRemote.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.followRemote.title": {
+    "placeholders": {}
+  },
   "workflow.option.identity.desc": {
     "placeholders": {}
   },
@@ -275,10 +327,22 @@
   "workflow.option.mergeChecks.desc": {
     "placeholders": {}
   },
+  "workflow.option.mergeChecks.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.jjTitle": {
+    "placeholders": {}
+  },
   "workflow.option.mergeChecks.title": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.title": {
@@ -371,10 +435,22 @@
   "workflow.option.strict.desc": {
     "placeholders": {}
   },
+  "workflow.option.strict.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.jjTitle": {
+    "placeholders": {}
+  },
   "workflow.option.strict.title": {
     "placeholders": {}
   },
   "workflow.option.style.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.style.title": {
@@ -448,6 +524,33 @@
   },
   "workflow.refused.forward.notAgents.next": {
     "placeholders": {}
+  },
+  "workflow.refused.forward.resolutionSource.message": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain",
+      "revision": "plain",
+      "source": "plain"
+    }
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "placeholders": {
+      "source": "plain"
+    }
+  },
+  "workflow.refused.forward.resolutionTarget.message": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.forward.resolutionTarget.next": {
+    "placeholders": {
+      "to": "plain"
+    }
   },
   "workflow.refused.integrate.approved.message": {
     "placeholders": {
@@ -703,6 +806,58 @@
       "folder": "plain"
     }
   },
+  "workflow.refused.platform.changed.message": {
+    "placeholders": {
+      "card": "plain",
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.changed.next": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.jjRefused.message": {
+    "placeholders": {
+      "why": "select",
+      "card": "plain",
+      "count": "plural",
+      "files": "plain",
+      "base": "plain",
+      "commit": "plain",
+      "other": "plain",
+      "max": "number"
+    }
+  },
+  "workflow.refused.platform.jjRefused.next": {
+    "placeholders": {
+      "why": "select"
+    }
+  },
+  "workflow.refused.platform.offLine.message": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "where": "select",
+      "head": "plain",
+      "on": "plain"
+    }
+  },
+  "workflow.refused.platform.offLine.next": {
+    "placeholders": {
+      "where": "select",
+      "line": "plain",
+      "on": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.targetGone.message": {
     "placeholders": {
       "card": "plain",
@@ -828,6 +983,14 @@
     }
   },
   "workflow.refused.start.notBlocked.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.platformReady.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.start.platformReady.next": {
     "placeholders": {}
   },
   "workflow.refused.start.slotAvailable.change": {
@@ -1025,6 +1188,9 @@
   "workflow.rule.done.contained": {
     "placeholders": {}
   },
+  "workflow.rule.forward.resolutionSource": {
+    "placeholders": {}
+  },
   "workflow.rule.integrate.approved": {
     "placeholders": {}
   },
@@ -1053,6 +1219,9 @@
     "placeholders": {}
   },
   "workflow.rule.start.notBlocked": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.platformReady": {
     "placeholders": {}
   },
   "workflow.rule.start.slotAvailable": {
@@ -1250,6 +1419,24 @@
       "path": "plain"
     }
   },
+  "workflow.unreadable.remoteBehind": {
+    "placeholders": {
+      "target": "plain",
+      "endpoint": "plain"
+    }
+  },
+  "workflow.unreadable.remoteHead": {
+    "placeholders": {
+      "branch": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.remoteSetup": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "workflow.unreadable.replay": {
     "placeholders": {
       "revision": "plain",
@@ -1317,6 +1504,9 @@
   "workflow.value.finish.notChecked": {
     "placeholders": {}
   },
+  "workflow.value.finish.userIntegrates": {
+    "placeholders": {}
+  },
   "workflow.value.folder.project": {
     "placeholders": {}
   },
@@ -1324,6 +1514,9 @@
     "placeholders": {}
   },
   "workflow.value.mergeInstall.always": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.alwaysCandidate": {
     "placeholders": {}
   },
   "workflow.value.mergeInstall.onManifestChange": {

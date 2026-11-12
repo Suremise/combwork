@@ -21,8 +21,14 @@ import type { Disposable, ObserveEvent } from './history'
 import { historyFor, observePort } from './historyPorts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
-import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
+import { isUnknown, unknown, withDetail, type Containment, type Maybe, type Unknown } from './types'
+import { isAgain } from './again'
+import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
+import type { TargetChanges } from '../../shared/types'
+
+/** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
+const SLOT_FETCH_MS = 60_000
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -153,7 +159,10 @@ export class GitPlatform implements PlatformAdapter {
         const here = await this.start(card, { ...o, folder: 'project' })
         return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
       }
-      const th = await G.lineHead(this.project, target)
+      // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
+      const followed = await this.followedHead(o, target, dry)
+      if (isUnknown(followed)) return followed
+      const th = followed ?? (await G.lineHead(this.project, target))
       if (isUnknown(th)) return th
       if (!th) return unknown(UNREADABLE.head, { where: target })
       const line = await this.lineFor(card)
@@ -196,6 +205,32 @@ export class GitPlatform implements PlatformAdapter {
     if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
+  }
+
+  /**
+   * G21 (HI-1183, §16.9.4): the head a slotted card starts from when its target follows its remote: the remote's branch
+   * fetched (in the sealed context, bounded), pinned at `refs/cw/fetch/<target>` until the card's line holds it. Null when
+   * the target doesn't follow its remote (or a dry plan). A remote it can't use, a fetch that fails, or a local target with
+   * commits the remote lacks refuses the start with why: never the local head instead.
+   */
+  private async followedHead(o: WorkflowOptions, target: string, dry: boolean): Promise<Maybe<string | null>> {
+    // G21 is in no ruleset: read from the project's options as they are now, as the queue reads it.
+    if (dry || o.finish !== 'combworkMerges' || this.wf.cfg.options().followRemote !== true) return null
+    const h = projectHost(this.project)
+    const d = await destinationOf(h, target)
+    if (isAgain(d)) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.again.message)
+    if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
+    const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
+    if ('failed' in f) return withDetail(unknown(UNREADABLE.remoteHead, { branch, endpoint: d.snapshot.display, target }), f.failed)
+    const local = await G.lineHead(this.project, target)
+    if (isUnknown(local)) return local
+    if (local && local !== f.head) {
+      const behind = await G.isAncestor(this.project, local, f.head)
+      if (isUnknown(behind)) return behind
+      if (!behind) return unknown(UNREADABLE.remoteBehind, { target, endpoint: d.snapshot.display })
+    }
+    return f.head
   }
 
   /** Whether a start here asks for a slot (#1438): the app's lending, while the rules are enforced. */
@@ -359,6 +394,16 @@ export class GitPlatform implements PlatformAdapter {
       const read = got ? null : await G.heads(folder, target)
       const h = got ? got.head! : read!.head
       if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
+      // HI-3010: its folder on the card's own line, or what it holds isn't what the card's line merges: work committed on
+      // a detached head (or another branch) passed review, then went stale at the merge, which reads the line.
+      const on = got ? got.line : read!.line
+      const line = s.started!.line
+      // Its branch unreadable while its head was read (HR2's round 2: G.heads reads each on its own when its single read
+      // fails): not known to be on its line, so refused as unknown rather than let through.
+      if (line) {
+        if (isUnknown(on)) return { ok: false, refusal: unknownRefusal(card, on, 'submit') }
+        if (on !== line) return { ok: false, refusal: { rule: 'platform.offLine', values: { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7) } } } // i18n-ignore: codes
+      }
       const mismatch = args.revision ? await notTheHead(folder, args.revision, h) : null
       if (mismatch) return { ok: false, refusal: mismatch }
       revision = h
@@ -428,16 +473,35 @@ export class GitPlatform implements PlatformAdapter {
   /** The combined change of a shared-folder card's own commits, applied in order (§16.3.2). */
   private async ownChange(base: string, commits: string[]): Promise<Maybe<{ files: FileChange[]; key: string | null }>> {
     const files = new Map<string, string>()
+    // HI-2864: a path with a gitlink in any of the commits: where its change starts (the first such commit's parent) and
+    // ends (the last commit changing it), so its sides are read from those trees, not stitched from the commits' rows.
+    const ends = new Map<string, { from: string; to: string; gitlink: boolean }>()
     const keys: string[] = []
     for (const c of commits) {
       const parent = await G.resolve(this.project, `${c}^`)
       if (isUnknown(parent)) return parent
       const ch = await G.change(this.project, parent ?? base, c)
       if (isUnknown(ch)) return ch
-      for (const f of ch.files) files.set(f.path, f.status)
+      for (const f of ch.files) {
+        files.set(f.path, f.status)
+        const e = ends.get(f.path)
+        ends.set(f.path, { from: e?.from ?? parent ?? base, to: c, gitlink: !!e?.gitlink || !!f.gitlink })
+      }
       if (ch.key) keys.push(ch.key)
     }
-    return { files: [...files].map(([path, status]) => ({ path, status })), key: keys.length ? keys.join('+') : null }
+    const out: FileChange[] = []
+    for (const [path, status] of files) {
+      const e = ends.get(path)
+      if (!e?.gitlink) {
+        out.push({ path, status })
+        continue
+      }
+      const [from, to] = await Promise.all([G.treeSide(this.project, e.from, path), G.treeSide(this.project, e.to, path)])
+      if (isUnknown(from)) return from
+      if (isUnknown(to)) return to
+      out.push({ path, status, ...(from.kind === 'gitlink' || to.kind === 'gitlink' ? { gitlink: { from, to } } : {}) })
+    }
+    return { files: out, key: keys.length ? keys.join('+') : null }
   }
 
   /**
@@ -586,6 +650,18 @@ export class GitPlatform implements PlatformAdapter {
 
   targetHead(target: string): Promise<Maybe<string | null>> {
     return G.lineHead(this.project, target)
+  }
+
+  /** HI-2944: the folder `target` is checked out in and its uncommitted files (null: checked out nowhere, or clean; never a refusal). */
+  async targetChanges(target: string): Promise<TargetChanges | null> {
+    const where = await G.checkouts(this.project)
+    const folder = isUnknown(where) ? null : where[target]
+    if (!folder) return null
+    const now = await G.worktreeNow(folder)
+    // A git operation's marker (`(MERGE_HEAD)`) isn't a file to commit: the files only, told apart by the operations
+    // listed (HI-2983: a changed file named `(MERGE_HEAD)` is a file).
+    const files = isUnknown(now) ? [] : now.dirty.slice(0, now.dirty.length - (now.operations?.length ?? 0))
+    return files.length ? { target, folder, files } : null
   }
 
   async lineNow(folder: string, target: string): Promise<Maybe<LineNow>> {

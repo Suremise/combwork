@@ -5,10 +5,10 @@
 // In the app (#1263): the runtime compiles a project's resolved options (main/workflow/rulesets.ts) and stores each
 // ruleset a card starts under.
 
-import { deliversCommits, hasCapability, merges } from '../platform/descriptors'
+import { accepts, deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
-import { contradictions, reviewerAgent, type Contradiction, type WorkflowOptions } from './options'
+import { contradictions, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
 import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
 
 export const RULESET_VERSION = 1
@@ -60,12 +60,12 @@ export function canonical(v: unknown): string {
  * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'userIntegrates')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -79,7 +79,8 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
+  // Where its user integrates (jj, HI-2799), your integration follows the approval, as a merge Combwork doesn't check follows Git's.
+  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
@@ -116,7 +117,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   }
   if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
   // G10 holds the report of a merge Combwork doesn't check too (#1592): only its containment isn't checked.
-  if ((o.finish === 'agentMerges' || o.finish === 'notChecked') && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
+  if ((o.finish === 'agentMerges' || userReportsMerge(o.finish)) && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
   if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
   if (o.finish === 'combworkMerges') {
     if (review) g.integrate.push('integrate.approved')
@@ -164,7 +165,24 @@ export function loadRuleset(data: unknown): LoadResult {
     if (!(MOVES as readonly string[]).includes(move)) return { ok: false, error: 'unknownPiece', piece: move }
     for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
   }
-  return { ok: true, ruleset: r as Ruleset, readOnly: r.version > RULESET_VERSION }
+  const readOnly = r.version > RULESET_VERSION
+  return { ok: true, ruleset: readOnly ? (r as Ruleset) : withoutRetired(r as Ruleset), readOnly }
+}
+
+/**
+ * The guard J6 put in every jj ruleset until J9e (HI-2874) let jj cards run: `start.platformReady`. A jj ruleset stored
+ * before (a lane's, an Override's) still names it; it is dropped as the ruleset is read, so its cards start under the rest
+ * of its rules. Kept a known piece so such a row still loads, and its texts kept for the `Refused` facts it left.
+ */
+export const RETIRED_GUARD: GuardId = 'start.platformReady'
+
+/**
+ * A supported ruleset as read (HI-2874): a jj one with the retired guard gets a copy without it, its id, version, other
+ * guards, options and stages as they were; any other is returned as it is.
+ */
+function withoutRetired(r: Ruleset): Ruleset {
+  if (r.options?.platform !== 'jj' || !r.guards.start?.includes(RETIRED_GUARD)) return r
+  return { ...r, guards: { ...r.guards, start: r.guards.start.filter((g) => g !== RETIRED_GUARD) } }
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)
@@ -181,8 +199,11 @@ export const baseRulesetId = (id: string): string => (id.endsWith(REVIEW_SKIPPED
  */
 export const TARGETED = '~target:'
 
-/** An id with a forward merge's mark (HI-2679) taken off: its base's. */
-const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id)
+/** What marks a forward resolution's rules (HI-2959): its id is its base's with this after it (`mergeCommitOf`). */
+export const MERGE_COMMIT = '~mergeCommit'
+
+/** An id with a forward merge's mark (HI-2679) or a forward resolution's (HI-2959) taken off: its base's. */
+const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id.endsWith(MERGE_COMMIT) ? id.slice(0, -MERGE_COMMIT.length) : id)
 
 /**
  * A ruleset's rules for old rules (§16.5.4, HI-2556): its id with neither a review skip nor another target marked, so a
@@ -191,7 +212,8 @@ const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(
 export const rulesBaseId = (id: string): string => {
   const base = unforwarded(baseRulesetId(id))
   const at = base.indexOf(TARGETED)
-  return at < 0 ? base : base.slice(0, at)
+  // A forward resolution retargeted (HI-2959): its mark is before the target's.
+  return at < 0 ? base : unforwarded(base.slice(0, at))
 }
 
 /** The other target a ruleset's id marks (HI-2556), or null: the one its options name (G7) is its own. */
@@ -230,6 +252,18 @@ export function forwardOf(r: Ruleset, to: string): Ruleset {
   const base = targetedOf(r, to)
   const c = mustCompile({ ...base.options, target: to, review: 'none', reviewers: 1, reviewerMode: 'lane', style: 'merge', strict: false, focusedTests: false })
   return { ...c, id: base.id + FORWARD }
+}
+
+/**
+ * The rules a forward resolution (HI-2959: a card made by Resolve on a builder) runs under: its base's with a merge
+ * commit always (G6), so a squash or a rebase never drops the source's history from the destination (the next forward
+ * merge would conflict again); review, checks and everything else as its base's. The base itself when it merges with a
+ * merge commit already. Its id is the base's marked (`MERGE_COMMIT`), found again by `rulesBaseId`.
+ */
+export function mergeCommitOf(r: Ruleset): Ruleset {
+  if (r.options.style === 'merge') return r
+  const c = mustCompile({ ...r.options, style: 'merge' })
+  return { ...c, id: r.id + MERGE_COMMIT }
 }
 
 /**

@@ -10,7 +10,8 @@
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { open } from 'original-fs/promises'
 import { lineHistory } from '../platform/historyPorts'
-import { endTree, shellSpec } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
+import { shellSpec } from '../progressReporters/wrapper'
 import { bracketEnd, bracketStart, checkEnv, programFound, type Spawn } from './queueChecks'
 import { FOCUSED_MAX_DIAGNOSTICS, FOCUSED_MAX_OUTPUT, changePaths, parsePick, type FocusedPickState, type FocusedPickWhy, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { agentMsg, say } from '../../shared/agentText'
@@ -99,6 +100,8 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
     let timedOut = false
     let settled = false
     let after: NodeJS.Timeout | undefined
+    // Its tree is ended off main's thread (HI-3009): the outcome, and a time-out's grace, wait for that teardown.
+    const ending = treeEnding(platform)
     const diagnostics = (): Pick<PickOutcome, 'diagnostics'> => (err.trim() ? { diagnostics: err.trim().slice(-FOCUSED_MAX_DIAGNOSTICS) } : {})
     const done = (o: PickOutcome): void => {
       if (settled) return
@@ -106,17 +109,20 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
       clearTimeout(timer)
       clearTimeout(after)
       deps.signal?.removeEventListener('abort', cancel)
-      resolve(o)
+      ending.after(() => resolve(o))
     }
     const timer = setTimeout(() => {
       timedOut = true
-      if (child) endTree(child, platform)
-      after = setTimeout(() => done({ state: 'unknown', tests: [], why: 'timedOut', ...diagnostics() }), CLOSE_AFTER_KILL_MS) // i18n-ignore: codes (a why, a check name), never shown as text
-      after.unref?.()
+      ending.end(child)
+      ending.after(() => {
+        if (settled) return
+        after = setTimeout(() => done({ state: 'unknown', tests: [], why: 'timedOut', ...diagnostics() }), CLOSE_AFTER_KILL_MS) // i18n-ignore: codes (a why, a check name), never shown as text
+        after.unref?.()
+      })
     }, deps.timeoutMs)
     timer.unref?.()
     const cancel = (): void => {
-      if (child) endTree(child, platform)
+      ending.end(child)
       done({ state: 'unknown', tests: [], why: 'cancelled', ...diagnostics() }) // i18n-ignore: codes (a why), never shown as text
     }
     if (deps.signal?.aborted) return cancel()
@@ -137,7 +143,7 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
       if (out.length > FOCUSED_MAX_OUTPUT) {
         // More than a selection can be: ended, and not read.
         over = true
-        if (child) endTree(child, platform)
+        ending.end(child)
       }
     })
     child.stderr?.on('data', (c: string) => {

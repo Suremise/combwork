@@ -36,6 +36,7 @@ const { setSlotStarts, workflowFor } = await import('../src/main/workflow/servic
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
 const { targetOfRulesetId } = await import('../src/shared/workflow/compile')
+const { reconcileNow } = await import('../src/main/workflow/reconciler')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -203,7 +204,12 @@ async function workspace(): Promise<{ w: WS; repo: string }> {
 }
 const wfOf = async (w: WS, repo: string) => (await workflowFor(w, repo))!
 
-/** A card started by b1 on 1.2.0, its slot's line made and one commit of its own on it: its number, folder and line. */
+/**
+ * A card started by b1 on 1.2.0, its slot's line made and one commit of its own on it: its number, folder and line. A
+ * line made here, not by the slot's own preparation, has that preparation recorded as the slot does (`SlotPrepared`, as
+ * the jj candidate tests do): until then the reconciler never observes the line (#1551), and a pass's reconciliation
+ * (HI-2938) would take the card's head for its base and its pass for stale (HI-3001).
+ */
 async function started(w: WS, repo: string, title = 'Card'): Promise<{ n: number; folder: string; line: string }> {
   const n = await inWorkspace(w, async () => (await tasks.createTask({ title, project: 'p' }, user)).number)
   const wf = await wfOf(w, repo)
@@ -211,15 +217,22 @@ async function started(w: WS, repo: string, title = 'Card'): Promise<{ n: number
   const s = wf.state(wf.store.card(n))
   const folder = s.started!.folder
   const line = s.started!.line!
-  if (!existsSync(folder)) git(repo, 'worktree', 'add', '-q', '-b', line, folder, s.started!.base!)
+  if (!existsSync(folder)) {
+    git(repo, 'worktree', 'add', '-q', '-b', line, folder, s.started!.base!)
+    await wf.write(wf.store.card(n), null, 'combwork', (x) => void x.fact('SlotPrepared', { lease: s.started!.lease!, line, revision: s.started!.base! }))
+  }
   commitIn(folder, `work-${n}.txt`)
   return { n, folder, line }
 }
-/** 1.2.0 merged into main (the release), then deleted, and the project's target moved to main. */
+/**
+ * 1.2.0 merged into main (the release), then deleted, and the project's target moved to main; Combwork's reconciliation
+ * of it settled (HI-3001: its observation of 1.2.0 gone, written during a move after it, makes the move refuse as changed).
+ */
 async function release(w: WS, repo: string, o: { keepBranch?: boolean } = {}): Promise<void> {
   git(repo, 'merge', '-q', '--no-ff', '-m', '1.2.0 into main', '1.2.0')
   if (!o.keepBranch) git(repo, 'branch', '-D', '1.2.0')
   await w.mutateProjectConfig(repo, (cfg) => ({ workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, target: 'main', otherTargets: o.keepBranch ? ['1.2.0'] : [] } } }))
+  await inWorkspace(w, () => reconcileNow(w, repo, ['main', '1.2.0']))
 }
 const stateOf = async (w: WS, repo: string, n: number) => {
   const wf = await wfOf(w, repo)
@@ -453,8 +466,11 @@ describe("a reviewed card's evidence when it moves (HI-2753, HR1's point 3)", ()
     const wf = await wfOf(w, repo)
     expect(await store.boardWrite(w, async () => wf.submit(`#${n}`, agentActor('b1'), { summary: 'Done' }))).toMatchObject({ ok: true })
     expect(await store.boardWrite(w, async () => wf.verdict(`#${n}`, agentActor('r1'), { pass: true, comment: 'ok', startReview: true }))).toMatchObject({ ok: true })
+    // The reconciliation its pass asks for (HI-2938) settled first: it observes the line's head, the one approved.
+    await inWorkspace(w, () => reconcileNow(w, repo))
     const before = await stateOf(w, repo, n)
     expect(before.stage).toBe('approved')
+    expect(before.stale).toBeNull()
     await release(w, repo)
     await inWorkspace(w, () => tasks.setTarget(n, 'main', user))
     const s = await stateOf(w, repo, n)

@@ -339,6 +339,106 @@
     "note": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer.",
     "audience": "both"
   },
+  "service.folderChanges.agentBusy": {
+    "text": "{agent} is working in {folder}. Try again once it has finished.",
+    "note": "HI-2944: an error from Commit or Set aside: an agent ({agent}) works in the folder ({folder}, a path); nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.busy": {
+    "text": "An agent or a run is working in {folder} ({what}). Try again once it has finished.",
+    "note": "HI-2944: an error from Commit or Set aside: an agent holds files or a run works in the folder ({folder}, a path); {what} names the first file or run's folder; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.changed": {
+    "text": "The changes in {folder} aren't the ones shown any more. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.commitFailed": {
+    "text": "Git did not commit: {why}",
+    "note": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were.",
+    "audience": "both"
+  },
+  "service.folderChanges.deletedKept": {
+    "text": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
+    "note": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves.",
+    "audience": "both"
+  },
+  "service.folderChanges.detached": {
+    "text": "{folder} isn't on a branch, so Combwork doesn't commit there.",
+    "note": "HI-2944: an error from Commit it (Files) or Commit: the folder ({folder}, a path) has a detached HEAD (git's term), so nothing is committed.",
+    "audience": "both"
+  },
+  "service.folderChanges.indexBusy": {
+    "text": "Another git command is using the repository. Try again in a moment.",
+    "note": "HI-2944: an error from Commit or Set aside: git's index is locked by another git command.",
+    "audience": "both"
+  },
+  "service.folderChanges.midOperation": {
+    "text": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
+    "note": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.moved": {
+    "text": "Where {target} is checked out changed meanwhile. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: the folder the branch {target} is checked out in changed while Combwork waited to act; nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.nestedRepo": {
+    "text": "{folder} is a Git repository of its own inside this one, so Combwork doesn't commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.",
+    "note": "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name.",
+    "audience": "both"
+  },
+  "service.folderChanges.noTarget": {
+    "text": "{target} isn't checked out in a folder of this project now: nothing to commit or set aside there.",
+    "note": "HI-2944: an error from Commit or Set aside (a paused merge, a start's warning): the branch {target} isn't checked out anywhere now.",
+    "audience": "both"
+  },
+  "service.folderChanges.nothing": {
+    "text": "{file} has no changes to commit.",
+    "note": "HI-2944: an error from Files' Commit it after Exclude from Git: the ignore file ({file}, such as .gitignore) has no uncommitted change.",
+    "audience": "both"
+  },
+  "service.folderChanges.readFailed": {
+    "text": "Git could not read the folder's changes: {why}",
+    "note": "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done.",
+    "audience": "both"
+  },
+  "service.folderChanges.stashFailed": {
+    "text": "Git did not set the changes aside: {why}",
+    "note": "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were.",
+    "audience": "both"
+  },
+  "service.folderChanges.stashPartial": {
+    "text": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
+    "note": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command.",
+    "audience": "both"
+  },
+  "service.folderChanges.tooManyToSetAside": {
+    "text": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
+    "note": "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command.",
+    "audience": "both"
+  },
+  "service.folderChanges.unplaced": {
+    "text": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",
+    "note": "HI-2962: an error from Files' Commit it after Exclude from Git: a project folder ({folder}, a path) inside the same repository couldn't be placed by git (it answered nothing), so nothing was committed. Keep .gitignore: a file name.",
+    "audience": "both"
+  },
+  "service.folderChanges.wrongBranch": {
+    "text": "{folder} isn't on {target} now. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done.",
+    "audience": "both"
+  },
+  "service.forward.direction": {
+    "text": "{to} isn’t brought up to date with {from}: {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Nothing was queued. {dir, select, backward {Bring {from} up to date with {to} instead, or, if you mean it, ask the Assistant with your explicit override.} other {If you mean it, ask the Assistant with your explicit override.}}",
+    "note": "HI-2892: a forward merge refused: it would bring branch {to} up to date with branch {from} against the release path’s direction (forward merges go from a release, or main, into the next version). {why} says why (select: translate each; keep the keys): {to} is an older version, {to} is the repository’s default branch (main), the two names are the same version, or Combwork can’t order them. {dir}: backward (the reverse is the right way) or other. Branch names stay as they are.",
+    "audience": "both"
+  },
+  "service.forward.directionRetry": {
+    "text": "{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.",
+    "note": "HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there.",
+    "audience": "both"
+  },
   "service.forward.missing": {
     "text": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
     "note": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.",
@@ -354,14 +454,29 @@
     "note": "HI-2679: a forward merge refused: asked by a project agent or a script.",
     "audience": "both"
   },
+  "service.forward.notReturned": {
+    "text": "{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.",
+    "note": "HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card).",
+    "audience": "both"
+  },
   "service.forward.notTargets": {
     "text": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
     "note": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.",
     "audience": "both"
   },
+  "service.forward.openNoOverride": {
+    "text": "{card} is bringing {to} up to date with {from} already, without an override, so the override wasn’t applied to it: remove it from the queue first, then ask again.",
+    "note": "HI-2892: a forward merge asked with the user’s explicit override while a card ({card}: its key) for the same pair of branches ({from} into {to}) is open already, made without one: nothing changed.",
+    "audience": "both"
+  },
   "service.forward.raced": {
     "text": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
     "note": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.",
+    "audience": "both"
+  },
+  "service.forward.resolveRaced": {
+    "text": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
+    "note": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.",
     "audience": "both"
   },
   "service.fsutil.keptBusy": {
@@ -387,6 +502,11 @@
   "service.git.failed": {
     "text": "{command} failed: {why}",
     "note": "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run.",
+    "audience": "both"
+  },
+  "service.git.gitlinkUnread": {
+    "text": "Couldn't read which commit submodule {path} is at.",
+    "note": "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule.",
     "audience": "both"
   },
   "service.git.outside": {
@@ -719,6 +839,86 @@
     "note": "An error changing a project's key: the project hasn't been given Combwork's id (it hasn't been opened yet).",
     "audience": "both"
   },
+  "service.laneEdit.already": {
+    "text": "{card} is on this lane already.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes) that already has it.",
+    "audience": "both"
+  },
+  "service.laneEdit.cardChanged": {
+    "text": "{card} changed since (it was given to an agent, moved or edited): the change wasn’t undone.",
+    "note": "HI-2898: an error undoing an edit of lanes (Progress → Lanes) that took a card ({card}, its key) from an agent: the card changed since, so nothing was undone.",
+    "audience": "both"
+  },
+  "service.laneEdit.changed": {
+    "text": "The cards of {lane} changed meanwhile: look again, then try again.",
+    "note": "HI-2898: an error editing a lane's cards in Progress → Lanes (a lane: a builder and a reviewer agent working through cards in turn): the lane's list changed since the window showed it (an agent, the Assistant or another window changed it), so nothing was changed. {lane} is its builder / reviewer (B1 / R1).",
+    "audience": "both"
+  },
+  "service.laneEdit.dependency": {
+    "text": "{card} depends on {dep}, which would come after it: put {dep} first.",
+    "note": "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes): {card} (a key) depends on {dep} (a key: it's blocked by it), and the change would put {dep} later in the lane.",
+    "audience": "both"
+  },
+  "service.laneEdit.done": {
+    "text": "{card} is Done already.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's already Done.",
+    "audience": "both"
+  },
+  "service.laneEdit.ended": {
+    "text": "{lane} has ended: its cards can’t be changed any more.",
+    "note": "HI-2898: an error editing a lane's cards in Progress → Lanes: the lane ended (or was abandoned) meanwhile. {lane} is its builder / reviewer, or its id when it's gone.",
+    "audience": "both"
+  },
+  "service.laneEdit.fixedPlace": {
+    "text": "Cards already started or finished keep their places: {card} can only go after them.",
+    "note": "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes) to a place before a card that's already in progress, in review, approved or done ({card}: the card moved or added, its key).",
+    "audience": "both"
+  },
+  "service.laneEdit.invalid": {
+    "text": "That change of a lane’s cards isn’t one Combwork can make.",
+    "note": "HI-2898: an error, a change of a lane's cards sent by the window (Progress → Lanes) was malformed (a mistake in Combwork, or a window from another version). Rarely seen.",
+    "audience": "both"
+  },
+  "service.laneEdit.keptWork": {
+    "text": "{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane, or moving it to another lane (Progress → Lanes): it was started before and its work is kept (a branch, a slot lent for it, or a run in progress), so Combwork won't hand it to another builder from here.",
+    "audience": "both"
+  },
+  "service.laneEdit.noQueued": {
+    "text": "{lane} has no queued change to cancel.",
+    "note": "HI-2898: an error cancelling a lane's queued change (Progress → Lanes: a change of its cards waiting for its card in progress to be Done) when it has none any more. {lane} is its builder / reviewer.",
+    "audience": "both"
+  },
+  "service.laneEdit.notOnLane": {
+    "text": "{card} isn’t on this lane any more.",
+    "note": "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes) that the lane no longer has.",
+    "audience": "both"
+  },
+  "service.laneEdit.notQueued": {
+    "text": "{card} has started, or isn’t to do any more: only cards still waiting their turn can be moved or taken off.",
+    "note": "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes): only cards still waiting in To do, not another agent's, can be; this one is in progress, in review, approved, done, on hold or another agent's.",
+    "audience": "both"
+  },
+  "service.laneEdit.notTodo": {
+    "text": "{card} isn’t in To do: only cards not started yet join a lane.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's in progress, in review, approved or on hold. To do is the board's column of cards not started (as the board names it).",
+    "audience": "both"
+  },
+  "service.laneEdit.onLane": {
+    "text": "{card} is on the lane of {builder}: take it off there first, or use Move here.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it. Move here is the button beside this message that moves it: as it's translated there.",
+    "audience": "both"
+  },
+  "service.laneEdit.otherProject": {
+    "text": "{card} isn’t one of {project}’s cards, or it’s archived.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it belongs to another project than the lane's ({project}), or it's archived.",
+    "audience": "both"
+  },
+  "service.laneEdit.since": {
+    "text": "Ended lanes are listed from a time in the last two days.",
+    "note": "HI-2898: an error, the window asked for the lanes that ended since a time that isn't a time in the last 48 hours (a mistake in Combwork). Rarely seen.",
+    "audience": "both"
+  },
   "service.laneStart.busy": {
     "text": "{status, select, working {Agent {agent} is working.} starting {Agent {agent} is starting.} waiting {Agent {agent} is waiting for your answer.} background {Agent {agent} is waiting on background tasks it started.} signin {Agent {agent} needs you to sign in again.} other {Agent {agent} is waiting on cards (a card watch).}} Start the lane once it's idle, or choose another agent.",
     "note": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle. Each {status} a whole sentence with a noun before the name (HI-1585: glossary §1 rules 3 and 4).",
@@ -912,6 +1112,21 @@
   "service.providers.unknownHost": {
     "text": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
     "note": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.",
+    "audience": "both"
+  },
+  "service.queue.catchUpNoCommit": {
+    "text": "{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.",
+    "note": "HI-2988: an error from Commit on a paused merge queue whose target follows its remote: the card ({card}: its key) is already merged and published, and the pause is the local branch ({target}) catching up with it; only Set Aside (a button’s name: as translated there) is offered.",
+    "audience": "both"
+  },
+  "service.queue.pauseChanged": {
+    "text": "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.",
+    "note": "HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).",
+    "audience": "both"
+  },
+  "service.queue.pauseNoFolder": {
+    "text": "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.",
+    "note": "HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.",
     "audience": "both"
   },
   "service.repoOps.notOffered": {

@@ -1,4 +1,4 @@
-import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
+import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, LaunchedLimits, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
 import { MIGRATED_QUIT, migrateCombworkCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
@@ -13,6 +13,7 @@ import { samePath } from './movePaths'
 import { legacyWorktree } from './agentFolders'
 import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
 import { KindedError } from './kindedError'
+import { launchedWindow } from './localModelLimits'
 
 export const CW_DIR = '.combwork'
 
@@ -556,6 +557,18 @@ export function compactThreshold(project: { compactSuggestTokens?: number | null
 export function contextPercent(tokens: number, window: number | null | undefined): number | null {
   if (!window || window <= 0) return null
   return Math.min(100, Math.round((Math.max(0, tokens) / window) * 100))
+}
+
+/**
+ * An agent's context as its pane footer shows it (HI-2903 extracts it so the Activity map shows the same number): the
+ * tokens its usage holds (null: its usage isn't known, never a guess; a known 0 is 0), the window its CLI reported (else,
+ * for a local model, the one its launch declared: HI-2682), and the share (null without both).
+ */
+export function contextShown(usage: { contextTokens?: number | null; contextWindow?: number | null; model?: string | null } | null | undefined, live: { localLimits?: LaunchedLimits; modelId?: string | null } | null | undefined): { tokens: number | null; window: number | null; pct: number | null } {
+  const tokens = typeof usage?.contextTokens === 'number' ? usage.contextTokens : null
+  const running = live?.modelId || usage?.model || null
+  const window = usage?.contextWindow ?? launchedWindow(live?.localLimits, usage?.contextWindow, running)
+  return { tokens, window, pct: tokens === null ? null : contextPercent(tokens, window) }
 }
 
 /** The transcript size (MB) past which a session is flagged in a project (its own setting, else the global one); 0 never. */

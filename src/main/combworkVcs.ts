@@ -5,9 +5,11 @@ import type { CombworkVcs } from '../shared/types'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { repoHolding } from './platform/repoPorts'
+import { ensureJjExcluded } from './platform/jjKeepOut'
 import { vcsOf } from './vcsDetect'
 
 export { otherVcsOf, vcsOf } from './vcsDetect'
+export { ensureJjExcluded }
 
 /**
  * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of
@@ -76,7 +78,12 @@ export async function combworkVcs(projectPath: string, opts: { readOnly?: boolea
   const withSync = (v: CombworkVcs): CombworkVcs => (sync ? { ...v, sync } : v)
   const found = vcsOf(projectPath)
   if (!found) return withSync({ state: 'none' })
-  if (found.kind === 'other') return withSync({ state: 'other-vcs', vcs: found.name })
+  if (found.kind === 'other') {
+    // A non-colocated jj repository (HI-2800): kept out in its Git store's info/exclude, which jj honours.
+    const jj = await ensureJjExcluded(projectPath, opts).catch(() => null)
+    if (jj) return withSync({ state: jj.excluded ? 'excluded' : 'not-excluded', vcs: found.name })
+    return withSync({ state: 'other-vcs', vcs: found.name })
+  }
   const r = await ensureCombworkExcluded(projectPath, opts).catch(() => null)
   // Excluded or not, files committed before stay tracked (#364).
   const tracked = (await trackedCombworkFiles(projectPath, found.root).catch(() => null))?.length ?? 0

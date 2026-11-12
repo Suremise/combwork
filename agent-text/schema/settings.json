@@ -1064,6 +1064,21 @@
   "settings.advanced.cw.accounts.usageMoves.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.activity.mapMotion.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.off": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.on": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.system": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.activity.mapMotion.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.agents.tempFolder.desc": {
     "placeholders": {}
   },
@@ -1352,6 +1367,12 @@
   "settings.advanced.cw.prompt.rawCardStart.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.prompt.wholeCardMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.wholeCardMax.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.queue.checkMinutes.desc": {
     "placeholders": {}
   },
@@ -1452,6 +1473,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signFailFast.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signFailFast.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.sessions.terminalType.desc": {

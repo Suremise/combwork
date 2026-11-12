@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.jjRefused' | 'platform.switching' | 'platform.changed' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -34,6 +34,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.message', defaultMessage: "{card} can't start: {waitsFor} isn't done yet.", description: "A refused start of a card. {card} and {waitsFor} are card keys (AM-12): the card waits for {waitsFor}'s work to be merged or accepted." }),
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.next', defaultMessage: 'Wait for {waitsFor} to be done, or work on another card.', description: 'The next step after a refused start: {waitsFor} is the card key it waits for.' }),
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.change', defaultMessage: 'This rule is set in Version Control → Cards start only when the cards they wait for are merged.', description: 'Where the rule that refused starting a card before the cards it waits for are done is changed.' })
+  ),
+  'start.platformReady': r(
+    msg({ id: 'workflow.refused.start.platformReady.message', defaultMessage: "{card} can't start: cards don't run in a jj project yet.", description: 'A refused start of a card in a project using jj (Jujutsu, HI-2799): Combwork shows its repository but doesn’t start card work there yet. {card} is a card key. Keep jj (the tool’s name).' }),
+    msg({ id: 'workflow.refused.start.platformReady.next', defaultMessage: 'Work on it outside Combwork’s cards, or switch the project to Git in Version Control.', description: 'The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj.' })
   ),
   'start.slotAvailable': r(
     msg({ id: 'workflow.refused.start.slotAvailable.message', defaultMessage: "{card} can't start: no slot is free.", description: 'A refused start: every working folder (slot) is lent to other work. {card} is a card key.' }),
@@ -84,8 +88,8 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.submit.ownRunsStopped.change', defaultMessage: 'This rule is set in Version Control → Agents stop what they started before review.', description: 'Where the rule about stopping runs before review is changed.' })
   ),
   'submit.decisionsReceived': r(
-    msg({ id: 'workflow.refused.submit.decisionsReceived.message', defaultMessage: "{card} has a decision you haven't read.", description: 'A refused submit: the card has a newer decision than the builder has received.' }),
-    msg({ id: 'workflow.refused.submit.decisionsReceived.next', defaultMessage: 'Read it, check your work against it, then submit.', description: 'The next step after a refused submit for an unread decision.' })
+    msg({ id: 'workflow.refused.submit.decisionsReceived.message', defaultMessage: "{card} has a decision or a comment from the user that you haven't seen.", description: 'A refused submit (HI-2854): the card has a decision, or a comment the user wrote, newer than the builder has received.' }),
+    msg({ id: 'workflow.refused.submit.decisionsReceived.next', defaultMessage: 'Check your work against each (listed below, or read the card), then submit again.', description: 'The next step after a refused submit for an unseen decision or comment of the user\'s: the agent\'s reply lists them below when it can.' })
   ),
   'review.notAuthor': r(
     msg({ id: 'workflow.refused.review.notAuthor.message', defaultMessage: "You worked on {card}, so you can't review it.", description: 'A refused review: the reviewer is one of the agents who built the card.' }),
@@ -184,9 +188,25 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Combwork couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),
     msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Provider Setup or the folder, then try again.', description: 'The next step when Combwork could not read what a rule needs.' })
   ),
+  'platform.switching': r(
+    msg({ id: 'workflow.refused.platform.switching.message', defaultMessage: "{card} can't start now: its repository's version control is being switched.", description: 'HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.platform.switching.next', defaultMessage: 'Try again in a moment, once the switch has finished.', description: 'HI-2799: the next step after a start refused while the repository’s version control is switched.' })
+  ),
+  'platform.changed': r(
+    msg({ id: 'workflow.refused.platform.changed.message', defaultMessage: "{card} can't start under these rules: its project uses {platform} now.", description: 'HI-2799: a refused start: the start was prepared under the project’s previous version control, and the project was switched meanwhile. {card} is a card key; {platform} is None, Git or jj.' }),
+    msg({ id: 'workflow.refused.platform.changed.next', defaultMessage: 'Start it again: it is then checked under {platform}’s rules.', description: 'HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj.' })
+  ),
   'platform.targetGone': r(
     msg({ id: 'workflow.refused.platform.targetGone.message', defaultMessage: '{card} was started on {target}, which no longer exists in this repository.', description: 'HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12.' }),
     msg({ id: 'workflow.refused.platform.targetGone.next', defaultMessage: 'The user or the Assistant can move it to another branch with its work kept: set its Merges into, or retarget Work merges into.', description: 'HI-2753: the next step when the branch a card started on is gone: the user or the Combwork Assistant moves the card to another branch (its Merges into, or a retarget after changing Work merges into). Merges into and Work merges into are names in the window: as translated there.' })
+  ),
+  'platform.offLine': r(
+    msg({ id: 'workflow.refused.platform.offLine.message', defaultMessage: "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.", description: "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select." }),
+    msg({ id: 'workflow.refused.platform.offLine.next', defaultMessage: "{where, select, detached {Put the commits on the card's branch: git switch -c {line} if it doesn't exist yet, else git switch {line} and git cherry-pick the commits made off it. Then submit again.} other {Switch back with git switch {line}, and git cherry-pick there any commits of the card's made on {on}. Then submit again.}}", description: 'HI-3010: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch). git switch -c, git switch and git cherry-pick are commands: keep them as they are. {line} and {on} are branch names.' })
+  ),
+  'platform.jjRefused': r(
+    msg({ id: 'workflow.refused.platform.jjRefused.message', defaultMessage: "{why, select, tooLarge {{card}: jj left {count, plural, one {a new file} other {# new files}} out of its snapshot for being over its size limit for new files (snapshot.max-new-file-size), so the work isn't all recorded: {files}.} mergeWorkingCopy {{card}: the slot's working copy has more than one parent, so its work isn't one line of commits.} notFromBase {{card}: the work in its slot doesn't start from the card's base {base}.} otherCard {{card}: commit {commit} is {other}'s work.} divergent {{card}: commit {commit} is divergent in jj (its change has more than one visible commit).} conflicted {{card}: commit {commit} has unresolved conflicts.} tooLong {{card}: its work has more than {max, number} commits.} unbound {{card}: its slot isn't prepared for this card any more.} isolated {{card}: jj projects have no check copies yet.} recovered {{card}: commits of its work hold copies that Recover… wrote beside the original files: {files}.} other {{card}: jj refused it.}}", description: "HI-2868: a refused move on a card of a project using jj (Jujutsu): why its work can't be taken as it is. {card} is a card key like AM-12; {commit} and {base} are short commit ids; {other} is another card's key; {max} is a number; {files} is a list of file paths and {count} their number (HI-2973). 'working copy', 'divergent' and 'snapshot' are jj's terms; snapshot.max-new-file-size is jj's setting: keep it as it is. Translate each sentence. recovered (HI-2996): Recover… (a button of a stale slot, as the window names it) wrote a copy of the user's version beside a file that had changed meanwhile, and commits of the card's work hold that copy; {files} is a list of file paths, as they are." }),
+    msg({ id: 'workflow.refused.platform.jjRefused.next', defaultMessage: "{why, select, tooLarge {Leave a file out deliberately with .gitignore, or raise jj's limit (jj config set --repo snapshot.max-new-file-size and a size in bytes) and commit it with jj commit, then submit again.} mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {Put the card back and start it again.} isolated {Run the check again without --isolated, in the card's slot.} recovered {Compare each copy with its original and keep what you want under the original name, then take the copies out of every commit of the work (jj squash or jj diffedit: deleting them in a later commit leaves them in its history) and submit again.} other {Look at the slot with jj, then try again.}}", description: "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore and jj config set --repo snapshot.max-new-file-size are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them)." })
   ),
   'loop.roundLimit': r(
     msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Combwork asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),
@@ -202,7 +222,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'loop.noStep': r(
     msg({ id: 'workflow.refused.loop.noStep.message', defaultMessage: '{card} has no design or follow-up waiting for its check.', description: "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key." }),
-    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered.' })
+    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.', description: 'The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead.' })
   ),
   'loop.noReviewer': r(
     msg({ id: 'workflow.refused.loop.noReviewer.message', defaultMessage: '{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.', description: "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer." }),
@@ -275,6 +295,14 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'forward.notAgents': r(
     msg({ id: 'workflow.refused.forward.notAgents.message', defaultMessage: '{card} brings one branch up to date with another: only the user or the Assistant acts on it.', description: 'HI-2679: a refused intent: an agent acted on a forward-merge card (Combwork’s own card that merges one of the project’s target branches into another). {card} is its key (HI-12).' }),
     msg({ id: 'workflow.refused.forward.notAgents.next', defaultMessage: 'Leave it to the user or the Assistant.', description: 'HI-2679: the next step after an agent was refused acting on a forward-merge card.' })
+  ),
+  'forward.resolutionTarget': r(
+    msg({ id: 'workflow.refused.forward.resolutionTarget.message', defaultMessage: '{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.', description: 'HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.forward.resolutionTarget.next', defaultMessage: 'The user or the Assistant can set its Merges into to {to}, then start it again.', description: 'HI-2985: the next step after a refused start of a Resolve on a builder card: set its Merges into (a name in the window: as translated there) to branch {to}.' })
+  ),
+  'forward.resolutionSource': r(
+    msg({ id: 'workflow.refused.forward.resolutionSource.message', defaultMessage: '{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.', description: 'HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.forward.resolutionSource.next', defaultMessage: 'In its branch, run git merge {source}, resolve the conflict, commit, and submit again.', description: 'HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; "git merge" is a command, never translated) into the card’s branch.' })
   )
 }
 
@@ -356,6 +384,11 @@ export interface Refusal {
   values: RefusalValues
   /** What else the agent should know, in English (HI-2339: the files a None submit's paths leave out). */
   warnings?: string[]
+  /**
+   * HI-2854: a refused submit's unseen decisions and comments of the user's, each in full with who and when (agent text):
+   * received with the refusal, so the next submit goes on unless more came meanwhile.
+   */
+  unread?: string[]
 }
 
 /** How a refusal's sentences are formatted: in English for agents, or in the window's language (`refusalLines`). */
@@ -444,7 +477,7 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
  */
 export function refusalBody(x: Refusal): Record<string, unknown> {
   const l = currentChain() ? refusalLines(x.rule, x.values, IN_AGENTS) : { message: x.message, next: x.next, change: x.change ?? null }
-  return { refused: true, rule: x.rule, message: l.message, next: l.next, ...(l.change ? { change: l.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}) }
+  return { refused: true, rule: x.rule, message: l.message, next: l.next, ...(l.change ? { change: l.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}), ...(x.unread?.length ? { unread: x.unread } : {}) }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */

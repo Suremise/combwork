@@ -56,6 +56,18 @@
       "target": "plain"
     }
   },
+  "queue.failure.direction": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.directionResolution": {
+    "placeholders": {
+      "forward": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "queue.failure.focused.newProof": {
     "placeholders": {
       "tests": "plain"
@@ -91,6 +103,11 @@
       "files": "plain"
     }
   },
+  "queue.failure.notPublished": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "queue.failure.notUpToDate": {
     "placeholders": {
       "target": "plain"
@@ -100,6 +117,17 @@
     "placeholders": {
       "head": "plain",
       "files": "plain"
+    }
+  },
+  "queue.failure.pushRefused": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.resolution": {
+    "placeholders": {
+      "forward": "plain",
+      "source": "plain"
     }
   },
   "queue.failure.targetMoved": {
@@ -189,14 +217,34 @@
       "target": "plain"
     }
   },
+  "queue.next.direction": {
+    "placeholders": {}
+  },
+  "queue.next.directionResolution": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "queue.next.fix": {
     "placeholders": {}
+  },
+  "queue.next.forward": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
   },
   "queue.next.proof": {
     "placeholders": {}
   },
   "queue.next.repick": {
     "placeholders": {}
+  },
+  "queue.next.resolution": {
+    "placeholders": {
+      "source": "plain"
+    }
   },
   "queue.next.runner": {
     "placeholders": {}
@@ -218,6 +266,9 @@
     }
   },
   "queue.paused.mergeChoice": {
+    "placeholders": {}
+  },
+  "queue.paused.publish": {
     "placeholders": {}
   },
   "queue.paused.resume": {
@@ -250,6 +301,22 @@
     "placeholders": {}
   },
   "queue.returned.subjectIt": {
+    "placeholders": {}
+  },
+  "queue.signing.exited": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "queue.signing.noSshKey": {
+    "placeholders": {}
+  },
+  "queue.signing.notFound": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "queue.signing.unfinished": {
     "placeholders": {}
   },
   "queue.wake.left.decision": {

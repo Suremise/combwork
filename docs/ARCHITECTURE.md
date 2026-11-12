@@ -324,12 +324,51 @@ refusals' git commands are the descriptor's `remedies`. **The audit** is `tests/
 module from outside Git's implementation is a classified edge (Git implementation, a port's registry, Git-facing UI,
 historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
 "platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
-`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and 1.5.0's J0 routes each
-by the project's platform. Its `SWITCHES` justify, per file, the switches on a platform's id (`platform === 'git'`)
-left outside the descriptors, adapters and registry (HI-2822): everything else reads the descriptor's workflow facts
-(`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in `shared/platform/descriptors.ts`), a
-capability or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, a
-changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and the 1.5.0 J card
+implementing each one's port routes it by the project's platform. Its `SWITCHES` justify, per file, the switches on a
+platform's id (`platform === 'git'`) left outside the descriptors, adapters and registry (HI-2822): everything else reads
+the descriptor's workflow facts (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in
+`shared/platform/descriptors.ts`; jj's integration is `user`, neither merging nor accepting: HI-2799's option A), a
+capability, a gate or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one,
+a changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+jj (1.5.0's J0, HI-2793; SPEC §16.3.6, jj's runner and detection) is not a platform yet: `platform/jjRunner.ts` is its
+bounded runner (the standalone `jj.exe`, its version against `resources/tested-vcs.json` through `shared/jjTool.ts`,
+reads with `--ignore-working-copy` and config overrides, an output cap, a time limit, cancellation and shutdown, each
+ending jj's process tree by identity through `processTree.ts`, which cw-progress's wrapper uses too), starting its
+processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never Git's); only the pinned version is
+trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
+(`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
+with a code; its jj reads pinned to the one operation head, unknown with several, HI-2831). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
+the pinned jj, `npm run jj:fetch`). J3 (HI-2796; SPEC §16.3.6, jj's history, attribution and evidence) adds jj's side
+of port 3, unregistered too (J6 composes it): `platform/jjView.ts` (the operation heads, a checkout record and colocated
+Git state, read from files, bounded, no process), `jjReads.ts` (reads pinned `--at-op` the single head, used only while
+it still is), `jjBoundary.ts` (the one snapshot Combwork takes, under the store's lock and its owner's lease),
+`jjChecks.ts` (a check's bracket and its pure credit decision), `jjAttribution.ts` and `jjFacts.ts` (provenance from
+recorded commits and complete evolutions; the ids in `data.platform.jj`) and `jjObserve.ts` (the heads watched, read at
+one head). `tests/jjHistory.test.ts` and, on the pinned jj, `tests/jjHistoryReal.test.ts`. `platform/jjAdvanceProbe.ts`
+(J1, HI-2794) is evidence only, for the closed gate:advance (SPEC §16.3.6, "Open: jj's target advance": Darren decided
+on user-performed integration, no automatic advance). It is one advance attempt step by step, plus a classifier of what
+it observed, and only its tests reach it (`tests/jjAdvanceProbeReal.test.ts`; `tests/integrationPortsImports.test.ts`
+fails on any import of it from `src`).
+jj's workspaces (1.5.0's J2, HI-2795; SPEC §16.3.6, jj's workspaces):
+`platform/jjWorkspacePort.ts` is jj's workspace lifecycle port (`createJjWorkspacePort`: made by `jj workspace add` from
+a sparse, empty control workspace, reads pinned at one operation, line operations refused, `record` the explicit
+snapshot, removal journalled and checked by the folder's creation generation), `platform/jjRecovery.ts` a stale
+workspace's resumable recovery (`recoverStale`), and `schema/workspaceIdentityStep.ts` the slots' and copies' platform
+and identity columns. `slots.ts` and `copies.ts` take a port per row (`portOf`) and call `record` where they hold the
+folder; jj's port reaches them only by injection (not in `workspacePorts.ts`), from the tests (`tests/jjWorkspaces`,
+`jjSlotPool`, `jjRecovery`, over `tests/jjWorkspaceHarness.ts`).
+jj's operations (1.5.0's J7, HI-2800; SPEC §16.3.6, jj's recovery, agents and compatibility): `platform/jjOperations.ts`
+reads the operation log and an operation's views pinned at the single head, and `platform/jjOpView.ts` (pure, run on jj's
+worker through `runner.preview`) parses jj 0.47.1's `debug object view` whole and decides a revert's preview and whether
+its command is offered (E1–E7); the window's Operations section is `views/JjSections.tsx`. `platform/jjKeepOut.ts` keeps
+`.combwork` out of a non-colocated jj repository, and `shared/platform/metadataDirs.ts` names every platform's own folder
+(`.git`, `.jj`) for the Files tab, search, the watchers, the document tools and None's deliverables.
+A folder's repository boundary (1.5.0's J9f, HI-2896): `platform/repoBoundary.ts`, a leaf read with no process, names the
+nearest marker's platform (a non-colocated `.jj` hides any Git repository above it, an unreadable one is unknown), and
+`repoPorts`' folder helpers and `repoLock.commonGitDir` go by it. Every repository lock goes through one owner,
+`repoLock.takeStores` (stores deduplicated and ordered whatever platform named them, re-entrant only for a live owner);
+`slotsApp.storeLock` delegates to it.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
@@ -447,7 +486,11 @@ outside it: the same answer, with the fingerprint steady across the asking and t
 likely only stat data moved (an outside `git status` refreshing the index, an editor's git integration, a file
 touched). Even then the guards' inputs read in between may have seen another state and back (HR5, round 2: dirty,
 clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
-from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
+from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. A start (an
+agent's, or the start in a drag) may go further where its platform says so (`startGathers`; jj's 3, HI-2916: Combwork's own jj operations move the head its
+fingerprint keeps): gathered again while only the fingerprint moved, or while it can't be read at that instant (HI-2972,
+`startAgain`: jj's operation heads mid-update, or the target's ref while Combwork's file gate holds the store, HI-3012), before the transaction or in it (the content asked again after the write
+refused), until its passes are spent, then refused. Anything else (an edit, a staged change, a checkout, an operation,
 an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
 each lane's look in a branch-update pass, and each merge-queue entry's way through (#1386), is one `gitStep`
 (`platform/git.ts`, #1376): what it asks about fixed commits (an ancestor, a merge base, a tree, the queue's containment
@@ -608,8 +651,8 @@ The return comes before applying a stale pass's effects, so a pass that holds ag
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
-reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
-runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
+reconciles the project a short wait after the first of them (`RECONCILE_DEBOUNCE_MS`, which later asks never restart:
+asks every 200 ms used to keep any run from starting, HI-2914; one run at a time, a run asked for meanwhile runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
 when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run takes the project's
 runtime from `workflowFor` (above): `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
 MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone), and the table's moves, queue cancellations,

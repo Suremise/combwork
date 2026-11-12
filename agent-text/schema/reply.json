@@ -56,6 +56,12 @@
       "card": "plain"
     }
   },
+  "reply.ask.assistantWaiting": {
+    "placeholders": {
+      "card": "plain",
+      "delivery": "plain"
+    }
+  },
   "reply.attachment.bytes": {
     "placeholders": {
       "n": "number"
@@ -600,6 +606,7 @@
     "placeholders": {
       "target": "plain",
       "project": "plain",
+      "past": "select",
       "state": "plain"
     }
   },

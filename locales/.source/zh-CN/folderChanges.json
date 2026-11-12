@@ -1,0 +1,9 @@
+{
+  "folderChanges.commitFailed": "Could not commit",
+  "folderChanges.committed": "{count, plural, one {Committed # file} other {Committed # files}} on {branch}.",
+  "folderChanges.resumed": "The merge goes on.",
+  "folderChanges.setAside": "{count, plural, one {Set # file aside} other {Set # files aside}} on {branch}.",
+  "folderChanges.setAsideDetail": "Git keeps them in a stash named \"{name}\": git stash pop brings them back.",
+  "folderChanges.setAsideFailed": "Could not set the changes aside",
+  "folderChanges.stillPaused": "The merge is still paused: see why on it."
+}

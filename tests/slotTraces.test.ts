@@ -3,7 +3,9 @@
 // pool runs them through the workspace lifecycle port, are the same git commands (folder, argv, order) as the code before
 // the port ran. The expected traces were recorded at the revision before the port (a4a488fb7) with
 // `CW_RECORD_SLOT_TRACES=1 npx vitest run tests/slotTraces.test.ts`, into tests/fixtures/slotTraces.json; a trace that
-// differs is a behaviour change, which an R card never makes (a change found needed is its own card).
+// differs is a behaviour change, which an R card never makes (a change found needed is its own card). HI-1182 was one: a
+// made or prepared slot reads whether its revision uses submodules or Git LFS (one `ls-files`), and runs nothing more
+// where it uses neither.
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'

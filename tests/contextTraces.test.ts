@@ -3,7 +3,9 @@
 // workspace lifecycle port; the trust check's roots (a main working tree, a linked worktree, a folder in no repository),
 // Claude Code's memory base and the skill copies' exclude, through the repository context port. The same git commands
 // (folder, argv, order) as the code before the ports: the expected traces were recorded at 5cd46f422 (each context read's answer with it) with
-// `CW_RECORD_CONTEXT_TRACES=1 npx vitest run tests/contextTraces.test.ts`, into tests/fixtures/contextTraces.json.
+// `CW_RECORD_CONTEXT_TRACES=1 npx vitest run tests/contextTraces.test.ts`, into tests/fixtures/contextTraces.json. HI-1182
+// changed them on purpose: a copy made or reset reads whether its revision uses submodules or Git LFS (one `ls-files`),
+// and runs nothing more where it uses neither.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'

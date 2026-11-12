@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { shortRevision } from '@shared/progress'
 import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnCheck, returnedText, returnRun, returnWhy, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
 import type { MergeSlotInfo, ProgressRun } from '@shared/types'
@@ -11,6 +11,7 @@ import { cardLabelOf, choose, confirm, findProject, notify, openVersionControl, 
 import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
+import { FolderChangeButtons } from './FolderChangeButtons'
 import { Icon, Tooltip } from './ui'
 
 /**
@@ -56,10 +57,12 @@ const FORWARD_T = {
   cancel: msg({ id: 'board.queue.forwardCancel', defaultMessage: 'Cancel', description: 'HI-2679: the choice that cancels the forward merge.' }),
   failed: msg({ id: 'board.queue.forwardFailed', defaultMessage: 'Couldn’t bring the branch up to date', description: 'HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why.' }),
   upToDate: msg({ id: 'board.queue.forwardUpToDate', defaultMessage: '{to} already has everything of {from}', description: 'HI-2679: a notification: nothing to bring in, so nothing was queued.' }),
+  resolving: msg({ id: 'board.queue.forwardResolving', defaultMessage: '{card} is resolving it: Bring Up to Date waits for it', description: 'HI-3000: on a merge queue’s card, after the line saying how far its branch is behind another: a card ({card}: its key, such as HI-12) made by Resolve on a builder is merging that branch in by hand, so Bring Up to Date (the button’s name: as translated there) isn’t offered for that branch until the card is Done.' }),
   already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
 }
 
-export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean }) {
+/** `inVersionControl`: shown in Version Control's Merge queue section, so without its link there (HI-2893). */
+export function QueueCard({ view: v, runs, now, showProject, inVersionControl = false }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean; inVersionControl?: boolean }) {
   useLanguage()
   const [busy, setBusy] = useState(false)
   const testingRun = v.testing?.run ? (runs.find((r) => r.id === v.testing!.run) ?? null) : null
@@ -89,7 +92,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
   // HI-2679: what this target lacks of the project's other targets, and the button that brings it up to date.
   const behind = (v.forward?.behind ?? []).filter((b) => b.commits !== 0)
   const forward = async (): Promise<void> => {
-    const offered = behind.filter((b) => b.commits !== null).map((b) => b.from)
+    const offered = behind.filter((b) => b.commits !== null && !b.resolving).map((b) => b.from)
     if (!offered.length) return
     const from =
       offered.length === 1
@@ -132,6 +135,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
           <Icon name="debug-pause" />
           <span className="progress-queue-text">{pauseText(v.paused, v.target, tr, list)}</span>
           {v.paused.reason === 'needsYou' && v.paused.card && <CardButton keyOf={v.paused.card} />}
+          <FolderChangeButtons projectPath={v.projectPath} target={v.target} paused={v.paused} />
         </div>
       )}
       {v.testing && (
@@ -184,23 +188,34 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         </div>
       )}
       {behind.map((b) => (
-        <div key={`behind:${b.from}`} className="progress-queue-line progress-queue-behind" data-behind={b.from}>
-          <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
-            <span>
-              <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
-            </span>
-          </Tooltip>
-        </div>
+        <Fragment key={`behind:${b.from}`}>
+          <div className="progress-queue-line progress-queue-behind" data-behind={b.from}>
+            <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
+              <span>
+                <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
+              </span>
+            </Tooltip>
+          </div>
+          {/* HI-3000: the card resolving this pair, on its own line under it: no Bring Up to Date for the pair meanwhile. */}
+          {b.resolving && (
+            <div className="progress-queue-line progress-queue-resolving" data-resolving={b.resolving.key} data-resolving-from={b.from}>
+              <span className="progress-queue-text faint">{tr(FORWARD_T.resolving, { card: b.resolving.key })}</span>
+              <CardButton keyOf={b.resolving.key} />
+            </div>
+          )}
+        </Fragment>
       ))}
-      {behind.some((b) => b.commits !== null) && (
+      {behind.some((b) => b.commits !== null && !b.resolving) && (
         <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
           <Icon name="git-merge" /> {tr(FORWARD_T.button)}
         </button>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
-      <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
-        {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
-      </button>
+      {!inVersionControl && (
+        <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
+          {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
+        </button>
+      )}
     </div>
   )
 }

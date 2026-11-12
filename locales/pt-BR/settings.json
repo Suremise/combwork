@@ -558,7 +558,9 @@
   "settings.advanced.cw.prompt.clearDraft.desc": "Antes de o Combwork digitar um prompt ou Compactar na CLI de um agente, ele pressiona Ctrl+U, que limpa o que está na entrada da CLI, e pressiona de novo para retirar um prompt que interrompeu no meio. Desativado, o Combwork nunca pressiona: o texto deixado na entrada da CLI fica na frente do que o Combwork digita e é enviado junto, um prompt interrompido no meio fica na entrada, e Compactar pode falhar por causa de um rascunho. Mudar o modo do Codex continua limpando a entrada dele primeiro, como o menu dele exige.",
   "settings.advanced.cw.prompt.clearDraft.title": "Limpar o rascunho da CLI antes de o Combwork digitar",
   "settings.advanced.cw.prompt.rawCardStart.desc": "Quando um cartão é iniciado num agente, o Combwork o entrega embrulhado nas próprias palavras dele: qual cartão é no quadro, do que depende e que documentos ler primeiro, e que skill seguir. Ativado, o agente recebe só o título e a descrição do cartão, e o que você escreveu ao iniciá-lo. Os outros prompts do Combwork (os despertares e as mensagens) continuam como estão: é assim que o Combwork e os agentes conversam.",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "Ao iniciar um cartão em um agente, o Combwork dá a ele o cartão inteiro, com suas decisões e todos os comentários, se tudo couber neste número de caracteres, para que o agente não precise lê-lo de novo antes de começar. Um cartão maior recebe o título, a descrição e o último retorno, e o agente lê o resto. 0 nunca dá o cartão inteiro.",
   "settings.advanced.cw.prompt.rawCardStart.title": "O início de um cartão com as próprias palavras",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "Um cartão inteiro ao iniciá-lo, até",
   "settings.advanced.cw.queue.checkMinutes.desc": "Quanto tempo a fila de merge deixa uma verificação de merge ou uma instalação rodar antes de encerrá-la. Uma verificação encerrada assim é uma falha do ambiente, não do trabalho: o cartão volta marcado assim, e seu executor pode enviar a mesma versão de volta à fila. Aumente quando as verificações de um projeto realmente demoram mais; longo demais, e uma verificação travada segura a fila por esse tempo.",
   "settings.advanced.cw.queue.checkMinutes.title": "Fila de merge: tempo máximo de uma verificação de merge",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "Perguntar sempre",
@@ -593,6 +595,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "Retomar após um reinício: pronto em até",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "Quanto tempo o agente de código de um agente pode continuar esperando para reenviar a solicitação ao modelo (limite de taxa, ou o serviço inacessível) em um turno antes de o Combwork avisar o Assistente, uma vez por turno. 0: nunca.",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "Espera de nova tentativa: avisar o Assistente após",
+  "settings.advanced.cw.sessions.signFailFast.desc": "Quando um repositório assina seus commits, o commit de um agente com gpg ou ssh-keygen do Git for Windows, gpg do GnuPG ou ssh-keygen do Windows é assinado sem ninguém por perto, ou falha na hora e diz ao agente por quê, em vez de esperar uma frase secreta que ninguém pode digitar. A assinatura continua ligada, e suas configurações do git e do gpg nunca são alteradas: as sessões recebem um assinador do Combwork só no ambiente delas. Outros assinadores funcionam como antes. Desligado, as sessões usam o assinador do próprio git, como antes.",
+  "settings.advanced.cw.sessions.signFailFast.title": "Os commits assinados dos agentes nunca esperam uma frase secreta",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "Por quanto tempo o commit assinado de um agente deixa o gpg ou o ssh-keygen rodar antes que o Combwork o encerre e o commit falhe. Tempo suficiente para uma chave física que você toca; um assinador ainda rodando nesse momento está esperando alguém.",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "Assinador dos agentes: desistir depois de",
   "settings.advanced.cw.sessions.terminalType.desc": "O Combwork inicia cada sessão com TERM=xterm-256color, como é o terminal dela, e sem o WT_SESSION do Windows Terminal, para que as CLIs desenhem igual, tenha o Combwork sido aberto pelo menu Iniciar ou por um terminal (o Claude Code desenha ❯ em vez de >). Um TERM do seu próprio ambiente ou do da sessão é mantido. Desligado, as sessões recebem o ambiente com que o Combwork foi aberto.",
   "settings.advanced.cw.sessions.terminalType.title": "As sessões dizem que seu terminal é xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "Mostrar Ajuda → Console do desenvolvedor (Ctrl+Alt+J): o que cada CLI envia ao Combwork, ao lado do que o Combwork entendeu.",
@@ -1630,5 +1636,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Quanto tempo o servidor privado de um agente do OpenCode tem para responder antes de a inicialização desistir e encerrá-lo. Curto demais, um agente num PC lento não inicia.",
   "settings.advanced.opencode.server.readySeconds.title": "Servidor: tempo para iniciar",
   "settings.advanced.opencode.version.desc": "O que o opencode --version imprime: a versão é o primeiro grupo. O Combwork usa só o OpenCode 2 ou posterior. Errado, o OpenCode não é encontrado.",
-  "settings.advanced.opencode.version.title": "A versão em opencode --version"
+  "settings.advanced.opencode.version.title": "A versão em opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "O mapa de atividade envia um ponto por um raio até a estação a cada chamada de ferramenta de um agente, e de volta quando ela termina. Como o Windows diz segue a configuração Mostrar animações do Windows; Ligado sempre os move; Desligado só acende a estação.",
+  "settings.advanced.cw.activity.mapMotion.off": "Desligado",
+  "settings.advanced.cw.activity.mapMotion.on": "Ligado",
+  "settings.advanced.cw.activity.mapMotion.system": "Como o Windows diz",
+  "settings.advanced.cw.activity.mapMotion.title": "Pulsos em movimento do mapa de atividade"
 }

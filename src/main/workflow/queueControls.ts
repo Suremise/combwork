@@ -12,12 +12,14 @@
 
 import { queueIntegration } from '../platform/integrationPorts'
 import { app } from 'electron'
-import { CombworkError } from '../combworkError'
+import { CombworkError, combworkError } from '../combworkError'
+import type { OpsFor } from '../platform/repoOps'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
-import { branchExists, forwardSources, projectTargets } from './targets'
+import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
+import { forwardDirection, forwardPermitted, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
@@ -25,13 +27,13 @@ import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
 import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
-import type { TaskCard } from '../../shared/types'
+import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
 import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
-import { MergeQueue } from './mergeQueue'
+import { catchUpKey, catchUpPaused, MergeQueue } from './mergeQueue'
 import { kickQueue, queueChanged, queueHostsStamp, queueLive } from './queueHost'
 import { queueOrder } from './queueState'
 import { entryTook, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from './queueLogs'
@@ -63,9 +65,11 @@ interface QueueScope {
 }
 
 /**
- * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them. `window`: the
- * window's listing (#1356), which also lists the targets that only have cards in flight under Combwork merges, or are the
- * current options' target, so the panel can decide which show.
+ * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them: the same
+ * targets and the same classification for each (HI-2994), so agents see every queue the user does. Listed: the targets
+ * with an entry or a pause, those with cards in flight under Combwork merges, the current options' target and the
+ * project's other existing targets; the panel then decides which show (queueShown), the API leaves out past branches'.
+ * `window`: the window's own detail, each target's forward merges and the returns' test seam.
  */
 export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
   const stamp = viewsStamp(ws, projectPath)
@@ -122,16 +126,40 @@ function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
 async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
-  const scope = window ? await queueScope(wf, projectPath) : undefined
-  // HI-2679: the window's listing has each of the project's targets that exists, so a destination with nothing queued
-  // yet has its card (its reminder and its Bring up to date… button).
-  const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
-  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
-  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
+  // branch's (markPast, HI-2927), for agents as for the user.
+  const scope = await queueScope(wf, projectPath)
+  // HI-2679: each of the project's targets that exists, so a destination with nothing queued yet has its card (its
+  // reminder and its Bring up to date… button), and its queue is cw_queue's too.
+  const targets = scope.current ? await existingTargets(ws, projectPath) : []
+  const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
+  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))
+  markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
-  const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
-  if (sources.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, sources)
+  // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
+  // The window's alone (its Bring up to date… button and how far behind): not read for the API's listing.
+  const sources = window && targets.length ? await forwardSources(ws, projectPath, targets) : []
+  const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
+  // HI-3000: the pairs' open work, read once for the listing (the open cards alone folded), not per pair.
+  const open = sources.length ? openPairs(wf) : new Map<string, CardRecord>()
+  for (const v of views) {
+    if (!targets.includes(v.target)) continue
+    const f = await forwardOfTarget(wf, open, projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
+    if (f.others.length) v.forward = f
+  }
   return views
+}
+
+/**
+ * HI-2893: marks `past` each queue whose target is none of the project's targets now and that holds nothing: its history
+ * is Version Control's. HI-2927: nothing is no entry testing or queued, no card in flight into it, no pause (a stuck one
+ * too) and no Combwork running it, so those stay controllable; and targets that can't be read (`null`: not Git now, git's
+ * default unreadable) mark none past: unknown isn't "no targets".
+ */
+export function markPast(views: QueueView[], named: ProjectTargets | null): void {
+  if (!named) return
+  const current = [named.default, ...named.others]
+  for (const v of views) if (!current.includes(v.target) && !v.testing && !v.queued.length && !v.inFlight.length && !v.paused && !v.runBy) v.past = true
 }
 
 /** The project's targets that exist now (HI-2679): Work merges into and the others listed; none without a Git workflow. */
@@ -143,12 +171,38 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
   return out
 }
 
-/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources), and how far behind each it is. */
-async function forwardOfTarget(projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
+/**
+ * A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources, HI-2892: in
+ * the release path's direction), and how far behind each it is; HI-3000: and the card resolving that pair, while one is open.
+ */
+async function forwardOfTarget(wf: Workflow, open: ReadonlyMap<string, CardRecord>, projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
   const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
-  for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
+  for (const from of others) {
+    const r = open.get(pairKey(from, to))
+    const resolving = r && wf.state(r).resolves ? { card: r.id, key: r.key } : null
+    behind.push({ from, commits: await commitsBehind(projectPath, from, to), ...(resolving ? { resolving } : {}) })
+  }
   return { others, behind }
+}
+
+const pairKey = (from: string, to: string): string => `${from}\n${to}` // i18n-ignore: a key, never shown
+
+/**
+ * The open work of each branch pair (HI-2679, HI-3000), by pairKey: its forward card, or the card resolving it (Resolve
+ * on a builder: the forward Done, its resolution not yet), while that isn't Done; the first by number when there are
+ * several. Only the cards not Done are read and folded (`cardsOpen`): a board's Done cards cost nothing here.
+ */
+export function openPairs(wf: Workflow): Map<string, CardRecord> {
+  const out = new Map<string, CardRecord>()
+  for (const c of wf.store.cardsOpen()) {
+    const st = wf.state(c)
+    const pair = st.forward ?? st.resolves
+    if (!pair || st.stage === 'done') continue
+    const k = pairKey(pair.from, pair.to)
+    if (!out.has(k)) out.set(k, c)
+  }
+  return out
 }
 
 /** Counts kept by the two heads they were read at (HI-2679): at most BEHIND_KEPT, the oldest dropped. */
@@ -198,7 +252,7 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
-export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope): QueueView {
+export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope, window = false): QueueView {
   const store = wf.store
   // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
   // card reads and refusals give agents too).
@@ -207,7 +261,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, window ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const { returns, returnsMore } = outcomes
   const recent = historyOf(wf, target, outcomes.recent)
   const p = store.queuePause(target)
@@ -215,7 +269,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     project: basename(projectPath),
     projectPath,
     target,
-    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.message ? { message: p.message } : {}), ...(p.stuck ? { stuck: p.stuck } : {}) } : null,
+    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.message ? { message: p.message } : {}), ...(p.stuck ? { stuck: p.stuck } : {}), ...(catchUpPaused(store.meta(catchUpKey(target)), p) ? { catchUp: true as const } : {}) } : null,
     runBy: lease?.profile ?? null,
     runHere: live.running,
     testing,
@@ -239,7 +293,7 @@ export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): 
   const pending = new Set(pushPendingOf(wf.store.meta(pushPendingKey(target))).map((p) => p.entry))
   const settled = new Map(pushLogOf(wf.store.meta(pushLogKey(target))).map((p) => [p.entry, p.state]))
   const o = wf.cfg.options()
-  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
+  const pushesNow = merges(o.platform) && o.finish === 'combworkMerges' && (o.pushTarget === true || o.followRemote === true)
   return recent.map((r) => {
     const took = r.entry ? entryTook(of(r.card), r.entry) : null
     const push: QueueRecent['push'] = r.outcome !== 'merged' || r.by !== 'combwork' || !r.entry ? undefined : pending.has(r.entry) ? 'pending' : (settled.get(r.entry) ?? (pushesNow ? 'unknown' : undefined))
@@ -345,10 +399,13 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
  * Resume: the pause cleared and the queue run, once its cause, where Combwork can see it, is gone; else paused again, as
  * it is now (`resumed` false). A queue not paused is just run.
  */
-export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void): Promise<QueueResumed> {
+export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void, expected?: QueuePauseRef): Promise<QueueResumed> {
   const wf = await needWorkflow(ws, projectPath)
   const p = wf.store.queuePause(target)
+  // HI-2944: only the pause a Commit or Set aside acted on; another one now stays as it is, shown.
+  if (expected && !samePause(p, expected)) return { resumed: false, view: queueView(ws, wf, projectPath, target) }
   const still = p ? await stillPaused(ws, wf, projectPath, target, p) : null
+  let cleared = false
   await wf.locked(() => {
     // The caller's authority as it is now, in the write: refused, nothing is cleared and the queue isn't run.
     guard?.()
@@ -356,10 +413,44 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
     // Changed meanwhile (another Resume, the queue pausing for something else): left as it is, said as it is.
     if (!now || !p || now.reason !== p.reason || now.at !== p.at) return
     wf.store.setQueuePause(target, still ? { ...p, ...still, at: undefined } : null)
+    cleared = !still
   })
   queueChanged(ws, projectPath, target)
   if (!still) void kickQueue(ws, projectPath, target)
-  return { resumed: !still, view: queueView(ws, wf, projectPath, target) }
+  return { resumed: expected ? cleared : !still, view: queueView(ws, wf, projectPath, target) }
+}
+
+/** HI-2944: a pause as stored is the one the window showed (its reason, card and time). */
+const samePause = (p: QueuePause | null | undefined, ref: QueuePauseRef): boolean => !!p && p.reason === ref.reason && p.card === ref.card && (p.at ?? '') === ref.at
+
+const PAUSE_NO_FOLDER = msg({ id: 'service.queue.pauseNoFolder', defaultMessage: "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.", description: 'HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.' })
+
+const PAUSE_CATCH_UP_COMMIT = msg({ id: 'service.queue.catchUpNoCommit', defaultMessage: '{card} is merged and on {target}’s remote already: a commit here would put one on {target} that its remote doesn’t have. Set the changes aside instead, and {target} catches up.', description: 'HI-2988: an error from Commit on a paused merge queue whose target follows its remote: the card ({card}: its key) is already merged and published, and the pause is the local branch ({target}) catching up with it; only Set Aside (a button’s name: as translated there) is offered.' })
+
+const PAUSE_CHANGED = msg({ id: 'service.queue.pauseChanged', defaultMessage: "The merge queue's pause changed meanwhile: nothing was committed or set aside. Look again.", description: 'HI-2944: an error from Commit or Set aside on a paused merge: the pause shown is no longer the current one (resumed, or paused for something else).' })
+
+/**
+ * HI-2944: Commit or Set aside exactly the files shown, in the folder `target` is checked out in (port 5's folderChanges,
+ * which finds it and checks it again under the repository lock and its fence). From a paused merge, the pause shown must
+ * still be the current one there, before anything is touched; then the queue is resumed only if that same pause still
+ * stands and its condition is gone (Resume's own check, git read again). From a start's warning (no pause): only done.
+ */
+export async function settleQueueChanges(ws: WorkspaceService, projectPath: string, target: string, action: FolderChangeAction, shown: unknown, pause: QueuePauseRef | null, shownFolder: string | null, ops: OpsFor<'folderChanges'>): Promise<QueueChangesSettled> {
+  const wf = pause ? await needWorkflow(ws, projectPath) : null
+  // The folder the changes were seen in: the pause's own record (never the window's word), else the start warning's.
+  const stored = wf && pause ? wf.store.queuePause(target) : null
+  if (pause && !samePause(stored, pause)) throw combworkError(PAUSE_CHANGED)
+  const seen = pause ? (stored?.folder ?? null) : shownFolder
+  if (!seen) throw combworkError(PAUSE_NO_FOLDER)
+  const current = wf && pause ? () => void (samePause(wf.store.queuePause(target), pause) || (() => { throw combworkError(PAUSE_CHANGED) })()) : undefined
+  // HI-2988: the owed catch-up's pause (the card merged and published): set aside only, never committed on the local target.
+  const catchUp = !!wf && catchUpPaused(wf.store.meta(catchUpKey(target)), stored)
+  if (catchUp && action === 'commit') throw combworkError(PAUSE_CATCH_UP_COMMIT, { card: pause!.card, target })
+  // i18n-ignore: the commit's or stash's message (in the repository, English as Combwork's other commits)
+  const label = catchUp ? `before bringing ${target} up to date with ${pause!.card}` : pause ? `before merging ${pause.card}` : `before starting work on ${target}`
+  const done = await ops.settleChanges(projectPath, target, seen, action, Array.isArray(shown) ? shown : [], label, current)
+  if (!pause) return { done, resumed: false }
+  return { done, resumed: (await resumeQueue(ws, projectPath, target, undefined, pause)).resumed }
 }
 
 /**
@@ -418,7 +509,8 @@ export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: stri
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
 export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string, guard?: () => void): Promise<{ done: IntentDone; card: TaskCard }> {
-  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt.
+  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt; HI-2892: refused
+  // against the release path's direction, unless its own request recorded the user's override.
   const forward = kind === 'retryMerge' ? await forwardSourceNow(ws, n) : null
   const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}), ...(forward ? { forward } : {}) })
   const projectPath = ws.path && r.card.project ? join(ws.path, r.card.project) : null
@@ -428,13 +520,18 @@ export async function queueCardChange(ws: WorkspaceService, n: number, actor: Ta
   return r
 }
 
-/** A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read. */
+/**
+ * A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read.
+ * HI-2892: throws ForwardRefused for one against the release path's direction with no override recorded.
+ */
 async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ source: string } | null> {
   for (const p of ws.info()?.projects ?? []) {
     const wf = await workflowFor(ws, p.path).catch(() => null)
     const rec = wf?.store.cards().find((c) => c.id === n)
     const f = rec ? wf!.state(rec).forward : null
     if (!f) continue
+    const d = forwardDirection(f.from, f.to, await defaultBranch(ws, p.path))
+    if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec!.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
     const head = await lineHistory().lineHead(p.path, f.from)
     return head && !isUnknown(head) ? { source: head } : null
   }
@@ -442,7 +539,7 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
 }
 
 /** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
-export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string }
+export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string; overridden?: true }
 
 /** Thrown for a forward request that can't be made: why, as a message (the caller's window or tool says it). */
 export class ForwardRefused extends CombworkError {}
@@ -455,6 +552,9 @@ const FORWARD_TEXT = {
   notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.', description: 'HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.' }),
   missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
   raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
+  direction: msg({ id: 'service.forward.direction', defaultMessage: '{to} isn’t brought up to date with {from}: {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Nothing was queued. {dir, select, backward {Bring {from} up to date with {to} instead, or, if you mean it, ask the Assistant with your explicit override.} other {If you mean it, ask the Assistant with your explicit override.}}', description: 'HI-2892: a forward merge refused: it would bring branch {to} up to date with branch {from} against the release path’s direction (forward merges go from a release, or main, into the next version). {why} says why (select: translate each; keep the keys): {to} is an older version, {to} is the repository’s default branch (main), the two names are the same version, or Combwork can’t order them. {dir}: backward (the reverse is the right way) or other. Branch names stay as they are.' }),
+  directionRetry: msg({ id: 'service.forward.directionRetry', defaultMessage: '{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.', description: 'HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there.' }),
+  openNoOverride: msg({ id: 'service.forward.openNoOverride', defaultMessage: '{card} is bringing {to} up to date with {from} already, without an override, so the override wasn’t applied to it: remove it from the queue first, then ask again.', description: 'HI-2892: a forward merge asked with the user’s explicit override while a card ({card}: its key) for the same pair of branches ({from} into {to}) is open already, made without one: nothing changed.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
@@ -464,8 +564,10 @@ const FORWARD_TEXT = {
  * of them or the repository's default branch (HI-2885: main into the next version, after a release).
  * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
  * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
+ * HI-2892: only in the release path's direction (forwardOrder.ts), unless `override` (the user's explicit choice, through
+ * the Agent API alone), recorded in the card's request; an open card without one is never given it.
  */
-export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void): Promise<ForwardDone> {
+export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void, opts: { override?: boolean } = {}): Promise<ForwardDone> {
   if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
   const t = await projectTargets(ws, projectPath)
   const wf = await workflowFor(ws, projectPath)
@@ -474,6 +576,10 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
   const sources = await forwardSources(ws, projectPath, all)
   if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
+  // HI-2892: the release path's direction, or the user's explicit override (bypassing the direction alone).
+  const d = forwardDirection(from, to, await defaultBranch(ws, projectPath))
+  if (d.dir !== 'forward' && opts.override !== true) throw new ForwardRefused(withValues(FORWARD_TEXT.direction, { from, to, ...directionValues(d) }), { kind: 'invalid' })
+  const override: ForwardOverride | undefined = d.dir !== 'forward' ? { by: actor.kind === 'assistant' ? 'assistant' : 'user', dir: d.dir, why: d.why } : undefined
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
   const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
@@ -486,24 +592,94 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   // and started with its facts and entry, all in one transaction under the board's lock, which another Combwork on the
   // board takes too. Refused or stopped part way, none of it is kept: no card without its forward facts, none twice.
   const done = await cardBatch(ws, async (): Promise<ForwardDone> => {
-    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry).
-    const open = wf.store.cards().find((c) => {
-      const st = wf.state(c)
-      return !!st.forward && st.forward.from === from && st.forward.to === to && st.stage !== 'done'
-    })
+    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry), or HI-3000 the card resolving it.
+    const open = openPairs(wf).get(pairKey(from, to))
+    if (open && override && !(wf.state(open).forward ?? wf.state(open).resolves)?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
     if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
     guard?.()
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
-    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}) }, by, ruleset, guard), undefined, guard)
     // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
-    return { card: r.saved ?? made, queued: true, from, to }
+    // HI-2892: `overridden`, the user's override recorded on it (a pair against the release path's direction).
+    return { card: r.saved ?? made, queued: true, from, to, ...(override ? { overridden: true as const } : {}) }
   })
   if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
   return done
 }
+
+const RESOLVE_TEXT = {
+  title: msg({ id: 'service.forward.resolveTitle', defaultMessage: 'Resolve: bring {to} up to date with {from}', description: 'HI-2959: the title of the card Resolve on a builder makes from a forward merge that came back with a conflict: an agent merges branch {from} into branch {to} by hand and resolves the conflict. Branch names.' }),
+  description: msg({
+    id: 'service.forward.resolveDescription',
+    defaultMessage:
+      '{forward} tried to merge {from} ({source}) into {to} and came back{files, select, none {.} other {: a conflict in {files}.}} Resolve on a builder ended it and made this card, so a builder does that merge.\n\nIn this card’s branch (made from {to}): `git merge {source}`, resolve the conflict, commit the merge and submit it for review. It merges into {to} as a merge commit, whatever the project’s merge style, so {to} keeps {from}’s history.',
+    description: 'HI-2959: the description of the card Resolve on a builder makes. {forward}: the forward merge card’s key (HI-12); {from}, {to}: branch names; {source}: the commit id to merge (keep it); {files}: the files in conflict, a list (none: leave that part out; keep the select keys). Keep the git command in backticks as it is.'
+  }),
+  notReturned: msg({ id: 'service.forward.notReturned', defaultMessage: '{card} isn’t a forward merge the merge queue sent back, so there is nothing to resolve on a builder.', description: 'HI-2959: Resolve on a builder refused: the card ({card}: its key) isn’t a forward merge card waiting after a conflict or a red check (it is queued, merging, Done, or an ordinary card).' }),
+  raced: msg({ id: 'service.forward.resolveRaced', defaultMessage: '{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.', description: 'HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.' })
+}
+
+/** What Resolve on a builder did (HI-2959): the card made for a builder, and the forward merge it ended. */
+export interface ForwardResolved {
+  card: TaskCard
+  forward: string
+  from: string
+  to: string
+  source: string
+}
+
+/**
+ * HI-2959 (SPEC §16.9): Resolve on a builder, on a forward merge the queue returned, the user's or the Assistant's alone
+ * (`actor`; the Assistant's guard checked again inside each write). One board change: an ordinary code card made on the
+ * forward's destination, pinned to it even when it is Work merges into now (HI-2985), linked to it, saying what came back and how to resolve it; marked its forward resolution
+ * (`ForwardResolution`: its rules merge it as a merge commit); and the forward ended (Done, nothing merged). The returned
+ * attempt's frozen source is what the card merges, not the source's head now. Refused or stopped part way, none of it is
+ * kept: a Retry, a Remove or another Resolve meanwhile leaves no card.
+ */
+export async function resolveForward(ws: WorkspaceService, n: number, actor: TaskActor, reason: string, guard?: () => void): Promise<ForwardResolved> {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
+  const found = await forwardCard(ws, n)
+  if (!found) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: `#${n}` }), { kind: 'invalid' })
+  const { wf, rec, projectPath } = found
+  // HI-2892, as Retry: only in the release path's direction as it reads now, unless its own request recorded the user's
+  // override; one returned for its direction is ended by Remove from queue alone, never handed to a builder.
+  const f = wf.state(rec).forward!
+  const d = forwardDirection(f.from, f.to, await defaultBranch(ws, projectPath))
+  if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
+  const back = wf.returnedForward(rec)
+  if (!back) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: rec.key }), { kind: 'conflict' })
+  const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+  const files = back.failed?.files?.length ? fmt.list(back.failed.files.slice(0, 20)) : ''
+  const { cardBatch, createTask, runIntent } = await import('../tasks')
+  const done = await cardBatch(ws, async (): Promise<ForwardResolved> => {
+    guard?.()
+    const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { pinTarget: true, ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
+    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source, ...(f.override ? { override: f.override } : {}) }, by, guard), undefined, guard)
+    if (isRefusal(marked.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
+    // Refused (a Retry, a Remove or another Resolve since it was read): thrown, so the card made just now goes too.
+    const ended = await runIntent(wf, rec.id, actor, (x) => x.resolveForward(rec.id, { entry: back.entry, resolver: wf.store.card(made.number).key }, reason, by, guard), undefined, guard)
+    if (isRefusal(ended.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
+    return { card: marked.saved ?? made, forward: rec.key, from: back.from, to: back.to, source: back.source }
+  })
+  queueChanged(ws, projectPath, back.to)
+  return done
+}
+
+/** The forward merge card `n` (HI-2679) with its project's workflow; null for any other card. */
+async function forwardCard(ws: WorkspaceService, n: number): Promise<{ wf: Workflow; rec: CardRecord; projectPath: string } | null> {
+  for (const p of ws.info()?.projects ?? []) {
+    const wf = await workflowFor(ws, p.path).catch(() => null)
+    const rec = wf?.store.cards().find((c) => c.id === n)
+    if (wf && rec && wf.state(rec).forward) return { wf, rec, projectPath: p.path }
+  }
+  return null
+}
+
+/** A direction's values for its refusals (HI-2892): why, and whether the reverse is the release path's way. */
+const directionValues = (d: ForwardDirection): { why: string; dir: string } => (d.dir === 'forward' ? { why: 'other', dir: 'other' } : { why: d.why, dir: d.dir === 'backward' ? 'backward' : 'other' }) // i18n-ignore: select keys
 
 /** HI-2679: a forward merge asked by a project agent (or a script): the user's and the Assistant's alone. */
 const M_FORWARD_AGENTS = msg({ id: 'service.forward.notAgents', defaultMessage: 'Only the user or the Assistant brings one branch up to date with another.', description: 'HI-2679: a forward merge refused: asked by a project agent or a script.' })

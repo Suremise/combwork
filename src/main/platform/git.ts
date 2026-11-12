@@ -12,6 +12,7 @@ import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
 import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
+import { gitlinkOf, parseRawRows, sideOf, type GitlinkSide } from '../../shared/gitlink'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
 import type { CommitInfo, WorktreeNow } from './history'
@@ -421,20 +422,36 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   if (out.length !== asked.length + (o.target && target === undefined ? 1 : 0)) return unknown(U.state, { folder })
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
-  MARKERS.forEach((marker, i) => {
-    if (there[i]) files.push(`(${marker})`)
-  })
-  return { line, head: oid, dirty: files, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
+  return { line, head: oid, dirty: [...files, ...operations], operations, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
-/** Files changed from base to head, as git lists them. */
+/**
+ * Files changed from base to head, as git lists them. HI-2864: read as raw rows (the same paths and letters as
+ * `--name-status`, with both modes and full ids), so a row with a gitlink on either side keeps what each side is (a
+ * submodule's commit, a file, a link, nothing) for the Work section. Output that isn't raw rows is unknown, never a
+ * partial list.
+ */
 export async function filesChanged(repo: string, base: string, headRev: string): Promise<Maybe<FileChange[]>> {
-  const r = await git(repo, ['diff', '--name-status', '--no-renames', '-z', base, headRev])
-  if (!r.ok) return unknown(U.filesChanged, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
-  const parts = r.out.split('\0').filter(Boolean)
-  const out: FileChange[] = []
-  for (let i = 0; i + 1 < parts.length; i += 2) out.push({ status: parts[i][0], path: parts[i + 1] })
-  return out
+  const r = await git(repo, ['diff', '--raw', '-z', '--no-abbrev', '--no-renames', '--no-ext-diff', base, headRev])
+  const rows = r.ok ? parseRawRows(r.out) : null
+  if (!rows) return unknown(U.filesChanged, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
+  return rows.map((row) => {
+    const link = gitlinkOf(row)
+    return { status: row.status, path: row.path, ...(link ? { gitlink: { from: link.from, to: link.to } } : {}) }
+  })
+}
+
+/**
+ * HI-2864: what a path is at a commit (a gitlink with its commit, a file, a link, or nothing there), from its tree entry's
+ * mode: `ls-tree -z` of that one literal path. Unknown when git can't say or its output isn't one entry or none.
+ */
+export async function treeSide(repo: string, rev: string, path: string): Promise<Maybe<GitlinkSide>> {
+  const r = await git(repo, ['--literal-pathspecs', 'ls-tree', '-z', '--full-tree', rev, '--', path])
+  const entries = r.ok ? r.out.split('\0').filter(Boolean) : null
+  const m = entries?.length === 1 ? /^(\d{6}) \w+ ([0-9a-f]{40}|[0-9a-f]{64})\t(.*)$/s.exec(entries[0]) : null
+  if (!entries || entries.length > 1 || (entries.length === 1 && (!m || m[3] !== path))) return unknown(U.filesChanged, { from: rev.slice(0, 7), to: rev.slice(0, 7) })
+  return m ? sideOf(m[1], m[2]) : { kind: 'none' }
 }
 
 /**

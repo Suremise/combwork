@@ -21,6 +21,7 @@
 //   a token: withheld from the Agent API (`titleFromCommand`, #620).
 // - A log that can't be written never stops a run: it is closed and given as no log, and every run started is finished.
 
+import type { WorkspaceFiles } from '../platform/workspacePort'
 import { randomUUID } from 'crypto'
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, rmdirSync, rmSync, statSync, unlinkSync, writeSync } from 'original-fs'
@@ -28,7 +29,8 @@ import { join } from 'path'
 import { StringDecoder } from 'string_decoder'
 import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
-import { endTree, resolveCommand, shellSpec } from '../progressReporters/wrapper'
+import { resolveCommand, shellSpec } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
 import { snapshot } from './checks'
 import type { CheckContext, CheckResult } from './mergeQueue'
 import type { ProgressCaller, ProgressStore } from '../progress'
@@ -56,8 +58,9 @@ export interface QueueRuns {
  * caller is Combwork's own: only Combwork changes these runs. An install's title is its command line: `titleFromCommand` keeps
  * it from the Agent API's public form (#620).
  */
-export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined): QueueRuns {
-  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
+export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined, extra: { copy?: string; stoppable?: boolean } = {}): QueueRuns {
+  // HI-2938: `extra` places the runs in a check copy (its name) whose job Stop ends (a jj candidate's checks).
+  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...extra, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
   return {
     start: (r) => {
       if (!on()) return null
@@ -91,6 +94,12 @@ export interface QueueChecksDeps {
   timeoutMs: () => number
   /** The project's worktree setup command (Project Settings → Agents), as it is now. */
   setupCommand: () => string | Promise<string>
+  /** HI-1182: whether Set up submodules and LFS is on now (absent: off, nothing set up). */
+  gitFilesOn?: () => Promise<boolean>
+  /** The project's folder: a relative submodule URL's base when the repository has no origin (HI-1182). */
+  project?: string
+  /** HI-1182: the platform's submodules-and-LFS step (its workspace port's); absent, none. */
+  files?: WorkspaceFiles
   /** The network error codes that make a failed check transient in its last lines (Settings → Advanced, #1362); none: only the sure causes. */
   networkCodes?: () => RegExp | null
   platform?: NodeJS.Platform
@@ -502,19 +511,24 @@ export const execCommand = (o: { spawn: Spawn; platform: NodeJS.Platform; timeou
     let timedOut = false
     let settled = false
     let after: NodeJS.Timeout | undefined
+    // At its limit its tree is ended off main's thread (HI-3009): the end, and the grace after it, wait for that teardown.
+    const ending = treeEnding(o.platform)
     const done = (e: Omit<CheckEnd, 'output'>): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       clearTimeout(after)
-      resolve({ ...e, timedOut: timedOut || undefined, output: '' })
+      ending.after(() => resolve({ ...e, timedOut: timedOut || undefined, output: '' }))
     }
     const timer = setTimeout(() => {
       timedOut = true
-      if (child) endTree(child, o.platform)
+      ending.end(child)
       // A descendant that got away may keep the output open: the run ends anyway.
-      after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
-      after.unref?.()
+      ending.after(() => {
+        if (settled) return
+        after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
+        after.unref?.()
+      })
     }, o.timeoutMs)
     timer.unref?.()
     try {
@@ -592,7 +606,12 @@ export async function bracketEnd(folder: string, revision: string, start: QueueB
 }
 
 /** The runner the queue calls for its folder: `runCheck` and `install` (QueueConfig). */
-export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>; install: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }> } {
+export function queueChecks(deps: QueueChecksDeps): {
+  runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
+  install: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
+  gitFiles: (folder: string, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
+  gitFilesOn: () => Promise<boolean>
+} {
   const spawn = deps.spawn ?? nodeSpawn
   const platform = deps.platform ?? process.platform
   // A pattern that can't be read (an Advanced value gone bad) leaves only the sure causes.
@@ -612,7 +631,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
    * Runs one command as one of Combwork's runs, in the folder. Its run is always finished and its log always closed, also
    * when the log can't be written (then it is given as no log) or a step before the command fails.
    */
-  const run = async (label: string, command: string, folder: string, ctx: CheckContext, opts: { titleFromCommand?: boolean; asWritten?: boolean; before?: () => void } = {}): Promise<CheckResult> => {
+  const run = async (label: string, command: string, folder: string, ctx: CheckContext, opts: { titleFromCommand?: boolean; asWritten?: boolean; before?: () => void; steps?: (log: BoundedLog) => Promise<CheckEnd> } = {}): Promise<CheckResult> => {
     const title = `${ctx.card} · ${label} · ${ctx.revision.slice(0, 7)}` // i18n-ignore: a run's title: its card, check or command, and revision, no words
     const id = deps.runs?.start({ title, command, card: ctx.number, revision: ctx.revision, folder, ...(ctx.noInstall ? { noInstall: true } : {}), ...(opts.titleFromCommand ? { titleFromCommand: true } : {}), ...(opts.asWritten ? { installAsWritten: true } : {}) }) ?? null
     let logPath: string | null = null
@@ -637,7 +656,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         end = { spawnError: true, exitCode: null, signal: null, output: '' }
         return { ok: false, transient: true, cause: { cause: 'spawn' }, output: '', command, run: id ?? randomUUID() }
       }
-      end = await exec(command, folder, log, ctx.env)
+      end = opts.steps ? await opts.steps(log) : await exec(command, folder, log, ctx.env)
     } finally {
       output = log.close()
       const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
@@ -668,6 +687,28 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
       // From scratch whatever the command: node_modules goes first, so no warm package outlives an install that
       // installed nothing (a dry run) and the checks fail on what's missing rather than pass on what was there.
       return run(plan.command, plan.command, folder, ctx, { titleFromCommand: true, asWritten, before: () => removeNodeModules(folder) })
+    },
+    gitFilesOn: async () => !!(await deps.gitFilesOn?.().catch(() => true)),
+    // HI-1182: the merged result's submodules and LFS files, as one of the queue's runs (its gits in the queue's spawn,
+    // no shell, within a check's time limit); nothing (no run) where the folder uses neither or the setting is off.
+    gitFiles: async (folder, ctx) => {
+      const files = deps.files
+      if (!files || !(await deps.gitFilesOn?.().catch(() => true))) return { ok: true, output: '', skipped: true }
+      const need = await files.needed(folder, true)
+      if (typeof need === 'object') return { ok: false, output: need.error, command: files.title, run: randomUUID() }
+      if (!need) return { ok: true, output: '', skipped: true }
+      return run(files.title, files.title, folder, ctx, {
+        steps: async (log) => {
+          const x = files.exec({ spawn, env: { ...checkEnv(deps.env()), ...ctx.env }, log, timeoutMs: deps.timeoutMs(), platform })
+          try {
+            const o = await files.prepare(x, { folder, project: deps.project ?? folder, disposable: true }).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }))
+            if (!o.ok) log.write(Buffer.from(`${o.error}\n`))
+            return { exitCode: o.ok ? 0 : 1, signal: null, output: '', ...(x.timedOut() ? { timedOut: true } : {}) }
+          } finally {
+            x.close()
+          }
+        }
+      })
     }
   }
 }

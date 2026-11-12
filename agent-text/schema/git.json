@@ -37,9 +37,23 @@
       "profile": "plain"
     }
   },
+  "git.repoLock.jjFolder": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "git.repoLock.noGitDir": {
     "placeholders": {
       "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "git.repoLock.order": {
+    "placeholders": {}
+  },
+  "git.repoLock.unknownRepo": {
+    "placeholders": {
+      "root": "plain",
       "why": "plain"
     }
   },
@@ -76,6 +90,9 @@
   "git.vc.git": {
     "placeholders": {}
   },
+  "git.vc.jj": {
+    "placeholders": {}
+  },
   "git.vc.none": {
     "placeholders": {}
   },
@@ -84,12 +101,61 @@
       "platform": "plain"
     }
   },
+  "git.vc.switch.drain": {
+    "placeholders": {}
+  },
+  "git.vc.switch.fallback": {
+    "placeholders": {}
+  },
+  "git.vc.switch.gates": {
+    "placeholders": {}
+  },
+  "git.vc.switch.groupChanged": {
+    "placeholders": {}
+  },
+  "git.vc.switch.jjInGit": {
+    "placeholders": {
+      "root": "plain"
+    }
+  },
+  "git.vc.switch.jjNoGitCopy": {
+    "placeholders": {}
+  },
+  "git.vc.switch.jjTool": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
+  "git.vc.switch.jjToolBack": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
+  "git.vc.switch.jjUnknown": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "git.vc.switch.memberDrain": {
+    "placeholders": {}
+  },
   "git.vc.switch.noGit": {
+    "placeholders": {}
+  },
+  "git.vc.switch.noJj": {
     "placeholders": {}
   },
   "git.vc.switch.otherFound": {
     "placeholders": {
       "vcs": "plain"
     }
+  },
+  "git.vc.switch.otherWorkspace": {
+    "placeholders": {
+      "workspace": "plain"
+    }
+  },
+  "git.vc.switch.switching": {
+    "placeholders": {}
   }
 }

@@ -27,6 +27,11 @@ export interface WorktreeNow {
   /** Null: no commit yet. */
   head: string | null
   dirty: string[]
+  /**
+   * HI-2983: the operations under way among `dirty` (Git: its markers, `(MERGE_HEAD)`…, listed last), apart from the
+   * files, so a changed file of the same name is a file. Absent: the platform lists none.
+   */
+  operations?: string[]
   /** The line asked for's head (null: no such line), when one was. */
   target?: string | null
   /** The platform's metadata paths asked for, absolute, in their order. */
@@ -160,6 +165,8 @@ export type ObserveEvent =
   | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
   | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
   | { kind: 'written'; project: string; folder: string; paths: string[] }
+  /** HI-2882: something a platform keeps (jj's retained bundles) may have changed, or its minute's tick: its adapter decides. */
+  | { kind: 'invalidated'; project: string; what: string }
 
 export interface Disposable {
   dispose(): void

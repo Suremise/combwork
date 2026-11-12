@@ -144,6 +144,34 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   check("this repository's no-reply address clears the warning", !!(await lib.until(async () => (await warning.count()) === 0 && (await text(branches.locator('[data-identity-used="email"]'))) === '1+test@users.noreply.github.com', HUNG_MS)) && g(alpha, 'config', '--local', 'user.email') === '1+test@users.noreply.github.com')
   await shot(page, '3-remotes')
 
+  // --- HI-1185: Signing, read-only. Off; then an ssh key with no passphrase (Git for Windows' own ssh-keygen: signs without
+  // asking); then a signing program Combwork doesn't run by itself (not checked, and never run: its marker stays absent).
+  const signingBox = branches.locator('[data-git-signing]')
+  const signingIs = (kind) => lib.until(async () => (await signingBox.getAttribute('data-git-signing')) === kind, HUNG_MS)
+  const reopenBranches = async () => {
+    await page.locator('.git-sections button', { hasText: 'History' }).click()
+    await page.locator('.git-sections button', { hasText: 'Branches & remotes' }).click()
+  }
+  check('Signing says commits aren’t signed', !!(await signingIs('off')), await text(signingBox))
+  const gitRoot = path.resolve(g(alpha, '--exec-path'), '..', '..', '..')
+  const signKey = path.join(lib.WORK, `gitview-signing-${Date.now()}`).replace(/\\/g, '/')
+  execFileSync(path.join(gitRoot, 'usr', 'bin', 'ssh-keygen.exe'), ['-q', '-t', 'ed25519', '-N', '', '-f', signKey])
+  g(alpha, 'config', 'gpg.format', 'ssh')
+  g(alpha, 'config', 'user.signingkey', signKey)
+  g(alpha, 'config', 'commit.gpgsign', 'true')
+  await reopenBranches()
+  check('…an unlocked ssh key: signs without asking, with its format, key and scope', !!(await signingIs('unattended')) && /SSH/.test(await text(signingBox)) && (await text(signingBox)).includes(path.basename(signKey)) && /set in this repository/.test(await text(signingBox)), await text(signingBox))
+  await shot(page, '3b-signing')
+  const marker = path.join(lib.WORK, `gitview-signer-ran-${Date.now()}.txt`)
+  const customSigner = path.join(lib.WORK, 'gitview-custom-signer.cmd')
+  fs.writeFileSync(customSigner, `@echo ran > "${marker}"\r\n`)
+  g(alpha, 'config', 'gpg.ssh.program', customSigner.replace(/\\/g, '/'))
+  await signingBox.locator('[data-action="signing-check"]').click()
+  check('…a signing program Combwork doesn’t run by itself: not checked, never run', !!(await signingIs('notChecked')) && !fs.existsSync(marker), await text(signingBox))
+  // Back as it was for what follows (commits made later aren't signed).
+  g(alpha, 'config', '--unset', 'gpg.ssh.program')
+  g(alpha, 'config', '--unset', 'commit.gpgsign')
+
   // --- History and tags.
   await page.locator('.git-sections button', { hasText: 'History' }).click()
   const history = page.locator('[data-git-history]')

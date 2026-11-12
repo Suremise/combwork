@@ -23,6 +23,14 @@
   "runtime.choice.takeOver": {
     "placeholders": {}
   },
+  "runtime.forward.resolving": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain"
+    }
+  },
   "runtime.move.doneByOverride": {
     "placeholders": {
       "cards": "plain",
@@ -62,6 +70,12 @@
       "card": "plain"
     }
   },
+  "runtime.start.moreFiles": {
+    "placeholders": {
+      "files": "plain",
+      "more": "plain"
+    }
+  },
   "runtime.start.slotMove": {
     "placeholders": {
       "slot": "plain",
@@ -74,6 +88,13 @@
     "placeholders": {
       "card": "plain",
       "why": "plain"
+    }
+  },
+  "runtime.start.targetChanges": {
+    "placeholders": {
+      "target": "plain",
+      "folder": "plain",
+      "files": "plain"
     }
   },
   "runtime.submit.movedAhead": {

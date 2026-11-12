@@ -2,7 +2,7 @@
 // app's leaseForStart): the card's line from the target's head in it, its `Started` with the slot and lease, and its
 // `prepareSlot` action; none free, refused `start.slotAvailable`; a lease lent for a start that isn't written given back;
 // a window Start that only asks lends nothing; no slot (the rules off), where the agent is.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { lineName, slugOf, type SlotForStart } from '../../src/main/workflow/runtime'
@@ -11,10 +11,23 @@ import { reconcile, slotPreparationOwed } from '../../src/main/workflow/reconcil
 import type { FactData } from '../../src/shared/workflow/facts'
 import { GUARD_FNS, type GuardInputs } from '../../src/shared/workflow/guards'
 
+/** HI-3010 (HR2's round 2): which folder's reads of its branch fail, while its head and the target still read. */
+const branchUnread = vi.hoisted(() => ({ folder: null as string | null }))
+vi.mock('../../src/main/git', async (orig) => {
+  const actual = await orig<typeof import('../../src/main/git')>()
+  const reads = (args: string[]): boolean => args[0] === 'symbolic-ref' || (args[0] === 'status' && args.includes('--branch')) || (args[0] === 'rev-parse' && args.includes('--symbolic-full-name'))
+  return {
+    ...actual,
+    git: async (cwd: string, args: string[], ...rest: unknown[]) =>
+      branchUnread.folder && cwd.toLowerCase() === branchUnread.folder.toLowerCase() && reads(args) ? { ok: false, out: '', err: 'fatal: unable to read HEAD (test)', code: 128 } : (actual.git as (...a: unknown[]) => Promise<unknown>)(cwd, args, ...rest)
+  }
+})
+
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
+  branchUnread.folder = null
 })
 
 const opts = { ...preset('git', 'pair'), preChecks: [], mergeChecks: [], folder: 'slots' as const, review: 'none' as const, finish: 'agentMerges' as const }
@@ -184,6 +197,46 @@ describe('cards on slots (#1438)', () => {
     expect(e.wf.state(card).started).toMatchObject({ line, base: left })
   })
 
+  it("HI-3010: a submission from a slot off the card's line is refused, naming where it is; on its line, it goes", async () => {
+    const folder = tempDir('slot-')
+    const { e } = world(() => ({ slot: 'slot-a', folder, lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'Off its line' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    const line = s.started!.line!
+    // Its slot never switched onto its line (its preparation waited): its builder committed on the detached head.
+    sh(e.project, 'worktree', 'add', '-q', '--detach', folder, s.started!.base!)
+    const work = commit(folder, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    const detached = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine')
+    expect(detached.message).toMatch(new RegExp(`isn't on its branch ${line}: its head is detached at ${work.slice(0, 7)}`))
+    expect(detached.next).toMatch(new RegExp(`git switch -c ${line}`))
+    // On another branch.
+    sh(folder, 'switch', '-q', '-c', 'elsewhere')
+    expect(refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine').message).toMatch(/: it is on elsewhere,/)
+    expect(e.wf.state(card).stage).toBe('active')
+    // On its line, made where its work is: submitted.
+    sh(folder, 'switch', '-q', '-c', line)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("HI-3010 (HR2's round 2): its branch unreadable while its head reads is refused as unknown, never let through", async () => {
+    const folder = tempDir('slot-')
+    const { e } = world(() => ({ slot: 'slot-a', folder, lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'Branch unread' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    sh(e.project, 'worktree', 'add', '-q', '--detach', folder, s.started!.base!)
+    commit(folder, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    branchUnread.folder = folder
+    expect(sh(folder, 'rev-parse', 'HEAD')).toMatch(/^[0-9a-f]{40}$/)
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.unknown')
+    expect(e.wf.state(card).stage).toBe('active')
+    // Readable again, and on its line: submitted.
+    branchUnread.folder = null
+    sh(folder, 'switch', '-q', '-c', s.started!.line!)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
   it("names a card's line: lower case ASCII letters, digits and hyphens, at most 40, accents folded", () => {
     expect(lineName('AM', { key: 'AM-12', title: 'Fix the Login!' })).toBe('cw/AM/AM-12-fix-the-login')
     expect(slugOf('Café déjà vu — naïve')).toBe('cafe-deja-vu-naive')
@@ -276,5 +329,46 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     const card = e.wf.createCard({ title: 'On its own line' })
     moved(await e.wf.start(card.key, B1))
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
+  })
+})
+
+describe('a slotted card whose target follows its remote (G21, HI-1183)', () => {
+  /** Combwork merges, slots, the target tracking a bare remote; `ahead`: the remote has a commit the local target lacks. */
+  function following(ahead: boolean) {
+    const e = (env = setup({ ...opts, finish: 'combworkMerges', followRemote: true }, { autoRun: false }))
+    const bare = tempDir('remote-').replace(/\\/g, '/') + '/origin.git'
+    sh(e.project, 'init', '-q', '--bare', '-b', 'main', bare)
+    sh(e.project, 'remote', 'add', 'origin', bare)
+    sh(e.project, 'push', '-q', '-u', 'origin', 'main')
+    if (ahead) {
+      const other = tempDir('other-')
+      sh(other, 'clone', '-q', bare, '.')
+      sh(other, 'config', 'user.email', 'o@example.com')
+      sh(other, 'config', 'user.name', 'O')
+      commit(other, { 'theirs.txt': 'x\n' }, 'theirs')
+      sh(other, 'push', '-q', 'origin', 'main')
+    }
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: tempDir('slot-'), lease: 'l-1', fresh: true })
+    return { e, bare }
+  }
+
+  it('starts from the remote’s head (fetched, never the local one), pinned until its line holds it', async () => {
+    const { e, bare } = following(true)
+    const card = e.wf.createCard({ title: 'From the remote' })
+    moved(await e.wf.start(card.key, B1))
+    const remote = sh(bare, 'rev-parse', 'main')
+    expect(remote).not.toBe(sh(e.project, 'rev-parse', 'main'))
+    expect(e.wf.state(card).started?.base).toBe(remote)
+    expect(sh(e.project, 'rev-parse', 'refs/cw/fetch/main')).toBe(remote)
+  })
+
+  it('a remote it can’t fetch, or a local target with commits the remote lacks, refuses the start with why', async () => {
+    const { e } = following(false)
+    commit(e.project, { 'local.txt': 'x\n' }, 'local only')
+    const card = e.wf.createCard({ title: 'Diverged' })
+    expect(refusedBy(await e.wf.start(card.key, B1), 'platform.unknown').message).toMatch(/push or pull/)
+    sh(e.project, 'remote', 'set-url', 'origin', tempDir('gone-').replace(/\\/g, '/') + '/none.git')
+    expect(refusedBy(await e.wf.start(card.key, B1), 'platform.unknown').message).toMatch(/which main follows/)
+    expect(e.wf.state(card).stage).toBe('todo')
   })
 })

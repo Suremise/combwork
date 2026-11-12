@@ -10,7 +10,10 @@
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
-// Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German.
+// - Set up submodules and LFS (HI-1182): absent in a project with neither; in one with a submodule (gamma), shown on with
+//   how many it has, turned off (project.json's slots.gitFiles false) and on again (removed).
+// Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German, and of the
+// Set up submodules and LFS row, on and off, light and dark.
 // Dev build, throwaway profile and workspace.
 // Dev build only (#1578): B1's slot is lent through slots:test, and a write is held with a test seam
 // (CW_TEST_SLOW_IPC).
@@ -47,6 +50,15 @@ function board(sql, ...args) {
   const beta = path.join(fx.ws, 'beta')
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
+  // HI-1182: a third project with a local submodule (its repository outside the workspace, so it is no project).
+  const gamma = path.join(fx.ws, 'gamma')
+  const gammaSub = path.join(path.dirname(fx.ws), 'gamma-sub')
+  fs.rmSync(gammaSub, { recursive: true, force: true })
+  lib.gitProject(gammaSub, { 's.txt': 's\n' })
+  lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.combwork/\n' })
+  lib.git(gamma, ['branch', '-M', 'main'])
+  lib.git(gamma, ['-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', gammaSub, 'libs/s'])
+  lib.git(gamma, ['commit', '-q', '-m', 'submodule'])
   const marker = 'setup-marker.txt'
   let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   let { page, inv, app } = h
@@ -227,6 +239,20 @@ function board(sql, ...args) {
     check('…and the default, .env*, with no level setting one', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'default' && (await copyOrigin.innerText()).includes('.env*'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     check('Reviewers review in review copies shows Advanced’s switch', (await slotsGroup.locator('[data-slot-option="reviewCopies"] [data-value]').getAttribute('data-value')) === 'on')
     await shot('slots-group', slotsGroup)
+    check('a project with neither submodules nor Git LFS has no Set up submodules and LFS row', (await slotsGroup.locator('[data-slot-option="gitFiles"]').count()) === 0)
+
+    // --- Set up submodules and LFS (HI-1182): gamma has a submodule, so the row shows, on, saying so; off is saved.
+    await openWorkflow(gamma)
+    const gitFiles = slotsGroup.locator('[data-slot-option="gitFiles"]')
+    check('a project with a submodule shows Set up submodules and LFS, saying how many it has', !!(await until(async () => (await gitFiles.count()) === 1 && (await gitFiles.locator('[data-git-files="submodules"]').innerText().catch(() => '')).includes('1 submodule'), HUNG_MS)), await slotsGroup.innerText().catch(() => ''))
+    check('…on by default', (await gitFiles.locator('[role="switch"]').getAttribute('aria-checked')) === 'true')
+    await shot('git-files-on', gitFiles)
+    await gitFiles.locator('[role="switch"]').click()
+    check('…turned off, saved as the project’s own (slots.gitFiles: false)', !!(await until(() => projectJson(gamma).slots?.gitFiles === false, HUNG_MS)), JSON.stringify(projectJson(gamma).slots))
+    await shot('git-files-off', gitFiles)
+    await gitFiles.locator('[role="switch"]').click()
+    check('…and on again, removed', !!(await until(() => !('gitFiles' in (projectJson(gamma).slots ?? {})), HUNG_MS)), JSON.stringify(projectJson(gamma).slots))
+    await openWorkflow(fx.alpha)
 
     // --- Project Settings: General first, and no slot rows or link (HI-1765).
     await lib.openProjectSettings(page)

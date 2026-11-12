@@ -7,6 +7,7 @@ import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
+import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -24,7 +25,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { SwitchRefusal } from './platform/switching'
+import type { StoreSwitch, SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -1445,6 +1446,12 @@ export interface TaskWaiting {
   /** Who marked it (the user, the Assistant, an agent's name). */
   by: string
   at: string
+  /**
+   * HI-2915: set only by Combwork when the card's agent asked the Assistant (`cw_ask_assistant`) on it: that request's ref
+   * (its delivery's), so the mark goes when that request ends and only then (a later mark has none). Never from the
+   * Agent API.
+   */
+  ask?: string
 }
 
 /** An agent reviewing a card (TaskCard.review). */
@@ -1737,7 +1744,7 @@ export interface RetargetPreview {
 }
 
 /** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
-export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine'
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
@@ -1769,6 +1776,8 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
+  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
+  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
@@ -1910,6 +1919,20 @@ export interface ProjectConfig {
   loopStepWaitMinutes?: number | null
 }
 
+/**
+ * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
+ * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
+ * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.
+ */
+export interface SlotRecovery {
+  restored: number
+  copies: { path: string; copy: string }[]
+  /** Files it moved aside and left there, the version before the recovery: their path was created again meanwhile. */
+  asides: { path: string; copy: string }[]
+  keptDeleted: string[]
+  divergent: string | null
+}
+
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
 export interface SlotView {
   name: string
@@ -1925,6 +1948,11 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
+  /** HI-2869: the platform that made it (jj's, when not Git's), and, for a jj slot, stale (another workspace rewrote it). */
+  platform?: 'jj'
+  stale?: true
+  /** HI-2995: a jj slot kept for a card put back with committed work not in its target yet: that card's number. */
+  keptFor?: number
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -1958,11 +1986,22 @@ export interface CopyView {
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
 export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number } | { op: 'quit'; agent: string }
 
+/** HI-1182: what a project folder uses of submodules and Git LFS (Version Control → Slots and copies), and git-lfs's version line (null: not installed, or LFS unused). */
+export interface GitFilesStatus {
+  submodules: number
+  lfs: boolean
+  lfsVersion: string | null
+  /** Whether an LFS filter is configured (git lfs install); without one, LFS files stay pointers. */
+  lfsFilter: boolean
+}
+
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
   setup?: string
   archive?: string
   copy?: string
+  /** HI-1182: false turns off setting up submodules and Git LFS in slots and copies (left out: on, where either is used). */
+  gitFiles?: boolean
 }
 
 export interface ProjectProviderConfig {
@@ -3764,6 +3803,8 @@ export interface GitDiff {
   original: string
   modified: string
   binary: boolean
+  /** HI-2864: either side is a submodule (mode 160000). Its sides are git's own `Subproject commit` lines; a file's or link's side is its content. */
+  gitlink?: GitlinkChange
 }
 
 /** A recent workspace as a window sees it (File → Open Recent, the welcome page; #144). */
@@ -3938,6 +3979,45 @@ export interface FileGitDone {
   lines: string[]
   count: number
   branch: string | null
+}
+
+/** HI-2944: what is done with a folder's uncommitted changes: committed there, or set aside (a named git stash). */
+export type FolderChangeAction = 'commit' | 'setAside'
+
+/** HI-2944: a folder's changes committed or set aside. */
+export interface FolderChangesDone {
+  action: FolderChangeAction
+  /** The folder, as git lists it. */
+  folder: string
+  /** Its branch then. */
+  branch: string
+  /** The paths acted on (a rename's both). */
+  files: string[]
+  /** The commit's or the stash's message (the stash is found by it in `git stash list`). */
+  message: string
+  /** The commit made, or the stash's object (`git stash list` shows it). */
+  made: string
+}
+
+/** HI-2944: a target's folder with uncommitted changes, as a start finds it (warned of, never refused). */
+export interface TargetChanges {
+  target: string
+  folder: string
+  /** Every path git reports changed there, untracked ones too. */
+  files: string[]
+}
+
+/** HI-2944: the queue's pause a Commit or Set aside acts on, as the window showed it. */
+export interface QueuePauseRef {
+  card: string
+  reason: string
+  at: string
+}
+
+/** HI-2944: Commit or Set aside from a paused merge: done, and whether the queue goes on (the pause then, if not). */
+export interface QueueChangesSettled {
+  done: FolderChangesDone
+  resumed: boolean
 }
 
 /** A file opened in the Files tab editor. */
@@ -4342,6 +4422,8 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /** Its list's revision (HI-2898, LaneRecord.listRev): what a window edit of its list names, refused once it moved. */
+  listRev: number
   /**
    * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
@@ -4402,6 +4484,61 @@ export interface LaneSlotInfo {
   line: string | null
   state: 'ready' | 'preparing'
   since: string
+}
+
+/** A running lane as a window edit of its list saw it (HI-2898): its id and its list's revision (LaneInfo.listRev). */
+export interface LaneSeen {
+  lane: string
+  rev: number
+}
+
+/**
+ * A window edit of a running lane's list (HI-2898, Progress → Lanes): each names the revision it was made on, and is
+ * refused once that moved. `to` and `at` are places in the lane's working list (its queued list when it has one): `to`
+ * where the card ends up, `at` before which card it goes (none: last).
+ */
+export type LaneEdit =
+  | ({ op: 'move'; card: number; to: number } & LaneSeen)
+  | ({ op: 'add'; card: number; at?: number } & LaneSeen)
+  | ({ op: 'remove'; card: number } & LaneSeen)
+  | ({ op: 'cancel' } & LaneSeen)
+  | { op: 'transfer'; card: number; from: LaneSeen; to: LaneSeen; at?: number }
+  | { op: 'undo'; undo: LaneEditUndo }
+
+/** A lane's list as an edit left it or found it: its cards, its queued list (null: none) and their revision. */
+export interface LaneListState {
+  lane: string
+  cards: number[]
+  pending: number[] | null
+  rev: number
+}
+
+/**
+ * What undoing a window edit of lanes needs (HI-2898): each lane's list before it and the revision the edit left it at,
+ * the card's agent before and after when the edit changed it, with the card's history entry the edit left (its token:
+ * any change of the card since moves it on), and the cards it would bring back. Undone whole or not at all.
+ */
+export interface LaneEditUndo {
+  lanes: { before: Omit<LaneListState, 'rev'>; rev: number }[]
+  card: { number: number; before: string | null; after: string | null; head: string | null } | null
+  /**
+   * Each card the undo would bring back onto a lane (one the edit took off, or Move here's), as the edit left it: its last
+   * history entry, and whether it kept work from an earlier start then. The undo is refused once one of them changed
+   * since (started, given to an agent, moved), or gained such work (HR1's round 1).
+   */
+  back: { number: number; head: string | null; work: boolean }[]
+}
+
+/** What a window edit of lanes did (HI-2898): for its notification, and its Undo (null: nothing to undo). */
+export interface LaneEditResult {
+  op: LaneEdit['op']
+  card: number | null
+  /**
+   * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
+   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   */
+  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
+  undo: LaneEditUndo | null
 }
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
@@ -4615,6 +4752,8 @@ export interface ProgressRun {
    * it, and it can be stopped from the panel: its processes are in the copy's job).
    */
   copy?: string
+  /** HI-2938: Combwork's own run in a check copy whose processes are its lease's job (a jj candidate's check): Stop ends them. */
+  stoppable?: boolean
 }
 
 /**

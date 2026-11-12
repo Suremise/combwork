@@ -3165,6 +3165,33 @@ p.hint {
   position: absolute;
   inset: 0;
 }
+/* A moved submodule's diff (HI-2864): its row on top, git's own lines below it when asked for. */
+.editor-host > .gitlink-diff {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gitlink-diff-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.gitlink-row,
+.gitlink-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.gitlink-row {
+  font-weight: 600;
+}
 /* The code editor's right-click menu (#1102). Monaco draws it in a shadow root hosted beside .monaco-editor, where
    its theme's colour variables don't reach (it showed black text on no surface), and standalone Monaco defines no
    border width or radius at all. Custom properties do cross into a shadow root, so its host gets Combwork's menu look
@@ -8323,6 +8350,8 @@ button.agent-place:hover {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* The Activity map's layout (HI-2903) follows the tab's width, not the window's. */
+  container-type: inline-size;
 }
 .activity-head {
   display: flex;
@@ -8344,6 +8373,357 @@ button.agent-place:hover {
   overflow: auto;
   padding: 10px 14px 16px;
 }
+/* The Activity map (HI-2903): a honeycomb beside the list (wide) or above it (narrow), drawn from the same reads. */
+:root,
+[data-theme='dark'] {
+  --map-hex: #26262a;
+  --map-comb: rgba(255, 255, 255, 0.035);
+  --map-agent-0: #f59e0b;
+  --map-agent-1: #3b9eff;
+  --map-agent-2: #b48cff;
+  --map-agent-3: #2aa9bb;
+  --map-agent-4: #4ec96b;
+  --map-agent-5: #f472b6;
+  --map-agent-6: #a3a3a3;
+  --map-agent-7: #e2b93b;
+}
+[data-theme='light'] {
+  --map-hex: #fafafa;
+  --map-comb: rgba(0, 0, 0, 0.035);
+  --map-agent-0: #d97706;
+  --map-agent-1: #0969da;
+  --map-agent-2: #8250df;
+  --map-agent-3: #0e7f8e;
+  --map-agent-4: #1a7f37;
+  --map-agent-5: #bf3989;
+  --map-agent-6: #6e7781;
+  --map-agent-7: #9a6700;
+}
+.activity-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.activity-body > .activity-list,
+.activity-body > .pane-empty {
+  flex: 1;
+  min-height: 0;
+}
+.activity-body.with-map > .activity-list {
+  border-top: 1px solid var(--border-subtle);
+}
+@container (min-width: 900px) {
+  .activity-body.with-map {
+    flex-direction: row;
+  }
+  .activity-body.with-map > .activity-list {
+    border-top: none;
+    border-left: 1px solid var(--border-subtle);
+  }
+}
+.activity-map {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  align-items: flex-start;
+  overflow: auto;
+}
+@container (max-width: 640px) {
+  .activity-map {
+    flex-direction: column;
+  }
+}
+.activity-map-board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: 440px;
+  max-width: 100%;
+}
+.activity-map-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 46vh;
+}
+@container (min-width: 900px) {
+  .activity-map-svg {
+    max-height: calc(100vh - 230px);
+  }
+}
+.activity-map-comb polygon {
+  fill: none;
+  stroke: var(--map-comb);
+}
+.activity-map-spoke {
+  stroke: var(--border);
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+.activity-map-spoke.failed {
+  stroke: var(--error);
+}
+.activity-map-spoke.na {
+  stroke: var(--fg-decor);
+  stroke-dasharray: 3 5;
+  opacity: 0.6;
+}
+.activity-map-station polygon {
+  fill: var(--map-hex);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.activity-map-station.active polygon {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.activity-map-station.failed polygon {
+  stroke: var(--error);
+  stroke-width: 2;
+}
+.activity-map-station.notReported polygon {
+  stroke-dasharray: 4 4;
+}
+.activity-map svg text {
+  text-anchor: middle;
+  fill: var(--fg-faint);
+  font-size: 11px;
+}
+.activity-map-station-name {
+  font-size: 13px !important;
+  font-weight: 600;
+  fill: var(--fg-strong) !important;
+}
+.activity-map-station.notReported .activity-map-station-name {
+  fill: var(--fg-decor) !important;
+}
+.activity-map-station.failed .activity-map-station-sub,
+.activity-map-station.failed .activity-map-station-last {
+  fill: var(--error) !important;
+}
+.activity-map-station-last {
+  font-family: var(--font-mono);
+  font-size: 10.5px !important;
+  fill: var(--fg-muted) !important;
+}
+.activity-map-centre > polygon {
+  fill: var(--bg-elevated);
+  stroke: var(--border);
+}
+.activity-map-centre.waiting > polygon {
+  stroke: var(--state-waiting);
+  stroke-width: 2;
+}
+.activity-map-centre-name {
+  font-size: 15px !important;
+  font-weight: 600;
+  fill: var(--fg-strong) !important;
+}
+.activity-map-centre-doing {
+  font-size: 12px !important;
+  fill: var(--fg-muted) !important;
+}
+.activity-map-centre .waiting,
+.activity-map-centre.waiting .activity-map-centre-doing {
+  fill: var(--state-waiting) !important;
+}
+.activity-map-context path {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.activity-map-context .track,
+.activity-map-ring-mark .track {
+  stroke: var(--border-subtle);
+}
+.activity-map-context .fill,
+.activity-map-ring-mark .fill {
+  stroke: var(--accent);
+}
+.activity-map-context.amber .fill,
+.activity-map-ring-mark.amber .fill,
+.activity-map-centre-context.amber {
+  stroke: var(--warning);
+  fill: var(--warning) !important;
+}
+.activity-map-context .fill,
+.activity-map-ring-mark .fill {
+  fill: none !important;
+}
+.activity-map-context.red .fill,
+.activity-map-ring-mark.red .fill {
+  stroke: var(--error);
+}
+.activity-map-centre-context.red {
+  fill: var(--error) !important;
+}
+.activity-map-centre-context.ok {
+  fill: var(--accent) !important;
+}
+.activity-map-pulse {
+  animation: activity-map-out 700ms ease-in-out forwards;
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+.activity-map-pulse.back {
+  animation-name: activity-map-back;
+}
+@keyframes activity-map-out {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+@keyframes activity-map-back {
+  from {
+    transform: translate(var(--dx), var(--dy));
+  }
+  to {
+    transform: translate(0, 0);
+  }
+}
+.activity-map-flash {
+  fill: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: activity-map-flash 600ms ease-out forwards;
+}
+.activity-map-flash.failed {
+  fill: var(--error);
+}
+@keyframes activity-map-flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.activity-map-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.activity-map-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.activity-map-ring:hover {
+  background: var(--bg-hover);
+}
+.activity-map-ring-mark path {
+  fill: none;
+  stroke-width: 3;
+}
+.activity-map-ring-mark.hatched .track {
+  stroke-dasharray: 2 2;
+}
+.activity-map-feed {
+  flex: 0 0 220px;
+  min-width: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+@container (max-width: 640px) {
+  .activity-map-feed {
+    flex-basis: auto;
+    width: min(440px, 100%);
+  }
+}
+.activity-map-feed h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+}
+.activity-map-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  white-space: nowrap;
+  min-width: 0;
+}
+.activity-map-feed-time {
+  color: var(--fg-decor);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+.activity-map-feed-station {
+  color: var(--fg-faint);
+  flex: 0 0 46px;
+}
+.activity-map-feed-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.activity-map-feed-row.failed .activity-map-feed-name {
+  color: var(--error);
+}
+.activity-map-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.activity-map-partial {
+  margin-top: 6px;
+  font-size: 11px;
+}
+.activity-map-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  font-size: 12px;
+}
+.activity-map-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.activity-map-toggle {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font: inherit;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+.activity-map-toggle.on {
+  background: var(--accent-soft);
+  color: var(--fg-strong);
+}
+.activity-map-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .activity-card-head {
   display: flex;
   align-items: baseline;
@@ -8361,6 +8741,14 @@ button.agent-place:hover {
 .activity-card-column {
   flex: none;
   white-space: nowrap;
+}
+/* Waiting on purpose (HI-2915): a line of its own under the card's, cut short; its title has it whole. */
+.activity-card-waiting {
+  margin: -2px 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .activity-card-title {
   color: var(--fg-strong);
@@ -11398,14 +11786,20 @@ textarea.input.task-blocked-input {
 .for-you-show-work {
   margin-top: 4px;
 }
-/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. */
+/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. It fills the tab's body and
+   scrolls in it, as the other sections' .scroll-page does (HI-2894: unbounded, it grew past the body, which doesn't
+   scroll, so the queues further down couldn't be reached). Its parts keep their height: the page scrolls instead. */
 .git-queue {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 12px;
   overflow-y: auto;
-  min-height: 0;
+}
+.git-queue > * {
+  flex-shrink: 0;
 }
 .git-queue-target {
   display: flex;
@@ -11415,6 +11809,24 @@ textarea.input.task-blocked-input {
 }
 .git-queue-history-h {
   font-weight: 600;
+}
+/* HI-2893: past branches' queues, folded under the live ones: their histories only. */
+.git-queue-past {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+}
+.git-queue-past > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.git-queue-past[open] > summary {
+  margin-bottom: 12px;
+}
+.git-queue-past > .git-queue-target + .git-queue-target {
+  margin-top: 16px;
 }
 /* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
    ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways
@@ -12935,6 +13347,144 @@ button.progress-run-show:focus-visible {
 .progress-lane-queue-row.unrecorded {
   opacity: 0.7;
 }
+/* A running lane's queue, editable in the Lanes tab (HI-2898): a card waiting its turn drags by its grip (or Alt+Up and
+   Alt+Down), × takes it off; the card under way shows a lock; a line shows where a dragged card goes. */
+.progress-lane-queue-row.movable {
+  cursor: grab;
+  border-radius: 3px;
+}
+.progress-lane-queue-row.movable:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.progress-lane-queue-row.dragging {
+  opacity: 0.45;
+}
+.progress-lane-queue-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.progress-lane-queue-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.progress-lane-queue-grip,
+.progress-lane-queue-lock {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.progress-lane-queue-remove {
+  flex-shrink: 0;
+  margin: -2px 0;
+  opacity: 0;
+}
+.progress-lane-queue-row.movable:hover .progress-lane-queue-remove,
+.progress-lane-queue-row.movable:focus-within .progress-lane-queue-remove {
+  opacity: 1;
+}
+.progress-lane-queue-add {
+  margin-top: 4px;
+}
+/* Add Card…: a search and the matching cards, a line each. */
+.progress-lane-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.progress-lane-picker > .search-box {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.progress-lane-picker-list {
+  flex: 1 1 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.progress-lane-picker-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.progress-lane-picker-card:hover,
+.progress-lane-picker-card:focus-visible {
+  background: var(--bg-hover);
+}
+.progress-lane-picker-none {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+/* A refused change, in place under its lane, with Move here for a card another lane has. */
+.progress-lane-refusal {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.progress-lane-refusal > .codicon {
+  flex-shrink: 0;
+  color: var(--warning);
+  line-height: 18px;
+}
+.progress-lane-refusal-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.progress-lane-cancel-change {
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+/* A card dragged from the board over a running lane: it takes the card last. */
+.progress-lane.card-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+/* Ended today, collapsed at the top of the Lanes tab. */
+.progress-lanes-ended {
+  margin: 0 8px 6px;
+}
+.progress-lanes-ended-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.progress-lanes-ended .progress-lane {
+  margin: 0 0 6px;
+}
+.progress-lane-ended .progress-lane-top {
+  gap: 6px;
+}
+.progress-lane-ended-took {
+  font-variant-numeric: tabular-nums;
+}
 /* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
 .progress-attention {
   display: flex;
@@ -13445,6 +13995,22 @@ button.progress-card-key:hover {
 }
 .progress-queue-paused .progress-queue-text {
   flex: 1 1 160px;
+}
+/* HI-3000: the card resolving a pair, under that pair's behind line, indented to its text. */
+.progress-queue-resolving {
+  flex-wrap: wrap;
+  align-items: center;
+  padding-left: 20px;
+}
+.progress-queue-resolving .progress-queue-text {
+  flex: 1 1 140px;
+}
+/* HI-2944: Commit and Set Aside on a merge paused on uncommitted changes (the queue card, a card's Work section). */
+.folder-change-buttons,
+.card-work-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .progress-queue-merged > .codicon {
   color: var(--success);
@@ -13983,6 +14549,10 @@ button.progress-card-key:hover {
 }
 .progress-lane-state.abandoned {
   color: var(--error);
+}
+/* A card waiting on purpose (HI-2915): said, never a warning. */
+.progress-lane-state.waiting {
+  color: var(--fg-muted);
 }
 /* Why it waits (#1279): in the header, in the room the lane's name had, cut short with its whole text in its title. */
 .progress-lane-why {
@@ -15396,3 +15966,8 @@ button.progress-lane-retry {
 .ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
 .ignore-rule-file .monaco { height: 100%; }
+
+/* jj's leftovers (HI-2869): a long path wraps rather than pushing its button out of the panel. */
+.jj-leftovers code {
+  overflow-wrap: anywhere;
+}

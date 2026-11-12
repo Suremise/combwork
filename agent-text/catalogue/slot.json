@@ -39,6 +39,10 @@
     "text": "git couldn't read {what}",
     "note": "A slot's setup or preparation error: git couldn't read a branch or HEAD. {what} is the branch's name, or HEAD."
   },
+  "slot.error.identityUnread": {
+    "text": "its workspace's identity couldn't be read",
+    "note": "A slot's setup error (HI-2795): a jj workspace was made but its store, name or folder ids couldn't be read, so Combwork won't use or remove it."
+  },
   "slot.error.interrupted": {
     "text": "its setup was interrupted",
     "note": "A slot's setup error, kept on the slot, when the setup was taken over from a Combwork that is gone (#1429). Read by agents and in the log."
@@ -99,6 +103,54 @@
     "text": "its agent reviews now",
     "note": "As slot.hold.draining: the agent is reviewing."
   },
+  "slot.jj.filesUnread": {
+    "text": "jj couldn't read {slot}'s files",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't say whether its working copy has changes. The jj counterpart of slot.prepare.filesUnread."
+  },
+  "slot.jj.forgetFailed": {
+    "text": "jj workspace forget failed",
+    "note": "HI-3003: why a jj slot is kept, not removed: jj's removal of its workspace refused and said nothing. The jj counterpart of slot.remove.failed."
+  },
+  "slot.jj.lineUnread": {
+    "text": "jj couldn't read {what}",
+    "note": "HI-3003: a jj slot's setup or preparation error: jj couldn't read the card's line or the target bookmark. {what} is its name. The jj counterpart of slot.error.gitRead."
+  },
+  "slot.jj.noTarget": {
+    "text": "no target bookmark",
+    "note": "HI-3003: why Combwork can't tell whether a jj slot's work is in its target: the project has no target bookmark (Version Control → Workflow's Work merges into). The jj counterpart of slot.check.noTarget."
+  },
+  "slot.jj.notListed": {
+    "text": "its folder is there but jj does not list it as a workspace",
+    "note": "HI-3003: a jj slot's setup error: its folder exists but isn't a workspace jj knows, so Combwork leaves it alone. The jj counterpart of slot.error.notListed."
+  },
+  "slot.jj.prepareFailed": {
+    "text": "jj couldn't prepare {slot} for the card: {error}",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj refused or failed the step that puts its workspace on the card's base. {error} is jj's first line, else failed. The jj counterpart of slot.prepare.switchFailed: names no git or switch."
+  },
+  "slot.jj.workspaceAdd": {
+    "text": "jj workspace add: {error}",
+    "note": "HI-3003: a jj slot's setup error: `jj workspace add` failed. {error} is jj's first line, else failed. The jj counterpart of slot.error.worktreeAdd."
+  },
+  "slot.jj.workspaceUnread": {
+    "text": "jj couldn't read {slot}'s workspace",
+    "note": "HI-3003: why a jj slot couldn't be prepared for its card: jj couldn't read the slot's workspace (what it is bound to). The jj counterpart of slot.prepare.branchUnread: names no git or branch."
+  },
+  "slot.kept.busy": {
+    "text": "something works in it now",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) is not lent back now: an operation, a session or a process holds it."
+  },
+  "slot.kept.gone": {
+    "text": "its folder is gone",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) can't be lent back: its folder was deleted."
+  },
+  "slot.kept.other": {
+    "text": "another slot was asked for",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) is not the one lent: the start named another slot."
+  },
+  "slot.kept.stale": {
+    "text": "its binding isn't this card's at the folder's generation any more: recover or remove the slot",
+    "note": "HI-2995: why a kept slot (slot.refusal.kept) can't be lent back: jj's record of the slot no longer names the card."
+  },
   "slot.laneEnd.merged": {
     "text": "{card} merged at {commit}",
     "note": "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters."
@@ -151,6 +203,10 @@
     "text": "its lease has ended",
     "note": "Why a slot couldn't be prepared for its card: the lease it was lent under ended."
   },
+  "slot.prepare.stale": {
+    "text": "{slot} is stale: another jj workspace rewrote its working copy. The user can recover it with Recover… under Slots and copies",
+    "note": "Why a jj slot couldn't be prepared for its card (HI-2913): another workspace rewrote its working-copy commit (a rebase of the card's commit, say), so its files are behind; recovering it is the user's action."
+  },
   "slot.prepare.switchFailed": {
     "text": "git switch: {error}",
     "note": "Why a slot couldn't be prepared for its card: `git switch` failed. {error} is git's first line, else failed."
@@ -178,6 +234,10 @@
   "slot.refusal.inUse": {
     "text": "{slot} is in use by {agent} for {what}",
     "note": "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane."
+  },
+  "slot.refusal.kept": {
+    "text": "{slot} holds this card's committed work from before it was put back, kept for it there: it gets that slot back, never a fresh one ({why})",
+    "note": "HI-2995: a jj card's start refused while its own earlier work is kept in a slot that can't be lent back to it now. {why} is slot.kept.*."
   },
   "slot.refusal.lane": {
     "text": "lane {lane}",

@@ -16,7 +16,8 @@ import { Icon } from './ui'
  * The Version Control tab's Merge queue section (#1357, SPEC §16.9.3): each target's queue as the Progress panel's card shows it (now,
  * Pause queue / Resume queue), and its history, the latest 50 outcomes (card, revision, result or reason, when). A target
  * shows by #1356's rule (its state, old rulesets included), and while it has a history. Placed in the Version Control
- * tab as it was (#1416), for None too while an old Git ruleset's queue is there.
+ * tab as it was (#1416), for None too while an old Git ruleset's queue is there. HI-2893: a past branch's queue (none of
+ * the project's targets now, nothing in it) shows only its history, under Past branches, folded: no card, no Pause queue.
  */
 
 const list = (items: string[]): string => fmt.list(items, 'conjunction')
@@ -24,6 +25,8 @@ const list = (items: string[]): string => fmt.list(items, 'conjunction')
 const M = {
   region: msg({ id: 'git.queue.region', defaultMessage: 'Merge queues', description: "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue." }),
   reading: msg({ id: 'git.queue.reading', defaultMessage: 'Reading the merge queues…', description: "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue." }),
+  past: msg({ id: 'git.queue.past', defaultMessage: '{n, plural, one {Past branches (# branch)} other {Past branches (# branches)}}', description: "HI-2893: a folded part of the Version Control tab's Merge queue section: the history of the queues of branches that aren't the project's targets any more (Work merges into, Other branches work can merge into), {n} of them. A click unfolds it." }),
+  pastTip: msg({ id: 'git.queue.pastTip', defaultMessage: 'Branches that work no longer merges into, with nothing in their queue: what their queues merged and returned.', description: "HI-2893: tooltip of Past branches in the Version Control tab's Merge queue section." }),
   none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Combwork merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Combwork's names: keep them as Combwork shows them. Glossary 2.5: merge queue." }),
   history: msg({ id: 'git.queue.history', defaultMessage: 'History of {target}', description: "A heading in the Git tab's Merge queue section: the latest outcomes of the queue for the branch {target} follow." }),
   noHistory: msg({ id: 'git.queue.noHistory', defaultMessage: 'Nothing merged or returned yet.', description: "The Git tab's Merge queue section, under a queue's history heading, when it has none yet." }),
@@ -90,16 +93,30 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
         </div>
       </div>
     )
-  const shown = views.filter((v) => queueShown(v, now) || v.recent.length > 0).sort((a, b) => a.target.localeCompare(b.target))
+  const byTarget = (a: QueueView, b: QueueView): number => a.target.localeCompare(b.target)
+  const shown = views.filter((v) => !v.past && (queueShown(v, now) || v.recent.length > 0)).sort(byTarget)
+  // HI-2893: past branches' queues, their history only, folded under the live ones.
+  const past = views.filter((v) => v.past && v.recent.length > 0).sort(byTarget)
   return (
-    <div className="git-queue" role="region" aria-label={tr(M.region)}>
-      {!shown.length && <div className="pane-empty">{tr(M.none)}</div>}
+    // Focusable (HI-2894): the page scrolls with the keyboard too, its history tables' own scroll inside it.
+    <div className="git-queue" role="region" aria-label={tr(M.region)} tabIndex={0}>
+      {!shown.length && !past.length && <div className="pane-empty">{tr(M.none)}</div>}
       {shown.map((v) => (
         <section key={v.target} className="git-queue-target" data-target={v.target}>
-          <QueueCard view={v} runs={runs} now={now} showProject={false} />
+          <QueueCard view={v} runs={runs} now={now} showProject={false} inVersionControl />
           <QueueHistory project={project} view={v} />
         </section>
       ))}
+      {past.length > 0 && (
+        <details className="git-queue-past" data-queue-past="">
+          <summary title={tr(M.pastTip)}>{tr(M.past, { n: past.length })}</summary>
+          {past.map((v) => (
+            <section key={v.target} className="git-queue-target" data-target={v.target} data-past="">
+              <QueueHistory project={project} view={v} />
+            </section>
+          ))}
+        </details>
+      )}
     </div>
   )
 }

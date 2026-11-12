@@ -399,7 +399,8 @@
     "text": "end lane {lane}"
   },
   "api.change.forward": {
-    "text": "bring {to} up to date with {from} in {project}"
+    "text": "bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}",
+    "note": "HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice)."
   },
   "api.change.forwardAny": {
     "text": "bring a branch up to date with another"
@@ -466,6 +467,13 @@
     "text": "put {total} {count, plural, one {card} other {cards}} in order in {column}",
     "note": "count: the number, for its plural; total: the same number as written."
   },
+  "api.change.resolveForward": {
+    "text": "hand {card} to a builder to resolve",
+    "note": "HI-2959: Resolve on a builder on a forward merge card the queue returned."
+  },
+  "api.change.resolveForwardAny": {
+    "text": "hand a returned forward merge to a builder"
+  },
   "api.change.resumeAQueue": {
     "text": "resume a merge queue"
   },
@@ -531,6 +539,10 @@
   },
   "api.check.leaseArgs": {
     "text": "lease, pid, after and before are required"
+  },
+  "api.check.noCopies": {
+    "text": "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot",
+    "note": "HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0)."
   },
   "api.check.noVcs": {
     "text": "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files"
@@ -700,7 +712,12 @@
     "text": "Created the project {name}"
   },
   "api.done.forwardQueued": {
-    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{card} is bringing {to} up to date with {from} already}}",
+    "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card."
+  },
+  "api.done.forwardResolved": {
+    "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged",
+    "note": "HI-2959: Resolve on a builder’s reply. {card}: the new card; {forward}: the forward merge card it ended; {source}: a short commit id."
   },
   "api.done.forwardUpToDate": {
     "text": "{to} has everything of {from} already: nothing queued"
@@ -1088,6 +1105,10 @@
     "text": "git at {root}{subfolder, select, yes { (a subfolder of that repository)} other {}}",
     "note": "The version control found in a project folder."
   },
+  "api.project.vcsJj": {
+    "text": "jj at {root}{colocated, select, yes { (colocated with git)} other { (not colocated: no git working copy)}}",
+    "note": "HI-2799: a jj repository found in a project folder."
+  },
   "api.project.vcsUnsupported": {
     "text": "{name} (not supported: None)"
   },
@@ -1103,6 +1124,10 @@
   },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
+  },
+  "api.queue.overrideArg": {
+    "text": "override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction",
+    "note": "HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true."
   },
   "api.queue.projectRequired": {
     "text": "project is required"

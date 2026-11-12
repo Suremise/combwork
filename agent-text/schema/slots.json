@@ -29,6 +29,9 @@
       "max": "number"
     }
   },
+  "slots.setting.badSwitch": {
+    "placeholders": {}
+  },
   "slots.setting.badText": {
     "placeholders": {
       "max": "number"

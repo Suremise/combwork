@@ -158,6 +158,11 @@ export interface QueuePauseInfo {
   message?: string
   /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
   stuck?: QueueStuck
+  /**
+   * HI-2988: the owed catch-up's pause (follow mode: `card` merged and published already, the local target behind it):
+   * its changes are set aside, never committed there.
+   */
+  catchUp?: true
 }
 
 /** A project's queue for one target. */
@@ -169,7 +174,8 @@ export interface QueuePauseInfo {
  */
 export interface QueueForward {
   others: string[]
-  behind: { from: string; commits: number | null }[]
+  /** HI-3000: `resolving`, the card resolving that pair (Resolve on a builder) while it is open: nothing more is offered for it. */
+  behind: { from: string; commits: number | null; resolving?: { card: number; key: string } }[]
 }
 
 export interface QueueView {
@@ -205,6 +211,13 @@ export interface QueueView {
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
    */
   inFlight: number[]
+  /**
+   * HI-2893: a past branch's queue: its target is none of the project's targets now (Work merges into, Other branches work
+   * can merge into) and it holds nothing: no entry testing or queued, and (HI-2927) no card in flight into it, no pause
+   * and no Combwork running it; unreadable targets make none past. The Merges tab leaves it out, Version Control lists
+   * its history under Past branches, and the Agent API lists it only when asked (`past=true`).
+   */
+  past?: true
 }
 
 /**

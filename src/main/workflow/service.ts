@@ -9,7 +9,8 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
-import { resolve as resolvePath } from 'path'
+import type { JjCardDeps } from '../platform/jjPlatform'
+import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -33,6 +34,7 @@ import { Workflow, type SlotForStart } from './runtime'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
+import { noticeTargetChanges } from '../targetChangesNotice'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = WORKFLOW_ENFORCE
@@ -86,6 +88,13 @@ export interface SlotStarts {
 let slotStarts: SlotStarts | null = null
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
+}
+
+/** jj's card work's dependencies for a project (HI-2868: the app's jjCards.ts, set while slots run); none: jj answers nothing. */
+type JjCards = (ws: WorkspaceService, projectPath: string, projectId: () => string) => JjCardDeps
+let jjCards: JjCards | null = null
+export function setJjCards(f: JjCards | null): void {
+  jjCards = f
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -189,11 +198,13 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
 function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
+  let jjDeps: JjCardDeps | undefined
   return new Workflow({
     // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
+    projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path),
     get projectKey() {
       return store.projectKey()
     },
@@ -201,8 +212,23 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
+    targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
+    // jj's card work (HI-2868), composed once for the project while slots run.
+    get jj() {
+      jjDeps ??= jjCards?.(ws, project.path, () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path))
+      return jjDeps
+    },
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
+    // HI-2938: a card that passed is reconciled soon (a jj card's candidate is built then; its pass changes no jj
+    // operation or ref that would schedule it otherwise).
+    moved: (card, _from, to) => {
+      // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
+      // never a window's proxy of it, which this workflow may have been made from.
+      // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+    },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
     reviewersPresent: async () => {

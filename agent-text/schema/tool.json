@@ -520,6 +520,12 @@
   "tool.queue.arg.items": {
     "placeholders": {}
   },
+  "tool.queue.arg.override": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.past": {
+    "placeholders": {}
+  },
   "tool.queue.arg.preview": {
     "placeholders": {}
   },
@@ -550,6 +556,15 @@
       "from": "plain",
       "queued": "select",
       "card": "plain"
+    }
+  },
+  "tool.queue.reply.resolve": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
     }
   },
   "tool.queue.reply.retarget": {

@@ -37,6 +37,9 @@
       "what": "plain"
     }
   },
+  "slot.error.identityUnread": {
+    "placeholders": {}
+  },
   "slot.error.interrupted": {
     "placeholders": {}
   },
@@ -98,6 +101,53 @@
     }
   },
   "slot.hold.reviews": {
+    "placeholders": {}
+  },
+  "slot.jj.filesUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.jj.forgetFailed": {
+    "placeholders": {}
+  },
+  "slot.jj.lineUnread": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "slot.jj.noTarget": {
+    "placeholders": {}
+  },
+  "slot.jj.notListed": {
+    "placeholders": {}
+  },
+  "slot.jj.prepareFailed": {
+    "placeholders": {
+      "slot": "plain",
+      "error": "plain"
+    }
+  },
+  "slot.jj.workspaceAdd": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "slot.jj.workspaceUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.kept.busy": {
+    "placeholders": {}
+  },
+  "slot.kept.gone": {
+    "placeholders": {}
+  },
+  "slot.kept.other": {
+    "placeholders": {}
+  },
+  "slot.kept.stale": {
     "placeholders": {}
   },
   "slot.laneEnd.merged": {
@@ -178,6 +228,11 @@
   "slot.prepare.leaseEnded": {
     "placeholders": {}
   },
+  "slot.prepare.stale": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
   "slot.prepare.switchFailed": {
     "placeholders": {
       "error": "plain"
@@ -215,6 +270,12 @@
       "slot": "plain",
       "agent": "plain",
       "what": "plain"
+    }
+  },
+  "slot.refusal.kept": {
+    "placeholders": {
+      "slot": "plain",
+      "why": "plain"
     }
   },
   "slot.refusal.lane": {

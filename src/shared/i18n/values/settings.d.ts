@@ -460,6 +460,11 @@ interface CombworkMessageValues {
   'settings.advanced.copilotFooter.title': { mode: string | number }
   'settings.advanced.cw.accounts.usageMoves.desc': undefined
   'settings.advanced.cw.accounts.usageMoves.title': undefined
+  'settings.advanced.cw.activity.mapMotion.desc': undefined
+  'settings.advanced.cw.activity.mapMotion.off': undefined
+  'settings.advanced.cw.activity.mapMotion.on': undefined
+  'settings.advanced.cw.activity.mapMotion.system': undefined
+  'settings.advanced.cw.activity.mapMotion.title': undefined
   'settings.advanced.cw.agents.tempFolder.desc': undefined
   'settings.advanced.cw.agents.tempFolder.title': undefined
   'settings.advanced.cw.assistant.startView.desc': undefined
@@ -556,6 +561,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.prompt.clearDraft.title': undefined
   'settings.advanced.cw.prompt.rawCardStart.desc': undefined
   'settings.advanced.cw.prompt.rawCardStart.title': undefined
+  'settings.advanced.cw.prompt.wholeCardMax.desc': undefined
+  'settings.advanced.cw.prompt.wholeCardMax.title': undefined
   'settings.advanced.cw.queue.checkMinutes.desc': undefined
   'settings.advanced.cw.queue.checkMinutes.title': undefined
   'settings.advanced.cw.queue.checkedOutTarget.ask': undefined
@@ -590,6 +597,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.sessions.signFailFast.desc': undefined
+  'settings.advanced.cw.sessions.signFailFast.title': undefined
+  'settings.advanced.cw.sessions.signTimeoutSeconds.desc': undefined
+  'settings.advanced.cw.sessions.signTimeoutSeconds.title': undefined
   'settings.advanced.cw.sessions.terminalType.desc': undefined
   'settings.advanced.cw.sessions.terminalType.title': undefined
   'settings.advanced.cw.showDeveloperFeatures.desc': undefined

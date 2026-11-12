@@ -341,6 +341,7 @@ export function packagedStatus(info, code) {
 
 /**
  * Whether a run needs the dev build in out/ at all: not when every suite is one of the installer's, which test
- * dist/win-unpacked (packagedStatus checks that one), unless packaged-progress is told to check the dev build's wrapper.
+ * dist/win-unpacked (packagedStatus checks that one), unless packaged-progress or packaged-sign is told to check the dev
+ * build's (CW_PROGRESS_CHECK_DEV, CW_SIGN_CHECK_DEV).
  */
-export const needsDevBuild = (suites, env = process.env) => !suites.length || !suites.every((s) => (s.needs ?? []).includes('packaged')) || env.CW_PROGRESS_CHECK_DEV === '1'
+export const needsDevBuild = (suites, env = process.env) => !suites.length || !suites.every((s) => (s.needs ?? []).includes('packaged')) || env.CW_PROGRESS_CHECK_DEV === '1' || env.CW_SIGN_CHECK_DEV === '1'

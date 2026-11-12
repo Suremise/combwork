@@ -55,6 +55,9 @@ interface CombworkMessageValues {
   'shell.command.assistant.start': undefined
   'shell.command.assistant.toggle': undefined
   'shell.command.console.showCapture': undefined
+  'shell.command.files.commitIgnore': undefined
+  'shell.command.folderChanges.settle': undefined
+  'shell.command.folderChanges.show': undefined
   'shell.command.help.about': { app: string | number }
   'shell.command.help.agentSetup': undefined
   'shell.command.help.api': undefined
@@ -70,6 +73,7 @@ interface CombworkMessageValues {
   'shell.command.help.shortcuts': undefined
   'shell.command.help.tips': undefined
   'shell.command.hooks.adminSnippet': undefined
+  'shell.command.lanes.undoEdit': undefined
   'shell.command.layout': { layout: string | number }
   'shell.command.mcp.import': undefined
   'shell.command.notes.open': undefined

@@ -32,6 +32,33 @@ interface CombworkMessageValues {
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
+  'activity.map.agentsWorking': { agents: number; working: number }
+  'activity.map.cardRole': { card: string | number; role: string }
+  'activity.map.context': { pct: number }
+  'activity.map.contextUnknown': undefined
+  'activity.map.count': { n: number }
+  'activity.map.doing': { doing: string }
+  'activity.map.feedHeading': undefined
+  'activity.map.label': undefined
+  'activity.map.loading': undefined
+  'activity.map.needYou': { n: number }
+  'activity.map.needsYou': undefined
+  'activity.map.noCalls': undefined
+  'activity.map.notLoaded': undefined
+  'activity.map.notReported': undefined
+  'activity.map.partial': undefined
+  'activity.map.pct': { pct: number }
+  'activity.map.prompt': undefined
+  'activity.map.ringTip': { name: string | number; load: string; known: string; pct: number }
+  'activity.map.show': undefined
+  'activity.map.state': { state: string }
+  'activity.map.station': { station: string }
+  'activity.map.stationTip': { station: string | number; n: number; heat: number; hasLast: string; last: string | number }
+  'activity.map.stationTipPending': { station: string | number; status: string }
+  'activity.map.stripLabel': undefined
+  'activity.map.toggleContext': undefined
+  'activity.map.toggleFeed': undefined
+  'activity.map.toggleMap': undefined
   'activity.modelSwitch': { launched: string | number; running: string | number }
   'activity.modelSwitch.tip': undefined
   'activity.noPrompt': undefined
@@ -66,6 +93,7 @@ interface CombworkMessageValues {
   'activity.task': { type: string }
   'activity.thinking': undefined
   'activity.toolFor': { summary: string | number; time: string | number }
+  'activity.waiting': { assistant: string; reason: string | number }
   'activity.workspace.agentIn': { project: string | number; agent: string | number }
   'activity.workspace.assistant': undefined
   'activity.workspace.cardNobody': { card: string | number }

@@ -55,6 +55,21 @@ function dialectForRun(file, providerKey) {
 }
 
 /** Puts a run's dialect (dialectForRun) into a scenario workspace: `.combwork/dialects/<CLI>/<label>.json`. */
+/**
+ * A jj scenario's environment (HI-2800, sc.jj): the pinned jj (npm run jj:fetch) first on `basePath`, and a jj config in
+ * the scenario's folder (an identity and no pager), so neither Combwork's jj nor an agent's finds the user's. Throws when
+ * the pinned jj isn't fetched: the scenario fails at setup, saying so.
+ */
+function jjScenarioEnv(root, basePath) {
+  const { jjDir, portableJj } = require('../jjPortable.cjs')
+  if (!portableJj()) throw new Error("setup: this scenario needs the pinned jj, which isn't fetched (npm run jj:fetch)")
+  fs.mkdirSync(root, { recursive: true })
+  const config = path.join(root, 'jj.toml')
+  fs.writeFileSync(config, '[user]\nname = "Coder"\nemail = "coder@example.invalid"\n[ui]\npaginate = "never"\n')
+  // Git for Windows' system attributes (diff=astextplain) are jj's attributes gate (HI-2799): left out, as jjview does.
+  return { PATH: `${jjDir()};${basePath ?? ''}`, JJ_CONFIG: config, GIT_ATTR_NOSYSTEM: '1' }
+}
+
 function placeDialect(dialect, ws) {
   if (!dialect) return
   const dest = path.join(ws, '.combwork', 'dialects', ...dialect.path.split('/'))
@@ -557,6 +572,18 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
   }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  // Advanced settings (HI-2867): the scenario's own (sc.advanced), then the run's (--advanced), in its profile's advanced.json.
+  const advancedValues = { ...sc.advanced, ...opts.advanced }
+  if (Object.keys(advancedValues).length) {
+    const advFile = path.join(userData, 'advanced.json')
+    let had = {}
+    try {
+      had = JSON.parse(fs.readFileSync(advFile, 'utf8'))
+    } catch {
+      // none yet
+    }
+    fs.writeFileSync(advFile, JSON.stringify({ ...had, format: 1, values: { ...had.values, ...advancedValues } }, null, 2))
+  }
 
   const port = opts.port ?? 47930
   const started = Date.now()
@@ -584,6 +611,10 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The fake OpenCode the same, on the run's own test home (the CLI-home seam: no OpenCode account needed).
       ...(p.provider === 'opencode' ? { FAKE_OPENCODE_LOG: opencodeLog, FAKE_OPENCODE_WAKES: opencodeWakes, FAKE_OPENCODE_FOLLOW_NOTICES: '1', FAKE_OPENCODE_MODEL_MS: '700', XDG_DATA_HOME: opencodeHome } : {})
     }
+    // A jj scenario (HI-2800, sc.jj): the pinned jj first on Combwork's PATH (whatever PATH the provider's settings gave
+    // it, Copilot's and Codex's included), so its sessions' shells find it too, with a jj config of the run's own.
+    // PATH read whatever its spelling (HI-2945: PowerShell's copy of Windows' environment gives Path, not PATH).
+    if (sc.jj) Object.assign(env, jjScenarioEnv(root, lib.envValue(env, 'PATH') ?? lib.envValue(lib.baseEnv(), 'PATH')))
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
@@ -1105,9 +1136,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.notes = ((await api('GET', '/v1/shared')).body ?? []).flatMap(function flat(e) {
       return e.isDir ? (e.children ?? []).flatMap(flat) : [e.relPath]
     })
-    observed.gitStatus = ctx.git('status', '--porcelain')
+    // A non-colocated jj project (HI-2896, sc.separate) has no .git: no Git status or branches to read.
+    // No repository (a scenario that took alpha out of version control, HI-2854's A/B): neither to read.
+    const noGit = sc.separate || !fs.existsSync(path.join(alpha, '.git'))
+    observed.gitStatus = noGit ? '' : ctx.git('status', '--porcelain')
     // alpha's branches and its Work merges into and other branches as the run left them (HI-2811: Start the next version).
-    observed.branches = String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
+    observed.branches = noGit ? [] : String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
     observed.targets = await inv('workflow:form', alpha).then((f) => ({ target: f?.options?.target ?? null, otherTargets: f?.options?.otherTargets ?? [] })).catch(() => null)
     // A scenario's own reading of what the run left, through Combwork (its `after`), for its checks: `observed.after`.
     if (sc.after) observed.after = await sc.after(ctx).catch((e) => ({ error: String(e?.message ?? e) }))

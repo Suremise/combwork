@@ -928,5 +928,13 @@ describe("a lane's first card and brief in one task, in slots (HI-2558)", () => 
       await briefAfterFailedPrepare(ws, ALPHA, 1, 'b2')
       expect(state.calls).toEqual([])
     })
+
+    it('nothing for a later card whose builder is stopped (HI-2923: a jj lane ends its builder before each preparation; it had its brief with card 1)', async () => {
+      on()
+      lane()
+      state.view = { id: 'lane-1', state: 'active', builder: { id: 'b1' }, cards: [{ number: 1, column: 'done', blocked: null }, { number: 2, column: 'doing', blocked: null }] }
+      await briefAfterFailedPrepare(ws, ALPHA, 2, 'b1')
+      expect(state.calls).toEqual([])
+    })
   })
 })

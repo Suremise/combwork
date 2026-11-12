@@ -9,6 +9,7 @@ import * as compare from '../gitCompare'
 import * as watch from '../branchWatch'
 import * as merge from '../branchMerge'
 import type { RepoReads } from './repoReads'
+import { viewSigning } from './gitSigning'
 
 export const gitRepoReads: RepoReads = {
   changes: (root, base) => G.gitStatus(root, base),
@@ -17,6 +18,7 @@ export const gitRepoReads: RepoReads = {
   workTarget: (projectPath) => repo.workTargetOf(projectPath),
   info: (root, workTarget) => repo.repoInfo(root, workTarget),
   leftovers: (root, workTarget) => repo.leftoverInfo(root, workTarget),
+  signing: (root, force) => viewSigning(root, force),
   history: (root, o) => repo.repoHistory(root, o),
   compareLines: (root, workTarget, slots) => compare.compareLines(root, workTarget, slots),
   compare: (root, base, head, page, pinned) => compare.compareBranches(root, base, head, page, pinned),

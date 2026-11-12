@@ -32,7 +32,8 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkRepoTools } from './platform/repoPorts'
-import { handoverSession, combworkInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
+import { handoverSession, combworkInstructions, platformRuleKey, withLatestHandover, withPlatformRule, wrapsLongCommands } from '../shared/combworkGuidance'
+import { detect } from './platform/registry'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -72,11 +73,13 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
 import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { stopPublishWorker } from './jjPublish'
 import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
@@ -775,6 +778,9 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await sessions.writersSettled(3000)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
+  // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
+  // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
+  await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
   // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
   // with its job (kill on close) as Combwork exits.
   await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
@@ -1094,6 +1100,15 @@ app.whenReady().then(async () => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
+  // Agents' signer (HI-2867): cw-sign.exe, built with Combwork (resources\bin installed, out\bin in development), and
+  // cw-sign.js beside cw-progress.js. Without the launcher, sessions sign with git's own signer, as before.
+  const signLauncher = app.isPackaged ? join(process.resourcesPath, 'bin', 'cw-sign.exe') : join(__dirname, '..', 'bin', 'cw-sign.exe')
+  void stat(signLauncher).then(
+    (s) => {
+      if (s.isFile()) sessions.signer = { launcher: signLauncher, exec: process.execPath, script: unpackedScript('cw-sign.js') }
+    },
+    () => log.warn(`No signer launcher at ${userText(signLauncher)}: agents' signed commits use git's own signer`)
+  )
   /** Tests only (development builds): where the combwork MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
   sessions.combworkMcp = (projectPath, agentId): McpServerDef | null => {
@@ -1184,8 +1199,12 @@ app.whenReady().then(async () => {
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
       // Naming only the skills its agents get (#1431).
-      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
-      return withLatestHandover(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
+      const pc = await workspace.projectConfig(projectPath)
+      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames(pc.skillDelivery)])
+      // A jj project's agents get the jj rule after the contract (HI-2800), as cw-mcp.ts gives Claude Code.
+      // A jj repository with no Git working copy gets its own variant (HI-2896).
+      const rule = platformRuleKey(pc.platform, pc.platform === 'jj' ? detect(projectPath) : null)
+      return withLatestHandover(withPlatformRule(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), rule), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -1271,6 +1290,8 @@ app.whenReady().then(async () => {
   startReconciling()
   // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
+  // HI-1185: a signing check of one of its projects still running is ended.
+  WorkspaceService.closingTasks.add((path) => endOwnedWork((owner) => workspaceFor(owner)?.path?.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
@@ -1440,12 +1461,15 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  // The fallback when the quit couldn't wait (an updater's install, a crash's quit): synchronous, best effort.
+  endOwnedWorkNow()
   stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()
   stopObserving()
   stopReconciling()
+  void stopPublishWorker()
   stopQueueHosts()
   stopSlotCards()
   stopLaneBriefs()

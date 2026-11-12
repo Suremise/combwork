@@ -543,7 +543,8 @@
     "placeholders": {
       "to": "plain",
       "from": "plain",
-      "project": "plain"
+      "project": "plain",
+      "override": "select"
     }
   },
   "api.change.forwardAny": {
@@ -640,6 +641,14 @@
       "column": "plain"
     }
   },
+  "api.change.resolveForward": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.change.resolveForwardAny": {
+    "placeholders": {}
+  },
   "api.change.resumeAQueue": {
     "placeholders": {}
   },
@@ -735,6 +744,9 @@
     "placeholders": {}
   },
   "api.check.leaseArgs": {
+    "placeholders": {}
+  },
+  "api.check.noCopies": {
     "placeholders": {}
   },
   "api.check.noVcs": {
@@ -1006,7 +1018,17 @@
       "queued": "select",
       "card": "plain",
       "to": "plain",
-      "from": "plain"
+      "from": "plain",
+      "override": "select"
+    }
+  },
+  "api.done.forwardResolved": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
     }
   },
   "api.done.forwardUpToDate": {
@@ -1565,6 +1587,12 @@
       "subfolder": "select"
     }
   },
+  "api.project.vcsJj": {
+    "placeholders": {
+      "root": "plain",
+      "colocated": "select"
+    }
+  },
   "api.project.vcsUnsupported": {
     "placeholders": {
       "name": "plain"
@@ -1583,6 +1611,9 @@
     "placeholders": {
       "what": "plain"
     }
+  },
+  "api.queue.overrideArg": {
+    "placeholders": {}
   },
   "api.queue.projectRequired": {
     "placeholders": {}

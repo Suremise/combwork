@@ -453,30 +453,44 @@
   "tool.queue.arg.items": {
     "text": "retarget: the card keys, lane names and slot names to move, from the preview named."
   },
+  "tool.queue.arg.override": {
+    "text": "forward: true only when the user explicitly asked for this merge against the release path; recorded on its card.",
+    "note": "HI-2892; HI-2960: within 120 characters, the refusal says which direction is against it."
+  },
+  "tool.queue.arg.past": {
+    "text": "true: also past branches' queues.",
+    "note": "HI-2893; HI-2960: shortened to keep the agent tool list within its total (toolLimits.cjs)."
+  },
   "tool.queue.arg.preview": {
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
   },
   "tool.queue.arg.reason": {
-    "text": "remove, retry: the user's reason, recorded with the override."
+    "text": "remove, retry, resolve: the user's reason, recorded with the override.",
+    "note": "HI-3004: resolve takes it too."
   },
   "tool.queue.arg.target": {
     "text": "The target branch."
   },
   "tool.queue.description": {
-    "text": "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
+    "text": "Your project's merge queues, one per target branch, merging approved cards in turn: what tests now, what waits, recent outcomes, whether paused."
   },
   "tool.queue.description.assistant": {
-    "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "A project's merge queues, one per target branch, merging approved cards in turn: list, pause, resume, remove (back to Approved), retry (a returned card), resolve (a returned forward merge: a card to merge it by hand). remove, retry and resolve take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}",
+    "note": "HI-3004: within 300 characters (replysize); what each action does is in tools.md."
   },
   "tool.queue.error.action": {
     "text": "action must be list"
   },
   "tool.queue.error.action.assistant": {
-    "text": "action must be list, pause, resume, remove or retry"
+    "text": "action must be list, pause, resume, remove, retry or resolve"
   },
   "tool.queue.reply.forward": {
     "text": "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}",
     "note": "HI-2679: cw_queue forward's reply."
+  },
+  "tool.queue.reply.resolve": {
+    "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged.",
+    "note": "HI-2959: cw_queue resolve's reply."
   },
   "tool.queue.reply.retarget": {
     "text": "Moved to {to}: {moved}. Left where they were: {skipped}.",

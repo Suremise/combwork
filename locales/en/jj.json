@@ -1,0 +1,526 @@
+{
+  "jj.badge.conflict": {
+    "defaultMessage": "conflicted",
+    "description": "A badge on a jj commit storing unresolved conflicts (HI-2799). Lower case."
+  },
+  "jj.badge.divergent": {
+    "defaultMessage": "divergent",
+    "description": "A badge on a jj commit whose change id names several commits (HI-2799). Lower case."
+  },
+  "jj.badge.divergentTip": {
+    "defaultMessage": "This change id names more than one commit: refer to this one by its commit id. Combwork never picks one.",
+    "description": "Tooltip of the divergent badge in jj’s History (HI-2799)."
+  },
+  "jj.badge.empty": {
+    "defaultMessage": "empty",
+    "description": "A badge on a jj commit with no changes (HI-2799). Lower case."
+  },
+  "jj.badge.workingCopy": {
+    "defaultMessage": "working copy",
+    "description": "A badge on the jj working-copy commit (@) of the project folder (HI-2799). Lower case."
+  },
+  "jj.bookmarks.conflict": {
+    "defaultMessage": "conflicted: {sides}",
+    "description": "A conflicted jj bookmark (HI-2799): it names several commits ({sides}, short ids)."
+  },
+  "jj.bookmarks.name": {
+    "defaultMessage": "Bookmark",
+    "description": "A column of jj’s Bookmarks (HI-2799): the name (and remote)."
+  },
+  "jj.bookmarks.none": {
+    "defaultMessage": "No bookmarks.",
+    "description": "jj’s Bookmarks section (HI-2799) when there are none."
+  },
+  "jj.bookmarks.notInGit": {
+    "defaultMessage": "not the same in Git",
+    "description": "A badge on a jj bookmark whose Git branch differs (HI-2799): not exported yet, or Git moved it. Lower case. Keep Git."
+  },
+  "jj.bookmarks.note": {
+    "defaultMessage": "Bookmarks are created, moved and pushed with jj itself: Combwork only shows them.",
+    "description": "A note in jj’s Bookmarks section (HI-2799). Keep jj."
+  },
+  "jj.bookmarks.target": {
+    "defaultMessage": "Points at",
+    "description": "A column of jj’s Bookmarks (HI-2799): the change and commit it names."
+  },
+  "jj.compare.ambiguous": {
+    "defaultMessage": "{rev} names {n, plural, one {# commit} other {# commits}}: pick one by its commit id.",
+    "description": "jj’s Compare (HI-2799): the id is ambiguous (a divergent change id, or a prefix of several): Combwork never picks one."
+  },
+  "jj.compare.bad": {
+    "defaultMessage": "Type a bookmark, a change id or a commit id.",
+    "description": "jj’s Compare (HI-2799): a field holds something else (spaces, symbols)."
+  },
+  "jj.compare.capped": {
+    "defaultMessage": "The diff is long: only its start is shown.",
+    "description": "Under a jj diff in Compare (HI-2799) cut at its limit."
+  },
+  "jj.compare.files": {
+    "defaultMessage": "{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}",
+    "description": "jj’s Compare (HI-2799): how many files differ."
+  },
+  "jj.compare.from": {
+    "defaultMessage": "From",
+    "description": "A field of jj’s Compare (HI-2799): the older revision (a bookmark, change id or commit id)."
+  },
+  "jj.compare.go": {
+    "defaultMessage": "Compare",
+    "description": "The button of jj’s Compare (HI-2799)."
+  },
+  "jj.compare.none": {
+    "defaultMessage": "Nothing is called {rev}.",
+    "description": "jj’s Compare (HI-2799): no revision has that name or id."
+  },
+  "jj.compare.pick": {
+    "defaultMessage": "Use This One",
+    "description": "A button beside one of the commits an ambiguous id names in jj’s Compare (HI-2799): puts its commit id in the field."
+  },
+  "jj.compare.placeholder": {
+    "defaultMessage": "Bookmark, change or commit id",
+    "description": "Placeholder of jj’s Compare fields (HI-2799)."
+  },
+  "jj.compare.to": {
+    "defaultMessage": "To",
+    "description": "A field of jj’s Compare (HI-2799): the newer revision."
+  },
+  "jj.conflicts.files": {
+    "defaultMessage": "{n, plural, one {# conflicted file} other {# conflicted files}}",
+    "description": "Under a conflicted jj commit (HI-2799)."
+  },
+  "jj.conflicts.intro": {
+    "defaultMessage": "jj can keep a conflict in a commit and carry on. These commits store conflicts; resolve them with jj in a terminal (jj resolve).",
+    "description": "The top of jj’s Conflicts section (HI-2799). Keep jj and jj resolve (a command)."
+  },
+  "jj.conflicts.none": {
+    "defaultMessage": "No commit stores a conflict.",
+    "description": "jj’s Conflicts section (HI-2799) when there are none."
+  },
+  "jj.history.capped": {
+    "defaultMessage": "Only the latest {n, number} are shown.",
+    "description": "Under jj’s History (HI-2799) when there are more commits than shown."
+  },
+  "jj.ids.tip": {
+    "defaultMessage": "Change {change}\nCommit {commit}",
+    "description": "Tooltip of a jj commit’s ids (HI-2799): both in full."
+  },
+  "jj.integrate.candidate": {
+    "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts; no merge checks were run on it.",
+    "description": "Under a passed jj card (HI-2871): Combwork built a candidate for the user to integrate: the reviewed change brought onto the target bookmark’s current commit ({expected}, short) as a new commit ({commit}, short; {change} its jj change id, short). {style} says how (keep the select keys). It has no conflicts; Combwork ran no merge checks on it."
+  },
+  "jj.integrate.candidateBuilt": {
+    "defaultMessage": "Candidate built: commit {commit}, {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. It’s offered once its merge checks pass.",
+    "description": "Under a passed jj card (HI-2938): Combwork built a candidate (a new commit, {commit} short) on the target bookmark {target} at its commit {expected}; it isn’t offered to integrate until the project’s merge checks pass on it. Keep the select keys."
+  },
+  "jj.integrate.candidateHow": {
+    "defaultMessage": "To integrate it, move {target} to the candidate:",
+    "description": "Above the jj command that integrates a passed card’s candidate (HI-2871): it moves the target bookmark {target} to the candidate commit. Combwork never runs it."
+  },
+  "jj.integrate.candidatePassed": {
+    "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts, and its merge checks passed: {checks}.",
+    "description": "Under a passed jj card (HI-2938): the candidate Combwork built for the user to integrate (as jj.integrate.candidate) has no conflicts and passed the project’s merge checks ({checks}: their names, already joined as a list). Keep the select keys."
+  },
+  "jj.integrate.candidateSigning": {
+    "defaultMessage": "No candidate: this repository signs its commits, and Combwork doesn’t make commits in it. Integrate it yourself, for example:",
+    "description": "Under a passed jj card (HI-2871): Combwork didn’t build a candidate because the repository’s jj signs commits (signing.behavior). The user integrates it by hand; an example follows."
+  },
+  "jj.integrate.candidateUnknown": {
+    "defaultMessage": "Combwork couldn’t build a candidate ({why}). It tries again with each change; meanwhile, integrate it yourself, for example:",
+    "description": "Under a passed jj card (HI-2871): Combwork tried several times to build a candidate and couldn’t; {why} is a short code for the log (keep it as it is). The user can integrate it by hand; an example follows."
+  },
+  "jj.integrate.card": {
+    "defaultMessage": "{card} {title}: commit {commit} into {target}",
+    "description": "A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into."
+  },
+  "jj.integrate.change": {
+    "defaultMessage": "change {change}",
+    "description": "Beside a passed jj card’s reviewed commit (HI-2869): its jj change id (short). “change” is jj’s term."
+  },
+  "jj.integrate.checksAgain": {
+    "defaultMessage": "Run Checks Again",
+    "description": "A button under a jj card’s candidate (HI-2938): runs the project’s merge checks on it again, after they were stopped or kept failing. It changes nothing in the repository."
+  },
+  "jj.integrate.checksFailing": {
+    "defaultMessage": "Its merge checks couldn’t run ({why}). Combwork tries again by itself.",
+    "description": "Under a jj card’s candidate (HI-2938): the project’s merge checks failed several times for a reason that isn’t the work’s (the machine, the network, a time limit); {why} is the check and what it said (keep it as it is). Combwork retries them."
+  },
+  "jj.integrate.checksRunning": {
+    "defaultMessage": "Running its merge checks: {check} ({position, number} of {total, number}).",
+    "description": "Under a jj card’s candidate (HI-2938): Combwork is running the project’s merge checks on it; {check} is the one running (its name), {position} of {total}."
+  },
+  "jj.integrate.checksStopped": {
+    "defaultMessage": "Its merge checks were stopped ({check}). Run them again to have it offered.",
+    "description": "Under a jj card’s candidate (HI-2938): the user stopped its merge check {check} (its name) from the Progress panel; it isn’t offered until they run again and pass."
+  },
+  "jj.integrate.checksWaiting": {
+    "defaultMessage": "Its merge checks wait for a free check copy.",
+    "description": "Under a jj card’s candidate (HI-2938): its merge checks wait until one of the project’s check copies (working folders Combwork keeps for checks) is free."
+  },
+  "jj.integrate.head": {
+    "defaultMessage": "Waiting for you to integrate",
+    "description": "A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves."
+  },
+  "jj.integrate.how": {
+    "defaultMessage": "For example, copy it onto {target}, then move {target} to the copy jj prints with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commit would rewrite the slot’s working copy and leave it stale.",
+    "description": "Above a jj command suggested to integrate a passed card (HI-2913): copy it onto its target with jj duplicate, then move the target bookmark to the new commit jj prints. Why a copy: a rebase would rewrite the commit the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command)."
+  },
+  "jj.integrate.noMerge": {
+    "defaultMessage": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
+    "description": "A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj."
+  },
+  "jj.integrate.none": {
+    "defaultMessage": "No card is waiting.",
+    "description": "Under “Waiting for you to integrate” (HI-2799) when no card has passed."
+  },
+  "jj.integrate.notChecked": {
+    "defaultMessage": "Not checked yet whether it’s in {target}.",
+    "description": "Under a passed jj card (HI-2869): Combwork hasn’t looked yet, since its review passed, whether its reviewed work is in its target bookmark ({target})."
+  },
+  "jj.integrate.notYet": {
+    "defaultMessage": "Not in {target} as of {when}.",
+    "description": "Under a passed jj card (HI-2869): Combwork last looked and its reviewed work wasn’t in its target bookmark ({target}) yet. {when} is how long ago it looked (already translated, such as “5 minutes ago”)."
+  },
+  "jj.integrate.unknown": {
+    "defaultMessage": "Couldn’t check whether it’s in {target} ({when}): {why, select, conflictedTarget {{target} is conflicted} divergentChange {its change is divergent} partialExport {{target} isn’t the same in Git} ambiguousRemote {it isn’t clear which remote {target} follows} notFetched {the remote has a commit Combwork hasn’t fetched} other {jj couldn’t read it}}.",
+    "description": "Under a passed jj card (HI-2869): Combwork’s last look couldn’t say whether its reviewed work is in its target bookmark ({target}); never read as not integrated. {when}: how long ago (already translated). {why} picks the reason: keep the select keys."
+  },
+  "jj.leftovers.head": {
+    "defaultMessage": "Left over from setting up jj slots",
+    "description": "A heading of the jj Repository section (HI-2869): folders an interrupted or lost set-up of jj slots kept because Combwork couldn’t prove they were its own; the user removes them."
+  },
+  "jj.leftovers.hint": {
+    "defaultMessage": "Combwork never deletes these: remove each one yourself once you’ve looked at it.",
+    "description": "Under “Left over from setting up jj slots” (HI-2869)."
+  },
+  "jj.leftovers.more": {
+    "defaultMessage": "{n, plural, one {# more not shown} other {# more not shown}}",
+    "description": "Under “Left over from setting up jj slots” (HI-2869): how many more there are than the list shows."
+  },
+  "jj.leftovers.show": {
+    "defaultMessage": "Show in folder",
+    "description": "A button beside a leftover folder (HI-2869): opens it in the file manager."
+  },
+  "jj.leftovers.why": {
+    "defaultMessage": "{why, select, unrecorded {a set-up that didn’t finish} lost {a set-up that was lost} notEmpty {not empty} unproved {not provably Combwork’s} other {kept}}{name, select, none {} other {, registered as {name}}}",
+    "description": "Why a folder under “Left over from setting up jj slots” was kept (HI-2869), and the jj workspace name it’s registered under (none: keep that branch empty). Keep the select keys."
+  },
+  "jj.ops.absent": {
+    "defaultMessage": "none",
+    "description": "In a jj undo preview (HI-2800): a bookmark, ref or workspace that didn’t exist (before) or doesn’t any more (after). Lower case."
+  },
+  "jj.ops.added": {
+    "defaultMessage": "{n, plural, one {# commit made} other {# commits made}}: {ids}",
+    "description": "In a jj undo preview (HI-2800): the commits the operation made (or rewrote into), short ids."
+  },
+  "jj.ops.by": {
+    "defaultMessage": "{user} in {workspace}",
+    "description": "Who ran a jj operation and in which workspace (HI-2800), after its description. {user} is user@host as jj records it."
+  },
+  "jj.ops.change": {
+    "defaultMessage": "{what}: {before} → {after}",
+    "description": "One thing a jj operation changed (HI-2800): {what} names it (a bookmark, a Git ref…), {before} and {after} its value (short commit ids, or “none”). Keep the arrow."
+  },
+  "jj.ops.command": {
+    "defaultMessage": "Undoing it changes only what it changed. To undo it, run this in the project folder:",
+    "description": "Above the jj command a preview offers (HI-2800). Combwork never runs it itself."
+  },
+  "jj.ops.conflicted": {
+    "defaultMessage": "conflicted ({sides})",
+    "description": "In a jj undo preview (HI-2800): a bookmark or ref whose target is conflicted; {sides} are its commits, short ids."
+  },
+  "jj.ops.copied": {
+    "defaultMessage": "Command copied",
+    "description": "A notification (HI-2800): the jj undo command was copied."
+  },
+  "jj.ops.copy": {
+    "defaultMessage": "Copy",
+    "description": "A button beside the jj command of an undo preview (HI-2800): copies it, after checking the repository hasn’t changed since the preview."
+  },
+  "jj.ops.did": {
+    "defaultMessage": "What it changed (undoing it puts these back)",
+    "description": "A heading in a jj undo preview (HI-2800): the bookmarks, refs, commits and workspaces the operation changed."
+  },
+  "jj.ops.didNothing": {
+    "defaultMessage": "Nothing that undoing it would change.",
+    "description": "A jj undo preview (HI-2800) for an operation that changed nothing."
+  },
+  "jj.ops.hidden": {
+    "defaultMessage": "{n, plural, one {# commit hidden} other {# commits hidden}}: {ids}",
+    "description": "In a jj undo preview (HI-2800): the commits the operation hid (abandoned or rewrote), short ids. Undoing it brings them back."
+  },
+  "jj.ops.intro": {
+    "defaultMessage": "jj records every command as an operation. Preview one to see what undoing it would change. Combwork changes nothing here: when undoing it would touch nothing else, it gives you the command to run yourself.",
+    "description": "The top of jj’s Operations section (HI-2800). Keep jj."
+  },
+  "jj.ops.kind.bookmark": {
+    "defaultMessage": "Bookmark {name}",
+    "description": "A jj bookmark in an undo preview (HI-2800). {name} is its name."
+  },
+  "jj.ops.kind.githead": {
+    "defaultMessage": "Git HEAD of {name}",
+    "description": "A workspace’s Git HEAD as jj records it, in a jj undo preview (HI-2800). Keep Git HEAD."
+  },
+  "jj.ops.kind.gitref": {
+    "defaultMessage": "Git ref {name}",
+    "description": "A Git ref as jj records it, in a jj undo preview (HI-2800). Keep Git."
+  },
+  "jj.ops.kind.head": {
+    "defaultMessage": "Head commit {name}",
+    "description": "A visible head commit in a jj undo preview (HI-2800). {name} is its short id."
+  },
+  "jj.ops.kind.remote": {
+    "defaultMessage": "Remote {name}",
+    "description": "A remote in a jj undo preview (HI-2800)."
+  },
+  "jj.ops.kind.remoteBookmark": {
+    "defaultMessage": "Bookmark {name}@{remote}",
+    "description": "A remote’s bookmark (and whether it is tracked) in a jj undo preview (HI-2800). Keep the @."
+  },
+  "jj.ops.kind.remoteTag": {
+    "defaultMessage": "Tag {name}@{remote}",
+    "description": "A remote’s tag in a jj undo preview (HI-2800). Keep the @."
+  },
+  "jj.ops.kind.tag": {
+    "defaultMessage": "Tag {name}",
+    "description": "A jj tag in an undo preview (HI-2800)."
+  },
+  "jj.ops.kind.wc": {
+    "defaultMessage": "Working copy of {name}",
+    "description": "A workspace’s working-copy commit in a jj undo preview (HI-2800). {name} is the workspace."
+  },
+  "jj.ops.later": {
+    "defaultMessage": "Later work undoing it would also change",
+    "description": "A heading in a jj undo preview (HI-2800): changes made since the operation that undoing it would touch too."
+  },
+  "jj.ops.movedAtCopy": {
+    "defaultMessage": "The repository changed since this preview, so nothing was copied. Here it is again: look at it before copying.",
+    "description": "In a jj undo preview (HI-2800): Copy found the repository changed since the preview; the preview shown is the new one."
+  },
+  "jj.ops.noCommand": {
+    "defaultMessage": "No command: {why}",
+    "description": "In a jj undo preview (HI-2800): Combwork gives no command, and why ({why})."
+  },
+  "jj.ops.none": {
+    "defaultMessage": "No operations.",
+    "description": "jj’s Operations section (HI-2800) when there are none."
+  },
+  "jj.ops.older": {
+    "defaultMessage": "Show Older",
+    "description": "A button under jj’s operations list (HI-2800): shows the next page of older operations."
+  },
+  "jj.ops.preview": {
+    "defaultMessage": "Preview Undo",
+    "description": "A button on one jj operation (HI-2800): shows what undoing (reverting) it would change, without changing anything."
+  },
+  "jj.ops.previewAt": {
+    "defaultMessage": "A preview at operation {at}. If anything else changes before you run it, preview again: this isn’t a guarantee about a later command.",
+    "description": "Under a jj undo preview’s heading (HI-2800): the preview holds only for the repository as it was at that operation ({at}, a short id). Keep jj."
+  },
+  "jj.ops.previewHead": {
+    "defaultMessage": "Undoing “{description}”",
+    "description": "The heading of a jj operation’s undo preview (HI-2800). {description} is the operation as jj named it."
+  },
+  "jj.ops.previewSnapshot": {
+    "defaultMessage": "Run in the project folder, jj first records any edits you haven’t recorded yet, as its own operation, then undoes this one.",
+    "description": "A note on a jj undo preview and its command (HI-2800): jj snapshots the working copy before the revert, as a separate operation. Keep jj."
+  },
+  "jj.ops.refused.bounds": {
+    "defaultMessage": "it changed more than a preview shows.",
+    "description": "Why a jj undo preview gives no command (HI-2800): too many bookmarks, refs or commits to account for."
+  },
+  "jj.ops.refused.gitOwn": {
+    "defaultMessage": "it recorded a change made in Git: undoing it changes nothing in Git, and jj would import it again.",
+    "description": "Why a jj undo preview gives no command (HI-2800): an import of Git’s refs or a fetch. Keep jj and Git."
+  },
+  "jj.ops.refused.heads": {
+    "defaultMessage": "jj’s operation log has more than one head.",
+    "description": "Why a jj undo preview gives no command (HI-2800). Keep jj."
+  },
+  "jj.ops.refused.moved": {
+    "defaultMessage": "the repository changed since the preview.",
+    "description": "Why a jj undo preview gives no command (HI-2800): a new operation was recorded meanwhile."
+  },
+  "jj.ops.refused.nothing": {
+    "defaultMessage": "it changed nothing to undo.",
+    "description": "Why a jj undo preview gives no command (HI-2800)."
+  },
+  "jj.ops.refused.overlap": {
+    "defaultMessage": "undoing it would also change later work, listed above.",
+    "description": "Why a jj undo preview gives no command (HI-2800)."
+  },
+  "jj.ops.refused.parents": {
+    "defaultMessage": "it joins operations that ran at the same time (or is the first one), so undoing it can’t be previewed.",
+    "description": "Why a jj undo preview gives no command (HI-2800): a merge of concurrent operations, or the root operation."
+  },
+  "jj.ops.refused.shape": {
+    "defaultMessage": "jj recorded it in a form Combwork can’t read whole.",
+    "description": "Why a jj undo preview gives no command (HI-2800): the operation’s view isn’t exactly what the tested jj writes. Keep jj."
+  },
+  "jj.ops.refused.stale": {
+    "defaultMessage": "the project folder’s workspace is stale. jj workspace update-stale updates it, but edits jj hasn’t recorded can end up in a separate commit.",
+    "description": "Why a jj undo preview gives no command (HI-2800): the project folder’s files are behind its working-copy commit. Keep jj workspace update-stale (a command)."
+  },
+  "jj.ops.refused.tool": {
+    "defaultMessage": "jj isn’t the version Combwork is tested with.",
+    "description": "Why a jj undo preview gives no command (HI-2800). Keep jj."
+  },
+  "jj.ops.refused.unimported": {
+    "defaultMessage": "Git has changes jj hasn’t recorded yet (a branch, a tag or HEAD moved with git): your jj command would take them in first. Run any jj command, then preview again.",
+    "description": "Why a jj undo preview gives no command (HI-2800): the colocated Git repository’s refs or HEAD differ from what jj last recorded. Keep jj and Git, git and HEAD."
+  },
+  "jj.ops.refused.unimportedStore": {
+    "defaultMessage": "Git’s store inside .jj was changed with git (a ref moved), which jj hasn’t recorded. jj git import takes it in; then preview again.",
+    "description": "Why a jj undo preview gives no command (HI-2896): in a jj repository not colocated with Git, the refs of the Git store jj keeps inside .jj differ from what jj last recorded, which only a git command run on that store does. Keep jj, Git, git, .jj and jj git import (a command)."
+  },
+  "jj.ops.refused.workingCopy": {
+    "defaultMessage": "it changed a workspace’s working copy: undoing it would update files there, which a preview can’t check.",
+    "description": "Why a jj undo preview gives no command (HI-2800): a commit, describe, new, snapshot, workspace added or forgotten."
+  },
+  "jj.ops.snapshot": {
+    "defaultMessage": "snapshot",
+    "description": "A badge on a jj operation that recorded a workspace’s files (a working-copy snapshot, HI-2800). Lower case."
+  },
+  "jj.ops.tracked": {
+    "defaultMessage": "{commit}, {state, select, Tracked {tracked} other {not tracked}}",
+    "description": "A remote bookmark’s value in a jj undo preview (HI-2800): its commit and whether it is tracked. Lower case."
+  },
+  "jj.ops.why.changed": {
+    "defaultMessage": "{what} changed since: now {now}",
+    "description": "Later work in a jj undo preview (HI-2800): something the operation changed was changed again since."
+  },
+  "jj.ops.why.descendant": {
+    "defaultMessage": "Commit {commit} was made on top of what it made: undoing it would rebase that commit",
+    "description": "Later work in a jj undo preview (HI-2800)."
+  },
+  "jj.ops.why.restored": {
+    "defaultMessage": "Commit {commit} it hid is back since",
+    "description": "Later work in a jj undo preview (HI-2800)."
+  },
+  "jj.ops.why.rewritten": {
+    "defaultMessage": "Commit {commit} it made was rewritten or abandoned since",
+    "description": "Later work in a jj undo preview (HI-2800)."
+  },
+  "jj.readFailed": {
+    "defaultMessage": "Couldn’t read it: {error}",
+    "description": "A jj section couldn’t be read (HI-2799). {error} says why."
+  },
+  "jj.reading": {
+    "defaultMessage": "Reading…",
+    "description": "While a jj section of the Version Control tab is read (HI-2799)."
+  },
+  "jj.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "A button in a jj section of the Version Control tab (HI-2799): reads it again."
+  },
+  "jj.repo.colocated": {
+    "defaultMessage": "{colocated, select, yes {Colocated with Git: Git sees the same history.} other {Not colocated with Git.}}",
+    "description": "The jj Repository section (HI-2799): whether a .git is beside .jj. Keep Git."
+  },
+  "jj.repo.edits": {
+    "defaultMessage": "jj has no uncommitted changes: edits are recorded in the working-copy commit when jj snapshots them.",
+    "description": "A note in the jj Repository section (HI-2799), in place of Git’s Changes. Keep jj."
+  },
+  "jj.repo.here": {
+    "defaultMessage": "project folder",
+    "description": "A badge on the jj workspace that is the project folder itself (HI-2800). Lower case."
+  },
+  "jj.repo.op": {
+    "defaultMessage": "Operation {op}",
+    "description": "The jj Repository section (HI-2799): jj’s current operation (its id, short), which every view is read at."
+  },
+  "jj.repo.root": {
+    "defaultMessage": "Repository at {root}",
+    "description": "The jj Repository section (HI-2799): the repository’s folder."
+  },
+  "jj.repo.stale": {
+    "defaultMessage": "stale",
+    "description": "A badge on a jj workspace whose files are behind its working-copy commit (HI-2800). Lower case."
+  },
+  "jj.repo.staleTip": {
+    "defaultMessage": "Its files are behind its working-copy commit: another workspace rewrote it. jj workspace update-stale updates them, but edits jj hasn’t recorded can end up in a separate commit: look before you run it. Combwork doesn’t run it.",
+    "description": "Tooltip of the stale badge on a jj workspace (HI-2800). Keep jj workspace update-stale (a command)."
+  },
+  "jj.repo.unsupported": {
+    "defaultMessage": "Not supported with jj in Combwork",
+    "description": "A heading of the jj Repository section (HI-2799): what Combwork doesn’t do or support with jj. Keep jj."
+  },
+  "jj.repo.version": {
+    "defaultMessage": "jj {version}",
+    "description": "The jj Repository section (HI-2799): the jj version Combwork uses. Keep jj."
+  },
+  "jj.repo.workspace": {
+    "defaultMessage": "{name}: change {change}, commit {commit}",
+    "description": "A jj workspace in the Repository section (HI-2799): its name and its working copy’s change id and commit id (short)."
+  },
+  "jj.repo.workspaces": {
+    "defaultMessage": "Workspaces",
+    "description": "A heading of the jj Repository section (HI-2799): jj’s workspaces (working folders) of this repository, Combwork’s slots among them."
+  },
+  "jj.row.change": {
+    "defaultMessage": "Change",
+    "description": "A column of jj’s History (HI-2799): the change id (stable across rewrites)."
+  },
+  "jj.row.commit": {
+    "defaultMessage": "Commit",
+    "description": "A column of jj’s History (HI-2799): the commit id (this exact version)."
+  },
+  "jj.row.description": {
+    "defaultMessage": "Description",
+    "description": "A column of jj’s History (HI-2799)."
+  },
+  "jj.row.noDescription": {
+    "defaultMessage": "(no description)",
+    "description": "A jj commit with an empty description (HI-2799)."
+  },
+  "jj.toCheck.changed": {
+    "defaultMessage": "That record changed since it was shown: look again.",
+    "description": "A notice after Mark as checked was refused (HI-2869): the record changed meanwhile (checked elsewhere, or seen again)."
+  },
+  "jj.toCheck.differs": {
+    "defaultMessage": "{what, select, remote {Its remote changed: {was} → {now}} url {Its remote’s address changed} pushed {The remote now has {now} (it had {was})} inRemote {The remote no longer has it} held {{now, select, yes {It’s back in its target} other {It’s no longer in its target}}} other {Something differs}}",
+    "description": "What differs now for a publish record under “Publish records to check” (HI-2869). {was} and {now} are names or short commit ids (in held: yes or no). Keep the select keys."
+  },
+  "jj.toCheck.head": {
+    "defaultMessage": "Publish records to check",
+    "description": "A heading of the jj Repository section (HI-2869): integrations whose recorded publish state (pushed to the remote, or no longer held) no longer matches what Combwork sees; the user checks each."
+  },
+  "jj.toCheck.mark": {
+    "defaultMessage": "Mark as checked",
+    "description": "A button on a row under “Publish records to check” (HI-2869): the user has checked it; it leaves the list. Nothing in the repository changes."
+  },
+  "jj.toCheck.markMessage": {
+    "defaultMessage": "It leaves this list. Combwork changes nothing in the repository or on the remote: this only records that you’ve looked.",
+    "description": "The confirmation before Mark as checked (HI-2869)."
+  },
+  "jj.toCheck.markTitle": {
+    "defaultMessage": "Mark {card} as checked?",
+    "description": "The title of the confirmation before Mark as checked (HI-2869). {card} is a card key."
+  },
+  "jj.toCheck.more": {
+    "defaultMessage": "Show more",
+    "description": "A button under “Publish records to check” (HI-2869): the next page of records."
+  },
+  "jj.toCheck.row": {
+    "defaultMessage": "{card}: {result} into {target} was recorded {was, select, published {as published to {remote}} other {as no longer in {target}}} ({when}).",
+    "description": "A row under “Publish records to check” (HI-2869). {card} a card key; {result} a short commit id; {target} a bookmark; {remote} a remote’s name; {when} how long ago it was recorded (already translated). Keep the select keys."
+  },
+  "jj.unknown.heads": {
+    "defaultMessage": "jj’s operation log has {detail} heads: Combwork reads nothing until jj reconciles them (any jj command in a terminal does).",
+    "description": "A jj section can’t be read (HI-2799): jj’s operation log diverged (or can’t be read). {detail} is how many heads, or “unreadable”. Keep jj."
+  },
+  "jj.unknown.moved": {
+    "defaultMessage": "The repository changed while it was read: refresh to read it again.",
+    "description": "A jj section can’t be read (HI-2799): jj recorded an operation while Combwork read."
+  },
+  "jj.unknown.noRepo": {
+    "defaultMessage": "No jj repository was found here.",
+    "description": "A jj section can’t be read (HI-2799): the project folder has no jj repository (any more). Keep jj."
+  },
+  "jj.unknown.other": {
+    "defaultMessage": "jj couldn’t answer ({code}).",
+    "description": "A jj section can’t be read (HI-2799). {code} is a short code for why, kept in English, with jj’s own words after it. Keep jj."
+  },
+  "jj.unknown.tool": {
+    "defaultMessage": "jj isn’t installed, or isn’t the version Combwork is tested with, so nothing is read through it.",
+    "description": "A jj section can’t be read (HI-2799): the jj tool. Keep jj."
+  }
+}

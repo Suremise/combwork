@@ -81,20 +81,46 @@ interface CombworkMessageValues {
   'service.filesGit.nothing': undefined
   'service.filesGit.ruleChanged': undefined
   'service.filesGit.tooLarge': { file: string | number }
+  'service.folderChanges.agentBusy': { agent: string | number; folder: string | number }
+  'service.folderChanges.busy': { folder: string | number; what: string | number }
+  'service.folderChanges.changed': { folder: string | number }
+  'service.folderChanges.commitFailed': { why: string | number }
+  'service.folderChanges.deletedKept': { file: string | number }
+  'service.folderChanges.detached': { folder: string | number }
+  'service.folderChanges.indexBusy': undefined
+  'service.folderChanges.midOperation': { state: string; folder: string | number }
+  'service.folderChanges.moved': { target: string | number }
+  'service.folderChanges.nestedRepo': { folder: string | number }
+  'service.folderChanges.noTarget': { target: string | number }
+  'service.folderChanges.nothing': { file: string | number }
+  'service.folderChanges.readFailed': { why: string | number }
+  'service.folderChanges.stashFailed': { why: string | number }
+  'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
+  'service.folderChanges.unplaced': { folder: string | number }
+  'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
+  'service.forward.direction': { to: string | number; from: string | number; why: string; dir: string }
+  'service.forward.directionRetry': { card: string | number; why: string; to: string | number; from: string | number }
   'service.forward.missing': { unknown: string; branch: string | number }
   'service.forward.noGit': undefined
   'service.forward.notAgents': undefined
+  'service.forward.notReturned': { card: string | number }
   'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number; sources: string | number }
+  'service.forward.openNoOverride': { card: string | number; to: string | number; from: string | number }
   'service.forward.raced': undefined
+  'service.forward.resolveDescription': { forward: string | number; from: string | number; source: string | number; to: string | number; files: string }
+  'service.forward.resolveRaced': { card: string | number }
+  'service.forward.resolveTitle': { to: string | number; from: string | number }
   'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.keptUnreadable': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }
   'service.git.exitCode': { code: string | number }
   'service.git.failed': { command: string | number; why: string | number }
+  'service.git.gitlinkUnread': { path: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
   'service.gitCompare.noBranch': { branch: string | number }
@@ -196,6 +222,22 @@ interface CombworkMessageValues {
   'service.keys.prefix': { key: string | number; other: string | number }
   'service.keys.taken': { key: string | number }
   'service.keys.unknownProject': undefined
+  'service.laneEdit.already': { card: string | number }
+  'service.laneEdit.cardChanged': { card: string | number }
+  'service.laneEdit.changed': { lane: string | number }
+  'service.laneEdit.dependency': { card: string | number; dep: string | number }
+  'service.laneEdit.done': { card: string | number }
+  'service.laneEdit.ended': { lane: string | number }
+  'service.laneEdit.fixedPlace': { card: string | number }
+  'service.laneEdit.invalid': undefined
+  'service.laneEdit.keptWork': { card: string | number }
+  'service.laneEdit.noQueued': { lane: string | number }
+  'service.laneEdit.notOnLane': { card: string | number }
+  'service.laneEdit.notQueued': { card: string | number }
+  'service.laneEdit.notTodo': { card: string | number }
+  'service.laneEdit.onLane': { card: string | number; builder: string | number }
+  'service.laneEdit.otherProject': { card: string | number; project: string | number }
+  'service.laneEdit.since': undefined
   'service.laneStart.busy': { status: string; agent: string | number }
   'service.laneStart.done': { card: string | number }
   'service.laneStart.needsReviewer': { project: string | number }
@@ -255,10 +297,19 @@ interface CombworkMessageValues {
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.providers.unknownHost': { cli: string | number }
+  'service.queue.catchUpNoCommit': { card: string | number; target: string | number }
+  'service.queue.pauseChanged': undefined
+  'service.queue.pauseNoFolder': undefined
   'service.repoOps.notOffered': { platform: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }
+  'service.targetChanges.commit': undefined
+  'service.targetChanges.message': { folder: string | number; count: number; files: string | number; target: string | number }
+  'service.targetChanges.more': { files: string | number; more: number }
+  'service.targetChanges.setAside': undefined
+  'service.targetChanges.show': undefined
+  'service.targetChanges.title': { target: string | number }
   'service.templates.v09': { n: number }
   'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined
@@ -302,6 +353,8 @@ interface CombworkMessageValues {
   'service.workspace.platformGitFound': { project: string | number }
   'service.workspace.platformInvalid': { project: string | number; value: string | number }
   'service.workspace.platformInvalidTitle': { project: string | number }
+  'service.workspace.platformJjFound': { project: string | number }
+  'service.workspace.platformJjGone': { project: string | number }
   'service.workspace.platformOpen': undefined
   'service.workspace.platformOtherFound': { vcs: string | number; project: string | number }
   'service.workspace.platformRepositoryGone': { project: string | number }
