@@ -13,9 +13,9 @@
 //   with no receipt, or one that doesn't match it, is the user's to remove or keep.
 // The predicates are synchronous, so the caller runs them with nothing awaited before the rename or the removal.
 
-import { existsSync, lstatSync, readFileSync } from 'original-fs'
+import { lstatSync, readFileSync, realpathSync } from 'original-fs'
 import { lstat, readdir, readFile, realpath } from 'original-fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'path'
+import { dirname, isAbsolute, join, relative, resolve } from 'path'
 
 /** What the port recorded of a slot's Git worktree entry when it made the slot (board_meta, keyed by the slot's folder). */
 export interface GitLinkReceipt {
@@ -27,6 +27,8 @@ export interface GitLinkReceipt {
   entry: string
   /** The entry folder's file id and birth time. */
   entryId: string
+  /** `<store>/worktrees`' own file id and birth time (a real folder, no link). */
+  worktreesId: string
   /** The entry's `gitdir` and `commondir` files, byte for byte (as text). */
   gitdir: string
   commondir: string
@@ -53,7 +55,7 @@ const target = (from: string, text: string): string => {
 export function asReceipt(v: unknown): GitLinkReceipt | null {
   if (!v || typeof v !== 'object') return null
   const r = v as Record<string, unknown>
-  const strings = ['store', 'folder', 'workspace', 'generation', 'entry', 'entryId', 'gitdir', 'commondir'] as const
+  const strings = ['store', 'folder', 'workspace', 'generation', 'entry', 'entryId', 'worktreesId', 'gitdir', 'commondir'] as const
   if (!strings.every((k) => typeof r[k] === 'string' && r[k])) return null
   if (r.clearing !== undefined && typeof r.clearing !== 'string') return null
   if (r.residues !== undefined && !Array.isArray(r.residues)) return null
@@ -107,7 +109,11 @@ export async function receiptOf(o: { store: string; folder: string; workspace: s
   if (!same(dirname(entry), worktreesOf(o.store))) return null
   const st = await lstat(entry).catch(() => null)
   if (!st || !st.isDirectory() || st.isSymbolicLink()) return null
-  if (!same(await realOr(dirname(entry)), await realOr(worktreesOf(o.store)))) return null
+  // Physically where it says (HR1's round 1): no link or junction between the store and the entry, `worktrees` itself
+  // a real folder whose identity the receipt keeps.
+  if (!inStoreSync(o.store, entry)) return null
+  const worktreesId = entryIdSync(worktreesOf(o.store))
+  if (!worktreesId) return null
   const entryId = entryIdSync(entry)
   const gitdir = await readFile(join(entry, 'gitdir'), 'utf8').catch(() => null)
   const commondir = await readFile(join(entry, 'commondir'), 'utf8').catch(() => null)
@@ -116,7 +122,30 @@ export async function receiptOf(o: { store: string; folder: string; workspace: s
   if (!same(await realOr(target(entry, commondir)), await realOr(o.store))) return null
   const links = await linksTo(o.store, o.folder)
   if (!links || links.length !== 1 || !same(links[0], entry)) return null
-  return { store: o.store, folder: o.folder, workspace: o.workspace, generation: o.generation, entry, entryId, gitdir, commondir }
+  return { store: o.store, folder: o.folder, workspace: o.workspace, generation: o.generation, entry, entryId, worktreesId, gitdir, commondir }
+}
+
+/**
+ * Whether a path under the store is physically there: its real path is the store's real path with the same path below
+ * it, so no link or junction between the store and it (a `worktrees` junction, say); false when it can't be read.
+ */
+export function inStoreSync(store: string, p: string): boolean {
+  try {
+    return same(realpathSync.native(p), join(realpathSync.native(store), relative(store, p)))
+  } catch {
+    return false
+  }
+}
+
+/** Whether something is at a path: false only for ENOENT or ENOTDIR, null when it can't be told. */
+function presentSync(p: string): boolean | null {
+  try {
+    lstatSync(p)
+    return true
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    return code === 'ENOENT' || code === 'ENOTDIR' ? false : null
+  }
 }
 
 /** Why a path isn't there (ENOENT or ENOTDIR): true; there, or unreadable: false. */
@@ -142,8 +171,13 @@ export function provedSync(r: GitLinkReceipt, at: string, where: 'entry' | 'asid
   const id = entryIdSync(at)
   if (!id) return 'gone' // i18n-ignore: a protocol code
   if (id !== r.entryId) return 'replaced' // i18n-ignore: a protocol code
+  // Physically in the store (HR1's round 1): no link or junction between the store and it (a `worktrees` redirected
+  // since keeps the entry's own ids), and `worktrees` still the folder the receipt saw.
+  if (!inStoreSync(r.store, at)) return 'indirect' // i18n-ignore: a protocol code
+  if (where === 'entry' && entryIdSync(worktreesOf(r.store)) !== r.worktreesId) return 'worktrees' // i18n-ignore: a protocol code
   try {
-    if (existsSync(join(at, 'locked'))) return 'locked' // i18n-ignore: a protocol code
+    const locked = presentSync(join(at, 'locked'))
+    if (locked !== false) return locked ? 'locked' : 'unreadable' // i18n-ignore: a protocol code
     if (readFileSync(join(at, 'gitdir'), 'utf8') !== r.gitdir) return 'gitdir' // i18n-ignore: a protocol code
     if (readFileSync(join(at, 'commondir'), 'utf8') !== r.commondir) return 'commondir' // i18n-ignore: a protocol code
   } catch {

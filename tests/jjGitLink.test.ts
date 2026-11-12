@@ -2,12 +2,12 @@
 // worktree entry when it forgets a workspace whose folder is gone, and Git then refuses an add at that path; the port
 // clears the entry only when its receipt proves it Combwork's (design HI-3046/s7–s14). On the real jj; the plain Git
 // worktrees here are the user's own, made by the test. Skipped without the fetched jj (npm run jj:fetch).
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { JJ_REFUSED } from '../src/main/platform/jjWorkspacePort'
-import { asideOf, asReceipt, residuesOf } from '../src/main/platform/jjGitLink'
+import { asideOf, asReceipt, receiptOf, residuesOf } from '../src/main/platform/jjGitLink'
 import type { JjPortDeps } from '../src/main/platform/jjWorkspacePort'
 import { harness, jjExe } from './jjWorkspaceHarness'
 
@@ -102,6 +102,44 @@ describe.skipIf(!jjExe)(`a colocated jj slot made again after its folder was del
     expect((await legacy.h.port.create(legacy.repo, legacy.folder, legacy.base)).err).toContain(JJ_REFUSED.gitLink)
     expect(idOf(legacy.entry)).toBe(lid)
     expect(existsSync(legacy.folder)).toBe(false)
+  })
+
+  it("a junctioned worktrees (the entry physically outside the store): no receipt, so refused and untouched (HR1's round 1)", async () => {
+    // Git won't add a worktree through a junctioned `worktrees`, so the entry is made in place and its `worktrees` then
+    // moved out with a junction left at its name: the entry still names the slot both ways, physically elsewhere.
+    const h = harness()
+    const { repo, root, base } = h.repo('gitlink-junction', true)
+    const folder = join(root, 'slot-a')
+    expect(await h.port.create(repo, folder, base)).toEqual({ ok: true, err: '' })
+    const store = join(repo, '.git')
+    const outside = join(root, '..', 'external-admin')
+    renameSync(join(store, 'worktrees'), outside)
+    symlinkSync(outside, join(store, 'worktrees'), 'junction')
+    const generation = (await h.port.identity!(folder))!.generation
+    expect(await receiptOf({ store, folder, workspace: h.port.nameFor(repo, folder), generation })).toBeNull()
+    // Nothing recorded for it, so the slot's next make there is refused and the entry kept.
+    const journal = h.journals.of(`jj_gitlink:${folder.toLowerCase()}`)
+    await journal.clear()
+    rmSync(folder, { recursive: true, force: true })
+    await h.port.prune(repo)
+    const entry = join(outside, 'slot-a')
+    const id = idOf(entry)
+    expect((await h.port.create(repo, folder, base)).err).toContain(JJ_REFUSED.gitLink)
+    expect(idOf(entry)).toBe(id)
+  })
+
+  it("worktrees redirected after the receipt (moved out, a junction in its place, the entry's ids kept): refused, untouched (HR1's round 1)", async () => {
+    const w = await goneSlot()
+    expect(asReceipt(w.journal.read())).not.toBeNull()
+    const outside = join(w.root, '..', 'external-admin')
+    renameSync(join(w.store, 'worktrees'), outside)
+    symlinkSync(outside, join(w.store, 'worktrees'), 'junction')
+    const moved = join(outside, 'slot-a')
+    const id = idOf(moved)
+    expect(id).toBe(asReceipt(w.journal.read())!.entryId)
+    expect((await w.port.create(w.repo, w.folder, w.base)).err).toContain(JJ_REFUSED.gitLink)
+    expect(idOf(moved)).toBe(id)
+    expect(asides(w.store)).toEqual([])
   })
 
   it('replaced between its last check and the move: what was moved fails the proof, is put back, nothing removed', async () => {
