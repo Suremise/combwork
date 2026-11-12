@@ -362,6 +362,8 @@
   "workflow.refused.platform.unknown.next": "Sprawdź Konfigurację dostawców lub folder i spróbuj ponownie.",
   "workflow.refused.platform.targetGone.message": "Karta {card} została rozpoczęta na {target}, której nie ma już w tym repozytorium.",
   "workflow.refused.platform.targetGone.next": "Użytkownik lub Assistant może przenieść ją na inną gałąź, zachowując jej pracę: ustaw jej „Scalanie do” albo przestaw „Praca jest scalana do”.",
+  "workflow.refused.platform.offLine.message": "Folder karty {card} nie jest na jej gałęzi {line}: {where, select, detached {jej HEAD jest odłączony na {head}} other {jest na {on}}}, więc praca w nim nie jest tym, co karta by scaliła.",
+  "workflow.refused.platform.offLine.next": "{where, select, detached {Przenieś commity na gałąź karty: git switch -c {line}, jeśli jeszcze nie istnieje, w przeciwnym razie git switch {line} i git cherry-pick commitów zrobionych poza nią. Potem prześlij ponownie.} other {Wróć poleceniem git switch {line} i zrób tam git cherry-pick commitów karty zrobionych na {on}. Potem prześlij ponownie.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {Repozytorium Git projektu zniknęło: przywróć je albo przełącz projekt na Brak w zakładce Kontrola wersji (od następnej karty).} other {Repozytorium Git projektu zniknęło: poproś użytkownika, by je przywrócił albo przełączył projekt na Brak w zakładce Kontrola wersji (od następnej karty).}}",
   "workflow.refused.queue.advancing.message": "Karta {card} jest teraz scalana z {target}: nie można jej już usunąć z kolejki scalania.",
   "workflow.refused.queue.advancing.next": "Poczekaj, aż scalanie się zakończy. Jeśli zmiana nie jest potrzebna, cofnij ją w gałęzi {target}.",

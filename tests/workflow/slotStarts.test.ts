@@ -2,7 +2,7 @@
 // app's leaseForStart): the card's line from the target's head in it, its `Started` with the slot and lease, and its
 // `prepareSlot` action; none free, refused `start.slotAvailable`; a lease lent for a start that isn't written given back;
 // a window Start that only asks lends nothing; no slot (the rules off), where the agent is.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { lineName, slugOf, type SlotForStart } from '../../src/main/workflow/runtime'
@@ -11,10 +11,23 @@ import { reconcile, slotPreparationOwed } from '../../src/main/workflow/reconcil
 import type { FactData } from '../../src/shared/workflow/facts'
 import { GUARD_FNS, type GuardInputs } from '../../src/shared/workflow/guards'
 
+/** HI-3010 (HR2's round 2): which folder's reads of its branch fail, while its head and the target still read. */
+const branchUnread = vi.hoisted(() => ({ folder: null as string | null }))
+vi.mock('../../src/main/git', async (orig) => {
+  const actual = await orig<typeof import('../../src/main/git')>()
+  const reads = (args: string[]): boolean => args[0] === 'symbolic-ref' || (args[0] === 'status' && args.includes('--branch')) || (args[0] === 'rev-parse' && args.includes('--symbolic-full-name'))
+  return {
+    ...actual,
+    git: async (cwd: string, args: string[], ...rest: unknown[]) =>
+      branchUnread.folder && cwd.toLowerCase() === branchUnread.folder.toLowerCase() && reads(args) ? { ok: false, out: '', err: 'fatal: unable to read HEAD (test)', code: 128 } : (actual.git as (...a: unknown[]) => Promise<unknown>)(cwd, args, ...rest)
+  }
+})
+
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
+  branchUnread.folder = null
 })
 
 const opts = { ...preset('git', 'pair'), preChecks: [], mergeChecks: [], folder: 'slots' as const, review: 'none' as const, finish: 'agentMerges' as const }
@@ -182,6 +195,46 @@ describe('cards on slots (#1438)', () => {
     commit(e.project, { 'b.txt': 'b\n' }, 'the target moved on')
     moved(await e.wf.start(card.key, B1))
     expect(e.wf.state(card).started).toMatchObject({ line, base: left })
+  })
+
+  it("HI-3010: a submission from a slot off the card's line is refused, naming where it is; on its line, it goes", async () => {
+    const folder = tempDir('slot-')
+    const { e } = world(() => ({ slot: 'slot-a', folder, lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'Off its line' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    const line = s.started!.line!
+    // Its slot never switched onto its line (its preparation waited): its builder committed on the detached head.
+    sh(e.project, 'worktree', 'add', '-q', '--detach', folder, s.started!.base!)
+    const work = commit(folder, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    const detached = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine')
+    expect(detached.message).toMatch(new RegExp(`isn't on its branch ${line}: its head is detached at ${work.slice(0, 7)}`))
+    expect(detached.next).toMatch(new RegExp(`git switch -c ${line}`))
+    // On another branch.
+    sh(folder, 'switch', '-q', '-c', 'elsewhere')
+    expect(refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.offLine').message).toMatch(/: it is on elsewhere,/)
+    expect(e.wf.state(card).stage).toBe('active')
+    // On its line, made where its work is: submitted.
+    sh(folder, 'switch', '-q', '-c', line)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("HI-3010 (HR2's round 2): its branch unreadable while its head reads is refused as unknown, never let through", async () => {
+    const folder = tempDir('slot-')
+    const { e } = world(() => ({ slot: 'slot-a', folder, lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'Branch unread' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    sh(e.project, 'worktree', 'add', '-q', '--detach', folder, s.started!.base!)
+    commit(folder, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    branchUnread.folder = folder
+    expect(sh(folder, 'rev-parse', 'HEAD')).toMatch(/^[0-9a-f]{40}$/)
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'platform.unknown')
+    expect(e.wf.state(card).stage).toBe('active')
+    // Readable again, and on its line: submitted.
+    branchUnread.folder = null
+    sh(folder, 'switch', '-q', '-c', s.started!.line!)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   })
 
   it("names a card's line: lower case ASCII letters, digits and hyphens, at most 40, accents folded", () => {

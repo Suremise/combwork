@@ -1009,6 +1009,16 @@
     "note": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore and jj config set --repo snapshot.max-new-file-size are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them).",
     "audience": "both"
   },
+  "workflow.refused.platform.offLine.message": {
+    "text": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",
+    "note": "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.offLine.next": {
+    "text": "{where, select, detached {Put the commits on the card's branch: git switch -c {line} if it doesn't exist yet, else git switch {line} and git cherry-pick the commits made off it. Then submit again.} other {Switch back with git switch {line}, and git cherry-pick there any commits of the card's made on {on}. Then submit again.}}",
+    "note": "HI-3010: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch). git switch -c, git switch and git cherry-pick are commands: keep them as they are. {line} and {on} are branch names.",
+    "audience": "both"
+  },
   "workflow.refused.platform.switching.message": {
     "text": "{card} can't start now: its repository's version control is being switched.",
     "note": "HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12.",

@@ -362,6 +362,8 @@
   "workflow.refused.platform.unknown.next": "请检查“配置提供方”或该文件夹，然后重试。",
   "workflow.refused.platform.targetGone.message": "{card} 是在 {target} 上开始的，而此仓库中已不再有该分支。",
   "workflow.refused.platform.targetGone.next": "用户或 Assistant 可以在保留其工作的情况下把它移到另一个分支：设置它的“合并到”，或更改“工作合并到”的目标。",
+  "workflow.refused.platform.offLine.message": "{card} 的文件夹不在其分支 {line} 上：{where, select, detached {其 HEAD 分离在 {head}} other {它在 {on} 上}}，因此那里的工作并不是该卡片将要合并的内容。",
+  "workflow.refused.platform.offLine.next": "{where, select, detached {把提交放到卡片的分支上：若分支尚不存在，用 git switch -c {line}；否则用 git switch {line}，再用 git cherry-pick 拿回在分支外做的提交。然后重新提交。} other {用 git switch {line} 切回去，并在那里用 git cherry-pick 拿回在 {on} 上做的卡片提交。然后重新提交。}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {项目的 Git 仓库不见了：请恢复它，或在其“版本控制”标签页中将项目切换到“无”（从下一张卡片起生效）。} other {项目的 Git 仓库不见了：请让用户恢复它，或在其“版本控制”标签页中将项目切换到“无”（从下一张卡片起生效）。}}",
   "workflow.refused.queue.advancing.message": "{card} 正在合并到 {target}：已无法再移出合并队列。",
   "workflow.refused.queue.advancing.next": "请等待合并完成。如果不需要这项更改，请在 {target} 中还原它。",
