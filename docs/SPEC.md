@@ -6137,7 +6137,8 @@ touched:
   that fails ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
   and (as for native programs) one whose parent had exited and that carries no marker. **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
   `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
-  (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too), so the real index and its lock
+  (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too, by a step bounded as the commit
+  is and running nothing of the repository's, as the step into the real index below: HI-3079), so the real index and its lock
   are never held while a hook, filter or signer runs, and the user's own `git add` works meanwhile. Combwork never
   removes an `index.lock` it didn't make: what git leaves is the copy's, removed with the copy and every file git named after it (a
   stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
