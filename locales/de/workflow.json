@@ -633,6 +633,8 @@
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} kann unter diesen Regeln nicht starten: Das Projekt verwendet jetzt {platform}.",
   "workflow.refused.platform.changed.next": "Starte sie erneut: Dann wird sie nach den Regeln von {platform} geprüft.",
+  "workflow.refused.platform.noTarget.message": "{card} kann nicht starten: In seinem Projekt ist kein Ziel-Bookmark gewählt, in das seine Arbeit gemergt wird.",
+  "workflow.refused.platform.noTarget.next": "Wähle eines unter Versionsverwaltung → Workflow (Arbeit wird gemergt in) und starte die Karte dann erneut.",
   "workflow.refused.platform.keptAcross.message": "{card} kann nicht starten: Ihre committete Arbeit von vor dem Zurücklegen ist in Slot {slot} aufbewahrt, einem {platform}-Slot von vor dem Wechsel des Repositorys zu {now}.",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {Sein Ordner fehlt, es ist also nichts mehr da, womit es weitergehen könnte: Entferne den Slot (Versionsverwaltung → Slots und Kopien, Entfernen…), dann startet {card} neu von ihrem Ziel aus.} other {Wechsle das Repository zurück zu {platform}, um mit {card} in diesem Slot weiterzumachen.}}",
   "workflow.refused.platform.switching.message": "{card} kann jetzt nicht starten: Die Versionsverwaltung ihres Repositorys wird gerade gewechselt.",

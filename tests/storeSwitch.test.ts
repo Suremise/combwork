@@ -199,6 +199,32 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await startCard(w, q, 'q')).not.toMatchObject({ refused: true, rule: expect.stringMatching(/^platform\./) })
   })
 
+  it("HI-3106: a switch to jj gives a project with no jj target Git's: the repository's default branch, or the one Git's options name; one jj already names is kept", async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    // P's Git options name a target of their own; Q's name none (its default branch, main).
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'integration' } } }), { existing: true })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+    expect((await w.projectConfig(p)).workflow?.options?.target).toBe('integration')
+    expect((await w.projectConfig(q)).workflow?.options?.target).toBe('main')
+    // Back to Git and to jj again: jj's own target, kept from before, isn't replaced.
+    await w.mutateProjectConfig(q, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'trunk' } } }), { existing: true })
+    await sw.setPlatform(w, p, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, p, 'git')).store!.token })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect((await w.projectConfig(q)).workflow?.options?.target).toBe('trunk')
+  })
+
+  it("HI-3106: a jj start with no target chosen is refused saying so (platform.noTarget), never as an unreadable blank", async () => {
+    const { w, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, q, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, q, 'jj')).store!.token })
+    await w.mutateProjectConfig(q, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder: 'slots', target: '' } } }), { existing: true })
+    const r = await startCard(w, q, 'q')
+    expect(r).toMatchObject({ refused: true, rule: 'platform.noTarget' })
+    expect(JSON.stringify(r)).toContain('has no target bookmark chosen')
+    expect(JSON.stringify(r)).toContain('Choose one in Version Control → Workflow (Work merges into)')
+    expect(JSON.stringify(r)).not.toContain('Provider Setup')
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

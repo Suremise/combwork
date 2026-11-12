@@ -352,12 +352,15 @@ export class JjPlatform implements PlatformAdapter {
 
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {
     const d = this.deps
-    if (!this.wf || !d) return notYet()
+    if (!this.wf) return notYet()
     const target = card.target || o.target || null
     // A no-code card changes nothing: it starts where its agent is, with no line (as under Git).
     if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target }
     if (o.folder !== 'slots' || !this.wf.cfg.slotFor) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.slots))
-    if (!target) return withDetail(unknown(UNREADABLE.target, { target: '' }), say(START_TEXT.target))
+    // HI-3106: no target bookmark chosen (jj resolves no default): refused saying so, never "couldn't read" a blank name.
+    // Asked before jj's card work is needed: what the project's options lack is said first.
+    if (!target) return { ...withDetail(unknown(UNREADABLE.target, { target: '' }), say(START_TEXT.target)), rule: 'platform.noTarget' }
+    if (!d) return notYet()
     const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
     if (!got) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.noSlot))
     if ('wait' in got) return { folder: 'project', line: null, base: null, target, slotWait: got.wait }
