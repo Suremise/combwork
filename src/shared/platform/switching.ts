@@ -85,13 +85,16 @@ export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal |
   return found.platform === to ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
 }
 
+/** A repository platform's name as a refusal's value (product names, the same in every language: HI-3072's `storeRuns`). */
+const REPO_PLATFORM_NAME: Record<PlatformId, string> = { none: 'None', git: 'Git', jj: 'jj' } // i18n-ignore: product names, kept in every language
+
 /** A refusal's message and values. */
 export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<string, string> } {
   switch (r.why) {
     case 'otherFound':
       return { m: SWITCH_REFUSED.otherFound, values: { vcs: r.vcs } }
     case 'storeRuns':
-      return { m: SWITCH_REFUSED.storeRuns, values: { platform: r.platform === 'jj' ? 'jj' : r.platform === 'git' ? 'Git' : r.platform } } // i18n-ignore: product names
+      return { m: SWITCH_REFUSED.storeRuns, values: { platform: REPO_PLATFORM_NAME[r.platform] } }
     case 'jjTool':
       return { m: SWITCH_REFUSED.jjTool, values: { state: r.state } }
     case 'jjToolBack':
