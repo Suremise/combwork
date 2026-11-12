@@ -6089,7 +6089,9 @@ touched:
   after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in
   neither the index nor the folder), made the stash then died on it, every try; it is given the new side alone, which
   stashes the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives
-  the rename back), then the old side is put back from HEAD (`checkout HEAD --`, in the private index, bounded); either
+  the rename back), then the old side is put back from HEAD in the private index, bounded: its entry (`reset`), then its
+  file by `checkout-index` without `--force`, which refuses a path that exists rather than writing over it (HR1: a file
+  made there since the check, in no stash, is kept; the refusal is said with the stash made); either
   side shown brings the other. A file added then deleted on disk (`AD`): git stashes it, then says "No valid patches
   in input"; with the stash made and none of the paths changed any more, that is done, never said as a problem.
   **Bounded** (HI-3021): a commit or stash still running after two

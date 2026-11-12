@@ -441,6 +441,20 @@ async function onDisk(folder: string, rel: string): Promise<Removed> {
   return s.isDirectory() ? 'folder' : 'file'
 }
 
+/**
+ * HI-3022: a staged rename's old sides put back from HEAD after the stash took the new sides, in the private index:
+ * their entries from HEAD (`reset`), then their files by `checkout-index` without `--force`, which refuses a path that
+ * exists rather than writing over it (HR1's round 1: a file made there since the check, never in the stash, kept; the
+ * refusal, "… already exists, no checkout", then said with the stash made). Both bounded.
+ */
+async function restoreOldSides(folder: string, env: NodeJS.ProcessEnv, olds: string[]): Promise<GitResult> {
+  const bound = { env, timeout: folderChangesBounds.actMs }
+  const entries = await git(folder, ['reset', '-q', ...PATHS_IN], undefined, pathsIn(olds), bound)
+  if (!entries.ok) return entries
+  // Paths, not pathspecs, on its input (checkout-index takes no pathspec magic).
+  return git(folder, ['checkout-index', '-z', '--stdin'], undefined, olds.map((p) => `${p}\0`).join(''), bound)
+}
+
 /** HI-3022: none of `files` changed in the folder now, as git status reads it (false when it can't be read). */
 async function leftUnchanged(folder: string, files: string[]): Promise<boolean> {
   const now = await changedIn(folder).catch(() => null)
@@ -473,7 +487,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
     const after = await stashTop(folder)
     const stash = after && after !== before ? after : null
-    if (stash && pushed.ok && renamedFrom.length) pushed = await git(folder, ['checkout', '-q', 'HEAD', ...PATHS_IN], undefined, pathsIn(renamedFrom), { env, timeout: folderChangesBounds.actMs })
+    if (stash && pushed.ok && renamedFrom.length) pushed = await restoreOldSides(folder, env, renamedFrom)
     if (stash) {
       const took = await takeEntries(folder, copy, files)
       if (!took.ok) throw combworkError(M.indexNotTaken, { action: 'setAside', made: stash.slice(0, 12), why: took.why })

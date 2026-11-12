@@ -27,6 +27,8 @@ vi.mock('original-fs/promises', async (original) => {
     }) as typeof real.lstat
   }
 })
+/** HI-3022: a file written just before the next `checkout-index` (a rename's old side put back) runs. */
+let beforeRestore: { file: string; text: string } | null = null
 /** HI-3021: each git command and its bound, while a test collects them (null: none). */
 let gitCalls: { args: string[]; timeout?: number }[] | null = null
 /** HI-3021: the next `rev-parse --verify HEAD` fails as an unreadable HEAD does (not an unborn branch's exit 1). */
@@ -46,6 +48,11 @@ vi.mock('../src/main/git', async (original) => {
       }
       if (failTopIn && args[0] === 'rev-parse' && args.includes('--show-toplevel') && resolve(cwd).toLowerCase() === resolve(failTopIn.folder).toLowerCase())
         return failTopIn.empty ? { ok: true, code: 0, out: '', err: '', buf: Buffer.alloc(0) } : { ok: false, code: 128, out: '', err: 'fatal: unable to read the repository', buf: Buffer.alloc(0) }
+      if (beforeRestore && args.includes('checkout-index')) {
+        // HI-3022 (HR1's round 1): a file made at a rename's old side just before it is put back from HEAD.
+        writeFileSync(join(cwd, beforeRestore.file), beforeRestore.text)
+        beforeRestore = null
+      }
       if (lateFile && args[0] === 'stash' && args[1] === 'push') {
         // HI-2983 (HR1's round 1): a change made after the check, never shown, just before git stashes.
         writeFileSync(join(cwd, lateFile), 'not shown\n')
@@ -123,6 +130,7 @@ beforeEach(() => {
   failTopIn = null
   failHeadOnce = false
   gitCalls = null
+  beforeRestore = null
   failStashAfter = false
   failLstatOf = null
   lateFile = null
@@ -255,6 +263,18 @@ describe('Set aside', () => {
       expect(read('c.txt')).toBe(edit ? 'b\nmore\n' : 'b\n')
       expect(existsSync(join(proj, 'b.txt'))).toBe(false)
     })
+
+  it("a staged rename's old side made again just before it is put back (HR1's round 1): never written over, the stash made named", async () => {
+    sh(proj, 'mv', 'b.txt', 'c.txt')
+    beforeRestore = { file: 'b.txt', text: 'late user work\n' }
+    const err = await settle('setAside', ['c.txt']).catch((e: Error) => e)
+    const stash = sh(proj, 'rev-parse', 'refs/stash')
+    expect(String(err)).toMatch(new RegExp(`after keeping them in a stash \\(${stash.slice(0, 12)}\\).*b\\.txt already exists, no checkout`))
+    expect(read('b.txt')).toBe('late user work\n')
+    expect(sh(proj, 'show', 'refs/stash:c.txt')).toBe('b')
+    expect(existsSync(join(proj, 'c.txt'))).toBe(false)
+    expect(sh(proj, 'stash', 'list').split('\n')).toHaveLength(1)
+  })
 
   it('a file added then deleted on disk (AD): set aside, said as done, not as a problem (HI-3022)', async () => {
     writeFileSync(join(proj, 'new.txt'), 'new\n')
