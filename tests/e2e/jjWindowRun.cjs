@@ -446,8 +446,9 @@ const onDb = (fn) => {
     fs.writeFileSync(path.join(w5.folder, 'wip.txt'), 'unrecorded before the abandon\n')
     const back5 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back before op abandon' }).catch((e) => ({ error: String(e) }))
     await inv('session:stop', shop, b1.id)
-    // Not lent, and B1's run no longer writing there (Recover… refuses a slot something works in: busy).
-    check('card 2 put back: its slot not lent, nothing writing in it', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === slot5); return s && !s.lease && !s.writer ? s : null }, HUNG_MS)), JSON.stringify({ back5, slots: await inv('slots:list', shop) }))
+    // Not lent, B1's run no longer writing there (Recover… refuses a slot something works in: busy), and its settle done
+    // (dirty: the edit recorded), so the user's commands below never race Combwork's own record of the slot.
+    check('card 2 put back: its slot settled dirty, nothing writing in it', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === slot5); return s && !s.lease && !s.writer && s.state === 'dirty' ? s : null }, HUNG_MS)), JSON.stringify({ back5, slots: await inv('slots:list', shop) }))
     const shopFiles = () => Object.fromEntries(fs.readdirSync(shop).filter((f) => f !== '.jj' && f !== '.git' && fs.statSync(path.join(shop, f)).isFile()).map((f) => [f, fs.readFileSync(path.join(shop, f), 'utf8')]))
     fs.writeFileSync(path.join(shop, 'user-a.txt'), 'a\n')
     jj(shop, 'commit', '-m', 'the user’s a')

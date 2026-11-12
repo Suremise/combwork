@@ -5,6 +5,7 @@
 //   identical to its preserved one would collide in: `collision` at the cap, `fence` on a lost fence, both resumable);
 // - Combwork's control workspace is mended (update-stale in it alone), on a fresh proof, refused and retryable when the
 //   head moves or the control isn't empty;
+// - an edit Combwork had recorded in an operation the abandon discards is kept in the folder too;
 // - the user's own project folder is left exactly as it was.
 // Skipped without the fetched jj (npm run jj:fetch).
 
@@ -14,6 +15,7 @@ import { join, relative } from 'path'
 import { describe, expect, it } from 'vitest'
 import { recoverStale, type GitRun, type RecoveryDeps } from '../src/main/platform/jjRecovery'
 import type { JjPortDeps } from '../src/main/platform/jjWorkspacePort'
+import { isUnknown } from '../src/main/platform/types'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 
@@ -36,7 +38,7 @@ function filesOf(root: string): Record<string, string> {
 }
 
 /** A project with a slot holding an unrecorded edit; the user then commits twice and abandons old operations. */
-async function abandoned(colocated: boolean, more: Partial<JjPortDeps> = {}) {
+async function abandoned(colocated: boolean, more: Partial<JjPortDeps> = {}, recorded = false) {
   const h0 = harness()
   const h = { ...h0, port: more && Object.keys(more).length ? h0.portWith(more) : h0.port }
   const { repo, root, base } = h.repo('opab', colocated)
@@ -44,6 +46,8 @@ async function abandoned(colocated: boolean, more: Partial<JjPortDeps> = {}) {
   expect((await h.port.create(repo, slot, base)).ok).toBe(true)
   const id = (await h.port.identity!(slot))!
   writeFileSync(join(slot, 'wip.txt'), 'an edit jj has not recorded\n')
+  // Recorded by Combwork (a settle's owned record), in an operation the user's abandon below then discards.
+  if (recorded) expect(isUnknown(await h.port.record!(slot, yes, id))).toBe(false)
   writeFileSync(join(repo, 'u1.txt'), 'u1\n')
   h.jj(repo, 'commit', '-m', 'user 1')
   writeFileSync(join(repo, 'u2.txt'), 'u2\n')
@@ -140,5 +144,17 @@ describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-309
     expect(w.h.journals.of('rec').read()).toBeNull()
     expect(readFileSync(join(w.slot, 'wip.txt'), 'utf8')).toBe('an edit jj has not recorded\n')
     expect(await w.h.port.stale(w.slot)).toBe(false)
+  })
+
+  it.each([true, false])('an edit Combwork recorded in an operation the user then abandoned: Recover… keeps it in the folder (colocated: %s)', async (colocated) => {
+    const w = await abandoned(colocated, {}, true)
+    expect(await w.h.port.stale(w.slot)).toBe(true)
+    const rec = await w.recover()
+    expect(rec).toMatchObject({ ok: true })
+    expect(readFileSync(join(w.slot, 'wip.txt'), 'utf8')).toBe('an edit jj has not recorded\n')
+    expect(await w.h.port.stale(w.slot)).toBe(false)
+    expect(w.status(w.slot)).toMatch(/^ok: /)
+    expect(w.h.jj(w.slot, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'divergent')).toBe('false')
+    expect(w.user()).toEqual(w.before)
   })
 })
