@@ -964,13 +964,19 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
   const [picking, setPicking] = useState(false)
   const [said, setSaid] = useState('')
   const ref = useRef<HTMLOListElement>(null)
-  const refocus = useRef<number | null>(null)
+  /** The row (its card) or the lane's own row ('lane') the focus goes to once the lane shows an edit made here. */
+  const refocus = useRef<number | 'lane' | null>(null)
   useLayoutEffect(() => {
     const n = refocus.current
     if (n === null) return
     refocus.current = null
-    ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)?.focus({ preventScroll: true })
+    const to = n === 'lane' ? ref.current?.closest<HTMLElement>('.progress-lane') : ref.current?.querySelector<HTMLElement>(`.progress-lane-queue-row[data-card="${n}"]`)
+    to?.focus({ preventScroll: true })
   }, [l])
+  /** An edit asked here that wasn't made (refused, or nothing to do): the focus it would have moved stays (HI-3068). */
+  const keepFocus = (o: EditOutcome, n: number | 'lane' | null): void => {
+    if (o !== 'made' && refocus.current === n) refocus.current = null
+  }
   const reset = (): void => {
     setDragCard(null)
     setDropBefore(undefined)
@@ -1021,16 +1027,17 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
   }
   /**
    * Takes a card off from its row (Delete or ×). Its row goes, and the focus with it to the page's body, where Ctrl+Z
-   * (the Lanes tab's) no longer hears it (HI-3020): so the focus moves first to the next card's row, or the lane's own row
-   * when none comes after it.
+   * (the Lanes tab's) no longer hears it (HI-3020): so the focus moves to the next card's row, or the lane's own row when
+   * none comes after it. Only once the lane shows it made (HI-3068): moved before, a second Delete (or a held one) took
+   * the next card off too, and a refused one left the focus on a card it never asked about.
    */
   const takeOff = (n: number, row: HTMLElement | null): void => {
     if (!edit) return
     let next = row?.nextElementSibling ?? null
     while (next && !next.matches('.progress-lane-queue-row.movable')) next = next.nextElementSibling
-    const to = next instanceof HTMLElement ? next : row?.closest<HTMLElement>('.progress-lane')
-    to?.focus({ preventScroll: true })
-    void edit.run(removing(n))
+    const to = next instanceof HTMLElement && next.dataset.card ? Number(next.dataset.card) : 'lane'
+    refocus.current = to
+    void edit.run(removing(n)).then((o) => keepFocus(o, to))
   }
   const nudge = (n: number, by: -1 | 1): void => {
     const label = cardLabelOf({ tasks }, n)
@@ -1044,6 +1051,7 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
         return to === null ? null : { op: 'move', lane: cur.id, rev: rev(cur.id), card: n, to }
       })
       .then((o) => {
+        keepFocus(o, n)
         if (o === 'skipped') return setSaid(tr(EDIT.stuck, { card: label }))
         if (o !== 'made') return
         const after = laneNow(l.id)
@@ -1101,7 +1109,8 @@ function LaneQueue({ lane: l, badges, edit }: { lane: Lane; badges: Map<number, 
                       } else if (e.target === e.currentTarget && e.key === 'Delete' && !e.altKey && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault()
                         e.stopPropagation()
-                        takeOff(c.number, e.currentTarget)
+                        // Held down, one card (HI-3068): the key's repeats take nothing more off.
+                        if (!e.repeat) takeOff(c.number, e.currentTarget)
                       }
                     }
                   }
