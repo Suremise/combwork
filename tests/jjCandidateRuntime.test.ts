@@ -776,6 +776,56 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       })
     }
   })
+
+  // HI-3044 (found by HI-3019): in the same window, the user integrates the reviewed commit their own way: main set onto it
+  // (a fast-forward), or onto their own work on top of it. Before, a rebase's copy was not the same change and returned
+  // the card with its work in the target, stuck; a merge's or squash's empty build stayed in the user's log as uncertain.
+  describe.each([true, false] as const)('integrated their own way between the proof and the step (HI-3044), colocated: %s', (colocated) => {
+    for (const style of ['rebase', 'squash', 'merge'] as const) {
+      for (const onto of ['reviewed', 'descendant'] as const) {
+        it(`${style}, main onto the ${onto === 'reviewed' ? 'reviewed commit' : 'user’s work on top of it'}: nothing built or returned; the next proof makes it Done; nothing left in the log`, async () => {
+          const w = await world(colocated, { candidates: true, oneSlot: true })
+          const { card, P } = await approved(w)
+          reapply(w, card, { style })
+          const jjp = new JjPlatform(w.wf)
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          const cycle = w.wf.state(card).cycle
+          expect(shown(w, card, cycle)!.offer!.style).toBe(style)
+          const before = entries(w, card, cycle).length
+          // The run's second read of the target (its step's, after its proof's): the user moves main first.
+          const real = w.deps.integration
+          let n = 0
+          let head = P
+          w.deps.integration = async () => {
+            if (++n === 2) {
+              if (onto === 'reviewed') w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+              else {
+                w.h.jj(w.repo, 'new', P, '-m', 'theirs on top')
+                writeFileSync(join(w.repo, 'theirs.txt'), 'theirs\n')
+                w.h.jj(w.repo, 'commit', '-m', 'theirs on top')
+                w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+                head = w.h.id(w.repo, 'main')
+              }
+            }
+            return real()
+          }
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          w.deps.integration = real
+          expect(w.main()).toBe(head)
+          expect(w.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').map((f) => (f.data as { reason: string }).reason)).toEqual([])
+          expect(w.wf.state(card).stage).toBe('approved')
+          expect(entries(w, card, cycle)).toHaveLength(before)
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          expect(w.store.facts(card.id).some((x) => x.kind === 'Integrated')).toBe(true)
+          expect(w.wf.state(card).stage).toBe('done')
+          await jjp.afterRun()
+          await jjp.afterRun()
+          expect(entries(w, card, cycle).filter((e) => e.record.uncertain?.length)).toEqual([])
+          expect(left(w, card, cycle)).toEqual([])
+        })
+      }
+    }
+  })
 })
 
 /** Of the card's attempts' commits, those still in the user's log that main doesn't reach (HI-2990: none once settled). */

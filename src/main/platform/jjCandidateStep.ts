@@ -171,6 +171,11 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
     if (r.revision !== fp.revision || r.base !== fp.base) continue
     if (await reaches(deps.j4.git, r.result, head)) return { none: 'reached' }
   }
+  // HI-3044: and so does a head that holds the reviewed revision itself (the user's own way of integrating in that window:
+  // main set onto the reviewed commit, or onto work on top of it). A build there is empty (merge, squash: kept as
+  // uncertain in the user's log) or not the same change (rebase: the card returned with its work already in the target);
+  // the next run's proof credits the revision in the target.
+  if (await reaches(deps.j4.git, fp.revision, head)) return { none: 'reached' }
 
   // 3. The current answer for exactly this fingerprint and head, if there is one.
   const live = deps.entries().filter((e) => !e.state && !e.failure && e.record.phase === 'done')
