@@ -1061,7 +1061,24 @@ export class MergeQueue {
         await this.setCatchUp(target, c.to, null)
         return null
       }
-      if (f.found === 'requeue') {
+      // HI-3090: nor are its files rolled back under a commit the user made since: where the folder's listed files are as
+      // the local target has them now (the user committed what the catch-up had staged), nothing of the catch-up is left
+      // uncommitted; its phase dropped, it is looked at again as a fresh one.
+      const committed = f.found === 'rollback' && local ? await this.asIn(I, h, folder, c.files, local) : false
+      if (committed === null) return null
+      if (f.found === 'requeue' || committed) {
+        await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+        return 'again'
+      }
+    }
+    // HI-3090: a terminal state whose files are all as they were before the catch-up (the user's `git reset --hard` or
+    // `git stash` after a stop, or a folder switched to another branch before anything moved): nothing of it is left, and
+    // the advance's table can't say so (its phase `ref` expects the files moved). A catch-up's card is Done and published,
+    // so it is simply looked at again as a fresh one, never paused needing the user to put right what is already right.
+    if (f.found === 'stuck') {
+      const untouched = await this.asIn(I, h, folder, c.files, c.from)
+      if (untouched === null) return null
+      if (untouched) {
         await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
         return 'again'
       }
@@ -1094,6 +1111,17 @@ export class MergeQueue {
       return this.catchUpConfirm(target, c, folder)
     }
     return this.catchUpPause(target, c, 'needsYou', undefined, undefined, f.stuck)
+  }
+
+  /**
+   * HI-3090: whether every listed file of a catch-up is, in the folder's index and working copy, as `commit` has it
+   * (nothing staged or changed against it); null when that can't be read. No files listed: false (nothing to tell by).
+   */
+  private async asIn(I: IntegrationPort, h: ReturnType<MergeQueue['host']>, folder: string, files: string[] | undefined, commit: string): Promise<boolean | null> {
+    if (!files?.length) return false
+    const sd = await I.sides(h, folder, files, commit, commit)
+    if (!sd) return null
+    return sd.every((x) => x.side === 'expected')
   }
 
   /** `look`: whether the remote is asked before the local target is brought to the result (HI-3041; not right after publishing it). */
