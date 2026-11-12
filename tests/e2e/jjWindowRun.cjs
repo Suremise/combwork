@@ -332,6 +332,9 @@ const onDb = (fn) => {
 
     // HI-2995: B1 commits work for card 2 there; the user puts the card back and stops B1: the slot is kept for that card
     // (not lent with no lease), Slots and copies says so, and the card started again gets that slot back with its work.
+    // B1 is given the card once its slot is prepared for it (its binding card 2's): only then does it work there.
+    const given = new RegExp(`Giving \\S*B1\\S* #${n2} in`)
+    check('card 2 given to B1 in its prepared slot', !!(await until(async () => fs.existsSync(appLog) && given.test(fs.readFileSync(appLog, 'utf8')), HUNG_MS)), JSON.stringify(await inv('tasks:work', n2)))
     fs.writeFileSync(path.join(w2.folder, 'second.txt'), 'second\n')
     jj(w2.folder, 'commit', '-m', 'second work')
     const keptCommit = jj(w2.folder, 'log', '--no-graph', '-r', `${w2.workspace}@-`, '-T', 'commit_id').trim()
