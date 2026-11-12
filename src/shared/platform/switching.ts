@@ -88,6 +88,21 @@ export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal |
 /** A repository platform's name as a refusal's value (product names, the same in every language: HI-3072's `storeRuns`). */
 const REPO_PLATFORM_NAME: Record<PlatformId, string> = { none: 'None', git: 'Git', jj: 'jj' } // i18n-ignore: product names, kept in every language
 
+/** The refusals a switch's dialog shows with their lists (the warning's details), Check Again reading them afresh. */
+export const DETAILED_REFUSALS: ReadonlySet<SwitchRefusal['why']> = new Set<SwitchRefusal['why']>(['gates', 'fallback', 'drain', 'memberDrain', 'memberNoJj', 'otherWorkspace', 'switching'])
+
+/**
+ * HI-3105: after a repository switch was refused as Switch was pressed, whether the dialog gives way to a fresh look
+ * (the check read again): when that check reads clear now (the refusal was a passing race: a fresh confirmation, never a
+ * switch made by itself), or refuses with its lists. Not when it couldn't be read (null) or refuses for another reason:
+ * the original error stays shown.
+ */
+export function rereadAfterRefusal(again: { refused: SwitchRefusal | null; store?: unknown } | null): boolean {
+  if (!again) return false
+  if (!again.refused) return true
+  return !!again.store && DETAILED_REFUSALS.has(again.refused.why)
+}
+
 /** A refusal's message and values. */
 export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<string, string> } {
   switch (r.why) {
