@@ -2668,7 +2668,9 @@ merges under jj.
   the switch back to it; a member's switch to None counts every kept slot; and (HI-3070) the repository's other
   projects whose choice is None, never switched with it, through their work still under Git or jj only: cards in
   flight started under a repository's rules, their merge queue's work, open slot leases, unfreed copies and kept
-  slots, never their None cards or lanes; such a project stays None and outside the group), `otherWorkspace` (the store is a
+  slots, and their running lanes whose recorded ruleset needs a repository (one before its first card starts holds Git's
+  rules for it; a ruleset that can't be read counts), never their None cards or a lane recorded under None; such a
+  project stays None and outside the group), `otherWorkspace` (the store is a
   project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes

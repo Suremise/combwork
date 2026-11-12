@@ -18,7 +18,7 @@
 
 import { createHash, randomUUID } from 'crypto'
 import { basename, dirname, join } from 'path'
-import { listLanes } from '../lanes'
+import { listLanes, rawLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, platformIdOf, projectPlatform } from '../platform/registry'
@@ -178,11 +178,23 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[], to: Pla
 /**
  * HI-3070: a project on None beside the group (a bystander) adds only its work under Git or jj: its cards in flight
  * started under a repository's rules (`Started` compiled with Git or jj: a card started under None never touches the
- * repository), its merge queue's work, its open slot leases, unfreed copies and slots kept across platforms. Its lanes
- * aren't listed: a lane's card under Git is listed itself, and one under None needn't wait.
+ * repository), its merge queue's work, its open slot leases, unfreed copies and slots kept across platforms, and its
+ * running lanes whose recorded ruleset needs a repository (HR2's round 1: a Git lane keeps Git's rules for its cards,
+ * Todo ones too, so one before its first card starts holds repository work no started card shows; a ruleset that can't
+ * be read counts as one); never a lane recorded under None.
  */
 async function bystanderDrain(ws: WorkspaceService, m: Member, to: PlatformId, d: SwitchDrain): Promise<void> {
   const wf = await workflowFor(ws, m.path).catch(() => null)
+  for (const l of await rawLanes(ws)) {
+    if (l.state !== 'active' || l.project.toLowerCase() !== m.name.toLowerCase()) continue
+    let repo = true
+    try {
+      repo = !l.ruleset || !wf ? !!l.ruleset : needsRepository(wf.store.ruleset(l.ruleset).options.platform)
+    } catch {
+      repo = true
+    }
+    if (repo) d.lanes.push({ project: m.name, id: l.id, name: l.name, builder: l.builder.name })
+  }
   if (wf) {
     const repoCards = new Set(
       wf.store
