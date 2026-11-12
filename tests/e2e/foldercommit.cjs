@@ -129,7 +129,8 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     await f.themes(page, pausedB, 'foldercommit-card-staged')
     await aside.click()
     const keyB = (await h.card(b.n))?.key
-    check('Set Aside: keep.txt kept in a stash named after the card, the index clean', !!(await waitHung(() => new RegExp(`Combwork: set aside before merging ${keyB}`).test(git('stash', 'list', '--format=%s')) || null)) && git('diff', '--cached', '--name-only') === '', git('stash', 'list', '--format=%s'))
+    // Both at once: git moves the stash ref before Combwork takes its entries into the index (HI-3056: and refreshes them).
+    check('Set Aside: keep.txt kept in a stash named after the card, the index clean', !!(await waitHung(() => (new RegExp(`Combwork: set aside before merging ${keyB}`).test(git('stash', 'list', '--format=%s')) && git('diff', '--cached', '--name-only') === '') || null)), `${git('stash', 'list', '--format=%s')} | staged: ${git('diff', '--cached', '--name-only')}`)
     check('…and the merge goes on: Done, keep.txt as the card made it', !!(await waitHung(async () => (await h.card(b.n))?.column === 'done')) && f.text('keep.txt') === 'kept\nby the card\n', JSON.stringify(f.text('keep.txt')))
     check('…the user\'s staged change is in the stash', git('show', 'stash@{0}:keep.txt') === 'kept, and the user staged this', git('show', 'stash@{0}:keep.txt'))
     await page.keyboard.press('Escape')
