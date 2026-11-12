@@ -254,15 +254,15 @@ describe("a resolution whose direction no longer reads forward at its merge (HI-
 })
 
 describe('a default branch that can’t be read or named at the merge is no answer (HI-3040)', () => {
-  /** A resolution of `from` into 1.2.0, resolved on a builder, reviewed and approved; `from` the default branch. */
-  async function approvedResolution(e: Env, from: string) {
+  /** A resolution of `from` into 1.2.0, resolved on a builder, reviewed and approved; `from` the default branch (`main`: recorded at Resolve, HI-3049). */
+  async function approvedResolution(e: Env, from: string, main?: string) {
     const card = e.wf.createCard({ title: `Bring 1.2.0 up to date with ${from}` })
     const source = head(e, from)
     moved(await e.wf.forwardStart(card.key, { from, to: '1.2.0', source, base: sh(e.project, 'merge-base', from, '1.2.0') }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0')))
     expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
     const back = e.wf.returnedForward(e.wf.store.card(card.id))!
     const made = e.wf.createCard({ title: `Resolve: bring 1.2.0 up to date with ${from}`, target: back.to })
-    moved(await e.wf.markForwardResolution(made.key, { forward: card.key, from: back.from, to: back.to, source: back.source }, 'user'))
+    moved(await e.wf.markForwardResolution(made.key, { forward: card.key, from: back.from, to: back.to, source: back.source, ...(main ? { defaultBranch: main } : {}) }, 'user'))
     moved(await e.wf.resolveForward(card.key, { entry: back.entry, resolver: made.key }, 'merge by hand', 'user'))
     const started = await e.wf.start(made.key, B1)
     moved(started)
@@ -330,6 +330,42 @@ describe('a default branch that can’t be read or named at the merge is no answ
     }
     expect(reads).toBe(0)
   })
+
+  /** trunk the default (no main or master), the project folder on it: a resolution of trunk into 1.2.0, trunk recorded at Resolve. */
+  async function onTrunk() {
+    const e = conflicting({ target: '1.2.0', targetOwn: true })
+    sh(e.project, 'branch', '-m', 'main', 'trunk')
+    sh(e.project, 'checkout', '-q', 'trunk')
+    const made = await approvedResolution(e, 'trunk', 'trunk')
+    expect(e.wf.state(made).resolves?.defaultBranch).toBe('trunk')
+    return { e, made }
+  }
+
+  it('HI-3049: the project folder switched to another branch (no main or master): paused saying so, not returned; back on trunk, resumed, merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, made } = await onTrunk()
+    // The user checks out feature-x in the project folder meanwhile: git's default branch reads feature-x.
+    sh(e.project, 'checkout', '-q', '-b', 'feature-x')
+    expect(await historyOf('git')!.defaultTarget(e.project)).toBe('feature-x')
+    const dest = head(e, '1.2.0')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'paused', reason: 'needsYou' }])
+    expect(e.queue().paused('1.2.0')).toMatchObject({ reason: 'needsYou', card: made.key, message: expect.stringContaining('has feature-x checked out') })
+    expect(e.queue().paused('1.2.0')!.message).toContain('Check out trunk there')
+    expect(head(e, '1.2.0')).toBe(dest)
+    expect(e.wf.state(made).stage).toBe('merging')
+    expect(e.wf.store.facts(made.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+    sh(e.project, 'checkout', '-q', 'trunk')
+    e.queue().resume('1.2.0')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+  })
+
+  for (const [change, how] of [['main made since', (e: Env) => sh(e.project, 'branch', 'main', 'trunk')], ['trunk renamed (gone)', (e: Env) => sh(e.project, 'branch', '-m', 'trunk', 'feature-x')]] as const) {
+    it(`HI-3049: a real change (${change}) still returns it for its direction`, { timeout: GIT_HEAVY_MS }, async () => {
+      const { e, made } = await onTrunk()
+      how(e)
+      expect(await historyOf('git')!.defaultTarget(e.project)).not.toBe('trunk')
+      expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'returned', reason: 'direction' }])
+    })
+  }
 })
 
 describe('the override recorded on a resolution returned for its direction lets its revision back in once (HI-3040)', () => {

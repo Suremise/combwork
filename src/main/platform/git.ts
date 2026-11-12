@@ -319,13 +319,20 @@ export function treeOf(repo: string, rev: string): Promise<Maybe<string>> {
   })
 }
 
-/** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
-export async function defaultBranch(repo: string): Promise<Maybe<string>> {
+/** The repository's own main branch, `main` or `master`, whichever exists first; null when it has neither (HI-3049). */
+export async function mainBranch(repo: string): Promise<Maybe<string | null>> {
   for (const b of ['main', 'master']) {
     const h = await lineHead(repo, b)
     if (isUnknown(h)) return h
     if (h) return b
   }
+  return null
+}
+
+/** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
+export async function defaultBranch(repo: string): Promise<Maybe<string>> {
+  const m = await mainBranch(repo)
+  if (m !== null) return m
   const b = await branch(repo)
   if (isUnknown(b)) return b
   return b ?? unknown(U.defaultBranch, { folder: repo })

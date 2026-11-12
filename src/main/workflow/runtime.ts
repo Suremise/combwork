@@ -1549,7 +1549,7 @@ export class Workflow {
    * source frozen at `d.source`. Under its own rules (`forwardOf`), recorded with these facts. Only from the forward
    * request (queueControls' `forwardMerge`), as the user or the Assistant: refused for a card started before.
    */
-  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string; override?: ForwardOverride }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
+  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string; override?: ForwardOverride; defaultBranch?: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1558,7 +1558,7 @@ export class Workflow {
       const now = w.state()
       if (now.started || now.stage !== 'todo') return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'start', moves: '' } } as GuardRefusal // i18n-ignore: intent names
       w.fact('Started', { folder: 'project', line: null, base: d.base, target: d.to, builder: 'combwork', cardKind: 'code' }) // i18n-ignore: a fact's kind and codes, not text
-      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by, ...(d.override ? { override: d.override } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by, ...(d.override ? { override: d.override } : {}), ...(d.defaultBranch ? { defaultBranch: d.defaultBranch } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       w.move('active', 'intent')
       this.enqueueForward(w, d.source)
       return null

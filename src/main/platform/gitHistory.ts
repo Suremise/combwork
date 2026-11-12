@@ -56,6 +56,7 @@ export const gitHistory: HistoryPort = {
   line: (folder) => G.branch(folder),
   lineHead: (repo, line) => G.lineHead(repo, line),
   defaultTarget: (repo) => G.defaultBranch(repo),
+  mainLine: (repo) => G.mainBranch(repo),
   store: (repo) => G.commonDir(repo),
   storeFast: (repo) => G.commonDirFast(repo),
   refSync: (store, ref) => G.refSync(store, ref),

@@ -576,8 +576,10 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
   const sources = await forwardSources(ws, projectPath, all)
   if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
-  // HI-2892: the release path's direction, or the user's explicit override (bypassing the direction alone).
-  const d = forwardDirection(from, to, await defaultBranch(ws, projectPath))
+  // HI-2892: the release path's direction, or the user's explicit override (bypassing the direction alone). HI-3049: the
+  // default branch it read with, recorded on the request.
+  const main = await defaultBranch(ws, projectPath)
+  const d = forwardDirection(from, to, main)
   if (d.dir !== 'forward' && opts.override !== true) throw new ForwardRefused(withValues(FORWARD_TEXT.direction, { from, to, ...directionValues(d) }), { kind: 'invalid' })
   const override: ForwardOverride | undefined = d.dir !== 'forward' ? { by: actor.kind === 'assistant' ? 'assistant' : 'user', dir: d.dir, why: d.why } : undefined
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
@@ -608,7 +610,7 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
-    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}) }, by, ruleset, guard), undefined, guard)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}), ...(main ? { defaultBranch: main } : {}) }, by, ruleset, guard), undefined, guard)
     // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
     // HI-2892: `overridden`, the user's override recorded on it (a pair against the release path's direction).
@@ -655,7 +657,9 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   // HI-2892, as Retry: only in the release path's direction as it reads now, unless its own request recorded the user's
   // override; one returned for its direction is ended by Remove from queue alone, never handed to a builder.
   const f = wf.state(rec).forward!
-  const d = forwardDirection(f.from, f.to, await defaultBranch(ws, projectPath))
+  // HI-3049: the default branch as it reads now, recorded on the resolution with the direction it gave.
+  const main = await defaultBranch(ws, projectPath)
+  const d = forwardDirection(f.from, f.to, main)
   if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
   const back = wf.returnedForward(rec)
   if (!back) throw new ForwardRefused(withValues(RESOLVE_TEXT.notReturned, { card: rec.key }), { kind: 'conflict' })
@@ -665,7 +669,7 @@ export async function resolveForward(ws: WorkspaceService, n: number, actor: Tas
   const done = await cardBatch(ws, async (): Promise<ForwardResolved> => {
     guard?.()
     const made = await createTask({ title: tr(RESOLVE_TEXT.title, { from: back.from, to: back.to }), description: tr(RESOLVE_TEXT.description, { forward: rec.key, from: back.from, to: back.to, source: back.source, files: files || 'none' }), project: basename(projectPath), target: back.to, links: [rec.id] }, actor, { pinTarget: true, ...(guard ? { commit: guard } : {}) }) // i18n-ignore: a select key
-    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source, ...(f.override ? { override: f.override } : {}) }, by, guard), undefined, guard)
+    const marked = await runIntent(wf, made.number, actor, (x) => x.markForwardResolution(made.number, { forward: rec.key, from: back.from, to: back.to, source: back.source, ...(f.override ? { override: f.override } : {}), ...(main ? { defaultBranch: main } : {}) }, by, guard), undefined, guard)
     if (isRefusal(marked.reply)) throw new ForwardRefused(withValues(RESOLVE_TEXT.raced, { card: rec.key }), { kind: 'conflict' })
     // Refused (a Retry, a Remove or another Resolve since it was read): thrown, so the card made just now goes too.
     const ended = await runIntent(wf, rec.id, actor, (x) => x.resolveForward(rec.id, { entry: back.entry, resolver: wf.store.card(made.number).key }, reason, by, guard), undefined, guard)

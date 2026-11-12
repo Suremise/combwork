@@ -5903,7 +5903,12 @@ builder (`direction`, nothing merged), its wake and comment saying not to submit
 When the names alone don't decide the direction (two versions do) and the default branch can't be read or named at
 that attempt (git unable to answer, a detached project folder with no main or master), or its head can't be read, that
 is no answer (HI-3040): the entry goes round as any unreadable read does (`readFailed`), then pauses `needsYou` saying
-so, never comes back for good on it. The user's way on (HI-3040): a forward request for the pair with the override
+so, never comes back for good on it. HI-3049: a forward's request and its resolution (at Resolve) record the default
+branch as it read then (`defaultBranch` on `ForwardRequested` / `ForwardResolution`); when the direction doesn't permit
+it, the repository has no main or master (the port's `mainLine` null: the default is only the project folder's
+checked-out branch), and the default now is another than the recorded one, which still exists, that is no answer too
+(the folder switched, not the release path): round again, then paused saying which branch to check out. A main or
+master made since, the recorded branch gone, or nothing recorded (a card from before), still returns it. The user's way on (HI-3040): a forward request for the pair with the override
 (`override: true`), made while the resolution is back in Active for its direction (`overridableEntry`: its last entry
 `failed` for `direction` and its latest submission's, none open, no override yet), records it on the resolution
 (`ResolutionOverride` {override?, entry, by}, checked again in its own write with the caller's guard; nothing else made;

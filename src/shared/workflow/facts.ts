@@ -412,16 +412,21 @@ export interface FactData {
    * head as asked (each attempt's own frozen commit is its entry's `revision`). Written right after its `Started` (whose
    * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
    */
-  /** HI-2892: `override`, the user's explicit choice of a pair against the release path's direction (forwardOrder.ts). */
-  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string; override?: ForwardOverride }
+  /**
+   * HI-2892: `override`, the user's explicit choice of a pair against the release path's direction (forwardOrder.ts).
+   * HI-3049: `defaultBranch`, the repository's default branch as it read at the request (none when it named none), so the
+   * queue tells a project folder merely switched to another branch (no main or master) from a real change.
+   */
+  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string; override?: ForwardOverride; defaultBranch?: string }
   /**
    * HI-2959: this card resolves a forward merge the queue returned (`forward`: its key), made for a builder by Resolve on
    * a builder (the user's or the Assistant's): its work merges `from` at `source` (the returned attempt's frozen commit)
    * into `to`. Written while it is in Todo, before its start, and kept over every cycle: its rules always merge it as a
    * merge commit (`mergeCommitOf`), so the destination keeps the source's history. `override` (HI-2998): the forward's
    * own request's (HI-2892), carried so the queue checks the resolution's direction at each attempt as the forward's.
+   * `defaultBranch` (HI-3049): the default branch as it read at Resolve, as `ForwardRequested`'s.
    */
-  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant'; override?: ForwardOverride }
+  ForwardResolution: { forward: string; from: string; to: string; source: string; by: 'user' | 'assistant'; override?: ForwardOverride; defaultBranch?: string }
   /**
    * HI-3040: the user's explicit override of the release path's direction, recorded on a resolution the queue returned
    * for its direction (`entry`: that failed entry's id), by a forward request with the override for its pair. Sets the
