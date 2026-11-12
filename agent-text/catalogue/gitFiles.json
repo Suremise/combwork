@@ -50,5 +50,21 @@
   "gitFiles.error.url": {
     "text": "Combwork can't resolve submodule {name}'s URL {url}: set submodule.{name}.url",
     "note": "A slot's or copy's setup error (HI-1182): a relative submodule URL Combwork can't resolve as git would. {name} is the submodule's name, {url} the URL; submodule.{name}.url is a git config key, as it is."
+  },
+  "gitFiles.remove.changed": {
+    "text": "the worktree has changes or untracked files, inside its submodules too: {path}",
+    "note": "Why a slot with submodules wasn't removed (HI-3026): git's own clean check (its submodules counted) lists something. {path} is the first entry git lists."
+  },
+  "gitFiles.remove.odd": {
+    "text": "couldn't check submodule {path} before removing the worktree: it isn't a clone Combwork can read (a link, a stray file, an incomplete clone, or nested too deep)",
+    "note": "Why a slot with submodules wasn't removed (HI-3026): something under the worktree's git dir where submodule clones are kept isn't one Combwork can check, so nothing was removed. {path} is that folder under the worktree's git dir (.git: the worktree names no git dir)."
+  },
+  "gitFiles.remove.unpushed": {
+    "text": "submodule {path} has commits that aren't on its remote (a branch, tag or stash there, or a commit fetched by its id), which removing the worktree would delete",
+    "note": "Why a slot with submodules wasn't removed (HI-3026): a submodule clone only this worktree has holds commits no remote-tracking ref has. {path} is the clone's folder under the worktree's git dir."
+  },
+  "gitFiles.remove.unread": {
+    "text": "couldn't check submodule {path} before removing the worktree: {error}",
+    "note": "Why a slot with submodules wasn't removed (HI-3026): a read of its submodules' clones failed, so nothing was removed. {path} is the clone's folder under the worktree's git dir, {error} git's first line or why."
   }
 }

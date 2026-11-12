@@ -59,6 +59,10 @@ const T = {
   lfs: agentMsg({ id: 'gitFiles.error.lfs', text: 'git lfs pull: {error}', note: "A slot's or copy's setup error (HI-1182): `git lfs pull` failed. {error} is git-lfs's first line, else failed." }),
   removeLeft: agentMsg({ id: 'gitFiles.error.removeLeft', text: "the folder of removed submodule {path} couldn't be removed: {error}", note: "A copy's setup error (HI-1182): a submodule the revision no longer has left its folder, and Combwork couldn't remove it. {path} is the folder, {error} git's first line or why." }),
   doubtfulLeft: agentMsg({ id: 'gitFiles.error.doubtfulLeft', text: "the folder of removed submodule {path} isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away", note: "A copy's setup error (HI-1182): a submodule its revision no longer has left a folder that Combwork can't be sure it cloned itself, so it removes nothing and the copy isn't handed over. {path} is the folder." }),
+  workUnread: agentMsg({ id: 'gitFiles.remove.unread', text: "couldn't check submodule {path} before removing the worktree: {error}", note: "Why a slot with submodules wasn't removed (HI-3026): a read of its submodules' clones failed, so nothing was removed. {path} is the clone's folder under the worktree's git dir, {error} git's first line or why." }),
+  workOdd: agentMsg({ id: 'gitFiles.remove.odd', text: "couldn't check submodule {path} before removing the worktree: it isn't a clone Combwork can read (a link, a stray file, an incomplete clone, or nested too deep)", note: "Why a slot with submodules wasn't removed (HI-3026): something under the worktree's git dir where submodule clones are kept isn't one Combwork can check, so nothing was removed. {path} is that folder under the worktree's git dir (.git: the worktree names no git dir)." }),
+  workChanged: agentMsg({ id: 'gitFiles.remove.changed', text: 'the worktree has changes or untracked files, inside its submodules too: {path}', note: "Why a slot with submodules wasn't removed (HI-3026): git's own clean check (its submodules counted) lists something. {path} is the first entry git lists." }),
+  workUnpushed: agentMsg({ id: 'gitFiles.remove.unpushed', text: "submodule {path} has commits that aren't on its remote (a branch, tag or stash there, or a commit fetched by its id), which removing the worktree would delete", note: "Why a slot with submodules wasn't removed (HI-3026): a submodule clone only this worktree has holds commits no remote-tracking ref has. {path} is the clone's folder under the worktree's git dir." }),
   stopped: agentMsg({ id: 'gitFiles.error.stopped', text: 'the setup of submodules and Git LFS was ended', note: "A slot's or copy's setup error (HI-1182): the run was ended (its time limit, or the workspace closing) before it finished." })
 }
 
@@ -405,6 +409,82 @@ export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, fold
       (e: unknown) => (e instanceof Error ? e.message : String(e))
     )
     if (err) return stored(T.removeLeft, { path: rel, error: err })
+  }
+  return null
+}
+
+// ---- A worktree with submodule clones, removed (HI-3026) ----
+
+/**
+ * Whether a worktree's own git dir holds submodule clones (`<gitdir>/modules`), which git won't move and won't remove
+ * unforced. Null: its `.git` file names no git dir. Anything there but unreadable counts as holding them.
+ */
+export async function hasPrivateModules(folder: string): Promise<boolean | null> {
+  const gitDir = await gitFileTarget(folder)
+  if (!gitDir) return null
+  return lstat(join(gitDir, 'modules')).then(
+    () => true,
+    (e: NodeJS.ErrnoException) => e.code !== 'ENOENT'
+  )
+}
+
+/** Names a clone's metadata has: one with some but not both of HEAD and config is a broken clone, never a folder of clones. */
+const CLONE_PARTS = ['HEAD', 'config', 'objects', 'refs', 'packed-refs']
+
+/**
+ * Every submodule clone under `<gitDir>/modules`, nested ones (each clone's own `modules`) too, failing closed: a folder
+ * that can't be read, a link on the way, a file where only folders of clones belong, a clone missing HEAD or config, or
+ * a depth past the bound is a failure naming it (with the system's error when it gave one), never skipped. A `modules`
+ * that isn't there holds none.
+ */
+async function everyClone(gitDir: string): Promise<{ clones: { dir: string; rel: string }[] } | { error?: string; path: string }> {
+  const top = join(gitDir, 'modules')
+  const clones: { dir: string; rel: string }[] = []
+  const relOf = (p: string): string => relative(top, p).split(sep).join('/') || 'modules'
+  const walk = async (dir: string, depth: number, optional: boolean): Promise<{ error?: string; path: string } | null> => {
+    if (depth > 32) return { path: relOf(dir) }
+    const st = await lstat(dir).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? null : e))
+    if (st === null) return optional ? null : { path: relOf(dir) }
+    if (st instanceof Error) return { error: st.message, path: relOf(dir) }
+    if (st.isSymbolicLink() || !st.isDirectory()) return { path: relOf(dir) }
+    const names = await readdir(dir).catch((e: Error) => e)
+    if (names instanceof Error) return { error: names.message, path: relOf(dir) }
+    if (names.includes('HEAD') && names.includes('config')) {
+      clones.push({ dir, rel: relOf(dir) })
+      return walk(join(dir, 'modules'), depth + 1, true)
+    }
+    if (names.some((n) => CLONE_PARTS.includes(n))) return { path: relOf(dir) }
+    for (const n of names) {
+      const r = await walk(join(dir, n), depth + 1, false)
+      if (r) return r
+    }
+    return null
+  }
+  const failed = await walk(top, 0, true)
+  return failed ?? { clones }
+}
+
+/**
+ * HI-3026: why a worktree holding submodule clones can't be removed by force without losing anything, else null. git
+ * refuses any unforced removal of one; forced, it skips its own clean check and deletes the clones with it. So first:
+ * git's clean check as it would make it (`status --porcelain --ignore-submodules=none`, empty), and every clone, nested
+ * too, holding no commit that a remote-tracking ref there lacks (`rev-list --all --not --remotes`: branches, tags, a
+ * stash, HEAD, any ref). A commit fetched by its id alone counts as not on the remote: kept, conservatively. A read that
+ * failed keeps it too. The reason is stored, in the Default dialect.
+ */
+export async function submoduleWorkKept(x: Pick<GitFilesExec, 'git'>, folder: string): Promise<string | null> {
+  const gitDir = await gitFileTarget(folder)
+  if (!gitDir) return stored(T.workOdd, { path: '.git' })
+  const st = await x.git(folder, ['status', '--porcelain', '-z', '--ignore-submodules=none'])
+  if (!st.ok) return stored(T.workUnread, { path: '.', error: firstLine(st) })
+  const first = nul(st.out)[0]
+  if (first) return stored(T.workChanged, { path: first.slice(3) })
+  const all = await everyClone(gitDir)
+  if (!('clones' in all)) return all.error ? stored(T.workUnread, { path: all.path, error: all.error }) : stored(T.workOdd, { path: all.path })
+  for (const c of all.clones) {
+    const r = await x.git(c.dir, [`--git-dir=${c.dir}`, 'rev-list', '-n1', '--all', '--not', '--remotes'])
+    if (!r.ok) return stored(T.workUnread, { path: c.rel, error: firstLine(r) })
+    if (r.out.trim()) return stored(T.workUnpushed, { path: c.rel })
   }
   return null
 }

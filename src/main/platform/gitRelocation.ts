@@ -11,6 +11,7 @@ import { realPath, samePlace } from '../fsutil'
 import { git } from '../git'
 import { localBranches } from '../worktrees'
 import type { Relocation } from './workspacePort'
+import { hasPrivateModules } from './gitModules'
 
 const under = (p: string, root: string): boolean => rebase(p, root, root) !== null
 
@@ -53,6 +54,9 @@ export const gitRelocation: Relocation = {
     const r = await git(repo, ['worktree', 'move', from, to])
     return { ok: r.ok, err: r.err }
   },
+  // HI-3026: git refuses to move a worktree holding submodule clones, forced or not; one that can't be read counts as one.
+  // agent-protocol: the log's reason (the rename logs it), never an agent's
+  unmovable: async (folder) => ((await hasPrivateModules(folder)) === false ? null : "git can't move a worktree with submodules"), // i18n-ignore: the log's reason, never shown
   repair: async (repo, folders) => {
     const r = await git(repo, ['worktree', 'repair', ...folders])
     return { ok: r.ok, err: r.err, code: r.code }

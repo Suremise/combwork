@@ -8001,6 +8001,18 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   folder and all; its clone stays. git's checkout and merge leave a populated submodule's folder in place, whose files
   would otherwise stand as untracked where the card tracks its own, pausing the queue on every pass. A doubtful one is
   left for git to name.
+- **A slot with submodule clones, removed and renamed** (HI-3026, design HI-3026/s11). git refuses any unforced
+  `worktree remove` of a worktree whose git dir has `modules` (the files step's clones), and forced it skips its own
+  clean check and deletes the clones with it. So a slot's removal, once its guards pass, removes such a worktree forced
+  only after: git's clean check made as git would (`status --porcelain --ignore-submodules=none` empty, so a user's
+  `ignore` setting hides nothing here), and every clone under `<gitdir>/modules`, nested ones too, holding no commit
+  that its remote-tracking refs lack (`rev-list -n1 --all --not --remotes`: branches, tags, a stash, HEAD, any ref).
+  Else the slot is kept (`gitRefused`), its detail naming the submodule. Conservative by design: a commit fetched by
+  its id alone, or a fetched tag on no remote branch, keeps it; another checkout's copy is never taken as proof. The
+  clones are found failing closed (an unreadable folder, a link, a stray file, a clone missing HEAD or config, a
+  depth past the bound: "couldn't check", kept), and any failed read keeps it. Without `modules`, the plain removal as
+  before; copies keep their forced removal. git refuses `worktree move` of such a worktree, forced or not, so an adopted
+  slot's rename (The rename, above) keeps its name before anything is copied or reserved, logged with why.
 - **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
   status reports it (a user's `ignore` setting honoured).
 - **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A

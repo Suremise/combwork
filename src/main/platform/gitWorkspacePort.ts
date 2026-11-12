@@ -10,7 +10,7 @@ import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
-import { GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, prepareGitFiles, SKIP_SMUDGE } from './gitModules'
+import { GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
 import { gitFilesExec } from './gitModulesRun'
 import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
 
@@ -99,7 +99,15 @@ export const gitWorkspacePort: WorkspacePort = {
     const cl = await git(folder, ['clean', '-fd'])
     return cl.ok ? { ok: true } : { ok: false, failed: 'clean', err: cl.err }
   },
-  remove: (repo, folder, o) => step(git(repo, o?.force ? ['worktree', 'remove', '--force', folder] : ['worktree', 'remove', folder])),
+  // HI-3026: git refuses any unforced removal of a worktree holding submodule clones (`<gitdir>/modules`, made by the
+  // files step). Such a worktree is removed forced only once git's own clean check, made here as git would, and every
+  // clone holding nothing a remote lacks say it loses nothing; else refused, saying why. Without clones, as before.
+  remove: async (repo, folder, o) => {
+    if (o?.force) return step(git(repo, ['worktree', 'remove', '--force', folder]))
+    if ((await hasPrivateModules(folder)) !== true) return step(git(repo, ['worktree', 'remove', folder]))
+    const kept = await submoduleWorkKept(gitReads, folder)
+    return kept ? { ok: false, err: kept } : step(git(repo, ['worktree', 'remove', '--force', folder]))
+  },
   dropLine: (repo, line, at) => step(git(repo, ['update-ref', '-d', `refs/heads/${line}`, at])),
   restoreLine: (repo, line, revision) => step(git(repo, ['update-ref', `refs/heads/${line}`, revision, ''])),
   errorLine: gitErrorLine,

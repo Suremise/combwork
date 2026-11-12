@@ -62,5 +62,26 @@
       "name": "plain",
       "url": "plain"
     }
+  },
+  "gitFiles.remove.changed": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.odd": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.unpushed": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.unread": {
+    "placeholders": {
+      "path": "plain",
+      "error": "plain"
+    }
   }
 }
