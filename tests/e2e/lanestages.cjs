@@ -264,7 +264,12 @@ const beta = path.join(fx.ws, 'beta')
     await waitHung(async () => (await laneNow(s1))?.state === 'abandoned')
     check("Solo: Pulse leaves out beta's ended lane", !!(await waitHung(async () => (await row(l3).count()) === 1 && (await row(s1).count()) === 0)), await panel.innerText())
     await showTab('lanes')
-    check('…the Lanes tab keeps it', !!(await waitHung(async () => (await row(s1).count()) === 1)))
+    // Ended today (HI-2898) holds it, collapsed: opened before its row is looked for (HI-3060).
+    const endedToday = panel.locator('.progress-lanes-ended')
+    const endedBar = endedToday.locator('.progress-lanes-ended-bar')
+    await waitHung(async () => (await endedBar.count()) === 1)
+    if ((await endedBar.getAttribute('aria-expanded')) !== 'true') await endedBar.click()
+    check('…the Lanes tab keeps it, under Ended today', !!(await waitHung(async () => (await endedToday.locator(`.progress-lane[data-lane="${s1}"]`).count()) === 1)), await endedToday.innerText().catch(() => ''))
     check('…the Lanes tab has the legend too', !!(await hover(panel.locator('.progress-lanes-legend'), (t) => t.includes('Each colour is a category'))), await tipText())
     await showTab('pulse')
     const bc2 = (await inv('tasks:create', { title: 'Solo again', project: 'beta' })).number
