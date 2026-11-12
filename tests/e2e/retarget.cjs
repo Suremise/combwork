@@ -172,6 +172,13 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const madeDef = await api(assistant, 'POST', '/v1/tasks', { title: 'Made for integration', project: 'alpha', target: 'integration' })
     check("…one made with the project's own says nothing of it", madeDef.status === 200 && !/target of its own/.test(String(madeDef.body?.nudge ?? '')), JSON.stringify(madeDef.body))
     for (const m of [madeOwn, madeDef]) if (m.body?.number) await inv('tasks:delete', m.body.number)
+    // HI-3114: Start the next version names the release it starts from, as the Assistant read it: none is refused (400),
+    // one the project has moved on from (409, a retried request), each starting nothing.
+    const noFrom = await api(assistant, 'POST', '/v1/workflow/next-version', { project: 'alpha', name: '9.9.0' })
+    check('HI-3114: next-version without from is refused (400), saying from is required', noFrom.status === 400 && /from is required/.test(noFrom.body?.error ?? ''), JSON.stringify(noFrom.body))
+    const stale = await api(assistant, 'POST', '/v1/workflow/next-version', { project: 'alpha', from: '1.2.0', name: '9.9.0' })
+    check('…one from a release the project moved on from is refused (409)', stale.status === 409 && /integration now, not 1\.2\.0/.test(stale.body?.error ?? ''), JSON.stringify(stale.body))
+    check('…neither made a branch or moved Work merges into', !git(fx.alpha, 'branch', '--list', '9.9.0') && (await inv('workflow:form', fx.alpha)).options?.target === 'integration', JSON.stringify((await inv('workflow:form', fx.alpha)).options))
     await inv('session:stop', home, 'assistant')
 
     // --- HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration. Save…'s Retarget offers it, with its
