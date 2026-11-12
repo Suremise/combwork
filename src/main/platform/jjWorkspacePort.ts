@@ -18,7 +18,7 @@
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, lstatSync, readdirSync, readFileSync, renameSync, statSync } from 'original-fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, statSync } from 'original-fs'
 import { lstat, mkdir, readdir, readFile, realpath, rm, rmdir, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
@@ -46,6 +46,8 @@ export const JJ_REFUSED = {
   control: "Combwork's control workspace isn't ready", // i18n-ignore: jj's side of an error, in English as jj's messages are
   nested: 'the folder is inside another repository or workspace', // i18n-ignore: jj's side of an error, in English as jj's messages are
   exists: 'the folder exists already', // i18n-ignore: jj's side of an error, in English as jj's messages are
+  /** HI-3050: what a slot's make refused `exists` adds after what it read there (never where the folder came from). */
+  existsLeft: 'Combwork makes a slot only in a folder it creates itself, so it left this one as it is: remove or move it to make the slot here', // i18n-ignore: as above
   tool: 'jj is not the version Combwork is tested with', // i18n-ignore: jj's side of an error, in English as jj's messages are
   notEmpty: "the workspace's working copy isn't empty", // i18n-ignore: jj's side of an error, in English as jj's messages are
   generation: "the folder's file ids can't be read", // i18n-ignore: as above
@@ -133,7 +135,7 @@ export interface JjPortDeps {
    * Test hooks, run between steps. `beforeGitLinkAside` runs synchronously between a Git worktree entry's last check and
    * its move aside; `afterGitLinkAside` right after the move, before the moved entry is proved again (HI-3046).
    */
-  hooks?: { afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void> }
+  hooks?: { afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void>; beforeLeftoverAside?: (folder: string) => void }
 }
 
 export interface JjWorkspacePort extends WorkspacePort {
@@ -185,6 +187,16 @@ const OP_WALK = 200
 const OP_END = 'cw-op-end'
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)
 const step = (ok: boolean, err = ''): WorkspaceStep => ({ ok, err })
+
+/**
+ * A failed add's error with what it left (HI-3050/s10 §3): jj's `Error:` line (the one the pool shows: the port's
+ * errorLine), else its first line, saying the folder was kept and why, then jj's full answer as it was.
+ */
+export function keptNote(err: string, folder: string, why: string): string {
+  const all = lines(err)
+  const line = all.find((l) => l.startsWith('Error:'))?.replace(/^Error:\s*/, '') ?? all[0] ?? 'failed' // i18n-ignore: as JJ_REFUSED
+  return `Error: ${line} (its folder ${folder} was left as it is: ${why})${err.trim() ? `\n${err}` : ''}` // i18n-ignore: as JJ_REFUSED
+}
 const ownedPrefix = (repoHash: string): string => `cw-${repoHash}-`
 /** Residues a prune looks at in one pass (HI-2869/s16: bounded, rotating). */
 const PRUNE_BATCH = 16
@@ -717,6 +729,126 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     return null
   }
 
+  /** A real directory's file id and birth time (never a link's), read synchronously; null when it isn't one or can't be read. */
+  const dirIdSync = (p: string): string | null => {
+    try {
+      const s = lstatSync(p, { bigint: true })
+      return s.isDirectory() && !s.isSymbolicLink() && s.ino !== 0n ? `${s.ino}:${s.birthtimeNs}` : null
+    } catch {
+      return null
+    }
+  }
+  const emptySync = (p: string): boolean => {
+    try {
+      return readdirSync(p).length === 0
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * A slot's folder made by this attempt itself (HI-3050/s10): exclusively (anything there already is `exists`), its file
+   * id and birth time read in the same synchronous step, so a folder at the path with that id is provably this attempt's.
+   * `error`: it couldn't be made (nothing made), or was made and can't be read (kept: `kept` set).
+   */
+  const makeOwn = (folder: string): { id: string } | 'exists' | { error: string; kept?: true } => {
+    try {
+      mkdirSync(folder)
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      return code === 'EEXIST' ? 'exists' : { error: `the folder couldn't be made (${code ?? 'error'})` } // i18n-ignore: as JJ_REFUSED
+    }
+    const id = dirIdSync(folder)
+    return id ? { id } : { error: JJ_REFUSED.generation, kept: true }
+  }
+
+  /** A slot's make refused `exists` (HI-3050/s10 §3): only what was read there, never where it came from. */
+  const existsRefused = async (repo: string, folder: string): Promise<string> => {
+    const files = await readdir(folder).catch(() => null)
+    const facts: string[] = []
+    if (files) facts.push(files.length ? 'not empty' : 'empty') // i18n-ignore: as JJ_REFUSED
+    const op = await pinned(repo)
+    const l = isUnknown(op) ? null : await listAt(repo, op)
+    if (l && !isUnknown(l) && l.some((w) => samePath(w.root, folder))) facts.push('and jj lists a workspace there') // i18n-ignore: as JJ_REFUSED
+    return `${JJ_REFUSED.exists}${facts.length ? `, ${facts.join(', ')}` : ''}: ${JJ_REFUSED.existsLeft}`
+  }
+
+  /**
+   * After a slot's add failed (HI-3050/s10 §2), under the store's lock: the folder this attempt made (`id0`) removed when
+   * it is provably that and nothing else. Only once jj's outcome is settled (`settled`: it didn't start, or ran to its own
+   * exit), jj registers no workspace at the folder (under any name) at the single operation head, and no Git worktree entry
+   * points at it; then, with the file gate held for the folder and the store and nothing awaited: the operation head still
+   * that one, the folder still `id0` and empty, moved aside, proved again on what was moved, and only then `rmdir`ed (never
+   * anything non-empty). A mismatch after the move puts it back under its name while that is free, else leaves it aside.
+   * Null when removed (or already gone); else why it was kept, and where when that isn't its own path.
+   */
+  const dropLeftover = async (repo: string, ctx: JjContext, folder: string, id0: string, settled: boolean): Promise<{ why: string; at?: string } | null> => {
+    // Each `why` a protocol code, for the setup error and the log.
+    if (!settled) return { why: 'uncertain' } // i18n-ignore: a protocol code
+    const there = await lstat(folder).catch((e: { code?: string }) => (e?.code === 'ENOENT' ? null : 'unreadable'))
+    if (there === null) return null
+    if (there === 'unreadable') return { why: 'unreadable' } // i18n-ignore: a protocol code
+    if (dirIdSync(folder) !== id0) return { why: 'replaced' } // i18n-ignore: a protocol code
+    const op = await pinned(repo)
+    if (isUnknown(op)) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    const l = await listAt(repo, op)
+    if (isUnknown(l)) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    // Any workspace at the folder, whatever its name (its name may be another folder's of the same name: not this one's).
+    const real = await realOr(folder)
+    for (const w of l) if (samePath(w.root, folder) || samePath(await realOr(w.root), real)) return { why: 'registered' } // i18n-ignore: a protocol code
+    if (ctx.colocated) {
+      const links = await linksTo(ctx.store, folder)
+      if (!links) return { why: 'unreadable' } // i18n-ignore: a protocol code
+      if (links.length) return { why: 'gitLink' } // i18n-ignore: a protocol code
+    }
+    const [fk, sk] = await Promise.all([pathKey(folder), pathKey(ctx.store)])
+    if (!fk || !sk) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    const grant = await jjFileGate.acquire([rootKey(fk), storeKey(sk)], 'exclusive')
+    try {
+      const check = (p: string): string | null => (readOpHeads(ctx.jjRepo)?.join() !== op ? 'moved' : dirIdSync(p) !== id0 ? 'replaced' : emptySync(p) ? null : 'notEmpty')
+      const before = check(folder)
+      if (before) return { why: before }
+      const aside = join(dirname(folder), `.cw-add-${randomUUID().replace(/-/g, '').slice(0, 12)}`)
+      deps.hooks?.beforeLeftoverAside?.(folder)
+      try {
+        renameSync(folder, aside)
+      } catch {
+        return { why: 'rename' } // i18n-ignore: a protocol code
+      }
+      const after = check(aside)
+      if (after) {
+        // What was moved isn't this attempt's empty folder now: put back under its name while that is free, else left aside.
+        if (!existsSync(folder)) {
+          try {
+            renameSync(aside, folder)
+            return { why: after }
+          } catch {
+            /* left aside */
+          }
+        }
+        return { why: after, at: aside }
+      }
+      try {
+        rmdirSync(aside)
+      } catch {
+        return { why: 'remove', at: aside } // i18n-ignore: a protocol code
+      }
+      return null
+    } finally {
+      grant.release()
+    }
+  }
+
+  /**
+   * A slot's make that failed after its folder was made (HI-3050/s10 §3): the step's error is what failed, its `Error:`
+   * line saying what was left when the folder was kept (so the pool's setup error, which shows that line, says it).
+   */
+  const failedAdd = async (repo: string, ctx: JjContext, folder: string, id0: string, err: string, settled: boolean): Promise<WorkspaceStep> => {
+    const kept = await dropLeftover(repo, ctx, folder, id0, settled)
+    if (!kept) return step(false, err)
+    return step(false, keptNote(err, kept.at ?? folder, kept.why))
+  }
+
   /**
    * A slot's completed binding as it stands (HI-2866): its pointer, only while the folder is the one it was made for (its
    * generation) and its working copy descends from the binding's base, read pinned. Null with no binding (none kept, or a
@@ -1044,7 +1176,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const ctx = await contextOf(repo)
       if (!ctx) return step(false, JJ_REFUSED.control)
       if (!jjSupported(ctx.tool)) return step(false, JJ_REFUSED.tool)
-      if (existsSync(folder)) return step(false, JJ_REFUSED.exists)
+      if (existsSync(folder)) return step(false, await existsRefused(repo, folder))
       if (await nestedIn(folder, ctx)) return step(false, JJ_REFUSED.nested)
       const from = await control(repo, ctx)
       if (!from) return step(false, JJ_REFUSED.control)
@@ -1054,20 +1186,28 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // the add (which would collide with it in Git and leave a folder behind).
         const blocked = await clearGitLink(repo, ctx, folder)
         if (blocked) return step(false, blocked)
-        if (existsSync(folder)) return step(false, JJ_REFUSED.exists)
+        if (existsSync(folder)) return step(false, await existsRefused(repo, folder))
         // Its parent made first, which jj doesn't make (HI-2870): before the control's proof, so nothing is awaited
         // between the proof's final check and the add (HI-2887).
         await mkdir(dirname(folder), { recursive: true })
         deps.slotParentMade?.()
+        // The folder itself made by this attempt, exclusively, its id read with it (HI-3050/s10 §1): jj adds into an
+        // empty folder and keeps it, so a failed add's leftover is provably this attempt's and can go (failedAdd).
+        const own = makeOwn(folder)
+        if (own === 'exists') return step(false, await existsRefused(repo, folder))
+        if ('error' in own) return step(false, own.kept ? keptNote(own.error, folder, 'unreadable') : own.error) // i18n-ignore: a protocol code
+        const failed = (err: string, settled = true): Promise<WorkspaceStep> => failedAdd(repo, ctx, folder, own.id, err, settled)
         // The control proved for this add, inside the lock; its synchronous check right before the add starts (HI-2887).
         const proof = await controlProof(repo, ctx)
-        if (!proof || proof.path !== from || !proof.check()) return step(false, JJ_REFUSED.control)
+        if (!proof || proof.path !== from || !proof.check()) return failed(JJ_REFUSED.control)
         // From the control (empty, sparse: its snapshot is empty), full files, colocation chosen as the project's. Its
         // destination gated with it, and the control's synchronous check again under the file gate's admission, right
         // before jj starts (HI-2918; HI-2887's "nothing awaited between the check and the add" kept across the wait).
         const r = await jj(from, ['workspace', 'add', folder, '--name', name, '-r', at, '--sparse-patterns', 'full', ctx.colocated ? '--colocate' : '--no-colocate'], { write: true, also: [folder], recheck: () => (proof.check() ? null : JJ_REFUSED.control) })
-        if (r.refused) return step(false, r.refused)
-        if (!r.ok) return step(false, r.err)
+        // Settled: jj never started (refused), or ran to its own exit. A timeout, a cancellation or a lost worker may
+        // leave jj running: the folder is kept.
+        if (r.refused) return failed(r.refused)
+        if (!r.ok) return failed(r.err, r.code >= 0)
         // Read back (rule 3): listed at that root, its working copy an empty child of exactly `at`, same store.
         const op = await pinned(folder)
         if (isUnknown(op)) return step(false, op.detail ?? op.what)
