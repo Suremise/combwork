@@ -5,7 +5,7 @@
 // own checks (its confirmation, the gates, the fallback) are stood in for here (`storeSwitchSeams.repo`): the real-jj
 // tests run them.
 import { execFileSync } from 'child_process'
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -500,6 +500,53 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     expect(after.store?.drain.lanes).toEqual([])
     expect(after.refused).toBeNull()
     expect(await sw.setPlatform(w, p, 'jj', { expected: 'git', token: after.store!.token })).toEqual({ from: 'git', to: 'jj' })
+  })
+
+  it('HI-3071: a refresh that can’t read the repository (its .git moved away a moment) keeps every member; one read on another repository leaves', async () => {
+    const { w, p, q } = await members(false)
+    const memberRow = async (dir: string): Promise<string | null> => {
+      const id = await idOf(w, dir)
+      return store.boardRead(w, (db) => metaOf(db).get(MEMBER_KEY(id)) ?? null)
+    }
+    await leaseOk(w, q, 'jj')
+    expect((await sw.checkPlatformSwitch(w, q, 'none')).refused).toEqual({ why: 'memberDrain' })
+    const ws = join(p, '..')
+    const [rowP, rowQ] = [await memberRow(p), await memberRow(q)]
+    expect(rowP && rowQ).toBeTruthy()
+    // The repository unreadable at one look at the stores, then back.
+    renameSync(join(ws, '.git'), join(ws, 'git-away'))
+    await ss.mapStores(w)
+    expect([await memberRow(p), await memberRow(q)]).toEqual([rowP, rowQ])
+    renameSync(join(ws, 'git-away'), join(ws, '.git'))
+    await ss.mapStores(w)
+    expect([await memberRow(p), await memberRow(q)]).toEqual([rowP, rowQ])
+    // Still drained as members: Q's jj lease keeps Q's switch to None and P's switch back to Git refused.
+    expect((await sw.checkPlatformSwitch(w, q, 'none')).refused).toEqual({ why: 'memberDrain' })
+    const back = await sw.checkPlatformSwitch(w, p, 'git')
+    expect(back.refused).toEqual({ why: 'drain' })
+    expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['q'])
+    // Control: Q read on a repository of its own (another store) does leave the fence.
+    git(q, 'init', '-q', '-b', 'main')
+    await ss.mapStores(w)
+    expect(await memberRow(q)).toBeNull()
+    expect(await memberRow(p)).toEqual(rowP)
+  })
+
+  it.each([
+    ['reads as no repository (Mercurial found in it)', (q: string) => mkdirSync(join(q, '.hg'))],
+    ["can't be read (a .git file naming nothing)", (q: string) => writeFileSync(join(q, '.git'), 'gitdir: ./nowhere\n')]
+  ] as const)("HI-3071 (HR1's round 1): while only Q %s, P's switch back to Git still waits for Q's jj work", async (_what, hide) => {
+    const { w, p, q } = await members(false)
+    await leaseOk(w, q, 'jj')
+    hide(q)
+    await ss.mapStores(w)
+    const back = await sw.checkPlatformSwitch(w, p, 'git')
+    expect(back.refused).toEqual({ why: 'drain' })
+    expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['q'])
+    await expect(sw.setPlatform(w, p, 'git', { expected: 'jj', token: back.store!.token })).rejects.toThrow()
+    expect(await platformIn(w, p)).toBe('jj')
+    rmSync(join(q, '.hg'), { recursive: true, force: true })
+    rmSync(join(q, '.git'), { force: true })
   })
 
   it('paused after its begin, then after its drain: nothing of the project is admitted, the other member is told to try again', async () => {

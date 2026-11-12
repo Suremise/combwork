@@ -17,6 +17,7 @@
 // shows (reconcile); recovery (`recoverFences`) does the same for a switch whose owner is gone, under the same lock.
 
 import { createHash, randomUUID } from 'crypto'
+import { lstat } from 'original-fs/promises'
 import { basename, dirname, join } from 'path'
 import { listLanes, rawLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
@@ -60,18 +61,33 @@ const ACTIVE = new Set<string>()
  * `.git`, so both name one store). A jj repository inside a Git working tree, or one whose files can't be read, is none.
  */
 async function storeOf(path: string): Promise<string | 'none'> {
+  const s = await storeRead(path)
+  return s === 'unknown' ? 'none' : s
+}
+
+/**
+ * HI-3071: as `storeOf`, but a read that failed (git couldn't be run or answered an error, jj's files couldn't be read)
+ * is `unknown`, never `none`: one refresh that can't read the repository says nothing about where the project is.
+ */
+async function storeRead(path: string): Promise<string | 'none' | 'unknown'> {
   const d = projectPlatform(path, 'none').detected
   if (d.platform === 'jj' && d.root && !d.jj?.colocated) {
     if (d.jj?.inGit) return 'none'
     const b = await boundaryOf(d.root)
-    return 'jj' in b ? storeKey(b.jj.store) : 'none'
+    return 'jj' in b ? storeKey(b.jj.store) : 'unknown' in b ? 'unknown' : 'none'
   }
   const root = d.platform === 'git' || d.platform === 'jj' ? d.root : null
   if (!root) return 'none'
-  return commonGitDir(root).then(
-    (s) => storeKey(s),
-    () => 'none'
-  )
+  const s = await commonGitDir(root).catch(() => null)
+  // A store whose folder isn't a git folder (a `.git` file naming a missing one, read textually: HR1's round 1) proves
+  // nothing about where the project is: unknown, never another repository.
+  return s && (await gitDirThere(s)) ? storeKey(s) : 'unknown'
+}
+
+/** Whether a common git dir is there as one: a folder holding HEAD and objects (read; any failure counts as not). */
+async function gitDirThere(dir: string): Promise<boolean> {
+  const [head, objects] = await Promise.all([lstat(join(dir, 'HEAD')).catch(() => null), lstat(join(dir, 'objects')).catch(() => null)])
+  return !!head && !!objects?.isDirectory()
 }
 
 /** What a project's project.json holds of what a switch changes (its platform as in force). */
@@ -122,7 +138,15 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
     const cfg = await ws.projectConfig(p.path).catch(() => null)
     if (!cfg) continue
     const from = platformIdOf(p.path, cfg.platform)
-    if (!isSelf && (await storeOf(p.path)) !== store) continue
+    if (!isSelf) {
+      // HI-3071: a project read as on another repository is outside the group; one whose repository can't be read now,
+      // or reads as none (its `.git` away a moment: HR1's round 1), stays in it while it is a member of this store's
+      // fence, as `mapStores` keeps it one (never left undrained by one failed read). Its membership itself unreadable:
+      // the switch is refused (`switching`), never decided without it.
+      const s = await storeRead(p.path)
+      const id = projectIdOf(cfg, p.path)
+      if (s === 'unknown' || s === 'none' ? memberStoreOf(ws, id) !== store : s !== store) continue
+    }
     if (!isSelf && from === 'none') {
       bystanders.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from })
       continue
@@ -625,11 +649,14 @@ onAfterRefresh((ws) => {
  * project of this workspace, never while they take part in a switch under way.
  */
 export async function mapStores(ws: WorkspaceService): Promise<void> {
-  const rows: [string, string | 'none'][] = []
+  const read: [string, string | 'none' | 'unknown'][] = []
   for (const p of ws.info()?.projects ?? []) {
     const cfg = await ws.projectConfig(p.path).catch(() => null)
-    rows.push([projectIdOf(cfg, p.path), await storeOf(p.path)])
+    read.push([projectIdOf(cfg, p.path), await storeRead(p.path)])
   }
+  // HI-3071: a project whose repository couldn't be read keeps its mapping and its membership as they are.
+  const rows = read.filter((r): r is [string, string | 'none'] => r[1] !== 'unknown')
+  const inWorkspace = new Set(read.map(([id]) => id))
   const live = new Map(rows.map(([id, s]) => [id, s === 'none' ? 'none' : storeKey(s)]))
   const { changed, left } = boardRead(ws, (db) => {
     const meta = metaOf(db)
@@ -643,7 +670,11 @@ export async function mapStores(ws: WorkspaceService): Promise<void> {
           return null
         }
       })()
-      return live.get(id) !== store
+      // Left only when it really has: no longer in the workspace, or its repository read as another store. Read as no
+      // repository (a `.git` moved away a moment, say) or not read at all, it stays a member (HI-3071).
+      if (!inWorkspace.has(id)) return true
+      const now = live.get(id)
+      return now !== undefined && now !== 'none' && now !== store
     }).map((r) => r.key.slice('platform_member:'.length))
     return { changed: rows.some(([id, s]) => meta.get(`platform_store:${id}`) !== (s === 'none' ? 'none' : storeKey(s))), left: gone }
   })
