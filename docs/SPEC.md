@@ -2516,7 +2516,8 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `gitdir` and `commondir` bytes, the slot's store, folder, workspace and generation), and before the next add at that
   folder clears an entry there only when the receipt proves it: under the store's lock and the file gate's write
   admission for the folder and the store, with no workspace listed at the folder or under its name at the single head,
-  the entry is checked synchronously (folder absent, not `locked`, its identity and bytes the receipt's), moved aside
+  the entry is checked synchronously (folder absent, not `locked`, its identity and bytes the receipt's, its real path
+  the store's real path with `worktrees/<n>` below it and `worktrees` the receipt's real folder: no junction), moved aside
   out of `worktrees` (`<store>/.cw-gitlink-<token>`, the intent journalled first), proved again on what was moved, and
   only then removed asynchronously. A mismatch puts it back (or lists it as a residue), never deletes it; a restart's
   resume proves it all again. An entry with no receipt or another identity (a user's worktree at that path) refuses
