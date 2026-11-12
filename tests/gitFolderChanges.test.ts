@@ -8,13 +8,16 @@ import { spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
 import { msysBinFor } from '../src/main/gitWorker'
 
-const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
+const req = createRequire(import.meta.url)
+const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
+type Ids = { pid: number; started: number }[]
+const { identify, stillSame, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; stillSame: (ids: Ids) => number[]; endExactly: (targets: Ids) => number }
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
@@ -346,12 +349,17 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     // outside the commit (no marker), is left running.
     const msys = process.platform === 'win32'
     const control = join(tempDir('cw-folderchanges-control-'), 'pids')
+    let controlId: { pid: number; started: number }[] = []
     if (msys) {
       const bin = msysBinFor({ env: process.env })
       expect(bin).not.toBeNull()
       spawn(join(bin!, 'sh.exe'), ['-c', sleeper(control)], { stdio: 'ignore', windowsHide: true, env: baseEnv() }).unref()
       await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: 20_000 })
+      // Its identity while it is known to be the test's own (#603): ended by it afterwards.
+      controlId = identify(pidsIn(control))
+      expect(controlId).toHaveLength(1)
     }
+    onTestFinished(() => void endExactly(controlId))
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids, msys))
     writeFileSync(join(proj, 'new.txt'), 'new\n')
@@ -365,8 +373,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds.*The files and the index are as they were/)
     await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
-    expect(pidsIn(control).filter(alive)).toEqual(pidsIn(control))
-    for (const pid of pidsIn(control)) process.kill(pid)
+    expect(stillSame(controlId)).toEqual(controlId.map((c) => c.pid))
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     expect(head()).toBe(before)

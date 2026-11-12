@@ -15,7 +15,10 @@ import { msysBinFor } from '../src/main/gitWorker'
 import { boundedOutput, endTreeAsync, findMsysMarked, msysMatches, MSYS_FIND_SCRIPT, RUN_MARK_VAR, treesToEnd, type ListedProcess } from '../src/main/processTree'
 import { tempDir } from './tempDir'
 
-const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
+const req = createRequire(import.meta.url)
+const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
+type Ids = { pid: number; started: number }[]
+const { identify, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; endExactly: (targets: Ids) => number }
 
 const isWin = process.platform === 'win32'
 const alive = (pid: number): boolean => {
@@ -26,10 +29,11 @@ const alive = (pid: number): boolean => {
     return false
   }
 }
-/** Processes a test started and must not leave behind. */
-const spawned: number[] = []
+/** Processes a test started and must not leave behind: their identities, taken as each reported its pid (#603). */
+const spawned: Ids = []
+const own = (pid: number): void => void spawned.push(...identify([pid]))
 afterEach(() => {
-  for (const pid of spawned.splice(0)) if (alive(pid)) process.kill(pid)
+  endExactly(spawned.splice(0))
 })
 
 const p = (pid: number, started: number, parent = 0): ListedProcess => ({ pid, parent, started })
@@ -115,15 +119,15 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
   const tree = async (): Promise<{ top: ChildProcess; child: number }> => {
     const file = join(tempDir('msys-tree-'), 'child.pid')
     const top = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('fs').writeFileSync(${JSON.stringify(file)}, String(c.pid)); setInterval(() => {}, 1000)`], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
-    spawned.push(top.pid!)
+    own(top.pid!)
     await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: 20_000 })
     const child = Number(readFileSync(file, 'utf8'))
-    spawned.push(child)
+    own(child)
     return { top, child }
   }
   const lone = (): number => {
     const c = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
-    spawned.push(c.pid!)
+    own(c.pid!)
     return c.pid!
   }
 
@@ -164,11 +168,10 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
      */
     const sleeper = async (name: string, vars: Record<string, string>): Promise<number> => {
       const file = join(dir, name)
-      const sh = spawn(join(bin!, 'sh.exe'), ['-c', SLEEPER, 'sh', file.replace(/\\/g, '/')], { stdio: 'ignore', windowsHide: true, env: { ...baseEnv(), ...vars } })
-      spawned.push(sh.pid!)
+      spawn(join(bin!, 'sh.exe'), ['-c', SLEEPER, 'sh', file.replace(/\\/g, '/')], { stdio: 'ignore', windowsHide: true, env: { ...baseEnv(), ...vars } })
       await vi.waitFor(() => expect(existsSync(file) && /\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: 20_000 })
       const pid = Number(readFileSync(file, 'utf8').trim())
-      spawned.push(pid)
+      own(pid)
       return pid
     }
     const exact = await sleeper('exact', { [RUN_MARK_VAR]: mark })
