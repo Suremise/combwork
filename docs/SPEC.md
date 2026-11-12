@@ -2523,6 +2523,16 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   resume proves it all again. An entry with no receipt or another identity (a user's worktree at that path) refuses
   the add before jj runs, naming the entry: the user's to remove or keep. No other entry is touched and no command
   prunes.
+  **A failed add's folder** (HI-3050, design HI-3050/s10): jj adds into an existing empty folder and keeps it, and a
+  failed add leaves it (probed). So under the store's lock `create` makes the slot's folder itself, exclusively (anything
+  there already refuses the add before jj runs), its file id and birth time read in the same synchronous step. After any
+  failure from then on, the folder is removed only when jj's outcome is settled (it never started, or ran to its own
+  exit: a timeout, a cancellation or a lost worker keeps it), no workspace is listed at the folder at the single head,
+  and, colocated, no Git worktree entry points at it; then, with the file gate's write admission for the folder and the
+  store and nothing awaited, the head still that one and the folder still that id and empty, it is moved aside
+  (`.cw-add-<token>` beside it), proved again on what was moved, and only then `rmdir`ed. A mismatch puts it back under
+  its name (or leaves it aside); a kept folder is named, with why, on the setup error's line. A later make that finds a
+  folder there says only what it read (empty or not, a workspace jj lists there) and never removes it.
   `add` and `forget` snapshot the workspace they run from and refuse `--ignore-working-copy` (probed), so they run from
   a **control workspace** of Combwork's per project (`<worktrees>/<project>/.cw-jj-control`, named `cw-<project
   hash>-control`, sparse and empty: its snapshot is always empty), never lent, sized or tidied as a slot, its record

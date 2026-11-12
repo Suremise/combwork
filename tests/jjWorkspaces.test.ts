@@ -51,7 +51,10 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         const id = await h.port.identity!(folder)
         expect(id).toMatchObject({ workspace: h.port.nameFor(repo, folder) })
         // A folder that exists, or inside another repository, is refused.
-        expect((await h.port.create(repo, folder, base)).err).toBe(JJ_REFUSED.exists)
+        // A healthy workspace there (HI-3050): what was read, and left exactly as it was.
+        expect((await h.port.create(repo, folder, base)).err).toBe(`${JJ_REFUSED.exists}, not empty, and jj lists a workspace there: ${JJ_REFUSED.existsLeft}`)
+        expect(await h.port.identity!(folder)).toEqual(id)
+        expect(await h.port.head(folder)).toBe(base)
       })
 
       it('two agents in two workspaces: both kept, each recorded only by its holder; the line operations refused', async () => {
