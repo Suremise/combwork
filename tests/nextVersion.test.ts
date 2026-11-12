@@ -267,9 +267,9 @@ describe('Start the next version (HI-2807)', () => {
 
 describe('a lane left on the release by Start the next version (HI-3113)', () => {
   const card = async (w: WS, title: string) => (await inWorkspace(w, () => tasks.createTask({ title, project: 'p' }, user))).number
-  const pin = async (w: WS, repo: string, n: number, target: string) => {
+  const pin = async (w: WS, repo: string, num: number, target: string) => {
     const wf = (await workflowFor(w, repo))!
-    await store.boardWrite(w, async () => wf.store.updateCard(n, { target }))
+    await store.boardWrite(w, async () => wf.store.updateCard(num, { target }))
   }
 
   it('reads as merging into 1.3.0, as its ruleset recorded it: shown, counted as using it, and its cards checked against it', async () => {
