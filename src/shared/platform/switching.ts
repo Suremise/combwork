@@ -28,6 +28,7 @@ export type SwitchRefusal =
   | { why: 'otherFound'; vcs: string }
   | { why: 'noJj' }
   | { why: 'jjInGit'; root: string }
+  | { why: 'memberNoJj'; project: string }
   | { why: 'jjNoGitCopy' }
   | { why: 'jjTool'; state: string }
   | { why: 'jjToolBack'; state: string }
@@ -46,6 +47,7 @@ export const SWITCH_REFUSED = {
   changed: msg({ id: 'git.vc.switch.changed', defaultMessage: 'Changed meanwhile: this project uses {platform} now. Look again before switching.', description: 'Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj.' }),
   noJj: msg({ id: 'git.vc.switch.noJj', defaultMessage: 'No jj repository here. Combwork never makes one: create it with jj.', description: 'Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj.' }),
   jjInGit: msg({ id: 'git.vc.switch.jjInGit', defaultMessage: 'This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.', description: 'Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git.' }),
+  memberNoJj: msg({ id: 'git.vc.switch.memberNoJj', defaultMessage: '{project} is on this repository, but its folder isn’t a jj workspace (a Git worktree, say), so it can’t use jj. Choose None for {project}, or remove it from the workspace, then switch.', description: 'Why a switch to jj is refused (HI-3034): every project on the repository switches together, and {project}, another project on it, is a folder jj doesn’t know (typically a git worktree the user made). Keep jj, Git and None (glossary 2.1).' }),
   jjNoGitCopy: msg({ id: 'git.vc.switch.jjNoGitCopy', defaultMessage: 'No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.', description: 'Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is.' }),
   jjTool: msg({ id: 'git.vc.switch.jjTool', defaultMessage: '{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.', description: 'Why a project can’t be switched to jj (HI-2799): the jj tool Combwork found. Keep jj.' }),
   jjToolBack: msg({ id: 'git.vc.switch.jjToolBack', defaultMessage: '{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so Combwork can’t check that this repository is ready to go back to Git. Install the jj Combwork is tested with, then switch. Or, if you’re done with jj, remove the .jj folder: the project can then go back to Git without it.', description: 'Why a jj project can’t be switched back to Git (HI-2975): jj itself is missing or not the tested version, so whether its bookmarks reached Git can’t be checked. Keep jj, Git and .jj.' }),
@@ -94,6 +96,8 @@ export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<s
       return { m: SWITCH_REFUSED.jjUnknown, values: { code: r.code } }
     case 'jjInGit':
       return { m: SWITCH_REFUSED.jjInGit, values: { root: r.root } }
+    case 'memberNoJj':
+      return { m: SWITCH_REFUSED.memberNoJj, values: { project: r.project } }
     case 'otherWorkspace':
       return { m: SWITCH_REFUSED.otherWorkspace, values: { workspace: r.workspace } }
     default:

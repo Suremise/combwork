@@ -578,3 +578,87 @@ describe('a non-colocated jj repository switches too (HI-2896)', () => {
     expect(ran).toBe(false)
   })
 })
+
+/**
+ * A workspace with `app`, a Git repository with a `.jj` beside its `.git` (an empty one: jj can't read it, so the real
+ * fallback check finds its heads unreadable), and `hot`, a `git worktree` of it the user made, as a project (HI-3034).
+ * `platform`: both projects' recorded choice; `appOutside`: app lives outside the workspace, so only hot is a project.
+ */
+async function worktreeWorkspace(platform: 'git' | 'jj', o: { appOutside?: boolean } = {}): Promise<{ w: WS; app: string; hot: string }> {
+  const ws = join(base, `wt-${++n}`)
+  const app = o.appOutside ? join(base, `wt-${n}-app`) : join(ws, 'app')
+  const hot = join(ws, 'hot')
+  for (const d of [app, ws]) mkdirSync(join(d, '.combwork'), { recursive: true })
+  writeFileSync(join(app, 'a.txt'), 'a\n')
+  git(app, 'init', '-q', '-b', 'main')
+  for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(app, 'config', k, v)
+  writeFileSync(join(app, '.gitignore'), '.combwork/\n.jj/\n')
+  git(app, 'add', '-A')
+  git(app, 'commit', '-qm', 'initial')
+  mkdirSync(join(app, '.jj'))
+  git(app, 'worktree', 'add', '-q', '-b', 'hotfix', hot)
+  mkdirSync(join(hot, '.combwork'), { recursive: true })
+  for (const [dir, id] of [[app, 'app'], [hot, 'hot']] as const) writeFileSync(join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, id, platform, agents: [{ id: `b-${id}`, name: `B${id}`, role: 'builder' }, { id: `r-${id}`, name: `R${id}`, role: 'reviewer' }], workflow: { platform, preset: 'pair', options: {} } }))
+  const w = createWorkspaceService()
+  await w.open(ws)
+  opened.push(w)
+  return { w, app, hot }
+}
+
+describe('a git worktree project of a colocated jj repository (HI-3034)', () => {
+  it('to jj: refused naming the worktree project, whose folder is no jj workspace; nothing changed. Once it is None, the rest switch', async () => {
+    const { w, app, hot } = await worktreeWorkspace('git')
+    const check = await sw.checkPlatformSwitch(w, app, 'jj')
+    expect(check.store?.group.map((g) => g.name).sort()).toEqual(['app', 'hot'])
+    expect(check.refused).toEqual({ why: 'memberNoJj', project: 'hot' })
+    await expect(sw.setPlatform(w, app, 'jj', { expected: 'git', token: check.store!.token })).rejects.toThrow(/hot is on this repository, but its folder isn’t a jj workspace/)
+    expect([await platformIn(w, app), await platformIn(w, hot)]).toEqual(['git', 'git'])
+    // Its own way out, as the refusal says: None for the worktree project, which then takes no part.
+    await sw.setPlatform(w, hot, 'none', { expected: 'git' })
+    const again = await sw.checkPlatformSwitch(w, app, 'jj')
+    expect(again.refused).toBeNull()
+    await sw.setPlatform(w, app, 'jj', { expected: 'git', token: again.store!.token })
+    expect([await platformIn(w, app), await platformIn(w, hot)]).toEqual(['jj', 'none'])
+  })
+
+  it('back to Git asked from the worktree project checks the repository’s jj (app’s .jj), as asked from app: refused the same', async () => {
+    const { w, app, hot } = await worktreeWorkspace('jj')
+    const seams = ss.storeSwitchSeams.repo
+    const asked: string[] = []
+    ss.storeSwitchSeams.repo = { ...seams, fallback: async (path) => (asked.push(path), ss.fallbackOf(path)) }
+    try {
+      const fromApp = await sw.checkPlatformSwitch(w, app, 'git')
+      const fromHot = await sw.checkPlatformSwitch(w, hot, 'git')
+      expect(asked).toEqual([app, app])
+      expect(fromApp.refused).toEqual({ why: 'fallback' })
+      expect(fromHot.refused).toEqual({ why: 'fallback' })
+      expect(fromHot.store?.fallback).toEqual(fromApp.store?.fallback)
+      expect(fromHot.store?.fallback?.[0]).toMatchObject({ code: 'heads' })
+      await expect(sw.setPlatform(w, hot, 'git', { expected: 'jj', token: fromHot.store!.token })).rejects.toThrow(/isn’t ready to go back to Git/)
+    } finally {
+      ss.storeSwitchSeams.repo = seams
+    }
+    expect([await platformIn(w, app), await platformIn(w, hot)]).toEqual(['jj', 'jj'])
+  })
+
+  it('back to Git from the worktree project alone (app not a project): the jj beside the repository’s .git is checked', async () => {
+    const { w, app, hot } = await worktreeWorkspace('jj', { appOutside: true })
+    const seams = ss.storeSwitchSeams.repo
+    const asked: string[] = []
+    ss.storeSwitchSeams.repo = { ...seams, fallback: async (path) => (asked.push(path), ss.fallbackOf(path)) }
+    try {
+      const fromHot = await sw.checkPlatformSwitch(w, hot, 'git')
+      expect(fromHot.store?.group.map((g) => g.name)).toEqual(['hot'])
+      expect(asked.map((a) => realpathSync(a))).toEqual([realpathSync(app)])
+      expect(fromHot.refused).toEqual({ why: 'fallback' })
+      // Its .jj gone (HI-2975): nothing left to check, so back to Git goes through.
+      rmSync(join(app, '.jj'), { recursive: true })
+      const gone = await sw.checkPlatformSwitch(w, hot, 'git')
+      expect(gone.refused).toBeNull()
+      await sw.setPlatform(w, hot, 'git', { expected: 'jj', token: gone.store!.token })
+    } finally {
+      ss.storeSwitchSeams.repo = seams
+    }
+    expect(await platformIn(w, hot)).toBe('git')
+  })
+})

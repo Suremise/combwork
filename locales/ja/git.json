@@ -505,6 +505,7 @@
   "git.vc.switch.jjUnknown": "jjがこのリポジトリを確認できなかった（{code}）ため、このプロジェクトは切り替えられません。",
   "git.vc.switch.noJj": "ここにはjjリポジトリがありません。Combworkは作成しません。jjで作成してください。",
   "git.vc.switch.memberDrain": "このプロジェクトではまだ作業が実行中です。リポジトリがGitとjjの間で切り替えられたことがあるため、このプロジェクトはその作業が終わってからでないと「なし」に切り替えられません。",
+  "git.vc.switch.memberNoJj": "{project}はこのリポジトリ上にありますが、そのフォルダーはjjのワークスペースではない（Gitのworktreeなど）ため、jjを使えません。{project}を「なし」にするか、ワークスペースから削除してから切り替えてください。",
   "git.vc.switch.otherWorkspace": "このリポジトリは、開いているワークスペース{workspace}のプロジェクトでもあります。先にそちらで閉じてください。",
   "git.vc.switch.switching": "このリポジトリのバージョン管理を切り替え中です。しばらくしてからもう一度お試しください。"
 }

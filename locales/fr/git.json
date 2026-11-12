@@ -505,6 +505,7 @@
   "git.vc.switch.jjUnknown": "jj n’a pas pu confirmer ce dépôt ({code}), donc ce projet ne peut pas changer.",
   "git.vc.switch.noJj": "Pas de dépôt jj ici. Combwork n’en crée jamais : crée-le avec jj.",
   "git.vc.switch.memberDrain": "Du travail est encore en cours dans ce projet. Son dépôt a déjà été basculé entre Git et jj, donc le projet ne passe à Aucune qu’une fois ce travail terminé.",
+  "git.vc.switch.memberNoJj": "{project} est sur ce dépôt, mais son dossier n’est pas un espace de travail jj (un worktree Git, par exemple) : il ne peut donc pas utiliser jj. Choisis Aucune pour {project}, ou retire-le de l’espace de travail, puis bascule.",
   "git.vc.switch.otherWorkspace": "Ce dépôt est aussi un projet de l’espace de travail ouvert {workspace} : ferme-le d’abord là-bas.",
   "git.vc.switch.switching": "La gestion de versions de ce dépôt est en cours de changement : réessaie dans un instant."
 }

@@ -2638,7 +2638,7 @@ merges under jj.
   `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
   in flight, a member's merge queue with work, open slot leases, unfreed copy leases), `otherWorkspace` (the store is a
   project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
-  the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896) and the **compatibility assessment**
+  the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
   `.gitattributes`, untracked ones (colocated: `ls-files -o --exclude-standard`; in either mode, the one on disk in the root and in each
@@ -2650,7 +2650,7 @@ merges under jj.
   `gfwSystemFiles`); its `core.autocrlf true` does, and the finding carries `autocrlf` for the dialog's hint to turn it
   off for the repository. Back to Git (`fallback`): one head, no conflicted
   local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
-  `.jj` stays. With no `.jj` any more (the `jjGone` offer, HI-2975) nothing is checked: nothing can be unexported or
+  `.jj` stays. It is read in the repository's jj workspace whichever member asks (HI-3034): the asked project's, else a member's that is one, else the working tree beside the repository's Git folder when it has a `.jj`. With no `.jj` there any more (the `jjGone` offer, HI-2975) nothing is checked: nothing can be unexported or
   conflicted, so it goes through, fenced and drained as any. jj missing or not the tested version refuses it as
   `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None (and Git → None) of a member is its own switch, drained through the fence as a group of one (HI-2974,
   §16.6.5), so no jj card can be in flight once it is None.

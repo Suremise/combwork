@@ -479,6 +479,7 @@
   "git.vc.switch.laneUnnamed": "Lane (builder {builder})",
   "git.vc.switch.lanes": "{n, plural, one {This running lane keeps {from}’s rules until it ends:} other {These running lanes keep {from}’s rules until they end:}}",
   "git.vc.switch.memberDrain": "Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.",
+  "git.vc.switch.memberNoJj": "{project} is on this repository, but its folder isn’t a jj workspace (a Git worktree, say), so it can’t use jj. Choose None for {project}, or remove it from the workspace, then switch.",
   "git.vc.switch.noGit": "No Git repository here: Initialise repository… first.",
   "git.vc.switch.noJj": "No jj repository here. Combwork never makes one: create it with jj.",
   "git.vc.switch.notSwitched": "{project} is a Git repository now, but it wasn't switched to Git: {error}",

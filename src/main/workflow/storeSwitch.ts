@@ -17,7 +17,7 @@
 // shows (reconcile); recovery (`recoverFences`) does the same for a switch whose owner is gone, under the same lock.
 
 import { createHash, randomUUID } from 'crypto'
-import { basename, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
@@ -36,7 +36,7 @@ import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { commonGitDir } from '../repoLock'
 import { boundaryOf } from '../platform/repoBoundary'
-import { gitAbove } from '../vcsDetect'
+import { gitAbove, jjOf } from '../vcsDetect'
 import { readKeptJson } from '../fsutil'
 import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { SlotStore } from '../slots'
@@ -192,6 +192,30 @@ async function gatesOf(path: string, store: string): Promise<GateCheck[]> {
   })
 }
 
+/**
+ * A member other than the one asked whose folder holds no jj workspace (HI-3034): a `git worktree` of the repository, or
+ * one nested inside its jj workspace (HI-2976), which jj doesn't know. Made a jj project by the group's switch, it would
+ * be one with no jj repository, so the switch is refused naming it. Null when every member is a jj workspace.
+ */
+function memberWithoutJj(path: string, members: readonly Member[]): SwitchRefusal | null {
+  const m = members.find((x) => x.path.toLowerCase() !== path.toLowerCase() && !jjOf(x.path))
+  return m ? { why: 'memberNoJj', project: m.name } : null // i18n-ignore: a code, never shown as text
+}
+
+/**
+ * The folder whose jj repository a switch back to Git checks (HI-3034): the asked project's own when it is a jj
+ * workspace, else a member's that is, else the working tree beside the repository's Git folder when it has a `.jj` (the
+ * asked project a `git worktree` of a colocated repository that isn't itself a project). The asked folder when none has
+ * one: the repository's `.jj` is gone (HI-2975), and nothing is left to check.
+ */
+async function jjSideOf(path: string, members: readonly Member[]): Promise<string> {
+  if (jjOf(path)) return path
+  const member = members.find((m) => jjOf(m.path))
+  if (member) return member.path
+  const gitDir = await commonGitDir(path).catch(() => null)
+  return gitDir && jjOf(dirname(gitDir))?.colocated ? dirname(gitDir) : path
+}
+
 const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly string[]).includes(g))
 
 /**
@@ -241,12 +265,14 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
   if (to === 'jj') {
     refused ??= slotsInGit(ws, path)
+    refused ??= memberWithoutJj(path, g.members)
     refused ??= await (storeSwitchSeams.repo?.ready ?? jjReady)(path, g.store)
     store.gates = await (storeSwitchSeams.repo?.gates ?? gatesOf)(path, g.store)
     store.unsupported = UNSUPPORTED
     if (!refused && store.gates.some((x) => !('clear' in x))) refused = { why: 'gates' } // i18n-ignore: a code or SQL, never shown as text
   } else {
-    store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(path)
+    // The repository's jj state, whichever member asks (HI-3034): a member with no .jj of its own reads none.
+    store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(await jjSideOf(path, g.members))
     // jj missing or not the tested version (HI-2975): the repository's readiness can't be checked, so the switch is
     // refused saying the way out (install the tested jj, or remove .jj once done with it), not as a list's `unknown`.
     if (!refused && store.fallback.some((f) => f.code === 'unknown' && /^tool(:|$)/.test(f.detail))) refused = { why: 'jjToolBack', state: jjRunner.readinessNow().state } // i18n-ignore: a code or SQL, never shown as text

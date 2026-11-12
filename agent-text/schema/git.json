@@ -139,6 +139,11 @@
   "git.vc.switch.memberDrain": {
     "placeholders": {}
   },
+  "git.vc.switch.memberNoJj": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
   "git.vc.switch.noGit": {
     "placeholders": {}
   },
