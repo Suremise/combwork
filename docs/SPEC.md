@@ -7074,7 +7074,12 @@ Whether a conversation may resume there is its **hold** (none: it may):
     post-checkout or reference-transaction hook could change files beside the builder: for that command alone
     `core.hooksPath` names a folder that can't exist and `core.fsmonitor` is off, the repository's settings never
     written); only the cycle and the
-    rules are checked at that boundary. What is left (a line made before, another line there, submodules and LFS files, an
+    rules are checked at that boundary. Only the lease's own commits may be over the base (HI-3031): where the head was
+    as the lease began (the worktree's `HEAD` reflog at the lease's start, to the whole second, a move in that second
+    counted as before it) must be the base or behind it, else the preparation that waits for its builder runs. A free
+    slot waits at its last target's head, which can be past the base with another target's work (an integration branch
+    over main; a local target ahead of the remote in follow mode), and a stray commit on a free slot is no card's; no
+    reflog (turned off, expired) is a refusal too. What is left (a line made before, another line there, submodules and LFS files, an
     install) waits for its builder as above. Before, a builder told of its lane's next card another way (a wake, the
     Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its
     submission moved the card on, the preparation gave up, and the line never existed (HI-2997: passed, then stale at
