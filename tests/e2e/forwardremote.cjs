@@ -60,18 +60,21 @@ const isIn = (repo, commit, ref) => {
     check('the local 1.4.0 and 1.5.0 are equal; only origin/1.4.0 has the hotfix', git(fx.alpha, 'rev-parse', '1.4.0') === git(fx.alpha, 'rev-parse', '1.5.0') && !isIn(fx.alpha, git(fx.alpha, 'rev-parse', '1.5.0'), hotfix) && git(origin, 'rev-parse', '1.4.0') === hotfix)
 
     const tab = await q.mergesTab(h)
+    // No agent works in alpha, so All projects leaves its idle queue out (HI-2165): the user picks it, as the panel offers.
+    await tab.panel.locator('select[aria-label="Show the runs of"]').selectOption({ label: 'alpha' })
     const card = tab.card('1.5.0')
     const view = async () => (await h.inv('queue:list', fx.alpha, '1.5.0'))[0]
     const fwd = await waitHung(async () => (await view())?.forward)
-    check("1.5.0's queue says it follows its remote, 1.4.0 at 0 commits behind locally", fwd?.follows === true && JSON.stringify(fwd?.behind) === '[{"from":"1.4.0","commits":0}]', JSON.stringify(fwd))
+    check("1.5.0's queue says it follows its remote, 1.4.0 (and main) at 0 commits behind locally", fwd?.follows === true && JSON.stringify(fwd?.behind) === '[{"from":"1.4.0","commits":0},{"from":"main","commits":0}]', JSON.stringify(fwd))
     check('…its card shows no "behind" line, and still offers Bring Up to Date…', !!(await waitHung(async () => (await card.locator('[data-action="forward"]').count()) === 1)) && (await card.locator('[data-behind="1.4.0"]').count()) === 0, await tab.text('1.5.0'))
     await h.page.mouse.move(5, 5)
     await card.screenshot({ path: path.join(fx.shots, 'forwardremote-1-offered.png') })
 
     await card.locator('[data-action="forward"]').click()
-    const ask = h.page.locator('.dialog', { hasText: 'Bring 1.5.0 up to date with 1.4.0?' })
+    // Two sources offered (1.4.0 and main): the choice of branch.
+    const ask = h.page.locator('.dialog', { hasText: 'Bring 1.5.0 up to date with…' })
     await ask.waitFor({ timeout: HUNG_MS })
-    await ask.getByRole('button', { name: 'Queue It' }).click()
+    await ask.getByRole('button', { name: '1.4.0', exact: true }).click()
     const done = await waitHung(async () => (await h.inv('tasks:list')).find((c) => c.title === 'Bring 1.5.0 up to date with 1.4.0' && c.column === 'done'))
     const integrated = done ? (await h.facts(done.number)).find((f) => f.kind === 'Integrated') : null
     check("the forward card takes the remote's hotfix and merges it through 1.5.0's queue: Done", !!integrated && integrated.data.target === '1.5.0' && integrated.data.revision === hotfix, JSON.stringify(done ? await h.kinds(done.number) : null))
