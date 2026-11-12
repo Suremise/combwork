@@ -503,6 +503,10 @@
     "defaultMessage": "Bring {to} up to date with {from}",
     "description": "HI-2679: the title of the card Combwork makes for a forward merge: it merges branch {from} into branch {to} through {to}’s merge queue. Branch names."
   },
+  "service.forward.unreadable": {
+    "defaultMessage": "{to} isn’t brought up to date with {from}: Combwork couldn’t read {what}, so nothing was queued.{detail, select, none {} other { Git said: {detail}}}",
+    "description": "HI-3126: a forward merge (bringing branch {to} up to date with branch {from}) refused under “The target branch follows its remote”: Combwork reads both branches’ remote heads first, and one couldn’t be read. {what} says what (a phrase of its own, already translated); {detail} is Git’s own words in English, or “none” (keep the select keys). Branch names stay as they are."
+  },
   "service.fsutil.keptBusy": {
     "defaultMessage": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
     "description": "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made."

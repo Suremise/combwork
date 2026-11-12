@@ -598,6 +598,7 @@
   "workflow.unreadable.revisionIn": "the revision in {folder}",
   "workflow.unreadable.state": "the state of {folder}",
   "workflow.unreadable.target": "the target branch {target}",
+  "workflow.unreadable.tracking": "which remote branch {branch} tracks (its upstream must be a branch on a remote, or it must track none)",
   "workflow.unreadable.uncommitted": "the uncommitted changes in {folder}",
   "workflow.unreadable.worktrees": "the worktrees of {folder}",
   "workflow.unreadable.writes": "the files written in {folder}",

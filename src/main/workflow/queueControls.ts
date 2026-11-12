@@ -31,7 +31,8 @@ import type { TaskActor } from '../tasks'
 import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
 import { historyFor, lineHistory } from '../platform/historyPorts'
-import { isUnknown } from '../platform/types'
+import { isUnknown, type Unknown } from '../platform/types'
+import { workflowMessage } from '../../shared/workflow/texts'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
 import { catchUpKey, catchUpPaused, MergeQueue } from './mergeQueue'
@@ -184,7 +185,8 @@ async function forwardOfTarget(wf: Workflow, open: ReadonlyMap<string, CardRecor
     const resolving = r && wf.state(r).resolves ? { card: r.id, key: r.key } : null
     behind.push({ from, commits: await commitsBehind(projectPath, from, to), ...(resolving ? { resolving } : {}) })
   }
-  return { others, behind }
+  // HI-3126: under follow mode the window offers every source, whatever its local count (the request reads the remotes).
+  return { others, behind, ...(followsRemote(wf) ? { follows: true } : {}) }
 }
 
 const pairKey = (from: string, to: string): string => `${from}\n${to}` // i18n-ignore: a key, never shown
@@ -533,7 +535,10 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
     if (!f) continue
     await mayGoNow(wf!, rec!, p.path, f)
     const head = await lineHistory().lineHead(p.path, f.from)
-    return head && !isUnknown(head) ? { source: head } : null
+    if (!head || isUnknown(head)) return null
+    // HI-3126: under follow mode, the remote's head of its source, fetched now, as the request reads it (refused, saying
+    // why, when it can't be read).
+    return { source: (await forwardEnds(wf!, p.path, f.from, null)).source }
   }
   return null
 }
@@ -553,7 +558,10 @@ async function mayGoNow(wf: Workflow, rec: CardRecord, projectPath: string, f: F
 }
 
 /** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
-export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string; overridden?: true }
+export type ForwardDone = ({ upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string; overridden?: true }) & {
+  /** HI-3126: under follow mode, the commits of the local `from` its remote lacks (along its first parents), not brought in. */
+  localAhead?: number
+}
 
 /** Thrown for a forward request that can't be made: why, as a message (the caller's window or tool says it). */
 export class ForwardRefused extends CombworkError {}
@@ -571,7 +579,55 @@ const FORWARD_TEXT = {
   folderSwitched: msg({ id: 'service.forward.folderSwitched', defaultMessage: '{card} waits: the project folder has {now} checked out, so git names {now} the default branch (this repository has no main or master), and it was {was} when {card}’s direction was checked. Check out {was} in the project folder, then try again.', description: 'HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key, such as HI-12): in a repository with no main or master, git names the project folder’s checked-out branch as the default, and the folder was switched from {was} to {now} since the card’s direction was checked. Nothing changed. Branch names stay as they are.' }),
   defaultUnread: msg({ id: 'service.forward.defaultUnread', defaultMessage: '{card} waits: Combwork can’t read which branch is this repository’s default now (with no main or master, it is the branch the project folder has checked out), so it can’t tell whether {from} into {to} goes the release path’s way. Put the project folder on its branch, then try again.', description: 'HI-3085: Retry merge or Resolve on a builder held back on a forward-merge card ({card}: its key) bringing branch {to} up to date with {from}: git couldn’t name the default branch (the project folder on no branch, say). Nothing changed. Branch names stay as they are.' }),
   openNoOverride: msg({ id: 'service.forward.openNoOverride', defaultMessage: '{card} is bringing {to} up to date with {from} already, without an override, so the override wasn’t applied to it: remove it from the queue first, then ask again.', description: 'HI-2892: a forward merge asked with the user’s explicit override while a card ({card}: its key) for the same pair of branches ({from} into {to}) is open already, made without one: nothing changed.' }),
+  unreadable: msg({ id: 'service.forward.unreadable', defaultMessage: '{to} isn’t brought up to date with {from}: Combwork couldn’t read {what}, so nothing was queued.{detail, select, none {} other { Git said: {detail}}}', description: 'HI-3126: a forward merge (bringing branch {to} up to date with branch {from}) refused under “The target branch follows its remote”: Combwork reads both branches’ remote heads first, and one couldn’t be read. {what} says what (a phrase of its own, already translated); {detail} is Git’s own words in English, or “none” (keep the select keys). Branch names stay as they are.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
+}
+
+/** HI-3126: how long a forward request waits for each remote branch it fetches (the window or the Assistant waits for it). */
+const FORWARD_FETCH_MS = 60_000
+
+/** Whether the project's targets follow their remotes now (G21: the options as they are, as the queue reads them). */
+function followsRemote(wf: Workflow): boolean {
+  const o = wf.cfg.options()
+  return merges(o.platform) && o.finish === 'combworkMerges' && o.followRemote === true && !!historyFor(o.platform).trackedHead
+}
+
+/** A remote read's refusal of a forward: what couldn't be read, in the window's language, and git's words. */
+function unreadableForward(from: string, to: string, u: Unknown): ForwardRefused {
+  const m = u.whatText ? workflowMessage(u.whatText.id) : null
+  const what = m ? withValues(m, (u.whatText!.values ?? {}) as Record<string, string | number>) : u.what
+  return new ForwardRefused(withValues(FORWARD_TEXT.unreadable, { from, to, what, detail: u.detail || 'none' }), { kind: 'conflict' }) // i18n-ignore: a select key
+}
+
+/**
+ * HI-3126 (SPEC §16.9.4): a forward's two ends. Under follow mode the source is the head of the remote branch `from`
+ * tracks, fetched now and frozen (never the local `from`, which may lack what others published or hold what was never
+ * published: `localAhead` counts those, along its first parents, left out), and the destination "up to date" is read
+ * against is the head of the remote branch `to` tracks, fetched too (a local `to` holding the source unpublished doesn't
+ * count). A branch that tracks none: its local head. Off follow mode: both local, as before. Anything unreadable
+ * (tracking set up another way, a fetch that fails): ForwardRefused, nothing queued. `to` null: the source alone (Retry).
+ */
+async function forwardEnds(wf: Workflow, projectPath: string, from: string, to: string | null): Promise<{ source: string; dest: string | null; localAhead: number }> {
+  const H = lineHistory()
+  const localHead = async (branch: string): Promise<string> => {
+    const h = await H.lineHead(projectPath, branch)
+    if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
+    return h
+  }
+  const local = await localHead(from)
+  const localTo = to ? await localHead(to) : null
+  if (!followsRemote(wf)) return { source: local, dest: localTo, localAhead: 0 }
+  const P = historyFor(wf.cfg.options().platform)
+  const pin = (branch: string): string => `refs/cw/forward/${branch.replace(/[^A-Za-z0-9._-]/g, '-')}`
+  const remoteHead = async (branch: string, own: string): Promise<string> => {
+    const r = await P.trackedHead!(projectPath, branch, pin(branch), FORWARD_FETCH_MS)
+    if (isUnknown(r)) throw unreadableForward(from, to ?? from, r)
+    return r === 'untracked' ? own : r
+  }
+  const source = await remoteHead(from, local)
+  const dest = to && localTo ? await remoteHead(to, localTo) : null
+  const localAhead = source === local ? 0 : ((await H.countFirstParents(projectPath, source, local)) ?? 0)
+  return { source, dest, localAhead }
 }
 
 /**
@@ -598,12 +654,15 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   const d = forwardDirection(from, to, main)
   if (d.dir !== 'forward' && opts.override !== true) throw new ForwardRefused(withValues(FORWARD_TEXT.direction, { from, to, ...directionValues(d) }), { kind: 'invalid' })
   const override: ForwardOverride | undefined = d.dir !== 'forward' ? { by: actor.kind === 'assistant' ? 'assistant' : 'user', dir: d.dir, why: d.why } : undefined
-  // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
-  const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
-  for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
-  const contained = await lineHistory().isAncestor(projectPath, source as string, dest as string)
-  if (contained === true) return { upToDate: true, from, to }
-  const base = await lineHistory().mergeBase(projectPath, source as string, dest as string)
+  // Git's answers first, outside the board's lock: the heads (HI-3126: the remotes' under follow mode), whether there is
+  // anything to bring in, the base.
+  const ends = await forwardEnds(wf, projectPath, from, to)
+  const { source } = ends
+  const dest = ends.dest as string
+  const ahead = ends.localAhead ? { localAhead: ends.localAhead } : {}
+  const contained = await lineHistory().isAncestor(projectPath, source, dest)
+  if (contained === true) return { upToDate: true, from, to, ...ahead }
+  const base = await lineHistory().mergeBase(projectPath, source, dest)
   const { cardBatch, readTask, createTask, runIntent } = await import('../tasks')
   const by = actor.kind === 'assistant' ? 'assistant' : 'user'
   // One board change (HR3's round 1): the open card for the pair looked for, the caller's authority checked, the card made
@@ -618,19 +677,19 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
     if (open && opts.override === true && overridableEntry(wf.state(open), from, to, !!override)) {
       const r = await runIntent(wf, open.id, actor, (x) => x.overrideResolution(open.id, { from, to, ...(override ? { override } : {}) }, by, guard), undefined, guard)
       if (isRefusal(r.reply)) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
-      return { card: r.saved ?? (await readTask(open.id, { kind: 'user' })), queued: false, from, to, overridden: true }
+      return { card: r.saved ?? (await readTask(open.id, { kind: 'user' })), queued: false, from, to, overridden: true, ...ahead }
     }
     if (open && override && !(wf.state(open).forward ?? wf.state(open).resolves)?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
-    if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
+    if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to, ...ahead }
     guard?.()
-    const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
+    const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: source.slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
-    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}), ...(main ? { defaultBranch: main } : {}) }, by, ruleset, guard), undefined, guard)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source, base: base && !isUnknown(base) ? base : dest, ...(override ? { override } : {}), ...(main ? { defaultBranch: main } : {}) }, by, ruleset, guard), undefined, guard)
     // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
     // HI-2892: `overridden`, the user's override recorded on it (a pair against the release path's direction).
-    return { card: r.saved ?? made, queued: true, from, to, ...(override ? { overridden: true as const } : {}) }
+    return { card: r.saved ?? made, queued: true, from, to, ...(override ? { overridden: true as const } : {}), ...ahead }
   })
   if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
   return done

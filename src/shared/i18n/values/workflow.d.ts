@@ -600,6 +600,7 @@ interface CombworkMessageValues {
   'workflow.unreadable.revisionIn': { folder: string | number }
   'workflow.unreadable.state': { folder: string | number }
   'workflow.unreadable.target': { target: string | number }
+  'workflow.unreadable.tracking': { branch: string | number }
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }

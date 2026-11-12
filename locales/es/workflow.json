@@ -573,6 +573,7 @@
   "workflow.unreadable.revisionIn": "la versión extraída en {folder}",
   "workflow.unreadable.state": "el estado de {folder}",
   "workflow.unreadable.target": "la rama de destino {target}",
+  "workflow.unreadable.tracking": "qué rama remota rastrea {branch} (su upstream debe ser una rama en un remoto, o no debe rastrear ninguna)",
   "workflow.unreadable.uncommitted": "los cambios sin confirmar en {folder}",
   "workflow.unreadable.worktrees": "los worktrees de {folder}",
   "workflow.unreadable.writes": "los archivos escritos en {folder}",

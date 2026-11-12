@@ -8,10 +8,11 @@ import { git, gitReading } from '../git'
 import * as G from './git'
 import type { HistoryPort } from './history'
 import { gitOwnWork } from './gitOwnWork'
-import { isUnknown, unknown, type Maybe } from './types'
+import { isUnknown, unknown, withDetail, type Maybe } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isAgain } from './again'
 import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
+import { configRead } from './gitCommits'
 
 /** HI-3041: how long a target's remote head, fetched for the reconciler, stands for it (a pass over many cards fetches once). */
 const REMOTE_HEAD_MS = 60_000
@@ -73,6 +74,22 @@ export const gitHistory: HistoryPort = {
   async remoteHas(repo, target, revision) {
     const head = await remoteHeadOf(repo, target)
     return isUnknown(head) ? head : G.isAncestor(repo, revision, head)
+  },
+  async trackedHead(repo, line, pin, timeoutMs) {
+    const h = projectHost(repo)
+    const get = async (key: string) => configRead(await h.run(repo, ['config', '--get', key]))
+    const remote = await get(`branch.${line}.remote`)
+    if (typeof remote !== 'string') return withDetail(unknown(U.tracking, { branch: line }), remote.failed)
+    const merge = await get(`branch.${line}.merge`)
+    if (typeof merge !== 'string') return withDetail(unknown(U.tracking, { branch: line }), merge.failed)
+    if (!remote && !merge) return 'untracked'
+    // Half set, another local branch ('.'), or not a branch: never taken for "tracks none".
+    if (!remote || !merge || remote === '.' || !merge.startsWith('refs/heads/')) return unknown(U.tracking, { branch: line })
+    const d = await destinationOf(h, line)
+    if (isAgain(d)) return withDetail(unknown(U.tracking, { branch: line }), d.again.message)
+    if ('pause' in d) return withDetail(unknown(d.pause === 'noUpstream' ? U.tracking : U.remoteSetup, d.pause === 'noUpstream' ? { branch: line } : { target: line }), d.files?.join(', '))
+    const f = await fetchHeadOf(h, d.snapshot, pin, timeoutMs)
+    return 'failed' in f ? withDetail(unknown(U.remoteHead, { branch: d.snapshot.ref.replace(/^refs\/heads\//, ''), endpoint: d.snapshot.display, target: line }), f.failed) : f.head
   },
   firstParents: (repo, base, head) => G.firstParents(repo, base, head),
   commits: (repo, range, opts) => G.commits(repo, range, opts),

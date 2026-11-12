@@ -114,6 +114,7 @@
   "service.forward.resolveRaced": "{card} hat sich geändert, während es einem Bearbeiter übergeben wurde (ein Wiederholen, ein Entfernen oder ein weiteres Lösen), daher wurde nichts erstellt: Sieh dir die Karte an und frage bei Bedarf erneut.",
   "service.forward.resolveTitle": "Lösen: {to} auf den Stand von {from} bringen",
   "service.forward.title": "{to} auf den Stand von {from} bringen",
+  "service.forward.unreadable": "{to} wird nicht auf den Stand von {from} gebracht: Combwork konnte {what} nicht lesen, daher wurde nichts eingereiht.{detail, select, none {} other { Git meldete: {detail}}}",
   "service.fsutil.keptBusy": "{file} wird gerade von einem anderen Programm gespeichert: Es wurde nichts geändert. Versuche es gleich noch einmal.",
   "service.fsutil.keptUnreadable": "{file} konnte nicht gelesen werden: Es wurde nichts geändert. Versuche es gleich noch einmal.",
   "service.fsutil.notCopied": "{name} konnte nicht kopiert werden",

@@ -573,6 +573,7 @@
   "workflow.unreadable.revisionIn": "文件夹 {folder} 中的修订版本",
   "workflow.unreadable.state": "文件夹 {folder} 的状态",
   "workflow.unreadable.target": "目标分支 {target}",
+  "workflow.unreadable.tracking": "{branch} 跟踪的远程分支（它的上游必须是某个远程仓库上的分支，或者不跟踪任何分支）",
   "workflow.unreadable.uncommitted": "文件夹 {folder} 中未提交的更改",
   "workflow.unreadable.worktrees": "文件夹 {folder} 的工作树",
   "workflow.unreadable.writes": "文件夹 {folder} 中写入的文件",

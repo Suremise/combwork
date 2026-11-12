@@ -1086,7 +1086,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:forward': async (p, from, to) => {
       const r = await forwardMerge(currentWorkspace(), workspace.assertProject(p), queueTarget(from), queueTarget(to), { kind: 'user' })
-      return 'upToDate' in r ? { upToDate: true, card: null, queued: false } : { upToDate: false, card: r.card.number, queued: r.queued }
+      const ahead = r.localAhead ? { localAhead: r.localAhead } : {}
+      return 'upToDate' in r ? { upToDate: true, card: null, queued: false, ...ahead } : { upToDate: false, card: r.card.number, queued: r.queued, ...ahead }
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     // HI-2944: the port refuses it first where the project's version control doesn't offer it.

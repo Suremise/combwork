@@ -158,6 +158,7 @@ export const SUITES = [
   { name: 'foldercommit' },
   { name: 'followupsubmit' },
   { name: 'footerfit' },
+  { name: 'forwardremote' },
   { name: 'foryou' },
   { name: 'freshpath' },
   { name: 'freshresume' },

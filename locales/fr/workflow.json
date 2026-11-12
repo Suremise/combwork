@@ -573,6 +573,7 @@
   "workflow.unreadable.revisionIn": "la révision extraite dans le dossier {folder}",
   "workflow.unreadable.state": "l’état du dossier {folder}",
   "workflow.unreadable.target": "la branche cible {target}",
+  "workflow.unreadable.tracking": "quelle branche distante suit {branch} (son amont doit être une branche sur un dépôt distant, ou elle ne doit en suivre aucune)",
   "workflow.unreadable.uncommitted": "les modifications non commitées dans le dossier {folder}",
   "workflow.unreadable.worktrees": "les worktrees du dossier {folder}",
   "workflow.unreadable.writes": "les fichiers écrits dans le dossier {folder}",

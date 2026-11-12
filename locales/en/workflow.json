@@ -2395,6 +2395,10 @@
     "defaultMessage": "the target branch {target}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the branch the work merges into. {target} is its name."
   },
+  "workflow.unreadable.tracking": {
+    "defaultMessage": "which remote branch {branch} tracks (its upstream must be a branch on a remote, or it must track none)",
+    "description": "What Combwork couldn’t read, the object of \"Combwork couldn’t read …\" (HI-3126, “The target branch follows its remote”): how the branch {branch} tracks a remote branch. Its Git settings name only half of one, another local branch, or a remote that isn’t there, or they couldn’t be read."
+  },
   "workflow.unreadable.uncommitted": {
     "defaultMessage": "the uncommitted changes in {folder}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path."
