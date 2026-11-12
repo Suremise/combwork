@@ -3414,7 +3414,12 @@ route('POST', '/v1/tasks', async ({ body }) => {
   const create = (commit?: () => void) => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor, { commit }), commit))
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
-  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
+  // A target of its own given as it is made (HI-3043): said as cw_update_task says it (HI-3017), under the reply.
+  const reply = async (c: TaskCard) => {
+    const own = input.target ? (await cardTargetSaid(workspace, c.number, c.project)).note : ''
+    const notes = [nudge, own].filter(Boolean).join('\n')
+    return { ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+  }
   // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
   if (actor.kind !== 'assistant') return placing(await reply(await create()))
@@ -3455,7 +3460,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   let ownTargetNote = ''
   const setCardTarget = async (commit?: () => void): Promise<void> => {
     const c = await tasks.setTarget(n, target, actor, { commit })
-    const { own, note } = await cardTargetSaid(workspace, n, c.project, target)
+    const { own, note } = await cardTargetSaid(workspace, n, c.project)
     changes.push(sayStored([API.card.saidTarget, { own: own ? 'yes' : 'no', target: own ?? '' }]))
     ownTargetNote = note
   }
