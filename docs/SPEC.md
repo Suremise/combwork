@@ -6585,8 +6585,8 @@ each secret value of the snapshot, its URL's query values included). Where it ca
      in phase `push`): verified at the snapshot's endpoint (a fresh fetch). There, Done. Anything else (absent, even
      exactly at `onto`, moved, deleted, unreadable, or the snapshot missing or not matching its digest): paused
      `publishUnknown`, the entry left begun with its pins and snapshot, and For you asks once (Approve: it was
-     published, Done; Decline: it wasn't, tested again). Never pushed or tested again before the remote shows it or the
-     user answers; Resume looks again. A crash in phase `prePush` sent nothing: tested again.
+     published, Done; Decline: it wasn't, tested again), the answer running the queue at once (HI-3088). Never pushed or
+     tested again before the remote shows it or the user answers; Resume looks again. A crash in phase `prePush` sent nothing: tested again.
 4. **The owed catch-up** (store meta `queue.catchUp:<target>`, settled before the next entry): a recorded step first, by
    §16.9.2's recovery table (`files`, `ref`, `rollback`, journalled in the meta); then from the local head as it is now
    (another ancestor of the result gets its own journalled plan, never an earlier one's files). Not checked out: a
