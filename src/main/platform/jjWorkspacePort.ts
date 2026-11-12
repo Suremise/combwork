@@ -774,7 +774,21 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
         // The slot's own work (HI-2995): a detach refused for it is `kept` (the card's, not a refusal to retry).
         const keptStep = (r: WorkspaceStep): WorkspaceStep => (kind === 'detach' && !!j.prev?.card ? { ...r, kept: true } : r)
-        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return keptStep(await refuse(JJ_REFUSED.unintegrated))
+        // Also (HI-2980, Darren's decision A, with HR1's full-ancestry proof) a slot whose card's commits were rewritten
+        // as they were integrated (described, rebased onto a moved target, squashed): nothing in it that isn't in the
+        // previous binding's target already. Its working copy empty, a previous binding with a target, that target one
+        // known commit T at H, and everything below the working copy (its parents and all their ancestry, not only the
+        // range over the old base: unrelated work there is refused) in T's history, read pinned at H. Unknown fails
+        // closed. Integration is still proved below, separately: neither stands in for the other.
+        const inTarget = async (): Promise<boolean> => {
+          const prev = j.prev
+          if (!prev?.target || !wc.empty) return false
+          const T = await bookmarkAt(folder, H, prev.target)
+          if (isUnknown(T) || !T) return false
+          const left = await read(folder, H, ['log', '--no-graph', '-n', '1', '-r', `::(${revsetName(ws)}@-) ~ ::${T}`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revisionIn, { folder }))
+          return !isUnknown(left) && lines(left).length === 0
+        }
+        if (!onPrevBase && !chainIsBinding(chain, j.prev) && !(await inTarget())) return keptStep(await refuse(JJ_REFUSED.unintegrated))
         if (j.prev?.submitted.length) {
           const prev = j.prev
           const contained = async (): Promise<boolean> => {
