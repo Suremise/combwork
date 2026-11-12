@@ -6040,10 +6040,11 @@ touched:
   or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
   (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in, tried
   again briefly while another git holds the index; their stat data left empty rather than refreshed, which could run
-  a filter unbounded); every other entry is left. That step runs nothing of the repository's it can turn off (HR2's
-  round 3: `core.hooksPath` a folder never made, `core.fsmonitor=false`) and is bounded (10 s): a hook set in git's
-  config can't be turned off, but git runs post-index-change once it has written the index and given its lock up, so
-  ending one there leaves no lock, and the index is read to see whether the entries are in. That step failing is said with the commit or stash made (*Git made
+  a filter unbounded); every other entry is left. That step runs nothing of the repository's (HR2's rounds 3 and
+  4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
+  as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
+  can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
+  holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
   is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
   round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its

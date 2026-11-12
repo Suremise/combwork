@@ -27,6 +27,8 @@ vi.mock('original-fs/promises', async (original) => {
     }) as typeof real.lstat
   }
 })
+/** HI-3021: each git command and its bound, while a test collects them (null: none). */
+let gitCalls: { args: string[]; timeout?: number }[] | null = null
 /** HI-3021: the next `rev-parse --verify HEAD` fails as an unreadable HEAD does (not an unborn branch's exit 1). */
 let failHeadOnce = false
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
@@ -36,6 +38,7 @@ vi.mock('../src/main/git', async (original) => {
   return {
     ...real,
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
+      gitCalls?.push({ args, timeout: opts?.timeout })
       if (failHeadOnce && args[0] === 'rev-parse' && args.includes('--verify') && args.includes('HEAD')) {
         // HI-3021 (HR2's round 2): HEAD unreadable for a moment, as git fails reading it.
         failHeadOnce = false
@@ -119,6 +122,7 @@ beforeEach(() => {
   fencedProbe = null
   failTopIn = null
   failHeadOnce = false
+  gitCalls = null
   failStashAfter = false
   failLstatOf = null
   lateFile = null
@@ -411,32 +415,45 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(leftovers()).toEqual([])
   })
 
-  it("the step into the real index runs no hook from the hooks folder, and one set in git's config is bounded (HR2's round 3): made, the index taken in", async () => {
-    changes.folderChangesBounds.takeMs = 2000
-    try {
-      const dir = tempDir('cw-folderchanges-pic-')
-      const fileHook = join(dir, 'file hook ran')
-      const configHook = join(dir, 'config hook ran')
-      // Each only for the real index (no GIT_INDEX_FILE): the private index's commit runs them too.
-      const slow = (marker: string): string => `[ -n "$GIT_INDEX_FILE" ] || { : > "${fwd(marker)}"; "${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'; }`
-      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-      writeFileSync(join(proj, '.git', 'hooks', 'post-index-change'), `#!/bin/sh\n${slow(fileHook)}\n`)
-      writeFileSync(join(dir, 'config-hook.sh'), `#!/bin/sh\n${slow(configHook)}\n`)
-      sh(proj, 'config', 'hook.slow.event', 'post-index-change')
-      sh(proj, 'config', 'hook.slow.command', `sh "${fwd(join(dir, 'config-hook.sh'))}"`)
-      writeFileSync(join(proj, 'a.txt'), 'edit\n')
-      writeFileSync(join(proj, 'new.txt'), 'new\n')
-      const done = await settle('commit', ['a.txt', 'new.txt'])
-      expect(done.made).toBe(head())
-      expect(committed()).toEqual(['a.txt', 'new.txt'])
-      expect(existsSync(fileHook)).toBe(false)
-      expect(existsSync(configHook)).toBe(true)
-      sh(proj, 'config', '--unset', 'hook.slow.event')
-      expect(lines()).toEqual([])
-      expect(existsSync(lockPath())).toBe(false)
-    } finally {
-      changes.folderChangesBounds.takeMs = 10_000
-    }
+  it("the step into the real index runs no hook, from the hooks folder or set in git's config, and is never bounded (HR2's rounds 3 and 4): made, the index taken in", async () => {
+    const dir = tempDir('cw-folderchanges-pic-')
+    const fileHook = join(dir, 'file hook ran')
+    const configHook = join(dir, 'config hook ran')
+    // Each only for the real index (no GIT_INDEX_FILE): the private index's commit runs them too.
+    const slow = (marker: string): string => `[ -n "$GIT_INDEX_FILE" ] || { : > "${fwd(marker)}"; "${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'; }`
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'post-index-change'), `#!/bin/sh\n${slow(fileHook)}\n`)
+    writeFileSync(join(dir, 'config-hook.sh'), `#!/bin/sh\n${slow(configHook)}\n`)
+    // A name with a dot and capitals, as git keeps a hook's name.
+    sh(proj, 'config', 'hook.My.Slow.event', 'post-index-change')
+    sh(proj, 'config', 'hook.My.Slow.command', `sh "${fwd(join(dir, 'config-hook.sh'))}"`)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    gitCalls = []
+    const done = await settle('commit', ['a.txt', 'new.txt'])
+    expect(done.made).toBe(head())
+    expect(committed()).toEqual(['a.txt', 'new.txt'])
+    expect(existsSync(fileHook)).toBe(false)
+    expect(existsSync(configHook)).toBe(false)
+    // Never given a bound: never ended while it holds the real index's lock.
+    const takes = gitCalls.filter((c) => c.args.includes('update-index'))
+    expect(takes).toHaveLength(1)
+    expect(takes[0].timeout).toBeUndefined()
+    gitCalls = null
+    sh(proj, 'config', '--unset', 'hook.My.Slow.event')
+    expect(lines()).toEqual([])
+    expect(existsSync(lockPath())).toBe(false)
+  })
+
+  it('entries compared whatever their order, each side sorted once (HR2\'s round 4): 50,000 a side', () => {
+    const a = Array.from({ length: 50_000 }, (_, i) => `100644 ${String(i).padStart(40, '0')} 0\tf${i}`)
+    const b = [...a].reverse()
+    const t = performance.now()
+    expect(changes.sameEntries(a, b)).toBe(true)
+    // A bound for a hung run, not how long it should take (once per entry, it took minutes).
+    expect(performance.now() - t).toBeLessThan(5_000)
+    expect(changes.sameEntries(a, [...b.slice(1), 'other'])).toBe(false)
+    expect(changes.sameEntries(a, b.slice(1))).toBe(false)
   })
 
   it("HEAD unreadable before the commit (HR2's round 2): refused before anything runs, never taken for a commit made", async () => {
