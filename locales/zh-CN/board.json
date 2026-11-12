@@ -770,7 +770,7 @@
   "board.queue.removeTitle": "将 {card} 移出合并队列？",
   "board.queue.resume": "恢复队列",
   "board.queue.resumeFailed": "无法恢复合并队列",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {冲突} other {{files} 中有冲突}}} checks {{check, select, none {检查未通过} other {检查未通过：{check}}}} hook {钩子失败} folderBusy {检出 {target} 的文件夹正忙} notUpToDate {未与 {target} 保持同步} focused {其针对性测试无法选出或证明} direction {逆着版本发布方向，无例外放行} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {冲突} other {{files} 中有冲突}}} checks {{check, select, none {检查未通过} other {检查未通过：{check}}}} hook {钩子失败} folderBusy {检出 {target} 的文件夹正忙} notUpToDate {未与 {target} 保持同步} focused {其针对性测试无法选出或证明} direction {逆着版本发布方向，无例外放行} resolution {其要解决的提交是复制的，而非合并} targetMoved {合并期间 {target} 发生了变化} pushRefused {发布到 {target} 的远程被拒绝} notPublished {未发布到 {target} 的远程} other {{why}}}",
   "board.queue.returned": "{card} 已退回：{why}",
   "board.queue.returnedTo": "{card} 已退回给构建者 {builder}：{why}",
   "board.queue.runBy": "由配置文件 {profile} 运行",

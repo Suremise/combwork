@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
-import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, RETURN_REASON_CODES, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copiesRunsKey, CW_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
@@ -188,6 +188,25 @@ describe('returns on a queue card', () => {
     expect(nextFold(view({ returns: [seen(1, 1_000), seen(2, 4_000)], returnsMore: 3 }))).toBe(NOW - 4_000 + RETURN_SEEN_SHOWN_MS)
   })
 
+  it('says every reason the queue records in words, never its code, in every language (HI-3037)', () => {
+    const LOCALES = join(__dirname, '..', 'locales')
+    // Each with a file, so a conflict's words ("conflict in a.ts") aren't its code; the code alone is what shows unsaid.
+    const said = (code: string): string[] => RETURN_REASON_CODES.filter((reason) => returnWhy(recent({ outcome: 'returned', reason, files: ['a.ts'] }), null, '1.5.0', tr, list) === reason).map((reason) => `${code}: ${reason}`)
+    expect(RETURN_REASON_CODES).toContain('resolution')
+    expect(said('en')).toEqual([])
+    try {
+      for (const code of readdirSync(LOCALES, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'en' && !d.name.startsWith('.')).map((d) => d.name)) {
+        const dir = join(LOCALES, code)
+        setLanguage(code, Object.assign({}, ...readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))))
+        expect(said(code)).toEqual([])
+      }
+    } finally {
+      setLanguage('en', {})
+    }
+    // A reason Combwork doesn't know yet (a newer build's) is still shown as recorded.
+    expect(returnWhy(recent({ outcome: 'returned', reason: 'somethingNew' }), null, 'main', tr, list)).toBe('somethingNew')
+  })
+
   it('why, in a few words: a conflict with its files, a red check by name, a hook, a temporary failure', () => {
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] }), null, 'main', tr, list)).toBe('conflict in tasks.ts')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'] }), null, 'main', tr, list)).toBe('conflict in a.ts, b.ts, c.ts, and 2 more')
@@ -196,6 +215,7 @@ describe('returns on a queue card', () => {
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks' }), null, 'main', tr, list)).toBe('checks failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'hook' }), null, 'main', tr, list)).toBe('a hook failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks', transient: true }), 'unit', 'main', tr, list)).toBe('checks failed: unit (temporary)')
+    expect(returnWhy(recent({ outcome: 'returned', reason: 'resolution' }), null, '1.5.0', tr, list)).toBe('the commit it resolves was copied, not merged')
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict in tasks.ts', 'HB1', tr)).toBe('HI-108 returned to builder HB1: conflict in tasks.ts')
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict', null, tr)).toBe('HI-108 returned: conflict')
   })
