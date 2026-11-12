@@ -16,7 +16,7 @@
 // LFS is the superproject's (`git lfs pull`, its objects shared by every worktree in the common dir); a submodule's
 // LFS files are smudged as the user's own git-lfs filter config says. Every git here runs with no prompt.
 
-import { lstat, readdir, readFile, realpath } from 'original-fs/promises'
+import { lstat, readdir, readFile, realpath, rm as removeTree } from 'original-fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'path'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
 import { git } from '../git'
@@ -363,6 +363,48 @@ export async function removeLeftSubmodules(x: GitFilesExec, folder: string, gitD
     x.note(`Removing the folder of submodule ${rel}, which this revision no longer has (its clone stays).`) // i18n-ignore: the run's log, beside git's own output
     const r = await x.git(folder, ['clean', '-ffdxq', '--', rel], { env: LITERAL, log: true })
     if (!r.ok) return stored(T.removeLeft, { path: rel, error: firstLine(r) })
+  }
+  return null
+}
+
+/**
+ * HI-3027: the merge queue's folder, just before it is checked out at a revision and merges another: each submodule
+ * checkout of its own that one of `revisions` doesn't keep as a submodule (vendored into ordinary files there, or gone)
+ * removed, folder and all. git's checkout and merge leave a populated submodule's folder where it is, so its files stand
+ * "untracked" where the revision tracks files of its own, and the merge refuses on every pass. Only this folder's own
+ * clones' checkouts, as removeLeftSubmodules decides them (a private module whose core.worktree is a literal path
+ * strictly inside, no link on the way, whose `.git` file names it back); the clone stays, for the files step to use
+ * again. Anything doubtful is left as it is, for git to name. A read git couldn't make, or a removal that failed: its
+ * words (nothing else removed after it).
+ */
+export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, folder: string, revisions: string[]): Promise<string | null> {
+  const dirR = await x.git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
+  if (!dirR.ok) return firstLine(dirR)
+  const gitDir = dirR.out.trim()
+  for (const mod of await privateModules(gitDir)) {
+    const owned = await ownedModule(gitDir, mod)
+    if (!owned) continue
+    const wt = await moduleWorktree(x, owned)
+    if (!wt || !strictlyInside(folder, wt)) continue
+    const rel = relative(resolve(folder), wt).split(sep).join('/')
+    const full = insidePath(folder, rel)
+    // Not there (never checked out, or removed already), or a link on the way: nothing of ours to remove.
+    if (!full || (await linked(folder, full)) !== false) continue
+    const target = await gitFileTarget(full)
+    const t = target ? await real(target) : null
+    if (!t || !same(t, owned)) continue
+    let kept = true
+    for (const rev of revisions) {
+      const at = await x.git(folder, ['ls-tree', '-z', rev, '--', rel], { env: LITERAL })
+      if (!at.ok) return firstLine(at)
+      if (!nul(at.out).some((e) => e.startsWith('160000 ') && e.slice(e.indexOf('\t') + 1) === rel)) kept = false
+    }
+    if (kept) continue
+    const err = await removeTree(full, { recursive: true, force: true }).then(
+      () => null,
+      (e: unknown) => (e instanceof Error ? e.message : String(e))
+    )
+    if (err) return stored(T.removeLeft, { path: rel, error: err })
   }
   return null
 }

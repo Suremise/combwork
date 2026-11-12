@@ -543,27 +543,28 @@ describe.skipIf(!lfsInstalled)('Git LFS (git-lfs installed)', () => {
 
 it.skipIf(lfsInstalled)('Git LFS: skipped here, git-lfs is not installed on this machine', () => undefined)
 
-describe("the merge queue's candidate (HR2's round 2): LFS files from the card's merge left for the files step", () => {
-  /** The queue's host over real git, in the test's environment; `skip`: Set up submodules and LFS on. */
-  function host(project: string, folder: string, skip: boolean): CandidateHost {
-    return {
-      project,
-      folder,
-      signTimeoutMs: 30_000,
-      reads: {},
-      identity: async () => ({ name: 'Combwork Test', email: 'test@example.invalid' }),
-      skipSmudge: async () => skip,
-      run: async (cwd, args, opts) => {
-        try {
-          const out = execFileSync('git', args, { cwd, env: { ...opts?.env, ...ENV }, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
-          return { ok: true, code: 0, out, err: '' }
-        } catch (e) {
-          const x = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string }
-          return { ok: false, code: x.status ?? 1, out: String(x.stdout ?? ''), err: String(x.stderr ?? '') }
-        }
+/** The queue's host over real git, in the test's environment; `skip`: Set up submodules and LFS on. */
+function host(project: string, folder: string, skip: boolean): CandidateHost {
+  return {
+    project,
+    folder,
+    signTimeoutMs: 30_000,
+    reads: {},
+    identity: async () => ({ name: 'Combwork Test', email: 'test@example.invalid' }),
+    skipSmudge: async () => skip,
+    run: async (cwd, args, opts) => {
+      try {
+        const out = execFileSync('git', args, { cwd, env: { ...opts?.env, ...ENV }, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+        return { ok: true, code: 0, out, err: '' }
+      } catch (e) {
+        const x = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string }
+        return { ok: false, code: x.status ?? 1, out: String(x.stdout ?? ''), err: String(x.stderr ?? '') }
       }
     }
   }
+}
+
+describe("the merge queue's candidate (HR2's round 2): LFS files from the card's merge left for the files step", () => {
   /** A target E and a card R that adds a filter=lfs file, under a smudge filter that fails unless the smudge is skipped. */
   function strictFilterProject(name: string): { p: string; E: string; R: string } {
     const p = repo(name, { 'base.txt': 'base\n' })
@@ -626,5 +627,86 @@ describe("the merge queue's candidate (HR2's round 2): LFS files from the card's
     expect(readFileSync(join(folder, 'big.bin'), 'utf8')).toMatch(/^version https:\/\/git-lfs/)
     expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
     expect(readFileSync(join(folder, 'big.bin'), 'utf8')).toBe(content)
+  })
+})
+
+describe("HI-3027: the queue's folder, its submodule set up by the files step, and a revision that no longer has it", () => {
+  /** A project with submodule libs/s, and the queue's folder after an earlier card's round: the files step has filled it. */
+  async function queued(name: string): Promise<{ p: string; E: string; folder: string }> {
+    const sub = repo(`${name}-sub`, { 'v.txt': '1\n' })
+    const p = repo(name)
+    g(p, 'submodule', 'add', '-q', sub, 'libs/s')
+    const E = commitAll(p, 'sub')
+    g(p, 'switch', '-q', '-c', `${name}-earlier`)
+    const R0 = commitAll(p, 'earlier card', { 'other.txt': 'x\n' })
+    g(p, 'switch', '-q', 'main')
+    const folder = join(root, `${name}-folder`)
+    const first = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R0, expected: E, style: 'merge', message: async () => 'merge' })
+    expect(first, JSON.stringify(first)).toHaveProperty('result')
+    expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
+    expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
+    return { p, E, folder }
+  }
+  /** On a new branch from `from`: the submodule removed and its files committed as ordinary ones at its path. */
+  function vendor(p: string, branch: string, from = 'main'): string {
+    g(p, 'switch', '-q', '-c', branch, from)
+    g(p, 'rm', '-q', 'libs/s')
+    g(p, 'rm', '-q', '-f', '.gitmodules')
+    const R = commitAll(p, 'vendored', { 'libs/s/v.txt': 'vendored\n', 'libs/s/extra.txt': 'x\n' })
+    g(p, 'switch', '-q', 'main')
+    return R
+  }
+  /** The folder holds the vendored files as ordinary ones, no clone's checkout left in it, and the files step passes there. */
+  async function vendored(p: string, folder: string): Promise<void> {
+    expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('vendored\n')
+    expect(existsSync(join(folder, 'libs', 's', '.git'))).toBe(false)
+    expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
+    expect(g(folder, 'status', '--porcelain')).toBe('')
+  }
+
+  for (const style of ['merge', 'squash', 'rebase'] as const) {
+    it(`a ${style} of a card that vendors the submodule gets its test merge`, async () => {
+      const { p, E, folder } = await queued(`q3027-${style}`)
+      const R = vendor(p, 'vendor')
+      const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, style, message: async () => 'merge' })
+      expect(out, JSON.stringify(out)).toHaveProperty('result')
+      await vendored(p, folder)
+    })
+  }
+
+  it('the target dropped the submodule outside the queue, and a card adds files at its path: its test merge too', async () => {
+    const { p, folder } = await queued('q3027-dropped')
+    g(p, 'rm', '-q', 'libs/s')
+    g(p, 'rm', '-q', '-f', '.gitmodules')
+    const E2 = commitAll(p, 'submodule dropped')
+    g(p, 'switch', '-q', '-c', 'adds')
+    const R = commitAll(p, 'files at its path', { 'libs/s/new.txt': 'new\n' })
+    g(p, 'switch', '-q', 'main')
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E2, revision: R, expected: E2, style: 'merge', message: async () => 'merge' })
+    expect(out, JSON.stringify(out)).toHaveProperty('result')
+    expect(readdirSync(join(folder, 'libs', 's'))).toEqual(['new.txt'])
+  })
+
+  it("strict's update of a card that keeps the submodule onto a target that vendored it", async () => {
+    const { p, E, folder } = await queued('q3027-update')
+    g(p, 'switch', '-q', '-c', 'card')
+    const R = commitAll(p, 'card', { 'card.txt': 'c\n' })
+    g(p, 'switch', '-q', 'main')
+    const E2 = vendor(p, 'target-vendors')
+    g(p, 'merge', '-q', '--ff-only', 'target-vendors')
+    const out = await gitIntegration.update(host(p, folder, true), { card: 'HI-2', revision: R, base: E, expected: E2, target: 'main', entry: 'e1', how: 'merge', message: () => 'update' })
+    expect(out, JSON.stringify(out)).toHaveProperty('updated')
+    await vendored(p, folder)
+  })
+
+  it("a card that keeps the submodule leaves the folder's checkout of it as it was", async () => {
+    const { p, E, folder } = await queued('q3027-kept')
+    g(p, 'switch', '-q', '-c', 'card')
+    const R = commitAll(p, 'card', { 'card.txt': 'c\n' })
+    g(p, 'switch', '-q', 'main')
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    expect(out, JSON.stringify(out)).toHaveProperty('result')
+    expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
+    expect(existsSync(join(folder, 'libs', 's', '.git'))).toBe(true)
   })
 })
