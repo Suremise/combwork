@@ -5923,6 +5923,13 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
   Resolve on a Builder… and Remove from Queue…, for one returned or declined alike, and Remove from Queue… alone for one
   returned for its direction. Remove's confirmation, there and on a queued forward in the queue's card (its
   `QueueQueued.forward`), says it ends in Done with nothing merged, never that it goes back to Approved.
+- the user's and the Assistant's moves of it go only where it stays a forward (HI-3086, `forwardMoves`, the runtime's
+  `move` and the board's drop columns, `moveColumns`): On Hold and back to where it was, back into Active (out of the
+  queue, for Retry merge or Resolve on a builder), and Done (nothing merged); a Done one stays Done. Todo (the project's
+  rules now), a start or a Done one reopened (a new `Started` drops `forward`: an ordinary card on the project's default
+  target) and a drag on past where it was (a builder's submit and review) are refused (`move.notFromHere`, naming its
+  own ways on), nothing written. Back from On Hold to Merging it is queued again as a forward (`enqueueForward`), with
+  the commit its latest attempt froze (a Retry's too), never the source's head then.
 
 **Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
 to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
