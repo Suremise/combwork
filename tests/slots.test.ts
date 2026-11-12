@@ -484,7 +484,6 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
     // idle tidy removes it by that port; the Git slot stays.
     const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
-    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
     registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
     try {
       await w.pool.refresh()
