@@ -712,8 +712,8 @@
     "text": "Created the project {name}"
   },
   "api.done.forwardQueued": {
-    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{card} is bringing {to} up to date with {from} already}}",
-    "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card."
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{override, select, yes {Recorded the user’s override on {card}, the resolution bringing {to} up to date with {from}: its builder is told to submit it again} other {{card} is bringing {to} up to date with {from} already}}}}",
+    "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card. HI-3040: queued no with override yes: the override was recorded on the resolution the queue returned for its direction."
   },
   "api.done.forwardResolved": {
     "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged",

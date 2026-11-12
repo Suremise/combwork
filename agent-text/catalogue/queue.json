@@ -168,8 +168,8 @@
     "note": "The next step after a forward merge came back against the release path’s direction (HI-2892)."
   },
   "queue.next.directionResolution": {
-    "text": "Don’t submit it again: it comes back the same way. Say so on the card and leave it to the user; only a new forward request with their explicit override merges {from} into {to}.",
-    "note": "The next step, for its builder, after a resolution of a forward merge came back against the release path’s direction (HI-2998)."
+    "text": "Don’t submit it again yet: it comes back the same way. Say so on the card and leave it to the user: only their explicit override (a forward request of {from} into {to} with the override, which records it on this card) lets it merge. Once it is recorded, you are told to submit the same revision again.",
+    "note": "The next step, for its builder, after a resolution of a forward merge came back against the release path’s direction (HI-2998; HI-3040: the override request records it on the resolution)."
   },
   "queue.next.fix": {
     "text": "Fix it in your worktree, commit and submit again (cw_submit).",

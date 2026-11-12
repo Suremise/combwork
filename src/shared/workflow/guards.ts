@@ -139,6 +139,9 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
   'requeue.allowed': (i): GuardRefusal | null => {
     const s = i.state
     const last = s.entries[s.entries.length - 1]
+    // HI-3040: a resolution returned for its direction, the user's override recorded since for that very entry: its same
+    // revision goes back in once (the override authorizes it, whatever transient requeues counted); its new entry ends it.
+    if (last && last.state === 'failed' && last.failure?.reason === 'direction' && s.overrideEntry === last.id) return null
     const transient = last && ((last.state === 'failed' && last.failure?.transient) || (last.state === 'cancelled' && (last.cancelled === 'hold' || last.cancelled === 'user')))
     if (!transient) return { rule: 'requeue.allowed', values: { card: i.card.key, revision: short(i.revision), cause: 'requeueNotTransient' } }
     const n = transientRequeues(s)

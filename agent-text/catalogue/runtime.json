@@ -187,6 +187,10 @@
     "text": "{card} was taken out of the merge queue by {by, select, user {the user} other {the Assistant}}{reason}. It isn't merged; it is queued again only if the user retries it or it is approved again.",
     "note": "The builder's wake for a card taken out of the queue. {by}: user or assistant. {reason}: \": \" and the reason, or nothing."
   },
+  "runtime.wake.resolutionOverride": {
+    "text": "{card}: the user’s override of the release path’s direction is recorded on it, so its merge may bring {to} up to date with {from}. Submit the same revision again (cw_submit): it goes back into the merge queue once, as approved.",
+    "note": "HI-3040: the builder’s wake when the user (or the Assistant on their explicit request) recorded an override on a forward merge’s resolution the queue returned for its direction. {from} and {to}: branch names."
+  },
   "runtime.wake.reviewerAsks": {
     "text": "{card}: the reviewer asks: {text}",
     "note": "#912: the builder's wake for its reviewer's request mid-review. {text}: the request, in the reviewer's words."

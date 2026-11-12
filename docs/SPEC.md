@@ -5899,8 +5899,21 @@ branch, as a card made before HI-2985 stored none: setting its Merges into to `t
 Its direction is checked at each queue attempt as a forward's is (HI-2998, `forwardAllowed`: `from` into `to` with the
 default branch as it reads then, or the override its forward's request recorded, carried on its `ForwardResolution`):
 the default branch or the branches changed since Resolve so that it no longer reads forward, it is returned to its
-builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user;
-only a new forward request with the user's override merges that pair.
+builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user.
+When the names alone don't decide the direction (two versions do) and the default branch can't be read or named at
+that attempt (git unable to answer, a detached project folder with no main or master), or its head can't be read, that
+is no answer (HI-3040): the entry goes round as any unreadable read does (`readFailed`), then pauses `needsYou` saying
+so, never comes back for good on it. The user's way on (HI-3040): a forward request for the pair with the override
+(`override: true`), made while the resolution is back in Active for its direction (`overridableEntry`: its last entry
+`failed` for `direction` and its latest submission's, none open, no override yet), records it on the resolution
+(`ResolutionOverride` {override?, entry, by}, checked again in its own write with the caller's guard; nothing else made;
+no `override` when the direction reads forward again, only the requeue) and wakes its builder to submit the same
+revision again; `requeue.allowed` lets that
+revision back in once, bound to that failed entry (whatever transient requeues counted; its new entry uses it up), and
+the override, kept on its `ForwardResolution` from then on, bypasses the direction alone. A resolution in any other
+state is refused as before (`openNoOverride`). A direct forward's way stays Remove from queue, then the request again
+with the override (a new card). Not covered: a project folder switched to another branch that isn't a version, with no
+main or master, makes git name that branch the default, which reads as a real answer (follow-up).
 
 Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
 `source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
