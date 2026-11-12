@@ -44,9 +44,16 @@ const UNFINISHED = ['active', 'review', 'approved', 'merging']
 /** A shared folder's new commits attributed in one transaction at most (HI-2379): main's thread given back between. */
 export const ATTRIBUTE_BATCH = 100
 
+/**
+ * Whether a card is built in the project folder beside others (§16.3.2). HI-3083: never a forward merge card (HI-2679):
+ * it records the project folder with no line, but no agent builds it and it has no commits of its own, so it takes no
+ * attribution and makes no other card's commits need a trailer.
+ */
+export const sharesFolder = (s: CardState): boolean => s.started?.folder === 'project' && !s.forward
+
 /** Cards working in the project folder that aren't finished (Active, Review, Approved). */
 function sharedFolderCards(wf: Workflow): CardRecord[] {
-  return wf.store.cards().filter((c) => UNFINISHED.includes(c.stage) && wf.state(c).started?.folder === 'project')
+  return wf.store.cards().filter((c) => UNFINISHED.includes(c.stage) && sharesFolder(wf.state(c)))
 }
 
 /**
@@ -90,7 +97,7 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks, H: HistoryPort
   if (isUnknown(list)) return 'done'
   await hooks.afterRead?.()
   const decided = list.map((c) => {
-    const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x)
+    const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x && !wf.state(x).forward)
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
     return { commit: c.commit, card, how: byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed' }
   })

@@ -1709,6 +1709,9 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
     card's trailer (`Combwork-Card: AM-12`, §16.12, OP-14) is that card's; otherwise, if exactly one card of the folder is
     **unfinished** (Active, Review or Approved: not just Active) it is that card's (`how: only card`); otherwise it
     belongs to no card (`how: unattributed`) and is listed in the Version Control tab for the user to assign or leave.
+    A forward merge card (HI-2679), though started in the project folder, is never one of the folder's cards (HI-3083,
+    `sharesFolder`): no agent builds it, so it takes no commit (not even one naming it), and the trailer guard
+    (`submit.trailer`) doesn't count it as another card working there.
     Combwork keeps the last head it attributed up to per folder line; the first look starts from the oldest `Started.base`
     of the folder's unfinished cards, so commits from before any card started are nobody's [P2].
     The folder's line is its first-parent history (HI-2382, Darren's decision): a branch merged into it (another line,
