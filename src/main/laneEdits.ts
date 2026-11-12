@@ -4,11 +4,11 @@ import { msg } from '../shared/i18n'
 import { LANE_MAX_CARDS, running, type LaneRecord } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { foldCard } from '../shared/workflow/facts'
-import { targetOfRulesetId } from '../shared/workflow/compile'
+import { otherThanOwn } from '../shared/workflow/compile'
 import type { LaneEdit, LaneEditResult, LaneEditUndo, LaneListState, TaskCard } from '../shared/types'
 import { boardRead, cardOwnersNow, cardPlacesNow } from './boardStore'
 import { combworkError } from './combworkError'
-import { applyLaneList, laneDefaultTarget, LaneError, lanesEnforced, mutateInBoard, refuseOtherTargets, refuseWhileTeamPaused } from './lanes'
+import { applyLaneList, laneDefaultTarget, LaneError, laneTarget, lanesEnforced, mutateInBoard, refuseOtherTargets, refuseWhileTeamPaused } from './lanes'
 import { resumeLaneBuilder } from './laneStart'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
@@ -235,7 +235,7 @@ function bringable(ws: WorkspaceService, lanes: LaneRecord[], l: LaneRecord, n: 
   const other = lanes.find((x) => x !== l && x !== o.leaving && running(x) && x.project.toLowerCase() === l.project.toLowerCase() && (x.cards.includes(n) || !!x.pending?.includes(n)))
   if (other) refuse(ws, 409, M.onLane, { card: cardRef(n), builder: other.builder.name })
   if (o.work && keepsWork(ws, l, n)) refuse(ws, 409, M.kept, { card: cardRef(n) })
-  refuseOtherTargets(ws, l.project, [n], l.ruleset ? targetOfRulesetId(l.ruleset) : null, o.def, null)
+  refuseOtherTargets(ws, l.project, [n], otherThanOwn(laneTarget(ws, l), o.def), o.def, null)
 }
 
 /** The checks for a card the edit moves within its lane or takes off it: on the lane, and queued there. */

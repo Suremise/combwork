@@ -15,7 +15,7 @@ import { CW_LANE_START } from './tasks'
 import { inWorkspace } from './workspace'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { CombworkError, combworkError, saidError } from './combworkError'
-import { changeFreshStart, freshStartsNow, holdLaneStart, laneNow, laneRunsWith, lanesEnforced, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
+import { changeFreshStart, freshStartsNow, holdLaneStart, laneNow, laneRunsWith, lanesEnforced, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane, storedRulesets } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
@@ -170,7 +170,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   try {
     const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}) })
     // From here, the lane's own Merges into (HI-2832), as it was recorded.
-    options = laneOptions(options, recorded.lane)
+    options = laneOptions(options, recorded.lane, storedRulesets(ws, project))
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -470,7 +470,7 @@ export async function briefAfterFailedPrepare(ws: WorkspaceService, projectPath:
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane, storedRulesets(ws, lane.project))
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const slot = (await listLanes(ws)).find((l) => l.id === lane.id)?.slot ?? null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
@@ -514,7 +514,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   // Who the reply names, and whether Combwork starts a running builder's first card (the rules on, HI-2029).
   const who = { builder: builder.name, firstCardByCombwork: workflowEnforced() }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane, storedRulesets(ws, lane.project))
   // Its cards all no-code (HI-2338): no slot.
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
@@ -614,7 +614,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   if (over()) return false
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane, storedRulesets(ws, lane.project))
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
   const stoppedOnly = lane.slotWait?.stoppedOnly === true
@@ -695,7 +695,7 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   if (stoppedSince()) return dropStopped()
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane, storedRulesets(ws, lane.project))
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   const slot = (await listLanes(ws)).find((l) => l.id === laneId)?.slot ?? null

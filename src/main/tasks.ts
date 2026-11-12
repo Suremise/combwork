@@ -31,7 +31,7 @@ import type { CardKind, Fact } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
-import { hasStage, skipReviewOf, targetOfRulesetId } from '../shared/workflow/compile'
+import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
 import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
@@ -2249,7 +2249,8 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
   const lane = wf.store.card(n).lane
   const rec = lane ? wf.lane(lane) : null
   if (!rec || rec.ended) return
-  const theirs = (rec.ruleset ? targetOfRulesetId(rec.ruleset) : null) ?? def
+  // Its branch, marked or as its ruleset recorded it (HI-3113): a lane left on the release by Start the next version too.
+  const theirs = laneTargetOf(rec.ruleset, (r) => wf.store.ruleset(r).options) ?? def
   if ((target ?? def) === theirs) return
   const builder = wf.store.laneBuilder(rec.id)
   throw new TaskConflictError(withValues(TARGET.inLane, { card: cardRef(n), builder: (builder && names.get(builder)) ?? builder ?? '', target: theirs ?? '' }))
