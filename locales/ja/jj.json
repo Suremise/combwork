@@ -39,7 +39,7 @@
   "jj.integrate.checksStopped": "マージチェックは停止されました（{check}）。提示されるようにするには、もう一度実行してください。",
   "jj.integrate.checksWaiting": "マージチェックは空いているチェック用コピーを待っています。",
   "jj.integrate.head": "統合待ち",
-  "jj.integrate.how": "たとえば、{target}の上にコピーしてから、jj bookmark setで{target}をjjが表示したコピーへ移動します。コピーならカードのスロットはそのままです。コミットをリベースすると、スロットの作業コピーが書き換えられ、スロットが古くなります。",
+  "jj.integrate.how": "たとえば、そのコミットを{target}の上にコピーしてから、jj bookmark setで{target}をjjがレビュー済みコミットについて表示したコピーへ移動します。コピーならカードのスロットはそのままです。コミットをリベースすると、スロットの作業コピーが書き換えられ、スロットが古くなります。",
   "jj.integrate.noMerge": "Combworkはjjではマージしません。レビュー済みの作業はjjでご自身で統合してください。",
   "jj.integrate.none": "待っているカードはありません。",
   "jj.integrate.notChecked": "{target}に入っているかはまだ確認していません。",

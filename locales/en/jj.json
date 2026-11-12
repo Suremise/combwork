@@ -160,8 +160,8 @@
     "description": "A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves."
   },
   "jj.integrate.how": {
-    "defaultMessage": "For example, copy it onto {target}, then move {target} to the copy jj prints with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commit would rewrite the slot’s working copy and leave it stale.",
-    "description": "Above a jj command suggested to integrate a passed card (HI-2913): copy it onto its target with jj duplicate, then move the target bookmark to the new commit jj prints. Why a copy: a rebase would rewrite the commit the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command)."
+    "defaultMessage": "For example, copy its commits onto {target}, then move {target} to the copy jj prints for the reviewed commit, with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commits would rewrite the slot’s working copy and leave it stale.",
+    "description": "Above a jj command suggested to integrate a passed card (HI-2913, HI-3094): copy all of its commits onto its target with jj duplicate (it prints a copy for each), then move the target bookmark to the copy of the reviewed commit (the card’s last). Why a copy: a rebase would rewrite the commits the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command)."
   },
   "jj.integrate.noMerge": {
     "defaultMessage": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
