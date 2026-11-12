@@ -32,6 +32,11 @@ export interface WorktreeNow {
    * files, so a changed file of the same name is a file. Absent: the platform lists none.
    */
   operations?: string[]
+  /**
+   * HI-3023: the submodules among `dirty` whose only changes are inside them (edited or untracked files there, the
+   * recorded commit unchanged): work held there, but nothing the folder itself can commit or set aside. Absent: none.
+   */
+  insideOnly?: string[]
   /** The line asked for's head (null: no such line), when one was. */
   target?: string | null
   /** The platform's metadata paths asked for, absolute, in their order. */

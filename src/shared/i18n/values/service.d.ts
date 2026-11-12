@@ -96,6 +96,7 @@ interface CombworkMessageValues {
   'service.folderChanges.readFailed': { why: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.submoduleInside': { folder: string | number }
   'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
   'service.folderChanges.unplaced': { folder: string | number }
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }

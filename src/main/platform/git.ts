@@ -376,6 +376,13 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
   return now.dirty.filter((f) => f.startsWith('(') || mine(f))
 }
 
+/**
+ * HI-3023: a porcelain v2 `1 ` row of a submodule whose only change is inside it: nothing staged (`X` is `.`), its
+ * checked-out commit the recorded one (`S.`), only edited or untracked files in it (`S.M.`, `S..U`, `S.MU`). The
+ * folder has nothing of it to commit or set aside: the work is the submodule's own.
+ */
+export const insideOnly = (xy: string | undefined, sub: string | undefined): boolean => !!xy && !!sub && xy[0] === '.' && sub.length === 4 && sub[0] === 'S' && sub[1] === '.' && (sub[2] === 'M' || sub[3] === 'U')
+
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
 
@@ -402,14 +409,19 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   let line: string | null = null
   let oid: string | null = null
   const files: string[] = []
+  const inside: string[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i]
     if (!p) continue
     if (p.startsWith('# branch.oid ')) oid = /^[0-9a-f]{40,64}$/.test(p.slice(13)) ? p.slice(13) : null
     else if (p.startsWith('# branch.head ')) line = p.slice(14) === '(detached)' ? null : p.slice(14)
-    else if (p.startsWith('1 ')) files.push(p.split(' ').slice(8).join(' '))
-    else if (p.startsWith('2 ')) {
+    else if (p.startsWith('1 ')) {
+      const f = p.split(' ')
+      const path = f.slice(8).join(' ')
+      files.push(path)
+      if (insideOnly(f[1], f[2])) inside.push(path)
+    } else if (p.startsWith('2 ')) {
       files.push(p.split(' ').slice(9).join(' '))
       i++ // the original path
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
@@ -423,7 +435,7 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
   const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
-  return { line, head: oid, dirty: [...files, ...operations], operations, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  return { line, head: oid, dirty: [...files, ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
 /**

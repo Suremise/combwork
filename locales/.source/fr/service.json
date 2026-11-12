@@ -94,6 +94,7 @@
   "service.folderChanges.readFailed": "Git could not read the folder's changes: {why}",
   "service.folderChanges.stashFailed": "Git did not set the changes aside: {why}",
   "service.folderChanges.stashPartial": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
+  "service.folderChanges.submoduleInside": "{folder} is a submodule whose changes are inside it, so Combwork can't commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.",
   "service.folderChanges.tooManyToSetAside": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",
   "service.folderChanges.unplaced": "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.",
   "service.folderChanges.wrongBranch": "{folder} isn't on {target} now. Look again.",

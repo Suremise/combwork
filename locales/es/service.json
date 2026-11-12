@@ -78,6 +78,7 @@
   "service.folderChanges.midOperation": "Git está en medio de {state, select, merge {una fusión} rebase {un rebase} cherryPick {un cherry-pick} other {un revert}} en {folder}. Termina o cancela esa operación primero.",
   "service.folderChanges.moved": "La carpeta donde {target} está activa cambió mientras tanto. Vuelve a mirar.",
   "service.folderChanges.nestedRepo": "{folder} es un repositorio de Git propio dentro de este, así que Combwork no hace commit de él ni lo aparta. Añádelo tú a .gitignore o como submódulo.",
+  "service.folderChanges.submoduleInside": "{folder} es un submódulo cuyos cambios están dentro de él, así que Combwork no puede hacer commit de ellos ni apartarlos aquí. Haz commit de ellos o apártalos dentro de {folder} y, si quieres, haz commit aquí de su nuevo commit.",
   "service.folderChanges.noTarget": "{target} ya no está activa en ninguna carpeta de este proyecto: no hay nada para hacer commit ni apartar allí.",
   "service.folderChanges.nothing": "{file} no tiene cambios para hacer commit.",
   "service.folderChanges.readFailed": "Git no pudo leer los cambios de la carpeta: {why}",

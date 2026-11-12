@@ -43,6 +43,7 @@ const M = {
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
+  submoduleInside: msg({ id: 'service.folderChanges.submoduleInside', defaultMessage: '{folder} is a submodule whose changes are inside it, so Combwork can\'t commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.', description: "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done." }),
   tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
@@ -145,7 +146,7 @@ const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() ==
  * work in (the folder's own project's agents there, unless the caller names more). Throws the refusal, in the
  * window's words.
  */
-async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<string> {
+async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[] }> {
   const now = await worktreeNow(folder)
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   if (!now.line) throw combworkError(M.detached, { folder })
@@ -160,7 +161,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
     const agent = await busyAgentIn(at.project, at.folder)
     if (agent) throw combworkError(M.agentBusy, { agent, folder: at.folder })
   }
-  return now.line
+  return { line: now.line, inside: now.insideOnly ?? [] }
 }
 
 /**
@@ -257,7 +258,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         const again = await checkouts(projectPath)
         if (isUnknown(again) || !again[target] || !samePlace(again[target], seen) || !samePlace(again[target], shownFolder)) throw combworkError(M.moved, { target })
         const folder = again[target]
-        const branch = await assertQuiet(projectPath, folder, target)
+        const { line: branch, inside } = await assertQuiet(projectPath, folder, target)
         guard?.()
         const now = await changedIn(folder)
         if (!shown.length || !shown.every((p) => now.has(p))) throw combworkError(M.changed, { folder })
@@ -267,6 +268,9 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A folder git lists whole: an untracked repository of its own, never committed or stashed as one (HI-2983).
         const nested = files.find((p) => p.endsWith('/'))
         if (nested) throw combworkError(M.nestedRepo, { folder: nested })
+        // A submodule changed only inside it (HI-3023): its commit unchanged, git has nothing of it to commit or stash here.
+        const sub = files.find((p) => inside.includes(p))
+        if (sub) throw combworkError(M.submoduleInside, { folder: sub })
         const kept = await keptDeleted(folder, files, now)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         // Set aside: always exactly the paths shown, never the whole folder's (HR1's round 1: a change made after this
@@ -318,7 +322,7 @@ export async function commitIgnore(projectPath: string): Promise<FolderChangesDo
     () =>
       changingFolder(repo.top, say(FENCE.ignore), async () => {
         const agentsAt = (await projectsInTree(repo.cwd, repo.top)).map((p) => ({ project: p, folder: p }))
-        const branch = await assertQuiet(repo.cwd, repo.top, null, agentsAt)
+        const { line: branch } = await assertQuiet(repo.cwd, repo.top, null, agentsAt)
         // Its paths from the repository's top (the project folder may be a folder in a larger repository).
         const now = await changedIn(repo.top)
         const file = '.gitignore'

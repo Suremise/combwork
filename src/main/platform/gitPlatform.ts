@@ -660,7 +660,10 @@ export class GitPlatform implements PlatformAdapter {
     const now = await G.worktreeNow(folder)
     // A git operation's marker (`(MERGE_HEAD)`) isn't a file to commit: the files only, told apart by the operations
     // listed (HI-2983: a changed file named `(MERGE_HEAD)` is a file).
-    const files = isUnknown(now) ? [] : now.dirty.slice(0, now.dirty.length - (now.operations?.length ?? 0))
+    // HI-3023: nor a submodule changed only inside, which the folder can't commit or set aside (a merge that changes its
+    // commit still pauses on it, and Commit and Set Aside say to settle it inside).
+    const inside = new Set(isUnknown(now) ? [] : (now.insideOnly ?? []))
+    const files = isUnknown(now) ? [] : now.dirty.slice(0, now.dirty.length - (now.operations?.length ?? 0)).filter((f) => !inside.has(f))
     return files.length ? { target, folder, files } : null
   }
 
