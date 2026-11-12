@@ -192,12 +192,12 @@ export function findMsysMarked(m: MsysMark): Promise<{ out: string } | { error: 
 }
 
 /**
- * The trees to end for `root` (treeToEnd, from `list`) and for each of `extra` (MSYS programs it started, each with what it
- * started in turn), each process once, children before their parents.
+ * The trees to end for `root` (treeToEnd, from `list`; null: none, its process gone) and for each of `extra` (MSYS
+ * programs it started, each with what it started in turn), each process once, children before their parents.
  */
-export function treesToEnd(list: ListedProcess[], root: number, extra: ListedProcess[]): ListedProcess[] {
+export function treesToEnd(list: ListedProcess[], root: number | null, extra: ListedProcess[]): ListedProcess[] {
   const out: ListedProcess[] = []
-  for (const p of [...extra.flatMap((x) => treeToEnd(list, x.pid)), ...treeToEnd(list, root)]) if (!out.some((x) => x.pid === p.pid)) out.push(p)
+  for (const p of [...extra.flatMap((x) => treeToEnd(list, x.pid)), ...(root === null ? [] : treeToEnd(list, root))]) if (!out.some((x) => x.pid === p.pid)) out.push(p)
   return out
 }
 
@@ -206,21 +206,32 @@ export function treesToEnd(list: ListedProcess[], root: number, extra: ListedPro
  * listing, identity check and order, through PowerShell runs it awaits rather than spawnSync. With `msys` (HI-3047), the
  * MSYS programs carrying its marker are found first and ended with the tree; a search that fails ends the tree alone, as
  * without it, and says why (onIncomplete).
+ *
+ * HI-3054: the root is ended only when `child` hasn't exited by the time the listing is read. Node holds its process's
+ * handle until it reports the exit (exitCode or signalCode set, then the handle closed), so until then its pid can't be
+ * another's and the listing's entry is that process; once it has exited during the search or the listing, its pid may
+ * already name another process, so no tree is walked from that number. Its marked MSYS programs, found by their marker,
+ * not their parent, are still ended with what they started; native programs it started, whose parent is then only a
+ * number, are left, as when it exits before any teardown.
  */
 export async function endTreeAsync(child: ChildProcess, platform = process.platform, msys?: MsysMark): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) return
+  const exited = (): boolean => child.exitCode !== null || child.signalCode !== null
+  if (exited()) return
   if (platform === 'win32' && child.pid) {
     // Searched before the listing: a match's process must still be the one listed (msysMatches).
     const found = msys ? await (msys.discover ?? findMsysMarked)(msys).catch((e: Error) => ({ error: `it couldn't run (${e.message})` })) : null // i18n-ignore: for the log
     const list = parseProcessList(await powershell(LIST_PS))
+    // Read after the listing, in the same turn as the walk (HI-3054): not exited yet, so the listing's entry is its own.
+    const root = exited() ? null : child.pid
     let extra: ListedProcess[] = []
     if (msys && found) {
       const matches = 'out' in found ? msysMatches(found.out, list) : null
       if (matches) extra = matches
       else msys.onIncomplete?.('error' in found ? found.error : 'its answer was malformed') // i18n-ignore: for the log
     }
-    const tree = treesToEnd(list, child.pid, extra)
-    if (tree.length && pidsOf(await powershell(endListedPs(tree))).includes(child.pid)) return
+    const tree = treesToEnd(list, root, extra)
+    const ended = tree.length ? pidsOf(await powershell(endListedPs(tree))) : []
+    if (root === null || ended.includes(root)) return
   }
   try {
     child.kill()
