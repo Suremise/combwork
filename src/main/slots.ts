@@ -250,6 +250,9 @@ export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: fals
 /** `stale` (HI-2913): the error is a stale jj workspace's, which the user's Recover… mends. */
 export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null; stale?: true }
 
+/** HI-3010: an in-place preparation's `retry` (the log's words): what is left waits for the slot's builder. */
+export const NOT_IN_PLACE = 'not in place: it waits for its builder' // agent-protocol: a log line's detail, never sent to an agent
+
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
   | { why: 'leased'; agent: string }
@@ -2553,8 +2556,13 @@ export class SlotPool {
    * own. `ready` is the caller's last word right before the slot's files change (its card still current, its builder
    * quiet): a reason, and nothing changes. A slot already on the line is prepared (a repeat changes nothing). `retry`:
    * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
+   *
+   * `inPlace` (HI-3010): only what changes no file, so its builder needn't be quiet (it may already be at work on the
+   * card): a slot detached at `base` or past it gets its new line where its head is (`branchHere`), and `inPlace` is
+   * that switch's last word instead of `ready`. Anything else (another line there, the line made before, its files or
+   * install due, a port without it) is `retry`, for the preparation that waits for its builder.
    */
-  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
+  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; inPlace?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
     const lease = this.store.lease(leaseId)
     if (!lease || lease.to) return { error: sayStored(T.leaseEnded) }
     const name = lease.slot
@@ -2572,10 +2580,17 @@ export class SlotPool {
           return { error: sayStored(T.branchUnread, { slot: name }) }
         }
         const there = on === p.line
+        const inPlace = !!p.inPlace
+        // In place (HI-3010): only a detached slot gets its line so; on another line, it waits for its builder.
+        if (inPlace && !there && (on !== null || !this.port.branchHere)) {
+          await end()
+          return { retry: NOT_IN_PLACE }
+        }
         // The same card started again in its own slot (HI-2981: jj gives each start a new key): what is in the folder is
         // that card's own uncommitted work, kept as on Git's same branch, never refused as another's.
-        const carried = !there && !!(await this.port.carries?.(slot.folder, p.line, p.base, { identity: slot.identity ?? null, ...(p.target ? { target: p.target } : {}) }))
-        if (!there && !carried) {
+        const carried = !there && !inPlace && !!(await this.port.carries?.(slot.folder, p.line, p.base, { identity: slot.identity ?? null, ...(p.target ? { target: p.target } : {}) }))
+        // In place, no file changes: what is in the folder is its builder's own work on this card, and stays as it is.
+        if (!there && !carried && !inPlace) {
           // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
           const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {
@@ -2591,6 +2606,11 @@ export class SlotPool {
         if (isUnknown(had)) {
           await end()
           return { error: sayStored(T.gitRead, { what: p.line }) }
+        }
+        // A line made before (a card started again) is switched to, which can change files: that waits for its builder.
+        if (inPlace && had) {
+          await end()
+          return { retry: NOT_IN_PLACE }
         }
         const hash = p.install ? await lockHash(slot.folder) : null
         // HI-1182: its submodules and LFS set up before every ready while the setting is on (a step that failed or was
@@ -2610,15 +2630,16 @@ export class SlotPool {
         // The caller's last word (its card current, the rules on, its builder quiet) and still this operation's, right
         // before the slot's files change: inside the caller's guard (the app's: the repository's lock, as merges and branch
         // deletions take it), after any wait for it, so nothing waited on stands in for a check made before it.
-        const last = async (): Promise<string | null> => {
-          const notYet = (await p.ready?.()) ?? null
+        const last = async (word = p.ready): Promise<string | null> => {
+          const notYet = (await word?.()) ?? null
           if (!notYet) await this.store.fenced(name, token, () => undefined)
           return notYet
         }
         if (!there) {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
-            const notYet = await last()
+            const notYet = await last(inPlace ? p.inPlace : p.ready)
             if (notYet) return { notYet }
+            if (inPlace) return this.port.branchHere!(slot.folder, p.line, p.base)
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
             const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
@@ -2631,6 +2652,11 @@ export class SlotPool {
           }
           if (!r.ok) {
             await end()
+            // In place (HI-3010): its head not past the base, say: the preparation that waits for its builder decides.
+            if (inPlace) {
+              log.info(`Slot ${userText(name)} not put on ${userText(p.line)} in place: ${userText(r.err.trim().split(/\r?\n/)[0] ?? '')}`)
+              return { retry: NOT_IN_PLACE }
+            }
             // jj's (HI-2913): quiet lost during its owned write, or a result to decide on the next pass, is a wait; a stale
             // workspace found there is said as itself.
             const err = r.err.trim()
@@ -2638,12 +2664,18 @@ export class SlotPool {
             if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
             return { error: sayStored(T.switchFailed, { error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
-          log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}`)
+          log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)
           files = await filesNeed()
           if (typeof files === 'object') {
             await end()
             return { error: files.error }
           }
+        }
+        // In place, its files or install (which change files) wait for its builder: the slot is on its line meanwhile.
+        const due = inPlace && p.install ? await lockHash(slot.folder) : null
+        if (inPlace && (files || (due !== null && due !== slot.installHash))) {
+          await end()
+          return { retry: NOT_IN_PLACE }
         }
         if (files) {
           // It changes the slot's files too: the same last word first.

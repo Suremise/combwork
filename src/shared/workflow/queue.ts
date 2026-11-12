@@ -174,7 +174,8 @@ export interface QueuePauseInfo {
  */
 export interface QueueForward {
   others: string[]
-  behind: { from: string; commits: number | null }[]
+  /** HI-3000: `resolving`, the card resolving that pair (Resolve on a builder) while it is open: nothing more is offered for it. */
+  behind: { from: string; commits: number | null; resolving?: { card: number; key: string } }[]
 }
 
 export interface QueueView {

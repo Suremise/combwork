@@ -4,7 +4,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -517,6 +517,49 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect((await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [rc], by: 'You', target: '1.2.0' })).lane.target).toBe('1.2.0')
     expect(await store.boardWrite(w, async () => wf.start(`#${rc}`, agentActor('b1')))).toMatchObject({ ok: true })
     expect(wf.state(wf.store.card(rc)).started).toMatchObject({ target: '1.2.0', base: git(repo, 'rev-parse', '1.2.0') })
+  })
+
+  it('HI-3000: while its resolution is open, a forward request for the pair returns that card and makes nothing; the queue card says it waits', async () => {
+    const { w, repo } = await conflicting()
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    const fwd = 'card' in made ? made.card : null
+    expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    const rc = (await inWorkspace(w, () => controls.resolveForward(w, fwd!.number, user, 'by hand'))).card.number
+    const wf = (await workflowFor(w, repo))!
+    const key = wf.store.card(rc).key
+    const before = wf.store.cards().length
+    // The forward is Done; its resolution in Todo is the pair's open work, for the window's request and the Assistant's.
+    for (const by of [user, assistant]) {
+      const again = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', by))
+      expect(again).toMatchObject({ queued: false, from: 'main', to: '1.2.0', card: { number: rc } })
+    }
+    expect(wf.store.cards().length).toBe(before)
+    expect(wf.state(wf.store.card(rc)).entries).toHaveLength(0)
+    // The queue card names it beside how far 1.2.0 is behind main (the window then offers nothing for that pair).
+    const view = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')!
+    expect(view.forward?.behind.find((b) => b.from === 'main')).toMatchObject({ resolving: { card: rc, key } })
+    // HR1's round 1: the lookup reads the open cards alone (the Done forward never folded), once per listing, not per pair.
+    const tasks = await import('../src/main/tasks')
+    const folded = vi.spyOn(wf, 'state')
+    const reads = vi.spyOn(wf.store, 'cardsOpen')
+    try {
+      expect(controls.openPairs(wf).get('main\n1.2.0')?.id).toBe(rc)
+      expect(folded.mock.calls.map(([c]) => (c as { id: number }).id)).toEqual([rc])
+      folded.mockClear()
+      reads.mockClear()
+      // A board change, so the listing is made afresh (not its cached view): one read of the open cards for it.
+      await inWorkspace(w, () => tasks.createTask({ title: 'something else', project: 'p' }, user))
+      await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+      expect(reads).toHaveBeenCalledTimes(1)
+    } finally {
+      folded.mockRestore()
+      reads.mockRestore()
+    }
+    // Done (here by the user's move, nothing to merge): the pair is open again, and a request makes a new forward.
+    await inWorkspace(w, () => tasks.moveTask(rc, 'done', { confirm: true, reason: 'resolved elsewhere' }))
+    const after = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')!
+    expect(after.forward?.behind.find((b) => b.from === 'main')?.resolving).toBeUndefined()
+    expect(await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))).toMatchObject({ queued: true })
   })
 
   it("is the user's or the Assistant's, only on a returned forward; one board change, never two cards", async () => {

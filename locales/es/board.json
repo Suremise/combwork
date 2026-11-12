@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, one {# más} many {# más} other {# más}}",
   "board.queue.forward": "Poner al día…",
   "board.queue.forwardAlready": "{to} ya se está poniendo al día con {from}",
+  "board.queue.forwardResolving": "{card} lo está resolviendo: «Poner al día» espera a que termine",
   "board.queue.forwardAskConfirm": "Poner en cola",
   "board.queue.forwardAskMessage": "{from}, tal como está ahora, se fusiona en {to} mediante la cola de fusión de {to}, con sus comprobaciones de fusión, como un commit de fusión. {from} no cambia. Si hay un conflicto o falla una comprobación, su tarjeta vuelve para que elijas Reintentar la fusión o Quitar.",
   "board.queue.forwardAskTitle": "¿Poner {to} al día con {from}?",

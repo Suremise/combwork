@@ -696,6 +696,7 @@
   "board.queue.filesMore": "{n, plural, one {# autre} many {# autres} other {# autres}}",
   "board.queue.forward": "Mettre à jour…",
   "board.queue.forwardAlready": "{to} est déjà en cours de mise à jour avec {from}",
+  "board.queue.forwardResolving": "La carte {card} le résout : « Mettre à jour » attend qu’elle soit terminée",
   "board.queue.forwardAskConfirm": "Mettre en file",
   "board.queue.forwardAskMessage": "{from}, telle qu’elle est maintenant, est fusionnée dans {to} par la file de fusion de {to}, avec ses vérifications de fusion, en commit de fusion. {from} elle-même ne change pas. En cas de conflit ou d’échec d’une vérification, sa carte revient pour que tu choisisses Réessayer la fusion ou Retirer.",
   "board.queue.forwardAskTitle": "Mettre à jour {to} avec {from} ?",

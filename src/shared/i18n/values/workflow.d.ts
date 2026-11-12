@@ -366,6 +366,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.changed.next': { platform: string | number }
   'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; base: string | number; commit: string | number; other: string | number; max: number }
   'workflow.refused.platform.jjRefused.next': { why: string }
+  'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
+  'workflow.refused.platform.offLine.next': { where: string; line: string | number; on: string | number }
   'workflow.refused.platform.switching.message': { card: string | number }
   'workflow.refused.platform.switching.next': undefined
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
