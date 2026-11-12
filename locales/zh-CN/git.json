@@ -488,6 +488,8 @@
   "git.vc.store.member": "{project}（现为 {platform}）",
   "git.vc.store.notExported": "书签 {name} 与 Git 中的不一致：请运行 jj git export，或检查一下。",
   "git.vc.store.queue": "{project}：其合并队列",
+  "git.vc.store.stuck": "Combwork 在将 {projects} 于 Git 和 jj 之间切换时停止了，无法根据它们的设置判断应朝哪个方向完成：{changed} 已被更改或无法读取。在它们显示切换前或切换后的版本控制之前，其仓库上不会开始任何工作。",
+  "git.vc.store.stuckTitle": "无法完成版本控制的切换",
   "git.vc.store.slot": "{project}：槽位 {slot}，借给了 {agent}",
   "git.vc.store.stock": "Git for Windows 自带的默认设置（它的 LFS 过滤器、Office 文档的 diff 驱动）不计入：只计入仓库或你自己的 Git 设置所用的内容。",
   "git.vc.store.toGit": "Combwork 会保留 .jj：如果不再需要，请用 jj 将其删除。",

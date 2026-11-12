@@ -454,6 +454,8 @@ interface CombworkMessageValues {
   'git.vc.store.queue': { project: string | number }
   'git.vc.store.slot': { project: string | number; slot: string | number; agent: string | number }
   'git.vc.store.stock': undefined
+  'git.vc.store.stuck': { projects: string | number; changed: string | number }
+  'git.vc.store.stuckTitle': undefined
   'git.vc.store.toGit': undefined
   'git.vc.store.toJj': undefined
   'git.vc.store.unknown': { gate: string | number; what: string | number }

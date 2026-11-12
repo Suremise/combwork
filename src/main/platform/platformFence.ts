@@ -45,6 +45,8 @@ export interface FenceOwner {
   token: string
   pid: number
   profile: string
+  /** HI-3073: its process's start time (ms), so a pid reused by another program isn't taken for it; absent in older fences. */
+  started?: number
 }
 
 export interface Fence {
@@ -104,7 +106,8 @@ function fenceOf(v: unknown): Fence | null {
   if (v.owner !== undefined) {
     const o = v.owner
     if (!isObj(o) || typeof o.token !== 'string' || typeof o.pid !== 'number' || typeof o.profile !== 'string') return null
-    owner = { token: o.token, pid: o.pid, profile: o.profile }
+    if (o.started !== undefined && typeof o.started !== 'number') return null
+    owner = { token: o.token, pid: o.pid, profile: o.profile, ...(typeof o.started === 'number' ? { started: o.started } : {}) }
   }
   return { generation: v.generation, state: v.state, ...(owner ? { owner } : {}), members }
 }
