@@ -1032,7 +1032,25 @@ export class MergeQueue {
     const I = this.catchUpPort(c)!
     const h = this.host({})
     const f = await I.recoveryState(h, { target, expected: c.from, result: c.to, files: c.files ?? [], folder, phase: c.phase! })
-    if (f.found === 'integrated' || f.found === 'requeue') {
+    // HI-3039: the local target moved meanwhile (the user's pull or commit), which the advance's table reads as its own
+    // ref taken by another client. A catch-up's is the user's branch: one that holds the result already (a pull past it)
+    // is settled, its files never moved back; one that lacks it stays owed, its phase dropped, and is looked at again
+    // as a fresh one (paused `remoteDiverged` over the user's commits), never cleared.
+    if (f.found === 'rollback' || f.found === 'requeue') {
+      const local = await I.targetHead(this.project, target)
+      if (isUnknown(local)) return null
+      const has = local ? await I.contains(this.project, c.to, local) : false
+      if (isUnknown(has)) return null
+      if (has) {
+        await this.setCatchUp(target, c.to, null)
+        return null
+      }
+      if (f.found === 'requeue') {
+        await this.setCatchUp(target, c.to, { from: c.from, to: c.to, card: c.card, entry: c.entry })
+        return 'again'
+      }
+    }
+    if (f.found === 'integrated') {
       await this.setCatchUp(target, c.to, null)
       return null
     }

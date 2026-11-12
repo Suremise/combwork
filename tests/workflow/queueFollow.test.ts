@@ -532,4 +532,49 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
     expect(e.store.facts(a.id).some((f) => f.kind === 'LeftTarget')).toBe(false)
   })
+
+  /** A published, Done; Combwork stopped (a crash, a lost lease) after journalling its catch-up's plan, before moving files. */
+  async function stoppedBeforeItsFiles() {
+    const f = following({}, { checkedOut: true })
+    const a = await queued(f.e, 'A', 'a.txt')
+    await expect(f.queue({ hooks: { beforeCatchUpFiles: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect(f.e.wf.state(a).stage).toBe('done')
+    expect(catchUpOf(f.e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key, phase: 'files' })
+    return { ...f, a, result: f.e.wf.state(a).integrated!.result }
+  }
+
+  it('HI-3039: a journalled catch-up after the user pulled past it: settled, the clean folder left as it is', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, transport, result } = await stoppedBeforeItsFiles()
+    // A teammate pushes on top of the published merge; the user pulls it (a fast-forward).
+    const top = theirs(bare)
+    sh(e.project, 'pull', '-q', '--ff-only', 'origin', 'main')
+    expect(head(e.project)).toBe(top)
+    expect(contains(e.project, result)).toBe(true)
+    expect(await restarted(e, transport).drain('main')).toEqual([])
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    expect(head(e.project)).toBe(top)
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('HI-3039: a journalled catch-up after the user committed on the local target: still owed, paused remoteDiverged, never LeftTarget', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, transport, a, result } = await stoppedBeforeItsFiles()
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine')
+    const q = restarted(e, transport)
+    expect(await q.drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'remoteDiverged', files: ['main'] }])
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))?.phase).toBeUndefined()
+    expect(contains(e.project, result)).toBe(false)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    // Put right (the user's commit taken off): caught up.
+    sh(e.project, 'reset', '-q', '--hard', 'HEAD~1')
+    q.resume('main')
+    await q.drain('main')
+    expect(contains(e.project, result)).toBe(true)
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+  })
 })
