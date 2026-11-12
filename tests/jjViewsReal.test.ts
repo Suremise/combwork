@@ -391,6 +391,10 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(used.attributes).toMatchObject({ uses: expect.arrayContaining([expect.stringContaining('eol=lf')]) })
     expect(used.hooks).toMatchObject({ uses: [expect.stringContaining('pre-commit')] })
     expect(used.signing).toMatchObject({ uses: ['commit.gpgsign (local)'] })
+    // HI-3035: a tracked one gone from disk (no jj command since, so still in the working-copy commit) is read from the
+    // store, named as its index copy.
+    rmSync(join(r.root, 'deep', '.gitattributes'))
+    expect((await assessJj(r.root, r.ctx.store, gitDeps, sep)).lfs).toMatchObject({ uses: [':deep/.gitattributes: *.bin filter=lfs diff=lfs merge=lfs -text'] })
     // Without `separate` git would be asked in a folder with no .git: unknown, never clear.
     const asFolder = await assessJj(r.root, r.ctx.store, gitDeps)
     expect(asFolder.submodules).toMatchObject({ unknown: expect.any(String) })
