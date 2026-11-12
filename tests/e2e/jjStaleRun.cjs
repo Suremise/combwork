@@ -301,7 +301,10 @@ function givings(n) {
     }, HUNG_MS * 3)
     console.log(`INFO Recover… tries after B1 stopped: ${answers.join(', ')}`)
     const logText = () => (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '')
-    check("Recover… with nothing in the lane's slot: recovered for card 3, not stale any more", !!recovered && logText().includes(`recovered for #${n3}`), `${tries} tries; ${JSON.stringify(await slotRow(slotName))}`)
+    // The app logs the recovery and reads the slot list again in its own time, after the call answered (HI-3007: read at
+    // once, under load the log didn't have the line yet): both are waited for.
+    const settled = !!recovered && !!(await until(async () => logText().includes(`recovered for #${n3}`) && (await notStale()), HUNG_MS))
+    check("Recover… with nothing in the lane's slot: recovered for card 3, not stale any more", settled, `${tries} tries; logged: ${logText().includes(`recovered for #${n3}`)}; ${JSON.stringify(await slotRow(slotName))}`)
     for (const l of logText().split(/\r?\n/).filter((x) => /wasn't recovered|recovered for|recovery refused|recovery stopped|prepared for #| is on jj:|Giving|ended in/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
 
     // --- Card 3 prepared in the recovered slot, B1 given it there; built, reviewed and integrated as shown.
