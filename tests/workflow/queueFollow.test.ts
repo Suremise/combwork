@@ -674,6 +674,23 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
   })
 
+  it('HI-3089: Resume of a catch-up whose remote can’t be read, nothing else queued: still paused (fetchFailed, git’s words), never cleared silently; read again, caught up', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    del(join(e.project, 'a.txt'))
+    sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+    queue().resume('main')
+    expect((await queue().drain('main')).at(-1)).toMatchObject({ card: a.key, outcome: 'paused', reason: 'fetchFailed' })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'fetchFailed', card: a.key, message: expect.stringMatching(/nowhere\.git/) })
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    expect(head(e.project)).not.toBe(head(bare))
+    sh(e.project, 'remote', 'set-url', 'origin', bare)
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+  })
+
   it('HI-3055: an owed catch-up behind the result whose remote can’t be read holds the next card (fetchFailed); read again, caught up, then the next card', { timeout: GIT_HEAVY_MS * 2 }, async () => {
     const { e, bare, queue, a } = await caughtOnAFile()
     del(join(e.project, 'a.txt'))

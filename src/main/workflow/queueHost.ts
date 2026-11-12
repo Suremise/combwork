@@ -34,7 +34,7 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
+import { catchUpKey, catchUpOf, MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
 import { changingFolder, inFolder } from '../folderFence'
 import { sessions } from '../sessions'
 import { progress } from '../progressService'
@@ -373,9 +373,10 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
 /**
  * The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d); and,
  * following the remote, `beforePublish`: in phase push with nothing sent, so the restart finds an unknown publication
- * the remote lacks and asks For you (HI-3088's window check).
+ * the remote lacks and asks For you (HI-3088's window check); `beforeCatchUpRef`: a published merge's local catch-up
+ * with its files moved and its ref not (HI-3089's window check: taken up as Combwork starts again).
  */
-const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback', 'beforePublish']
+const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback', 'beforePublish', 'beforeCatchUpRef']
 let raced = false
 
 /**
@@ -452,8 +453,10 @@ function openTargets(wf: Workflow): string[] {
     const e = openEntry(wf.state(f.card))
     if (e && e.id === d.entry) out.add(d.target)
   }
-  // A target whose push an earlier merge still owes (G18, #1179: Combwork stopped before it, or it was refused) runs too.
-  for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t)))) out.add(t)
+  // A target whose push an earlier merge still owes (G18, #1179: Combwork stopped before it, or it was refused) runs too;
+  // so does one whose local catch-up a published merge still owes (HI-3089: one stopped part way, its files moved and its
+  // ref not, was left staged in the user's folder with nothing said until another card came).
+  for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t))) || catchUpOf(wf.store.meta(catchUpKey(t)))) out.add(t)
   return [...out]
 }
 

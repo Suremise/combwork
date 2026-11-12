@@ -613,16 +613,19 @@ export class MergeQueue {
       if (published) return this.thenPush(target, published)
       const behind = await this.settleCatchUp(target)
       if (behind) return behind
+      // HI-3055, HI-3089: a catch-up still owed because its remote couldn't be read pauses with why (Resume reads it
+      // again), with or without an entry waiting: a Resume made offline otherwise cleared the pause and said nothing.
+      const pending = catchUpOf(this.wf.store.meta(catchUpKey(target)))
+      if (pending && this.unread) return this.catchUpPause(target, pending, this.unread.pause, this.unread.files, this.unread.message)
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
       const owed = await this.settlePush(target)
       if (owed) return owed
       const next = this.entries(target, true)[0]
       if (!next) return null
-      // HI-3055: a catch-up still owed (a read that couldn't tell) holds the next entry, whose publication would write its
-      // own catch-up over that journal (a recorded step's folder, files and phase lost). A remote that couldn't be read
-      // pauses with why (Resume reads it again); a local read that couldn't tell waits for the next look, as an advance's.
-      const pending = catchUpOf(this.wf.store.meta(catchUpKey(target)))
-      if (pending) return this.unread ? this.catchUpPause(target, pending, this.unread.pause, this.unread.files, this.unread.message) : null
+      // HI-3055: a catch-up still owed (a local read that couldn't tell) holds the next entry, whose publication would
+      // write its own catch-up over that journal (a recorded step's folder, files and phase lost): it waits for the next
+      // look, as an advance's unreadable read does.
+      if (pending) return null
       return this.thenPush(target, await this.process(next.card, next.entry))
     }).catch(lostIsNull)
   }
