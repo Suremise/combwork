@@ -309,12 +309,12 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
 
   it("HI-3105 (HR1's round 1): after a refusal at Switch, the dialog gives way to a fresh look when the check reads clear or refuses with lists, else keeps the error", async () => {
     const { rereadAfterRefusal } = await import('../src/shared/platform/switching')
-    const store = { group: [], token: 't', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
+    const shown = { group: [], token: 't', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
     // The race passed: clear now, a fresh confirmation (no switch made by itself).
-    expect(rereadAfterRefusal({ refused: null, store })).toBe(true)
+    expect(rereadAfterRefusal({ refused: null, store: shown })).toBe(true)
     // What the warning lists changed: the refused dialog with its lists.
-    expect(rereadAfterRefusal({ refused: { why: 'drain' }, store })).toBe(true)
-    expect(rereadAfterRefusal({ refused: { why: 'fallback' }, store })).toBe(true)
+    expect(rereadAfterRefusal({ refused: { why: 'drain' }, store: shown })).toBe(true)
+    expect(rereadAfterRefusal({ refused: { why: 'fallback' }, store: shown })).toBe(true)
     // The check itself couldn't be read, or refuses for something with no list: the original error stays.
     expect(rereadAfterRefusal(null)).toBe(false)
     expect(rereadAfterRefusal({ refused: { why: 'noGit' } })).toBe(false)
