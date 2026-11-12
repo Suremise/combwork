@@ -1627,7 +1627,8 @@ export class MergeQueue {
    * it) or with its request's override. HI-2998: a forward's resolution as its forward, with the override its forward's
    * request recorded. HI-3040: when the branches' names alone don't decide it, a default branch that can't be read or
    * named now (git unable to answer, a detached project folder with no main or master), or whose head can't be read, is
-   * no answer: `Again`, so the entry goes round, then pauses with why, never comes back for good on it.
+   * no answer: `Again`, so the entry goes round, then pauses with why, never comes back for good on it. HI-3049: and so
+   * is a default that is only the folder's checked-out branch, another than the one recorded when it was checked.
    */
   private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean | Again> {
     const f = s.forward ?? s.resolves
@@ -1643,7 +1644,19 @@ export class MergeQueue {
     const there = await H.lineHead(this.project, d).catch(() => null)
     if (there && isUnknown(there)) return again(gitSaid(there))
     if (!there) return none()
-    return forwardPermitted(forwardDirection(f.from, f.to, d), f.override)
+    if (forwardPermitted(forwardDirection(f.from, f.to, d), f.override)) return true
+    // HI-3049: no main or master, so the default named is only the branch the project folder has checked out; another
+    // than the one recorded at the request (or Resolve), which still exists, is the folder switched, not the release
+    // path changed: no answer, as HI-3040's. A main or master made since, or the recorded one gone, still returns it.
+    const was = f.defaultBranch
+    if (!was || was === d) return false
+    const main = await H.mainLine(this.project).catch(() => unknown(UNREADABLE.defaultBranch, { folder: this.project }))
+    if (isUnknown(main)) return again(gitSaid(main))
+    if (main !== null) return false
+    const kept = await H.lineHead(this.project, was).catch(() => unknown(UNREADABLE.line, { branch: was }))
+    if (isUnknown(kept)) return again(gitSaid(kept))
+    if (!kept) return false
+    return again(`${this.project} has ${d} checked out, so git names it the default branch (there is no main or master); it was ${was} when ${card.key}'s direction was checked. Check out ${was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
   }
 
   private history(card: CardRecord, s?: CardState): HistoryPort {

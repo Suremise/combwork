@@ -117,6 +117,11 @@ export interface HistoryPort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: its default branch). */
   defaultTarget(repo: string): Promise<Maybe<string>>
+  /**
+   * The repository's own main line (Git: `main` or `master`), null when it has none: then `defaultTarget` is only the
+   * line the folder has checked out (HI-3049).
+   */
+  mainLine(repo: string): Promise<Maybe<string | null>>
   /** The repository's store (Git: the common git dir), read by the tool. */
   store(repo: string): Promise<Maybe<string>>
   /** `store`, read from the folder's metadata files with no process where they say, else by the tool. */

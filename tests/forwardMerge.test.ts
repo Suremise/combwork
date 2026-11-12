@@ -530,6 +530,9 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
     const rc = (await inWorkspace(w, () => controls.resolveForward(w, fwd!.number, user, 'by hand'))).card.number
     const wf = (await workflowFor(w, repo))!
+    // HI-3049: the default branch each was checked with, recorded on the request and on the resolution.
+    expect(wf.state(wf.store.card(fwd!.number)).forward?.defaultBranch).toBe('main')
+    expect(wf.state(wf.store.card(rc)).resolves?.defaultBranch).toBe('main')
     const key = wf.store.card(rc).key
     const before = wf.store.cards().length
     // The forward is Done; its resolution in Todo is the pair's open work, for the window's request and the Assistant's.
