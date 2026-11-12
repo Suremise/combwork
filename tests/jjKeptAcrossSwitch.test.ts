@@ -154,7 +154,6 @@ describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back t
 
 describe("HI-3069: git's prunable worktrees with a relative gitdir", () => {
   it('names the folder the entry registers, read from its own entry, not from the process folder', async () => {
-    const { execFileSync } = await import('child_process')
     const g = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
     const base = tempDir('prunable-rel-')
     const repo = join(base, 'project')
