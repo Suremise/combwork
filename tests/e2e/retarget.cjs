@@ -297,12 +297,14 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const top11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"] .progress-lane-top`)
     const into = await waitHung(async () => ((await top11.locator('[data-lane-target="1.3.0"]').count()) === 1 ? true : null)).catch(() => null)
     check('…the lane stays on 1.3.0, and its header says "into 1.3.0"', !!into, await text(top11))
-    const row11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"]`)
+    // Start's notification covers the panel's foot, where the lane is: closed first.
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await waitHung(async () => (await page.locator('.toast').count()) === 0)
     await page.mouse.move(5, 5)
     for (const t of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme: t } })
       await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
-      await row11.screenshot({ path: path.join(fx.shots, `retarget-lane-left-on-release-${t}.png`) }).catch(() => undefined)
+      await panel.screenshot({ path: path.join(fx.shots, `retarget-lane-left-on-release-${t}.png`) }).catch(() => undefined)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
     // 1.3.0 taken out of Other branches in the tab: refused, naming the lane's builder; still listed.
@@ -313,10 +315,13 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const refusal = await waitHung(async () => {
       if (await save.isVisible().catch(() => false)) await save.getByRole('button', { name: 'Save', exact: true }).click().catch(() => undefined)
       const t = await text(page.locator('body'))
-      return /1\.3\.0 can’t be taken out of Other branches work can merge into while these use it: B11/.test(t) ? t : null
+      // Its card started on 1.3.0 and their slot are named too; the lane (B11) is what HI-3113 adds.
+      return /1\.3\.0 can’t be taken out of Other branches work can merge into while these use it: [^.]*\bB11\b/.test(t) ? t : null
     }).catch(() => null)
     await page.screenshot({ path: path.join(fx.shots, 'retarget-release-in-use.png') }).catch(() => undefined)
     check('…taking 1.3.0 out of Other branches is refused while the lane uses it, naming B11', !!refusal, (await text(page.locator('body'))).slice(-600))
+    await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
     check('…and 1.3.0 is still listed', ((await inv('workflow:form', fx.alpha))?.options?.otherTargets ?? []).includes('1.3.0'), JSON.stringify((await inv('workflow:form', fx.alpha))?.options?.otherTargets))
   } catch (e) {
     check('no exception', false, e.stack)
