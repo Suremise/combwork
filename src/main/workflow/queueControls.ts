@@ -19,7 +19,7 @@ import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
 import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
-import { forwardDirection, forwardPermitted, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
+import { forwardDirection, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { forwardNow, type ForwardPair } from './forwardNow'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
@@ -547,8 +547,8 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
 async function mayGoNow(wf: Workflow, rec: CardRecord, projectPath: string, f: ForwardPair): Promise<void> {
   const now = await forwardNow(historyFor(wf.rulesetOf(rec).options.platform), projectPath, f)
   if (now.ok) return
-  if (now.why === 'direction') throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(now.d) }), { kind: 'invalid' })
-  if (now.why === 'switched') throw new ForwardRefused(withValues(FORWARD_TEXT.folderSwitched, { card: rec.key, now: now.now, was: now.was }), { kind: 'conflict' })
+  if (now.is === 'direction') throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec.key, from: f.from, to: f.to, ...directionValues(now.d) }), { kind: 'invalid' })
+  if (now.is === 'switched') throw new ForwardRefused(withValues(FORWARD_TEXT.folderSwitched, { card: rec.key, now: now.now, was: now.was }), { kind: 'conflict' })
   throw new ForwardRefused(withValues(FORWARD_TEXT.defaultUnread, { card: rec.key, from: f.from, to: f.to }), { kind: 'conflict' })
 }
 

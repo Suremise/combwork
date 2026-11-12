@@ -1657,8 +1657,8 @@ export class MergeQueue {
     // HI-3085: the rule the window's and the Assistant's Retry merge and Resolve on a builder use too (forwardNow).
     const now = await forwardNow(this.history(card, s), this.project, f)
     if (now.ok) return true
-    if (now.why === 'direction') return false
-    if (now.why === 'unknown') return again(gitSaid(now.u))
+    if (now.is === 'direction') return false
+    if (now.is === 'unknown') return again(gitSaid(now.u))
     return again(`${this.project} has ${now.now} checked out, so git names it the default branch (there is no main or master); it was ${now.was} when ${card.key}'s direction was checked. Check out ${now.was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
   }
 
