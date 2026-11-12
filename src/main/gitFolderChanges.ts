@@ -141,8 +141,30 @@ const TAKE_RETRY_MS = 100
 /** takeEntries' answer: `kept`, the paths whose real entries another git changed meanwhile, left as it made them. */
 type Taken = { ok: true; kept: string[] } | { ok: false; why: string }
 
-/** A path's entries among `ls-files -s` lines (`mode object stage\tpath`). */
-const entriesOf = (entries: readonly string[], path: string): string[] => entries.filter((e) => e.slice(e.indexOf('\t') + 1) === path)
+/** An `ls-files -s` line's path (`mode object stage\tpath`). */
+const pathOf = (entry: string): string => entry.slice(entry.indexOf('\t') + 1)
+
+/** `ls-files -s` lines grouped by path, each sorted: one pass and one sort (HR1's round 1: never a scan per path). */
+function byPath(entries: readonly string[]): Map<string, string> {
+  const out = new Map<string, string[]>()
+  for (const e of entries) {
+    const p = pathOf(e)
+    const list = out.get(p)
+    if (list) list.push(e)
+    else out.set(p, [e])
+  }
+  return new Map([...out].map(([p, list]) => [p, list.sort().join('\0')]))
+}
+
+/**
+ * HI-3053: the paths of `files` whose entries in `now` aren't those in `was` (each an `ls-files -s` listing), in
+ * `files`' order. Linear in the entries (it runs on main's thread while the real index's lock is held).
+ */
+export function changedPaths(files: readonly string[], was: readonly string[], now: readonly string[]): string[] {
+  const a = byPath(was)
+  const b = byPath(now)
+  return files.filter((p) => (a.get(p) ?? '') !== (b.get(p) ?? ''))
+}
 
 /**
  * HI-3021: the real index's entries for `files` made what git left them in the private index `copy`: each path's
@@ -179,15 +201,16 @@ async function takeEntries(folder: string, index: string, copy: string, files: s
   try {
     const now = await entriesIn(folder, files, index)
     if (!now.ok) return now
-    const kept = files.filter((p) => !sameEntries(entriesOf(was, p), entriesOf(now.entries, p)))
-    const taken = files.filter((p) => !kept.includes(p))
-    if (!taken.length) return { ok: true, kept }
+    const kept = changedPaths(files, was, now.entries)
+    const keptSet = new Set(kept)
+    const taken = new Set(files.filter((p) => !keptSet.has(p)))
+    if (!taken.size) return { ok: true, kept }
     // Named after the private index, so removed with it whatever happens here.
     const scratch = `${copy}.take`
     await copyFile(index, scratch).catch((e: NodeJS.ErrnoException) => {
       if (e?.code !== 'ENOENT') throw e
     })
-    const input = [...taken.map((p) => `0 ${none}\t${p}`), ...from.entries.filter((e) => taken.includes(e.slice(e.indexOf('\t') + 1)))].map((l) => `${l}\0`).join('')
+    const input = [...[...taken].map((p) => `0 ${none}\t${p}`), ...from.entries.filter((e) => taken.has(pathOf(e)))].map((l) => `${l}\0`).join('')
     // HR2's round 4: never bounded, so never ended part way (on Windows an ended git leaves its lock): it runs nothing of
     // the repository's (noHooks), so it waits only on git's own work. Off main's thread (git's worker). The scratch is
     // Combwork's own, so its lock is too.

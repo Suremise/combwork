@@ -589,6 +589,21 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(lines()).toEqual([])
   })
 
+  it("HI-3053 (HR1's round 1): the paths another git changed found in one pass, never a scan per path: 50,000 selected", () => {
+    const files = Array.from({ length: 50_000 }, (_, i) => `f${i}`)
+    const was = files.map((p, i) => `100644 ${String(i).padStart(40, '0')} 0\t${p}`)
+    // f7 restaged, f9 put in conflict (its stages in another order), f11 gone; the rest the same, listed in reverse.
+    const now = [...was].reverse().filter((e) => !/\tf(7|9|11)$/.test(e))
+    now.push(`100644 ${'7'.repeat(40)} 0\tf7`, `100644 ${'9'.repeat(40)} 3\tf9`, `100644 ${'9'.repeat(40)} 2\tf9`)
+    const t = performance.now()
+    expect(changes.changedPaths(files, was, now)).toEqual(['f7', 'f9', 'f11'])
+    // A bound for a hung run, not how long it should take (a scan per path took seconds at 5,000).
+    expect(performance.now() - t).toBeLessThan(5_000)
+    // A path's entries in another order are the same.
+    expect(changes.changedPaths(['c'], ['100644 a 2\tc', '100644 b 3\tc'], ['100644 b 3\tc', '100644 a 2\tc'])).toEqual([])
+    expect(changes.changedPaths(['new'], [], ['100644 a 0\tnew'])).toEqual(['new'])
+  })
+
   it('entries compared whatever their order, each side sorted once (HR2\'s round 4): 50,000 a side', () => {
     const a = Array.from({ length: 50_000 }, (_, i) => `100644 ${String(i).padStart(40, '0')} 0\tf${i}`)
     const b = [...a].reverse()
