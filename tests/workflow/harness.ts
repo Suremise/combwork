@@ -47,12 +47,16 @@ export function put(dir: string, file: string, content: string): void {
   writeFileSync(p, content)
 }
 
-/** Writes files and commits them; the new commit's id. */
-export function commit(cwd: string, files: Record<string, string>, message: string, opts: { trailer?: string; email?: string } = {}): string {
+/**
+ * Writes files and commits them; the new commit's id. `at` (ms): the commit's and its reflog entry's time
+ * (GIT_COMMITTER_DATE), for a move that must fall in a later second than a lease's start (HI-3031).
+ */
+export function commit(cwd: string, files: Record<string, string>, message: string, opts: { trailer?: string; email?: string; at?: number } = {}): string {
   for (const [f, c] of Object.entries(files)) put(cwd, f, c)
   sh(cwd, 'add', '-A')
   const who = opts.email ? ['-c', `user.email=${opts.email}`] : []
-  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
+  const env = opts.at === undefined ? {} : { env: { ...process.env, GIT_COMMITTER_DATE: `@${Math.floor(opts.at / 1000)} +0000` } }
+  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe', ...env })
   return sh(cwd, 'rev-parse', 'HEAD')
 }
 

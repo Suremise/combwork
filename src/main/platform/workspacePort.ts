@@ -263,10 +263,12 @@ export interface WorkspacePort {
   /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
-   * Refused by the tool otherwise (the head not past `base`, the line there already). Git's only: absent, the pool waits
-   * for the slot's builder and prepares it as before.
+   * HI-3031: and only while every commit past `base` was made since `since` (the lease's start, ISO): a free slot waits
+   * at its last target's head, which may be past `base` with another target's work (an integration branch's, over main).
+   * Refused by the tool otherwise (the head not past `base`, commits over it from before the lease, the line there
+   * already). Git's only: absent, the pool waits for the slot's builder and prepares it as before.
    */
-  branchHere?(folder: string, line: string, base: string): Promise<WorkspaceStep>
+  branchHere?(folder: string, line: string, base: string, since: string): Promise<WorkspaceStep>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

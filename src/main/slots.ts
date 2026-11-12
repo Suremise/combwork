@@ -2681,7 +2681,8 @@ export class SlotPool {
    * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
    *
    * `inPlace` (HI-3010): only what changes no file, so its builder needn't be quiet (it may already be at work on the
-   * card): a slot detached at `base` or past it gets its new line where its head is (`branchHere`), and `inPlace` is
+   * card): a slot detached at `base` or past it, by commits made since its lease began (HI-3031: never another target's
+   * a free slot waited at), gets its new line where its head is (`branchHere`), and `inPlace` is
    * that switch's last word instead of `ready`. Anything else (another line there, the line made before, its files or
    * install due, a port without it) is `retry`, for the preparation that waits for its builder.
    */
@@ -2762,7 +2763,7 @@ export class SlotPool {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last(inPlace ? p.inPlace : p.ready)
             if (notYet) return { notYet }
-            if (inPlace) return this.port.branchHere!(slot.folder, p.line, p.base)
+            if (inPlace) return this.port.branchHere!(slot.folder, p.line, p.base, lease.from)
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
             const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}

@@ -74,10 +74,22 @@ export const gitWorkspacePort: WorkspacePort = {
   // (no start point: a commit meanwhile is on it, and no file changes). Its builder may be at work, so no hook runs
   // (HR1's round 1: a post-checkout or reference-transaction hook can change files): for this command only, hooks are
   // looked for where none can be and fsmonitor is off; the repository's settings are never written.
-  branchHere: async (folder, line, base) => {
+  // HI-3031: and the commits past the base the lease's own: where HEAD was as the lease began (its reflog, to the second,
+  // read at the lease's start's whole second, so a move in that second counts as before it) is the base or behind it. A
+  // free slot waits at its last target's head, which can be past the base with another target's commits; no reflog
+  // (turned off, expired) is a refusal too.
+  branchHere: async (folder, line, base, since) => {
     const past = await git(folder, ['merge-base', '--is-ancestor', base, 'HEAD'])
     // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
     if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // i18n-ignore: a log line's detail, never shown
+    const at = Math.floor(Date.parse(since) / 1000)
+    const was = Number.isFinite(at) ? await git(folder, ['rev-parse', '--verify', '--quiet', `HEAD@{@${at}}`]) : null
+    const wasHash = was?.ok ? was.out.trim() : ''
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!wasHash) return { ok: false, err: `HEAD's place as its lease began isn't known` } // i18n-ignore: a log line's detail, never shown
+    const own = await git(folder, ['merge-base', '--is-ancestor', wasHash, base])
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!own.ok) return { ok: false, err: own.err.trim() || `HEAD was past ${base} before its lease began` } // i18n-ignore: a log line's detail, never shown
     return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
   },
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),

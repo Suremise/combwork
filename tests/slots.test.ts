@@ -1489,8 +1489,9 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
     const base = sh(w.project, 'rev-parse', 'main')
     sh(r.slot.folder, 'switch', '-q', '--detach', base)
-    // Its builder already at work on the card (a commit on the detached head, and an edit not committed yet).
-    commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work')
+    // Its builder already at work on the card (a commit on the detached head, and an edit not committed yet), in a
+    // second after the lease's start (HI-3031: a move in that second counts as before it).
+    commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work', { at: Date.parse(r.lease.from) + 2000 })
     const work = sh(r.slot.folder, 'rev-parse', 'HEAD')
     writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
     // A repository's hook that changes files (HR1's round 1): never run beside a busy builder, wherever hooks are set.
@@ -1509,6 +1510,43 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
     // Already on its line: prepared as it is.
     expect(await w.pool.prepare(r.lease.id, { line: 'cw/AM/AM-1-one', base, install: false, ready: busy, inPlace })).toMatchObject({ ok: true, revision: work })
+  })
+
+  it("HI-3031: in place, a slot waiting at another target's head, or with a commit from before its lease, gets its line from the base", async () => {
+    const w = world({ builders: 1 })
+    const main = sh(w.project, 'rev-parse', 'main')
+    // An integration branch ahead of main (work not released yet).
+    sh(w.project, 'branch', 'integ', 'main')
+    sh(w.project, 'switch', '-q', 'integ')
+    const integ = commit(w.project, { 'unreleased.txt': 'not in main\n' }, 'unreleased work on integ')
+    sh(w.project, 'switch', '-q', 'main')
+    // A card into integ uses the slot and gives it back: the slot waits detached at integ's head.
+    const one = await w.pool.lend({ card: 1, agent: 'a1' }, { target: 'integ' })
+    if (!one.ok) throw new Error(JSON.stringify(one))
+    expect(await w.pool.prepare(one.lease.id, { line: 'cw/AM/AM-1-one', base: integ, install: false, target: 'integ' })).toMatchObject({ ok: true })
+    await w.pool.release(one.lease.id, 'done')
+    await w.pool.refresh()
+    expect(sh(one.slot.folder, 'rev-parse', 'HEAD')).toBe(integ)
+    // A card into main is lent it: in place refused (its head's commits over main aren't its own), nothing changed.
+    const two = await w.pool.lend({ card: 2, agent: 'a2' }, { target: 'main' })
+    if (!two.ok) throw new Error(JSON.stringify(two))
+    expect(two.slot.name).toBe(one.slot.name)
+    const inPlace = async (): Promise<null> => null
+    expect(await w.pool.prepare(two.lease.id, { line: 'cw/AM/AM-2-fix', base: main, install: false, target: 'main', inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(two.slot.folder)).toBe('')
+    expect(sh(w.project, 'branch', '--list', 'cw/AM/AM-2-fix')).toBe('')
+    // The preparation that waits for its builder makes it from main.
+    expect(await w.pool.prepare(two.lease.id, { line: 'cw/AM/AM-2-fix', base: main, install: false, target: 'main', ready: async () => null })).toMatchObject({ ok: true, revision: main })
+    expect(sh(two.slot.folder, 'log', '--format=%H', 'main..HEAD')).toBe('')
+    await w.pool.release(two.lease.id, 'done')
+    await w.pool.refresh()
+    // A stray commit on a free slot's detached head, from before the next lease: not that card's either.
+    sh(two.slot.folder, 'switch', '-q', '--detach', main)
+    commit(two.slot.folder, { 'stray.txt': 'stray\n' }, 'stray', { at: Date.now() - 5000 })
+    const three = await w.pool.lend({ card: 3, agent: 'a3' }, { target: 'main' })
+    if (!three.ok) throw new Error(JSON.stringify(three))
+    expect(await w.pool.prepare(three.lease.id, { line: 'cw/AM/AM-3-next', base: main, install: false, target: 'main', inPlace })).toEqual({ retry: NOT_IN_PLACE })
+    expect(branch(three.slot.folder)).toBe('')
   })
 
   it('HI-3010: in place, anything that would change files waits for its builder (retry), nothing changed', async () => {

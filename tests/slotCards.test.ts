@@ -1754,9 +1754,11 @@ describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout:
     // Its builder, told of the card another way, already at work: a commit on the detached head, an edit still open.
     state.live = { cwd: slot, sessionId: 's1' }
     state.working = true
-    const work = commit(slot, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key })
+    // Its lease began after the slot was made; its commit in a later second (HI-3031: only commits since then are its own).
+    const from = new Date().toISOString()
+    const work = commit(slot, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key, at: Date.parse(from) + 2000 })
     writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
-    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', project: 'p', from: '', to: null, why: null, endRev: null }
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', project: 'p', from, to: null, why: null, endRev: null }
     state.lanes = async () => [{ id: 'lane-1', state: 'active', cards: [card.id] }]
     // The pool as SlotPool.prepare answers (slots.test.ts proves it): in place, Git's branchHere; else its builder's quiet first.
     const asked: string[] = []
@@ -1768,7 +1770,7 @@ describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout:
         const notYet = await (p.inPlace ?? p.ready)?.()
         if (notYet) return { retry: notYet }
         if (!p.inPlace) return { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') }
-        const r = await gitWorkspacePort.branchHere!(slot, p.line, p.base)
+        const r = await gitWorkspacePort.branchHere!(slot, p.line, p.base, lease.from)
         return r.ok ? { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') } : { retry: NOT_IN_PLACE }
       }
     }
