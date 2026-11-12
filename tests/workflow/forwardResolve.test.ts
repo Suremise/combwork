@@ -636,3 +636,43 @@ describe('an ancestry read that fails never lets a resolution through (HI-2999, 
     })
   }
 })
+describe('a forward card doesn’t share the project folder (HI-3083)', () => {
+  /** A project whose cards are built in the project folder, its forward of main into 1.2.0 queued, or returned too. */
+  async function withForward(returnedToo: boolean) {
+    const e = conflicting({ folder: 'project', finish: 'committed', slotsUpToDate: false })
+    if (returnedToo) {
+      const { card } = await returned(e)
+      expect(e.wf.state(card).stage).toBe('active')
+      return { e, fwd: card }
+    }
+    const card = e.wf.createCard({ title: 'Bring 1.2.0 up to date with main' })
+    moved(await e.wf.forwardStart(card.key, { from: 'main', to: '1.2.0', source: head(e, 'main'), base: sh(e.project, 'merge-base', 'main', '1.2.0') }, 'user', forwardOf(e.wf.currentRuleset(), '1.2.0')))
+    expect(e.wf.state(card).stage).toBe('merging')
+    return { e, fwd: card }
+  }
+
+  for (const returnedToo of [false, true]) {
+    it(`a builder's card beside a forward ${returnedToo ? 'returned (Active)' : 'queued (Merging)'}: its commit, with no trailer, is its own and it submits`, { timeout: GIT_HEAVY_MS }, async () => {
+      const { e, fwd } = await withForward(returnedToo)
+      const card = e.wf.createCard({ title: 'a change of its own' })
+      sh(e.project, 'checkout', '-q', '-b', 'work', 'main')
+      moved(await e.wf.start(card.key, B1))
+      const own = commit(e.project, { 'own.txt': 'the change\n' }, 'the change')
+      moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+      expect(e.wf.state(card)).toMatchObject({ stage: 'review', attributed: [own] })
+      expect(e.wf.store.folderCommits(e.project)).toEqual([{ sha: own, card: card.id, how: 'onlyCard' }])
+      expect(e.wf.store.facts(fwd.id).some((f) => f.kind === 'CommitAttributed' || f.kind === 'HeadMoved')).toBe(false)
+    })
+  }
+
+  it('alone, it takes no attribution: the user’s commits in the project folder are nobody’s, and its source keeps its commits', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, fwd } = await withForward(true)
+    sh(e.project, 'checkout', '-q', 'main')
+    commit(e.project, { 'mine.txt': 'the user’s own\n' }, 'the user’s own commit')
+    commit(e.project, { 'more.txt': 'more\n' }, 'another, naming it', { trailer: fwd.key })
+    await reconcile(e.wf, e.wf.store.card(fwd.id))
+    expect(e.wf.store.facts(fwd.id).some((f) => f.kind === 'CommitAttributed' || f.kind === 'HeadMoved')).toBe(false)
+    expect(e.wf.state(fwd).attributed).toEqual([])
+    expect(e.wf.store.folderCommits(e.project).filter((c) => c.card !== null)).toEqual([])
+  })
+})

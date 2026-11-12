@@ -12,7 +12,7 @@ import type { CardState, FileChange } from '../../shared/workflow/facts'
 import { trailerRefusal, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
-import { attributeFolder, reconcileHistory, type ReconcileHooks } from '../workflow/reconcile'
+import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
@@ -525,7 +525,7 @@ export class GitPlatform implements PlatformAdapter {
    * an amend or a reset replaced isn't, nor one from before it started).
    */
   private async untrailered(card: CardRecord, s: CardState): Promise<Maybe<{ commit: string; head: boolean } | null>> {
-    const others = this.wf.store.cards().filter((c) => c.id !== card.id && ['active', 'review', 'approved'].includes(c.stage) && this.wf.state(c).started?.folder === 'project')
+    const others = this.wf.store.cards().filter((c) => c.id !== card.id && ['active', 'review', 'approved'].includes(c.stage) && sharesFolder(this.wf.state(c)))
     if (!others.length) return null
     const lastSub = s.latest?.commits?.at(-1)
     const rows = this.wf.store.folderCommits(this.project)
