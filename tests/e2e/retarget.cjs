@@ -164,6 +164,14 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const upd = await api(assistant, 'PATCH', `/v1/tasks/${await keyOf(nA)}`, { target: '1.2.0', column: 'todo', blocked: null })
     const cA = await card(nA)
     check("HI-2825: the Assistant changes a never-started held card's Merges into, with its column and blocked", upd.status === 200 && (await ownTarget(nA)) === '1.2.0' && cA?.column === 'todo' && !cA?.blocked, JSON.stringify({ status: upd.status, body: upd.body, column: cA?.column, blocked: cA?.blocked }))
+    // HI-3043: a card the Assistant makes with a target of its own says so, as an update does, naming the value that
+    // clears it (""); one made with the project's own says nothing. Both deleted after, so nothing later lists them.
+    const madeOwn = await api(assistant, 'POST', '/v1/tasks', { title: 'Made for 1.2.0', project: 'alpha', target: '1.2.0' })
+    const ownNote = String(madeOwn.body?.nudge ?? '')
+    check('HI-3043: a card made with a target of its own says so, and how to clear it ("")', madeOwn.status === 200 && /now has a target of its own, 1\.2\.0/.test(ownNote) && /target to "" \(its project's\)/.test(ownNote), JSON.stringify(madeOwn.body))
+    const madeDef = await api(assistant, 'POST', '/v1/tasks', { title: 'Made for integration', project: 'alpha', target: 'integration' })
+    check("…one made with the project's own says nothing of it", madeDef.status === 200 && !/target of its own/.test(String(madeDef.body?.nudge ?? '')), JSON.stringify(madeDef.body))
+    for (const m of [madeOwn, madeDef]) if (m.body?.number) await inv('tasks:delete', m.body.number)
     await inv('session:stop', home, 'assistant')
 
     // --- HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration. Save…'s Retarget offers it, with its
