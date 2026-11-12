@@ -238,8 +238,10 @@ function bringable(ws: WorkspaceService, lanes: LaneRecord[], l: LaneRecord, n: 
 }
 
 /** The checks for a card the edit moves within its lane or takes off it: on the lane, and queued there. */
-function queuedHere(ws: WorkspaceService, l: LaneRecord, n: number): void {
-  if (!working(l).includes(n)) refuse(ws, 409, M.notOnLane, { card: cardRef(n) })
+function queuedHere(ws: WorkspaceService, l: LaneRecord, n: number, o: { applied?: boolean } = {}): void {
+  // Move here's source (HI-3063): a card a queued change took off is still on its applied list, which other lanes see
+  // (bringable): Move here takes it from there too.
+  if (!working(l).includes(n) && !(o.applied && l.cards.includes(n))) refuse(ws, 409, M.notOnLane, { card: cardRef(n) })
   if (!queuedOn(cardPlacesNow(ws, [n]), l, n)) refuse(ws, 409, M.notQueued, { card: cardRef(n) })
 }
 
@@ -384,7 +386,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         // the lane, or its queued change), so an edit growing one past it is refused here, before anything is written.
         if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
-        if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!)
+        if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!, { applied: true })
         keepsFixed(ws, x.lane, was, x.next, p.card)
         // An undo sets the applied list back too: its fixed start kept there as well.
         if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)
@@ -454,6 +456,17 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
           queued.push({ lane: l.id, queuedAfter: null })
         } else {
           queued.push({ lane: l.id, queuedAfter: await applyLaneList(ws, l, x.next, on, checks) })
+          // Move here's card leaves its source at once (HI-3063, as HI-1821's): out of the applied list too while that
+          // lane's queued list waits, so no lane but the one it moved to has it. A card waiting in To do (queuedHere),
+          // never one in flight: the applied list keeps its card in flight.
+          if (p.op === 'transfer' && l === p.brings?.leaving && l.pending && l.cards.includes(p.card!)) {
+            l.cards = l.cards.filter((n) => n !== p.card)
+            // Its queued list then no change at all (it only took that card off): none left waiting.
+            if (sameList(l.pending, l.cards)) {
+              delete l.pending
+              queued[queued.length - 1].queuedAfter = null
+            }
+          }
         }
         l.updatedAt = new Date().toISOString()
       }

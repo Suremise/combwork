@@ -8835,7 +8835,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
       here) that is given to another agent than the lane's builder is given to nobody through the card-change owner, so
       the lane takes it next; given to the builder or nobody, it is left as it is.
     - **Move here:** a card another running lane has is refused, naming its builder, with **Move Here**: the card off
-      that lane and onto this one in the same change (both lists, the assignment), or nothing.
+      that lane and onto this one in the same change (both lists, the assignment), or nothing. A card that lane's
+      queued change took off is still on its applied list, so still that lane's (HI-3063): Move here takes it off the
+      applied list too, at once, while the queued list waits; its undo puts both back.
     - **Undo:** a notification with Undo, and Ctrl+Z in the tab, for the last change made in the window. It puts back
       each lane's `cards` and `pending` exactly, and the card's agent, only while each lane is still at the revision
       the edit left and the card is as it left it (its agent, Todo, and the history entry it left as the last: a token a
