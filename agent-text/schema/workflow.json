@@ -856,6 +856,14 @@
       "platform": "plain"
     }
   },
+  "workflow.refused.platform.noTarget.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.noTarget.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.offLine.message": {
     "placeholders": {
       "card": "plain",

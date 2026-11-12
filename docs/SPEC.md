@@ -4871,6 +4871,13 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   preset, options and `presetAsked`, when it has any) and brings the one chosen back from `kept` (its entry removed),
   else no preset, no options and no answer, so #1423's step offers its presets. Ordinary saves change only the platform
   in force and keep `kept`. A project the upgrade hasn't given `workflow` yet changes only its `platform`.
+  HI-3106: a switch to jj whose resulting jj options, as they resolve (the project's, the workspace's, Combwork's), name
+  no target is given Git's as its own (`seedJjTarget`, in the switch's after): the target Git's options resolve to, else
+  the repository's default branch, a bookmark of the same name in a colocated repository. jj resolves no default, so
+  without one no card could start. A target jj's options already name, kept from before or inherited, is never
+  replaced; Git's unreadable, nothing is seeded. A jj start that still has none (the user cleared it) is refused
+  `platform.noTarget` ("no target bookmark chosen"; next step Version Control → Workflow, Work merges into), never
+  `platform.unknown` with a blank name and "Check Provider Setup".
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains

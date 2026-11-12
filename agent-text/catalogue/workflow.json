@@ -1024,6 +1024,16 @@
     "note": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key.",
     "audience": "both"
   },
+  "workflow.refused.platform.noTarget.message": {
+    "text": "{card} can’t start: its project has no target bookmark chosen, the one its work merges into.",
+    "note": "HI-3106: a refused start in a project using jj (Jujutsu): no target bookmark (Work merges into) is chosen, and jj has no default to fall back on, as Git has its default branch. {card} is a card key like AM-12. A bookmark is jj’s name for a branch.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.noTarget.next": {
+    "text": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
+    "note": "HI-3106: the next step after a start refused for no target bookmark: the user chooses it in the window. Version Control, Workflow and Work merges into are names in the window: as translated there.",
+    "audience": "both"
+  },
   "workflow.refused.platform.offLine.message": {
     "text": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",
     "note": "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select.",
