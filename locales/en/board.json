@@ -1845,7 +1845,7 @@
   },
   "board.laneEdit.lastCard": {
     "defaultMessage": "{card} is the lane’s last card to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu)",
-    "description": "HI-3066: tooltip of the × (turned off) on a lane's last card not Done (Progress → Lanes): it can't be taken off, as a lane always keeps one. {card} is its key. End Lane and Abandon Lane… are the lane's menu items: as they're translated there."
+    "description": "HI-3066: tooltip of the × on a lane's last card not Done (a click shows the same refusal) (Progress → Lanes): it can't be taken off, as a lane always keeps one. {card} is its key. End Lane and Abandon Lane… are the lane's menu items: as they're translated there."
   },
   "board.laneEdit.leftOut": {
     "defaultMessage": "{n, plural, one {{cards} stays where it is: it can’t come back to the lane now.} other {{cards} stay where they are: they can’t come back to the lane now.}}",
