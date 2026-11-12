@@ -29,7 +29,7 @@ import { boundaryOf } from './repoBoundary'
 import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey, storeKey } from './jjFileGate'
-import { asideOf, asReceipt, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
+import { asideOf, asReceipt, entryIdSync, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import type { OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { agentMsg, type AgentMsg } from '../../shared/agentText'
@@ -1411,6 +1411,15 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           }
         }
         await journal.clear()
+        // Its Git worktree entry gone with the forget (HI-3046): its receipt goes too. One jj left (the folder was gone)
+        // keeps it, so the slot's next make can clear that entry.
+        const j = ctx.colocated ? (deps.gitLink?.(repo, folder) ?? null) : null
+        const raw = j?.read() ?? null
+        const rec = asReceipt(raw)
+        if (j && rec && !rec.clearing && entryIdSync(rec.entry) !== rec.entryId) {
+          const residues = residuesOf(raw)
+          await (residues.length ? j.write({ residues }) : j.clear())
+        }
       }
       return step(true)
     },
