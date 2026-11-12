@@ -162,6 +162,35 @@ describe("the map's model", () => {
     expect(m.agents[0].load).toBe('loaded')
   })
 
+  // HI-3029: calls sharing a time, or with none, keep their transcript's order, the later first, in the feed and each
+  // station's last label (a stable sort over the oldest-first calls had kept the oldest first).
+  const turn = (itemId: number, at: string | null, tools: ActivityTurns['turns'][number]['tools']): ActivityTurns['turns'][number] => ({ itemId, at, prompt: '', reply: '', lastKind: 'tool', tools })
+  const reads = (n: number, at: string | null, from = 10) => Array.from({ length: n }, (_, i) => ({ itemId: from + i, name: 'Read', summary: `src/f${i}.ts`, at, until: null, failed: false, done: i < n - 1 }))
+  const labels = (m: ReturnType<typeof buildMapModel>): string[] => m.feed.map((c) => (c.kind === 'prompt' ? '<prompt>' : c.label))
+
+  it('puts the later of parallel calls sharing one time first (HI-3029)', () => {
+    const turns: ActivityTurns = { sessionId: 's', version: 'v', total: 1, turns: [turn(1, ago(2), reads(12, ago(1)))] }
+    const m = buildMapModel([agent('A', { turns })], AT)
+    expect(m.stations.read.last).toBe('src/f11.ts')
+    expect(labels(m)).toEqual(['src/f11.ts', 'src/f10.ts', 'src/f9.ts', 'src/f8.ts', 'src/f7.ts', 'src/f6.ts', 'src/f5.ts', 'src/f4.ts'])
+  })
+
+  it("puts a script's latest calls first: they all carry the script's time (HI-3029)", () => {
+    const calls = ['Read', 'Read', 'Read', 'Read', 'Read', 'Read', 'Read', 'Read', 'Read', 'Shell', 'Edit']
+    const turns: ActivityTurns = { sessionId: 's', version: 'v', total: 1, turns: [turn(1, ago(2), [{ itemId: 2, name: 'Script', summary: '', at: ago(1), until: null, failed: false, done: true, calls }])] }
+    const m = buildMapModel([agent('A', { turns })], AT)
+    expect(labels(m).slice(0, 3)).toEqual(['Edit', 'Shell', 'Read'])
+    expect(m.stations.edit.last).toBe('Edit')
+    expect(m.stations.shell.last).toBe('Shell')
+  })
+
+  it('keeps a transcript without times newest first, a prompt after the calls that followed it (HI-3029)', () => {
+    const turns: ActivityTurns = { sessionId: 's', version: 'v', total: 2, turns: [turn(1, null, [{ itemId: 2, name: 'Read', summary: 'old/first.ts', at: null, until: null, failed: false, done: true }]), turn(3, null, reads(3, null))] }
+    const m = buildMapModel([agent('A', { turns })], AT)
+    expect(m.stations.read.last).toBe('src/f2.ts')
+    expect(labels(m)).toEqual(['src/f2.ts', 'src/f1.ts', 'src/f0.ts', '<prompt>', 'old/first.ts', '<prompt>'])
+  })
+
   it("tells loading, not reported and an observed zero apart", () => {
     expect(buildMapModel([agent('A')], 0).stations.read.status).toBe('loading')
     const zero = buildMapModel([agent('A', { turns: turnsOf('s', [[]]) })], 0)
