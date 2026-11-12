@@ -4,12 +4,20 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
+import { spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join, resolve } from 'path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
+import { msysBinFor } from '../src/main/gitWorker'
+
+const req = createRequire(import.meta.url)
+const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
+type Ids = { pid: number; started: number }[]
+const { identify, stillSame, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; stillSame: (ids: Ids) => number[]; endExactly: (targets: Ids) => number }
 
 /** The next stash's git: run for real, then answered as failed (a failure after git made the stash). */
 let failStashAfter = false
@@ -313,13 +321,17 @@ describe('a commit or stash past its bound (HI-3021)', () => {
   const fwd = (p: string): string => p.replace(/\\/g, '/')
   /**
    * A shell script that starts two node processes, one in the background and one it waits on, each writing its pid to
-   * `pids` and running 30 s (past any bound here): a hook's node, npm or gpg. Native programs, as hooks run: one of Git
-   * Bash's own (its sleep) is started outside Windows' process tree, where no tree walk finds it (HI-3047).
+   * `pids` and running 30 s (past any bound here): a hook's node, npm or gpg. With `msys` (HI-3047), first a Git Bash
+   * `sleep 30` of its own, started in the background by a subshell that then exits: outside Windows' process tree (MSYS's
+   * exec leaves its Windows parent gone, and its shell is gone too), found by the timed git's marker. Its winpid is
+   * written once it is sleep (until MSYS's exec, `$!` names the forked sh.exe).
    */
-  const slowScript = (pids: string): string => {
+  const slowScript = (pids: string, msys = false): string => {
     const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${fwd(pids)}"`
-    return `#!/bin/sh\n${node} &\n${node}\n`
+    return `#!/bin/sh\n${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
   }
+  /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep. */
+  const sleeper = (pids: string): string => `sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" >> "${fwd(pids)}"`
   const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((pid) => pid > 0) : [])
   const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
   let bound = 0
@@ -331,21 +343,37 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     changes.folderChangesBounds.actMs = bound
   })
 
-  it("Commit with a pre-commit hook slower than the bound: the hook ended too; the real index never locked (the user's git add meanwhile kept), as it was; said", async () => {
+  it("Commit with a pre-commit hook slower than the bound: the hook ended too, its Git Bash sleep included, and nothing else; the real index never locked (the user's git add meanwhile kept), as it was; said", async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    // HI-3047 (Git for Windows): the hook starts a Git Bash sleep too; and an unrelated one, started as the hook's is but
+    // outside the commit (no marker), is left running.
+    const msys = process.platform === 'win32'
+    const control = join(tempDir('cw-folderchanges-control-'), 'pids')
+    let controlId: { pid: number; started: number }[] = []
+    if (msys) {
+      const bin = msysBinFor({ env: process.env })
+      expect(bin).not.toBeNull()
+      spawn(join(bin!, 'sh.exe'), ['-c', sleeper(control)], { stdio: 'ignore', windowsHide: true, env: baseEnv() }).unref()
+      await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: 20_000 })
+      // Its identity while it is known to be the test's own (#603): ended by it afterwards.
+      controlId = identify(pidsIn(control))
+      expect(controlId).toHaveLength(1)
+    }
+    onTestFinished(() => void endExactly(controlId))
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids))
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids, msys))
     writeFileSync(join(proj, 'new.txt'), 'new\n')
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'b.txt'), 'staged by the user meanwhile\n')
     const before = head()
     const done = settle('commit', ['new.txt', 'a.txt']).catch((e: Error) => e)
     // While the hook runs, the user's own git add works: the real index isn't locked.
-    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: 20_000 })
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(msys ? 3 : 2), { timeout: 20_000 })
     sh(proj, 'add', 'b.txt')
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds.*The files and the index are as they were/)
     await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    expect(stillSame(controlId)).toEqual(controlId.map((c) => c.pid))
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     expect(head()).toBe(before)
