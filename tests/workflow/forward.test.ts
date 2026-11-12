@@ -229,7 +229,7 @@ describe('a forward merge goes only where it stays one (HI-3086)', () => {
     return { e, card }
   }
   /** Refused as not possible from where it is, naming its own ways on; nothing written, still the forward it was. */
-  const refusedAndKept = async (e: Env, card: { id: number; key: string }, to: Parameters<Env['wf']['move']>[1], by: 'user' | 'assistant' = 'user') => {
+  const refusedAndKept = async (e: Env, card: ReturnType<Env['wf']['createCard']>, to: Parameters<Env['wf']['move']>[1], by: 'user' | 'assistant' = 'user') => {
     // Its facts but a refusal's own record (the Assistant's `Refused`).
     const kept = () => e.wf.store.facts(card.id).filter((f) => f.kind !== 'Refused').length
     const before = kept()
