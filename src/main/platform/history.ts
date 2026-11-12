@@ -22,6 +22,20 @@ export interface CommitInfo {
 }
 
 /** A working folder as it is now (workspaceNow): its line (null: detached), head and uncommitted state (dirty's list). */
+/**
+ * HI-3124: how a submodule changed, from porcelain v2's row: `moved`, another commit checked out, not staged (`.M`, its
+ * commit changed); `staged`, a new commit staged (`M?`); `added` (`A?`); `removed`, its removal staged (`D?`, `git rm`);
+ * `deleted`, its folder gone, nothing staged (`.D`); `other`, anything else (a rename, only changes inside it).
+ */
+export type SubmoduleState = 'moved' | 'staged' | 'added' | 'removed' | 'deleted' | 'other'
+
+/** HI-3124: a submodule among a folder's changes: its path, how it changed, and HEAD's commit for it (null: none). */
+export interface SubmoduleChange {
+  path: string
+  state: SubmoduleState
+  recorded: string | null
+}
+
 export interface WorktreeNow {
   line: string | null
   /** Null: no commit yet. */
@@ -39,9 +53,10 @@ export interface WorktreeNow {
   insideOnly?: string[]
   /**
    * HI-3052: every submodule among `dirty` (porcelain v2's `S…`): its commit moved, staged, or changed inside. Git's stash
-   * can't set aside a submodule's checked-out commit. Absent: none.
+   * can't set aside a submodule's checked-out commit. HI-3124: each with how it changed, so a refusal says what to do
+   * for it. Absent: none.
    */
-  submodules?: string[]
+  submodules?: SubmoduleChange[]
   /** The line asked for's head (null: no such line), when one was. */
   target?: string | null
   /** The platform's metadata paths asked for, absolute, in their order. */

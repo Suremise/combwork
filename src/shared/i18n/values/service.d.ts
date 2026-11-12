@@ -103,8 +103,14 @@ interface CombworkMessageValues {
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
   'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number }
+  'service.folderChanges.submoduleAdded': { folder: string | number }
+  'service.folderChanges.submoduleDeleted': { folder: string | number }
   'service.folderChanges.submoduleInside': { folder: string | number }
   'service.folderChanges.submoduleMoved': { folder: string | number }
+  'service.folderChanges.submoduleOther': { folder: string | number }
+  'service.folderChanges.submoduleRemoved': { folder: string | number }
+  'service.folderChanges.submoduleStaged': { folder: string | number }
+  'service.folderChanges.submoduleStagedBack': { folder: string | number }
   'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
   'service.folderChanges.unmerged': { file: string | number }
   'service.folderChanges.unplaced': { folder: string | number }

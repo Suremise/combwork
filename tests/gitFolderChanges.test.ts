@@ -1461,9 +1461,11 @@ describe('a submodule changed only inside it', () => {
       writeFileSync(join(proj, 'a.txt'), 'ordinary edit\n')
       const now = await worktreeNow(proj)
       if (isUnknown(now)) throw new Error('unknown')
-      expect(now.submodules).toEqual(['sub'])
+      expect(now.submodules).toEqual([{ path: 'sub', state: staged ? 'staged' : 'moved', recorded: sh(proj, 'rev-parse', 'HEAD:sub') }])
       const before = [head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]
-      for (const shown of [['sub', 'a.txt'], ['sub']]) await expect(settle('setAside', shown)).rejects.toThrow(/^sub is a submodule now at another commit, which Git can't set aside\. Commit it instead/)
+      // HI-3124: each said as it is.
+      const said = staged ? /^sub is a submodule whose new commit is staged, which Git can't set aside\. Commit it instead, or unstage it \(git restore --staged sub\)/ : /^sub is a submodule now at another commit, which Git can't set aside\. Commit it instead/
+      for (const shown of [['sub', 'a.txt'], ['sub']]) await expect(settle('setAside', shown)).rejects.toThrow(said)
       expect([head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]).toEqual(before)
       // An ordinary edit alone is still set aside, the submodule left as it was.
       await settle('setAside', ['a.txt'])
@@ -1474,6 +1476,73 @@ describe('a submodule changed only inside it', () => {
       expect(done.made).toBe(head())
       expect(committed()).toEqual(['a.txt', 'sub'])
       expect(status()).toBe('')
+    })
+
+  // HI-3124: Set Aside's refusal said "now at another commit … check out its recorded commit" for every submodule
+  // change; followed on a staged new commit, it left `MM sub`, which Commit failed on ("On branch main").
+  it("a new commit staged, then the recorded commit checked out inside again (MM): Commit and Set Aside both refused, naming git restore --staged, which clears it", async () => {
+    const recorded = head(join(proj, 'sub'))
+    writeFileSync(join(proj, 'sub', 's.txt'), 'new submodule commit\n')
+    sh(join(proj, 'sub'), 'commit', '-q', '-am', 'inside')
+    sh(proj, 'add', 'sub')
+    sh(join(proj, 'sub'), 'checkout', '-q', recorded)
+    expect(status()).toBe('MM sub')
+    const before = [head(), status(), sh(proj, 'stash', 'list')]
+    for (const action of ['commit', 'setAside'] as const) await expect(settle(action, ['sub'])).rejects.toThrow(/^sub is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside\. Unstage it with git restore --staged sub\.$/)
+    expect([head(), status(), sh(proj, 'stash', 'list')]).toEqual(before)
+    sh(proj, 'restore', '--staged', 'sub')
+    expect(status()).toBe('')
+  })
+
+  it('a new commit staged, the checkout moved on to a third commit (MM too): committed as checked out', async () => {
+    writeFileSync(join(proj, 'sub', 's.txt'), 'staged commit\n')
+    sh(join(proj, 'sub'), 'commit', '-q', '-am', 'staged')
+    sh(proj, 'add', 'sub')
+    writeFileSync(join(proj, 'sub', 's.txt'), 'third commit\n')
+    sh(join(proj, 'sub'), 'commit', '-q', '-am', 'third')
+    expect(status()).toBe('MM sub')
+    await settle('commit', ['sub'])
+    expect(sh(proj, 'rev-parse', 'HEAD:sub')).toBe(head(join(proj, 'sub')))
+    expect(status()).toBe('')
+  })
+
+  it("a new commit staged: Set Aside's remedy (git restore --staged, then the recorded commit checked out inside) clears it", async () => {
+    const recorded = head(join(proj, 'sub'))
+    writeFileSync(join(proj, 'sub', 's.txt'), 'new submodule commit\n')
+    sh(join(proj, 'sub'), 'commit', '-q', '-am', 'inside')
+    sh(proj, 'add', 'sub')
+    await expect(settle('setAside', ['sub'])).rejects.toThrow(/whose new commit is staged/)
+    sh(proj, 'restore', '--staged', 'sub')
+    sh(join(proj, 'sub'), 'checkout', '-q', recorded)
+    expect(status()).toBe('')
+  })
+
+  for (const [name, state, make, said, clear] of [
+    ['added', 'added', () => {
+      // The submodule taken out of HEAD and added again: `A  sub` (with .gitmodules as it is).
+      sh(proj, 'rm', '-q', '--cached', 'sub')
+      sh(proj, 'commit', '-q', '-m', 'unsub')
+      sh(proj, 'add', 'sub')
+    }, /^sub is a submodule added here, which Git can't set aside\. Commit it instead\.$/, null],
+    ['removed (git rm)', 'removed', () => void sh(proj, 'rm', '-q', 'sub'), /^sub is a submodule removed from Git here, which Git can't set aside\. Commit the removal instead\.$/, null],
+    ['deleted by hand', 'deleted', () => rmSync(join(proj, 'sub'), { recursive: true, force: true }), /^sub is a submodule whose folder was deleted, which Git can't set aside\. Commit its removal instead, or bring it back with git submodule update sub\.$/, () => void sh(proj, 'submodule', 'update', '-q', 'sub')]
+  ] as const)
+    it(`${name}: Set Aside refused saying so, nothing done${clear ? '; its remedy clears it' : ''}; Commit takes it`, async () => {
+      make()
+      const now = await worktreeNow(proj)
+      if (isUnknown(now)) throw new Error('unknown')
+      expect(now.submodules?.map((s) => [s.path, s.state])).toEqual([['sub', state]])
+      const before = [head(), status(), sh(proj, 'stash', 'list')]
+      await expect(settle('setAside', ['sub'])).rejects.toThrow(said)
+      expect([head(), status(), sh(proj, 'stash', 'list')]).toEqual(before)
+      if (clear) {
+        clear()
+        expect(status()).toBe('')
+        make()
+      }
+      await settle('commit', ['sub'])
+      expect(committed()).toEqual(['sub'])
+      expect(status()).not.toMatch(/ sub$/m)
     })
 })
 

@@ -407,13 +407,37 @@
     "defaultMessage": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.",
     "description": "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command."
   },
+  "service.folderChanges.submoduleAdded": {
+    "defaultMessage": "{folder} is a submodule added here, which Git can't set aside. Commit it instead.",
+    "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a newly added submodule; git's stash can't set it aside, so nothing was done. Commit works for it."
+  },
+  "service.folderChanges.submoduleDeleted": {
+    "defaultMessage": "{folder} is a submodule whose folder was deleted, which Git can't set aside. Commit its removal instead, or bring it back with git submodule update {folder}.",
+    "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose folder was deleted (not through git); git's stash can't set that aside, so nothing was done. Committing records its removal; git submodule update checks it out again. Keep git submodule update as it is: a command."
+  },
   "service.folderChanges.submoduleInside": {
     "defaultMessage": "{folder} is a submodule whose changes are inside it, so Combwork can't commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.",
     "description": "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done."
   },
   "service.folderChanges.submoduleMoved": {
     "defaultMessage": "{folder} is a submodule now at another commit, which Git can't set aside. Commit it instead, or check out its recorded commit inside {folder} yourself.",
-    "description": "HI-3052: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say); git's stash can't put it back, so nothing was done. Commit works for it."
+    "description": "HI-3052, HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say), not staged; git's stash can't put it back, so nothing was done. Commit works for it."
+  },
+  "service.folderChanges.submoduleOther": {
+    "defaultMessage": "{folder} is a submodule, and Git can't set aside a submodule's change. Commit it instead.",
+    "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule changed in another way (renamed, say); git's stash can't set a submodule's change aside, so nothing was done. Commit works for it."
+  },
+  "service.folderChanges.submoduleRemoved": {
+    "defaultMessage": "{folder} is a submodule removed from Git here, which Git can't set aside. Commit the removal instead.",
+    "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose removal is staged (git rm); git's stash fails on it, so nothing was done. Commit works for it."
+  },
+  "service.folderChanges.submoduleStaged": {
+    "defaultMessage": "{folder} is a submodule whose new commit is staged, which Git can't set aside. Commit it instead, or unstage it (git restore --staged {folder}) and check out its recorded commit inside {folder} yourself.",
+    "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with a new commit staged (git add of the submodule); git's stash can't set it aside, so nothing was done. Commit works for it; unstaging it and checking out the recorded commit inside it clears it. Keep git restore --staged as it is: a command."
+  },
+  "service.folderChanges.submoduleStagedBack": {
+    "defaultMessage": "{folder} is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside. Unstage it with git restore --staged {folder}.",
+    "description": "HI-3124: an error from Commit or Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose new commit is staged while the commit already recorded is checked out inside it again; git has nothing to commit and can't stash it, so nothing was done. Unstaging it clears the change. Keep git restore --staged as it is: a command."
   },
   "service.folderChanges.tooManyToSetAside": {
     "defaultMessage": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",

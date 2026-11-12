@@ -390,12 +390,42 @@
       "stash": "plain"
     }
   },
+  "service.folderChanges.submoduleAdded": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleDeleted": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.submoduleInside": {
     "placeholders": {
       "folder": "plain"
     }
   },
   "service.folderChanges.submoduleMoved": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleOther": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleRemoved": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleStaged": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleStagedBack": {
     "placeholders": {
       "folder": "plain"
     }
