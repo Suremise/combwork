@@ -39,4 +39,52 @@ describe('CHANGELOG.md', () => {
     expect(at.length).toBeLessThanOrEqual(1)
     if (at.length) expect(at[0]).toBe(0)
   })
+
+  // The same union merge keeps both wordings of a bullet reworded on two branches (HI-3036): two bullets with one bold
+  // title in a section, the older wording beside the newer. And a release brought into the next version can leave a
+  // released bullet under Unreleased too, where the next release would list it again.
+  it('has no two bullets with the same bold title in one section', () => {
+    expect(repeatedTitles(text)).toEqual([])
+  })
+
+  it('has no Unreleased bullet that a released version already lists', () => {
+    expect(releasedAgain(text)).toEqual([])
+  })
+
+  it('catches both (HI-3036)', () => {
+    const sample = ['## Unreleased', '', '### Fixed', '', '- **A** new.', '- **B** once.', '- **A** old.', '', '## 1.0.0 — 2026-01-01', '', '### Fixed', '', '- **A** new.', '- **C** same.', '', '### Added', '', '- **C** same.', ''].join('\n')
+    expect(repeatedTitles(sample)).toEqual(['Unreleased › Fixed: A'])
+    expect(releasedAgain(sample)).toEqual(['- **A** new.'])
+  })
 })
+
+/** Each `## version › ### kind` section's bullets (nested ones too), trimmed, in order. */
+function sections(md: string): { name: string; bullets: string[] }[] {
+  const out: { name: string; bullets: string[] }[] = []
+  let version = ''
+  for (const line of md.split(/\r?\n/)) {
+    const h2 = /^## (.*?)\s*$/.exec(line)
+    const h3 = /^### (.*?)\s*$/.exec(line)
+    if (h2) {
+      version = h2[1].replace(/ — .*$/, '')
+      out.push({ name: version, bullets: [] })
+    } else if (h3) out.push({ name: `${version} › ${h3[1]}`, bullets: [] })
+    else if (/^\s*- /.test(line) && out.length) out[out.length - 1].bullets.push(line.trim())
+  }
+  return out
+}
+
+/** Bold titles a section has more than once, as "section: title". */
+function repeatedTitles(md: string): string[] {
+  return sections(md).flatMap(({ name, bullets }) => {
+    const titles = bullets.flatMap((b) => /^- \*\*(.+?)\*\*/.exec(b)?.[1] ?? [])
+    return titles.filter((t, i) => titles.indexOf(t) !== i).map((t) => `${name}: ${t}`)
+  })
+}
+
+/** Unreleased's bullets that a released version has word for word. */
+function releasedAgain(md: string): string[] {
+  const all = sections(md)
+  const released = new Set(all.filter((s) => !s.name.startsWith('Unreleased')).flatMap((s) => s.bullets))
+  return all.filter((s) => s.name.startsWith('Unreleased')).flatMap((s) => s.bullets.filter((b) => released.has(b)))
+}
