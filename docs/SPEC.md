@@ -6177,11 +6177,15 @@ touched:
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
   is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
-  round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its
-  message this one's, and its tree's entries for the paths the private index's; HEAD unreadable before
+  round 3: the real index being free, another git can commit meanwhile), by nothing a hook can change (HI-3075: a
+  commit-msg hook rewrites the message, a pre-commit hook stages more): its parent the HEAD it started from, and HEAD's
+  reflog naming it with this commit's own reflog action (`GIT_REFLOG_ACTION=commit (combwork:<uuid>)`, which only git
+  writes; `git reflog` shows it so). HEAD unreadable before
   the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
   unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
-  then. **Any number of files** (HI-2983): the paths go to git on its input
+  then; *the files and the index are as they were* only while HEAD is where it started. HEAD moved and not proved this
+  commit (another git's, or no reflog kept), it names where HEAD is now and that the index was left as it was (*The
+  branch moved meanwhile, to …, and Combwork can't tell that it is this commit …*). **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters

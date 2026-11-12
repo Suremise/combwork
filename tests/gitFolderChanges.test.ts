@@ -506,6 +506,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(theirs).not.toBe(before)
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    // HI-3075: HEAD moved, so never "as they were": where it is now, and that it isn't proved this commit.
+    expect(String(err)).toContain(`The branch moved meanwhile, to ${theirs.slice(0, 12)}, and Combwork can't tell that it is this commit`)
+    expect(String(err)).not.toMatch(/as they were/)
     expect(head()).toBe(theirs)
     expect(sh(proj, 'log', '-1', '--format=%s')).toBe('theirs')
     // a.txt neither committed nor staged as if it were.
@@ -540,6 +543,44 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     gitCalls = null
     sh(proj, 'config', '--unset', 'hook.My.Slow.event')
     expect(lines()).toEqual([])
+    expect(existsSync(lockPath())).toBe(false)
+  })
+
+  // HI-3075: a commit-msg hook that rewrites the message (Gerrit's Change-Id) made a commit ended in post-commit "not
+  // ours": "as they were" said, the index not taken, the folder stuck (`MM a.txt`, `D  new.txt`, `?? new.txt`).
+  const changeIdHook = (): void => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "\\nChange-Id: I0123456789\\n" >> "$1"\n')
+  }
+
+  it('a commit whose message a hook rewrote, ended in post-commit after it was made: recognised as made (its reflog), the index taken in, nothing left changed', async () => {
+    changeIdHook()
+    slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    const before = head()
+    const done = await settle('commit', ['a.txt', 'new.txt'])
+    expect(head()).not.toBe(before)
+    expect(done.made).toBe(head())
+    expect(sh(proj, 'log', '-1', '--format=%B')).toContain('Change-Id: I0123456789')
+    expect(committed()).toEqual(['a.txt', 'new.txt'])
+    expect(lines()).toEqual([])
+    expect(leftovers()).toEqual([])
+  })
+
+  it('…with no reflog kept (core.logAllRefUpdates=false): not proved, so said with where HEAD moved, never "as they were"; the index left as it was', async () => {
+    sh(proj, 'config', 'core.logAllRefUpdates', 'false')
+    rmSync(join(proj, '.git', 'logs'), { recursive: true, force: true })
+    changeIdHook()
+    slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const before = head()
+    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+    expect(head()).not.toBe(before)
+    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    expect(String(err)).toContain(`The branch moved meanwhile, to ${head().slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`)
+    expect(String(err)).not.toMatch(/as they were/)
+    expect(leftovers()).toEqual([])
     expect(existsSync(lockPath())).toBe(false)
   })
 
