@@ -310,7 +310,7 @@
   "workflow.refused.loop.noReviewer.message": "La tarjeta {card} no tiene revisor que la compruebe: no está en ningún carril con revisor y nadie la ha revisado todavía.",
   "workflow.refused.loop.noReviewer.next": "Inicia un carril para la tarjeta con un revisor, o escríbelo en un comentario.",
   "workflow.refused.loop.noStep.message": "La tarjeta {card} no tiene ningún diseño ni seguimiento esperando su comprobación.",
-  "workflow.refused.loop.noStep.next": "Lee la tarjeta: puede que ya tenga respuesta o que la tarjeta haya avanzado.",
+  "workflow.refused.loop.noStep.next": "Lee la tarjeta: puede que ya tenga respuesta o que la tarjeta haya avanzado. Si aún vale la pena dar tu opinión, déjala en la tarjeta como comentario.",
   "workflow.refused.loop.roundLimit.message": "La tarjeta {card} llegó a su límite de rondas: seguirá cuando se responda su pregunta de límite de rondas.",
   "workflow.refused.loop.roundLimit.next": "La pregunta está en la tarjeta (Para ti): cuando se responda, Combwork despertará a los agentes que esperan en ella.",
   "workflow.refused.loop.staleStep.message": "Tarjeta {card}: eso es sobre {design}, pero lo que espera su comprobación ahora es {waiting}.",

@@ -310,7 +310,7 @@
   "workflow.refused.loop.noReviewer.message": "La carte {card} n’a aucun relecteur pour la vérifier : elle n’est dans aucun couloir avec relecteur, et personne ne l’a encore relue.",
   "workflow.refused.loop.noReviewer.next": "Démarre un couloir pour la carte avec un relecteur, ou écris-le plutôt dans un commentaire.",
   "workflow.refused.loop.noStep.message": "La carte {card} n’a aucune conception ni aucun suivi qui attend sa vérification.",
-  "workflow.refused.loop.noStep.next": "Lis la carte : ce qui a été publié a peut-être déjà reçu une réponse, ou la carte a avancé.",
+  "workflow.refused.loop.noStep.next": "Lis la carte : ce qui a été publié a peut-être déjà reçu une réponse, ou la carte a avancé. Un retour qui reste utile se laisse en commentaire sur la carte.",
   "workflow.refused.loop.roundLimit.message": "La carte {card} a atteint sa limite de tours : elle reprendra une fois que sa question sur la limite de tours aura reçu une réponse.",
   "workflow.refused.loop.roundLimit.next": "La question est sur la carte (Pour toi) : une fois qu’elle a une réponse, Combwork réveille les agents qui attendent la carte.",
   "workflow.refused.loop.staleStep.message": "Carte {card} : cela concerne {design}, mais ce qui attend sa vérification maintenant est {waiting}.",

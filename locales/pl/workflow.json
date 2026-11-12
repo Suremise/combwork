@@ -310,7 +310,7 @@
   "workflow.refused.loop.noReviewer.message": "Karta {card} nie ma recenzenta, który mógłby to sprawdzić: nie jest w żadnym torze z recenzentem i nikt jej jeszcze nie recenzował.",
   "workflow.refused.loop.noReviewer.next": "Uruchom dla karty tor z recenzentem albo napisz to w komentarzu.",
   "workflow.refused.loop.noStep.message": "Na karcie {card} ani projekt, ani poprawki nie czekają na sprawdzenie.",
-  "workflow.refused.loop.noStep.next": "Przeczytaj kartę: mogła już przyjść odpowiedź albo karta poszła dalej.",
+  "workflow.refused.loop.noStep.next": "Przeczytaj kartę: mogła już przyjść odpowiedź albo karta poszła dalej. Uwagi, które wciąż warto przekazać, dodaj do karty jako komentarz.",
   "workflow.refused.loop.roundLimit.message": "Karta {card} osiągnęła limit rund: ruszy dalej, gdy pytanie o limit rund dostanie odpowiedź.",
   "workflow.refused.loop.roundLimit.next": "Pytanie jest na karcie (Dla Ciebie): gdy dostanie odpowiedź, Combwork wybudzi agentów, którzy czekają na kartę.",
   "workflow.refused.loop.staleStep.message": "Karta {card}: to dotyczy {design}, a teraz na sprawdzenie czeka {waiting}.",

@@ -5188,7 +5188,10 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
   outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
   a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
-  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is. For an answer
+  or `proceed`, nothing waiting (`loop.noStep`) and an earlier step named (`loop.staleStep`) are said before whose it is
+  (HI-3011): a design closes when its card leaves Doing (put back to To do), and the reviewer the pool gave it, answering
+  late, hears that nothing waits (its feedback goes on the card as a comment), not that it isn't its.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
   notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
   whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a

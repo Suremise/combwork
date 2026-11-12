@@ -314,7 +314,7 @@
   "workflow.refused.loop.noReviewer.message": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
   "workflow.refused.loop.noReviewer.next": "Start a lane for the card with a reviewer, or say it in a comment instead.",
   "workflow.refused.loop.noStep.message": "{card} has no design or follow-up waiting for its check.",
-  "workflow.refused.loop.noStep.next": "Read the card: it may have been answered, or the card moved on.",
+  "workflow.refused.loop.noStep.next": "Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.",
   "workflow.refused.loop.roundLimit.message": "{card} reached its round limit: it goes on once its round-limit question is answered.",
   "workflow.refused.loop.roundLimit.next": "The question is on the card (For you): once it is answered, Combwork wakes the agents waiting on it.",
   "workflow.refused.loop.staleStep.message": "{card}: that is about {design}, but the one waiting for its check now is {waiting}.",

@@ -310,7 +310,7 @@
   "workflow.refused.loop.noReviewer.message": "{card} 没有评审者来检查：它不在任何有评审者的通道中，也还没有人评审过它。",
   "workflow.refused.loop.noReviewer.next": "为这张卡片启动一个有评审者的通道，或改为写在评论里。",
   "workflow.refused.loop.noStep.message": "{card} 没有等待检查的设计方案或后续修改。",
-  "workflow.refused.loop.noStep.next": "请阅读卡片：它可能已有回复，或卡片已进入下一步。",
+  "workflow.refused.loop.noStep.next": "请阅读卡片：它可能已有回复，或卡片已进入下一步。仍值得提供的反馈，请作为评论写在卡片上。",
   "workflow.refused.loop.roundLimit.message": "{card} 已达到轮次上限：轮次上限的问题得到回答后才会继续。",
   "workflow.refused.loop.roundLimit.next": "问题在卡片上（待你处理）：问题得到回答后，Combwork 会唤醒等待该卡片的智能体。",
   "workflow.refused.loop.staleStep.message": "{card}：这是关于 {design} 的，但现在等待检查的是 {waiting}。",

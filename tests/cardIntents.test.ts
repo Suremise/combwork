@@ -769,6 +769,49 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, reviewer, design('Plan v3')))).toBeNull()
   })
 
+  it("a pool lane's design (HI-3011): the reviewer the pool gave it answers it, gaps then ok, and nobody else; once the card is put back, it hears nothing waits", async () => {
+    const { w, repo } = await workspace()
+    const card = await create(w)
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: null, pool: true, cards: [card], by: 'Builder (p)' })
+    await act(w, card, builder, { kind: 'start' })
+    const wf = (await service.workflowFor(w, repo))!
+    // What the pool's pass writes as it gives a design out (reviewerPool.ts): here to Other (a3), so the lane has no reviewer of its own to fall back on.
+    const give = async (id: string) => {
+      const submission = Number(id.split('/s')[1])
+      await wf.write(wf.store.card(card), null, 'combwork', (x) => x.fact('ReviewerAssigned', { reviewer: 'a3', submission, design: true }))
+    }
+    const wakes = () => wakesOf(w, card)
+    const first = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    // Not given out yet: nobody's to answer.
+    expect(await refused(act(w, card, other, answer('gaps', first)))).toBe('loop.stepNotYours')
+    await give(first)
+    // The production rule (loopReviewerOf's pool branch) names the one it was given.
+    expect((await loopReviewerOf(w, await tasks.getTask(card, w)))?.id).toBe('a3')
+    // Anyone else, the builder included, is still refused; the reviewer it was given answers, and the builder is woken.
+    expect(await refused(act(w, card, reviewer, answer('gaps', first)))).toBe('loop.stepNotYours')
+    expect(await refused(act(w, card, builder, answer('ok', first)))).toBe('loop.stepNotYours')
+    const before = wakes().length
+    expect(await refused(act(w, card, other, answer('gaps', first, 'What bounds it?')))).toBeNull()
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', actor: 'agent:a3', data: { step: 'gaps', of: 'design', design: first } })
+    expect(wakes().slice(before)).toEqual(['a1'])
+    // Revised and given again: its ok reaches the builder too; a late answer to the first hears it is stale.
+    const second = String((await act(w, card, builder, design('Plan v2'))).done.data?.design)
+    await give(second)
+    expect(await refused(act(w, card, other, answer('gaps', first)))).toBe('loop.staleStep')
+    expect(await refused(act(w, card, other, answer('ok', second, 'Fine')))).toBeNull()
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'ok', of: 'design', design: second } })
+    expect(wakes().slice(before)).toEqual(['a1', 'a1'])
+    // HI-2980's sequence: a design given out, then the card put back to To do before its answer. The design closed with
+    // the move, so its reviewer hears nothing waits (not that it isn't its), and the refused answer writes nothing.
+    const third = String((await act(w, card, builder, design('Plan v3'))).done.data?.design)
+    await give(third)
+    await act(w, card, builder, { kind: 'putBack', why: 'Waiting for the user' })
+    const after = { facts: facts(w, card).filter((f) => f.kind === 'LoopStep').length, wakes: wakes().length }
+    expect(await refused(act(w, card, other, answer('gaps', third, 'Late')))).toBe('loop.noStep')
+    expect(await refused(act(w, card, reviewer, answer('ok', third)))).toBe('loop.noStep')
+    expect({ facts: facts(w, card).filter((f) => f.kind === 'LoopStep').length, wakes: wakes().length }).toEqual(after)
+  })
+
   it("a follow-up of a passed card (#1467): named, it wakes the reviewer; only the reviewer's answer settles it, never going ahead", async () => {
     const { w, wt } = await workspace()
     const card = await inLane(w)
