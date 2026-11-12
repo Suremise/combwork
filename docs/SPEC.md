@@ -4029,7 +4029,7 @@ that can't be written fails the change whole.
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `InTarget` (observed) | revision, target, submission (its `Submitted` fact) | A card in Review whose submitted change is in its target already: the **already in main** mark; it stays in Review (§16.4.4) [HI-2709]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
-| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again: the mark cleared (HI-2988). |
+| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again, or whose own change is (merged back by hand, by the test that marks it left: HI-3041): the mark cleared (HI-2988). |
 | `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
 | `Refused` | intent or move, rule, message ids, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
@@ -6478,7 +6478,15 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
    A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
    pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with
-   nothing said). A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
+   nothing said). Before that pause the remote is fetched (into `refs/cw/catch-up/<target>`): when it no longer has the
+   result either (a force-push took the published merge off it), the catch-up ends, the queue goes on and the
+   reconciler marks the card `LeftTarget` (HI-3041: paused, it could never be put right); unknown (a failed fetch),
+   paused as above. A local target behind the result is asked about the same way before it is brought there, unless
+   the catch-up is the one right after this run published the result: one the remote no longer has is never brought
+   into the local target, and the catch-up ends; unknown, nothing moves and it stays owed, asked again at the next
+   look (only a remote seen holding the result lets it go on). A recorded step about to swap the ref (its files moved
+   before a stop) asks the same: gone, its files go back by the table's rollback and the catch-up then ends; unknown,
+   it is left as it is, still owed. A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
    table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
    holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
    folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
@@ -6487,7 +6495,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
    local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card
    published to the remote (its `IntegrationStarted.publish`, or integrated by outside while following) `LeftTarget`
-   while its catch-up is owed or the local target is behind its result.
+   while its catch-up is owed, or while the local target is behind its result and the remote still has it (HI-3041,
+   Darren's decision: undone on the remote too, it is marked as with a push after merging; the remote's branch fetched,
+   sealed, into `refs/cw/reconcile/<target>`, its head kept a minute per target; unreadable, nothing is recorded and the
+   pass is retried).
 
 **Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the

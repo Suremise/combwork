@@ -1,7 +1,7 @@
 // G21 (HI-1183, SPEC §16.9.4): the merge queue's target follows its remote. On real temporary repositories, each with
 // a bare repository of its own as the remote (never a real remote): the fetch before each test merge, the publication as
 // an exact compare-and-swap at the remote, the sealed transport, unknown publications, and the local target's catch-up.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { execFileSync } from 'child_process'
@@ -531,6 +531,177 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     await reconcile(e.wf, e.store.card(a.id))
     expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
     expect(e.store.facts(a.id).some((f) => f.kind === 'LeftTarget')).toBe(false)
+  })
+
+  it('HI-3041: the published merge taken off the remote while its catch-up is owed: ended once the local target is in line, the card marked as having left, the next card merged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const before = sh(e.project, 'rev-parse', `${e.wf.state(a).integrated!.result}^1`)
+    // A teammate force-pushes main without the merge (another commit in its place).
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'config', 'user.email', 'other@example.com')
+    sh(other, 'config', 'user.name', 'Other')
+    sh(other, 'reset', '-q', '--hard', before)
+    commit(other, { 'rewrite.txt': 'rewrite\n' }, 'rewrite')
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    // The user brings the local main in line with its remote, as the pause asks.
+    del(join(e.project, 'a.txt'))
+    sh(e.project, 'fetch', '-q', 'origin')
+    sh(e.project, 'reset', '-q', '--hard', 'origin/main')
+    expect(head(e.project)).toBe(head(bare))
+    const b = await queued(e, 'B', 'b.txt')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(contains(bare, e.wf.state(b).integrated!.result)).toBe(true)
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (HR1): the published merge taken off the remote while the local target is still behind it, its catch-up owed: never brought in locally; ended, marked left, the next card merged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const result = e.wf.state(a).integrated!.result
+    const before = sh(e.project, 'rev-parse', `${result}^1`)
+    expect(head(e.project)).toBe(before)
+    // The remote reset to the merge's parent (the published merge dropped); the local main still behind the result.
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'reset', '-q', '--hard', before)
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    del(join(e.project, 'a.txt'))
+    const b = await queued(e, 'B', 'b.txt')
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(contains(e.project, result)).toBe(false)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(contains(bare, e.wf.state(b).integrated!.result)).toBe(true)
+    expect(contains(e.project, e.wf.state(b).integrated!.result)).toBe(true)
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (HR2): stopped after its files moved, before its ref; the remote then drops the result: the files rolled back, never swapped in; ended, marked left, the next card merged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, transport, queue } = following({}, { checkedOut: true })
+    const a = await queued(e, 'A', 'a.txt')
+    await expect(queue({ hooks: { beforeCatchUpRef: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))?.phase).toBe('ref')
+    const result = e.wf.state(a).integrated!.result
+    const before = sh(e.project, 'rev-parse', `${result}^1`)
+    expect(head(e.project)).toBe(before)
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'reset', '-q', '--hard', before)
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    const b = await queued(e, 'B', 'b.txt')
+    await restarted(e, transport).drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(contains(e.project, result)).toBe(false)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (HR2): an owed catch-up behind the result whose remote can’t be read: nothing moved, still owed; read again, gone: ended, never brought in', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a } = await caughtOnAFile()
+    const result = e.wf.state(a).integrated!.result
+    const before = sh(e.project, 'rev-parse', `${result}^1`)
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'reset', '-q', '--hard', before)
+    sh(other, 'push', '-q', '-f', 'origin', 'main')
+    del(join(e.project, 'a.txt'))
+    // The remote unreachable for a while (its address points nowhere).
+    sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+    expect(head(e.project)).toBe(before)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    // Reachable again: the result is gone from it, so the catch-up ends with nothing brought in.
+    sh(e.project, 'remote', 'set-url', 'origin', bare)
+    queue().resume('main')
+    await queue().drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(contains(e.project, result)).toBe(false)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+  })
+
+  it('HI-3041 (2b): a published merge undone on the remote and locally is marked as having left, as with a push; on the remote still, behind is not left', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    const marks: Record<string, unknown> = {}
+    for (const follow of [true, false]) {
+      env?.close()
+      env = null
+      const { e, bare, queue } = following({ followRemote: follow, pushTarget: !follow })
+      const a = await queued(e, 'A', 'a.txt')
+      expect((await queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+      expect(head(bare)).toBe(head(e.project))
+      const before = sh(e.project, 'rev-parse', `${e.wf.state(a).integrated!.result}^1`)
+      // Behind locally only: the remote still has it, so not left (HI-2988).
+      sh(e.project, 'update-ref', 'refs/heads/main', before)
+      await reconcile(e.wf, e.store.card(a.id))
+      if (follow) expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+      // Undone on the remote too.
+      const other = join(tempDir('other-'), 'clone')
+      execFileSync('git', ['clone', '-q', bare, other])
+      sh(other, 'reset', '-q', '--hard', before)
+      sh(other, 'push', '-q', '-f', 'origin', 'main')
+      // A pass over a minute later (the remote's head is kept a minute per repository and target): only Date is faked.
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(Date.now() + 61_000)
+        await reconcile(e.wf, e.store.card(a.id))
+      } finally {
+        vi.useRealTimers()
+      }
+      marks[follow ? 'follow' : 'push'] = e.wf.state(a).marks.leftTarget ?? null
+    }
+    expect(marks.push).toMatchObject({ target: 'main' })
+    expect(marks.follow).toMatchObject({ target: 'main' })
+  })
+
+  it('HI-3041 (3a): left its target, then merged back by hand (a new merge of its revision): the mark cleared', { timeout: GIT_HEAVY_MS }, async () => {
+    const { reconcile } = await import('../../src/main/workflow/reconcile')
+    const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [] }))
+    sh(e.project, 'checkout', '-q', '--detach')
+    const before = head(e.project)
+    const a = await queued(e, 'A', 'a.txt')
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    const i = e.wf.state(a).integrated!
+    sh(e.project, 'update-ref', 'refs/heads/main', before)
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeDefined()
+    sh(e.project, 'checkout', '-q', 'main')
+    sh(e.project, 'merge', '-q', '--no-ff', '--no-edit', i.revision)
+    sh(e.project, 'checkout', '-q', '--detach')
+    expect(contains(e.project, i.result)).toBe(false)
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.wf.state(a).marks.leftTarget).toBeUndefined()
+    expect(e.kinds(a.id).filter((k) => k === 'LeftTarget' || k === 'BackInTarget')).toEqual(['LeftTarget', 'BackInTarget'])
+    // Again: a second pass writes nothing more.
+    await reconcile(e.wf, e.store.card(a.id))
+    expect(e.kinds(a.id).filter((k) => k === 'BackInTarget')).toHaveLength(1)
+  })
+
+  it('HI-3041: while the remote still has the result, a local commit of the user’s still pauses remoteDiverged (the remote looked at, not trusted away)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, queue, a } = await caughtOnAFile()
+    del(join(e.project, 'a.txt'))
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine')
+    queue().resume('main')
+    expect(await queue().drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'remoteDiverged' }])
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
   })
 
   /** A published, Done; Combwork stopped (a crash, a lost lease) after journalling its catch-up's plan, before moving files. */
