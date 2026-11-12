@@ -3785,6 +3785,14 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   afresh; any change or failure refused and retried by the next use). Never `jj op integrate` (probed on 0.47.1: it puts
   the user's own workspace back to an old view, and their `update-stale` then removes their files from the folder), and
   never another workspace touched. Tests: `tests/jjOpAbandon.test.ts`; the window's in jjWindowRun.cjs.
+- **Recover… under jj's line-ending conversion** (HI-3098): the user's own `working-copy.eol-conversion` (`input`, or
+  `input-output`, which checks text files out with CRLF) is read in the folder when recovery begins (`jj config get`,
+  journalled as `eol`; anything but its three values refuses) and the folder's bytes are compared with commits as jj will
+  store them (`storedForm`): every CRLF as LF, unless the file looks binary (a NUL, or a CR followed by anything but LF,
+  in its first 8192 bytes; a CR in the window's last byte doesn't count). Probed on jj 0.47.1, `.gitattributes` playing no
+  part. The scan's blob and the restore's `C` use it; the preserved and restored bytes stay the folder's own. So an
+  untouched file is no edit, X (exactly the delta) is tidied, and no `-late` or `beside` copies appear. The switch to jj
+  still allows the setting (unlike Git's `core.autocrlf`). Tests: `tests/jjRecoveryEol.test.ts`.
 - **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
   a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
   `slots:recoverStale`, its refusal said (busy, with stop its agent first; its card still being prepared; no longer

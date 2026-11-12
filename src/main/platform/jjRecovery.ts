@@ -130,6 +130,8 @@ interface Journal {
    */
   recordFrom?: string
   recorded?: string
+  /** HI-3098: jj's line-ending conversion for this folder, read when recovery began (absent: `none`, as before). */
+  eol?: EolConversion
 }
 
 const DEFAULT_BOUNDS = { files: 2000, bytes: 512 * 1024 * 1024 }
@@ -138,6 +140,34 @@ const SEP = '\u001f'
 const COLLISION_POLL_MS = 50
 const COLLISION_CAP_MS = 3_000
 const blobOf = (bytes: Buffer): string => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex') // i18n-ignore: a protocol code, never wording
+
+/** jj's `working-copy.eol-conversion` (HI-3098): `none` (the default) stores a file's bytes as they are. */
+export type EolConversion = 'none' | 'input' | 'input-output'
+/** How far into a file jj looks to decide it is binary (probed on 0.47.1, HI-3098). */
+const EOL_WINDOW = 8192
+
+/**
+ * A file's bytes as jj stores them (HI-3098), so they compare with a commit's blobs. With `input` or `input-output` jj
+ * stores every CRLF as LF, unless the file looks binary: a NUL in its first 8192 bytes, or a CR there followed by
+ * anything but LF (a CR in the window's last byte, its next byte outside it, doesn't count). Probed on jj 0.47.1;
+ * `.gitattributes` plays no part. With `none`, the bytes as they are.
+ */
+export function storedForm(bytes: Buffer, eol: EolConversion): Buffer {
+  if (eol === 'none' || !bytes.includes(0x0d)) return bytes
+  const end = Math.min(bytes.length, EOL_WINDOW)
+  for (let i = 0; i < end; i++) {
+    const b = bytes[i]
+    if (b === 0x00) return bytes
+    if (b === 0x0d && i + 1 < end && bytes[i + 1] !== 0x0a) return bytes
+  }
+  const out = Buffer.allocUnsafe(bytes.length)
+  let n = 0
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0x0d && bytes[i + 1] === 0x0a) continue
+    out[n++] = bytes[i]
+  }
+  return out.subarray(0, n)
+}
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
 const norm = (p: string): string => p.split(/[\\/]+/).filter(Boolean).join('/')
 const abs = (folder: string, rel: string): string => join(folder, ...rel.split('/'))
@@ -235,6 +265,8 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   const fenced = async (): Promise<boolean> => (await mine()) && (await req.quiet())
 
   let j = journal.read() as Journal | null
+  /** The recovery's line-ending conversion (HI-3098), as journalled when it began. */
+  const eolNow = (): EolConversion => j?.eol ?? 'none'
   if (j && (j.workspace !== req.identity.workspace || j.store.toLowerCase() !== req.identity.store.toLowerCase() || j.generation !== req.identity.generation || resolve(j.folder).toLowerCase() !== resolve(folder).toLowerCase())) return refuse('identity')
   // A folder that isn't the recorded workspace (a replacement at the same path, even of the same name and store) is
   // refused before anything is read or written, fresh or resumed.
@@ -295,7 +327,8 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const buf = await readCapped(abs(folder, path), st.size, (n) => deps.hooks?.read?.(path, n))
       if (buf === null) return refuse('unreadable', path)
       if (buf === 'over' || buf.length !== st.size) return refuse('changing', path)
-      const blob = blobOf(buf)
+      // As jj will store it (HI-3098): compared with the commit's blob, and with X's later; its raw bytes are what is kept.
+      const blob = blobOf(storedForm(buf, eolNow()))
       if (w && w.blob === blob) continue
       bytes += buf.length
       out.push({ path, kind: 'file', size: buf.length, sha256: sha256(buf), blob, wsBlob: w?.blob ?? null })
@@ -346,7 +379,12 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     if (!co || co.name !== req.identity.workspace) return refuse('identity')
     const ws = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(co.name)}@`, '-T', 'commit_id'], { op: co.op })
     if (!ws.ok || !/^[0-9a-f]{40}$/.test(ws.out.trim())) return refuse('unreadable', ws.err)
-    await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, generation: req.identity.generation, folder: resolve(folder), S: co.op, WS: ws.out.trim() })
+    // HI-3098: the folder's bytes are compared with commits as jj will store them, under this folder's own setting
+    // (user, repository or workspace config). Anything but its three values: refused, nothing changed.
+    const conv = await port.jj(folder, ['config', 'get', 'working-copy.eol-conversion'], { op: co.op })
+    const eol = conv.ok ? conv.out.trim() : ''
+    if (eol !== 'none' && eol !== 'input' && eol !== 'input-output') return refuse('unreadable', conv.ok ? `eol-conversion ${eol}` : conv.err) // i18n-ignore: a protocol detail, never wording
+    await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, generation: req.identity.generation, folder: resolve(folder), S: co.op, WS: ws.out.trim(), ...(eol !== 'none' ? { eol } : {}) })
   }
   let cur = j as unknown as Journal
 
@@ -480,7 +518,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       // The moved-aside file, read capped at the delta's byte bound: past it, it equals no version compared with.
       const asideThere = existsSync(s.aside)
       const asideRead = asideThere ? await readCapped(s.aside, bounds.bytes, (n) => deps.hooks?.read?.(e.path, n)) : null
-      const C = Buffer.isBuffer(asideRead) ? blobOf(asideRead) : asideThere ? 'unreadable or past the bound' : null // i18n-ignore: a value no blob equals, never shown
+      const C = Buffer.isBuffer(asideRead) ? blobOf(storedForm(asideRead, eolNow())) : asideThere ? 'unreadable or past the bound' : null // i18n-ignore: a value no blob equals, never shown
       const U = u.get(e.path)?.blob ?? null
       const WS = e.wsBlob
       let outcome: PathState['outcome']
