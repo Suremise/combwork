@@ -97,6 +97,31 @@ async function recover(w: World, name: string, lease: string): Promise<void> {
   expect(out).toEqual({ ok: true })
 }
 
+type How = 'described' | 'rebased onto a moved main' | 'squashed with a fixup' | 'squashed into a commit on main'
+
+/**
+ * The user integrates card 1's commit R by rewriting it, then sets main onto the result (HR1's round 1 asked for squash):
+ * described; rebased onto a moved main; a fixup squashed into it (R rewritten, the slot following it); or R squashed
+ * into a commit of main's (R gone, the slot's working copy back on the old base). Recovered, as the user would.
+ */
+async function integrateRewritten(w: World, how: How, slot: { name: string; folder: string }, ws: string, R: string, lease: string): Promise<void> {
+  if (how === 'described') w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', R, '-m', 'card 1, as integrated')
+  else if (how === 'rebased onto a moved main') {
+    mainMoves(w)
+    w.h.jj(w.repo, '--ignore-working-copy', 'rebase', '-s', R, '-d', 'main')
+  } else if (how === 'squashed with a fixup') {
+    w.h.jj(w.repo, 'new', R, '-m', 'fixup')
+    writeFileSync(join(w.repo, 'fixup.txt'), 'fixup\n')
+    w.h.jj(w.repo, 'squash', '--into', R, '-m', 'card 1, as integrated')
+  } else {
+    const M = mainMoves(w)
+    w.h.jj(w.repo, '--ignore-working-copy', 'squash', '--from', R, '--into', M, '-m', 'main moves, with card 1')
+  }
+  if (await w.port.stale(slot.folder)) await recover(w, slot.name, lease)
+  // main onto the result: the rewritten R (below the slot's working copy), or main's own commit that took R in.
+  if (how !== 'squashed into a commit on main') w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', w.h.id(slot.folder, `${ws}@-`), '--allow-backwards')
+}
+
 /** The user's commit on main, moving it on. */
 function mainMoves(w: World): string {
   w.h.jj(w.repo, 'new', 'main', '-m', 'main moves')
@@ -108,29 +133,20 @@ function mainMoves(w: World): string {
 
 describe.skipIf(!jjExe)(`a jj slot whose card's commit was rewritten as it was integrated (jj ${TESTED_JJ.version}), HI-2980`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
-    it.each(['described', 'rebased onto a moved main'] as const)("its commit %s, then main set onto it: the lane's next card is prepared in the slot", async (how) => {
+    it.each(['described', 'rebased onto a moved main', 'squashed with a fixup', 'squashed into a commit on main'] as const)("its commit %s, main onto the result: the lane's next card is prepared in the slot", async (how) => {
       const w = world(colocated)
       const { lent, row, ws, R } = await cardOne(w, { lane: 'L1' })
-      if (how === 'described') w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', R, '-m', 'card 1, as integrated')
-      else {
-        mainMoves(w)
-        w.h.jj(w.repo, '--ignore-working-copy', 'rebase', '-s', R, '-d', 'main')
-      }
-      await recover(w, row.name, lent.lease.id)
-      const R2 = w.h.id(row.folder, `${ws}@-`)
-      expect(R2).not.toBe(R)
-      w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', R2, '--allow-backwards')
+      await integrateRewritten(w, how, row, ws, R, lent.lease.id)
+      expect(w.h.id(row.folder, `${ws}@-`)).not.toBe(R)
       const key2 = jjLineKey(ws, 2, 1)
       expect(await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
       expect(await w.port.line(row.folder)).toBe(key2)
     })
 
-    it("a card's own slot, its commit described as it was integrated: ready again after its lease", async () => {
+    it.each(['described', 'squashed with a fixup', 'squashed into a commit on main'] as const)("a card's own slot, its commit %s as it was integrated: ready again after its lease", async (how) => {
       const w = world(colocated)
       const { lent, row, ws, R } = await cardOne(w, { card: 1 })
-      w.h.jj(w.repo, '--ignore-working-copy', 'describe', '-r', R, '-m', 'card 1, as integrated')
-      await recover(w, row.name, lent.lease.id)
-      w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', w.h.id(row.folder, `${ws}@-`), '--allow-backwards')
+      await integrateRewritten(w, how, row, ws, R, lent.lease.id)
       await w.pool.release(lent.lease.id, 'done')
       await w.pool.refresh()
       expect(w.store.slot(row.name)?.state).toBe('ready')
