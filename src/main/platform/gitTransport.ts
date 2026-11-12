@@ -204,8 +204,10 @@ async function havesOf(h: CandidateHost, snap: TransportSnapshot, into: string):
   const name = snap.ref.replace(/^refs\/heads\//, '')
   const track = `refs/remotes/${snap.remote}/${name}`
   const rows = r.out.split(/\r?\n/).map((l) => l.trim().split(' ')).filter(([id, type]) => type === 'commit' && hex.test(id))
-  const own = ([, , ref, up]: string[]): boolean => ref === into || ref === track || ref === `refs/heads/${name}` || up === track
-  return [...new Set([...rows.filter(own), ...rows.filter((row) => !own(row))].map(([id]) => id))].slice(0, HAVES_MAX)
+  // Tiers, each in git's order (HR1's round 1: branches tracking the target, however many, never before its own heads).
+  const tier = ([, , ref, up]: string[]): number => (ref === into ? 0 : ref === track ? 1 : ref === `refs/heads/${name}` ? 2 : up === track ? 3 : 4)
+  const ordered = [0, 1, 2, 3, 4].flatMap((t) => rows.filter((row) => tier(row) === t))
+  return [...new Set(ordered.map(([id]) => id))].slice(0, HAVES_MAX)
 }
 
 /** Fetches the snapshot's ref into the sealed context's own ref, reads that fetch's head there, and pins it in the project as `into`. */
