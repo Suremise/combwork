@@ -10,7 +10,7 @@ import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
-import { GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
+import { clearSubmoduleCheckouts, GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
 import { gitFilesExec } from './gitModulesRun'
 import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
 
@@ -93,7 +93,13 @@ export const gitWorkspacePort: WorkspacePort = {
     return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
   },
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
+  // HI-3028: a copy's own submodule checkouts the revision doesn't keep as submodules removed first (their clones stay):
+  // a forced checkout writes ordinary files into such a folder and `clean -fd` leaves its `.git` file, so git run in it
+  // would see the old clone as its repository. A failure is the checkout's, with its words. A copy with no clones (its git
+  // dir has no `modules`, an fs read) runs no git for it.
   resetTo: async (folder, revision, o) => {
+    const cleared = (await hasPrivateModules(folder)) === false ? null : await clearSubmoduleCheckouts(gitReads, folder, [revision])
+    if (cleared) return { ok: false, failed: 'checkout', err: cleared }
     const co = await git(folder, ['checkout', '--detach', '--force', revision], undefined, undefined, smudge(o))
     if (!co.ok) return { ok: false, failed: 'checkout', err: co.err }
     const cl = await git(folder, ['clean', '-fd'])

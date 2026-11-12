@@ -7998,6 +7998,11 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
   another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
   with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
+  A copy's reset (HI-3028) removes such a checkout before its checkout too, where the revision has ordinary files at
+  that path (the submodule vendored), as the queue's folder does below (`clearSubmoduleCheckouts`): a forced checkout
+  would write those files into the old checkout and `clean -fd` keep its `.git` file, so git run inside would see the
+  old clone. Its clone stays, so a later lease at a revision with the submodule sets it up again. A slot switches its
+  branch rather than resetting, which git refuses over such a folder.
   The merge queue's folder (HI-3027) removes such a checkout earlier: just before its test merge, strict's update or
   a rebase, each checkout of its own clones (as above, but claimed whether or not a gitlink is there now) that the
   revision checked out or the one merged into it doesn't keep as a submodule (vendored into ordinary files, or gone),
