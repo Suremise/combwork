@@ -6179,11 +6179,13 @@ touched:
   is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
   round 3: the real index being free, another git can commit meanwhile), not by its message or tree (HI-3075: a
   commit-msg hook rewrites the message, a pre-commit hook stages more) but by the move git wrote making it: the commit
-  runs with its own reflog action (`GIT_REFLOG_ACTION=commit (combwork:<uuid>)`; `git reflog` shows it so), and the
-  **first** entry of HEAD's reflog carrying it must move HEAD from the HEAD it started from to the commit now there,
-  whose parent that is. A hook's own git inherits the action (HR2's round 1: a post-commit `git reset` to an older
-  commit of the same parent writes it too), but only after the commit's own entry, so such a move is never taken
-  for the commit. HEAD unreadable before
+  runs with its own reflog action (`GIT_REFLOG_ACTION=commit (combwork:<uuid>)`; `git reflog` shows it so). A hook's
+  own git inherits the action, before the commit's write (a pre-commit `git reset` to an older commit of the same
+  parent) or after it (post-commit; HR2's rounds 1 and 2). So only HEAD's reflog written since the commit started is
+  read (its length taken first; at most 64 KB, a file grown more, shorter than it was or unreadable is *can't tell*),
+  and of it exactly one entry carries the action (more: *can't tell*); it is a commit's write, not a reset's or a
+  checkout's (git writes `<action>: <the commit's first line>`), moving HEAD from the HEAD it started from to the
+  commit now there, whose parent that is, and whose message is still this one's with what a hook added. HEAD unreadable before
   the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
   unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
   then; *the files and the index are as they were* only while HEAD is where it started. HEAD moved and not proved this

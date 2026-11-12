@@ -10,7 +10,7 @@
 // Darren, 11 Nov 2026). The commit or stash runs against a private copy of the index (HI-3021), so a hook, filter or
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
-import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
+import { copyFile, lstat, open, readFile, readdir, rename, rm, stat, writeFile } from 'original-fs/promises'
 import { randomUUID } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
@@ -340,28 +340,73 @@ export function sameEntries(a: readonly string[], b: readonly string[]): boolean
   return x.every((e, i) => e === y[i])
 }
 
+/** HI-3075 (HR2's round 2): the most of HEAD's reflog read after a commit ended at its bound; more written meanwhile is unknown. */
+const REFLOG_TAIL_MAX = 64 * 1024
+
+/** HI-3075: where HEAD's reflog file is and how long it is, taken before the commit runs (null: unreadable). */
+interface ReflogMark {
+  file: string
+  size: number
+}
+
+async function reflogMark(folder: string): Promise<ReflogMark | null> {
+  const where = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'logs/HEAD'])
+  if (!where.ok || !where.out.trim()) return null
+  const file = where.out.trim()
+  // None yet: it starts empty (git makes it with the commit's own entry, if reflogs are kept).
+  const size = await stat(file).then(
+    (s) => s.size,
+    (e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? 0 : null)
+  )
+  return size === null ? null : { file, size }
+}
+
+/** The reflog's lines written since `mark` (`old new who when\tmessage`), oldest first; null when they can't be read whole and bounded. */
+async function reflogSince(mark: ReflogMark): Promise<string[] | null> {
+  const fh = await open(mark.file, 'r').catch(() => null)
+  if (!fh) return null
+  try {
+    const size = (await fh.stat()).size
+    // Shorter than it was (expired, rewritten): what was written since can't be told apart.
+    if (size < mark.size || size - mark.size > REFLOG_TAIL_MAX) return null
+    const buf = Buffer.alloc(size - mark.size)
+    const { bytesRead } = await fh.read(buf, 0, buf.length, mark.size)
+    // Whole lines only (a line being written is left out).
+    const lines = buf.subarray(0, bytesRead).toString('utf8').split('\n')
+    return lines.slice(0, -1).filter((l) => l.includes('\t'))
+  } catch {
+    return null
+  } finally {
+    await fh.close().catch(() => undefined)
+  }
+}
+
 /**
  * HI-3021 (HR2's round 3): whether `now`, HEAD after a commit ended at its bound, is the commit this one made, not one
- * another git made meanwhile (the real index is free while the commit runs). HI-3075: not by its message or tree (a
- * commit-msg hook rewrites the message, a pre-commit hook stages more, HI-3074) but by the move git wrote making it: the
- * commit runs with its own reflog action (`tag`, GIT_REFLOG_ACTION), and the **first** entry of HEAD's reflog carrying
- * it must move HEAD from the HEAD it started from (none on an unborn branch) to `now`, whose parent that is. HR2's round
- * 1: a hook's own git inherits the action (a post-commit `git reset` to another commit writes it too), but only after
- * the commit's own entry, so a later move is never taken for the commit. `unknown`: the reflog can't say (none kept, or
- * unreadable).
+ * another git made meanwhile (the real index is free while the commit runs). HI-3075: a commit-msg hook rewrites the
+ * message and a pre-commit hook stages more (HI-3074), so it is told by the move git wrote making it: the commit runs
+ * with its own reflog action (`tag`, GIT_REFLOG_ACTION). HR2's rounds 1 and 2: a hook's own git inherits the action,
+ * before the commit's write (pre-commit) or after it (post-commit), so of the reflog written since the commit started
+ * (`mark`, read bounded): exactly one entry carries the action (more: `unknown`), and it is a commit's write, not a
+ * reset's or a checkout's (git writes `<action>: <the commit's first line>`), moving HEAD from the HEAD it started
+ * from (none on an unborn branch) to `now`, whose parent that is, and whose message is still this one's with what a
+ * hook added (a hook's own commit has its own). `unknown`: the reflog can't say (none kept, unreadable, rewritten, or
+ * too much written meanwhile).
  */
-async function madeByThis(folder: string, now: string, before: string | null, tag: string): Promise<'yes' | 'no' | 'unknown'> {
+async function madeByThis(folder: string, now: string, before: string | null, tag: string, mark: ReflogMark | null, message: string): Promise<'yes' | 'no' | 'unknown'> {
   const parent = await git(folder, ['rev-parse', '-q', '--verify', `${now}^`])
   if (before === null ? parent.ok : !parent.ok || parent.out.trim() !== before) return 'no'
-  // The reflog file itself, for each move's old and new commit (`old new who when\tmessage`), oldest first.
-  const where = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'logs/HEAD'])
-  const text = where.ok && where.out.trim() ? await readFile(where.out.trim(), 'utf8').catch(() => null) : null
-  const moves = (text ?? '').split('\n').filter((l) => l.includes('\t'))
-  if (!moves.length) return 'unknown'
-  const first = moves.find((l) => l.slice(l.indexOf('\t') + 1).startsWith(`${tag}: `))
-  if (!first) return 'no'
-  const [from, to] = first.split(' ')
-  return (before === null ? /^0+$/.test(from) : from === before) && to === now ? 'yes' : 'no'
+  const moves = mark ? await reflogSince(mark) : null
+  if (!moves?.length) return 'unknown'
+  const tagged = moves.filter((l) => l.slice(l.indexOf('\t') + 1).startsWith(`${tag}: `))
+  if (tagged.length !== 1) return tagged.length ? 'unknown' : 'no'
+  const [from, to] = tagged[0].split(' ')
+  if (!(before === null ? /^0+$/.test(from) : from === before) || to !== now) return 'no'
+  const said = await git(folder, ['log', '-1', '--format=%B', now])
+  if (!said.ok) return 'unknown'
+  const firstLine = said.out.replace(/^\s+/, '').split('\n')[0].trim()
+  const wrote = tagged[0].slice(tagged[0].indexOf('\t') + 1).trim()
+  return wrote === `${tag}: ${firstLine}` && said.out.includes(message.trim()) ? 'yes' : 'no'
 }
 
 /** HI-3074: what a commit leaves the index: its paths (those shown, and every path it changed) and its entries for them. */
@@ -530,11 +575,13 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   const tag = `commit (combwork:${randomUUID()})` // i18n-ignore: git's reflog action, in the repository (English, as git's own)
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
     const commitEnv = { ...env, GIT_REFLOG_ACTION: tag }
+    // HR2's round 2: where HEAD's reflog ends now, so only what is written from here on is read (bounded) if it is ended.
+    const mark = await reflogMark(folder)
     const r = byIndex ? await commitByIndex(folder, commitEnv, files, message, byIndex) : await commitOnly(folder, commitEnv, copy, files, untracked, message)
     // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read, moved, and proved this
     // commit's says so (HR2's round 3: another git can commit meanwhile, the real index being free).
     const now = r.ok || r.timedOut ? await headOf(folder) : undefined
-    const proved = typeof now === 'string' && !r.ok && now !== before ? await madeByThis(folder, now, before, tag) : null
+    const proved = typeof now === 'string' && !r.ok && now !== before ? await madeByThis(folder, now, before, tag, mark, message) : null
     const made = typeof now === 'string' && (r.ok || proved === 'yes') ? now : null
     if (!made) {
       // HI-3075: "as they were" only while HEAD is where it was: moved (or unread), it is said so, with where it is now.

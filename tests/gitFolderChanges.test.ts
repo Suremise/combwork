@@ -586,6 +586,48 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(leftovers()).toEqual([])
   })
 
+  it("…a pre-commit hook that moves HEAD to an older commit of the same parent and hangs, before any commit is written (HR2's round 2): never taken for this commit", async () => {
+    const before = head()
+    const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\ngit reset -q --soft ${b}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+    expect(head()).toBe(b)
+    expect(sh(proj, 'reflog', '-1', '--format=%gs')).toMatch(/^commit \(combwork:[0-9a-f-]+\): updating HEAD$/)
+    expect(err).toBeInstanceOf(Error)
+    expect(String(err)).toContain(`The branch moved meanwhile, to ${b.slice(0, 12)}, and Combwork can't tell that it is this commit`)
+    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+    expect(leftovers()).toEqual([])
+  })
+
+  // HR2's round 2: only what was written to HEAD's reflog since the commit started is read, and only so much.
+  const reflogHook = (then: string): void => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n"${fwd(process.execPath)}" -e '${then}'\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
+  }
+  for (const [name, then] of [
+    ['rewritten shorter (expired) after the commit', 'require("fs").writeFileSync(".git/logs/HEAD", "")'],
+    ['grown by more than the most read (64 KB) after the commit', 'require("fs").appendFileSync(".git/logs/HEAD", ("x".repeat(99) + "\\t" + "y".repeat(99) + "\\n").repeat(400))']
+  ] as const)
+    it(`…HEAD's reflog ${name}: can't tell, so said with where HEAD moved`, async () => {
+      reflogHook(then)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const before = head()
+      const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+      expect(head()).not.toBe(before)
+      expect(String(err)).toContain(`The branch moved meanwhile, to ${head().slice(0, 12)}, and Combwork can't tell that it is this commit`)
+      expect(leftovers()).toEqual([])
+    })
+
+  it("…HEAD's reflog given lines that aren't moves after the commit: they are left out, the commit's own entry found, made", async () => {
+    reflogHook('require("fs").appendFileSync(".git/logs/HEAD", "not a move\\n\\nnor this\\n")')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(lines()).toEqual([])
+  })
+
   it('…with no reflog kept (core.logAllRefUpdates=false): not proved, so said with where HEAD moved, never "as they were"; the index left as it was', async () => {
     sh(proj, 'config', 'core.logAllRefUpdates', 'false')
     rmSync(join(proj, '.git', 'logs'), { recursive: true, force: true })
