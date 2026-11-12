@@ -219,7 +219,7 @@ async function started(w: WS, repo: string, title = 'Card'): Promise<{ n: number
   const line = s.started!.line!
   if (!existsSync(folder)) {
     git(repo, 'worktree', 'add', '-q', '-b', line, folder, s.started!.base!)
-    await wf.write(wf.store.card(n), null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: s.started!.lease!, line, revision: s.started!.base! }))
+    await wf.write(wf.store.card(n), null, 'combwork', (x) => void x.fact('SlotPrepared', { lease: s.started!.lease!, line, revision: s.started!.base! }))
   }
   commitIn(folder, `work-${n}.txt`)
   return { n, folder, line }
