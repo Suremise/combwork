@@ -58,6 +58,8 @@ async function queued(e: Env, title: string, file: string, text = `${title}\n`) 
 }
 
 const head = (repo: string, ref = 'main'): string => sh(repo, 'rev-parse', ref)
+/** Whether the card's last answer wrote the `enqueue` the app runs its queue on (queueHost's onAction). */
+const answerEnqueues = (e: Env, card: number): boolean => e.store.hasAction(card, 'enqueue', e.store.facts(card).filter((f) => f.kind === 'Approval').at(-1)!.seq)
 const refsOf = (repo: string): string => sh(repo, 'for-each-ref', '--format=%(refname) %(objectname)')
 
 /** Another clone pushes a commit to the remote (someone else published first). */
@@ -295,6 +297,8 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     // The user says it was published: Done, without a push.
     const req = e.wf.state(a).requests.find((r) => r.gate === QUEUE_PUBLISH_GATE)!
     moved(await e.wf.answer(a.key, req.request, 'approved'))
+    // HI-3088: the answer itself has the app run the queue (its enqueue), as the advance's answer does.
+    expect(answerEnqueues(e, a.id)).toBe(true)
     expect((await queue({ git }).drain('main')).map((o) => o.outcome)).toContain('integrated')
     expect(pushes).toBe(1)
     expect(e.wf.state(a).stage).toBe('done')
@@ -315,6 +319,7 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect((await queue({ git }).drain('main')).at(-1)).toMatchObject({ reason: 'publishUnknown' })
     const req = e.wf.state(a).requests.find((r) => r.gate === QUEUE_PUBLISH_GATE)!
     moved(await e.wf.answer(a.key, req.request, 'declined'))
+    expect(answerEnqueues(e, a.id)).toBe(true)
     expect((await queue({ git }).drain('main')).map((o) => o.outcome)).toContain('integrated')
     expect(e.wf.state(a).stage).toBe('done')
     expect(head(bare)).toBe(head(e.project))

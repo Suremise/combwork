@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -2158,9 +2158,10 @@ export class Workflow {
         if (e) w.action('enqueue', { target: e.target })
         if (card.reviewer) this.wake(w, card.reviewer, said, 'answer')
       }
-      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE) {
+      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE || req.gate === QUEUE_PUBLISH_GATE) {
         // The merge queue's own (#1351): its target's queue looks at the answer now (an approved update runs at once; a
-        // stuck advance is looked at again, as Resume does).
+        // stuck advance is looked at again, as Resume does; HI-3088: an unknown publication's answer is taken up, its
+        // `publishUnknown` pause lifted, rather than waiting for a Resume, another card or a restart).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
       }
