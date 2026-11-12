@@ -219,6 +219,10 @@
     "text": "it moves on once the user says whether its push reached the remote (their answer in For you), or Resume finds it there",
     "note": "What a queue paused on an unknown publication waits for (HI-1183, follow mode): Approve or Decline in For you; Resume looks at the remote again."
   },
+  "queue.paused.publishAnswered": {
+    "text": "the user has answered whether its push reached the remote; it moves on as the queue takes up that answer",
+    "note": "HI-3091: a queue still paused on an unknown publication whose For you question the user has answered (nothing left to ask): the queue's next run settles it."
+  },
   "queue.paused.resume": {
     "text": "it moves on once the user resumes it",
     "note": "What any other paused queue waits for: the user's Resume (#1406)."
