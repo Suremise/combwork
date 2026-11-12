@@ -56,6 +56,8 @@ export const JJ_REFUSED = {
   notIntegrated: "the slot's last card's work isn't in its target yet", // i18n-ignore: as above
   base: "the card's base isn't a visible commit", // i18n-ignore: as above
   moved: 'the repository changed since the check', // i18n-ignore: as above
+  /** HI-3099: a checkout's operation not found in the head's history within its bound: whether it is stale is unknown. */
+  history: "the operation log is too long to find the folder's last operation in it", // i18n-ignore: as above
   /** HI-3097: a forgotten workspace's removal, refused because jj lists the workspace (its name or its folder) again. */
   listed: 'jj lists the workspace again', // i18n-ignore: as above
   uncertain: "a write's result couldn't be read back: decided on the next pass", // i18n-ignore: as above
@@ -137,9 +139,10 @@ export interface JjPortDeps {
    * Test hooks, run between steps. `beforeGitLinkAside` runs synchronously between a Git worktree entry's last check and
    * its move aside; `afterGitLinkAside` right after the move, before the moved entry is proved again (HI-3046).
    * HI-3097, a forgotten workspace's removal: `beforeForgottenProof` before its proof's reads, `beforeForgottenTrash`
-   * synchronously between the proof (and the fence) and the final head check right before the trash.
+   * synchronously between the proof (and the fence) and the final head check right before the trash. HI-3099:
+   * `beforeControlMend` between the control's mending proof and its `update-stale` (whose recheck then runs).
    */
-  hooks?: { beforeForgottenProof?: (folder: string) => void | Promise<void>; beforeForgottenTrash?: (folder: string) => void; afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void>; beforeLeftoverAside?: (folder: string) => void }
+  hooks?: { beforeControlMend?: (control: string) => void | Promise<void>; beforeForgottenProof?: (folder: string) => void | Promise<void>; beforeForgottenTrash?: (folder: string) => void; afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void>; beforeLeftoverAside?: (folder: string) => void }
 }
 
 export interface JjWorkspacePort extends WorkspacePort {
@@ -188,6 +191,8 @@ export interface JjWorkspacePort extends WorkspacePort {
 const SEPARATOR = '\u001f'
 /** How far back the operation log is read for a preparation's marked write, and its records' end. */
 const OP_WALK = 200
+/** How far back a checkout's operation is looked for in the head's history (HI-3099) before it counts as unknown. */
+const OP_HISTORY = 20_000
 const OP_END = 'cw-op-end'
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)
 const step = (ok: boolean, err = ''): WorkspaceStep => ({ ok, err })
@@ -347,11 +352,33 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     return me && samePath(await realOr(me.root), await realOr(folder)) ? co.name : withDetail(u, JJ_REFUSED.identity)
   }
 
-  /** Whether a folder's files are behind its working-copy commit (another workspace rewrote it): stale. */
+  /**
+   * Whether `wcOp` (a checkout's operation) is in the history of `op` (HI-3099): the user's `jj op abandon` can leave
+   * it outside (jj: "a sibling of the working copy's operation"), where jj refuses to read or record the folder until
+   * it is mended. Read pinned at `op`, the near history first, then up to OP_HISTORY operations; past that, unknown.
+   */
+  const inHistory = async (folder: string, op: string, wcOp: string): Promise<Maybe<boolean>> => {
+    for (const limit of [OP_WALK, OP_HISTORY]) {
+      const out = await read(folder, op, ['op', 'log', '--no-graph', '--limit', String(limit), '-T', 'id ++ "\\n"'], unknown(UNREADABLE.state, { folder }))
+      if (isUnknown(out)) return out
+      const ids = lines(out)
+      if (ids.includes(wcOp)) return true
+      if (ids.length < limit) return false
+    }
+    return withDetail(unknown(UNREADABLE.state, { folder }), JJ_REFUSED.history)
+  }
+
+  /**
+   * Whether a folder's files are behind its working-copy commit (another workspace rewrote it): stale. Also stale
+   * (HI-3099): its checkout's operation no longer in the head's history (the user's `jj op abandon`).
+   */
   const staleAt = async (folder: string, op: string): Promise<Maybe<boolean>> => {
     const co = await checkoutOf(folder)
     if (!co) return unknown(UNREADABLE.state, { folder })
     if (co.op === op) return false
+    const known = await inHistory(folder, op, co.op)
+    if (isUnknown(known)) return known
+    if (!known) return true
     const then = await wcAt(folder, co.op, co.name)
     const now = await wcAt(folder, op, co.name)
     if (isUnknown(then)) return then
@@ -532,14 +559,62 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     const hash = await repoHash(repo)
     const { recNow, usable, folderGen } = controlReads(repo, ctx)
     type Residue = ControlResidue
+    /**
+     * HI-3099: whether the usable control at `path` needs mending: its checkout's operation proved outside the head's
+     * history (the user's `jj op abandon`). `ok`: it doesn't; `mend`: it does; `refuse`: unknown (a walk past its bound,
+     * an unreadable log): the control isn't used.
+     */
+    const needsMend = async (path: string): Promise<'ok' | 'mend' | 'refuse'> => {
+      const head = await pinned(path)
+      const co = await checkoutOf(path)
+      if (isUnknown(head) || !co) return 'refuse'
+      if (co.op === head) return 'ok'
+      const known = await inHistory(path, head, co.op)
+      return isUnknown(known) ? 'refuse' : known ? 'ok' : 'mend'
+    }
+    /**
+     * The control mended (HI-3099), inside the store's lock: proved again here (the record, `usable`, one operation head
+     * H, still outside H's history), then a `controlProof` taken now, whose synchronous `check()` and H still the only
+     * head are `update-stale`'s recheck with nothing awaited before jj starts. Nothing but `jj workspace update-stale` in
+     * the control (Combwork's own, empty), never `op integrate`, never another workspace. That proof is discarded: the
+     * control is returned only when, read again, it is usable and not stale; its consumers then take their own proof.
+     * Null otherwise (refused; the next use tries again from the start).
+     */
+    const mendIn = async (path: string): Promise<string | null> => {
+      if ((await usable(recNow())) !== path) return null
+      const heads = readOpHeads(ctx.jjRepo)
+      if (!heads || heads.length !== 1) return null
+      const H = heads[0]
+      const co = await checkoutOf(path)
+      if (!co) return null
+      if (co.op !== H) {
+        const known = await inHistory(path, H, co.op)
+        if (isUnknown(known)) return null
+        if (!known) {
+          const proof = await controlProof(repo, ctx)
+          if (!proof || !samePath(proof.path, path)) return null
+          await deps.hooks?.beforeControlMend?.(path)
+          const r = await jj(path, ['workspace', 'update-stale'], { write: true, recheck: () => (!proof.check() ? JJ_REFUSED.control : readOpHeads(ctx.jjRepo)?.join() !== H ? JJ_REFUSED.moved : null) })
+          if (!r.ok || r.refused) return null
+        }
+      }
+      if ((await usable(recNow())) !== path) return null
+      const now = await pinned(path)
+      if (isUnknown(now)) return null
+      return (await staleAt(path, now)) === false ? path : null
+    }
+    const checked = async (path: string, locked: boolean): Promise<string | null> => {
+      const need = await needsMend(path)
+      return need === 'ok' ? path : need === 'refuse' ? null : locked ? mendIn(path) : lockCtx(ctx, () => mendIn(path))
+    }
     const fast = await usable(recNow())
-    if (fast) return fast
+    if (fast) return checked(fast, false)
     return lockCtx(ctx, async () => {
       // Everything decided from the record as it is now, inside the lock (another caller may have made it ready).
       const rec = recNow()
       if (rec?.store && !samePath(rec.store, ctx.store)) return null
       const now = await usable(rec)
-      if (now) return now
+      if (now) return checked(now, true)
       const residues: Residue[] = [...(rec?.residues ?? [])]
       const keep = (r: Residue): void => {
         if (!residues.some((x) => samePath(x.path, r.path) && x.name === r.name)) residues.push(r)

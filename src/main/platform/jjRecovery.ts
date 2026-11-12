@@ -41,6 +41,11 @@ export interface RecoveryDeps {
   trash: (path: string) => Promise<void>
   /** The delta's bounds (an Advanced setting's): refused past either. */
   bounds?: { files: number; bytes: number }
+  /**
+   * The clock the record's collision wait reads and waits on (HI-3099); the real one by default. `now` is wall time (ms),
+   * `wait` waits that long. The wait's cap counts the waits, never the wall clock (which can move back).
+   */
+  clock?: { now: () => number; wait: (ms: number) => Promise<void> }
   /** Test seams, run between steps. */
   hooks?: {
     afterPreserve?: () => void | Promise<void>
@@ -77,7 +82,7 @@ export type RecoveryResult =
   | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean; copies: { path: string; copy: string }[]; asides: { path: string; copy: string }[]; x: string | null; leftOut: string[] }
   | { ok: false; why: RecoveryRefusal; detail?: string }
 
-export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence'
+export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence' | 'collision'
 
 interface Entry {
   path: string
@@ -121,6 +126,9 @@ interface Journal {
 
 const DEFAULT_BOUNDS = { files: 2000, bytes: 512 * 1024 * 1024 }
 const SEP = '\u001f'
+/** HI-3099: the record's collision wait polls this often, and gives up (`collision`, retryable) after this much waiting. */
+const COLLISION_POLL_MS = 50
+const COLLISION_CAP_MS = 3_000
 const blobOf = (bytes: Buffer): string => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex') // i18n-ignore: a protocol code, never wording
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
 const norm = (p: string): string => p.split(/[\\/]+/).filter(Boolean).join('/')
@@ -516,6 +524,34 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   const manifest = (await manifestOf(cur)) ?? []
   const paths = cur.paths ?? {}
   if (!(await fenced())) return refuse('busy')
+  // HI-3099: after `update-stale` over an operation the user abandoned (`jj op abandon`), the working copy U is a divergent
+  // sibling of X (the same change, parents and author time). Recording the restored files then makes a commit identical
+  // to X while the clock is still in X's committer second (Git's timestamps are whole seconds), which jj refuses ("already
+  // exists"). So, while U and X share a change and that second hasn't passed, the record waits, polled, capped by the
+  // waits it made (never the wall clock, which can move back), and stops at once when the fence is lost. At the cap:
+  // `collision`, at the cap or a fence lost: nothing recorded or abandoned, the journal still `restored`, the preserved copy
+  // and the restored files as they are, so Recover… again resumes here. Re-read after the last wait: U, X, the head; the
+  // record's own owned guard (identity and fence) at its write.
+  if (cur.X && cur.U) {
+    const clock = deps.clock ?? { now: () => Date.now(), wait: (ms: number) => new Promise<void>((res) => setTimeout(res, ms)) }
+    for (let waited = 0; ; waited += COLLISION_POLL_MS) {
+      const head = await port.pinned(folder)
+      if (isUnknown(head)) return refuse('provenance', head.detail ?? head.what)
+      const read = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(cur.workspace)}@ | ${cur.X}`, '-T', `commit_id ++ "${SEP}" ++ change_id ++ "${SEP}" ++ committer.timestamp().format("%s") ++ "\\n"`], { op: head })
+      if (!read.ok) return refuse('provenance', read.err)
+      const rows = lines(read.out).map((l) => l.split(SEP))
+      const x = rows.find(([c]) => c === cur.X)
+      const u = rows.find(([c]) => c !== cur.X)
+      // The working copy is still U (nothing recorded since the update), X still there: else not this recovery's shape.
+      if (!x || (u && u[0] !== cur.U)) return refuse('provenance', 'U or X')
+      const second = Number(x[2])
+      if (!Number.isFinite(second)) return refuse('provenance', 'X time')
+      if (!u || u[1] !== x[1] || Math.floor(clock.now() / 1000) > second) break
+      if (waited >= COLLISION_CAP_MS) return refuse('collision')
+      if (!(await mine())) return refuse('fence')
+      await clock.wait(COLLISION_POLL_MS)
+    }
+  }
   const rec = await port.recordLeftOut(folder, req.fence, req.identity)
   if (isUnknown(rec)) return refuse('fence', rec.detail ?? rec.what)
   // New files jj leaves out for its size limit (HI-2973) are in the manifest but in no commit (X can't hold them): put

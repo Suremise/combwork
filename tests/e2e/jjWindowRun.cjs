@@ -431,6 +431,49 @@ const onDb = (fn) => {
     await askForgot.getByRole('button', { name: 'Remove', exact: true }).click()
     check('…removed: the slot and its folder gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot4) && !fs.existsSync(w4.folder), HUNG_MS)) && id(shop, forgotCommit) === forgotCommit, JSON.stringify(await inv('slots:list', shop)))
 
+    // HI-3099: card 2 afresh in a slot, an unrecorded edit left there, put back; then the user commits twice in the
+    // project folder and discards old operations (`jj op abandon`). The slot shows stale with Recover…, which mends it with
+    // the edit kept; the project folder's files are as the user left them, and theirs to use.
+    const givenBefore5 = givenCount()
+    const started5 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2, then op abandon' }).catch((e) => ({ error: String(e) }))
+    const w5 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      const lent = v?.folder && v.workspace ? (await inv('slots:list', shop)).find((s) => s.folder.toLowerCase() === v.folder.toLowerCase() && s.state === 'lent' && s.lease?.card === n2) : null
+      return lent && givenCount() > givenBefore5 ? v : null
+    }, HUNG_MS)
+    check('card 2 started in a slot, given to B1 there', !!w5, JSON.stringify({ started5, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
+    const slot5 = path.basename(w5.folder)
+    fs.writeFileSync(path.join(w5.folder, 'wip.txt'), 'unrecorded before the abandon\n')
+    const back5 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back before op abandon' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    check('card 2 put back: its slot not lent', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === slot5); return s && !s.lease ? s : null }, HUNG_MS)), JSON.stringify({ back5, slots: await inv('slots:list', shop) }))
+    const shopFiles = () => Object.fromEntries(fs.readdirSync(shop).filter((f) => f !== '.jj' && f !== '.git' && fs.statSync(path.join(shop, f)).isFile()).map((f) => [f, fs.readFileSync(path.join(shop, f), 'utf8')]))
+    fs.writeFileSync(path.join(shop, 'user-a.txt'), 'a\n')
+    jj(shop, 'commit', '-m', 'the user’s a')
+    fs.writeFileSync(path.join(shop, 'user-b.txt'), 'b\n')
+    jj(shop, 'commit', '-m', 'the user’s b')
+    jj(shop, 'op', 'abandon', '..@-')
+    const shopBefore = shopFiles()
+    const shopBookmarks = jj(shop, '--ignore-working-copy', 'bookmark', 'list')
+    check('after the abandon, the slot is stale', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot5)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+    await toProject()
+    await section('workflow')
+    const row5 = page.locator(`[data-slot="${slot5}"]`)
+    check('Slots and copies: Stale, with Recover…', !!(await until(async () => (await row5.locator('[data-stale]').count()) === 1 && (await row5.locator('[data-action="recover"]').count()) === 1, HUNG_MS)), await text(row5))
+    await row5.scrollIntoViewIfNeeded()
+    await shoot(row5, 'slot-stale-abandoned')
+    await row5.locator('[data-action="recover"]').click()
+    const ask5 = page.locator('.dialog').filter({ hasText: `Recover ${slot5}?` })
+    check('…its confirmation', !!(await until(async () => (await ask5.count()) === 1, HUNG_MS)), await text(page.locator('.dialog')))
+    await ask5.getByRole('button', { name: 'Recover', exact: true }).click()
+    const recovered5 = await until(async () => {
+      const did5 = page.locator('.dialog').filter({ hasText: `${slot5} is recovered` })
+      if ((await did5.count()) === 1) await did5.getByRole('button', { name: 'OK', exact: true }).click()
+      return (await inv('slots:list', shop)).find((s) => s.name === slot5 && s.stale !== true) ?? null
+    }, HUNG_MS)
+    check('…recovered: not stale any more, its edit in the folder', !!recovered5 && fs.existsSync(path.join(w5.folder, 'wip.txt')) && fs.readFileSync(path.join(w5.folder, 'wip.txt'), 'utf8') === 'unrecorded before the abandon\n', JSON.stringify({ slots: await inv('slots:list', shop), toasts: await text(page.locator('.toasts')) }))
+    check('…the project folder as the user left it, its bookmarks too, and jj works there', JSON.stringify(shopFiles()) === JSON.stringify(shopBefore) && jj(shop, '--ignore-working-copy', 'bookmark', 'list') === shopBookmarks && /Working copy/.test(jj(shop, 'status')), JSON.stringify({ before: shopBefore, now: shopFiles() }))
+
   } finally {
     await app.close().catch(() => undefined)
   }
