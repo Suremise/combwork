@@ -44,7 +44,7 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
       const rw = jjRepoWatch(repo, (e) => void events.push(e), { watch: f.watch, intervalMs: 0, where })
       expect(rw.open()).toBe(2)
       // Nothing watched below the store (HI-3033): its folder itself, and the operation heads'.
-      expect(f.live().map(([d]) => d).sort()).toEqual([join(where.jjRepo, 'op_heads', 'heads'), where.store].sort())
+      expect(f.live().map(([dir]) => dir).sort()).toEqual([join(where.jjRepo, 'op_heads', 'heads'), where.store].sort())
       // Attached: every retained bundle marked due once (a pin deleted while Combwork was closed is checked, HR1's round 1).
       expect(events).toEqual([{ kind: 'invalidated', project: repo, what: 'retained:*' }])
       events.length = 0
