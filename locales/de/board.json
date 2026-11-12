@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Ausblenden",
   "board.laneEdit.done": "{op, select, move {{card} in {lane} verschoben} add {{card} zu {lane} hinzugefügt} remove {{card} aus {lane} genommen} transfer {{card} nach {lane} verschoben} cancel {Geplante Änderung von {lane} verworfen} other {Rückgängig gemacht}}",
   "board.laneEdit.handle": "Ziehen, um {card} zu verschieben, oder Alt+Up und Alt+Down drücken; Entf nimmt sie heraus",
+  "board.laneEdit.leftOut": "{n, plural, one {{cards} bleibt, wo sie ist: Sie kann jetzt nicht in die Lane zurück.} other {{cards} bleiben, wo sie sind: Sie können jetzt nicht in die Lane zurück.}}",
   "board.laneEdit.locked": "{card} ist in Arbeit: Sie behält ihren Platz",
   "board.laneEdit.moveHere": "Hierher verschieben",
   "board.laneEdit.noMatch": "Keine Karte in „Offen“ passt.",

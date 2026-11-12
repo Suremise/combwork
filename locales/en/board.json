@@ -1843,6 +1843,10 @@
     "defaultMessage": "Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off",
     "description": "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key."
   },
+  "board.laneEdit.leftOut": {
+    "defaultMessage": "{n, plural, one {{cards} stays where it is: it can’t come back to the lane now.} other {{cards} stay where they are: they can’t come back to the lane now.}}",
+    "description": "HI-3062: under the title of the notification after Cancel Change on a lane (Progress → Lanes: it drops a change of the lane's cards that was waiting for its card in progress to be Done): the cards that change had taken off and that can't be put back now (another lane or agent has them, they were started, or they keep work), which stay where they are. {cards}: their keys, listed (AL-4, AL-7); {n}: how many."
+  },
   "board.laneEdit.locked": {
     "defaultMessage": "{card} is under way: it keeps its place",
     "description": "HI-2898: tooltip of the lock on a lane's card in progress (Progress → Lanes): it can't be moved. {card} is its key."

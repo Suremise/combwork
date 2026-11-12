@@ -6,7 +6,7 @@ import { cardRef } from '../shared/projectKeys'
 import { foldCard } from '../shared/workflow/facts'
 import { targetOfRulesetId } from '../shared/workflow/compile'
 import type { LaneEdit, LaneEditResult, LaneEditUndo, LaneListState, TaskCard } from '../shared/types'
-import { boardRead, cardPlacesNow } from './boardStore'
+import { boardRead, cardOwnersNow, cardPlacesNow } from './boardStore'
 import { combworkError } from './combworkError'
 import { applyLaneList, laneDefaultTarget, LaneError, lanesEnforced, mutateInBoard, refuseOtherTargets, refuseWhileTeamPaused } from './lanes'
 import { resumeLaneBuilder } from './laneStart'
@@ -119,7 +119,7 @@ export function endedSinceOf(v: unknown, now = Date.now()): number {
 }
 
 /** Unit tests' seam: how a changed lane's stopped builder is started on it (never a CLI in a unit test). */
-export const laneEditHooks: { resume: (projectPath: string, lane: LaneRecord) => Promise<unknown> } = { resume: resumeLaneBuilder }
+export const laneEditHooks: { resume: (projectPath: string, lane: LaneRecord) => Promise<unknown>; planned: () => Promise<unknown> } = { resume: resumeLaneBuilder, planned: async () => undefined }
 
 /** Who makes the window's edits, as the board records it. */
 const USER: TaskActor = { kind: 'user' }
@@ -279,11 +279,9 @@ function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<s
   const list = working(l)
   if (e.op === 'cancel') {
     if (!l.pending) refuse(ws, 409, M.noQueued, { lane: pairOf(l) })
-    // The list as it applies now, through every check an edit gets (HI-2943), never put back unchecked: a card the queued
-    // change took off that another running lane holds now (Move here after a queued reorder) stays there, and each other
-    // card it brings back is checked as any card brought in (below). What's left saves as any edit's list does.
-    const held = (n: number): boolean => lanes.some((x) => x !== l && running(x) && x.project.toLowerCase() === l.project.toLowerCase() && (x.cards.includes(n) || !!x.pending?.includes(n)))
-    return { op: e.op, card: null, lanes: [{ lane: l, next: l.cards.filter((n) => list.includes(n) || !held(n)) }], brings: null, undoCard: null, back: [], def }
+    // The applied list, less what can't come back (HI-3062): decided under the board's lock, on the board as it is then
+    // (cancelled, below), never from this read.
+    return { op: e.op, card: null, lanes: [{ lane: l, next: [...l.cards] }], brings: null, undoCard: null, back: [], def }
   }
   if (e.op === 'remove') return { op: e.op, card: e.card, lanes: [{ lane: l, next: list.filter((n) => n !== e.card) }], brings: null, undoCard: null, back: [], def }
   if (e.op === 'move') {
@@ -294,6 +292,47 @@ function plan(ws: WorkspaceService, lanes: LaneRecord[], e: LaneEdit, def: Map<s
   const next = [...list]
   next.splice(placeAt(list, e.at), 0, e.card)
   return { op: e.op, card: e.card, lanes: [{ lane: l, next }], brings: { card: e.card, into: l, leaving: null }, undoCard: null, back: [], def }
+}
+
+/** The columns of a card in flight: started and not Done. */
+const FLYING: ReadonlySet<string> = new Set(['doing', 'review', 'passed'])
+
+/**
+ * Cancel Change's list (HI-3062): the lane's applied list, its own, with every card the queued change took off put back
+ * in its place unless it can't come back now, which stays where it is (left out). Never refused for what the queued list
+ * held. Under the board's lock, on the board as it is then. Left out: a card missing, archived or another project's now,
+ * one another running lane holds, one given to an agent other than the builder, one started (Doing, Review, Passed,
+ * whoever has it) and one in To do keeping work from a start. Put back: one in To do with none, one Done or on hold.
+ * The lane's own card in flight (the first of the applied list started and not another's, as stillBetweenCards reads
+ * it) is always kept: a queued list may leave it out, waiting for it, and the lane is working on it.
+ */
+function cancelled(ws: WorkspaceService, lanes: LaneRecord[], l: LaneRecord): { cards: number[]; leftOut: number[] } {
+  const queued = l.pending ?? l.cards
+  const returning = l.cards.filter((n) => !queued.includes(n))
+  if (!returning.length) return { cards: [...l.cards], leftOut: [] }
+  const places = cardPlacesNow(ws, l.cards)
+  const owners = cardOwnersNow(ws, l.cards)
+  const ours = (c: { project: string; archived: boolean } | undefined): c is { project: string; archived: boolean; column: string; agent: string | null } => !!c && !c.archived && c.project.toLowerCase() === l.project.toLowerCase()
+  const current = l.cards.find((n) => {
+    const c = places.get(n)
+    const o = owners.get(n)
+    return ours(c) && FLYING.has(c.column) && (o?.agent ? o.agent === l.builder.id : !o?.lane || o.lane === l.id)
+  })
+  const comesBack = (n: number): boolean => {
+    if (n === current) return true
+    const c = places.get(n)
+    if (!ours(c)) return false
+    if (lanes.some((x) => x !== l && running(x) && x.project.toLowerCase() === l.project.toLowerCase() && (x.cards.includes(n) || !!x.pending?.includes(n)))) return false
+    if (c.agent && c.agent !== l.builder.id) return false
+    if (c.column === 'todo') return !keepsWork(ws, l, n)
+    return c.column === 'done' || c.column === 'hold'
+  }
+  const leftOut = returning.filter((n) => !comesBack(n))
+  const cards = l.cards.filter((n) => !leftOut.includes(n))
+  // A queued list waits behind a card in flight, which is kept: never none left. Refused rather than saved if it were
+  // (a lane with no cards can't be read back).
+  if (!cards.length) refuse(ws, 409, M.cardChanged, { card: cardRef(leftOut[0]) })
+  return { cards, leftOut }
 }
 
 /** The last entry of a card's history: what an undo of its assignment is bound to (an entry is never written twice). */
@@ -311,23 +350,36 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
   let cardUndo: LaneEditUndo['card'] = null
   let back: LaneEditUndo['back'] = []
   let queued: { lane: string; queuedAfter: number | null }[] = []
+  let leftOut: number[] = []
   const done = await mutateInBoard(
     ws,
     async (lanes) => {
       // Each project's own Merges into, read before the board's change (it reads the repository).
       const def = new Map<string, string | null>()
       for (const l of lanes) if (running(l) && !def.has(l.project.toLowerCase())) def.set(l.project.toLowerCase(), await laneDefaultTarget(ws, l.project))
-      return plan(ws, lanes, e, def)
+      const p = plan(ws, lanes, e, def)
+      // Tests: the board changed between the plan and the board's change.
+      await laneEditHooks.planned()
+      return p
     },
     async (lanes, p, checks) => {
       before = p.lanes.map((x) => stateOf(x.lane))
       cardUndo = null
       back = []
       queued = []
+      leftOut = []
       const defOf = (l: LaneRecord): string | null => p.def.get(l.project.toLowerCase()) ?? null
       // Checked under the board's lock, before anything is written, on the board as it is now.
       for (const x of p.lanes) {
         const was = working(x.lane)
+        // Cancel Change (HI-3062): the applied list, the lane's own, less what can't come back, decided here and now; none
+        // of an edit's list checks, which compared it with the queued list it drops.
+        if (p.op === 'cancel') {
+          const c = cancelled(ws, lanes, x.lane)
+          x.next = c.cards
+          leftOut = c.leftOut
+          continue
+        }
         // A lane holds at most LANE_MAX_CARDS (HI-3061): a list past it would be saved but never read back (readLane drops
         // the lane, or its queued change), so an edit growing one past it is refused here, before anything is written.
         if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
@@ -339,11 +391,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         keepsDependencies(ws, x.lane, was, x.next)
         // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, from
         // the lane it leaves in this undo; its earlier work, assignment and history are checked against the token below.
-        // Cancel Change's cards back from its queued change the same (HI-2943), from no other lane: one another running
-        // lane holds is refused here, on the board as it is now, if it got there after the plan left it out. With no
-        // record from before their removal, any work one keeps refuses it (HR1's round 1: started since and back in To do
-        // never comes back), as Add and Move here do; its assignment is checked below.
-        if (p.op === 'undo' || p.op === 'cancel') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.op === 'undo' ? (p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null) : null, fresh: true, work: p.op === 'cancel', def: defOf(x.lane) })
+        if (p.op === 'undo') for (const n of x.next.filter((c) => !was.includes(c))) bringable(ws, lanes, x.lane, n, { leaving: p.lanes.find((y) => y !== x && working(y.lane).includes(n))?.lane ?? null, fresh: true, work: false, def: defOf(x.lane) })
       }
       if (p.brings) bringable(ws, lanes, p.brings.into, p.brings.card, { leaving: p.brings.leaving, fresh: true, work: true, def: defOf(p.brings.into) })
       // The card's assignment, through the card-change owner, in this change (HR1's s17): a card brought in that is given
@@ -361,17 +409,6 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
               const c = await getTask(n, ws)
               if (!b || headOf(c) !== b.head || (c.agent && c.agent !== x.lane.builder.id && c.agent !== p.undoCard?.after)) refuse(ws, 409, M.cardChanged, { card: cardRef(n) })
               if (!b.work && keepsWork(ws, x.lane, n)) refuse(ws, 409, M.kept, { card: cardRef(n) })
-            }
-          }
-        }
-        // Cancel Change's cards back (HI-2943, HR1's round 1): given to nobody or to the lane's builder, never taken from
-        // an agent it was given to since it left. Checked before anything is written.
-        if (p.op === 'cancel') {
-          for (const x of p.lanes) {
-            const was = working(x.lane)
-            for (const n of x.next.filter((c) => !was.includes(c))) {
-              const c = await getTask(n, ws)
-              if (c.agent && c.agent !== x.lane.builder.id) refuse(ws, 409, M.cardChanged, { card: cardRef(n) })
             }
           }
         }
@@ -408,6 +445,13 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
           l.cards = [...x.restore.cards]
           if (x.restore.pending) l.pending = [...x.restore.pending]
           else delete l.pending
+        } else if (p.op === 'cancel') {
+          // Saved as it is, its queued list gone at once (HI-3062): never through applyLaneList, whose list change would
+          // queue a list leaving out a card the lane counts as in flight. It keeps the applied list's order and its card
+          // in flight, so there is no boundary to wait for.
+          l.cards = [...x.next]
+          delete l.pending
+          queued.push({ lane: l.id, queuedAfter: null })
         } else {
           queued.push({ lane: l.id, queuedAfter: await applyLaneList(ws, l, x.next, on, checks) })
         }
@@ -437,5 +481,5 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
   // and the Assistant's update of a lane); one that is running reads its list with cw_lane next.
   if (ws.path) for (const x of done.lanes) await laneEditHooks.resume(join(ws.path, x.lane.project), x.lane).catch((err: unknown) => log.warn(`resuming lane ${x.lane.id}'s builder`, err))
   // Each lane's revision now (HI-2932): the window's next quick edit names it, knowing only its own edit came between.
-  return { op: done.op, card: done.card, lanes: (queued.length ? queued : done.lanes.map((x) => ({ lane: x.lane.id, queuedAfter: null }))).map((x) => ({ ...x, rev: revOf.get(x.lane) ?? 0 })), undo }
+  return { op: done.op, card: done.card, lanes: (queued.length ? queued : done.lanes.map((x) => ({ lane: x.lane.id, queuedAfter: null }))).map((x) => ({ ...x, rev: revOf.get(x.lane) ?? 0 })), undo, ...(leftOut.length ? { leftOut } : {}) }
 }

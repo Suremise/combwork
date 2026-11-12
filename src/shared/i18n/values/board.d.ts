@@ -462,6 +462,7 @@ interface CombworkMessageValues {
   'board.laneEdit.dismiss': undefined
   'board.laneEdit.done': { op: string; card: string | number; lane: string | number }
   'board.laneEdit.handle': { card: string | number }
+  'board.laneEdit.leftOut': { n: number; cards: string | number }
   'board.laneEdit.locked': { card: string | number }
   'board.laneEdit.moveHere': undefined
   'board.laneEdit.noMatch': undefined
