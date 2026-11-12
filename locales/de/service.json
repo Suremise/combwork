@@ -87,6 +87,7 @@
   "service.folderChanges.stashPartial": "Git hat beim Beiseitelegen der Änderungen ein Problem gemeldet, nachdem es sie in einem Stash ({stash}) gesichert hatte. Prüfe git stash list und die Dateien, bevor du weitermachst. Git meldete: {why}",
   "service.folderChanges.stashTimedOut": "Git hat das Beiseitelegen der Änderungen nicht in {seconds, number} Sekunden abgeschlossen, daher hat Combwork es und alles, was es gestartet hatte, beendet.{made, select, yes { Bis dahin hatte es sie in einem Stash ({stash}) gesichert.} other {}} Prüfe git stash list und die Dateien, bevor du weitermachst.",
   "service.folderChanges.tooManyToSetAside": "Git kann nicht so viele Dateien ({count, number}) auf einmal in {folder} beiseitelegen. Committe sie, oder lege sie selbst mit git stash beiseite.",
+  "service.folderChanges.unmerged": "{file} hat in Git einen Konflikt: Löse ihn zuerst dort (korrigiere die Datei, dann git add). Combwork committet keine Datei mit Konflikt und legt sie nicht beiseite.",
   "service.folderChanges.unplaced": "Git hat nicht gesagt, in welchem Repository {folder} liegt, daher committet Combwork .gitignore nicht, solange es die dort arbeitenden Agenten nicht prüfen kann. Versuche es noch einmal.",
   "service.folderChanges.wrongBranch": "{folder} ist jetzt nicht auf {target}. Sieh noch einmal nach.",
   "service.forward.byAssistant": "dem Assistenten",

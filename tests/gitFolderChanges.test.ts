@@ -468,6 +468,48 @@ describe('a commit or stash past its bound (HI-3021)', () => {
   })
 })
 
+// HI-3025: a file in conflict with no operation under way (a `git stash pop` that conflicted: `UU`, no MERGE_HEAD) was
+// listed as any change, and Commit committed it markers and all (commit --only adds it, marking it resolved).
+describe('a file in conflict, no operation under way (HI-3025)', () => {
+  it('a conflicted stash pop: Commit and Set Aside refused by name, beside another change too; nothing committed, stashed or changed', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'mine\n')
+    sh(proj, 'stash', 'push', '-q')
+    commit(proj, { 'a.txt': 'theirs\n' }, 'theirs')
+    expect(() => sh(proj, 'stash', 'pop', '-q')).toThrow()
+    writeFileSync(join(proj, 'b.txt'), 'edit\n')
+    const now = await worktreeNow(proj)
+    if (isUnknown(now)) throw new Error('unknown')
+    // Listed by the notification, with no operation under way.
+    expect(now.dirty).toContain('a.txt')
+    expect(now.operations ?? []).toEqual([])
+    const before = head()
+    const stashes = sh(proj, 'stash', 'list')
+    const was = status()
+    const onDisk = read('a.txt')
+    for (const action of ['commit', 'setAside'] as const)
+      for (const shown of [['a.txt'], ['b.txt', 'a.txt']]) await expect(settle(action, shown)).rejects.toThrow(/a\.txt is in conflict in Git: resolve it there first/)
+    expect(head()).toBe(before)
+    expect(sh(proj, 'stash', 'list')).toBe(stashes)
+    expect(status()).toBe(was)
+    expect(read('a.txt')).toBe(onDisk)
+    expect(onDisk).toContain('<<<<<<<')
+    // The other change alone still goes.
+    await settle('commit', ['b.txt'])
+    expect(committed()).toEqual(['b.txt'])
+    expect(status()).toMatch(/^UU a\.txt$/m)
+  })
+
+  it("Files' Commit it with .gitignore in conflict: refused by name", async () => {
+    writeFileSync(join(proj, '.gitignore'), 'mine/\n')
+    sh(proj, 'stash', 'push', '-q')
+    commit(proj, { '.gitignore': 'theirs/\n' }, 'theirs')
+    expect(() => sh(proj, 'stash', 'pop', '-q')).toThrow()
+    const before = head()
+    await expect(inWorkspace(w, () => changes.commitIgnore(proj))).rejects.toThrow(/\.gitignore is in conflict in Git/)
+    expect(head()).toBe(before)
+  })
+})
+
 // HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the file's removal staged and the file in the folder. Commit
 // took each path from the folder (`commit --only`), so the file went back into Git with its local content. Darren's
 // decision (11 Nov 2026): git does all the index work; such a path is refused by name, nothing committed or changed.

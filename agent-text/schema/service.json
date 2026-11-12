@@ -386,6 +386,11 @@
       "folder": "plain"
     }
   },
+  "service.folderChanges.unmerged": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
   "service.folderChanges.unplaced": {
     "placeholders": {
       "folder": "plain"

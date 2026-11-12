@@ -64,6 +64,7 @@
 
 ### Fixed
 
+- **Commit no longer commits a file in conflict, markers and all** (HI-3025). After a `git stash pop` that conflicted, the uncommitted-changes notification listed the file like any other, and **Commit** put it on the branch with its conflict markers. Commit and Set Aside now refuse a file in conflict by name: resolve it in Git first.
 - **A merge into a branch that isn't checked out is signed and runs your hooks** (HI-3030). The Merge dialog's merge into a branch checked out nowhere made its commit unsigned and ran no hooks, even with commit signing on. It now merges as every other merge does: signed as your repository says, or refused with Git's reason, and with the repository's commit hooks run.
 - **A card made with a branch of its own says so too** (HI-3043). Creating a card with a Merges into other than the project's gave no note, unlike changing one (HI-3017); now it does. The note says to clear the card's target with `""`, the value the tool takes, and a resolution card kept on the project's own branch is no longer said to follow the project.
 - **A jj card's kept slot no longer locks it out** (HI-3032). A kept slot whose take-back failed once (its setup, say) or was cut short refused its card for good, saying something worked in it. It now stays kept for the card, which gets it back at its next start. A card coming back through a lane gets its kept slot too, or its start says why not. A kept slot whose folder was deleted says so, and Slots and copies offers **Remove…** for it, so the card can start again.

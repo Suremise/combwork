@@ -47,6 +47,7 @@ const M = {
   stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
+  unmerged: msg({ id: 'service.folderChanges.unmerged', defaultMessage: "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.", description: "HI-3025: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: the file ({file}, a path) has a conflict git hasn't had resolved (after a git stash pop that conflicted, say); committing it would put its conflict markers into the commit, so nothing was done. Keep git add as it is: a command." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
   tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
@@ -248,13 +249,18 @@ const STATES: Record<string, string> = { '(MERGE_HEAD)': 'merge', '(rebase-merge
 /**
  * One path git reports changed. `untracked`: git lists it as untracked (`??`). `deleted`: its index entry is gone (a
  * staged deletion, or a rename's old side), whatever is on disk: Stop Tracking leaves the file there, often also listed
- * untracked, so a path can be both (HI-2982). `from`: a rename's or copy's other side.
+ * untracked, so a path can be both (HI-2982). `from`: a rename's or copy's other side. `unmerged`: in conflict (HI-3025:
+ * `UU`, `AA`, `DD`, `AU`, `UA`, `DU`, `UD`), with no operation under way needed (a `git stash pop` that conflicted).
  */
 interface Changed {
   untracked: boolean
   deleted?: boolean
   from?: string
+  unmerged?: boolean
 }
+
+/** Porcelain v1's states of a path in conflict (git's `git status` short format). */
+const UNMERGED = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 
 /** What git status reports changed in a folder, by repository-relative path (`--porcelain=v1 -z`: renames' both sides). */
 export async function changedIn(folder: string): Promise<Map<string, Changed>> {
@@ -266,7 +272,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const was = out.get(path)
     const deleted = c.deleted || was?.deleted
     const from = c.from ?? was?.from
-    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}) })
+    const unmerged = c.unmerged || was?.unmerged
+    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}) })
   }
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
@@ -278,7 +285,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
       const from = parts[++i]
       put(path, { untracked: false, from })
       if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true })
-    } else put(path, { untracked: xy === '??', deleted: xy[0] === 'D' })
+    } else if (UNMERGED.has(xy)) put(path, { untracked: false, unmerged: true })
+    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D' })
   }
   return out
 }
@@ -454,6 +462,10 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A folder git lists whole: an untracked repository of its own, never committed or stashed as one (HI-2983).
         const nested = files.find((p) => p.endsWith('/'))
         if (nested) throw combworkError(M.nestedRepo, { folder: nested })
+        // HI-3025: a path in conflict, refused by name: commit --only would add it as it is, markers and all, marking it
+        // resolved; git itself refuses an ordinary commit then.
+        const conflicted = files.find((p) => now.get(p)?.unmerged)
+        if (conflicted) throw combworkError(M.unmerged, { file: conflicted })
         const kept = await keptDeleted(folder, files, now)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         // Set aside: always exactly the paths shown, never the whole folder's (HR1's round 1: a change made after this
@@ -511,6 +523,7 @@ export async function commitIgnore(projectPath: string): Promise<FolderChangesDo
         const file = '.gitignore'
         if (!now.has(file)) throw combworkError(M.nothing, { file })
         const message = 'Update .gitignore' // i18n-ignore: the commit's message, in the repository (English, as Combwork's other commits)
+        if (now.get(file)?.unmerged) throw combworkError(M.unmerged, { file })
         const kept = await keptDeleted(repo.top, [file], now)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         const made = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
