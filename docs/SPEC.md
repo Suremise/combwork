@@ -6149,7 +6149,10 @@ touched:
   stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
   or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
   (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in); every
-  other entry is left. **Their stat data refreshed** (HI-3056): `--index-info` leaves it empty, and what trusts it
+  other entry is left. **A commit's are the commit's** (HI-3074): a pre-commit hook's `git add` (a formatter, a
+  generated file) goes into what git commits, not the copy, so after a commit the paths shown and every path the
+  commit changed (`diff-tree` from the HEAD it started from) take the commit tree's entries (`ls-tree`), a path not in
+  it none: the index matches the commit, nothing left listed and no removal invented. **Their stat data refreshed** (HI-3056): `--index-info` leaves it empty, and what trusts it
   refused them (the queue's advance, `read-tree -m -u`: *Entry … not uptodate*, so the paused merge paused again as
   the target moving after a Commit). So the new index is made, and refreshed for those paths alone (`add --refresh`,
   noHooks, bounded as the commit is: a clean filter may run to compare content), in a scratch file beside the copy

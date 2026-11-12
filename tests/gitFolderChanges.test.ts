@@ -543,6 +543,48 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(existsSync(lockPath())).toBe(false)
   })
 
+  // HI-3074: a pre-commit hook's `git add` goes into what git commits, not the private index, so the index taken from the
+  // private index left the folder changed (a formatter: `MM a.txt`) or a removal invented (a generated file: `D gen.txt`).
+  const preCommit = (body: string): void => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n${body}\n`)
+  }
+
+  it('Commit with a pre-commit hook that formats and re-adds the file: the index matches the commit, nothing left changed; Commit again works', async () => {
+    preCommit('printf "formatted\\n" > a.txt\ngit add a.txt')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('formatted')
+    expect(sh(proj, 'show', ':a.txt')).toBe('formatted')
+    expect(lines()).toEqual([])
+    // Usable again: another edit committed, formatted again.
+    writeFileSync(join(proj, 'a.txt'), 'edit again\n')
+    writeFileSync(join(proj, 'b.txt'), 'b edited\n')
+    await settle('commit', ['a.txt', 'b.txt'])
+    expect(committed()).toEqual(['b.txt'])
+    expect(lines()).toEqual([])
+    expect(leftovers()).toEqual([])
+  })
+
+  it('Commit with a pre-commit hook that adds a generated file: it goes into the index as committed, no removal invented; Commit and Set Aside work after', async () => {
+    preCommit('printf "gen\\n" > gen.txt\ngit add gen.txt')
+    writeFileSync(join(proj, 'b.txt'), 'staged by the user\n')
+    sh(proj, 'add', 'b.txt')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(committed()).toEqual(['a.txt', 'gen.txt'])
+    expect(sh(proj, 'show', ':gen.txt')).toBe('gen')
+    // The user's other staging as it was.
+    expect(lines()).toEqual(['M  b.txt'])
+    rmSync(join(proj, '.git', 'hooks', 'pre-commit'))
+    writeFileSync(join(proj, 'a.txt'), 'more\n')
+    await settle('setAside', ['a.txt'])
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('more')
+    expect(lines()).toEqual(['M  b.txt'])
+  })
+
   // HI-3079: a new file's intent-to-add, before the commit, was neither bounded nor kept from the repository's hooks: a
   // post-index-change hook hanging there held the repository's lock and the folder's fence for good.
   it("Commit of a new file: its intent-to-add runs no hook or fsmonitor and is bounded; a post-index-change hook that hangs is ended with the commit, at its bound", async () => {
