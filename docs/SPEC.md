@@ -3252,6 +3252,23 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   same branch skips it; any other preparation over uncommitted edits is refused as before. On another target it is
   refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
   recovered.
+- **A card lease ended with the card's committed work in its slot** (HI-2995; design HI-2995/s12): put back, or
+  stopped, with commits that aren't in the target, so the detach that would return the slot to the pool is refused
+  for good (`WorkspaceStep.kept`: the chain not integrated, or not the binding's; a transient refusal, the fence, an
+  uncertain write, a moved head or a failed read, never sets it). The slot is **kept for that card**: `dirty`, with
+  `slot_heldfor:<project>:<slot>` = `{ card, generation }` in the same fenced write, shown in Slots and copies as
+  "Kept for <card>", never lent to another card (by name either) and never lent with no lease. That card's next lend
+  takes it back (`SlotStore.take`, in its write: the record still the card's at the row's generation, the slot dirty
+  with no lease, operation, job, writer or aside), and the warm checks again through the port (`heldFor`: jj's
+  binding still the card's at the folder's generation, its working copy on its base). The start then carries its
+  base and work. Refused at either step (busy, another generation, another binding, the folder gone, another slot
+  asked for), the lend is refused naming the slot (`slot.refusal.kept`), the slot kept as it was, never a fresh
+  slot instead. Once its work is in the target (or the user moves the card to Done, HI-2924), the next settle's
+  detach succeeds and the slot is ready again, its record deleted; removal deletes it too. With an edit not committed
+  yet beside the work (HR1's round 1), the slot settles dirty and no detach is asked: it is kept for the card all the
+  same while the port says its binding is still that card's (`heldFor`), and a take-back checks that ownership first,
+  before any clean check, the card's edits then carried by its preparation (HI-2981). Lanes keep their lease
+  across a put-back, so this is a card lease's only; Git's slots have no such answer.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that

@@ -13,7 +13,8 @@
 //   Recover…; the confirmation names the folder unrecorded edits go to; an edit there is kept in it, and the slot is
 //   recovered (not stale any more), its Recover… gone; an edit the update also changed is written beside its file, and
 //   what Recover… did shows in a window naming that copy (HI-2996);
-// - the next card starts in that same slot (HI-2906);
+// - the next card starts in that same slot (HI-2906); put back with a commit there, the slot is kept for it (Slots and
+//   copies: Kept for, in every language), and started again it gets that slot back with its commit (HI-2995);
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
 // both themes.
@@ -328,6 +329,33 @@ const onDb = (fn) => {
     }, HUNG_MS)
     check('the next card starts in that same slot', !!w2 && w2.folder.toLowerCase() === w1.folder.toLowerCase() && w2.workspace === w1.workspace, JSON.stringify({ started2, w2, slots: await inv('slots:list', shop) }))
     check('…lent to it', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.state === 'lent', HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+
+    // HI-2995: B1 commits work for card 2 there; the user puts the card back and stops B1: the slot is kept for that card
+    // (not lent with no lease), Slots and copies says so, and the card started again gets that slot back with its work.
+    // B1 is given the card once its slot is prepared for it (its binding card 2's): only then does it work there.
+    const given = new RegExp(`Giving \\S*B1\\S* #${n2} in`)
+    check('card 2 given to B1 in its prepared slot', !!(await until(async () => fs.existsSync(appLog) && given.test(fs.readFileSync(appLog, 'utf8')), HUNG_MS)), JSON.stringify(await inv('tasks:work', n2)))
+    fs.writeFileSync(path.join(w2.folder, 'second.txt'), 'second\n')
+    jj(w2.folder, 'commit', '-m', 'second work')
+    const keptCommit = jj(w2.folder, 'log', '--no-graph', '-r', `${w2.workspace}@-`, '-T', 'commit_id').trim()
+    const back2 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    const keptRow = await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot && s.keptFor === n2 && s.state === 'dirty' && !s.lease) ?? null, HUNG_MS)
+    check('card 2 put back with its commit: the slot kept for it, no lease', !!keptRow, JSON.stringify({ back2, slots: await inv('slots:list', shop) }))
+    // Slots and copies reads its list as it opens: opened again (it was still open from the stale slot above).
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    check('Slots and copies: Kept for card 2', !!(await until(async () => (await row.locator(`[data-kept-for="${n2}"]`).count()) === 1, HUNG_MS)), await text(row))
+    await row.scrollIntoViewIfNeeded()
+    await shoot(row, 'slot-kept')
+    await inEach(row, 'slot-kept', (cat) => (cat['workflow.slots.keptFor'] ?? '').split('{card}').pop().replace(/^[\s:：、，]+/, '').slice(0, 12))
+    const started3 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 again' }).catch((e) => ({ error: String(e) }))
+    const w3 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      return v?.folder && v.workspace && v.folder.toLowerCase() === w1.folder.toLowerCase() ? v : null
+    }, HUNG_MS)
+    check('card 2 started again: the same slot back, with its commit', !!w3 && jj(w1.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${keptCommit} & ::${w1.workspace}@`, '-T', 'commit_id').trim() === keptCommit, JSON.stringify({ started3, w3, slots: await inv('slots:list', shop) }))
 
   } finally {
     await app.close().catch(() => undefined)

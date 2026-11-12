@@ -1979,6 +1979,10 @@
     "defaultMessage": "Inherit",
     "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Combwork’s or the default)."
   },
+  "workflow.slots.keptFor": {
+    "defaultMessage": "Kept for {card}: its committed work isn’t in the target yet",
+    "description": "HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it."
+  },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
     "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12)."
@@ -2106,6 +2110,10 @@
   "workflow.slots.state.gone": {
     "defaultMessage": "Folder missing",
     "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it)."
+  },
+  "workflow.slots.state.kept": {
+    "defaultMessage": "Holds a card’s commits",
+    "description": "HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files."
   },
   "workflow.slots.state.lent": {
     "defaultMessage": "In use",

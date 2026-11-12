@@ -772,7 +772,9 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // An empty range alone proves nothing (a working copy on unrelated history has none); its integration is still
         // required below.
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
-        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
+        // The slot's own work (HI-2995): a detach refused for it is `kept` (the card's, not a refusal to retry).
+        const keptStep = (r: WorkspaceStep): WorkspaceStep => (kind === 'detach' && !!j.prev?.card ? { ...r, kept: true } : r)
+        if (!onPrevBase && !chainIsBinding(chain, j.prev)) return keptStep(await refuse(JJ_REFUSED.unintegrated))
         if (j.prev?.submitted.length) {
           const prev = j.prev
           const contained = async (): Promise<boolean> => {
@@ -783,7 +785,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
             return !isUnknown(c) && !!c
           }
           // Not proved (HI-2924): the user's own Done on exactly that card cycle stands for it.
-          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return refuse(JJ_REFUSED.notIntegrated)
+          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return keptStep(await refuse(JJ_REFUSED.notIntegrated))
         }
         const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
         if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)
@@ -993,6 +995,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     },
     // A card cycle's preparation (HI-2866/s13): always onto its base (a card's line under jj is made, never "the one it
     // has"), owned and journalled; its binding published once the slot is on the base.
+    heldFor: async (folder, identity, card) => {
+      if (!identity || !(await owns(folder, identity))) return false
+      const b = await bindingNow(folder)
+      return !isUnknown(b) && !!b && b.card === card && b.generation === identity.generation
+    },
     carries: async (folder, line, base, o) => {
       const k = parseJjLineKey(line)
       if (!k || !base || !o.identity || k.workspace !== o.identity.workspace || !(await owns(folder, o.identity))) return false
