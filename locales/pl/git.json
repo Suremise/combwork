@@ -505,6 +505,7 @@
   "git.vc.switch.jjUnknown": "jj nie potwierdził tego repozytorium ({code}), więc ten projekt nie może się przełączyć.",
   "git.vc.switch.noJj": "Nie ma tu repozytorium jj. Combwork nigdy go nie tworzy: utwórz je za pomocą jj.",
   "git.vc.switch.memberDrain": "W tym projekcie wciąż trwa praca. Jego repozytorium było już przełączane między Gitem a jj, więc projekt przełączy się na Brak dopiero po zakończeniu tej pracy.",
+  "git.vc.switch.memberNoJj": "{project} jest w tym repozytorium, ale jego folder nie jest obszarem roboczym jj (to np. worktree Gita), więc nie może używać jj. Wybierz Brak dla {project} albo usuń go z obszaru roboczego, a potem przełącz.",
   "git.vc.switch.otherWorkspace": "To repozytorium jest też projektem otwartego obszaru roboczego {workspace}: najpierw zamknij je tam.",
   "git.vc.switch.switching": "Kontrola wersji tego repozytorium jest właśnie przełączana: spróbuj za chwilę."
 }

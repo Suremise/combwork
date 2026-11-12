@@ -479,6 +479,7 @@ interface CombworkMessageValues {
   'git.vc.switch.laneUnnamed': { builder: string | number }
   'git.vc.switch.lanes': { n: number; from: string | number }
   'git.vc.switch.memberDrain': undefined
+  'git.vc.switch.memberNoJj': { project: string | number }
   'git.vc.switch.noGit': undefined
   'git.vc.switch.noJj': undefined
   'git.vc.switch.notSwitched': { project: string | number; error: string | number }

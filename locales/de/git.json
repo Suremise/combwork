@@ -505,6 +505,7 @@
   "git.vc.switch.jjUnknown": "jj konnte dieses Repository nicht bestätigen ({code}), daher kann dieses Projekt nicht wechseln.",
   "git.vc.switch.noJj": "Hier ist kein jj-Repository. Combwork erstellt nie eines: Erstelle es mit jj.",
   "git.vc.switch.memberDrain": "In diesem Projekt läuft noch Arbeit. Sein Repository wurde schon zwischen Git und jj gewechselt, daher wechselt das Projekt erst zu Keine, wenn diese Arbeit fertig ist.",
+  "git.vc.switch.memberNoJj": "{project} liegt in diesem Repository, aber sein Ordner ist kein jj-Workspace (etwa ein Git-Worktree), daher kann es jj nicht verwenden. Wähle Keine für {project} oder entferne es aus dem Arbeitsbereich, dann wechsle.",
   "git.vc.switch.otherWorkspace": "Dieses Repository ist auch ein Projekt des geöffneten Arbeitsbereichs {workspace}: Schließe es zuerst dort.",
   "git.vc.switch.switching": "Die Versionsverwaltung dieses Repositorys wird gerade gewechselt: Versuche es gleich noch einmal."
 }
