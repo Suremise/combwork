@@ -37,6 +37,11 @@ export interface WorktreeNow {
    * recorded commit unchanged): work held there, but nothing the folder itself can commit or set aside. Absent: none.
    */
   insideOnly?: string[]
+  /**
+   * HI-3052: every submodule among `dirty` (porcelain v2's `S…`): its commit moved, staged, or changed inside. Git's stash
+   * can't set aside a submodule's checked-out commit. Absent: none.
+   */
+  submodules?: string[]
   /** The line asked for's head (null: no such line), when one was. */
   target?: string | null
   /** The platform's metadata paths asked for, absolute, in their order. */

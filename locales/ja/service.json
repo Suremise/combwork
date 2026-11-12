@@ -83,6 +83,7 @@
   "service.folderChanges.moved": "{target}がチェックアウトされている場所がその間に変わりました。もう一度確認してください。",
   "service.folderChanges.nestedRepo": "{folder}はこのリポジトリ内にある独立したGitリポジトリのため、Combworkはコミットも退避もしません。自分で.gitignoreに追加するか、サブモジュールとして追加してください。",
   "service.folderChanges.submoduleInside": "{folder}は変更がその内部にあるサブモジュールのため、Combworkはここでコミットも退避もできません。{folder}の中でコミットまたは退避し、必要ならその新しいコミットをここでコミットしてください。",
+  "service.folderChanges.submoduleMoved": "{folder}は別のコミットにあるサブモジュールで、Gitはこれを退避できません。代わりにコミットするか、{folder}の中で記録されているコミットを自分でチェックアウトしてください。",
   "service.folderChanges.noTarget": "{target}は現在このプロジェクトのどのフォルダーでもチェックアウトされていません。そこでコミットまたは退避するものはありません。",
   "service.folderChanges.nothing": "{file}にはコミットする変更がありません。",
   "service.folderChanges.readFailed": "Gitはフォルダーの変更を読み取れませんでした: {why}",

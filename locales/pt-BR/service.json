@@ -83,6 +83,7 @@
   "service.folderChanges.moved": "O lugar onde {target} está em checkout mudou nesse meio-tempo. Confira de novo.",
   "service.folderChanges.nestedRepo": "{folder} é um repositório Git próprio dentro deste, então o Combwork não faz commit dele nem o deixa de lado. Adicione-o você mesmo ao .gitignore ou como submódulo.",
   "service.folderChanges.submoduleInside": "{folder} é um submódulo cujas alterações estão dentro dele, então o Combwork não pode fazer commit delas nem deixá-las de lado aqui. Faça commit delas ou deixe-as de lado dentro de {folder} e, se quiser, faça commit do novo commit dele aqui.",
+  "service.folderChanges.submoduleMoved": "{folder} é um submódulo agora em outro commit, que o Git não consegue deixar de lado. Faça o commit dele em vez disso, ou faça você mesmo o checkout do commit registrado dentro de {folder}.",
   "service.folderChanges.noTarget": "{target} não está em checkout em nenhuma pasta deste projeto agora: nada para fazer commit ou deixar de lado ali.",
   "service.folderChanges.nothing": "{file} não tem alterações para fazer commit.",
   "service.folderChanges.readFailed": "O Git não conseguiu ler as alterações da pasta: {why}",

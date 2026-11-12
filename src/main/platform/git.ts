@@ -417,6 +417,7 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   let oid: string | null = null
   const files: string[] = []
   const inside: string[] = []
+  const subs: string[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i]
@@ -428,8 +429,12 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
       const path = f.slice(8).join(' ')
       files.push(path)
       if (insideOnly(f[1], f[2])) inside.push(path)
+      if (f[2]?.[0] === 'S') subs.push(path)
     } else if (p.startsWith('2 ')) {
-      files.push(p.split(' ').slice(9).join(' '))
+      const f = p.split(' ')
+      const path = f.slice(9).join(' ')
+      files.push(path)
+      if (f[2]?.[0] === 'S') subs.push(path)
       i++ // the original path
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
     else if (p.startsWith('? ')) files.push(p.slice(2))
@@ -442,7 +447,7 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
   const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
-  return { line, head: oid, dirty: [...files, ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  return { line, head: oid, dirty: [...files, ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(subs.length ? { submodules: subs } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
 /**

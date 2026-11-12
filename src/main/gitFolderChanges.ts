@@ -53,6 +53,7 @@ const M = {
   unmerged: msg({ id: 'service.folderChanges.unmerged', defaultMessage: "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.", description: "HI-3025: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: the file ({file}, a path) has a conflict git hasn't had resolved (after a git stash pop that conflicted, say); committing it would put its conflict markers into the commit, so nothing was done. Keep git add as it is: a command." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
   submoduleInside: msg({ id: 'service.folderChanges.submoduleInside', defaultMessage: '{folder} is a submodule whose changes are inside it, so Combwork can\'t commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.', description: "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done." }),
+  submoduleMoved: msg({ id: 'service.folderChanges.submoduleMoved', defaultMessage: "{folder} is a submodule now at another commit, which Git can't set aside. Commit it instead, or check out its recorded commit inside {folder} yourself.", description: "HI-3052: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say); git's stash can't put it back, so nothing was done. Commit works for it." }),
   tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
@@ -406,7 +407,7 @@ const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() ==
  * work in (the folder's own project's agents there, unless the caller names more). Throws the refusal, in the
  * window's words.
  */
-async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[] }> {
+async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[]; submodules: string[] }> {
   const now = await worktreeNow(folder)
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   if (!now.line) throw combworkError(M.detached, { folder })
@@ -421,7 +422,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
     const agent = await busyAgentIn(at.project, at.folder)
     if (agent) throw combworkError(M.agentBusy, { agent, folder: at.folder })
   }
-  return { line: now.line, inside: now.insideOnly ?? [] }
+  return { line: now.line, inside: now.insideOnly ?? [], submodules: now.submodules ?? [] }
 }
 
 /**
@@ -627,7 +628,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         const again = await checkouts(projectPath)
         if (isUnknown(again) || !again[target] || !samePlace(again[target], seen) || !samePlace(again[target], shownFolder)) throw combworkError(M.moved, { target })
         const folder = again[target]
-        const { line: branch, inside } = await assertQuiet(projectPath, folder, target)
+        const { line: branch, inside, submodules } = await assertQuiet(projectPath, folder, target)
         guard?.()
         const now = await changedIn(folder)
         if (!shown.length || !shown.every((p) => now.has(p))) throw combworkError(M.changed, { folder })
@@ -649,6 +650,10 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         const kept = await keptDeleted(removed)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         if (action === 'setAside') {
+          // HI-3052: a submodule whose commit moved (or whose new commit is staged): git's stash saves its recorded commit
+          // but never checks the old one out again, so it would stay changed, reported set aside. Commit takes it.
+          const moved = files.find((p) => submodules.includes(p))
+          if (moved) throw combworkError(M.submoduleMoved, { folder: moved })
           // HI-3024: git's stash can't set aside a case-only rename (it fails after making the stash, the old name
           // "already exists"), nor a removal whose path is now a folder without taking the folder's files, shown or not.
           const alias = [...removed].find(([, k]) => k === 'alias')?.[0]

@@ -404,6 +404,11 @@
       "folder": "plain"
     }
   },
+  "service.folderChanges.submoduleMoved": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.folderChanges.tooManyToSetAside": {
     "placeholders": {
       "count": "number",
