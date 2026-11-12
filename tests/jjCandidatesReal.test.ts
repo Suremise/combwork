@@ -855,6 +855,25 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
       expect(w.log(`change_id(${change}) & ::visible_heads()`)).toEqual([])
     })
 
+    it("a mixed group (HR2's round 1): one root's parent rewritten in place, another root rewritten with its parents unchanged, in one operation: both kept", async () => {
+      const w = await world(false)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      // A second root of the attempt's, on the target's head (as if the attempt had made it).
+      h.jj(w.repo, '--ignore-working-copy', 'new', '--no-edit', w.T, '-m', 'hi3045 second root')
+      const X = w.log(`children(${w.T}) & description(substring:"hi3045 second root")`)[0]
+      const record = { ...out.record, commits: [...out.record.commits, X] }
+      const changes = [out.candidate.result, X].map((c) => w.log(c, 'change_id')[0])
+      // One operation: the reviewed commit rewritten in place (jj rebases the candidate) and X rewritten as it is.
+      h.jj(w.repo, '--ignore-working-copy', 'metaedit', '--force-rewrite', '-r', `${w.R} | ${X}`)
+      const now = changes.map((c) => w.log(`change_id(${c}) & ::visible_heads()`))
+      expect(now.map((n) => n.length)).toEqual([1, 1])
+      const d = await dropJjAttempt(w.deps(), record, 'main')
+      if (isInterrupted(d)) throw new Error(JSON.stringify(d.interrupted))
+      expect(d.dropped.keptSuccessors?.map((k) => [k.commit, k.why]).sort()).toEqual(now.map((n) => [n[0], 'user']).sort())
+      expect(changes.map((c) => w.log(`change_id(${c}) & ::visible_heads()`))).toEqual(now)
+    })
+
     it('an operation with several parents (concurrent history): the successor kept, said so, the attempt dropped', async () => {
       const { w, out, successor } = await rebasedByJj()
       const now = successor()

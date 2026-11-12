@@ -3636,7 +3636,8 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   it (`jj evolog`'s, one read) rebased it as a descendant of something it **rewrote in place**. The successors one
   operation made are decided together. For each root (one with a parent outside the attempt), each outside parent is the
   same commit or that parent's change rewritten by that operation with its own parents the same changes (a describe,
-  metaedit, squash-into, amend, absorb), at least one so rewritten, and each inside parent is that commit's successor
+  metaedit, squash-into, amend, absorb), at least one of that root's own so rewritten (never one shared across the
+  group: a root rewritten with its parents unchanged is ambiguous), and each inside parent is that commit's successor
   there. Anything else is the user's own operation (their `jj rebase -r/-s/-b` of the candidate or its revision, onto
   the moved target say, meaning to set the target onto it) or ambiguous, and stays. An operation with several parents
   (concurrent history) or with the root as its parent (history abandoned below it) can't be classified: kept, and the

@@ -1183,16 +1183,21 @@ async function classifySuccessors(a: Attempt, head: string, found: Successor[]):
  * descendants, the only shape adopted: for each, its parents in order are its predecessor's, each either (inside the
  * attempt) that commit's own successor in this group, or (outside) the same commit or that parent's change **rewritten
  * in place** by `op` (made by it, its own parents the same changes: a describe, metaedit, squash-into, amend or
- * absorb, never a move), and at least one outside parent so rewritten. Anything else (a parent of another change, a
+ * absorb, never a move), and, for each root (a successor with a parent outside the attempt), at least one of its own
+ * outside parents so rewritten. Anything else (a parent of another change, a
  * parent moved, a successor whose parents don't line up) is the user's operation, or ambiguous: false, so it stays.
  */
 async function automaticRebase(a: Attempt, head: string, op: string, parent: string, list: Successor[]): Promise<boolean> {
   const mine = new Set(a.rec.commits)
   const byChange = new Map(list.map((f) => [f.pred.change, f.succ.commit]))
   const changeOf = async (ids: readonly string[]): Promise<Map<string, string>> => new Map((await a.commits(head, set([...new Set(ids)]))).map((c) => [c.commit, c.change]))
-  let rewritten = false
+  // HR2's round 1: the rewrite is required of each root (one with a parent outside the attempt), never shared across the
+  // group, so one root's rebased parent can't vouch for another root rewritten with its parents unchanged (ambiguous).
+  let roots = 0
   for (const { pred, succ } of list) {
     if (pred.parents.length !== succ.parents.length) return false
+    const root = pred.parents.some((p) => !mine.has(p))
+    let rewritten = false
     const inside = pred.parents.filter((p) => mine.has(p))
     const insideChange = inside.length ? await changeOf(inside) : new Map<string, string>()
     for (let i = 0; i < pred.parents.length; i++) {
@@ -1215,8 +1220,10 @@ async function automaticRebase(a: Attempt, head: string, op: string, parent: str
       if (changes(pc.parents) !== changes(qc.parents)) return false
       rewritten = true
     }
+    if (root && !rewritten) return false
+    if (root) roots++
   }
-  return rewritten
+  return roots > 0
 }
 
 /**
