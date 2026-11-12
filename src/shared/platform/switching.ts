@@ -40,6 +40,7 @@ export type SwitchRefusal =
   | { why: 'otherWorkspace'; workspace: string }
   | { why: 'groupChanged' }
   | { why: 'switching' }
+  | { why: 'storeRuns'; platform: PlatformId }
 
 export const SWITCH_REFUSED = {
   noGit: msg({ id: 'git.vc.switch.noGit', defaultMessage: 'No Git repository here: Initialise repository… first.', description: 'Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there.' }),
@@ -58,6 +59,7 @@ export const SWITCH_REFUSED = {
   memberDrain: msg({ id: 'git.vc.switch.memberDrain', defaultMessage: 'Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.', description: 'Why a project can’t be switched to None now (HI-2974): its repository was once switched between Git and jj, and lanes, cards in flight, the merge queue, slots or review copies of this project are still in use (listed in the same dialog). Keep Git, jj and None (glossary 2.1).' }),
   otherWorkspace: msg({ id: 'git.vc.switch.otherWorkspace', defaultMessage: 'This repository is also a project of the open workspace {workspace}: close it there first.', description: 'Why a switch between Git and jj is refused (HI-2799): another open workspace (another window) has a project on the same repository, whose work Combwork can’t hold while it switches. {workspace} is its name. Keep Git and jj.' }),
   groupChanged: msg({ id: 'git.vc.switch.groupChanged', defaultMessage: 'This repository’s projects changed meanwhile: look again before switching.', description: 'Why a switch between Git and jj is refused (HI-2799): a project joined the repository, or one of its projects’ choices or options changed, after the warning was shown.' }),
+  storeRuns: msg({ id: 'git.vc.switch.storeRuns', defaultMessage: 'This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.', description: 'Why a project can’t be switched to Git (HI-3072): it is on a repository (a Git worktree of one, say) whose other projects switched it to jj, so a Git project there would mix Git and jj on one repository. {platform} is jj (or Git), as the window names it.' }),
   switching: msg({ id: 'git.vc.switch.switching', defaultMessage: 'This repository’s version control is being switched: try again in a moment.', description: 'Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way.' })
 } satisfies Record<string, Msg>
 
@@ -88,6 +90,8 @@ export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<s
   switch (r.why) {
     case 'otherFound':
       return { m: SWITCH_REFUSED.otherFound, values: { vcs: r.vcs } }
+    case 'storeRuns':
+      return { m: SWITCH_REFUSED.storeRuns, values: { platform: r.platform === 'jj' ? 'jj' : r.platform === 'git' ? 'Git' : r.platform } } // i18n-ignore: product names
     case 'jjTool':
       return { m: SWITCH_REFUSED.jjTool, values: { state: r.state } }
     case 'jjToolBack':

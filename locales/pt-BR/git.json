@@ -508,5 +508,6 @@
   "git.vc.switch.memberDrain": "Ainda há trabalho em andamento neste projeto. O repositório dele já foi trocado entre Git e jj, então o projeto só muda para Nenhum quando esse trabalho terminar.",
   "git.vc.switch.memberNoJj": "{project} está neste repositório, mas a pasta dele não é um espaço de trabalho do jj (um worktree do Git, por exemplo), então não pode usar o jj. Escolha Nenhum para {project} ou remova-o do espaço de trabalho e depois troque.",
   "git.vc.switch.otherWorkspace": "Este repositório também é um projeto do espaço de trabalho aberto {workspace}: feche-o lá primeiro.",
+  "git.vc.switch.storeRuns": "Este repositório agora usa {platform} (os outros projetos dele o trocaram), então este projeto não pode usar Git nele: primeiro troque o repositório de volta para Git a partir de um desses projetos.",
   "git.vc.switch.switching": "O controle de versão deste repositório está sendo mudado: tente de novo em instantes."
 }

@@ -336,6 +336,21 @@ export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Pro
   return out
 }
 
+/**
+ * HI-3072: the version control the repository of `path` runs now, when its fence's members (settled) use one other than
+ * `to` (a Git worktree project going back to Git on a repository its other projects switched to jj): a project there
+ * using `to` would mix the two, and the fence refuses its every admission. Null when there's no such fence, or it
+ * uses `to`, or isn't settled (a switch under way refuses on its own).
+ */
+export async function storeRunsOther(ws: WorkspaceService, path: string, to: PlatformId): Promise<PlatformId | null> {
+  const store = await storeOf(path)
+  if (store === 'none') return null
+  const f = boardRead(ws, (db) => readFence(metaOf(db), store))
+  if (!f || typeof f !== 'object' || f.state !== 'settled') return null
+  const used = new Set(Object.values(f.members).map((m) => m.current.platform).filter((p) => needsRepository(p)))
+  return used.size && !used.has(to) ? [...used][0] : null
+}
+
 /** A store-wide switch's warning and its refusal, read without changing anything (the dialog's, and the switch's own). */
 export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
   const g = await groupOf(ws, path)

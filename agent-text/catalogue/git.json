@@ -189,6 +189,11 @@
     "note": "Why a switch between Git and jj is refused (HI-2799): another open workspace (another window) has a project on the same repository, whose work Combwork can’t hold while it switches. {workspace} is its name. Keep Git and jj.",
     "audience": "both"
   },
+  "git.vc.switch.storeRuns": {
+    "text": "This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.",
+    "note": "Why a project can’t be switched to Git (HI-3072): it is on a repository (a Git worktree of one, say) whose other projects switched it to jj, so a Git project there would mix Git and jj on one repository. {platform} is jj (or Git), as the window names it.",
+    "audience": "both"
+  },
   "git.vc.switch.switching": {
     "text": "This repository’s version control is being switched: try again in a moment.",
     "note": "Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way.",

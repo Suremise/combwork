@@ -1951,6 +1951,10 @@
     "defaultMessage": "The {to} options it had before come back as they were; {from}’s are kept for a switch back.",
     "description": "In the warning before switching version control, when the project used the other one before: its options for it are restored. {to} and {from} are None or Git."
   },
+  "git.vc.switch.storeRuns": {
+    "defaultMessage": "This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.",
+    "description": "Why a project can’t be switched to Git (HI-3072): it is on a repository (a Git worktree of one, say) whose other projects switched it to jj, so a Git project there would mix Git and jj on one repository. {platform} is jj (or Git), as the window names it."
+  },
   "git.vc.switch.switching": {
     "defaultMessage": "This repository’s version control is being switched: try again in a moment.",
     "description": "Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way."

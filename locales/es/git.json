@@ -508,5 +508,6 @@
   "git.vc.switch.memberDrain": "Todavía hay trabajo en curso en este proyecto. Su repositorio ya se cambió entre Git y jj, así que el proyecto cambia a Ninguno solo cuando ese trabajo haya terminado.",
   "git.vc.switch.memberNoJj": "{project} está en este repositorio, pero su carpeta no es un espacio de trabajo de jj (un worktree de Git, por ejemplo), así que no puede usar jj. Elige Ninguno para {project} o quítalo del espacio de trabajo, y luego cambia.",
   "git.vc.switch.otherWorkspace": "Este repositorio también es un proyecto del espacio de trabajo abierto {workspace}: ciérralo allí primero.",
+  "git.vc.switch.storeRuns": "Este repositorio usa ahora {platform} (sus otros proyectos lo cambiaron), así que este proyecto no puede usar Git en él: primero vuelve a cambiar el repositorio a Git desde uno de esos proyectos.",
   "git.vc.switch.switching": "Se está cambiando el control de versiones de este repositorio: inténtalo de nuevo en un momento."
 }

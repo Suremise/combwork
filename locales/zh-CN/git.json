@@ -508,5 +508,6 @@
   "git.vc.switch.memberDrain": "此项目中仍有工作在运行。它的仓库曾在 Git 和 jj 之间切换过，因此只有在这些工作完成后，此项目才能切换为“无”。",
   "git.vc.switch.memberNoJj": "{project} 位于此仓库上，但它的文件夹不是 jj 工作区（例如 Git worktree），因此无法使用 jj。请为 {project} 选择“无”，或将其从工作区中移除，然后再切换。",
   "git.vc.switch.otherWorkspace": "此仓库也是已打开的工作区 {workspace} 的项目：请先在那里关闭它。",
+  "git.vc.switch.storeRuns": "此仓库现在使用 {platform}（它的其他项目已切换），因此此项目无法在其上使用 Git：请先从其中一个项目将仓库切换回 Git。",
   "git.vc.switch.switching": "正在切换此仓库的版本控制：请稍后再试。"
 }
