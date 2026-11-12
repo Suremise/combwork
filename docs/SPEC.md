@@ -3283,11 +3283,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   as "Kept for <card>, but its folder is missing" with **Remove…**, the user's explicit removal (`slots:removeKept`,
   `SlotPool.removeKeptGone`): only of the record the window showed (card and generation), checked again under the
   removal's operation (still `gone`, its folder still absent, the same record at the slot's generation, the platform's
-  fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the card
-  lease's `endRev`), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
+  fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the newest
+  `endRev` recorded for its card there, a failed take-back's lease recording none), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
   **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
   own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
-  started, or the lane's first card still to do as the lane gets its slot) takes the kept slot back as a card's lease
+  started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an
+  earlier read found, so a record a refresh writes meanwhile decides) takes the kept slot back as a card's lease
   does, kind `lane`, the warm's ownership check asked for that card; the builder's carried slot is not handed over for
   it, and both the hand-off's and the written slot's takeover writes refuse a card kept a slot elsewhere; the builder's
   run still writing in another slot is waited for (`slot.kept.written`); a lane already holding another slot refuses

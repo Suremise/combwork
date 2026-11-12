@@ -961,6 +961,15 @@ export class SlotStore {
   }
 
   /** A slot's newest lease, open or ended (#1434: whose work it holds). */
+  /**
+   * The newest head recorded as a lease of a slot ended (HI-3032: a kept slot's work, its last commit), of `card`'s own
+   * leases or a lane's, since `since` (the slot row's making: never an earlier slot's of that name). A failed or
+   * interrupted take-back's lease, which records none, is passed over. Null with none.
+   */
+  lastEndRev(slot: string, card: number, since: string): string | null {
+    return this.conn.read((db) => (db.prepare("SELECT end_rev FROM slot_leases WHERE project = ? AND slot = ? AND end_rev IS NOT NULL AND (card = ? OR kind = 'lane') AND from_at >= ? ORDER BY from_at DESC LIMIT 1").get(this.project, slot, card, since) as { end_rev: string } | undefined)?.end_rev ?? null)
+  }
+
   lastLease(slot: string): SlotLease | null {
     return this.conn.read((db) => {
       const r = db.prepare('SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1').get(this.project, slot) as Row | undefined
@@ -1906,6 +1915,13 @@ export class SlotPool {
 
   lastLease(name: string): SlotLease | null {
     return this.store.lastLease(name)
+  }
+
+  /** A kept slot's work, its last commit (HI-3032): the newest head recorded for its card there (SlotStore.lastEndRev). */
+  keptCommit(name: string): string | null {
+    const s = this.store.slot(name)
+    const card = this.store.keptCard(name)
+    return s && card !== null ? this.store.lastEndRev(name, card, s.createdAt) : null
   }
 
   /** Whether a carried lease is one the agent's Resume took, not an adopted worktree's (SlotStore.resumedCarry). */

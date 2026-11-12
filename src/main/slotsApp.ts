@@ -984,16 +984,10 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // Kept for a card (HI-2995), dirty; or with its folder gone (HI-3032): its record, for Remove….
       const record = jj && (s.state === 'dirty' || s.state === 'gone') ? pool.keptRecord(s.name) : null
       const keptFor = record?.card ?? null
-      const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: keptCommitOf(pool, s.name, record.card) } : null
+      const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name) } : null
       return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}) }
     })
   )
-}
-
-/** A kept slot's work, its last commit (HI-3032): the head recorded as its card's last lease there ended; null with none. */
-function keptCommitOf(pool: SlotPool, slot: string, card: number): string | null {
-  const last = pool.lastLease(slot)
-  return last && (last.card === card || last.kind === 'lane') && last.endRev ? last.endRev : null
 }
 
 /**

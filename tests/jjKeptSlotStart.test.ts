@@ -79,8 +79,11 @@ async function setup(name: string) {
   })
   const card = async (title: string): Promise<number> => (await run(() => tasks.createTask({ title, project: 'alpha', agent: 'b1' }, { kind: 'user' }))).number
   const start = (n: number, lane: string | null, dry = false) => run(() => leaseForStart(ws, project, { id: n, ...(lane ? { lane } : {}) }, 'b1', { dry, target: 'main' }))
-  /** Card `n` lent a slot, a commit made there, put back: kept for it. */
-  const putBack = async (n: number): Promise<{ name: string; folder: string; R: string }> => {
+  /**
+   * Card `n` lent a slot, a commit made there, put back: kept for it. `unsettled`: its lease ended in the board alone,
+   * no look of the slot yet (its kept record written only by the pool's next refresh).
+   */
+  const putBack = async (n: number, unsettled = false): Promise<{ name: string; folder: string; R: string }> => {
     const lent = await pool.lend({ card: n, agent: 'b1' }, { target: 'main' })
     if (!lent.ok) throw new Error(JSON.stringify(lent))
     const row = store.slot(lent.slot.name)!
@@ -90,6 +93,11 @@ async function setup(name: string) {
     h.jj(row.folder, 'commit', '-m', 'kept work')
     const R = h.id(row.folder, `${w}@-`)
     expect(await port.submitted(row.folder, jjLineKey(w, n, 1), [R], row.identity, 1)).toBe(true)
+    if (unsettled) {
+      await store.end(lent.lease.id, 'putBack')
+      expect(pool.keptCard(row.name)).toBeNull()
+      return { name: row.name, folder: row.folder, R }
+    }
     await pool.release(lent.lease.id, 'putBack')
     await pool.refresh()
     expect(pool.keptCard(row.name)).toBe(n)
@@ -109,6 +117,17 @@ describe.skipIf(!jjExe)('a card with a kept jj slot, started (HI-3032)', { timeo
     expect(t.h.id(k.folder, '@-')).toBe(k.R)
     // Its card's start in the lane: that lease, in that slot.
     expect(await t.start(n, 'lane-1')).toMatchObject({ slot: k.name })
+  })
+
+  it("kept only once the lane's own lend looks (its refresh, after the start's read found none): the lane still gets it", async () => {
+    const t = await setup('lane-late')
+    const n = await t.card('kept')
+    const k = await t.putBack(n, true)
+    lanes.set('lane-4', [n])
+    expect(await t.run(() => lendLane(t.ws, t.project, 'lane-4', 'b1', 'main'))).toEqual({ slot: k.name })
+    expect(t.pool.leaseOf({ lane: 'lane-4' })).toMatchObject({ slot: k.name, kind: 'lane' })
+    expect(t.pool.keptCard(k.name)).toBe(n)
+    expect(t.h.id(k.folder, '@-')).toBe(k.R)
   })
 
   it('a lane already working in another slot: the card is refused naming both, nothing lent', async () => {

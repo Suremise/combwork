@@ -1957,11 +1957,12 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
   const pool = await poolFor(ws, projectPath)
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
-  // Its first card still to do, when a slot is kept for it (HI-3032): the lane's slot is that one, by the same ways a
-  // card's start places it (slotForStart), never another.
+  // Its first card still to do (HI-3032): a slot kept for it is the lane's, by the same ways a card's start places it
+  // (slotForStart), never another. The card goes with every placement's request, whatever this read found: each write
+  // decides by the kept record as it is then (one a refresh writes meanwhile included).
   const first = laneFirstCard(ws, (await rawLanes(ws)).find((l) => l.id === lane)?.cards ?? [])
   const kept = first !== null ? pool.keptSlotFor(first) : null
-  const req = { lane, agent: builder, ...(kept && first !== null ? { startsCard: first } : {}) }
+  const req = { lane, agent: builder, ...(first !== null ? { startsCard: first } : {}) }
   // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
   const own = kept ? null : await carriedToHand(ws, projectPath, pool, builder, target)
   const handed = own ? await handOffCarried(ws, projectPath, pool, own, req, name(builder)) : null
@@ -2050,7 +2051,7 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
       // Its first card still to do, with a slot kept for it (HI-3032): that slot is the lane's, as in lendLaneSlot.
       const first = laneFirstCard(ws, lane.cards)
       kept = first !== null ? pool.keptSlotFor(first) : null
-      req = { lane: lane.id, agent: lane.builder.id, ...(kept && first !== null ? { startsCard: first } : {}) }
+      req = { lane: lane.id, agent: lane.builder.id, ...(first !== null ? { startsCard: first } : {}) }
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
       const own = kept ? null : await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return

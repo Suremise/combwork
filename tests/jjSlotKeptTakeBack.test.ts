@@ -100,6 +100,36 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     expect(w.h.id(a.folder, '@-')).toBe(a.R)
   })
 
+  it.each(['failed', 'interrupted'] as const)('A/B then D: a take-back %s, then its folder deleted: Remove… still names its work, kept in the store', async (how) => {
+    const w = world()
+    const a = await putBackWithWork(w, true)
+    if (how === 'failed') {
+      w.runs.fail = true
+      expect(await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })).toMatchObject({ ok: false, refusal: { why: 'setupFailed' } })
+      w.runs.fail = false
+    } else {
+      let open: () => void = () => undefined
+      w.runs.gate = new Promise<void>((res) => (open = res))
+      const before = w.runs.calls
+      const going = w.poolOf(2).lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+      await expect.poll(() => w.runs.calls, { timeout: 60_000 }).toBeGreaterThan(before)
+      w.dead.add(2)
+      await w.pool.refresh()
+      w.runs.gate = null
+      open()
+      await going
+    }
+    // The take-back's own lease, the slot's newest, ended with no head recorded (warm's fail and recover record none):
+    // the work's commit is the card's earlier lease's.
+    expect(w.store.slot(a.name)?.state).toBe('dirty')
+    rmSync(a.folder, { recursive: true, force: true })
+    await w.pool.refresh()
+    expect(w.store.slot(a.name)?.state).toBe('gone')
+    expect(w.pool.keptCommit(a.name)).toBe(a.R)
+    expect(await w.pool.removeKeptGone(a.name, w.pool.keptRecord(a.name)!)).toEqual({ ok: true })
+    expect(w.h.id(w.repo, a.R)).toBe(a.R)
+  })
+
   it('B: cut short (the Combwork taking it back gone): kept for the card, which gets it back', async () => {
     const w = world()
     const a = await putBackWithWork(w, true)
