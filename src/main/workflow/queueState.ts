@@ -194,7 +194,8 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
       const d = o.f.data as FactData['IntegrationRequested']
       // HI-2709: what it waits for, as the board is now (a dependency's edit shows at once); still in the list, in its place.
       const on = o.state === 'open' ? wf.queueWaitingOn(o.card.id) : []
-      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at, ...(on.length ? { waitingOn: on } : {}) }
+      const fw = of(o.card.id).s.forward
+      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at, ...(on.length ? { waitingOn: on } : {}), ...(fw ? { forward: { from: fw.from, to: fw.to } } : {}) }
     })
   return { open, entries, cards, testing, queued }
 }

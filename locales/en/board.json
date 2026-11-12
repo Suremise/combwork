@@ -3067,6 +3067,10 @@
     "defaultMessage": "Couldn't remove the card from the queue",
     "description": "An error's title: Remove from queue failed (Progress panel); its message says why (its merge has begun, say)."
   },
+  "board.queue.removeForwardMessage": {
+    "defaultMessage": "It ends in Done and nothing is merged: {to} isn't brought up to date with {from}. To try again later, use Bring Up to Date… on {to}'s queue.",
+    "description": "HI-3084: the confirmation before Remove from queue on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}): it has no builder, so it ends in Done (a stage, glossary 2.2) with nothing merged. Bring Up to Date… is a button on the merge queue's card: as translated there."
+  },
   "board.queue.removeMessage": {
     "defaultMessage": "It goes back to Approved and isn't merged. Its builder is told. To merge it later, requeue it from the card.",
     "description": "The confirmation before Remove from queue (Progress panel). Approved is a stage (glossary 2.2)."
@@ -4251,6 +4255,10 @@
     "defaultMessage": "No agent works on a forward merge: it waits for you. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} by hand; Remove from queue ends it, nothing merged.",
     "description": "HI-2959: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned with a conflict or a red check: no agent may act on it, so the user (or the Assistant) chooses. Retry merge, Resolve on a builder and Remove from queue are commands: as translated there."
   },
+  "board.workQueue.forwardRemoveOnly": {
+    "defaultMessage": "No agent works on a forward merge: it waits for you. It went against the release path’s direction ({from} into {to}), so it can’t be merged or handed to a builder: Remove from queue ends it, nothing merged.",
+    "description": "HI-3084: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned because it would merge against the release path's direction (an older version from a newer one, say): only Remove from queue ends it. Remove from queue is a command: as translated there."
+  },
   "board.workQueue.heading": {
     "defaultMessage": "Merge queue",
     "description": "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue."
@@ -4282,6 +4290,10 @@
   "board.workQueue.queuedNoPlace": {
     "defaultMessage": "Queued for {target}",
     "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)."
+  },
+  "board.workQueue.remove": {
+    "defaultMessage": "Remove from Queue…",
+    "description": "HI-3084: a button in the card dialog's Work section on a forward merge card the merge queue returned (or whose merge was declined): ends it in Done, nothing merged (asks first). Title case, as the window's buttons."
   },
   "board.workQueue.resolve": {
     "defaultMessage": "Resolve on a Builder…",

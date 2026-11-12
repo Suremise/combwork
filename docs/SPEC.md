@@ -5914,6 +5914,10 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
   the user's or the Assistant's three choices (Retry merge, Resolve on a builder, Remove from queue), never a builder's
   `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it", on the board too (its
   work badge's `forwardWait`, `stalledReason`'s): only Remove from queue for one returned for its direction (HI-2959).
+  Its Work section offers what those name (HI-3084, `ForwardChoices` from the same `forwardWaitOf`): Retry merge…,
+  Resolve on a Builder… and Remove from Queue…, for one returned or declined alike, and Remove from Queue… alone for one
+  returned for its direction. Remove's confirmation, there and on a queued forward in the queue's card (its
+  `QueueQueued.forward`), says it ends in Done with nothing merged, never that it goes back to Approved.
 
 **Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
 to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`

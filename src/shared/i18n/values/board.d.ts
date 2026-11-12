@@ -768,6 +768,7 @@ interface CombworkMessageValues {
   'board.queue.remove': undefined
   'board.queue.removeConfirm': undefined
   'board.queue.removeFailed': undefined
+  'board.queue.removeForwardMessage': { to: string | number; from: string | number }
   'board.queue.removeMessage': undefined
   'board.queue.removeNamed': { card: string | number }
   'board.queue.removeTitle': { card: string | number }
@@ -1064,6 +1065,7 @@ interface CombworkMessageValues {
   'board.workQueue.expected': undefined
   'board.workQueue.files': { n: number }
   'board.workQueue.forwardNext': { from: string | number; to: string | number }
+  'board.workQueue.forwardRemoveOnly': { from: string | number; to: string | number }
   'board.workQueue.heading': undefined
   'board.workQueue.hideLog': undefined
   'board.workQueue.noBranch': undefined
@@ -1072,6 +1074,7 @@ interface CombworkMessageValues {
   'board.workQueue.paused': { target: string | number }
   'board.workQueue.queued': { target: string | number; position: number }
   'board.workQueue.queuedNoPlace': { target: string | number }
+  'board.workQueue.remove': undefined
   'board.workQueue.resolve': undefined
   'board.workQueue.resolveConfirm': undefined
   'board.workQueue.resolveFailed': undefined
