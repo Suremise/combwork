@@ -1481,7 +1481,7 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
   it("a lane waiting for a slot whose lend is under way as Combwork quits isn't started: it keeps the slot and its wait for the next start", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
-    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
     let lends = 0
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
