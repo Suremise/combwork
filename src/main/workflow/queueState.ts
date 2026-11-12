@@ -185,7 +185,7 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     // HI-3091: a begun entry the queue is paused on isn't being merged (an unknown publication waiting for the user's
     // answer, an interrupted advance): it is shown with the pause, never as "moving the target to its merge now".
     const pausedOn = store.queuePause(target)?.card ?? null
-    const begun = open.find((o) => o.state === 'started' && o.card.key !== pausedOn) ??(store.queueLease(target) && !live.running ? open.find((o) => !wf.queueWaitingOn(o.card.id).length) : undefined)
+    const begun = open.find((o) => o.state === 'started' && o.card.key !== pausedOn) ?? (store.queueLease(target) && !live.running ? open.find((o) => o.card.key !== pausedOn && !wf.queueWaitingOn(o.card.id).length) : undefined)
     if (begun) {
       const d = begun.f.data as FactData['IntegrationRequested']
       const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started

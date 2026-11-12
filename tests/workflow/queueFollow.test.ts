@@ -350,6 +350,28 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(line(b.id)).toMatch(/the user has answered whether its push reached the remote/)
   })
 
+  it('HI-3091 (HR1): the same with a queue lease recorded and no live run here (another Combwork’s, or an interrupted runner’s): A still paused, never testing', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    const onto = head(bare)
+    let lose = true
+    const git = gitWith(async (args, run) => {
+      if (args[0] !== 'push' || !lose) return run()
+      lose = false
+      const r = await run()
+      sh(bare, 'update-ref', 'refs/heads/main', onto)
+      return { ...r, ok: false, code: -1, timedOut: true }
+    })
+    expect((await queue({ git }).drain('main')).at(-1)).toMatchObject({ card: a.key, reason: 'publishUnknown' })
+    const at = new Date().toISOString()
+    expect(e.store.takeQueueLease({ target: 'main', lease: 'lb', token: 'tb', profile: 'Combwork-B', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)).toBe(true)
+    expect(e.store.queueLease('main')).not.toBeNull()
+    expect(e.wf.queueLive('main').running).toBeFalsy()
+    expect(queueOrder(e.wf, 'main').testing).toBeNull()
+    expect(queueStateOf(e.wf, e.store.card(a.id))).toMatchObject({ state: 'paused', reason: 'publishUnknown', card: a.key })
+    expect(queueLine(queueStateOf(e.wf, e.store.card(a.id))!)).toMatch(/whether its push reached the remote \(their answer in For you\)/)
+  })
+
   it('declined (it wasn’t published): the card is tested and published again', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following()
     const a = await queued(e, 'A', 'a.txt')
