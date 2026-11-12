@@ -46,6 +46,19 @@ const smudge = (o?: CheckoutOptions): { env?: NodeJS.ProcessEnv } => (o?.skipSmu
  */
 export const noHooks = (folder: string): string => join(folder, '.git', `combwork-no-hooks-${randomBytes(8).toString('hex')}`)
 
+/**
+ * HI-3078: a slot's own submodule checkouts that `revision` doesn't keep as submodules (vendored into ordinary files
+ * there, or gone) removed before it moves there, as a copy's and the queue's folder's are (HI-3027, HI-3028): git's
+ * switch leaves such a folder where it is, so the switch refuses over its files, or leaves it untracked with its `.git`
+ * file. A slot is someone's work folder, so a checkout with a change or an untracked file is left for git to name; its
+ * clone stays. Only a worktree whose own git dir holds clones (`modules`, an fs read): with none, or no `.git` file
+ * naming a git dir, no git runs for it and nothing is removed.
+ */
+async function clearSlotSubmodules(folder: string, revision: string): Promise<string | null> {
+  if ((await hasPrivateModules(folder)) !== true) return null
+  return clearSubmoduleCheckouts(gitReads, folder, [revision], { keepChanged: true })
+}
+
 export const gitWorkspacePort: WorkspacePort = {
   platform: 'git',
   list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch })) ?? null,
@@ -69,7 +82,11 @@ export const gitWorkspacePort: WorkspacePort = {
   copyIgnored: (repo, folder, patterns) => copyIgnored(repo, folder, patterns),
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
-  prepare: (folder, line, base, o) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o))),
+  prepare: async (folder, line, base, o) => {
+    const cleared = await clearSlotSubmodules(folder, base ?? `refs/heads/${line}`)
+    if (cleared) return { ok: false, err: cleared }
+    return step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o)))
+  },
   // HI-3010: the head past `base` first (git's own exit, no words, when it isn't), then the line made where HEAD is now
   // (no start point: a commit meanwhile is on it, and no file changes). Its builder may be at work, so no hook runs
   // (HR1's round 1: a post-checkout or reference-transaction hook can change files): for this command only, hooks are
@@ -92,7 +109,11 @@ export const gitWorkspacePort: WorkspacePort = {
     if (!own.ok) return { ok: false, err: own.err.trim() || `HEAD was past ${base} before its lease began` } // i18n-ignore: a log line's detail, never shown
     return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
   },
-  detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
+  detach: async (folder, revision, o) => {
+    const cleared = await clearSlotSubmodules(folder, revision)
+    if (cleared) return { ok: false, err: cleared }
+    return step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision]))
+  },
   // HI-3028: a copy's own submodule checkouts the revision doesn't keep as submodules removed first (their clones stay):
   // a forced checkout writes ordinary files into such a folder and `clean -fd` leaves its `.git` file, so git run in it
   // would see the old clone as its repository. A failure is the checkout's, with its words. A copy with no clones (its git
