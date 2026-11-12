@@ -6,7 +6,7 @@ import { writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { tempDir } from './tempDir'
-import { destinationOf, displayUrl, fetchHeadOf, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
+import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
 import { gitTree } from '../src/main/workflow/mergeQueue'
 import type { CandidateHost } from '../src/main/platform/integration'
 
@@ -104,7 +104,11 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     return v.count + v['in-pack']
   }
 
-  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: 120_000 }, async () => {
+  /**
+   * A project of 120 commits on `main` tracking a bare `origin`, with `branches` old local branches (`feature/…`, sorting
+   * before `main`) at its tenth commit; someone else pushes one commit. Its host, snapshot, objects before and that commit.
+   */
+  async function pushedOnce(branches: number) {
     const root = tempDir('sealed-haves-')
     const bare = slash(join(root, 'origin.git'))
     const project = join(root, 'project')
@@ -121,6 +125,8 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     sh(project, 'reset', '-q', '--hard', 'main')
     sh(project, 'remote', 'add', 'origin', bare)
     sh(project, 'push', '-q', '-u', 'origin', 'main')
+    const old = sh(project, 'rev-parse', 'main~110')
+    if (branches) execFileSync('git', ['update-ref', '--stdin'], { cwd: project, env, input: Array.from({ length: branches }, (_, i) => `create refs/heads/feature/${String(i).padStart(4, '0')} ${old}\n`).join('') })
     sh(project, 'gc', '-q')
     const other = join(root, 'other')
     execFileSync('git', ['clone', '-q', bare, other], { env })
@@ -133,14 +139,24 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     const host: CandidateHost = { project, folder: project, signTimeoutMs: 0, identity: async () => null, reads: {}, run: (cwd, args, opts) => gitTree(cwd, args, { env, ...opts }) }
     const d = await destinationOf(host, 'main')
     if (!('snapshot' in d)) throw new Error(JSON.stringify(d))
-    const before = objects(project)
-    expect(await fetchHeadOf(host, d.snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+    return { project, host, snapshot: d.snapshot, before: objects(project), theirs }
+  }
+
+  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: 120_000 }, async () => {
+    const { project, host, snapshot, before, theirs } = await pushedOnce(0)
+    expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     // The new commit is three objects (commit, tree, blob); the branch's history is 360.
     expect(objects(project) - before).toBe(3)
     expect(sh(project, 'rev-parse', 'refs/cw/queue/t-fetch')).toBe(theirs)
     // Fetched again with nothing new: nothing arrives.
     const again = objects(project)
-    expect(await fetchHeadOf(host, d.snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+    expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     expect(objects(project)).toBe(again)
+  })
+
+  it(`HI-3042: past ${HAVES_MAX} local branches sorting before the target, the target's own heads are still offered: only the new commit arrives`, { timeout: 120_000 }, async () => {
+    const { project, host, snapshot, before, theirs } = await pushedOnce(HAVES_MAX + 4)
+    expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+    expect(objects(project) - before).toBe(3)
   })
 })

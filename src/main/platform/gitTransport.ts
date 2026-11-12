@@ -193,13 +193,19 @@ export const HAVES_MAX = 256
 /**
  * HI-2987: the project's commits a sealed fetch offers the remote as haves: its previous pin (`into`), what it tracks of
  * that remote, and its local branches, read in the project (refs only: no transport setting). Unreadable: none, the fetch
- * still correct, only larger.
+ * still correct, only larger. HI-3042: the target's own first (the pin, the fetched ref's remote-tracking ref, the local
+ * branch of its name and any whose upstream that is), then the rest in git's order up to HAVES_MAX: git lists by name, so
+ * a cap in the read itself filled up with `cw/…` or `feature/…` branches before the target's and the remote's.
  */
 async function havesOf(h: CandidateHost, snap: TransportSnapshot, into: string): Promise<string[]> {
-  const r = await h.run(h.project, ['for-each-ref', `--count=${HAVES_MAX}`, '--format=%(objectname) %(objecttype)', into, `refs/remotes/${snap.remote}/`, 'refs/heads/'])
+  const r = await h.run(h.project, ['for-each-ref', '--format=%(objectname) %(objecttype) %(refname) %(upstream)', into, `refs/remotes/${snap.remote}/`, 'refs/heads/'])
   if (!r.ok) return []
   const hex = /^[0-9a-f]{40}([0-9a-f]{24})?$/
-  return [...new Set(r.out.split(/\r?\n/).map((l) => l.trim().split(' ')).filter(([id, type]) => type === 'commit' && hex.test(id)).map(([id]) => id))]
+  const name = snap.ref.replace(/^refs\/heads\//, '')
+  const track = `refs/remotes/${snap.remote}/${name}`
+  const rows = r.out.split(/\r?\n/).map((l) => l.trim().split(' ')).filter(([id, type]) => type === 'commit' && hex.test(id))
+  const own = ([, , ref, up]: string[]): boolean => ref === into || ref === track || ref === `refs/heads/${name}` || up === track
+  return [...new Set([...rows.filter(own), ...rows.filter((row) => !own(row))].map(([id]) => id))].slice(0, HAVES_MAX)
 }
 
 /** Fetches the snapshot's ref into the sealed context's own ref, reads that fetch's head there, and pins it in the project as `into`. */
