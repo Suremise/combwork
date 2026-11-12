@@ -6136,7 +6136,9 @@ touched:
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Only a file of exactly that name counts
   (HI-3024): each part of the path as its folder lists it, so a case-only rename's old side (`b.txt`, which Windows'
-  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file. Git's partial commit
+  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file; the same goes for a file
+  deleted without the deletion staged (HI-3076: ` D b.txt` beside `?? b.txt/x.txt`, which git's stash took with the
+  folder's files and its partial commit refused alike). Git's partial commit
   takes neither ("will not add file alias"; "does not have a commit checked out"), so such a Commit is built in the
   private index instead (`commitByIndex`): every other staged change, and every other path in conflict (HR1: a plain
   commit refuses an index with one; the real index keeps it), taken back to HEAD there, the removed paths

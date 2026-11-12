@@ -899,6 +899,49 @@ describe('a case-only rename, and a removal replaced by a folder (HI-3024)', () 
     expect(lines()).toEqual(['?? b.txt/x.txt', 'D  b.txt'])
   })
 
+  // HI-3076: the same with the deletion not staged (` D b.txt`): HI-3024's handling missed it, so Set Aside took the
+  // folder's files, shown or not, into a stash that couldn't be popped, and Commit failed every time.
+  const fileToFolder = (): void => {
+    rmSync(join(proj, 'b.txt'))
+    mkdirSync(join(proj, 'b.txt'))
+    writeFileSync(join(proj, 'b.txt', 'x.txt'), 'x\n')
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D b.txt'])
+  }
+
+  it('a deleted file (not staged) whose path is now a folder: Set Aside refused by name, shown alone or with the folder, a late file never reached, nothing changed', async () => {
+    fileToFolder()
+    for (const shown of [['b.txt'], ['b.txt', 'b.txt/x.txt']]) {
+      lateFile = 'b.txt/late.txt'
+      await expect(settle('setAside', shown)).rejects.toThrow(/^b\.txt was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too/)
+      lateFile = null
+    }
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    expect(read('b.txt/x.txt')).toBe('x\n')
+    expect(existsSync(join(proj, 'b.txt', 'late.txt'))).toBe(false)
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D b.txt'])
+  })
+
+  for (const shown of [['b.txt'], ['b.txt', 'b.txt/x.txt']])
+    it(`a deleted file (not staged) whose path is now a folder: Commit of ${shown.join(' and ')} works`, async () => {
+      fileToFolder()
+      const was = tree()
+      await settle('commit', shown)
+      expect(tree()).toEqual(shown.length === 1 ? was.filter((p) => p !== 'b.txt') : [...was.filter((p) => p !== 'b.txt'), 'b.txt/x.txt'].sort())
+      expect(lines()).toEqual(shown.length === 1 ? ['?? b.txt/x.txt'] : [])
+      expect(read('b.txt/x.txt')).toBe('x\n')
+    })
+
+  it('a deleted file (not staged) with nothing in its place: Set Aside and Commit as before (git\'s ordinary deletion)', async () => {
+    rmSync(join(proj, 'b.txt'))
+    await settle('setAside', ['b.txt'])
+    expect(lines()).toEqual([])
+    sh(proj, 'stash', 'pop', '-q')
+    expect(lines()).toEqual(['D b.txt'])
+    await settle('commit', ['b.txt'])
+    expect(tree()).not.toContain('b.txt')
+    expect(lines()).toEqual([])
+  })
+
   it("a case-only rename beside another file in conflict (HR1's round 1): Commit commits the rename, the other file's conflict kept in the index and on disk", async () => {
     writeFileSync(join(proj, 'a.txt'), 'mine\n')
     sh(proj, 'stash', 'push', '-q')

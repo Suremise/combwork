@@ -407,6 +407,8 @@ interface Changed {
   unmerged?: boolean
   /** HI-3024: a change staged (porcelain's X column), a rename's both sides included. */
   staged?: boolean
+  /** HI-3076: its file deleted from the folder, the deletion not staged (porcelain's Y column `D`). */
+  gone?: boolean
 }
 
 /** Porcelain v1's states of a path in conflict (git's `git status` short format). */
@@ -424,7 +426,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const from = c.from ?? was?.from
     const unmerged = c.unmerged || was?.unmerged
     const staged = c.staged || was?.staged
-    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}), ...(staged ? { staged } : {}) })
+    const gone = c.gone || was?.gone
+    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}), ...(staged ? { staged } : {}), ...(gone ? { gone } : {}) })
   }
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
@@ -437,7 +440,7 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
       put(path, { untracked: false, from, staged: true })
       if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true, staged: true })
     } else if (UNMERGED.has(xy)) put(path, { untracked: false, unmerged: true })
-    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?' })
+    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?', gone: xy[1] === 'D' })
   }
   return out
 }
@@ -581,7 +584,14 @@ type Removed = 'absent' | 'file' | 'folder' | 'alias'
 /** Removed's answer for each path of `files` whose index entry is gone. */
 async function removedIn(folder: string, files: string[], now: Map<string, Changed>): Promise<Map<string, Removed>> {
   const out = new Map<string, Removed>()
-  for (const p of files) if (now.get(p)?.deleted) out.set(p, await onDisk(folder, p))
+  for (const p of files) {
+    const c = now.get(p)
+    if (c?.deleted) out.set(p, await onDisk(folder, p))
+    // HI-3076: a deletion not staged, with a folder now in its place (` D b.txt`, `?? b.txt/x.txt`), is the staged one's
+    // case (HI-3024): git's stash takes the folder's files with it, shown or not, and its partial commit can't take it.
+    // Any other unstaged deletion is git's ordinary one.
+    else if (c?.gone && (await onDisk(folder, p)) === 'folder') out.set(p, 'folder')
+  }
   return out
 }
 
