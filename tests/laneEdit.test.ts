@@ -480,6 +480,34 @@ describe('editLanes (HI-2898)', () => {
     expect((await card(t)).agent).toBe('b1')
   })
 
+  it('Move here takes a card a queued change took off: off the source applied list too, on one lane only (HI-3063)', async () => {
+    const [a, b, c, d, x] = [await make('A'), await make('B'), await make('C'), await make('D'), await make('X')]
+    const from = await start('b1', [a, b, c])
+    const to = await start('b2', [x])
+    await doing(a, 'b1')
+    await doing(x, 'b2')
+    const revOf = async (id: string): Promise<number> => (await raw(id)).listRev ?? 0
+    // D added behind A, then C taken off: queued, so C is still on the applied list.
+    await edit({ op: 'add', lane: from.id, rev: await revOf(from.id), card: d })
+    await edit({ op: 'remove', lane: from.id, rev: await revOf(from.id), card: c })
+    expect([(await raw(from.id)).cards, (await raw(from.id)).pending]).toEqual([[a, b, c], [a, b, d]])
+    // Add on the other lane points to Move here; Move here works (it used to say C isn't on the lane any more).
+    await expect(edit({ op: 'add', lane: to.id, rev: await revOf(to.id), card: c })).rejects.toThrow(/on the lane of B1: take it off there first, or use Move here/)
+    const r = await edit({ op: 'transfer', card: c, from: { lane: from.id, rev: await revOf(from.id) }, to: { lane: to.id, rev: await revOf(to.id) } })
+    const [f, g] = [await raw(from.id), await raw(to.id)]
+    expect([f.cards, f.pending]).toEqual([[a, b], [a, b, d]])
+    expect(g.pending ?? g.cards).toEqual([x, c])
+    const lists = (l: { cards: number[]; pending?: number[] }): number[] => [...l.cards, ...(l.pending ?? [])]
+    expect([f, g].filter((l) => lists(l).includes(c))).toHaveLength(1)
+    // Undo: both lanes as they were, C on the source's applied list again, not queued.
+    await edit({ op: 'undo', undo: r.undo! })
+    expect([(await raw(from.id)).cards, (await raw(from.id)).pending]).toEqual([[a, b, c], [a, b, d]])
+    expect((await raw(to.id)).pending ?? (await raw(to.id)).cards).toEqual([x])
+    // Not a card in flight: one started on the source (its applied list) can't be moved.
+    await doing(c, 'b1')
+    await expect(edit({ op: 'transfer', card: c, from: { lane: from.id, rev: await revOf(from.id) }, to: { lane: to.id, rev: await revOf(to.id) } })).rejects.toThrow(/has started/)
+  })
+
   it('a refused destination leaves the source lane and the assignment as they were', async () => {
     const [a, x, dep] = [await make('A'), await make('X'), await make('Dep')]
     const t = await make('T', { agent: 'b1' })
