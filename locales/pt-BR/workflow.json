@@ -635,6 +635,8 @@
   "workflow.refused.platform.changed.next": "Comece de novo: ele será verificado com as regras de {platform}.",
   "workflow.refused.platform.noTarget.message": "O cartão {card} não pode começar: o projeto não tem um bookmark de destino escolhido, aquele em que o trabalho é mesclado.",
   "workflow.refused.platform.noTarget.next": "Escolha um em Controle de versão → Fluxo de trabalho (O trabalho é mesclado em) e comece-o de novo.",
+  "workflow.refused.platform.detachedFolder.message": "O cartão {card} não pode começar: a pasta do projeto não está em nenhum branch (o HEAD dela está desanexado em {head}), então o que o builder fizer commit não ficaria em nenhum.",
+  "workflow.refused.platform.detachedFolder.next": "{has, select, yes {Mude para o branch dele na pasta do projeto (git switch {branch}) e comece-o de novo.} other {Mude para um branch na pasta do projeto (um existente com git switch ou um novo com git switch -c) e comece-o de novo.}}",
   "workflow.refused.platform.keptAcross.message": "O cartão {card} não pode começar: o trabalho com commit de antes de ele ser devolvido está reservado no slot {slot}, um slot de {platform} de antes de o repositório mudar para {now}.",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {A pasta dele está ausente, então não sobrou nada para continuar: remova o slot (Controle de versão → Slots e cópias, Remover…) e {card} recomeçará do zero a partir do destino.} other {Mude o repositório de volta para {platform} para continuar {card} nesse slot.}}",
   "workflow.refused.platform.switching.message": "O cartão {card} não pode começar agora: o controle de versão do repositório está sendo mudado.",

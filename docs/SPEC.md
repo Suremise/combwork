@@ -4890,6 +4890,14 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   replaced; Git's unreadable, nothing is seeded. A jj start that still has none (the user cleared it) is refused
   `platform.noTarget` ("no target bookmark chosen"; next step Version Control → Workflow, Work merges into), never
   `platform.unknown` with a blank name and "Check Provider Setup".
+  HI-3104: a Git card built in the project folder (a code card; not a provisional plan while a slot is waited for, nor
+  the builder's own worktree, nor a no-code card) while that folder is on no branch (its head detached, as a colocated
+  jj repository leaves Git's after the switch back) is refused `platform.detachedFolder`, naming the head: its commits
+  would be on no branch. Its next step names the branch to check out (`git switch <branch>`) only when one is proved
+  usable (the card's or project's target, else the default branch, a local branch no other worktree has checked out),
+  else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
+  never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
+  the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains

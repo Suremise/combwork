@@ -635,6 +635,8 @@
   "workflow.refused.platform.changed.next": "请重新开始：届时会按 {platform} 的规则检查。",
   "workflow.refused.platform.noTarget.message": "{card} 无法开始：它的项目没有选择目标书签（工作合并到的书签）。",
   "workflow.refused.platform.noTarget.next": "请在 版本控制 → 工作流程（工作合并到）中选择一个，然后重新开始它。",
+  "workflow.refused.platform.detachedFolder.message": "{card} 无法开始：项目文件夹不在任何分支上（其 HEAD 分离在 {head}），因此它的构建者提交的内容不会在任何分支上。",
+  "workflow.refused.platform.detachedFolder.next": "{has, select, yes {请在项目文件夹中检出它的分支（git switch {branch}），然后重新开始它。} other {请在项目文件夹中检出一个分支（已有的用 git switch，新建的用 git switch -c），然后重新开始它。}}",
   "workflow.refused.platform.keptAcross.message": "{card} 无法开始：它被放回前已提交的工作保留在槽位 {slot} 中，这是仓库切换到 {now} 之前的 {platform} 槽位。",
   "workflow.refused.platform.keptAcross.next": "{gone, select, yes {它的文件夹已缺失，没有可继续的内容：移除该槽位（版本控制 → 槽位和副本，移除…），{card} 将从其目标重新开始。} other {将仓库切换回 {platform}，即可在该槽位中继续 {card}。}}",
   "workflow.refused.platform.switching.message": "{card} 现在无法开始：其仓库的版本控制正在切换。",

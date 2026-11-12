@@ -1156,7 +1156,7 @@ export class Workflow {
       // A refusal of the platform's own (HI-3106: no target chosen), not a read that failed.
       if (plan.rule) {
         log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
-        return { rule: plan.rule, values: { card: card.key } }
+        return { rule: plan.rule, values: { card: card.key, ...plan.ruleValues } }
       }
       // Which read and why (HI-2916): the refusal says only what couldn't be read.
       log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
