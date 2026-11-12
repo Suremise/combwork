@@ -441,6 +441,12 @@ async function onDisk(folder: string, rel: string): Promise<Removed> {
   return s.isDirectory() ? 'folder' : 'file'
 }
 
+/** HI-3022: none of `files` changed in the folder now, as git status reads it (false when it can't be read). */
+async function leftUnchanged(folder: string, files: string[]): Promise<boolean> {
+  const now = await changedIn(folder).catch(() => null)
+  return !!now && !files.some((p) => now.has(p))
+}
+
 /** The stash ref's object now (null: no stash). */
 async function stashTop(folder: string): Promise<string | null> {
   const r = await git(folder, ['rev-parse', '-q', '--verify', 'refs/stash'])
@@ -454,12 +460,20 @@ async function stashTop(folder: string): Promise<string | null> {
  * private copy of the index (withPrivateIndex, HI-3021): once a stash is made, the real index's entries for `files`
  * become what git left them (takeEntries), however far it got; with none made, the real index is as it was.
  */
-async function setAsidePaths(folder: string, files: string[], message: string): Promise<string> {
+async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = []): Promise<string> {
   const before = await stashTop(folder)
+  // HI-3022: a staged rename's old side is in neither the index nor the folder, and git's stash, given it, makes the
+  // stash and then dies on it ("pathspec … did not match any files"), every try. Given the new side alone, it stashes
+  // the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives the
+  // rename back) and leaves the old side's removal staged: the old side is then put back from HEAD.
+  const stashed = files.filter((p) => !renamedFrom.includes(p))
+  // Never a stash with no paths: it would take every change in the folder.
+  if (!stashed.length) throw failed(M.stashFailed, 'nothing to set aside but a rename\'s old side') // i18n-ignore: stands in for git's own (English) words
   const { r, made } = await withPrivateIndex(folder, M.stashFailed, async (env, copy) => {
-    const pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
+    let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
     const after = await stashTop(folder)
     const stash = after && after !== before ? after : null
+    if (stash && pushed.ok && renamedFrom.length) pushed = await git(folder, ['checkout', '-q', 'HEAD', ...PATHS_IN], undefined, pathsIn(renamedFrom), { env, timeout: folderChangesBounds.actMs })
     if (stash) {
       const took = await takeEntries(folder, copy, files)
       if (!took.ok) throw combworkError(M.indexNotTaken, { action: 'setAside', made: stash.slice(0, 12), why: took.why })
@@ -470,6 +484,12 @@ async function setAsidePaths(folder: string, files: string[], message: string): 
     // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
     if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended at its bound: ${made}`)
     throw combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' })
+  }
+  // HI-3022: a file added then deleted on disk (`AD`): git stashes it, then says "No valid patches in input" putting
+  // back what it has none of. With the stash made and none of the paths changed any more, that is the job done.
+  if (!r.ok && made && /No valid patches in input/.test(r.err) && (await leftUnchanged(folder, files))) {
+    log.warn(`git stash reported a problem in ${userText(folder)} after setting the paths aside (${made}), all of them left unchanged: ${userText(gitErrorLine(r.err))}`)
+    return made
   }
   if (!r.ok) {
     if (made) {
@@ -511,7 +531,8 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         const now = await changedIn(folder)
         if (!shown.length || !shown.every((p) => now.has(p))) throw combworkError(M.changed, { folder })
         // A rename's other side goes with it: committed or set aside, the rename stays whole.
-        const files = [...new Set(shown.flatMap((p) => [p, ...(now.get(p)?.from ? [now.get(p)!.from!] : [])]))]
+        // HI-3022: either side shown brings the other.
+        const files = [...new Set(shown.flatMap((p) => [p, ...(now.get(p)?.from ? [now.get(p)!.from!] : []), ...[...now].filter(([, c]) => c.from === p).map(([q]) => q)]))]
         const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label}` // i18n-ignore: the commit's or stash's message, in the repository (English, as Combwork's other commits)
         // A folder git lists whole: an untracked repository of its own, never committed or stashed as one (HI-2983).
         const nested = files.find((p) => p.endsWith('/'))
@@ -543,7 +564,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
         // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
         const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => (c.staged || c.unmerged) && !files.includes(p)).map(([p]) => p) } : undefined
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message)
+        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)))
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
       }),

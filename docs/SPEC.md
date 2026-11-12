@@ -6086,7 +6086,13 @@ touched:
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
   its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
-  after it made one is said with that stash, kept. **Bounded** (HI-3021): a commit or stash still running after two
+  after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in
+  neither the index nor the folder), made the stash then died on it, every try; it is given the new side alone, which
+  stashes the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives
+  the rename back), then the old side is put back from HEAD (`checkout HEAD --`, in the private index, bounded); either
+  side shown brings the other. A file added then deleted on disk (`AD`): git stashes it, then says "No valid patches
+  in input"; with the stash made and none of the paths changed any more, that is done, never said as a problem.
+  **Bounded** (HI-3021): a commit or stash still running after two
   minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
   running). **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left

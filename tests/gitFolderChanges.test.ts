@@ -232,6 +232,41 @@ describe('Set aside', () => {
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
   })
 
+  // HI-3022: git's stash, given a staged rename's old side (in neither the index nor the folder), made the stash then
+  // died on it, every try, leaving a stash each time and nothing set aside.
+  for (const [what, edit, shown] of [
+    ['a pure staged rename', false, ['c.txt']],
+    ['a staged rename with an edit', true, ['c.txt']],
+    ['a staged rename shown by its old side', false, ['b.txt']]
+  ] as const)
+    it(`${what}: one stash, the folder clean, and git stash pop --index gives the rename back (HI-3022)`, async () => {
+      sh(proj, 'mv', 'b.txt', 'c.txt')
+      if (edit) writeFileSync(join(proj, 'c.txt'), 'b\nmore\n')
+      const was = status()
+      const done = await settle('setAside', [...shown])
+      expect(done.files.sort()).toEqual(['b.txt', 'c.txt'])
+      expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
+      expect(sh(proj, 'stash', 'list').split('\n')).toHaveLength(1)
+      expect(status()).toBe('')
+      expect(read('b.txt')).toBe('b\n')
+      expect(existsSync(join(proj, 'c.txt'))).toBe(false)
+      sh(proj, 'stash', 'pop', '-q', '--index')
+      expect(status()).toBe(was)
+      expect(read('c.txt')).toBe(edit ? 'b\nmore\n' : 'b\n')
+      expect(existsSync(join(proj, 'b.txt'))).toBe(false)
+    })
+
+  it('a file added then deleted on disk (AD): set aside, said as done, not as a problem (HI-3022)', async () => {
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    sh(proj, 'add', 'new.txt')
+    rmSync(join(proj, 'new.txt'))
+    expect(status()).toBe('AD new.txt')
+    const done = await settle('setAside', ['new.txt'])
+    expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
+    expect(sh(proj, 'show', 'refs/stash^2:new.txt')).toBe('new')
+    expect(status()).toBe('')
+  })
+
   it('git failing before any stash: said, nothing set aside', async () => {
     const err = await settle('setAside', ['a.txt']).catch((e: Error) => e)
     expect(String(err)).toMatch(/aren't the ones shown/)
