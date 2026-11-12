@@ -2028,8 +2028,9 @@ export class SlotPool {
           const last = detached === 'kept' ? this.store.lastLease(s.name) : null
           // The card its work is kept for: the last lease's own, else (a lane's lease on a slot taken back for its card,
           // HI-3032) the record already kept for it at this slot's generation, never dropped for a lease of no card.
+          // HI-3057: that lane gone on to another card in it is bound to that card now, whose work it then is.
           const was = detached === 'kept' && s.identity && !(last?.kind === 'card' && last.card !== null) ? this.store.keptRecord(s.name) : null
-          const keptCard = last?.kind === 'card' && last.card !== null ? last.card : was && was.generation === s.identity?.generation ? was.card : null
+          const keptCard = last?.kind === 'card' && last.card !== null ? last.card : was && was.generation === s.identity?.generation ? ((last?.kind === 'lane' ? await this.laneCard(s) : null) ?? was.card) : null
           if (now === 'busy') busyDetach = true
           else if (detached === 'kept' && keptCard !== null && s.identity) {
             // The card's own committed work, not in the target (HI-2995): kept for it, never lent with no lease.
@@ -2055,6 +2056,14 @@ export class SlotPool {
               if (lastLease?.kind === 'card' && lastLease.card !== null && s.identity && port.heldFor && (await port.heldFor(s.folder, s.identity, lastLease.card))) {
                 held = { card: lastLease.card, generation: s.identity.generation }
                 log.info(`${userText(s.name)} is kept for #${lastLease.card}: its work, an edit not committed yet included, is still in it`)
+              } else if (lastLease?.kind === 'lane' && s.identity && this.store.keptRecord(s.name)?.generation === s.identity.generation) {
+                // A lane's lease on a slot it took back for its kept card (HI-3032), gone on to another card there
+                // (HI-3057): kept for the card its binding names now, else as it was kept.
+                const card = await this.laneCard(s)
+                if (card !== null) {
+                  held = { card, generation: s.identity.generation }
+                  log.info(`${userText(s.name)} is kept for #${card}: its lane's work, an edit not committed yet included, is still in it`)
+                }
               }
             }
           }
@@ -2260,6 +2269,12 @@ export class SlotPool {
    * switch failed); `kept` when the port refused it as the slot's own work not in the target yet (HI-2995); `ok` when
    * it is, or needn't be.
    */
+  /** The card a slot's binding names now (HI-3057: the card a lane went on to in it), or null: none, or the port can't tell. */
+  private async laneCard(s: Slot): Promise<number | null> {
+    const port = this.portOf(s)
+    return s.identity && port.heldCard ? await port.heldCard(s.folder, s.identity) : null
+  }
+
   private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<'ok' | 'kept' | 'failed'> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return 'ok'

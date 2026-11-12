@@ -3317,7 +3317,9 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   run still writing in another slot is waited for (`slot.kept.written`); a lane already holding another slot refuses
   the card's start (`slot.kept.lane`), no slot swapped; a dry start answers the kept slot, or the kept refusal. A lane's
   lease on a kept slot ending with the work still not in the target keeps it again for the recorded card (its
-  generation the slot's), never left lent with no lease.
+  generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
+  for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
+  card's record goes; the binding unreadable, for the recorded card as before.
 - **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
   (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
   workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that

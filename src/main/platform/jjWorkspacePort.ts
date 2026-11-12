@@ -1292,6 +1292,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const b = await bindingNow(folder)
       return !isUnknown(b) && !!b && b.card === card && b.generation === identity.generation
     },
+    heldCard: async (folder, identity) => {
+      if (!identity || !(await owns(folder, identity))) return null
+      const b = await bindingNow(folder)
+      return !isUnknown(b) && !!b && b.generation === identity.generation ? b.card : null
+    },
     carries: async (folder, line, base, o) => {
       const k = parseJjLineKey(line)
       if (!k || !base || !o.identity || k.workspace !== o.identity.workspace || !(await owns(folder, o.identity))) return false
