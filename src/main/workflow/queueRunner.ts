@@ -147,6 +147,14 @@ export function isQueueFolder(root: string, folder: string): boolean {
 }
 
 const live = new Set<QueueRunner>()
+/**
+ * HI-3120: the leases a runner of this Combwork owns, from just before it takes one until its release (or failed start)
+ * has ended, whatever it wrote. A lease row naming this process but none of these is stale (a runner whose start or
+ * release couldn't write, its workspace closed under it): it is taken over, as one of a process that has ended.
+ */
+const owned = new Set<string>()
+/** HI-3120: runners being acquired (lease taken, not yet live): a workspace closing asks them to give their lease up. */
+const starting = new Set<QueueRunner>()
 const selves = new WeakMap<ProcessProbe, Promise<{ pid: number; started: number }>>()
 const selfOf = (probe: ProcessProbe): Promise<{ pid: number; started: number }> => {
   let s = selves.get(probe)
@@ -199,33 +207,46 @@ export class QueueRunner {
     const store = cfg.store
     for (let tries = 0; tries < 3; tries++) {
       const now = store.queueLease(cfg.target)
-      if (now) {
-        // This process holds it (another runner of its own, still running): never taken from itself.
-        if (now.pid === me.pid && (now.started === me.started || !now.started || !me.started)) return { ok: false, heldBy: holderOf(now) }
-        if ((await probe.alive(now.pid, now.started)) !== false) return { ok: false, heldBy: holderOf(now) }
-      }
+      // This process's own lease: held while a runner here owns it (never taken from itself), else stale (HI-3120).
+      const own = !!now && now.pid === me.pid && (now.started === me.started || !now.started || !me.started)
+      if (now && (own ? owned.has(now.lease) : (await probe.alive(now.pid, now.started)) !== false)) return { ok: false, heldBy: holderOf(now) }
       const lease = randomBytes(8).toString('hex')
       const token = randomBytes(16).toString('hex')
       const at = new Date().toISOString()
-      const taken = await locked(cfg, () => store.takeQueueLease({ target: cfg.target, lease, token, profile: cfg.profile, pid: me.pid, started: me.started, takenAt: at, renewedAt: at }, now?.token ?? null))
+      // Owned before the row is written, so another acquire here never takes it for stale meanwhile.
+      owned.add(lease)
+      const taken = await locked(cfg, () => store.takeQueueLease({ target: cfg.target, lease, token, profile: cfg.profile, pid: me.pid, started: me.started, takenAt: at, renewedAt: at }, now?.token ?? null)).catch((e: unknown) => {
+        owned.delete(lease)
+        throw e
+      })
       // Another Combwork took or freed it meanwhile: looked at again.
-      if (!taken) continue
-      if (now) log.info(`Took over the merge queue for ${userText(cfg.target)} from ${userText(now.profile)} (process ${now.pid} has ended)`)
+      if (!taken) {
+        owned.delete(lease)
+        continue
+      }
+      if (now && own) log.info(`Took over the merge queue for ${userText(cfg.target)} from an earlier runner of this Combwork that no longer runs`)
+      else if (now) log.info(`Took over the merge queue for ${userText(cfg.target)} from ${userText(now.profile)} (process ${now.pid} has ended)`)
       const runner = new QueueRunner(cfg, lease, token, join(cfg.root, queueFolderName(cfg.project, cfg.target, lease)))
+      starting.add(runner)
       try {
         const problem = await runner.startJob()
         if (problem) {
           log.warn(`The merge queue for ${userText(cfg.target)} can't run: its job couldn't be made (${userText(problem)})`)
+          starting.delete(runner)
           runner.stop()
-          await locked(cfg, () => store.dropQueueLease(lease, token))
+          await locked(cfg, () => store.dropQueueLease(lease, token)).finally(() => owned.delete(lease))
           return { ok: false, heldBy: null, problem }
         }
+        starting.delete(runner)
+        // Its workspace closed while it started (HI-3120): its lease given up as a failed start's, never live.
+        if (runner.releaseAsked) throw new LeaseLost(cfg.target)
         live.add(runner)
         const paused = await runner.settle()
         await runner.settleFolders()
         runner.startRenewal()
         return { ok: true, runner, ...(paused !== null ? { paused } : {}) }
       } catch (e) {
+        starting.delete(runner)
         // A failed set-up (a write that failed, the lease lost) gives its lease up, by its own token (a successor's is
         // never touched), once its job is closed: a retry, in this Combwork or another, can take it at once. Its job's duty
         // goes with it once closing it has ended what was in it (kill on close) and its journal holds nothing; else it
@@ -234,6 +255,8 @@ export class QueueRunner {
         await runner.closeJob()
         await runner.forgetFailedJob().catch((x) => log.warn(`forgetting the merge queue's job for ${userText(cfg.target)} after a failed start`, x))
         await locked(cfg, () => store.dropQueueLease(lease, token)).catch((x) => log.warn(`giving up the merge queue's lease for ${userText(cfg.target)} after a failed start`, x))
+        // Its row, if that write was refused, is stale from now on: taken over by the next acquire here (HI-3120).
+        owned.delete(lease)
         if (!(e instanceof LeaseLost)) throw e
         const h = store.queueLease(cfg.target)
         return { ok: false, heldBy: h ? holderOf(h) : null }
@@ -597,8 +620,12 @@ export class QueueRunner {
     if (this.releasing) return this.releasing
     if (this.released) return Promise.resolve()
     // HI-2078: its own git (removing its folder) runs on git's worker, outside the queue's route it may be called from.
-    return (this.releasing = withoutGitRoute(() => this.releaseOnce()))
+    // HI-3120: once it has ended, whatever it could write, its lease is no longer owned here: a row it couldn't drop is stale.
+    return (this.releasing = withoutGitRoute(() => this.releaseOnce()).finally(() => owned.delete(this.lease)))
   }
+
+  /** HI-3120: asked to give its lease up while it is being acquired (its workspace closing): it never goes live. */
+  releaseAsked = false
 
   private async releaseOnce(): Promise<void> {
     this.stop()
@@ -670,6 +697,7 @@ export class QueueRunner {
           if (!held && !this.released) {
             log.warn(`The merge queue for ${userText(this.target)} is run by another Combwork now: this one stopped`)
             this.stop()
+            owned.delete(this.lease)
           }
         })
         .catch((e) => log.warn('noting the merge queue runner as seen', e))
@@ -938,5 +966,7 @@ export function queueRunners(): QueueRunner[] {
 
 /** Releases this Combwork's runners (all, or those `which` picks): a workspace closing, Combwork quitting, a project removed. */
 export async function releaseQueueRunners(which: (r: QueueRunner) => boolean = () => true): Promise<void> {
+  // HI-3120: one still being acquired gives its lease up as its start ends, rather than going live.
+  for (const r of starting) if (which(r)) r.releaseAsked = true
   await Promise.all(queueRunners().filter(which).map((r) => r.release().catch((e) => log.warn(`releasing the merge queue for ${userText(r.target)}`, e))))
 }

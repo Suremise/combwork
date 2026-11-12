@@ -6400,7 +6400,12 @@ holder process is gone** (its pid gone, or given to a process that started at an
 renewals stopped: a stalled but living Combwork keeps its queue, and the panel says "run by <profile>". A Combwork that finds
 the lease held **watches the holder's process** while the target has open entries (every 30 s, the renewal period: the
 pid first, then its start time) and, once it is gone, runs the queue itself, taking the lease over with no other
-prompt [#1455, built in #1358: before it, the queue waited for a new entry, Resume or a reopened workspace].
+prompt [#1455, built in #1358: before it, the queue waited for a new entry, Resume or a reopened workspace]. A lease
+naming this Combwork's own process is held only while one of its runners owns it, from just before it takes the lease
+until its release (or failed start) has ended. One that none owns (a runner whose start or release couldn't write the
+board because its workspace closed under it) is stale, and is taken over like a gone holder's. A workspace closing also
+asks a runner it is still acquiring to give its lease up, rather than go live [HI-3120: before it, the workspace opened
+again in the same Combwork found its queue "run by" itself until Combwork restarted].
 
 Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
 check's detached server too: nothing may break away from it), held by Combwork's process supervisor (the one agents'
