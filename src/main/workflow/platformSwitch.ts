@@ -67,7 +67,7 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
   const lanes = same ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
   // HI-3072: a project's own switch to a platform its repository's other projects switched it away from: refused, saying so.
   const runs = same || storeWide(now.id, to, now.detected) || !needsRepository(to) ? null : await storeRunsOther(ws, project.path, to)
-  const detected = same ? null : (switchRefused(to, now.detected) ?? (runs ? ({ why: 'storeRuns', platform: runs } as const) : null))
+  const detected = same ? null : (switchRefused(to, now.detected) ?? (runs ? ({ why: 'storeRuns', platform: runs } as const) : null)) // i18n-ignore: a reason's key, not text
   // Git ↔ jj (HI-2799): the repository's projects switch together, after a drain and jj's checks.
   const store = !same && !detected && storeWide(now.id, to, now.detected) ? await checkStoreSwitch(ws, project.path, to) : null
   // A fence member's switch to None (HI-2974): drained, as the repository's are; its lists shown when refused.
@@ -138,7 +138,7 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
   const nowId = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform).id
   const runs = nowId !== to && needsRepository(to) ? await storeRunsOther(ws, project.path, to) : null
   if (runs) {
-    const t = switchRefusalText({ why: 'storeRuns', platform: runs })
+    const t = switchRefusalText({ why: 'storeRuns', platform: runs }) // i18n-ignore: a reason's key, not text
     // agent-text: switchRefusalText
     throw new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
   }
