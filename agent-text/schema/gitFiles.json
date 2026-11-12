@@ -5,6 +5,13 @@
       "path": "plain"
     }
   },
+  "gitFiles.error.clearStray": {
+    "placeholders": {
+      "name": "plain",
+      "path": "plain",
+      "error": "plain"
+    }
+  },
   "gitFiles.error.doubtfulLeft": {
     "placeholders": {
       "path": "plain"

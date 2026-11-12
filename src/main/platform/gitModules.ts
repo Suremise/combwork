@@ -57,6 +57,7 @@ const T = {
   noLfs: agentMsg({ id: 'gitFiles.error.noLfs', text: "Git LFS is used, but git-lfs isn't installed", note: "A slot's or copy's setup error (HI-1182): the repository has files in Git LFS and git-lfs couldn't be run. Git LFS and git-lfs are names, as they are." }),
   noLfsFilter: agentMsg({ id: 'gitFiles.error.noLfsFilter', text: "Git LFS is used, but it isn't set up for this repository: run git lfs install", note: "A slot's or copy's setup error (HI-1182): git-lfs is installed but no LFS filter is configured (git lfs install was never run), so git lfs pull would leave pointer files. Git LFS and git lfs install are a name and a command, as they are." }),
   lfs: agentMsg({ id: 'gitFiles.error.lfs', text: 'git lfs pull: {error}', note: "A slot's or copy's setup error (HI-1182): `git lfs pull` failed. {error} is git-lfs's first line, else failed." }),
+  clearStray: agentMsg({ id: 'gitFiles.error.clearStray', text: "submodule {name}: the files left in {path} couldn't be removed: {error}", note: "A copy's setup error (HI-3080): a submodule's folder held only files an earlier run left (ignored build output, say), and Combwork couldn't remove them before setting the submodule up. {name} is the submodule's name, {path} its folder, {error} the system's words." }),
   removeLeft: agentMsg({ id: 'gitFiles.error.removeLeft', text: "the folder of removed submodule {path} couldn't be removed: {error}", note: "A copy's setup error (HI-1182): a submodule the revision no longer has left its folder, and Combwork couldn't remove it. {path} is the folder, {error} git's first line or why." }),
   doubtfulLeft: agentMsg({ id: 'gitFiles.error.doubtfulLeft', text: "the folder of removed submodule {path} isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away", note: "A copy's setup error (HI-1182): a submodule its revision no longer has left a folder that Combwork can't be sure it cloned itself, so it removes nothing and the copy isn't handed over. {path} is the folder." }),
   workUnread: agentMsg({ id: 'gitFiles.remove.unread', text: "couldn't check submodule {path} before removing the worktree: {error}", note: "Why a slot with submodules wasn't removed (HI-3026): a read of its submodules' clones failed, so nothing was removed. {path} is the clone's folder under the worktree's git dir, {error} git's first line or why." }),
@@ -420,6 +421,48 @@ export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, fold
   return null
 }
 
+/** Past this many entries, or this depth, a folder is never taken for leftovers (clearStrayFolder). */
+const STRAY_MAX_ENTRIES = 200_000
+const STRAY_MAX_DEPTH = 64
+/** Names a git dir has beside HEAD (lower case): any of them with a HEAD makes a folder a repository, bare or not. */
+const GIT_DIR_PARTS = new Set(['config', 'objects', 'refs', 'packed-refs', 'commondir', 'gitdir', 'index'])
+
+/**
+ * HI-3080: a disposable folder's submodule path that holds only files an earlier run left (a revision had ordinary files
+ * there, and a build's ignored output stayed after the reset's `clean -fd`), emptied so the submodule can be set up. git's
+ * own clean skips a path the index holds as a gitlink, so it is removed here, but only when nothing in it is a repository
+ * or a link: no `.git` at any depth, no folder that is a bare one (HEAD beside config, objects, refs…), no symlink or
+ * junction on the way or inside, within the bounds above. Anything
+ * else is left as it is (the step then names it foreign). Null: emptied, or left; else the system's words.
+ */
+async function clearStrayFolder(x: Pick<GitFilesExec, 'note'>, root: string, s: Submodule): Promise<string | null> {
+  const full = insidePath(root, s.path)
+  if (!full || (await linked(root, full)) !== false) return null
+  let seen = 0
+  const plain = async (dir: string, depth: number): Promise<boolean> => {
+    if (depth > STRAY_MAX_DEPTH) return false
+    const names = await readdir(dir).catch(() => null)
+    if (!names) return false
+    // A bare repository (HR1's round 1) has no `.git`: its HEAD beside any other part of a git dir counts as one.
+    const lower = names.map((n) => n.toLowerCase())
+    if (lower.includes('head') && lower.some((n) => n !== 'head' && GIT_DIR_PARTS.has(n))) return false
+    for (const n of names) {
+      if (++seen > STRAY_MAX_ENTRIES || n.toLowerCase() === '.git') return false
+      const st = await lstat(join(dir, n)).catch(() => null)
+      if (!st || st.isSymbolicLink()) return false
+      if (st.isDirectory() && !(await plain(join(dir, n), depth + 1))) return false
+    }
+    return true
+  }
+  const st = await lstat(full).catch(() => null)
+  if (!st?.isDirectory() || !(await plain(full, 0))) return null
+  x.note(`Removing what earlier runs left in ${s.path}, where the submodule ${s.name} now belongs.`) // i18n-ignore: the run's log, beside git's own output
+  return removeTree(full, { recursive: true, force: true }).then(
+    () => null,
+    (e: unknown) => (e instanceof Error ? e.message : String(e))
+  )
+}
+
 // ---- A worktree with submodule clones, removed (HI-3026) ----
 
 /**
@@ -602,7 +645,12 @@ export async function prepareGitFiles(x: GitFilesExec, s: GitFilesStep): Promise
   if (use.submodules.length) {
     // Every first-level folder looked at before anything changes: one that isn't missing, empty or ours stops it all.
     for (const sub of use.submodules) {
-      const what = await submoduleFolder(x, s.folder, gitDir, sub)
+      let what = await submoduleFolder(x, s.folder, gitDir, sub)
+      if (what === 'foreign' && s.disposable) {
+        const cleared = await clearStrayFolder(x, s.folder, sub)
+        if (cleared) return { ok: false, error: stored(T.clearStray, { name: sub.name, path: sub.path, error: cleared }) }
+        what = await submoduleFolder(x, s.folder, gitDir, sub)
+      }
       if (what === 'badPath') return { ok: false, error: stored(T.badPath, { name: sub.name, path: sub.path }) }
       if (what === 'foreign') return { ok: false, error: stored(T.foreign, { name: sub.name, path: sub.path }) }
     }
