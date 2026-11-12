@@ -56,6 +56,8 @@ export const JJ_REFUSED = {
   notIntegrated: "the slot's last card's work isn't in its target yet", // i18n-ignore: as above
   base: "the card's base isn't a visible commit", // i18n-ignore: as above
   moved: 'the repository changed since the check', // i18n-ignore: as above
+  /** HI-3097: a forgotten workspace's removal, refused because jj lists the workspace (its name or its folder) again. */
+  listed: 'jj lists the workspace again', // i18n-ignore: as above
   uncertain: "a write's result couldn't be read back: decided on the next pass", // i18n-ignore: as above
   notBound: "the slot isn't bound to that card's preparation", // i18n-ignore: as above
   journal: "the preparation's record can't be read", // i18n-ignore: as above
@@ -134,8 +136,10 @@ export interface JjPortDeps {
   /**
    * Test hooks, run between steps. `beforeGitLinkAside` runs synchronously between a Git worktree entry's last check and
    * its move aside; `afterGitLinkAside` right after the move, before the moved entry is proved again (HI-3046).
+   * HI-3097, a forgotten workspace's removal: `beforeForgottenProof` before its proof's reads, `beforeForgottenTrash`
+   * synchronously between the proof (and the fence) and the final head check right before the trash.
    */
-  hooks?: { afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void>; beforeLeftoverAside?: (folder: string) => void }
+  hooks?: { beforeForgottenProof?: (folder: string) => void | Promise<void>; beforeForgottenTrash?: (folder: string) => void; afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void>; beforeLeftoverAside?: (folder: string) => void }
 }
 
 export interface JjWorkspacePort extends WorkspacePort {
@@ -1488,6 +1492,54 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const at = (journal.read() as { phase?: string; workspace?: string; folder?: string; generation?: string } | null) ?? null
       if (at && (at.workspace !== identity.workspace || !at.folder || !samePath(at.folder, folder) || at.generation !== identity.generation)) return step(false, JJ_REFUSED.identity)
       const fenced = async (): Promise<boolean> => !o.fence || (await o.fence.still())
+      /** Right before the trash: still the folder made then (its file ids), never the project, the store or above them. */
+      const trashable = async (): Promise<boolean> => {
+        const real = await realOr(folder)
+        const guarded = [ctx.root, ctx.store, ctx.jjRepo, repo].map((p) => resolve(p).toLowerCase())
+        if (guarded.some((g) => g === real.toLowerCase() || g.startsWith(real.toLowerCase() + sep))) return false
+        if ((await generationOf(folder)) !== identity.generation) return false
+        const pointer = (await readFile(join(folder, '.jj', 'repo'), 'utf8').catch(() => '')).trim()
+        return !!pointer && samePath(await realOr(resolve(folder, '.jj', pointer)), ctx.jjRepo)
+      }
+      /** Its Git worktree entry gone with the workspace (HI-3046): its receipt goes too; one jj left keeps it. */
+      const dropReceipt = async (): Promise<void> => {
+        const j = ctx.colocated ? (deps.gitLink?.(repo, folder) ?? null) : null
+        const raw = j?.read() ?? null
+        const rec = asReceipt(raw)
+        if (j && rec && !rec.clearing && entryIdSync(rec.entry) !== rec.entryId) {
+          const residues = residuesOf(raw)
+          await (residues.length ? j.write({ residues }) : j.clear())
+        }
+      }
+      // HI-3097: a workspace the user forgot outside Combwork, its folder left: trashed whole (its changes unread: jj can't
+      // read a forgotten workspace), only on a fresh proof, every attempt, inside the store's lock: one operation head,
+      // whose listing names no such workspace nor any at the folder; the folder still the recorded workspace by its files
+      // alone; the pool's fence; then, nothing awaited, that head still the only one as the trash starts. Unknown: refused,
+      // the folder kept. Never journalled, never a removal of ours resumed: a journal there refuses it.
+      if (o.forgotten) {
+        if (at) return step(false, JJ_REFUSED.identity)
+        return lockCtx(ctx, async () => {
+          await deps.hooks?.beforeForgottenProof?.(folder)
+          if (!existsSync(folder)) return step(false, JJ_REFUSED.identity)
+          const heads = readOpHeads(ctx.jjRepo)
+          if (!heads || heads.length !== 1) return step(false, JJ_REFUSED.heads)
+          const op = heads[0]
+          const l = await listAt(repo, op)
+          if (isUnknown(l)) return step(false, l.detail ?? l.what)
+          if (l.some((w) => w.name === identity.workspace || (!!w.root && samePath(w.root, folder)))) return step(false, JJ_REFUSED.listed)
+          if (!(await owns(folder, identity)) || !(await trashable())) return step(false, JJ_REFUSED.identity)
+          if (!(await fenced())) return step(false, JJ_REFUSED.fence)
+          deps.hooks?.beforeForgottenTrash?.(folder)
+          if (readOpHeads(ctx.jjRepo)?.join() !== op) return step(false, JJ_REFUSED.moved)
+          try {
+            await deps.trash(folder)
+          } catch (e) {
+            return step(false, e instanceof Error ? e.message : String(e))
+          }
+          await dropReceipt()
+          return step(true)
+        })
+      }
       let phase = at?.phase ?? 'start'
       if (phase === 'start') {
         if (existsSync(folder)) {
@@ -1541,13 +1593,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       }
       if (phase === 'forgotten') {
         if (existsSync(folder)) {
-          // Right before the trash: still the folder made then (its file ids), never the project, the store or above them.
-          const real = await realOr(folder)
-          const guarded = [ctx.root, ctx.store, ctx.jjRepo, repo].map((p) => resolve(p).toLowerCase())
-          if (guarded.some((g) => g === real.toLowerCase() || g.startsWith(real.toLowerCase() + sep))) return step(false, JJ_REFUSED.identity)
-          if ((await generationOf(folder)) !== identity.generation) return step(false, JJ_REFUSED.identity)
-          const pointer = (await readFile(join(folder, '.jj', 'repo'), 'utf8').catch(() => '')).trim()
-          if (!pointer || !samePath(await realOr(resolve(folder, '.jj', pointer)), ctx.jjRepo)) return step(false, JJ_REFUSED.identity)
+          if (!(await trashable())) return step(false, JJ_REFUSED.identity)
           if (!(await fenced())) return step(false, JJ_REFUSED.fence)
           try {
             await deps.trash(folder)
@@ -1558,13 +1604,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         await journal.clear()
         // Its Git worktree entry gone with the forget (HI-3046): its receipt goes too. One jj left (the folder was gone)
         // keeps it, so the slot's next make can clear that entry.
-        const j = ctx.colocated ? (deps.gitLink?.(repo, folder) ?? null) : null
-        const raw = j?.read() ?? null
-        const rec = asReceipt(raw)
-        if (j && rec && !rec.clearing && entryIdSync(rec.entry) !== rec.entryId) {
-          const residues = residuesOf(raw)
-          await (residues.length ? j.write({ residues }) : j.clear())
-        }
+        await dropReceipt()
       }
       return step(true)
     },

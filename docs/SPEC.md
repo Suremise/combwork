@@ -3308,6 +3308,18 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   removal's operation (still `gone`, its folder still absent, the same record at the slot's generation, the platform's
   fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the newest
   `endRev` recorded for its card there, a failed take-back's lease recording none), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
+  **Its workspace forgotten by the user** (HI-3097: `jj workspace forget` outside Combwork, its folder left): still
+  `gone` (jj doesn't list it), told apart by its folder being there: the start says `slot.kept.forgotten`, Slots and
+  copies "Kept for <card>, but jj no longer lists its workspace" (`keptGone.forgotten`), and Remove…'s confirmation
+  says the folder goes whole to the Recycle Bin. `removeKeptGone`'s read then only makes it eligible (the folder
+  there, `present` false); the removal (`remove`'s `keptForgotten`, this action's only) keeps the session, in-flight and
+  process guards on every attempt and waives only dirty and unmerged, which jj can't read of a forgotten workspace. The
+  port (`remove`'s `forgotten`) proves it afresh on every attempt, inside the store's lock, fail-closed: exactly one
+  operation head, whose listing names no such workspace nor any at the folder; the folder the recorded workspace by its
+  files alone (`owns`) and the existing pre-trash checks; the pool's fence; then, nothing awaited, the same single head
+  as the trash starts (`moved` otherwise). Never journalled, never resumed: a failed trash leaves the slot `gone` and
+  kept, and the next Remove… proves it all again. A colocated slot's Git worktree receipt is dropped only after the
+  trash, by HI-3046's checks. Remaking the workspace in place isn't offered (jj can't add one at an existing folder).
   **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
   own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
   started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an

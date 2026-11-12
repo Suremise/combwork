@@ -3,16 +3,19 @@
 // - A: the take-back's install fails once: the slot is kept (dirty, still the card's), and the card's next start gets it;
 // - B: the Combwork taking it back is gone mid-way and another takes the operation over: kept, and given back the same;
 // - D: its folder gone, seen by a refresh first: the card's start says so ("its folder is gone");
-// - C2: a lane that took it back and went on to another card keeps that card's work for that card (HI-3057).
+// - C2: a lane that took it back and went on to another card keeps that card's work for that card (HI-3057);
+// - F: its workspace forgotten by the user (jj workspace forget), its folder left: said so, and Remove… trashes the
+//   folder whole only on the port's fresh proof that jj lists no such workspace (HI-3097).
 // Skipped without the fetched jj (npm run jj:fetch).
 
-import { readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { basename, join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder } from '../src/main/slots'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { boardPrepStore, jjLineKey } from '../src/main/platform/jjSlotPrep'
+import { JJ_REFUSED, type JjPortDeps } from '../src/main/platform/jjWorkspacePort'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
@@ -28,7 +31,7 @@ afterEach(async () => {
 
 type Run = { ok: boolean; exitCode: number; logPath: null; settled: boolean }
 
-function world(colocated = true) {
+function world(colocated = true, more: Partial<JjPortDeps> = {}) {
   const h = harness()
   const { repo, root } = h.repo('keptback', colocated)
   const ws = join(tempDir('keptback-'), 'ws')
@@ -41,7 +44,7 @@ function world(colocated = true) {
     dismiss()
   })
   const prep = boardPrepStore(conn)
-  const port = h.portWith({ prep: () => prep, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
+  const port = h.portWith({ prep: () => prep, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at), ...more })
   const dead = new Set<number>()
   const holderOf = (pid: number): OpHolder => ({ self: async () => ({ pid, started: 1000 + pid }), alive: async (p) => !dead.has(p), live: new Set() })
   // The slot's install (npm ci for the lock file the card's commit added): failing, or held at a gate, as a test says.
@@ -247,5 +250,115 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     expect(await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })).toMatchObject({ ok: true, slot: { name: a.name } })
     if (R2) expect(w.h.id(a.folder, '@-')).toBe(R2)
     if (work !== 'committed') expect(readFileSync(join(a.folder, 'edit.txt'), 'utf8')).toBe('not committed\n')
+  })
+})
+
+/**
+ * HI-3097: a world whose port's removal of a forgotten workspace can be stepped into (`proof`: before the proof's reads;
+ * `trash`: synchronously right before the final head check) and whose trash can fail once; the folders it trashed.
+ */
+function forgetting(colocated: boolean) {
+  const at: { proof: (() => void) | null; trash: (() => void) | null; failTrash: boolean } = { proof: null, trash: null, failTrash: false }
+  const bin = tempDir('keptforgot-bin-')
+  const trashed: { from: string; to: string }[] = []
+  const w = world(colocated, {
+    hooks: { beforeForgottenProof: () => at.proof?.(), beforeForgottenTrash: () => at.trash?.() },
+    trash: async (p) => {
+      if (at.failTrash) {
+        at.failTrash = false
+        throw new Error('the Recycle Bin refused it')
+      }
+      const to = join(bin, `${trashed.length + 1}-${basename(p)}`)
+      renameSync(p, to)
+      trashed.push({ from: p, to })
+    }
+  })
+  return { w, at, trashed }
+}
+
+/** Card 1's kept slot, its workspace then forgotten by the user from the project folder, a refresh seeing it. */
+async function forgotten(w: World): Promise<{ name: string; folder: string; R: string; workspace: string; generation: string }> {
+  const a = await putBackWithWork(w, false)
+  const row = w.store.slot(a.name)!
+  const workspace = row.identity!.workspace
+  w.h.jj(w.repo, 'workspace', 'forget', workspace)
+  await w.pool.refresh()
+  expect(w.store.slot(a.name)?.state).toBe('gone')
+  expect(existsSync(a.folder)).toBe(true)
+  expect(w.pool.keptCard(a.name)).toBe(1)
+  return { ...a, workspace, generation: row.identity!.generation }
+}
+
+describe.skipIf(!jjExe)('a kept jj slot whose workspace the user forgot (HI-3097)', { timeout: REAL_JJ_MS }, () => {
+  it.each([true, false])('F: the start says so; Remove… trashes the folder whole, an edit in it too; the card starts afresh (colocated: %s)', async (colocated) => {
+    const { w, trashed } = forgetting(colocated)
+    const a = await forgotten(w)
+    writeFileSync(join(a.folder, 'edit.txt'), 'not committed\n')
+    const start = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+    expect(start).toMatchObject({ ok: false, refusal: { slot: a.name, error: expect.stringMatching(/jj no longer lists its workspace/) } })
+    expect(await w.pool.keptPreview(1)).toEqual({ wait: expect.stringMatching(/jj no longer lists its workspace/) })
+    // The window's record of another generation: refused, nothing removed.
+    expect(await w.pool.removeKeptGone(a.name, { card: 1, generation: 'another' })).toEqual({ ok: false, why: 'changed' })
+    expect(await w.pool.removeKeptGone(a.name, { card: 1, generation: a.generation })).toEqual({ ok: true })
+    expect(w.store.slot(a.name)).toBeNull()
+    expect(w.pool.keptCard(a.name)).toBeNull()
+    expect(existsSync(a.folder)).toBe(false)
+    expect(trashed.map((t) => t.from)).toEqual([a.folder])
+    expect(readFileSync(join(trashed[0].to, 'edit.txt'), 'utf8')).toBe('not committed\n')
+    // The card's commit stays in jj's store; the card starts afresh.
+    expect(w.h.id(w.repo, a.R)).toBe(a.R)
+    expect(await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })).toMatchObject({ ok: true })
+  })
+
+  it.each([true, false])('F: the workspace listed again after Remove… found it eligible: refused, the folder and the record kept (colocated: %s)', async (colocated) => {
+    const { w, at, trashed } = forgetting(colocated)
+    const a = await forgotten(w)
+    // Its name registered again elsewhere between the pool's read and the port's proof.
+    at.proof = () => void w.h.jj(w.repo, 'workspace', 'add', '--name', a.workspace, join(tempDir('keptforgot-again-'), 'again'))
+    expect(await w.pool.removeKeptGone(a.name, { card: 1, generation: a.generation })).toMatchObject({ ok: false, why: 'kept', kept: { why: 'gitRefused', detail: JJ_REFUSED.listed } })
+    expect(trashed).toEqual([])
+    expect(existsSync(a.folder)).toBe(true)
+    expect(w.store.slot(a.name)?.state).toBe('gone')
+    expect(w.pool.keptCard(a.name)).toBe(1)
+  })
+
+  it.each([true, false])('F: the repository moved between the proof and the trash: refused, the folder kept (colocated: %s)', async (colocated) => {
+    const { w, at, trashed } = forgetting(colocated)
+    const a = await forgotten(w)
+    at.trash = () => void w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'create', 'moved-meanwhile', '-r', 'main')
+    expect(await w.pool.removeKeptGone(a.name, { card: 1, generation: a.generation })).toMatchObject({ ok: false, why: 'kept', kept: { why: 'gitRefused', detail: JJ_REFUSED.moved } })
+    expect(trashed).toEqual([])
+    expect(existsSync(a.folder)).toBe(true)
+    expect(w.pool.keptCard(a.name)).toBe(1)
+  })
+
+  it.each([
+    [true, true],
+    [false, true],
+    [true, false],
+    [false, false]
+  ])('F: the trash failing, then Remove… again (colocated: %s, listed again meanwhile: %s): proved afresh', async (colocated, again) => {
+    const { w, at, trashed } = forgetting(colocated)
+    const a = await forgotten(w)
+    at.failTrash = true
+    expect(await w.pool.removeKeptGone(a.name, { card: 1, generation: a.generation })).toMatchObject({ ok: false, why: 'kept', kept: { why: 'gitRefused' } })
+    expect(existsSync(a.folder)).toBe(true)
+    expect(w.store.slot(a.name)?.state).toBe('gone')
+    expect(w.pool.keptCard(a.name)).toBe(1)
+    // A restart: another Combwork, the same board.
+    const p2 = w.poolOf(2)
+    if (again) w.h.jj(w.repo, 'workspace', 'add', '--name', a.workspace, join(tempDir('keptforgot-again-'), 'again'))
+    const r = await p2.removeKeptGone(a.name, { card: 1, generation: a.generation })
+    if (again) {
+      // Listed again: no longer eligible (the pool's read sees it), or refused by the port's proof; kept either way.
+      expect(r.ok).toBe(false)
+      expect(trashed).toEqual([])
+      expect(existsSync(a.folder)).toBe(true)
+      expect(w.pool.keptCard(a.name)).toBe(1)
+    } else {
+      expect(r).toEqual({ ok: true })
+      expect(trashed.map((t) => t.from)).toEqual([a.folder])
+      expect(w.store.slot(a.name)).toBeNull()
+    }
   })
 })

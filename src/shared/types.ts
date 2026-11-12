@@ -1956,8 +1956,9 @@ export interface SlotView {
   /**
    * HI-3032: a kept slot whose folder is gone (state `gone`): the generation it was kept at (Remove… sends it back, so only
    * that slot is removed) and its work's last commit, as recorded when its card's lease ended (null: none recorded).
+   * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
    */
-  keptGone?: { generation: string; commit: string | null }
+  keptGone?: { generation: string; commit: string | null; forgotten?: true }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */

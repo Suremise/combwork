@@ -646,5 +646,7 @@
   "workflow.slots.removeKeptTitle": "{slot} entfernen?",
   "workflow.slots.removeKeptMessage": "{card} beginnt dann neu von seinem Ziel aus, in einem anderen Slot. Die hier committete Arbeit bleibt in jjs Speicher{commit, select, none {.} other {: ihr letzter Commit ist {commit}.}}",
   "workflow.slots.removedKept": "{slot} ist entfernt.",
-  "workflow.slots.notRemovedKept": "{slot} wurde nicht entfernt: {why, select, changed {er hat sich geändert, seit die Liste angezeigt wurde (sein Ordner ist zurück, oder er wurde neu angelegt)} busy {etwas arbeitet gerade darin} other {Combwork hat ihn behalten}}."
+  "workflow.slots.notRemovedKept": "{slot} wurde nicht entfernt: {why, select, changed {er hat sich geändert, seit die Liste angezeigt wurde (sein Ordner ist zurück, oder er wurde neu angelegt)} busy {etwas arbeitet gerade darin} other {Combwork hat ihn behalten}}.",
+  "workflow.slots.keptForgottenFor": "Für {card} aufbewahrt, aber jj führt seinen Workspace nicht mehr",
+  "workflow.slots.removeForgottenMessage": "Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin. {card} beginnt dann neu von seinem Ziel aus, in einem anderen Slot. Die hier committete Arbeit bleibt in jjs Speicher{commit, select, none {.} other {: ihr letzter Commit ist {commit}.}}"
 }
