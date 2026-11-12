@@ -48,7 +48,7 @@ const M = {
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
   caseRename: msg({ id: 'service.folderChanges.caseRename', defaultMessage: "{from} is renamed to {to}, a change of letter case only, which Git can't set aside. Commit it instead, or rename it back yourself.", description: "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {from} (a path) was renamed to {to} (the same path in other letter case); git's stash fails on such a rename, so nothing was done. Commit works for it." }),
-  removedForFolder: msg({ id: 'service.folderChanges.removedForFolder', defaultMessage: "{file} was removed from Git, and a folder of that name is in its place with changes that weren't shown: setting the removal aside would take them too. Commit the removal instead, or use git stash yourself.", description: "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name now holds changed files not in the list shown; git's stash would take those too, so nothing was done. Keep git stash as it is: a command." }),
+  removedForFolder: msg({ id: 'service.folderChanges.removedForFolder', defaultMessage: "{file} was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too. Commit the removal instead, or use git stash yourself.", description: "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name is now there; git's stash would take the folder's files with the removal, so nothing was done. Keep git stash as it is: a command." }),
   unmerged: msg({ id: 'service.folderChanges.unmerged', defaultMessage: "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.", description: "HI-3025: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: the file ({file}, a path) has a conflict git hasn't had resolved (after a git stash pop that conflicted, say); committing it would put its conflict markers into the commit, so nothing was done. Keep git add as it is: a command." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
   submoduleInside: msg({ id: 'service.folderChanges.submoduleInside', defaultMessage: '{folder} is a submodule whose changes are inside it, so Combwork can\'t commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.', description: "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done." }),
@@ -378,8 +378,9 @@ async function commitOnly(folder: string, env: NodeJS.ProcessEnv, files: string[
 
 /**
  * HI-3024: the commit built in the private index, for what git's partial commit can't take (a case-only rename: "will
- * not add file alias"; a removal whose path is now a folder): every other staged change taken back to HEAD there
- * (`staged`), the removed paths taken out of it, the rest added as they are in the folder, then a plain commit of it.
+ * not add file alias"; a removal whose path is now a folder): every other staged change, and every other path in
+ * conflict (HR1's round 1: a plain commit refuses an index with one), taken back to HEAD there (`staged`; the real
+ * index keeps them), the removed paths taken out of it, the rest added as they are in the folder, then a plain commit.
  * The same commit `commit --only` makes: HEAD with `files` as the folder has them. Each step bounded, as the private
  * index is Combwork's own to leave.
  */
@@ -530,7 +531,9 @@ export async function settleChanges(projectPath: string, target: string, shownFo
           // "already exists"), nor a removal whose path is now a folder without taking the folder's files, shown or not.
           const alias = [...removed].find(([, k]) => k === 'alias')?.[0]
           if (alias) throw combworkError(M.caseRename, { from: alias, to: [...now].find(([, c]) => c.from === alias)?.[0] ?? alias })
-          const replaced = [...removed].find(([p, k]) => k === 'folder' && [...now.keys()].some((q) => q.startsWith(`${p}/`) && !files.includes(q)))?.[0]
+          // HR1's round 1: never, whatever is shown: the stash takes the folder's files by that path, a file made in it
+          // after this check too (HI-2983's unshown capture).
+          const replaced = [...removed].find(([, k]) => k === 'folder')?.[0]
           if (replaced) throw combworkError(M.removedForFolder, { file: replaced })
         }
         // Set aside: always exactly the paths shown, never the whole folder's (HR1's round 1: a change made after this
@@ -539,7 +542,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         if (action === 'setAside' && files.reduce((n, p) => n + stashPathCost(p), 0) > STASH_PATHS_MAX) throw combworkError(M.tooManyToSetAside, { count: files.length, folder })
         // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
         // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
-        const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => c.staged && !files.includes(p)).map(([p]) => p) } : undefined
+        const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => (c.staged || c.unmerged) && !files.includes(p)).map(([p]) => p) } : undefined
         const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }

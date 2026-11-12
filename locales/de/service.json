@@ -85,7 +85,7 @@
   "service.folderChanges.noTarget": "{target} ist jetzt in keinem Ordner dieses Projekts ausgecheckt: Dort gibt es nichts zu committen oder beiseitezulegen.",
   "service.folderChanges.nothing": "{file} hat keine Änderungen zum Committen.",
   "service.folderChanges.readFailed": "Git konnte die Änderungen des Ordners nicht lesen: {why}",
-  "service.folderChanges.removedForFolder": "{file} wurde aus Git entfernt, und an seiner Stelle ist ein gleichnamiger Ordner mit Änderungen, die nicht angezeigt wurden: Das Beiseitelegen der Entfernung würde sie mitnehmen. Committe die Entfernung stattdessen, oder verwende selbst git stash.",
+  "service.folderChanges.removedForFolder": "{file} wurde aus Git entfernt, und an seiner Stelle ist ein gleichnamiger Ordner: Das Beiseitelegen der Entfernung würde die Dateien des Ordners mitnehmen. Committe die Entfernung stattdessen, oder verwende selbst git stash.",
   "service.folderChanges.stashFailed": "Git hat die Änderungen nicht beiseitegelegt: {why}",
   "service.folderChanges.stashPartial": "Git hat beim Beiseitelegen der Änderungen ein Problem gemeldet, nachdem es sie in einem Stash ({stash}) gesichert hatte. Prüfe git stash list und die Dateien, bevor du weitermachst. Git meldete: {why}",
   "service.folderChanges.stashTimedOut": "Git hat das Beiseitelegen der Änderungen nicht in {seconds, number} Sekunden abgeschlossen, daher hat Combwork es und alles, was es gestartet hatte, beendet.{made, select, yes { Bis dahin hatte es sie in einem Stash ({stash}) gesichert.} other {}} Prüfe git stash list und die Dateien, bevor du weitermachst.",

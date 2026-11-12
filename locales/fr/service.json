@@ -85,7 +85,7 @@
   "service.folderChanges.noTarget": "{target} n’est plus extraite dans un dossier de ce projet : rien à commiter ni à mettre de côté là-bas.",
   "service.folderChanges.nothing": "{file} n’a aucune modification à commiter.",
   "service.folderChanges.readFailed": "Git n’a pas pu lire les modifications du dossier : {why}",
-  "service.folderChanges.removedForFolder": "{file} a été retiré de Git, et un dossier de ce nom est à sa place avec des modifications qui n’ont pas été montrées : mettre la suppression de côté les emporterait aussi. Commite plutôt la suppression, ou utilise git stash toi-même.",
+  "service.folderChanges.removedForFolder": "{file} a été retiré de Git, et un dossier de ce nom est à sa place : mettre la suppression de côté emporterait aussi les fichiers du dossier. Commite plutôt la suppression, ou utilise git stash toi-même.",
   "service.folderChanges.stashFailed": "Git n’a pas mis les modifications de côté : {why}",
   "service.folderChanges.stashPartial": "Git a signalé un problème en mettant les modifications de côté, après les avoir gardées dans un stash ({stash}). Vérifie git stash list et les fichiers avant de continuer. Git a dit : {why}",
   "service.folderChanges.stashTimedOut": "Git n’a pas fini de mettre les modifications de côté en {seconds, number} secondes, alors Combwork l’a arrêté avec tout ce qu’il avait lancé.{made, select, yes { Il les avait déjà gardées dans un stash ({stash}).} other {}} Vérifie git stash list et les fichiers avant de continuer.",

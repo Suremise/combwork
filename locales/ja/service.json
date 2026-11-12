@@ -85,7 +85,7 @@
   "service.folderChanges.noTarget": "{target}は現在このプロジェクトのどのフォルダーでもチェックアウトされていません。そこでコミットまたは退避するものはありません。",
   "service.folderChanges.nothing": "{file}にはコミットする変更がありません。",
   "service.folderChanges.readFailed": "Gitはフォルダーの変更を読み取れませんでした: {why}",
-  "service.folderChanges.removedForFolder": "{file}はGitから削除され、その場所に同じ名前のフォルダーがあり、表示されていない変更が含まれています。削除を退避するとそれらも一緒に退避されます。代わりに削除をコミットするか、自分でgit stashを使ってください。",
+  "service.folderChanges.removedForFolder": "{file}はGitから削除され、その場所に同じ名前のフォルダーがあります。削除を退避するとフォルダー内のファイルも一緒に退避されます。代わりに削除をコミットするか、自分でgit stashを使ってください。",
   "service.folderChanges.stashFailed": "Gitは変更を退避しませんでした: {why}",
   "service.folderChanges.stashPartial": "Gitは変更をスタッシュ（{stash}）に保存した後、退避中に問題を報告しました。続ける前にgit stash listとファイルを確認してください。Gitのメッセージ: {why}",
   "service.folderChanges.stashTimedOut": "Gitは{seconds, number}秒以内に変更の退避を完了しませんでした。そのためCombworkは、それと起動されたすべてのプロセスを終了しました。{made, select, yes {その時点で変更はスタッシュ（{stash}）に保存されていました。} other {}}続ける前にgit stash listとファイルを確認してください。",

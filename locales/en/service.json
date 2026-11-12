@@ -384,8 +384,8 @@
     "description": "HI-2944: an error from Commit or Set aside: git status failed; {why} is git's own message (English). Nothing was done."
   },
   "service.folderChanges.removedForFolder": {
-    "defaultMessage": "{file} was removed from Git, and a folder of that name is in its place with changes that weren't shown: setting the removal aside would take them too. Commit the removal instead, or use git stash yourself.",
-    "description": "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name now holds changed files not in the list shown; git's stash would take those too, so nothing was done. Keep git stash as it is: a command."
+    "defaultMessage": "{file} was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too. Commit the removal instead, or use git stash yourself.",
+    "description": "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name is now there; git's stash would take the folder's files with the removal, so nothing was done. Keep git stash as it is: a command."
   },
   "service.folderChanges.stashFailed": {
     "defaultMessage": "Git did not set the changes aside: {why}",

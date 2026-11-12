@@ -85,7 +85,7 @@
   "service.folderChanges.noTarget": "Gałąź {target} nie jest teraz wybrana w żadnym folderze tego projektu: nie ma tam czego commitować ani odkładać.",
   "service.folderChanges.nothing": "{file} nie ma zmian do commita.",
   "service.folderChanges.readFailed": "Git nie mógł odczytać zmian w folderze: {why}",
-  "service.folderChanges.removedForFolder": "{file} usunięto z Gita, a na jego miejscu jest folder o tej nazwie ze zmianami, których nie pokazano: odłożenie usunięcia zabrałoby je również. Zamiast tego zrób commita usunięcia albo sam użyj git stash.",
+  "service.folderChanges.removedForFolder": "{file} usunięto z Gita, a na jego miejscu jest folder o tej nazwie: odłożenie usunięcia zabrałoby również pliki z folderu. Zamiast tego zrób commita usunięcia albo sam użyj git stash.",
   "service.folderChanges.stashFailed": "Git nie odłożył zmian: {why}",
   "service.folderChanges.stashPartial": "Git zgłosił problem podczas odkładania zmian, już po zachowaniu ich w stashu ({stash}). Sprawdź git stash list i pliki, zanim przejdziesz dalej. Komunikat Gita: {why}",
   "service.folderChanges.stashTimedOut": "Git nie dokończył odkładania zmian w ciągu {seconds, number} s, więc Combwork zakończył go wraz ze wszystkim, co uruchomił.{made, select, yes { Do tego czasu zachował je w stashu ({stash}).} other {}} Sprawdź git stash list i pliki, zanim przejdziesz dalej.",

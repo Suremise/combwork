@@ -85,7 +85,7 @@
   "service.folderChanges.noTarget": "{target} 现在未在此项目的任何文件夹中检出：那里没有可提交或搁置的内容。",
   "service.folderChanges.nothing": "{file} 没有可提交的更改。",
   "service.folderChanges.readFailed": "Git 无法读取文件夹的更改：{why}",
-  "service.folderChanges.removedForFolder": "{file} 已从 Git 中移除，原位置现在是一个同名文件夹，其中有未显示的更改：搁置这次移除也会把它们一并带走。请改为提交这次移除，或自行使用 git stash。",
+  "service.folderChanges.removedForFolder": "{file} 已从 Git 中移除，原位置现在是一个同名文件夹：搁置这次移除也会把该文件夹中的文件一并带走。请改为提交这次移除，或自行使用 git stash。",
   "service.folderChanges.stashFailed": "Git 未搁置这些更改：{why}",
   "service.folderChanges.stashPartial": "Git 将更改保存到储藏（{stash}）后，在搁置过程中报告了问题。继续之前，请检查 git stash list 和这些文件。Git 的信息：{why}",
   "service.folderChanges.stashTimedOut": "Git 未在 {seconds, number} 秒内完成搁置更改，因此 Combwork 结束了它及其启动的所有进程。{made, select, yes {此前它已将更改保存到储藏（{stash}）中。} other {}}继续之前，请检查 git stash list 和这些文件。",

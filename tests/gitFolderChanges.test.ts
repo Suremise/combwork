@@ -527,17 +527,38 @@ describe('a case-only rename, and a removal replaced by a folder (HI-3024)', () 
     expect(read('b.txt/x.txt')).toBe('x\n')
   })
 
-  it('a removed file whose path is now a folder: Set Aside refused while the folder has a change not shown; with it shown, both set aside', async () => {
+  it("a removed file whose path is now a folder: Set Aside refused, with the folder's files shown or not (HR1's round 1: the stash would take any made there later), nothing changed", async () => {
     sh(proj, 'rm', '-q', 'b.txt')
     mkdirSync(join(proj, 'b.txt'))
     writeFileSync(join(proj, 'b.txt', 'x.txt'), 'x\n')
-    await expect(settle('setAside', ['b.txt'])).rejects.toThrow(/^b\.txt was removed from Git, and a folder of that name is in its place with changes that weren't shown/)
+    for (const shown of [['b.txt'], ['b.txt', 'b.txt/x.txt']]) {
+      // A file made in the folder just before git's stash would run (HI-2983's late file): never reached.
+      lateFile = 'b.txt/late.txt'
+      await expect(settle('setAside', shown)).rejects.toThrow(/^b\.txt was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too/)
+      lateFile = null
+    }
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
     expect(read('b.txt/x.txt')).toBe('x\n')
-    await settle('setAside', ['b.txt', 'b.txt/x.txt'])
-    expect(sh(proj, 'show', '--format=', '--name-only', 'refs/stash^3')).toBe('b.txt/x.txt')
-    expect(read('b.txt')).toBe('b\n')
-    expect(lines()).toEqual([])
+    expect(existsSync(join(proj, 'b.txt', 'late.txt'))).toBe(false)
+    expect(lines()).toEqual(['?? b.txt/x.txt', 'D  b.txt'])
+  })
+
+  it("a case-only rename beside another file in conflict (HR1's round 1): Commit commits the rename, the other file's conflict kept in the index and on disk", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'mine\n')
+    sh(proj, 'stash', 'push', '-q')
+    commit(proj, { 'a.txt': 'theirs\n' }, 'theirs')
+    expect(() => sh(proj, 'stash', 'pop', '-q')).toThrow()
+    sh(proj, 'mv', 'b.txt', 'B.txt')
+    expect(lines()).toEqual(['R  b.txt -> B.txt', 'UU a.txt'])
+    const conflict = sh(proj, 'ls-files', '-u', 'a.txt')
+    const onDisk = read('a.txt')
+    const was = tree()
+    await settle('commit', ['B.txt'])
+    expect(tree()).toEqual(was.map((p) => (p === 'b.txt' ? 'B.txt' : p)).sort())
+    expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('theirs')
+    expect(lines()).toEqual(['UU a.txt'])
+    expect(sh(proj, 'ls-files', '-u', 'a.txt')).toBe(conflict)
+    expect(read('a.txt')).toBe(onDisk)
   })
 })
 
