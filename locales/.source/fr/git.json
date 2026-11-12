@@ -489,6 +489,7 @@
   "git.vc.switch.otherWorkspace": "This repository is also a project of the open workspace {workspace}: close it there first.",
   "git.vc.switch.queue": "Their merge queue carries on, and stays in this tab and the Progress panel until it’s clear.",
   "git.vc.switch.restored": "The {to} options it had before come back as they were; {from}’s are kept for a switch back.",
+  "git.vc.switch.storeRuns": "This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.",
   "git.vc.switch.switching": "This repository’s version control is being switched: try again in a moment.",
   "git.vc.switch.title": "Switch {project} to {platform}?",
   "git.vc.switch.what": "From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.",

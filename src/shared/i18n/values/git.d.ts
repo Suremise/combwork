@@ -489,6 +489,7 @@ interface CombworkMessageValues {
   'git.vc.switch.otherWorkspace': { workspace: string | number }
   'git.vc.switch.queue': undefined
   'git.vc.switch.restored': { to: string | number; from: string | number }
+  'git.vc.switch.storeRuns': { platform: string | number }
   'git.vc.switch.switching': undefined
   'git.vc.switch.title': { project: string | number; platform: string | number }
   'git.vc.switch.what': { project: string | number; to: string | number; from: string | number }

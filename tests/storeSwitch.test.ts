@@ -134,7 +134,7 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect((await workflowFor(w, q))!.currentRuleset(false).options.platform).toBe('jj')
     expect(await startCard(w, q, 'q')).toMatchObject({ refused: true, rule: 'platform.unknown' })
     const card = await inWorkspace(w, () => tasks.createTask({ title: 'Stale', project: 'p' }, user))
-    expect(await store.boardWrite(w, async () => staleP.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ refused: true, rule: 'platform.changed' })
+    expect(await store.boardWrite(w, async () => staleP.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ refused: true, rule: 'platform.changed', message: expect.stringContaining('its project uses jj now'), next: expect.stringContaining('under jj’s rules') })
     // A Git slot lease of Q (compiled Git) is refused as changed; a jj one isn't refused by the fence.
     await expect(slotTake(w, q)).rejects.toThrow(/uses jj now/)
     expect(await fenceOf(w, p)).toMatchObject({ state: 'settled' })
@@ -802,6 +802,20 @@ describe('a git worktree project of a colocated jj repository (HI-3034)', () => 
     expect(again.refused).toBeNull()
     await sw.setPlatform(w, app, 'jj', { expected: 'git', token: again.store!.token })
     expect([await platformIn(w, app), await platformIn(w, hot)]).toEqual(['jj', 'none'])
+  })
+
+  it('HI-3072: the worktree project, None while the repository runs jj, is refused going back to Git, saying why; once the repository is back on Git, it goes', async () => {
+    const { w, app, hot } = await worktreeWorkspace('git')
+    await sw.setPlatform(w, hot, 'none', { expected: 'git' })
+    await sw.setPlatform(w, app, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, app, 'jj')).store!.token })
+    const back = await sw.checkPlatformSwitch(w, hot, 'git')
+    expect(back.refused).toEqual({ why: 'storeRuns', platform: 'jj' })
+    await expect(sw.setPlatform(w, hot, 'git', { expected: 'none' })).rejects.toThrow(/This repository uses jj now \(its other projects switched it\), so this project can’t use Git on it/)
+    expect([await platformIn(w, app), await platformIn(w, hot)]).toEqual(['jj', 'none'])
+    // The repository switched back to Git (from app): hot's own switch to Git goes, and its cards start under Git.
+    await sw.setPlatform(w, app, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, app, 'git')).store!.token })
+    expect((await sw.checkPlatformSwitch(w, hot, 'git')).refused).toBeNull()
+    expect(await sw.setPlatform(w, hot, 'git', { expected: 'none' })).toEqual({ from: 'none', to: 'git' })
   })
 
   it('back to Git asked from the worktree project checks the repository’s jj (app’s .jj), as asked from app: refused the same', async () => {

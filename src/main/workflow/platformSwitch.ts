@@ -14,7 +14,7 @@ import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
 import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, storeWide, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
-import { checkMemberSwitch, checkStoreSwitch, memberStoreOf, memberSwitch, noteMemberChoice, storeSwitch } from './storeSwitch'
+import { checkMemberSwitch, checkStoreSwitch, memberStoreOf, memberSwitch, noteMemberChoice, storeRunsOther, storeSwitch } from './storeSwitch'
 import { projectIdOf } from '../platform/fenceAdmit'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { withValues } from '../../shared/advanced'
@@ -65,7 +65,9 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
   const now = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform)
   const same = now.id === to
   const lanes = same ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-  const detected = same ? null : switchRefused(to, now.detected)
+  // HI-3072: a project's own switch to a platform its repository's other projects switched it away from: refused, saying so.
+  const runs = same || storeWide(now.id, to, now.detected) || !needsRepository(to) ? null : await storeRunsOther(ws, project.path, to)
+  const detected = same ? null : (switchRefused(to, now.detected) ?? (runs ? ({ why: 'storeRuns', platform: runs } as const) : null)) // i18n-ignore: a reason's key, not text
   // Git ↔ jj (HI-2799): the repository's projects switch together, after a drain and jj's checks.
   const store = !same && !detected && storeWide(now.id, to, now.detected) ? await checkStoreSwitch(ws, project.path, to) : null
   // A fence member's switch to None (HI-2974): drained, as the repository's are; its lists shown when refused.
@@ -130,6 +132,15 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
       if (r.from !== r.to) await afterSwitch(ws, project.path, r.from, r.to)
       return r
     }
+  }
+  // HI-3072: never a project's own switch to Git on a repository its other projects switched to jj (the fence would
+  // refuse its every admission): refused with that reason, read before the write.
+  const nowId = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform).id
+  const runs = nowId !== to && needsRepository(to) ? await storeRunsOther(ws, project.path, to) : null
+  if (runs) {
+    const t = switchRefusalText({ why: 'storeRuns', platform: runs }) // i18n-ignore: a reason's key, not text
+    // agent-text: switchRefusalText
+    throw new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
   }
   let from: PlatformId = to
   await ws.mutateProjectConfig(project.path, (cfg) => {

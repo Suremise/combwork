@@ -44,7 +44,6 @@ import { HISTORY, storedText } from '../../shared/taskHistory'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 import { admit } from '../platform/platformFence'
-import { PLATFORM_NAME } from '../../shared/platform/switching'
 import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
 import { asCardCounts } from './containment'
@@ -1097,7 +1096,7 @@ export class Workflow {
         // then refused: the boundary passed either way), then the start is checked against it.
         // The platform fence (HI-2799): a start is an admission on the project's repository, decided in this transaction.
         const fenced = this.cfg.projectId ? admit({ get: (k) => this.store.boardMeta(k), set: () => undefined }, this.cfg.projectId(), g.o.platform) : null
-        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: workflowText(PLATFORM_NAME[fenced.now]) } })
+        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: shownPlatform(fenced.now) } })
         if (this.enforced() && !opts.drag) {
           this.applyLaneBoundary(w, this.store.card(card.id))
           // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card

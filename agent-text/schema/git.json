@@ -160,6 +160,11 @@
       "workspace": "plain"
     }
   },
+  "git.vc.switch.storeRuns": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
   "git.vc.switch.switching": {
     "placeholders": {}
   }
