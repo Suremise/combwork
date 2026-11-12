@@ -776,6 +776,129 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
       })
     }
   })
+
+  // HI-3044 (found by HI-3019): in the same window, the user integrates the reviewed commit their own way: main set onto it
+  // (a fast-forward), or onto their own work on top of it. Before, a rebase's copy was not the same change and returned
+  // the card with its work in the target, stuck; a merge's or squash's empty build stayed in the user's log as uncertain.
+  describe.each([true, false] as const)('integrated their own way between the proof and the step (HI-3044), colocated: %s', (colocated) => {
+    for (const style of ['rebase', 'squash', 'merge'] as const) {
+      for (const onto of ['reviewed', 'descendant'] as const) {
+        it(`${style}, main onto the ${onto === 'reviewed' ? 'reviewed commit' : 'user’s work on top of it'}: nothing built or returned; the next proof makes it Done; nothing left in the log`, async () => {
+          const w = await world(colocated, { candidates: true, oneSlot: true })
+          const { card, P } = await approved(w)
+          reapply(w, card, { style })
+          const jjp = new JjPlatform(w.wf)
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          const cycle = w.wf.state(card).cycle
+          expect(shown(w, card, cycle)!.offer!.style).toBe(style)
+          const before = entries(w, card, cycle).length
+          // The run's second read of the target (its step's, after its proof's): the user moves main first.
+          const real = w.deps.integration
+          let n = 0
+          let head = P
+          w.deps.integration = async () => {
+            if (++n === 2) {
+              if (onto === 'reviewed') w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', P)
+              else {
+                w.h.jj(w.repo, 'new', P, '-m', 'theirs on top')
+                writeFileSync(join(w.repo, 'theirs.txt'), 'theirs\n')
+                w.h.jj(w.repo, 'commit', '-m', 'theirs on top')
+                w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+                head = w.h.id(w.repo, 'main')
+              }
+            }
+            return real()
+          }
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          w.deps.integration = real
+          expect(w.main()).toBe(head)
+          expect(w.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').map((f) => (f.data as { reason: string }).reason)).toEqual([])
+          expect(w.wf.state(card).stage).toBe('approved')
+          expect(entries(w, card, cycle)).toHaveLength(before)
+          await jjp.reconcile(w.wf.store.card(card.id), {})
+          expect(w.store.facts(card.id).some((x) => x.kind === 'Integrated')).toBe(true)
+          expect(w.wf.state(card).stage).toBe('done')
+          await jjp.afterRun()
+          await jjp.afterRun()
+          expect(entries(w, card, cycle).filter((e) => e.record.uncertain?.length)).toEqual([])
+          expect(left(w, card, cycle)).toEqual([])
+        })
+      }
+    }
+
+    /** The run's second read of the target (its step's): `move` runs first; from it on, git fails the first read `fails` matches. */
+    const stepRead = (w: World, move: () => void, fails: (args: readonly string[]) => boolean = () => false): (() => void) => {
+      const real = w.deps.integration
+      let n = 0
+      let failed = false
+      w.deps.integration = async () => {
+        const integ = await real()
+        if (!integ || ++n < 2) return integ
+        if (n === 2) move()
+        const git = integ.git
+        return {
+          ...integ,
+          git: async (args: readonly string[]) => {
+            if (failed || !fails(args)) return git(args)
+            failed = true
+            return { ok: false, out: '', err: 'fatal: could not read (HI-3044 test)', buf: Buffer.alloc(0), code: 128 }
+          }
+        }
+      }
+      return () => void (w.deps.integration = real)
+    }
+
+    it('rebase, main onto the user’s work on top of the reviewed commit, that read failing once: nothing built or returned; the next proof makes it Done (HR2)', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true })
+      const { card, P } = await approved(w)
+      reapply(w, card, { style: 'rebase' })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const before = entries(w, card, cycle).length
+      const told: string[] = []
+      const restore = stepRead(
+        w,
+        () => {
+          w.h.jj(w.repo, 'new', P, '-m', 'theirs on top')
+          writeFileSync(join(w.repo, 'theirs.txt'), 'theirs\n')
+          w.h.jj(w.repo, 'commit', '-m', 'theirs on top')
+          w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+        },
+        (args) => args[0] === 'merge-base' && args[1] === '--is-ancestor' && args[2] === P
+      )
+      await jjp.reconcile(w.wf.store.card(card.id), { unknown: (what?: string) => void told.push(String(what)) })
+      restore()
+      expect(w.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').map((f) => (f.data as { reason: string }).reason)).toEqual([])
+      expect(w.wf.state(card).stage).toBe('approved')
+      expect(entries(w, card, cycle)).toHaveLength(before)
+      expect(told.join(' ')).toContain('reviewed:unread')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      await jjp.afterRun()
+      await jjp.afterRun()
+      expect(left(w, card, cycle)).toEqual([])
+    })
+
+    it('merge, main onto the user’s own commit beside the reviewed one: still built on the new head, offered, not returned', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true })
+      const { card } = await approved(w)
+      reapply(w, card, { style: 'merge' })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const first = shown(w, card, cycle)!.offer!
+      let theirs = ''
+      const restore = stepRead(w, () => void (theirs = onTarget(w, 'theirs.txt', 'theirs\n')))
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      restore()
+      const now = shown(w, card, cycle)!.offer!
+      expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+      expect(w.wf.state(card).stage).toBe('approved')
+      expect(now.expected).toBe(theirs)
+      expect(now.result).not.toBe(first.result)
+    })
+  })
 })
 
 // HI-3045 (design HI-3045/s15): a candidate's successor is adopted only when jj's automatic rebase made it, its outside
