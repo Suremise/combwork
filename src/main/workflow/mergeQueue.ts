@@ -1025,13 +1025,14 @@ export class MergeQueue {
         return null
       }
       const folder = c.folder
-      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder)) : await this.catchUpFresh(target, c, c.entry !== published)
+      const look = c.entry !== published
+      const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder, look)) : await this.catchUpFresh(target, c, look)
       if (r !== 'again') return r
     }
     return null
   }
 
-  private async catchUpRecorded(target: string, c: CatchUp, folder: string): Promise<QueueOutcome | null | 'again'> {
+  private async catchUpRecorded(target: string, c: CatchUp, folder: string, look: boolean): Promise<QueueOutcome | null | 'again'> {
     const I = this.catchUpPort(c)!
     const h = this.host({})
     const f = await I.recoveryState(h, { target, expected: c.from, result: c.to, files: c.files ?? [], folder, phase: c.phase! })
@@ -1067,6 +1068,14 @@ export class MergeQueue {
     }
     if (f.found === 'rollback') return this.catchUpRollback(target, c, folder)
     if (f.found === 'swap') {
+      // HI-3041 (HR2's round 2): its files moved before a stop, the ref not yet: the remote asked first, as a fresh one
+      // is. Gone from it: the files back by the recovery table's rollback, then looked at again (and ended). Unknown:
+      // left as it is, still owed, asked again at the next look.
+      if (look) {
+        const there = await this.remoteHas(target, c)
+        if (there === null) return null
+        if (!there) return this.catchUpRollback(target, c, folder)
+      }
       await this.cfg.hooks?.beforeCatchUpRef?.(c.entry)
       this.stillHolds(target)
       if (!(await I.swap(h, target, c.from, c.to))) return this.catchUpRollback(target, c, folder)
@@ -1104,8 +1113,13 @@ export class MergeQueue {
     }
     // HI-3041 (HR1's round 1): behind it too, an owed catch-up taken up again (not the one right after its publication)
     // asks the remote first: a result it no longer has is never brought into the local target; the catch-up ends as
-    // above. Unknown: caught up as before (the remote had it when it was published).
-    if (look && (await this.remoteHas(target, c)) === false) return done()
+    // above. Unknown (HR2's round 2): nothing moved, still owed, asked again at the next look; only a remote seen
+    // holding it lets the local target be brought there.
+    if (look) {
+      const there = await this.remoteHas(target, c)
+      if (there === null) return null
+      if (!there) return done()
+    }
     const where = await I.checkouts(h)
     if (isUnknown(where)) return null
     const folder = where[target] ? resolve(where[target]) : null

@@ -6453,7 +6453,10 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    reconciler marks the card `LeftTarget` (HI-3041: paused, it could never be put right); unknown (a failed fetch),
    paused as above. A local target behind the result is asked about the same way before it is brought there, unless
    the catch-up is the one right after this run published the result: one the remote no longer has is never brought
-   into the local target, and the catch-up ends; unknown, it is caught up as before. A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
+   into the local target, and the catch-up ends; unknown, nothing moves and it stays owed, asked again at the next
+   look (only a remote seen holding the result lets it go on). A recorded step about to swap the ref (its files moved
+   before a stop) asks the same: gone, its files go back by the table's rollback and the catch-up then ends; unknown,
+   it is left as it is, still owed. A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
    table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
    holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
    folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
