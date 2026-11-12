@@ -3765,6 +3765,22 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
 - **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
   Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
   card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
+- **Stale after `jj op abandon`** (HI-3099): a folder whose checkout operation is no longer in the head's history (the
+  user discarded old operations; jj then refuses to read or record it, "a sibling of the working copy's operation") is
+  stale too (`staleAt`'s `inHistory`: the op log read pinned at the head, 200 ids then up to 20,000; only a completed
+  walk proves it outside, a truncated or unreadable one is unknown). A slot so is shown stale with Recover…, which mends
+  it: `update-stale` there leaves the working copy U a divergent sibling of X (its preserved snapshot: the same change,
+  parents and author time), so the record of the restored files, which would make a commit identical to X within X's
+  committer second (Git's whole seconds: jj refuses "already exists"), waits, polled every 50 ms, until the clock's
+  second is past it, capped at 3 s of waiting (never the wall clock), stopped at once on a lost fence: `collision` or
+  `fence`, nothing recorded or abandoned, the journal still `restored` for Recover… again; U, X and the head re-read
+  after the last wait, the record's owned guard at its write. Its provenance is journalled on every attempt (HR3's round 1, HR1's round 2): `recordFrom`, the head right before the record, and `recorded`, the working copy that attempt starts on (when already a record of this phase's) and then the one it made; a resume after any number of stops between a record and the journal's end accepts a working copy other than U only as such a record (the journalled commit, or the one snapshot of this workspace made directly on `recordFrom`, by the op log), and refuses any other movement (`provenance`). Combwork's control workspace so is mended automatically
+  (`control()`'s `mendIn`, under the store's lock: proved again, one head H, a `controlProof` taken then; `jj workspace
+  update-stale` in it alone, its recheck that proof's `check()` and H still the only head, nothing awaited before jj
+  starts; the proof discarded, the control returned only when usable and no longer stale, its consumers proving it
+  afresh; any change or failure refused and retried by the next use). Never `jj op integrate` (probed on 0.47.1: it puts
+  the user's own workspace back to an old view, and their `update-stale` then removes their files from the folder), and
+  never another workspace touched. Tests: `tests/jjOpAbandon.test.ts`; the window's in jjWindowRun.cjs.
 - **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
   a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
   `slots:recoverStale`, its refusal said (busy, with stop its agent first; its card still being prepared; no longer
