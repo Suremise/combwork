@@ -2,6 +2,7 @@ import { msg, type Msg } from './i18n/msg'
 import { shortRevision } from './progress'
 import type { Tr } from './tasks'
 import type { ProgressRun } from './types'
+import type { IntegrationFailReason } from './workflow/facts'
 import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, type QueuePauseInfo, type QueuePauseLogged, type QueuePushState, type QueueRecent, type QueueView } from './workflow/queue'
 
 export { RETURN_SEEN_SHOWN_MS }
@@ -230,16 +231,23 @@ export function mergedText(r: QueueRecent, tr: Tr): string {
   return tr(msg({ id: 'board.queue.merged', defaultMessage: '{card} merged as {result}', description: "A merge queue's card in the Progress panel, for a few seconds after a card merged: its key ({card}, such as HI-61) and the target's new commit ({result}: a short commit id)." }), { card: r.key, result: shortRevision(r.result ?? '') })
 }
 
+/**
+ * Every reason the queue records, each a branch of `board.queue.returnWhy`'s select (HI-3037: HI-2999's `resolution` had
+ * none, so the window showed the code). A reason added to IntegrationFailReason fails typecheck here until it is said.
+ */
+const RETURN_REASONS: Record<IntegrationFailReason, true> = { conflict: true, checks: true, targetMoved: true, folderBusy: true, notUpToDate: true, hook: true, focused: true, pushRefused: true, notPublished: true, direction: true, resolution: true }
+export const RETURN_REASON_CODES = Object.keys(RETURN_REASONS) as IntegrationFailReason[]
+
 /** Why a card was returned, in a few words: "conflict in tasks.ts", "checks failed: unit". */
 export function returnWhy(r: QueueRecent, check: string | null, target: string, tr: Tr, list: (items: string[]) => string): string {
   const files = r.files?.slice(0, 3) ?? []
   const more = (r.files?.length ?? 0) - files.length
-  const reason = r.reason === 'conflict' || r.reason === 'checks' || r.reason === 'hook' || r.reason === 'folderBusy' || r.reason === 'notUpToDate' || r.reason === 'focused' || r.reason === 'direction' ? r.reason : 'other'
+  const reason = r.reason && (RETURN_REASONS as Record<string, unknown>)[r.reason] === true ? r.reason : 'other'
   const why = tr(
     msg({
       id: 'board.queue.returnWhy',
-      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} other {{why}}}',
-      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review, or (direction, HI-2892) it was a forward merge against the release path's direction (into an older version or main) made without the user's override; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
+      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} resolution {the commit it resolves was copied, not merged} targetMoved {{target} moved while it was being merged} pushRefused {publishing it to {target}’s remote was refused} notPublished {its publication to {target}’s remote didn’t happen} other {{why}}}',
+      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review, or (direction, HI-2892) it was a forward merge against the release path's direction (into an older version or main) made without the user's override, or (resolution, HI-2999) a card resolving a forward merge's conflict lacks the commit it resolves, its changes cherry-picked or copied rather than merged, or the target moved during the merge, or publishing the merge to the target's remote was refused (a pre-push hook or the remote), or the user said its publication didn't happen; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
     }),
     { reason, files: files.length ? (more > 0 ? list([...files, tr(msg({ id: 'board.queue.filesMore', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no "and" written around a list).' }), { n: more })]) : list(files)) : 'none', check: check ?? 'none', target, why: r.reason ?? '' } // i18n-ignore: select keys, never shown
   )

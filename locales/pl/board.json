@@ -770,7 +770,7 @@
   "board.queue.removeTitle": "Usunąć kartę {card} z kolejki scalania?",
   "board.queue.resume": "Wznów kolejkę",
   "board.queue.resumeFailed": "Nie udało się wznowić kolejki scalania",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {konflikt} other {konflikt w {files}}}} checks {{check, select, none {sprawdzenia nie przeszły} other {sprawdzenia nie przeszły: {check}}}} hook {hook zakończył się błędem} folderBusy {folder, w którym wybrana jest gałąź {target}, był zajęty} notUpToDate {nieaktualna względem {target}} focused {nie udało się wybrać lub potwierdzić jej testów ukierunkowanych} direction {wbrew kierunkowi wydań, bez wyjątku} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {konflikt} other {konflikt w {files}}}} checks {{check, select, none {sprawdzenia nie przeszły} other {sprawdzenia nie przeszły: {check}}}} hook {hook zakończył się błędem} folderBusy {folder, w którym wybrana jest gałąź {target}, był zajęty} notUpToDate {nieaktualna względem {target}} focused {nie udało się wybrać lub potwierdzić jej testów ukierunkowanych} direction {wbrew kierunkowi wydań, bez wyjątku} resolution {rozwiązywany commit skopiowano zamiast go scalić} targetMoved {{target} przesunęła się podczas scalania} pushRefused {publikację w zdalnym repozytorium {target} odrzucono} notPublished {publikacja w zdalnym repozytorium {target} nie nastąpiła} other {{why}}}",
   "board.queue.returned": "{card} zwrócona: {why}",
   "board.queue.returnedTo": "Karta {card} zwrócona wykonawcy {builder}: {why}",
   "board.queue.runBy": "Kolejkę prowadzi profil {profile}",

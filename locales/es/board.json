@@ -770,7 +770,7 @@
   "board.queue.removeTitle": "¿Quitar {card} de la cola de fusión?",
   "board.queue.resume": "Reanudar la cola",
   "board.queue.resumeFailed": "No se pudo reanudar la cola de fusión",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflicto} other {conflicto en {files}}}} checks {{check, select, none {comprobaciones fallidas} other {comprobaciones fallidas: {check}}}} hook {falló un hook} folderBusy {la carpeta donde {target} está activa estaba ocupada} notUpToDate {no está al día con {target}} focused {no se pudieron elegir o demostrar sus pruebas específicas} direction {en contra del sentido de las versiones, sin excepción} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflicto} other {conflicto en {files}}}} checks {{check, select, none {comprobaciones fallidas} other {comprobaciones fallidas: {check}}}} hook {falló un hook} folderBusy {la carpeta donde {target} está activa estaba ocupada} notUpToDate {no está al día con {target}} focused {no se pudieron elegir o demostrar sus pruebas específicas} direction {en contra del sentido de las versiones, sin excepción} resolution {el commit que resuelve se copió, no se fusionó} targetMoved {{target} cambió mientras se fusionaba} pushRefused {se rechazó publicarla en el remoto de {target}} notPublished {su publicación en el remoto de {target} no se produjo} other {{why}}}",
   "board.queue.returned": "{card} devuelta: {why}",
   "board.queue.returnedTo": "{card} devuelta al autor {builder}: {why}",
   "board.queue.runBy": "La ejecuta el perfil {profile}",
