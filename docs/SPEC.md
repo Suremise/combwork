@@ -3330,7 +3330,9 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
   platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,
   the builder's own worktree), is refused before its folder is chosen (`platform.keptAcross`, the runtime's
-  `keptAcross`), naming the way on by the slot's state: its folder there, switching the repository back to the slot's
+  `keptAcross`), naming the way on by its folder as read then, not the row's `gone` (a folder restored since, or an
+  unlisted jj workspace's, HI-3097; absent only on ENOENT or ENOTDIR, unreadable never worded as gone, HR1's round 3):
+  its folder there, switching the repository back to the slot's
   platform (Remove… refuses a slot whose commits aren't in the target, and nothing removes it by force); its folder
   gone, **Remove…**. The pool's own lend and dry start say the same (`slot.kept.platform`), never `slot.kept.busy`.
   That Remove… forgets only Combwork's record (`recordOnly`): the fence asked to admit the project's platform now, no

@@ -41,7 +41,7 @@
 import { createHash, randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { admitOrThrow } from './platform/fenceAdmit'
-import { existsSync } from 'original-fs'
+import { existsSync, lstatSync } from 'original-fs'
 import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
@@ -98,9 +98,24 @@ export interface KeptAcross {
 const VC_NAME: Record<string, string> = { git: 'Git', jj: 'jj', none: 'None' } // i18n-ignore: product names, agent-facing
 
 /** HI-3069: the kept refusal for a slot made under another version control than `now`, naming its way on. */
-function keptAcrossText(s: Pick<Slot, 'name' | 'platform' | 'state'>, now: string): string {
+function keptAcrossText(s: Pick<Slot, 'name' | 'platform' | 'folder'>, now: string): string {
   const platform = VC_NAME[s.platform ?? 'git'] ?? (s.platform ?? 'git')
-  return say(T.kept, { slot: s.name, why: say(T.keptPlatform, { platform, now: VC_NAME[now] ?? now, gone: s.state === 'gone' ? 'yes' : 'no' }) })
+  return say(T.kept, { slot: s.name, why: say(T.keptPlatform, { platform, now: VC_NAME[now] ?? now, gone: folderAbsentSync(s.folder) ? 'yes' : 'no' }) })
+}
+
+/**
+ * HI-3069 (HR1's round 3): whether a slot's folder is absent now, read where its recovery is worded: only ENOENT or
+ * ENOTDIR is absent; there, or unreadable, is not (never a claim that it is gone). Not the row's `gone`, which a refresh
+ * set and a folder restored since (or an unlisted jj workspace, HI-3097) doesn't undo.
+ */
+function folderAbsentSync(folder: string): boolean {
+  try {
+    lstatSync(folder)
+    return false
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    return code === 'ENOENT' || code === 'ENOTDIR'
+  }
 }
 
 /** The slot pool's agent text (dialects, HI-2447): refusals, waits and the errors kept on a slot. */
@@ -1814,14 +1829,14 @@ export class SlotPool {
 
   /**
    * HI-3069: a card whose committed work is kept in a slot made under the other version control (a switch since it was
-   * put back): the slot, its platform, the pool's now, and whether its folder is gone (a refresh found it so). Null with
+   * put back): the slot, its platform, the pool's now, and whether its folder is absent now (fail-closed). Null with
    * no kept slot, or one of this pool's platform. Every start, real or dry, asks it before choosing its folder, so neither
    * a slot nor the project folder takes the card without its work (the workflow's `platform.keptAcross`).
    */
   keptAcross(card: number): KeptAcross | null {
     const k = this.store.keptSlotFor(card)
     if (!k || (k.slot.platform ?? 'git') === this.port.platform) return null
-    return { slot: k.slot.name, platform: k.slot.platform ?? 'git', now: this.port.platform, gone: k.slot.state === 'gone' }
+    return { slot: k.slot.name, platform: k.slot.platform ?? 'git', now: this.port.platform, gone: folderAbsentSync(k.slot.folder) }
   }
 
   slotOf(lease: SlotLease | string): Slot | null {

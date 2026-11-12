@@ -366,6 +366,7 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     expect(back.store?.drain.slots.map((s) => s.project)).toEqual(['p', 'p'])
   })
 
+  const keptFolders = new Map<string, string>()
   /**
    * HI-3069: a slot of P's kept for a card (put back with commits, HI-2995): a jj slot lent and ended, its kept record
    * written as the pool writes it. `as`: the platform its row is of (one left by a switch made before this fix).
@@ -373,6 +374,9 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
   async function keptSlot(w: WS, dir: string, card: number, as: 'git' | 'jj'): Promise<string> {
     const r = await lease(w, dir, (await platformIn(w, dir)) === 'jj' ? 'jj' : 'git')
     if (!r.ok) throw new Error(JSON.stringify(r.refusal))
+    // Its folder there, as a kept slot's is (the lease's row alone makes none).
+    mkdirSync(r.slot.folder, { recursive: true })
+    keptFolders.set(r.slot.name, r.slot.folder)
     const slots = new SlotStore(boardConn(w), await idOf(w, dir))
     await slots.end(r.lease.id, 'putBack')
     const id = await idOf(w, dir)
@@ -434,6 +438,12 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
       // The user's start too: never across it, in any folder.
       const byUser = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user'))
       expect(byUser).toMatchObject({ refused: true, rule: 'platform.keptAcross' })
+      // Its folder deleted since: the way on is Remove… (HR1's round 3: worded from the folder now, not the row).
+      rmSync(keptFolders.get(slot)!, { recursive: true, force: true })
+      const gone = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, agentActor('b-p')))
+      expect(gone).toMatchObject({ refused: true, rule: 'platform.keptAcross' })
+      expect(JSON.stringify(gone)).toContain('Its folder is gone')
+      expect(JSON.stringify(gone)).toContain('Remove…')
       // Another card starts as before.
       expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.keptAcross' })
     } finally {

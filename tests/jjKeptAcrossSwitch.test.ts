@@ -149,6 +149,14 @@ describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back t
     expect(readFileSync(join(row.folder, 'mine.txt'), 'utf8')).toBe('mine\n')
     expect(store.slot(row.name)).not.toBeNull()
     expect(pool.keptCard(row.name)).toBe(1)
+    // The row still says `gone` (no refresh since), but its folder is back: the way on is switching back, never Remove…
+    // (HR1's round 3), in the workflow's facts, the lend's refusal and the dry start alike.
+    expect(store.slot(row.name)?.state).toBe('gone')
+    expect(pool.keptAcross(1)).toMatchObject({ gone: false })
+    const start = JSON.stringify(await pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' }))
+    expect(start).toContain('switch the repository back to jj')
+    expect(start).not.toContain('remove it')
+    expect(pool.keptPreview(1)).toEqual({ wait: expect.stringContaining('switch the repository back to jj') })
   })
 })
 
