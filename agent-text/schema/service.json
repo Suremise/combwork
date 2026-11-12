@@ -903,6 +903,12 @@
       "card": "plain"
     }
   },
+  "service.laneEdit.full": {
+    "placeholders": {
+      "max": "number",
+      "lane": "plain"
+    }
+  },
   "service.laneEdit.invalid": {
     "placeholders": {}
   },
