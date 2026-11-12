@@ -835,3 +835,16 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     await expect(resolve(user)).rejects.toThrow(/isn’t a forward merge the merge queue sent back/)
   })
 })
+describe('HI-3087: cw_queue forward says what it did', () => {
+  it('its reply, from the catalogue: queued, queued with the override, the override recorded on a returned resolution, or already open', async () => {
+    // @ts-expect-error: a plain .mjs module without types
+    const { readCatalogue } = await import('../scripts/agentTextExtract.mjs')
+    const { IntlMessageFormat } = await import('intl-messageformat')
+    const text = (readCatalogue(join(__dirname, '..')) as Record<string, { text: string }>)['tool.queue.reply.forward'].text
+    const reply = (queued: boolean, overridden: boolean) => String(new IntlMessageFormat(text, 'en').format({ upToDate: 'no', queued: queued ? 'yes' : 'no', overridden: overridden ? 'yes' : 'no', card: 'AL-2', from: 'trunk', to: '1.2.0' }))
+    expect(reply(true, false)).toBe("Queued AL-2: bringing 1.2.0 up to date with trunk through 1.2.0's queue.")
+    expect(reply(true, true)).toBe("Queued AL-2: bringing 1.2.0 up to date with trunk through 1.2.0's queue, with the user's override of the release path's direction.")
+    expect(reply(false, true)).toBe("Recorded on AL-2, which resolves bringing 1.2.0 up to date with trunk: its builder is told to submit the same revision again, which goes back into 1.2.0's queue once.")
+    expect(reply(false, false)).toBe('AL-2 is bringing 1.2.0 up to date with trunk already.')
+  })
+})

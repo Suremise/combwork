@@ -2699,7 +2699,7 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
     })
     const made = 'upToDate' in r ? null : r
     const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
-    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to, ...(made?.overridden ? { overridden: true } : {}) } }
   })
 })
 // HI-2959: Resolve on a builder, on a forward merge the queue returned: the Assistant's (within Control agents, its
