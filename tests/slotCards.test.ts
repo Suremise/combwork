@@ -161,7 +161,12 @@ vi.mock('../src/main/lanes', async (orig) => ({
   ...(await orig<object>()),
   rawLanes: async () => (state.lanes ? state.lanes() : []),
   lanesWaitingForSlot: async () => (state.waitingLooks++, state.waiting),
-  setLaneSlotWait: async (_ws: unknown, lane: string) => void state.calls.push(`lane ${lane} waits no more`)
+  // A lane that waits no more is no longer among those waiting, as in lanes.ts (HI-3101: a pass run again after it, such
+  // as a held slot's retry landing during it, would otherwise lend it a slot again).
+  setLaneSlotWait: async (_ws: unknown, lane: string) => {
+    state.calls.push(`lane ${lane} waits no more`)
+    state.waiting = (state.waiting as { id: string }[]).filter((l) => l.id !== lane)
+  }
 }))
 vi.mock('../src/main/laneStart', async (orig) => ({
   ...(await orig<object>()),
