@@ -22,7 +22,7 @@ import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, platformIdOf, projectPlatform } from '../platform/registry'
-import { PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
+import { needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { withValues } from '../../shared/advanced'
@@ -97,6 +97,12 @@ interface Member {
 interface Group {
   store: string
   members: Member[]
+  /**
+   * HI-3070: the other projects of this workspace on the repository whose choice is None (not switched, never members),
+   * whose work still running under Git or jj (a card started under it and not done, its slot or copy leases, its merge
+   * queue) counts in the drain: the switch waits for it as for the members'.
+   */
+  bystanders: Member[]
   token: string
 }
 
@@ -110,13 +116,17 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
   if (store === 'none') return null
   const projects = ws.info()?.projects ?? []
   const members: (Member & { snap: Snap })[] = []
+  const bystanders: Member[] = []
   for (const p of projects) {
     const isSelf = p.path.toLowerCase() === path.toLowerCase()
     const cfg = await ws.projectConfig(p.path).catch(() => null)
     if (!cfg) continue
     const from = platformIdOf(p.path, cfg.platform)
-    if (!isSelf && from === 'none') continue
     if (!isSelf && (await storeOf(p.path)) !== store) continue
+    if (!isSelf && from === 'none') {
+      bystanders.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from })
+      continue
+    }
     members.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from, snap: snapOf(cfg, p.path) })
   }
   members.sort((a, b) => a.id.localeCompare(b.id))
@@ -128,7 +138,7 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
     .update(JSON.stringify([store, gen, members.map((m) => [m.id, m.path.toLowerCase(), m.from, createHash('sha256').update(JSON.stringify(m.snap)).digest('hex')])]))
     .digest('hex')
     .slice(0, 32)
-  return { store, members: members.map(({ snap: _s, ...m }) => m), token }
+  return { store, members: members.map(({ snap: _s, ...m }) => m), bystanders, token }
 }
 
 /** Another open workspace with a project on the store: its admissions can't be fenced from here (s17). */
@@ -147,8 +157,9 @@ async function otherWorkspaceOn(ws: WorkspaceService, store: string): Promise<st
  * switch, so the switch waits until its card has finished. One already of `to` is left out, so switching back to the
  * platform it was made under is never refused for it.
  */
-async function drainOf(ws: WorkspaceService, members: readonly Member[], to: PlatformId): Promise<SwitchDrain> {
+async function drainOf(ws: WorkspaceService, members: readonly Member[], to: PlatformId, bystanders: readonly Member[] = []): Promise<SwitchDrain> {
   const d: SwitchDrain = { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] }
+  for (const m of bystanders) await bystanderDrain(ws, m, to, d)
   for (const m of members) {
     for (const l of await listLanes(ws, { project: m.name })) if (l.state === 'active' || l.state === 'paused') d.lanes.push({ project: m.name, id: l.id, name: l.name, builder: l.builder.name })
     for (const c of await cardsInFlight(ws, { path: m.path, name: m.name })) d.cards.push({ project: m.name, number: c.number, title: c.title })
@@ -162,6 +173,35 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[], to: Pla
     for (const k of new SlotStore(boardConn(ws), m.id).keptSlots()) if (k.platform !== to) d.kept.push({ project: m.name, slot: k.slot, card: k.card })
   }
   return d
+}
+
+/**
+ * HI-3070: a project on None beside the group (a bystander) adds only its work under Git or jj: its cards in flight
+ * started under a repository's rules (`Started` compiled with Git or jj: a card started under None never touches the
+ * repository), its merge queue's work, its open slot leases, unfreed copies and slots kept across platforms. Its lanes
+ * aren't listed: a lane's card under Git is listed itself, and one under None needn't wait.
+ */
+async function bystanderDrain(ws: WorkspaceService, m: Member, to: PlatformId, d: SwitchDrain): Promise<void> {
+  const wf = await workflowFor(ws, m.path).catch(() => null)
+  if (wf) {
+    const repoCards = new Set(
+      wf.store
+        .cards()
+        .filter((c) => {
+          const s = wf.state(c)
+          return !!s.started && s.stage !== 'todo' && s.stage !== 'done' && needsRepository(wf.rulesetOf(c, s).options.platform)
+        })
+        .map((c) => c.id)
+    )
+    for (const c of await cardsInFlight(ws, { path: m.path, name: m.name })) if (repoCards.has(c.number)) d.cards.push({ project: m.name, number: c.number, title: c.title })
+    if (wf.store.cards().some((c) => {
+      const s = wf.state(c)
+      return !!s.started && s.stage !== 'todo' && s.stage !== 'done' && wf.rulesetOf(c, s).options.finish === 'combworkMerges'
+    })) d.queue.push(m.name)
+  }
+  for (const l of new SlotStore(boardConn(ws), m.id).openLeases()) d.slots.push({ project: m.name, slot: l.slot, agent: l.agent })
+  for (const l of new CopyStore(boardConn(ws), m.id).unfreed()) d.copies.push({ project: m.name, copy: l.copy, kind: l.kind })
+  for (const k of new SlotStore(boardConn(ws), m.id).keptSlots()) if (k.platform !== to) d.kept.push({ project: m.name, slot: k.slot, card: k.card })
 }
 
 /** jj itself confirms the repository on exactly this store, colocated or not (HI-2896), with the tested jj (s11 §3c). */
@@ -265,7 +305,7 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   const g = await groupOf(ws, path)
   const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
   if (!g) return { refused: { why: to === 'jj' ? 'noJj' : 'noGit' }, store: none } // i18n-ignore: a code or SQL, never shown as text
-  const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members, to) }
+  const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members, to, g.bystanders) }
   let refused: SwitchRefusal | null = null
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
@@ -348,7 +388,7 @@ async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId
     const ids = begin.map((m) => m.id)
     await storeSwitchSeams.at?.('afterBegin', { members: ids, generation: fence.generation })
     // Nothing more can be admitted on the store: what runs now is final (s17). Anything still running: back, nothing written.
-    const drain = await drainOf(ws, g.members, to)
+    const drain = await drainOf(ws, g.members, to, g.bystanders)
     await storeSwitchSeams.at?.('afterDrain', { members: ids, generation: fence.generation })
     if (!drainEmpty(drain)) {
       await fenceWrite(ws, (meta) => settle(meta, g.store, fence!.generation, Object.fromEntries(begin.map((m) => [m.id, m.before]))))
