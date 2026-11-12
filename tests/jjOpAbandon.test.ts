@@ -157,4 +157,32 @@ describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-309
     expect(w.h.jj(w.slot, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'divergent')).toBe('false')
     expect(w.user()).toEqual(w.before)
   })
+  // HR3's round 1: Combwork stopping right after Recover…'s own record succeeded, before its journal ends.
+  it.each([true, false])('stopped right after its own record: Recover… again finishes and tidies; a working copy moved by anyone else is still refused (colocated: %s)', async (colocated) => {
+    const w = await abandoned(colocated)
+    const stopping = { ...w.h.port, recordLeftOut: async (...a: Parameters<typeof w.h.port.recordLeftOut>) => {
+      await w.h.port.recordLeftOut(...a)
+      throw new Error('Combwork stopped')
+    } }
+    await expect(w.recover({ port: stopping })).rejects.toThrow('Combwork stopped')
+    const j = w.h.journals.of('rec').read() as { phase: string; recordFrom?: string; recorded?: string }
+    expect(j).toMatchObject({ phase: 'restored', recordFrom: expect.stringMatching(/^[0-9a-f]+$/) })
+    expect(j.recorded).toBeUndefined()
+    expect(await w.recover()).toMatchObject({ ok: true, xKept: false })
+    expect(w.h.journals.of('rec').read()).toBeNull()
+    expect(readFileSync(join(w.slot, 'wip.txt'), 'utf8')).toBe('an edit jj has not recorded\n')
+    expect(w.status(w.slot)).toMatch(/^ok: /)
+    expect(w.h.jj(w.slot, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'divergent')).toBe('false')
+
+    // Again stopped after the record, then something else moves the slot's working copy (a new change there): refused.
+    const v = await abandoned(colocated)
+    const stopping2 = { ...v.h.port, recordLeftOut: async (...a: Parameters<typeof v.h.port.recordLeftOut>) => {
+      await v.h.port.recordLeftOut(...a)
+      throw new Error('Combwork stopped')
+    } }
+    await expect(v.recover({ port: stopping2 })).rejects.toThrow('Combwork stopped')
+    v.h.jj(v.slot, 'new')
+    expect(await v.recover()).toMatchObject({ ok: false, why: 'provenance' })
+    expect((v.h.journals.of('rec').read() as { phase: string }).phase).toBe('restored')
+  })
 })

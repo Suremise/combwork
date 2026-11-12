@@ -54,6 +54,8 @@ export interface RecoveryDeps {
     beforePlace?: (path: string) => void | Promise<void>
     afterPath?: (path: string) => void | Promise<void>
     afterRestore?: () => void | Promise<void>
+    /** HI-3099: right before phase 5's record (its `recordFrom` journalled). */
+    beforeRecord?: () => void | Promise<void>
     /** Between a file's size read and its bytes read (tests: a writer growing it). */
     afterStat?: (path: string) => void | Promise<void>
     /** Each chunk a capped read takes from a file of the workspace (tests: the reader never passes its cap). */
@@ -122,6 +124,12 @@ interface Journal {
   /** Each late path's copy, as written (HI-2996); none for a late deletion. */
   lateCopies?: Record<string, string>
   paths?: Record<string, PathState>
+  /**
+   * HI-3099 (HR3's round 1): phase 5's record's provenance, so a stop after it resumes. `recordFrom`: the operation head
+   * right before the record, written first; `recorded`: the working copy's commit it recorded, written right after.
+   */
+  recordFrom?: string
+  recorded?: string
 }
 
 const DEFAULT_BOUNDS = { files: 2000, bytes: 512 * 1024 * 1024 }
@@ -532,7 +540,36 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   // `collision`, at the cap or a fence lost: nothing recorded or abandoned, the journal still `restored`, the preserved copy
   // and the restored files as they are, so Recover… again resumes here. Re-read after the last wait: U, X, the head; the
   // record's own owned guard (identity and fence) at its write.
-  if (cur.X && cur.U) {
+  // A resume after this phase's own record (HR3's round 1: a stop between the record and the journal's end): the working
+  // copy is no longer U but the record's, proved by the journal (`recorded`) or by its operation (`recordFrom`: the one
+  // snapshot of this workspace made directly on that head, whose working copy is the current one). Then nothing waits:
+  // the record again records nothing new. Anything else that moved the working copy is still refused.
+  let ours = false
+  const wsAt = async (op: string): Promise<string | null> => {
+    const r = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(cur.workspace)}@`, '-T', 'commit_id'], { op })
+    return r.ok && /^[0-9a-f]{40}$/.test(r.out.trim()) ? r.out.trim() : null
+  }
+  if (cur.X && cur.U && (cur.recorded || cur.recordFrom)) {
+    const head = await port.pinned(folder)
+    if (isUnknown(head)) return refuse('provenance', head.detail ?? head.what)
+    const now = await wsAt(head)
+    if (!now) return refuse('provenance', 'U')
+    if (now !== cur.U) {
+      if (cur.recorded) ours = now === cur.recorded
+      else {
+        const log = await port.jj(folder, ['op', 'log', '--no-graph', '--limit', '500', '-T', `id ++ "${SEP}" ++ parents.map(|p| p.id()).join(",") ++ "${SEP}" ++ snapshot ++ "${SEP}" ++ workspace_name ++ "\\n"`], { op: head })
+        if (!log.ok) return refuse('provenance', log.err)
+        const snaps = lines(log.out).map((l) => l.split(SEP)).filter(([, parents, snap, ws]) => parents === cur.recordFrom && snap === 'true' && ws === `${cur.workspace}@`)
+        ours = snaps.length === 1 && (await wsAt(snaps[0][0])) === now
+      }
+      if (!ours) return refuse('provenance', 'U or X') // i18n-ignore: a protocol code, never wording
+      if (!cur.recorded) {
+        await save({ ...cur, recorded: now })
+        cur = j as unknown as Journal
+      }
+    }
+  }
+  if (cur.X && cur.U && !ours) {
     const clock = deps.clock ?? { now: () => Date.now(), wait: (ms: number) => new Promise<void>((res) => setTimeout(res, ms)) }
     for (let waited = 0; ; waited += COLLISION_POLL_MS) {
       const head = await port.pinned(folder)
@@ -551,9 +588,24 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       if (!(await mine())) return refuse('fence')
       await clock.wait(COLLISION_POLL_MS)
     }
+    // The record's provenance first (HR3's round 1): the head it starts from.
+    const from = await port.pinned(folder)
+    if (isUnknown(from)) return refuse('provenance', from.detail ?? from.what)
+    await save({ ...cur, recordFrom: from })
+    cur = j as unknown as Journal
   }
+  await deps.hooks?.beforeRecord?.()
   const rec = await port.recordLeftOut(folder, req.fence, req.identity)
   if (isUnknown(rec)) return refuse('fence', rec.detail ?? rec.what)
+  // …and what it recorded, so a stop from here on resumes as this record's.
+  if (cur.X && cur.U && !cur.recorded) {
+    const head = await port.pinned(folder)
+    const now = isUnknown(head) ? null : await wsAt(head)
+    if (now && now !== cur.U) {
+      await save({ ...cur, recorded: now })
+      cur = j as unknown as Journal
+    }
+  }
   // New files jj leaves out for its size limit (HI-2973) are in the manifest but in no commit (X can't hold them): put
   // back on disk all the same, and named in the result; the slot's next record lists them as uncommitted.
   const leftOut = new Set(rec.leftOut.map((p) => p.replace(/\\/g, '/')))
