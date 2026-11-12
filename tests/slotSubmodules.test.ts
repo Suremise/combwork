@@ -5,7 +5,7 @@
 // remote lacks (any ref: a branch, a tag, a stash) say it loses nothing; anything doubtful or unreadable keeps it,
 // saying why. A rename of one keeps its name before anything is copied.
 import { execFileSync, spawn } from 'child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -101,6 +101,30 @@ async function usedSlot(nested = false, edit?: (folder: string, p: string) => vo
   return { pool: pl, name: r.slot.name, folder: r.slot.folder, p }
 }
 
+/** The target's submodule libs/s replaced with ordinary files at the same path; its new head. */
+const vendor = (p: string): string => {
+  g(p, 'rm', '-q', 'libs/s')
+  g(p, 'rm', '-q', '-f', '.gitmodules')
+  return commit(p, { 'libs/s/v.txt': 'vendored\n', 'libs/s/extra.txt': 'x\n' }, 'vendored')
+}
+
+/** The target's submodule libs/s removed; its new head. */
+const drop = (p: string): string => {
+  g(p, 'rm', '-q', 'libs/s')
+  g(p, 'rm', '-q', '-f', '.gitmodules')
+  g(p, 'commit', '-q', '-m', 'no submodule')
+  return g(p, 'rev-parse', 'HEAD')
+}
+
+/** A worktree of the project with its submodule set up as the files step does it (its clone in the worktree's own git dir). */
+function setUpWorktree(): { p: string; wt: string } {
+  const { ws, p } = project()
+  const wt = join(`${ws}.worktrees`, 'project', 'slot-x')
+  g(p, 'worktree', 'add', '-q', '--detach', wt, 'HEAD')
+  g(wt, 'submodule', 'update', '-q', '--init')
+  return { p, wt }
+}
+
 /** An unpushed commit in a submodule's checkout, HEAD then put back at the gitlink, so the superproject sees it clean. */
 function unpushed(dir: string, keep: (dir: string) => void): void {
   writeFileSync(join(dir, 'wip.txt'), 'wip\n')
@@ -155,6 +179,58 @@ describe('HI-3026: a slot whose submodule the files step set up', { timeout: 120
     const { pool: pl, name, folder } = await usedSlot(false, (f) => g(join(f, 'libs', 's'), 'remote', 'set-url', 'origin', join(tempDir('slot-sub-gone-'), 'missing')), 'light')
     expect(JSON.stringify(await pl.remove(name))).toContain("couldn't check submodule libs/s")
     expect(existsSync(join(folder, 'libs', 's', 'v.txt'))).toBe(true)
+  })
+
+  it("HI-3078: lent again after its target replaced the submodule with ordinary files: the card's line prepared there, its files the target's", async () => {
+    const { ws, p } = project()
+    const pl = pool(ws, p)
+    const first = await pl.lend({ agent: 'a1', card: 1 }, { target: 'main' })
+    if (!first.ok) throw new Error(JSON.stringify(first.refusal))
+    await pl.release(first.lease.id, 'done')
+    const to = vendor(p)
+    const second = await pl.lend({ agent: 'a1', card: 2 }, { target: 'main' })
+    if (!second.ok) throw new Error(JSON.stringify(second.refusal))
+    expect(second.slot.folder).toBe(first.slot.folder)
+    expect(await pl.prepare(second.lease.id, { line: 'cw/next', base: to, install: false })).toMatchObject({ ok: true })
+    const f = second.slot.folder
+    expect(g(f, 'rev-parse', 'HEAD')).toBe(to)
+    expect(g(f, 'branch', '--show-current')).toBe('cw/next')
+    expect(readFileSync(join(f, 'libs', 's', 'v.txt'), 'utf8')).toBe('vendored\n')
+    expect(existsSync(join(f, 'libs', 's', '.git'))).toBe(false)
+    expect(g(f, 'status', '--porcelain', '--untracked-files=all')).toBe('')
+  })
+
+  for (const [name, change] of [['vendored', vendor], ['removed', drop]] as const)
+    for (const how of ['prepare', 'detach'] as const)
+      it(`HI-3078: the Git port's ${how} to a revision where the submodule is ${name}: moved, clean, and the slot removable`, async () => {
+        const { p, wt } = setUpWorktree()
+        const to = change(p)
+        const r = how === 'prepare' ? await gitWorkspacePort.prepare(wt, 'cw/next', to) : await gitWorkspacePort.detach(wt, to)
+        expect(r).toMatchObject({ ok: true })
+        expect(g(wt, 'rev-parse', 'HEAD')).toBe(to)
+        expect(await gitWorkspacePort.dirty(wt)).toEqual([])
+        expect(existsSync(join(wt, 'libs', 's', '.git'))).toBe(false)
+        // The clone stays in the worktree's git dir, for a later revision with the submodule again.
+        expect(existsSync(join(g(wt, 'rev-parse', '--path-format=absolute', '--absolute-git-dir'), 'modules', 'libs', 's', 'HEAD'))).toBe(true)
+        expect(await gitWorkspacePort.remove(p, wt)).toMatchObject({ ok: true })
+        expect(existsSync(wt)).toBe(false)
+      })
+
+  it('HI-3078: an untracked file in the submodule, the target without it: the checkout and the file left, for git to name', async () => {
+    const { p, wt } = setUpWorktree()
+    writeFileSync(join(wt, 'libs', 's', 'mine.txt'), 'mine\n')
+    const to = drop(p)
+    await gitWorkspacePort.detach(wt, to)
+    expect(readFileSync(join(wt, 'libs', 's', 'mine.txt'), 'utf8')).toBe('mine\n')
+    expect(existsSync(join(wt, 'libs', 's', '.git'))).toBe(true)
+  })
+
+  it("HI-3078: a revision that keeps the submodule: its checkout untouched", async () => {
+    const { p, wt } = setUpWorktree()
+    const to = commit(p, { 'other.txt': 'o\n' }, 'other')
+    expect(await gitWorkspacePort.prepare(wt, 'cw/next', to)).toMatchObject({ ok: true })
+    expect(existsSync(join(wt, 'libs', 's', '.git'))).toBe(true)
+    expect(readFileSync(join(wt, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
   })
 
   it("an untracked file inside the submodule, hidden by the user's ignore setting from the slot's own check: kept", async () => {

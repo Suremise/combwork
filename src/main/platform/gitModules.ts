@@ -379,9 +379,11 @@ export async function removeLeftSubmodules(x: GitFilesExec, folder: string, gitD
  * clones' checkouts, as removeLeftSubmodules decides them (a private module whose core.worktree is a literal path
  * strictly inside, no link on the way, whose `.git` file names it back); the clone stays, for the files step to use
  * again. Anything doubtful is left as it is, for git to name. A read git couldn't make, or a removal that failed: its
- * words (nothing else removed after it).
+ * words (nothing else removed after it). HI-3078: `keepChanged` (a slot, someone's work folder) leaves a checkout whose
+ * own status lists anything (a change or an untracked file, in a nested submodule too) for git to name, removing only a
+ * clean one (its ignored files with it, as `git submodule deinit` does); its commits stay in the clone either way.
  */
-export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, folder: string, revisions: string[]): Promise<string | null> {
+export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, folder: string, revisions: string[], o?: { keepChanged?: boolean }): Promise<string | null> {
   const dirR = await x.git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
   if (!dirR.ok) return firstLine(dirR)
   const gitDir = dirR.out.trim()
@@ -404,6 +406,11 @@ export async function clearSubmoduleCheckouts(x: Pick<GitFilesExec, 'git'>, fold
       if (!nul(at.out).some((e) => e.startsWith('160000 ') && e.slice(e.indexOf('\t') + 1) === rel)) kept = false
     }
     if (kept) continue
+    if (o?.keepChanged) {
+      const st = await x.git(full, ['status', '--porcelain', '-z', '--untracked-files=all', '--ignore-submodules=none'])
+      if (!st.ok) return firstLine(st)
+      if (st.out.replace(/\0/g, '').trim()) continue
+    }
     const err = await removeTree(full, { recursive: true, force: true }).then(
       () => null,
       (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -483,7 +490,7 @@ export async function submoduleWorkKept(x: Pick<GitFilesExec, 'git'>, folder: st
   const all = await everyClone(gitDir)
   if (!('clones' in all)) return all.error ? stored(T.workUnread, { path: all.path, error: all.error }) : stored(T.workOdd, { path: all.path })
   for (const c of all.clones) {
-    const r = await x.git(c.dir, [`--git-dir=${c.dir}`, 'rev-list', '-n1', '--all', '--not', '--remotes'])
+    const r = await x.git(c.dir, [...cloneOnly(c.dir), 'rev-list', '-n1', '--all', '--not', '--remotes'])
     if (!r.ok) return stored(T.workUnread, { path: c.rel, error: firstLine(r) })
     if (!r.out.trim()) continue
     const kept = await keptPastRemoteTags(x, c.dir)
@@ -504,16 +511,16 @@ const LOCAL_TAGS_BUDGET = 16_000
  * can't be read is an error, never taken for "nothing there"; so many local tags they can't be named keeps it.
  */
 async function keptPastRemoteTags(x: Pick<GitFilesExec, 'git'>, dir: string): Promise<{ kept: boolean } | { error: string }> {
-  const gd = `--git-dir=${dir}`
-  const tagsR = await x.git(dir, [gd, 'for-each-ref', '--format=%(objectname) %(refname:strip=2)', 'refs/tags'])
+  const gd = cloneOnly(dir)
+  const tagsR = await x.git(dir, [...gd, 'for-each-ref', '--format=%(objectname) %(refname:strip=2)', 'refs/tags'])
   if (!tagsR.ok) return { error: firstLine(tagsR) }
   const tags = lines(tagsR.out)
   if (!tags.length) return { kept: true }
-  const remotesR = await x.git(dir, [gd, 'remote'])
+  const remotesR = await x.git(dir, [...gd, 'remote'])
   if (!remotesR.ok) return { error: firstLine(remotesR) }
   const theirs = new Set<string>()
   for (const remote of lines(remotesR.out)) {
-    const ls = await x.git(dir, [gd, 'ls-remote', '--tags', '--refs', remote], { env: { ...NO_PROMPT } })
+    const ls = await x.git(dir, [...gd, 'ls-remote', '--tags', '--refs', remote], { env: { ...NO_PROMPT } })
     if (!ls.ok) return { error: firstLine(ls) }
     for (const l of lines(ls.out)) {
       const m = /^([0-9a-f]+)\trefs\/tags\/(.+)$/.exec(l)
@@ -526,12 +533,18 @@ async function keptPastRemoteTags(x: Pick<GitFilesExec, 'git'>, dir: string): Pr
   const minePos = mine.map((t) => t.slice(0, t.indexOf(' ')))
   const mineExcl = mine.map((t) => `--exclude=${t.slice(t.indexOf(' ') + 1)}`)
   if ([...minePos, ...mineExcl].reduce((n, a) => n + a.length + 1, 0) > LOCAL_TAGS_BUDGET) return { kept: true }
-  const r = await x.git(dir, [gd, 'rev-list', '-n1', '--exclude=refs/tags/*', '--all', ...minePos, '--not', '--remotes', ...mineExcl, '--tags'])
+  const r = await x.git(dir, [...gd, 'rev-list', '-n1', '--exclude=refs/tags/*', '--all', ...minePos, '--not', '--remotes', ...mineExcl, '--tags'])
   if (!r.ok) return { error: firstLine(r) }
   return { kept: !!r.out.trim() }
 }
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.trim())
+
+/**
+ * A clone's refs read by itself: its git dir, and that same folder for its work tree, so the clone's core.worktree (its
+ * checkout, which a revision without the submodule no longer has: HI-3078) is never entered.
+ */
+const cloneOnly = (dir: string): string[] => [`--git-dir=${dir}`, `--work-tree=${dir}`]
 
 // ---- git-lfs ----
 

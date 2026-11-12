@@ -8146,12 +8146,18 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   gitlink there now), by `git clean -ffdx` of that path with literal pathspecs; its clone stays. Read from the copy's
   git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
   another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
-  with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
+  with it; a copy whose setup failed goes as any does.
   A copy's reset (HI-3028) removes such a checkout before its checkout too, where the revision has ordinary files at
   that path (the submodule vendored), as the queue's folder does below (`clearSubmoduleCheckouts`): a forced checkout
   would write those files into the old checkout and `clean -fd` keep its `.git` file, so git run inside would see the
-  old clone. Its clone stays, so a later lease at a revision with the submodule sets it up again. A slot switches its
-  branch rather than resetting, which git refuses over such a folder.
+  old clone. Its clone stays, so a later lease at a revision with the submodule sets it up again.
+  A slot (HI-3078) switches its branch rather than resetting: git's switch refuses over such a folder where the
+  revision has ordinary files there, and leaves it, `.git` file and all, untracked where the revision has nothing. So
+  a slot's move to a revision (a card's line prepared, a free slot detached at its target, a retarget) first removes
+  each of its own submodule checkouts, claimed as the queue's folder's are, that the revision doesn't keep as a
+  submodule, but only a checkout whose own status lists nothing (`--untracked-files=all --ignore-submodules=none`;
+  its ignored files go with it, as `git submodule deinit` does): one with a change or an untracked file is left for
+  git to name. Its clone, and so its commits, stay. A slot whose git dir holds no clones runs no git for it.
   The merge queue's folder (HI-3027) removes such a checkout earlier: just before its test merge, strict's update or
   a rebase, each checkout of its own clones (as above, but claimed whether or not a gitlink is there now) that the
   revision checked out or the one merged into it doesn't keep as a submodule (vendored into ordinary files, or gone),
