@@ -267,6 +267,7 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
   const r = (): Promise<SlotRenamer> => import('./workspaceMove').then((m) => m.worktreeRenamer(ws, projectPath))
   return {
     identity: async (f) => (await r()).identity(f),
+    unmovable: async (f) => (await r()).unmovable?.(f) ?? null,
     copy: async (a, b, who) => (await r()).copy(a, b, who),
     move: async (a, b, t) => (await r()).move(a, b, t),
     follow: async (a, b, t) => (await r()).follow(a, b, t),

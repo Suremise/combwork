@@ -1480,6 +1480,8 @@ function intentOf(v: string): RenameIntent | null {
 export interface SlotRenamer {
   /** A worktree's identity, stable through git's moves (its administrative folder); null when it isn't one git knows. */
   identity(folder: string): Promise<string | null>
+  /** HI-3026: why git can't move this worktree at all (it holds submodule clones), else null; asked before anything is copied. */
+  unmovable?(folder: string): Promise<string | null>
   /** Before git's move: each CLI's per-folder data copied for the new path; false when any of it couldn't be. */
   copy(from: string, to: string, who: string): Promise<boolean>
   /** Git's move of the worktree `tree`; true only when that worktree is then at exactly `to` (else moved back). */
@@ -2920,6 +2922,9 @@ export class SlotPool {
     return this.op(token, async () => {
       const tree = await this.deps.renamer!.identity(s.folder).catch(() => null)
       if (!tree) return log.info(`Slot ${userText(name)} keeps its name: its folder isn't a worktree git knows`), null
+      // HI-3026: one git can't move at all keeps its name before anything is copied or reserved; a read that failed too.
+      const unmovable = await (this.deps.renamer!.unmovable?.(s.folder) ?? Promise.resolve(null)).catch((e: unknown) => (e instanceof Error ? e.message : String(e)))
+      if (unmovable) return log.info(`Slot ${userText(name)} keeps its name: ${userText(unmovable)}`), null
       const intent = await this.store.startRename(name, s.state, token, await this.deps.holder.self(), this.deps.root, tree)
       if (!intent) return null
       return this.carryOut(name, token, intent, 'from', allowed)

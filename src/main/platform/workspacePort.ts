@@ -343,6 +343,8 @@ export interface Relocation {
   lineRemote(repo: string, line: string): Promise<string>
   /** A workspace moved from one folder to another by the tool. */
   move(repo: string, from: string, to: string): Promise<WorkspaceStep>
+  /** HI-3026: why the tool can't move this workspace at all (Git: it holds submodule clones), else null; asked before anything is copied. */
+  unmovable?(folder: string): Promise<string | null>
   /** The store's links to the workspaces now at `folders` made right again. */
   repair(repo: string, folders: string[]): Promise<WorkspaceStep & { code: number }>
   /** A line renamed. */
