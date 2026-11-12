@@ -6282,7 +6282,11 @@ focused pick, the submodules and LFS step's git, an OpenCode export) lists and e
 (`treeEnding` over `endTreeAsync`, `processTree.ts`), never `spawnSync`, which held main's thread, and so every pane's
 typing, for about 2.4 s each time. What came after the tree ended still does: the result, a time-out's grace, an OpenCode
 worker's shutdown reply. Only cw-progress's own process keeps the blocking `endTree` (`tests/endTreeImports.test.ts`, in check:repo;
-`tests/treeEndingOffThread.test.ts` for each caller's behaviour).
+`tests/treeEndingOffThread.test.ts` for each caller's behaviour). A command that exits while its tree is being looked
+for (the MSYS search, the listing) has no tree walked from its pid (HI-3054): Windows may already have given that number
+to another process, so only its marked MSYS programs and what they started are ended. Its pid is taken as its own only
+while Node still holds its handle, i.e. it hasn't exited when the listing is read (`tests/processTreeRootReuse.test.ts`,
+mock-only).
 
 **The runner's git** (HI-2079): its git commands with no time bound (reads, and its writes in its own folder and refs)
 run in one **git host** per lease, a process put in the job and recorded as a launcher is, before it runs anything; each
