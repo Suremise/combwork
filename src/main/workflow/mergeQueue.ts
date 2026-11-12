@@ -500,6 +500,8 @@ const lostIsNull = (e: unknown): null => {
 export class MergeQueue {
   /** Entries a restart's recovery found should run again from the test merge. */
   private rerun = new Set<string>()
+  /** HI-3055: why the owed catch-up's last remote read couldn't tell (a pause of its destination, or git's words), if it couldn't. */
+  private unread: { pause: PauseReason; files?: string[]; message?: string } | null = null
 
   constructor(
     readonly wf: Workflow,
@@ -615,6 +617,11 @@ export class MergeQueue {
       if (owed) return owed
       const next = this.entries(target, true)[0]
       if (!next) return null
+      // HI-3055: a catch-up still owed (a read that couldn't tell) holds the next entry, whose publication would write its
+      // own catch-up over that journal (a recorded step's folder, files and phase lost). A remote that couldn't be read
+      // pauses with why (Resume reads it again); a local read that couldn't tell waits for the next look, as an advance's.
+      const pending = catchUpOf(this.wf.store.meta(catchUpKey(target)))
+      if (pending) return this.unread ? this.catchUpPause(target, pending, this.unread.pause, this.unread.files, this.unread.message) : null
       return this.thenPush(target, await this.process(next.card, next.entry))
     }).catch(lostIsNull)
   }
@@ -1016,6 +1023,7 @@ export class MergeQueue {
    * `published`: the entry this run has just published (HI-3041: its catch-up needn't ask the remote again).
    */
   private async settleCatchUp(target: string, published?: string): Promise<QueueOutcome | null> {
+    this.unread = null
     for (let i = 0; i < 3; i++) {
       const c = catchUpOf(this.wf.store.meta(catchUpKey(target)))
       if (!c) return null
@@ -1138,16 +1146,24 @@ export class MergeQueue {
   /**
    * HI-3041: whether the remote still has an owed catch-up's result, fetched now into the target's own catch-up pin
    * (overwritten each time, as slots' `refs/cw/fetch/<target>`). Null when it can't tell (no transport, a destination
-   * that pauses, a failed fetch, an unreadable history).
+   * that pauses, a failed fetch, an unreadable history); a destination's pause or a failed fetch says why in `unread`.
    */
   private async remoteHas(target: string, c: CatchUp): Promise<boolean | null> {
     const I = this.catchUpPort(c)!
+    this.unread = null
     if (!I.destination || !I.fetchHead) return null
     const h = this.host({})
     const d = await I.destination(h, target)
-    if (isAgain(d) || 'pause' in d) return null
+    if (isAgain(d)) return null
+    if ('pause' in d) {
+      this.unread = { pause: d.pause, ...(d.files?.length ? { files: d.files } : {}) }
+      return null
+    }
     const f = await I.fetchHead(h, d.snapshot, catchUpPin(target))
-    if ('failed' in f) return null
+    if ('failed' in f) {
+      this.unread = { pause: 'fetchFailed', message: f.failed }
+      return null
+    }
     const has = await I.contains(this.project, c.to, f.head)
     return isUnknown(has) ? null : has
   }
