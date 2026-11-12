@@ -6025,20 +6025,27 @@ touched:
   the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
   over it. Files' Commit it refuses `.gitignore` in that state the same way. Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
-  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
-  intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked` with those paths, named
+  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
+  its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
   after it made one is said with that stash, kept. **Bounded** (HI-3021): a commit or stash still running after two
   minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
-  running). The commit runs with git's trace (`GIT_TRACE2_EVENT=2`, readCommitStream); its `index.lock` is removed
-  only when proved its own (HR2 on HI-3021: a time alone proves nothing, as another program can take the lock once
-  git gives it up): the child running when git was ended is one git runs only while holding the lock (pre-commit,
-  prepare-commit-msg, commit-msg, the signer), and the lock was made after git started and no later than that child,
-  checked again as it is moved aside. A commit ended after it was made (in post-commit: the branch moved) is made, and
-  said so; the intent-to-add entries are taken out, and the refusal says what happened (*Git didn't finish the commit
-  in 120 seconds …*). A stash takes and gives up the lock step by step, so nothing proves one its own: never removed.
-  A lock left is named in the refusal for the user to delete, and any stash made by then. **Any number of files** (HI-2983): the paths go to git on its input
+  running). **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
+  `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
+  (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too), so the real index and its lock
+  are never held while a hook, filter or signer runs, and the user's own `git add` works meanwhile. Combwork never
+  removes an `index.lock`: what git leaves is the copy's, removed with the copy and every file git named after it (a
+  stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
+  or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
+  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in, tried
+  again briefly while another git holds the index; their stat data left empty rather than refreshed, which could run
+  a filter unbounded); every other entry is left. That step failing is said with the commit or stash made (*Git made
+  the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
+  is as it was. A commit ended after it was made (post-commit: HEAD read and moved) is made; HEAD unreadable before
+  the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
+  unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
+  then. **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters

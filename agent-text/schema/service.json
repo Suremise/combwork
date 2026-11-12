@@ -308,9 +308,7 @@
   },
   "service.folderChanges.commitTimedOut": {
     "placeholders": {
-      "seconds": "number",
-      "lockLeft": "select",
-      "lock": "plain"
+      "seconds": "number"
     }
   },
   "service.folderChanges.deletedKept": {
@@ -325,6 +323,13 @@
   },
   "service.folderChanges.indexBusy": {
     "placeholders": {}
+  },
+  "service.folderChanges.indexNotTaken": {
+    "placeholders": {
+      "action": "select",
+      "made": "plain",
+      "why": "plain"
+    }
   },
   "service.folderChanges.midOperation": {
     "placeholders": {
@@ -372,9 +377,7 @@
     "placeholders": {
       "seconds": "number",
       "made": "select",
-      "stash": "plain",
-      "lockLeft": "select",
-      "lock": "plain"
+      "stash": "plain"
     }
   },
   "service.folderChanges.tooManyToSetAside": {
