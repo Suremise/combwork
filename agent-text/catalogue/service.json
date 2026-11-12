@@ -384,6 +384,11 @@
     "note": "HI-2944: an error from Commit or Set aside: git's index is locked by another git command.",
     "audience": "both"
   },
+  "service.folderChanges.indexKept": {
+    "text": "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.",
+    "note": "HI-3053: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command.",
+    "audience": "both"
+  },
   "service.folderChanges.indexNotTaken": {
     "text": "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.",
     "note": "HI-3021: an error from Commit or Set aside (a paused merge, a start's warning): git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands.",

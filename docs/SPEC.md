@@ -6137,12 +6137,19 @@ touched:
   `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
   (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too), so the real index and its lock
   are never held while a hook, filter or signer runs, and the user's own `git add` works meanwhile. Combwork never
-  removes an `index.lock`: what git leaves is the copy's, removed with the copy and every file git named after it (a
+  removes an `index.lock` it didn't make: what git leaves is the copy's, removed with the copy and every file git named after it (a
   stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
   or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
-  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in, tried
-  again briefly while another git holds the index; their stat data left empty rather than refreshed, which could run
-  a filter unbounded); every other entry is left. That step runs nothing of the repository's (HR2's rounds 3 and
+  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in; their stat
+  data left empty rather than refreshed, which could run a filter unbounded); every other entry is left. **Another
+  git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
+  `git add` of a path being committed can land before that step. So the step takes the real index's lock as git does
+  (`index.lock`, made only if none is there; tried again briefly while another git holds it, and only that lock ever
+  removed), compares each path's real entries with those it had when the copy was taken, writes the new index into a
+  scratch file beside the copy (`update-index` with `GIT_INDEX_FILE`) and renames it in through the lock, as git
+  commits a lock. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
+  in, and the refusal names the commit or stash made and the path kept (*Git made the commit (…), but another git
+  command staged a.txt meanwhile, so Combwork kept that staging as it was …*). That step runs nothing of the repository's (HR2's rounds 3 and
   4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
   as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
   can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it

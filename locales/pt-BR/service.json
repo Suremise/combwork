@@ -78,6 +78,7 @@
   "service.folderChanges.detached": "{folder} não está em um branch, então o Combwork não faz commit ali.",
   "service.folderChanges.indexBusy": "Outro comando git está usando o repositório. Tente de novo em instantes.",
   "service.folderChanges.indexNotTaken": "{action, select, commit {O Git fez o commit ({made})} other {O Git deixou as alterações de lado em um stash ({made})}}, mas o Combwork não conseguiu atualizar o índice desses arquivos depois: {why}. Até ele ser atualizado, o git status pode mostrá-los como alterados no índice: quando nenhum comando git estiver rodando, execute git reset neles.",
+  "service.folderChanges.indexKept": "{action, select, commit {O Git fez o commit ({made})} other {O Git deixou as alterações de lado em um stash ({made})}}, mas outro comando git preparou {file}{others, plural, =0 {} one { e mais um arquivo} many { e mais # arquivos} other { e mais # arquivos}} nesse meio-tempo, então o Combwork manteve esse estado do índice como estava. Confira o git status antes de continuar.",
   "service.folderChanges.midOperation": "O Git está no meio de {state, select, merge {um merge} rebase {um rebase} cherryPick {um cherry-pick} other {um revert}} em {folder}. Conclua ou aborte essa operação primeiro.",
   "service.folderChanges.moved": "O lugar onde {target} está em checkout mudou nesse meio-tempo. Confira de novo.",
   "service.folderChanges.nestedRepo": "{folder} é um repositório Git próprio dentro deste, então o Combwork não faz commit dele nem o deixa de lado. Adicione-o você mesmo ao .gitignore ou como submódulo.",

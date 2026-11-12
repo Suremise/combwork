@@ -41,6 +41,8 @@ let beforeRestore: { file: string; text: string } | null = null
 let gitCalls: { args: string[]; timeout?: number }[] | null = null
 /** HI-3021: the next `rev-parse --verify HEAD` fails as an unreadable HEAD does (not an unborn branch's exit 1). */
 let failHeadOnce = false
+/** HI-3053: run with the folder once the next commit or `stash push` is made, before Combwork takes its entries in. */
+let afterMade: ((cwd: string) => void) | null = null
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -67,6 +69,12 @@ vi.mock('../src/main/git', async (original) => {
         lateFile = null
       }
       const r = await real.git(cwd, args, max, input, opts)
+      if (afterMade && r.ok && (args[0] === 'commit' || (args[0] === 'stash' && args[1] === 'push'))) {
+        // HI-3053: another git's work once the commit or stash is made, before its entries are taken into the real index.
+        const then = afterMade
+        afterMade = null
+        then(cwd)
+      }
       if (failStashAfter && args[0] === 'stash') {
         failStashAfter = false
         return { ...r, ok: false, code: 1, err: 'error: could not write index' }
@@ -142,6 +150,7 @@ beforeEach(() => {
   failStashAfter = false
   failLstatOf = null
   lateFile = null
+  afterMade = null
 })
 
 describe('Commit', () => {
@@ -526,6 +535,73 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'config', '--unset', 'hook.My.Slow.event')
     expect(lines()).toEqual([])
     expect(existsSync(lockPath())).toBe(false)
+  })
+
+  // HI-3053: the real index is free while the commit or stash runs, so another git can stage a shown path meanwhile.
+  it('Commit: a shown path staged by another git after the commit is made and before its entries are taken in keeps that staging; the other shown path and an unshown staged one as they should be; said with the commit', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'content Combwork commits\n')
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    writeFileSync(join(proj, 'b.txt'), 'staged by the user before\n')
+    sh(proj, 'add', 'b.txt')
+    afterMade = (cwd) => {
+      writeFileSync(join(cwd, 'a.txt'), 'concurrently staged snapshot\n')
+      sh(cwd, 'add', 'a.txt')
+      writeFileSync(join(cwd, 'a.txt'), 'later unstaged text\n')
+    }
+    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
+    expect(afterMade).toBeNull()
+    expect(committed()).toEqual(['a.txt', 'new.txt'])
+    expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('content Combwork commits')
+    expect(String(err)).toContain(`Git made the commit (${head().slice(0, 12)}), but another git command staged a.txt meanwhile`)
+    // The other git's staging kept, never written over; new.txt taken in; b.txt still staged as it was.
+    expect(sh(proj, 'show', ':a.txt')).toBe('concurrently staged snapshot')
+    expect(read('a.txt')).toBe('later unstaged text\n')
+    expect(sh(proj, 'show', ':b.txt')).toBe('staged by the user before')
+    expect(lines()).toEqual(['M  b.txt', 'MM a.txt'])
+    expect(existsSync(lockPath())).toBe(false)
+    expect(leftovers()).toEqual([])
+  })
+
+  it('Set Aside: a shown path staged by another git after the stash is made keeps that staging; said with the stash', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside\n')
+    writeFileSync(join(proj, 'b.txt'), 'b set aside too\n')
+    afterMade = (cwd) => {
+      writeFileSync(join(cwd, 'a.txt'), 'concurrently staged snapshot\n')
+      sh(cwd, 'add', 'a.txt')
+    }
+    const err = await settle('setAside', ['a.txt', 'b.txt']).catch((e: Error) => e)
+    expect(afterMade).toBeNull()
+    const made = sh(proj, 'rev-parse', 'refs/stash')
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('set aside')
+    expect(String(err)).toContain(`Git set the changes aside in a stash (${made.slice(0, 12)}), but another git command staged a.txt meanwhile`)
+    expect(sh(proj, 'show', ':a.txt')).toBe('concurrently staged snapshot')
+    expect(lines()).toEqual(['M  a.txt'])
+    expect(existsSync(lockPath())).toBe(false)
+    expect(leftovers()).toEqual([])
+  })
+
+  it('a shown path another git staged to the same entry it had (nothing changed) is taken in as usual: made, nothing said', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    // git add of a file unchanged since HEAD: its entry is as it was.
+    afterMade = (cwd) => void sh(cwd, 'add', 'b.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(lines()).toEqual([])
+  })
+
+  it("HI-3053 (HR1's round 1): the paths another git changed found in one pass, never a scan per path: 50,000 selected", () => {
+    const files = Array.from({ length: 50_000 }, (_, i) => `f${i}`)
+    const was = files.map((p, i) => `100644 ${String(i).padStart(40, '0')} 0\t${p}`)
+    // f7 restaged, f9 put in conflict (its stages in another order), f11 gone; the rest the same, listed in reverse.
+    const now = [...was].reverse().filter((e) => !/\tf(7|9|11)$/.test(e))
+    now.push(`100644 ${'7'.repeat(40)} 0\tf7`, `100644 ${'9'.repeat(40)} 3\tf9`, `100644 ${'9'.repeat(40)} 2\tf9`)
+    const t = performance.now()
+    expect(changes.changedPaths(files, was, now)).toEqual(['f7', 'f9', 'f11'])
+    // A bound for a hung run, not how long it should take (a scan per path took seconds at 5,000).
+    expect(performance.now() - t).toBeLessThan(5_000)
+    // A path's entries in another order are the same.
+    expect(changes.changedPaths(['c'], ['100644 a 2\tc', '100644 b 3\tc'], ['100644 b 3\tc', '100644 a 2\tc'])).toEqual([])
+    expect(changes.changedPaths(['new'], [], ['100644 a 0\tnew'])).toEqual(['new'])
   })
 
   it('entries compared whatever their order, each side sorted once (HR2\'s round 4): 50,000 a side', () => {
