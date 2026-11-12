@@ -26,7 +26,7 @@ import { foundKey, platformIdOf, projectPlatform } from '../platform/registry'
 import { needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
-import * as G from '../platform/git'
+import { workspacePortOf } from '../platform/workspacePorts'
 import { withValues } from '../../shared/advanced'
 import type { ProjectConfig, ProjectWorkflow } from '../../shared/types'
 import { onAfterRefresh, openWorkspaces, type WorkspaceService } from '../workspace'
@@ -512,16 +512,17 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
 }
 
 /**
- * HI-3106: a project switched to jj whose jj options, as they resolve (its own, the workspace's, Combwork's), name no
- * target bookmark gets Git's target as its own: the one Git's options name, else the repository's default branch, which
- * a colocated jj repository has as a bookmark of the same name. jj resolves no default, so with none every start would
- * be refused. Nothing changes when jj's options already name one, or Git's target can't be read.
+ * HI-3106: a project switched to a platform with no default target (jj: its descriptor's `defaultTarget` false) whose
+ * options there, as they resolve (its own, the workspace's, Combwork's), name none gets the platform left's as its own:
+ * the target its options resolve to, else its repository's default line (its port's `defaultLine`; Git's default branch,
+ * which a colocated jj repository has as a bookmark of the same name). Without one no card could start there. Nothing
+ * changes when the options already name one, or the platform left's target can't be read.
  */
 async function seedJjTarget(ws: WorkspaceService, path: string, was: ProjectWorkflow, next: ProjectWorkflow): Promise<ProjectWorkflow> {
-  if (next.platform !== 'jj' || resolvedOf(ws, path, 'jj', { workflow: next }).options.target) return next
-  const gitTarget = was.platform === 'git' ? resolvedOf(ws, path, 'git', { workflow: was }).options.target : ''
-  const target = gitTarget || (await G.defaultBranch(path).catch(() => null))
-  return typeof target === 'string' && target ? { ...next, options: { ...next.options, target } } : next
+  if (!needsRepository(next.platform) || PLATFORMS[next.platform].defaultTarget || resolvedOf(ws, path, next.platform, { workflow: next }).options.target) return next
+  const leftTarget = needsRepository(was.platform) ? resolvedOf(ws, path, was.platform, { workflow: was }).options.target : ''
+  const line = leftTarget || (needsRepository(was.platform) ? await workspacePortOf(was.platform)?.defaultLine(path).catch(() => null) : null)
+  return typeof line === 'string' && line ? { ...next, options: { ...next.options, target: line } } : next
 }
 
 /** A switch's owner: this process, by its id and (HI-3073) its start time, as slots record their holders'. */
