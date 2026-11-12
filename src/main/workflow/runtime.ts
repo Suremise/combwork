@@ -916,6 +916,8 @@ export class Workflow {
   /** The intents an agent can use from a stage under a ruleset (§16.7.2's table): what a refusal offers as the next step. */
   movesFrom(stage: StageId, r?: Ruleset, s?: CardState): string[] {
     const o = r?.options
+    // HI-3086: a forward merge's own (the user's or the Assistant's): no agent's intent applies to it.
+    if (s?.forward) return stage === 'active' ? ['retry merge', 'resolve on a builder', 'remove from queue'] : stage === 'approved' || stage === 'merging' ? ['remove from queue'] : [] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     switch (stage) {
       case 'todo':
         return ['start']
@@ -2581,6 +2583,9 @@ export class Workflow {
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
+    // HI-3086: a forward merge (HI-2679) goes only where it stays one (forwardMoves); its other ways are its controls.
+    const fm = this.forwardMoves(card, s)
+    if (fm && !fm.includes(to)) return this.refuse(card, by, 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'move', moves: this.movesFrom(from, this.rulesetOf(card, s), s).join(', ') } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // `dry` (the user's, #1275): only whether it would ask, and which rules; nothing written (a window Start asks first).
     if (opts.dry && by !== 'user') throw new Error('a dry move is the user\'s') // i18n-ignore: a programming error, never shown
     // The Assistant's move on, while the card waits for the user at its round limit: only the user's answer resumes it.
@@ -2663,6 +2668,26 @@ export class Workflow {
     // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
     const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
     return this.ok(card, from, to, undefined, waiting.length ? [say(W.doneByOverride, { cards: waiting.join(', '), card: card.key })] : undefined)
+  }
+
+  /**
+   * HI-3086: the stages a forward merge (HI-2679) can be moved to by the user or the Assistant, null for any other card.
+   * It has no builder and no line, and is started only by its request: Todo would give it the project's rules now, a start
+   * from there (or a Done one reopened) a new `Started` that drops its `forward` (an ordinary card on the default target),
+   * and a drag on past where it was a builder's intents (submit, review). So: On Hold and back to where it was, back into
+   * Active (where Retry merge and Resolve on a builder take it on), and Done (nothing merged, as Remove from queue); a
+   * Done one stays Done.
+   */
+  forwardMoves(card: CardRecord, s: CardState = this.state(card)): StageId[] | null {
+    if (!s.forward) return null
+    if (s.stage === 'done') return ['done']
+    if (s.stage === 'hold') {
+      const back = [...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')
+      const was = back?.data.from ?? 'active'
+      return [...new Set<StageId>(['hold', was === 'todo' ? 'active' : was, 'active', 'done'])]
+    }
+    // Queued (Merging): back into Active takes it out of the queue, still a forward, Retry merge's to send again.
+    return [...new Set<StageId>([s.stage, 'active', 'hold', 'done'])]
   }
 
   /**

@@ -76,6 +76,9 @@ describe('the forward request (HI-2679)', () => {
     // HI-3084: queued, the window's queue names it a forward, so Remove's confirmation says it ends in Done.
     const listed = (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))).find((v) => v.target === '1.2.0')
     expect(listed?.queued).toMatchObject([{ card: card!.number, forward: { from: 'main', to: '1.2.0' } }])
+    // HI-3086: the board offers a drop only where it stays a forward: never Todo, Review, or Passed by a drag on.
+    const tasksMod = await import('../src/main/tasks')
+    expect(await inWorkspace(w, () => tasksMod.moveColumns(card!.number))).toEqual(['hold', 'doing', 'passed', 'done'])
     // The same pair again while it is open: that card, nothing new.
     const again = await ask('main', '1.2.0')
     expect(again).toMatchObject({ queued: false, card: { number: card!.number } })

@@ -1950,6 +1950,9 @@ export async function moveColumns(n: number): Promise<TaskColumn[] | null> {
   })()
   if (!wf || !rec || rec.preWorkflow) return null
   const s = wf.state(rec)
+  // HI-3086: a forward merge only where it stays one (its runtime refuses the rest).
+  const fm = wf.forwardMoves(rec, s)
+  if (fm) return TASK_COLUMNS.map((c) => c.id).filter((c) => c === head.column || fm.some((x) => STAGE_CATEGORY[x] === c))
   const r = wf.rulesetOf(rec, s.stage === 'done' ? { ...s, stage: 'todo' } : s)
   return TASK_COLUMNS.map((c) => c.id).filter((c) => c === 'hold' || c === head.column || r.stages.some((x) => STAGE_CATEGORY[x.id] === c))
 }

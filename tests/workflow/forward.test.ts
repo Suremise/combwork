@@ -216,3 +216,74 @@ describe('a forward merge (HI-2679)', () => {
     expect(e.wf.state(card).entries).toHaveLength(1)
   })
 })
+describe('a forward merge goes only where it stays one (HI-3086)', () => {
+  /** A forward of main into 1.2.0 the queue returned for a conflict (1.2.0 changed fix.txt too), waiting in Active. */
+  async function returnedForward() {
+    const e = project()
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    commit(e.project, { 'fix.txt': 'the 1.2.0 version\n' }, '1.2.0 changes it too')
+    sh(e.project, 'checkout', '-q', '--detach')
+    const { card } = await forward(e)
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    expect(e.wf.state(card).stage).toBe('active')
+    return { e, card }
+  }
+  /** Refused as not possible from where it is, naming its own ways on; nothing written, still the forward it was. */
+  const refusedAndKept = async (e: Env, card: { id: number; key: string }, to: Parameters<Env['wf']['move']>[1], by: 'user' | 'assistant' = 'user') => {
+    // Its facts but a refusal's own record (the Assistant's `Refused`).
+    const kept = () => e.wf.store.facts(card.id).filter((f) => f.kind !== 'Refused').length
+    const before = kept()
+    const stage = e.wf.state(card).stage
+    const r = await e.wf.move(card.key, to, by, { confirm: true, reason: 'by hand', builder: 'B1' })
+    expect(isRefusal(r) && r.rule).toBe('move.notFromHere')
+    expect(kept()).toBe(before)
+    expect(e.wf.state(card)).toMatchObject({ stage, forward: { from: 'main', to: '1.2.0' }, started: { line: null, target: '1.2.0', builder: 'combwork' } })
+    return r
+  }
+
+  it('returned: Todo, a start and a drag on past it are refused, the user’s or the Assistant’s, naming its controls', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, card } = await returnedForward()
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toEqual(['active', 'hold', 'done'])
+    const r = await refusedAndKept(e, card, 'todo')
+    expect(JSON.stringify(r)).toContain('retry merge, resolve on a builder, remove from queue')
+    for (const to of ['review', 'approved', 'merging'] as const) await refusedAndKept(e, card, to)
+    await refusedAndKept(e, card, 'todo', 'assistant')
+    // Still returned: Resolve on a builder (and Retry) take it on.
+    expect(e.wf.returnedForward(e.wf.store.card(card.id))).not.toBeNull()
+  })
+
+  it('On Hold and back to Active, and Done (nothing merged), stay its; out of On Hold or Done, never Todo or a reopening', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, card } = await returnedForward()
+    moved(await e.wf.move(card.key, 'hold', 'user'))
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toEqual(['hold', 'active', 'done'])
+    await refusedAndKept(e, card, 'todo')
+    await refusedAndKept(e, card, 'review')
+    moved(await e.wf.move(card.key, 'active', 'user', { confirm: true }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'active', forward: { from: 'main', to: '1.2.0' } })
+    expect(e.wf.returnedForward(e.wf.store.card(card.id))).not.toBeNull()
+    moved(await e.wf.move(card.key, 'done', 'user', { confirm: true }))
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.wf.store.facts(card.id).some((f) => f.kind === 'Integrated')).toBe(false)
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toEqual(['done'])
+    for (const to of ['todo', 'active', 'hold'] as const) await refusedAndKept(e, card, to)
+  })
+
+  it('queued: back into Active takes it out of the queue, still a forward, Retry merge’s to send again', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    const { card } = await forward(e)
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toEqual(['merging', 'active', 'hold', 'done'])
+    await refusedAndKept(e, card, 'todo')
+    moved(await e.wf.move(card.key, 'active', 'user', { confirm: true }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'active', forward: { from: 'main', to: '1.2.0' } })
+    expect(e.wf.state(card).entries.at(-1)?.state).toBe('cancelled')
+    expect(e.wf.returnedForward(e.wf.store.card(card.id))).not.toBeNull()
+  })
+
+  it('an ordinary card is moved as before', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    const card = e.wf.createCard({ title: 'ordinary' })
+    expect(e.wf.forwardMoves(e.wf.store.card(card.id))).toBeNull()
+    moved(await e.wf.move(card.key, 'hold', 'user'))
+    moved(await e.wf.move(card.key, 'todo', 'user'))
+  })
+})
