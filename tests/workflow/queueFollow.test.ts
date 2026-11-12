@@ -729,6 +729,24 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(owed?.phase).toBeUndefined()
   })
 
+  it('HI-3090 (HR2): a published merge that changes no file, stopped inside its catch-up, the folder then switched to another branch: run again, main brought there, never stuck', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    // A result that changes no file in the local target (a forward merge after a release, say) journals `files: []`. A
+    // card can't be published with no change of its own here (its submission is refused, and one already on the target
+    // is integrated outside), so the stop is a real one before its files moved, and its journal is the one Combwork
+    // writes for such a result: its list empty.
+    const { e, bare, transport } = await stoppedIn('beforeCatchUpFiles')
+    const journal = catchUpOf(e.store.meta(catchUpKey('main')))!
+    e.store.setMeta(catchUpKey('main'), JSON.stringify({ ...journal, files: [] }))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ phase: 'files', files: [] })
+    sh(e.project, 'switch', '-q', '-c', 'mine')
+    await restarted(e, transport).drain('main')
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+    expect(sh(e.project, 'branch', '--show-current')).toBe('mine')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
   it('HI-3090 (HR1): stopped between its files and its ref, the user commits only one of the two files it staged: the committed one never rolled back; the other kept staged; paused remoteDiverged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
     const { e, transport, a } = await stoppedIn('beforeCatchUpRef', { 'b.txt': 'B\n' })
     expect(sh(e.project, 'status', '--porcelain')).toBe('A  a.txt\nA  b.txt')

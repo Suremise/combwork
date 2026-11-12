@@ -1118,10 +1118,13 @@ export class MergeQueue {
 
   /**
    * HI-3090: whether every (or some) listed file of a catch-up is, in the folder's index and working copy, as `commit`
-   * has it (nothing staged or changed against it); null when that can't be read. No files listed: false.
+   * has it (nothing staged or changed against it); null when that can't be read. No list journalled: false (nothing to
+   * tell by). An empty list (a result that changes no file, as a forward merge after a release may: HR2's round 2): every
+   * one of none is as it was, and none is some.
    */
   private async asIn(I: IntegrationPort, h: ReturnType<MergeQueue['host']>, folder: string, files: string[] | undefined, commit: string, how: 'every' | 'some'): Promise<boolean | null> {
-    if (!files?.length) return false
+    if (!files) return false
+    if (!files.length) return how === 'every'
     const sd = await I.sides(h, folder, files, commit, commit)
     if (!sd) return null
     return how === 'every' ? sd.every((x) => x.side === 'expected') : sd.some((x) => x.side === 'expected')
