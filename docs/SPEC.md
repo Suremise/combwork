@@ -2146,7 +2146,11 @@ The **integration** capability's mechanics. The queue's state machine, its facts
 - `advance(ctx, target, expected, result, journal)` → `Advanced` · `Moved { actual }` · `Paused { condition, files }`
   (`folderBusy`, `wrongBranch`, `staged`, `unstagedChanges`) · `Terminal { state }` (§16.9.2's needs-you record) ·
   `Unknown`. Git: `update-ref <result> <expected>` for a target checked out nowhere, and the journaled `read-tree` /
-  `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2.
+  `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2. A branch a rebase is under way
+  for counts as checked out in that folder (HI-3081: `git worktree list` says `detached` then, but git writes the
+  branch back when the rebase ends and refuses if it moved, so an `update-ref` meanwhile left the user's rebase unable
+  to finish): its `rebase-merge` or `rebase-apply` `head-name` names it, so the queue pauses on that folder
+  (`wrongBranch`) rather than moving the branch.
 - `recover(ctx, journal)` → the same outcomes, classified from the journal's last phase **and** the state read now
   (§16.9.2's table); never assumed from the journal alone.
 - `publish(ctx, target, owed)` → `Published { pushed }` · `UpToDate { pushed }` · `NotHeld` (the target no longer

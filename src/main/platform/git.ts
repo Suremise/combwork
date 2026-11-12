@@ -6,7 +6,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
-import { access } from 'original-fs/promises'
+import { access, readFile } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
@@ -447,7 +447,8 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
   const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
-  return { line, head: oid, dirty: [...files, ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(subs.length ? { submodules: subs } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  // HI-3081: a path git lists twice (`D ` and `?`: Stop Tracking keeps the file) is one change, counted once.
+  return { line, head: oid, dirty: [...new Set(files), ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(subs.length ? { submodules: subs } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
 /**
@@ -709,12 +710,44 @@ export async function checkouts(repo: string): Promise<Maybe<Record<string, stri
   const r = await git(repo, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return withDetail(unknown(U.worktrees, { folder: repo }), r.err)
   const out: Record<string, string> = {}
+  const detached: string[] = []
   let folder = ''
   for (const l of lines(r.out)) {
     if (l.startsWith('worktree ')) folder = l.slice(9)
     else if (l.startsWith('branch refs/heads/')) out[l.slice(18)] = folder
+    else if (l === 'detached') detached.push(folder)
+  }
+  // HI-3081: a worktree a rebase has detached still has that branch checked out: git writes the branch back when the
+  // rebase ends (refusing if it moved meanwhile), so moving it from outside (the merge queue's `update-ref` "checked
+  // out nowhere") broke the user's rebase, and Commit and Set Aside said the branch wasn't checked out at all.
+  for (const f of detached) {
+    const rebasing = await rebasingBranch(f)
+    if (isUnknown(rebasing)) return rebasing
+    if (rebasing && !(rebasing in out)) out[rebasing] = f
   }
   return out
+}
+
+/** HI-3081: the branch a rebase under way in a worktree will write back (null: none under way). */
+async function rebasingBranch(folder: string): Promise<Maybe<string | null>> {
+  // Its git dir from `.git`, with no git process where it can say (most worktrees); else git's own answer.
+  const own = gitDirSync(folder)
+  let paths = own ? [join(own, 'rebase-merge', 'head-name'), join(own, 'rebase-apply', 'head-name')] : null
+  if (!paths) {
+    // A worktree whose folder is gone (prunable: a test merge's copy just removed) has nothing under way in it.
+    if (!existsSync(folder)) return null
+    const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'rebase-merge/head-name', '--git-path', 'rebase-apply/head-name'])
+    if (!r.ok) return withDetail(unknown(U.worktrees, { folder }), r.err)
+    paths = lines(r.out).map((l) => l.trim())
+  }
+  for (const p of paths) {
+    const name = await readFile(p, 'utf8').then(
+      (t) => t.trim(),
+      () => ''
+    )
+    if (name.startsWith('refs/heads/')) return name.slice(11)
+  }
+  return null
 }
 
 /** Makes a card's folder: a worktree on a new line from `base` (§16.10, the spike's stand-in for slots). */

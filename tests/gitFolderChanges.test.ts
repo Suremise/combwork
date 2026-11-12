@@ -112,7 +112,7 @@ vi.setConfig({ testTimeout: 60_000 })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
-const { worktreeNow } = await import('../src/main/platform/git')
+const { checkouts, worktreeNow } = await import('../src/main/platform/git')
 const { GitPlatform } = await import('../src/main/platform/gitPlatform')
 const { isUnknown } = await import('../src/main/platform/types')
 
@@ -1164,6 +1164,40 @@ describe('the folder and its state, checked under the lock', () => {
     expect(status()).toBe('M a.txt')
   })
 
+  // HI-3081: a rebase detaches HEAD, so `git worktree list` says `detached` and the branch looked checked out nowhere:
+  // Commit and Set Aside said so, and the merge queue moved the branch (`update-ref`) under the rebase, which then
+  // couldn't finish ("cannot lock ref … is at … but expected …").
+  const rebaseStopped = (): void => {
+    sh(proj, 'switch', '-q', '-c', 'side')
+    commit(proj, { 'a.txt': 'side\n' }, 'side')
+    sh(proj, 'switch', '-q', 'main')
+    commit(proj, { 'a.txt': 'mine\n' }, 'mine')
+    expect(() => sh(proj, 'rebase', 'side')).toThrow()
+    expect(sh(proj, 'worktree', 'list', '--porcelain')).toMatch(/^detached$/m)
+  }
+
+  it("a rebase of the branch under way (stopped on a conflict): it is still checked out in the folder, for the queue too; Commit and Set Aside say it's a rebase, nothing done", async () => {
+    rebaseStopped()
+    const where = await checkouts(proj)
+    if (isUnknown(where)) throw new Error('unknown')
+    expect(norm(where.main)).toBe(norm(proj))
+    const before = [status(), sh(proj, 'rev-parse', 'refs/heads/main')]
+    for (const action of ['commit', 'setAside'] as const) await expect(settle(action, ['a.txt'])).rejects.toThrow(/^Git is in the middle of a rebase in /)
+    expect([status(), sh(proj, 'rev-parse', 'refs/heads/main')]).toEqual(before)
+    sh(proj, 'rebase', '--abort')
+    // After it, the branch is checked out there as ever.
+    const after = await checkouts(proj)
+    if (isUnknown(after)) throw new Error('unknown')
+    expect(norm(after.main)).toBe(norm(proj))
+  })
+
+  it('a detached HEAD with no rebase under way: not counted as any branch checked out (as before)', async () => {
+    sh(proj, 'switch', '-q', '--detach')
+    const where = await checkouts(proj)
+    if (isUnknown(where)) throw new Error('unknown')
+    expect(where.main).toBeUndefined()
+  })
+
   it('a changed file whose name is in brackets is a file, not a git operation: Commit and Commit it go on beside it', async () => {
     writeFileSync(join(proj, '(draft).md'), 'a draft\n')
     mkdirSync(join(proj, '(notes)'), { recursive: true })
@@ -1463,5 +1497,60 @@ describe("Files' Commit it from a project in a larger repository (HI-2962)", () 
     await inRepoWorkspace(() => changes.commitIgnore(nested))
     expect(agentChecks.length).toBeGreaterThan(0)
     expect(agentChecks.every((c) => c.fenced !== null)).toBe(true)
+  })
+})
+
+// HI-3081: smaller shapes seen in hunt 7's probes.
+describe('a rename only in the folder, an intent-to-add file, an unborn branch, a path listed twice (HI-3081)', () => {
+  const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
+  const tree = (): string[] => sh(proj, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').filter(Boolean).sort()
+
+  it("a rename git sees in the folder only (' R', its new side intent-to-add): read as one rename; Commit of its new side takes both sides", async () => {
+    renameSync(join(proj, 'a.txt'), join(proj, 'n.txt'))
+    sh(proj, 'add', '-N', 'n.txt')
+    // (` R a.txt -> n.txt`: the helper trims its leading space.)
+    expect(sh(proj, 'status', '--porcelain=v1')).toBe('R a.txt -> n.txt')
+    const now = await changes.changedIn(proj)
+    expect([...now.keys()].sort()).toEqual(['a.txt', 'n.txt'])
+    expect(now.get('n.txt')).toMatchObject({ from: 'a.txt' })
+    // Nothing staged: the rename is the folder's alone.
+    expect(now.get('n.txt')?.staged).toBeUndefined()
+    expect(now.get('a.txt')?.staged).toBeUndefined()
+    await settle('commit', ['n.txt'])
+    expect(tree()).toContain('n.txt')
+    expect(tree()).not.toContain('a.txt')
+    expect(lines()).toEqual([])
+  })
+
+  it('an intent-to-add file: Set Aside takes it (as the untracked file it is), git stash pop brings it back; Commit works too', async () => {
+    writeFileSync(join(proj, 'n.txt'), 'new\n')
+    sh(proj, 'add', '-N', 'n.txt')
+    expect(lines()).toEqual(['A n.txt'])
+    await settle('setAside', ['n.txt'])
+    expect(existsSync(join(proj, 'n.txt'))).toBe(false)
+    expect(lines()).toEqual([])
+    expect(sh(proj, 'show', 'refs/stash^3:n.txt')).toBe('new')
+    sh(proj, 'stash', 'pop', '-q')
+    expect(read('n.txt')).toBe('new\n')
+    sh(proj, 'add', '-N', 'n.txt')
+    await settle('commit', ['n.txt'])
+    expect(tree()).toContain('n.txt')
+    expect(lines()).toEqual([])
+  })
+
+  it('Set Aside on a branch with no commit yet: refused saying so, never an empty reason; nothing done', async () => {
+    sh(proj, 'switch', '-q', '--orphan', 'fresh')
+    writeFileSync(join(proj, 'x.txt'), 'x\n')
+    const before = status()
+    await expect(settle('setAside', ['x.txt'], undefined, 'fresh')).rejects.toThrow(/^Git did not set the changes aside: the branch has no commit yet/)
+    expect(status()).toBe(before)
+  })
+
+  it('a path listed both as a staged removal and as untracked (Stop Tracking): one change in the folder\'s list, counted once', async () => {
+    sh(proj, 'rm', '--cached', '-q', 'b.txt')
+    expect(lines()).toEqual(['?? b.txt', 'D  b.txt'])
+    const now = await worktreeNow(proj)
+    if (isUnknown(now)) throw new Error('unknown')
+    expect(now.dirty.filter((f) => f === 'b.txt')).toHaveLength(1)
   })
 })

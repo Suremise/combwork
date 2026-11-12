@@ -409,6 +409,8 @@ interface Changed {
   staged?: boolean
   /** HI-3076: its file deleted from the folder, the deletion not staged (porcelain's Y column `D`). */
   gone?: boolean
+  /** HI-3081: added as intent-to-add (`git add -N`: porcelain's ` A`, or a rename's new side, ` R`). */
+  ita?: boolean
 }
 
 /** Porcelain v1's states of a path in conflict (git's `git status` short format). */
@@ -427,7 +429,8 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
     const unmerged = c.unmerged || was?.unmerged
     const staged = c.staged || was?.staged
     const gone = c.gone || was?.gone
-    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}), ...(staged ? { staged } : {}), ...(gone ? { gone } : {}) })
+    const ita = c.ita || was?.ita
+    out.set(path, { untracked: c.untracked || !!was?.untracked, ...(deleted ? { deleted } : {}), ...(from ? { from } : {}), ...(unmerged ? { unmerged } : {}), ...(staged ? { staged } : {}), ...(gone ? { gone } : {}), ...(ita ? { ita } : {}) })
   }
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
@@ -440,8 +443,14 @@ export async function changedIn(folder: string): Promise<Map<string, Changed>> {
       // HR1's round 1 (HI-3076): a staged rename's new side deleted since (`RD`) is gone too.
       put(path, { untracked: false, from, staged: true, gone: xy[1] === 'D' })
       if (from && xy[0] === 'R') put(from, { untracked: false, deleted: true, staged: true })
+    } else if (xy[1] === 'R' || xy[1] === 'C') {
+      // HI-3081: a rename git sees in the folder only (` R`, its new side intent-to-add): its other side is the next
+      // entry, never one of its own; the old side's deletion isn't staged.
+      const from = parts[++i]
+      put(path, { untracked: false, from, ita: true })
+      if (from && xy[1] === 'R') put(from, { untracked: false, gone: true })
     } else if (UNMERGED.has(xy)) put(path, { untracked: false, unmerged: true })
-    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?', gone: xy[1] === 'D' })
+    else put(path, { untracked: xy === '??', deleted: xy[0] === 'D', staged: xy[0] !== ' ' && xy[0] !== '?', gone: xy[1] === 'D', ita: xy === ' A' })
   }
   return out
 }
@@ -479,11 +488,12 @@ const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() ==
 async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[]; submodules: string[] }> {
   const now = await worktreeNow(folder)
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
-  if (!now.line) throw combworkError(M.detached, { folder })
-  if (branch !== null && now.line !== branch) throw combworkError(M.wrongBranch, { folder, target: branch })
-  // The operations under way, apart from the files (HI-2983: a changed file named `(MERGE_HEAD)` is a file).
+  // The operations under way, apart from the files (HI-2983: a changed file named `(MERGE_HEAD)` is a file). First
+  // (HI-3081): a rebase detaches HEAD, and is what the user should hear about, not a detached HEAD.
   const marker = now.operations?.[0]
   if (marker) throw combworkError(M.midOperation, { state: STATES[marker] ?? 'revert', folder })
+  if (!now.line) throw combworkError(M.detached, { folder })
+  if (branch !== null && now.line !== branch) throw combworkError(M.wrongBranch, { folder, target: branch })
   const { folderBuilders } = await import('./workflow/queueHost')
   const held = folderBuilders(workspace, folder)
   if (held) throw combworkError(M.busy, { folder, what: held[0] })
@@ -648,7 +658,9 @@ async function stashTop(folder: string): Promise<string | null> {
  * private copy of the index (withPrivateIndex, HI-3021): once a stash is made, the real index's entries for `files`
  * become what git left them (takeEntries), however far it got; with none made, the real index is as it was.
  */
-async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = []): Promise<string> {
+async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = []): Promise<string> {
+  // HI-3081: git's stash on a branch with no commit yet fails, saying why only without --quiet: said here instead.
+  if ((await headOf(folder)) === null) throw failed(M.stashFailed, "the branch has no commit yet, and git can't set changes aside before its first one") // i18n-ignore: stands in for git's own (English) words
   const before = await stashTop(folder)
   // HI-3022: a staged rename's old side is in neither the index nor the folder, and git's stash, given it, makes the
   // stash and then dies on it ("pathspec … did not match any files"), every try. Given the new side alone, it stashes
@@ -657,7 +669,16 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
   const stashed = files.filter((p) => !renamedFrom.includes(p))
   // Never a stash with no paths: it would take every change in the folder.
   if (!stashed.length) throw failed(M.stashFailed, 'nothing to set aside but a rename\'s old side') // i18n-ignore: stands in for git's own (English) words
-  const { r, made } = await withPrivateIndex(folder, files, M.stashFailed, async (env, _copy, take) => {
+  const { r, made } = await withPrivateIndex(folder, files, M.stashFailed, async (env, copy, take) => {
+    // HI-3081: git's stash can't take an intent-to-add entry ("Entry … not uptodate. Cannot merge"): taken out of the
+    // private index first, the file is set aside as the untracked file it is (and comes back untracked). Combwork's own
+    // step: nothing of the repository's run, bounded.
+    if (ita.length) {
+      const quiet = await noHooks(folder, copy)
+      if (!quiet.ok) throw failed(M.stashFailed, quiet.why)
+      const out = await git(folder, [...quiet.args, 'rm', '--cached', '-q', '--ignore-unmatch', ...PATHS_IN], undefined, pathsIn(ita), { env, timeout: folderChangesBounds.actMs })
+      if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
+    }
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
     const after = await stashTop(folder)
     const stash = after && after !== before ? after : null
@@ -757,7 +778,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
         // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
         const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => (c.staged || c.unmerged) && !files.includes(p)).map(([p]) => p) } : undefined
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)))
+        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)), files.filter((p) => now.get(p)?.ita))
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made }
       }),
