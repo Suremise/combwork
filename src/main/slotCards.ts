@@ -785,9 +785,10 @@ const ambiguousSaid = new Set<string>()
  */
 export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: string): { over: boolean; cards: number[] } | null {
   try {
-    const row = db.prepare('SELECT state FROM lanes WHERE id = ?').get(lane) as { state: string } | undefined
+    const row = db.prepare('SELECT state FROM lanes WHERE id = ?').get(lane) as { state: string } | undefined // i18n-ignore: SQL
     if (row?.state === 'active') return { over: false, cards: [] }
-    const started = new Set(wf.store.factsOfKind('Started').filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
+    const kind = 'Started' as const // i18n-ignore: a fact kind, not text
+    const started = new Set(wf.store.factsOfKind(kind).filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
     const cards = [...started].filter((n) => {
       const card = cardOf(wf, n)
       if (!card) return false
