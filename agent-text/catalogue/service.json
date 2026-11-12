@@ -529,6 +529,11 @@
     "note": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.",
     "audience": "both"
   },
+  "service.forward.unreadable": {
+    "text": "{to} isn’t brought up to date with {from}: Combwork couldn’t read {what}, so nothing was queued.{detail, select, none {} other { Git said: {detail}}}",
+    "note": "HI-3126: a forward merge (bringing branch {to} up to date with branch {from}) refused under “The target branch follows its remote”: Combwork reads both branches’ remote heads first, and one couldn’t be read. {what} says what (a phrase of its own, already translated); {detail} is Git’s own words in English, or “none” (keep the select keys). Branch names stay as they are.",
+    "audience": "both"
+  },
   "service.fsutil.keptBusy": {
     "text": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
     "note": "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made.",

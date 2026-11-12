@@ -705,6 +705,7 @@
   "board.queue.forwardChooseMessage": "The branch is merged into {to} as it is now, through {to}’s merge queue, with its merge checks. It doesn’t change itself.",
   "board.queue.forwardChooseTitle": "Bring {to} up to date with…",
   "board.queue.forwardFailed": "Couldn’t bring the branch up to date",
+  "board.queue.forwardLocalAhead": "{n, plural, one {# commit of your local {from} isn’t on its remote, so it wasn’t brought into {to}: publish it first if it should be.} other {# commits of your local {from} aren’t on its remote, so they weren’t brought into {to}: publish them first if they should be.}}",
   "board.queue.forwardResolving": "{card} is resolving it: Bring Up to Date waits for it",
   "board.queue.forwardUpToDate": "{to} already has everything of {from}",
   "board.queue.inVersionControl": "Queue in Version Control",

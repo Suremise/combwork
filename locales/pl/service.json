@@ -114,6 +114,7 @@
   "service.forward.resolveRaced": "{card} zmieniło się podczas przekazywania wykonawcy (ponowienie, usunięcie lub inne rozwiązanie), więc nic nie utworzono: zajrzyj do karty, a w razie potrzeby poproś ponownie.",
   "service.forward.resolveTitle": "Rozwiąż: zaktualizuj {to} względem {from}",
   "service.forward.title": "Zaktualizuj {to} względem {from}",
+  "service.forward.unreadable": "{to} nie jest aktualizowana względem {from}: Combwork nie mógł odczytać {what}, więc nic nie dodano do kolejki.{detail, select, none {} other { Git zgłosił: {detail}}}",
   "service.fsutil.keptBusy": "Inny program zapisuje teraz plik {file}: nic nie zostało zmienione. Spróbuj ponownie za chwilę.",
   "service.fsutil.keptUnreadable": "Nie udało się odczytać pliku {file}: nic nie zostało zmienione. Spróbuj ponownie za chwilę.",
   "service.fsutil.notCopied": "Nie udało się skopiować: {name}",

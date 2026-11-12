@@ -6800,6 +6800,31 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
 
+**Forward merges** (§16.9's Bring Up to Date, HI-3126; the design agreed with HR2 on the card, s7 and s11). With G21 on,
+a forward request reads both branches' remotes, each fetched now in the sealed context (within 60 seconds, the window or
+the Assistant waiting on the reply; pinned at `refs/cw/forward/<branch>`; no checkout, the local branches never moved):
+- **The source** is the head of the remote branch `from` tracks, frozen on the card as any forward's source is. It is
+  never the local `from`, which may lack what someone else published (hunt 7's S1: a release hotfix pushed from another
+  clone, which the request answered "up to date" and the next version never got) or hold commits never published
+  (P2: published to the next version's remote though the release's never had them). The local `from`'s commits the
+  remote lacks are left out and counted (`localAhead`, along its first parents): the window's notification and the
+  Agent API's reply say so, in every outcome (queued, already open, up to date).
+- **"Up to date"** is said only when the head of the remote branch `to` tracks, fetched too, has the source: a local `to`
+  holding it unpublished doesn't count, and one behind its remote isn't asked. The card's base is where the source and
+  that head meet. The queue then tests on `to`'s remote head as for any card (step 1 above).
+- **A branch that tracks none** (neither `branch.<b>.remote` nor `branch.<b>.merge` set, as git says it, exit 1: `main`
+  set up without an upstream, say) is read locally, as with G21 off; a setting set to nothing is set (HR2's round 1).
+  Tracking set up any other way (one of the two settings only, either set to nothing, another
+  local branch, `.`, a merge ref that isn't a branch, a remote git doesn't know, several push addresses, a shallow
+  repository), a setting git can't read, or a fetch that fails refuses the request with nothing queued, saying what
+  couldn't be read and git's words (`service.forward.unreadable`): never the local head instead.
+- **Retry merge** freezes its new source by the same rules, refused the same way.
+- **The window** (`QueueForward.follows`) offers Bring Up to Date… for every source it may take, even one whose local
+  count is 0 (its "N commits behind" line, a local count read without fetching, isn't shown then): only the request,
+  once chosen and confirmed, reaches the remotes. Off G21, everything is as before: both branches read locally.
+Seen in the real app at 295e8e59a (HG1, hunt 7: `queue:forward` answered `upToDate` while `origin/1.4.0` had a hotfix
+`origin/1.5.0` lacked) and checked again with the change in the `forwardremote` e2e suite.
+
 **The one residue:** a hook is the user's own code, run in the project with the project's configuration.
 
 #### 16.9.5 Signing checked before the queue signs <a id="spec-signing-check"></a>

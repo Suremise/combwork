@@ -485,7 +485,7 @@ export interface CombworkRequests {
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
   /** HI-2679: brings `to` up to date with `from` (a forward merge through `to`'s queue), as the user. */
-  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean }
+  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean; localAhead?: number }
   /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
   /**

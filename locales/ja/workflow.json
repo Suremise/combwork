@@ -573,6 +573,7 @@
   "workflow.unreadable.revisionIn": "{folder}のリビジョン",
   "workflow.unreadable.state": "{folder}の状態",
   "workflow.unreadable.target": "マージ先ブランチ{target}",
+  "workflow.unreadable.tracking": "{branch}が追跡するリモートブランチ（アップストリームはリモート上のブランチであるか、何も追跡しない必要があります）",
   "workflow.unreadable.uncommitted": "{folder}の未コミットの変更",
   "workflow.unreadable.worktrees": "{folder}のワークツリー",
   "workflow.unreadable.writes": "{folder}で書き込まれたファイル",

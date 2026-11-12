@@ -573,6 +573,7 @@
   "workflow.unreadable.revisionIn": "rewizji w folderze {folder}",
   "workflow.unreadable.state": "stanu folderu {folder}",
   "workflow.unreadable.target": "gałęzi docelowej {target}",
+  "workflow.unreadable.tracking": "którą gałąź zdalną śledzi {branch} (jej upstream musi być gałęzią w zdalnym repozytorium albo nie może śledzić żadnej)",
   "workflow.unreadable.uncommitted": "zmian bez commita w folderze {folder}",
   "workflow.unreadable.worktrees": "listy worktree w folderze {folder}",
   "workflow.unreadable.writes": "plików zapisanych w folderze {folder}",
