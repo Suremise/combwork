@@ -482,6 +482,79 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
   })
 })
 
+describe('HI-3085: Retry merge and Resolve on a builder read the direction as the queue does (HI-3049)', () => {
+  /** No main or master: trunk (checked out) a fix ahead of 1.2.0, which changes the same file, so trunk into 1.2.0 conflicts. */
+  async function trunkProject(): Promise<{ w: WS; repo: string }> {
+    const ws = join(base, `ws-${++n}`)
+    const repo = join(ws, 'p')
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    git(repo, 'init', '-q', '-b', 'trunk')
+    for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'initial')
+    git(repo, 'branch', '1.2.0')
+    writeFileSync(join(repo, 'fix0.txt'), 'fix 0\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'fix 0')
+    git(repo, 'checkout', '-q', '1.2.0')
+    writeFileSync(join(repo, 'fix0.txt'), 'the 1.2.0 version\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', '1.2.0 changes it too')
+    git(repo, 'checkout', '-q', 'trunk')
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, preChecks: [], mergeChecks: [], target: '1.2.0', otherTargets: ['trunk'] } } }))
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    return { w, repo }
+  }
+
+  it('the project folder switched to another branch: both wait, saying to check trunk out again, nothing changed; back on trunk, both go', async () => {
+    const { w, repo } = await trunkProject()
+    const wf = (await workflowFor(w, repo))!
+    const returnedOne = async (): Promise<number> => {
+      const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'trunk', '1.2.0', user))
+      const num = ('card' in made ? made.card : null)!.number
+      expect(wf.state(wf.store.card(num)).forward?.defaultBranch).toBe('trunk')
+      expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+      return num
+    }
+    const num = await returnedOne()
+    git(repo, 'checkout', '-q', '-b', 'other', '1.2.0')
+    const before = wf.store.facts(num).length
+    const cards = wf.store.cards().length
+    const said = /waits: the project folder has other checked out, so git names other the default branch \(this repository has no main or master\), and it was trunk when .+’s direction was checked\. Check out trunk in the project folder, then try again\./
+    await expect(inWorkspace(w, () => controls.queueCardChange(w, num, user, 'retryMerge', 'again'))).rejects.toThrow(said)
+    await expect(inWorkspace(w, () => controls.resolveForward(w, num, user, 'by hand'))).rejects.toThrow(said)
+    // Nothing written: still returned, no card made.
+    expect(wf.store.facts(num).length).toBe(before)
+    expect(wf.store.cards().length).toBe(cards)
+    expect(wf.state(wf.store.card(num)).stage).toBe('active')
+    // Back on trunk: Retry goes (queued again).
+    git(repo, 'checkout', '-q', 'trunk')
+    await inWorkspace(w, () => controls.queueCardChange(w, num, user, 'retryMerge', 'again'))
+    expect(wf.state(wf.store.card(num)).stage).toBe('merging')
+    // And Resolve goes on another returned one, recording trunk.
+    await inWorkspace(w, () => controls.queueCardChange(w, num, user, 'removeFromQueue', 'done with it'))
+    const other = await returnedOne()
+    const r = await inWorkspace(w, () => controls.resolveForward(w, other, user, 'by hand'))
+    expect(wf.state(wf.store.card(r.card.number)).resolves).toMatchObject({ from: 'trunk', to: '1.2.0', defaultBranch: 'trunk' })
+  })
+
+  it('the project folder on no branch (no main or master): both wait, saying to put it on its branch', async () => {
+    const { w, repo } = await trunkProject()
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'trunk', '1.2.0', user))
+    const num = ('card' in made ? made.card : null)!.number
+    expect(await drain(w, repo, '1.2.0')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    git(repo, 'checkout', '-q', '--detach')
+    const said = /waits: Combwork can’t read which branch is this repository’s default now .+ Put the project folder on its branch, then try again\./
+    await expect(inWorkspace(w, () => controls.queueCardChange(w, num, user, 'retryMerge', 'again'))).rejects.toThrow(said)
+    await expect(inWorkspace(w, () => controls.resolveForward(w, num, user, 'by hand'))).rejects.toThrow(said)
+  })
+})
+
 describe('HI-2959: Resolve on a builder, on the real board', () => {
   /** project(), with 1.2.0 changing main's fix too: the forward of main into 1.2.0 conflicts. */
   async function conflicting(targets?: Parameters<typeof project>[1]): Promise<{ w: WS; repo: string }> {

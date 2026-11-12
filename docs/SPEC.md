@@ -5963,8 +5963,10 @@ revision again; `requeue.allowed` lets that
 revision back in once, bound to that failed entry (whatever transient requeues counted; its new entry uses it up), and
 the override, kept on its `ForwardResolution` from then on, bypasses the direction alone. A resolution in any other
 state is refused as before (`openNoOverride`). A direct forward's way stays Remove from queue, then the request again
-with the override (a new card). Not covered: a project folder switched to another branch that isn't a version, with no
-main or master, makes git name that branch the default, which reads as a real answer (follow-up).
+with the override (a new card). The same rule (`forwardNow`, workflow/forwardNow.ts) decides Retry merge and Resolve on
+a builder (HI-3085): the folder switched, or a default branch that can't be read, holds them back saying to check the
+recorded branch out (`folderSwitched`) or to put the folder on its branch (`defaultUnread`), nothing written; only a
+real answer against the release path's direction refuses them with Remove from queue as the way on (`directionRetry`).
 
 Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
 `source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the

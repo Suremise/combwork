@@ -25,13 +25,13 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
-import { forwardDirection, forwardPermitted } from '../../shared/workflow/forwardOrder'
+import { forwardNow } from './forwardNow'
 import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
-import { FOR_YOU, UNREADABLE, workflowText } from '../../shared/workflow/texts'
+import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
 import type { HistoryPort } from '../platform/history'
-import { isUnknown, unknown, type Maybe, type Unknown } from '../platform/types'
+import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
@@ -1654,30 +1654,12 @@ export class MergeQueue {
   private async forwardAllowed(card: CardRecord, s: CardState): Promise<boolean | Again> {
     const f = s.forward ?? s.resolves
     if (!f) return true
-    if (f.override) return true
-    const alone = forwardDirection(f.from, f.to, null)
-    if (alone.dir !== 'unknown' || alone.why !== 'unordered') return forwardPermitted(alone, f.override)
-    const H = this.history(card, s)
-    const none = (): Again => again(gitSaid(unknown(UNREADABLE.defaultBranch, { folder: this.project })))
-    const d = await H.defaultTarget(this.project).catch(() => null)
-    if (!d) return none()
-    if (isUnknown(d)) return again(gitSaid(d))
-    const there = await H.lineHead(this.project, d).catch(() => null)
-    if (there && isUnknown(there)) return again(gitSaid(there))
-    if (!there) return none()
-    if (forwardPermitted(forwardDirection(f.from, f.to, d), f.override)) return true
-    // HI-3049: no main or master, so the default named is only the branch the project folder has checked out; another
-    // than the one recorded at the request (or Resolve), which still exists, is the folder switched, not the release
-    // path changed: no answer, as HI-3040's. A main or master made since, or the recorded one gone, still returns it.
-    const was = f.defaultBranch
-    if (!was || was === d) return false
-    const main = await H.mainLine(this.project).catch(() => unknown(UNREADABLE.defaultBranch, { folder: this.project }))
-    if (isUnknown(main)) return again(gitSaid(main))
-    if (main !== null) return false
-    const kept = await H.lineHead(this.project, was).catch(() => unknown(UNREADABLE.line, { branch: was }))
-    if (isUnknown(kept)) return again(gitSaid(kept))
-    if (!kept) return false
-    return again(`${this.project} has ${d} checked out, so git names it the default branch (there is no main or master); it was ${was} when ${card.key}'s direction was checked. Check out ${was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
+    // HI-3085: the rule the window's and the Assistant's Retry merge and Resolve on a builder use too (forwardNow).
+    const now = await forwardNow(this.history(card, s), this.project, f)
+    if (now.ok) return true
+    if (now.why === 'direction') return false
+    if (now.why === 'unknown') return again(gitSaid(now.u))
+    return again(`${this.project} has ${now.now} checked out, so git names it the default branch (there is no main or master); it was ${now.was} when ${card.key}'s direction was checked. Check out ${now.was} there, then resume.`) // i18n-ignore: the pause's detail, in English as git's are
   }
 
   private history(card: CardRecord, s?: CardState): HistoryPort {
