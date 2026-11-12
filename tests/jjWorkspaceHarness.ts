@@ -78,6 +78,7 @@ export function harness(o: { busy?: string } = {}): Harness {
   const deps = (more: Partial<JjPortDeps> = {}): JjPortDeps => ({
     runner,
     control: (repo) => ({ folder: join(resolve(repo, '..'), 'slots', '.cw-jj-control'), journal: journals.of(`jj_control:${repo.toLowerCase()}`) }),
+    gitLink: (_repo, folder) => journals.of(`jj_gitlink:${folder.toLowerCase()}`),
     projectHold: () => (o.busy ? { busy: o.busy } : { release: () => undefined }),
     lock: (_store, fn) => fn(),
     trash: async (p) => {

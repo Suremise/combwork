@@ -171,9 +171,8 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     expect(w.pool.keptCard(a.name)).toBeNull()
     expect(w.h.id(w.repo, a.R)).toBe(a.R)
     const fresh = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
-    expect(fresh).not.toMatchObject({ refusal: { error: expect.stringMatching(/kept for it there/) } })
-    // Colocated, jj can't make a workspace again where a deleted one's Git worktree was (HI-3046): not this card's.
-    if (!colocated) expect(fresh).toMatchObject({ ok: true })
+    // Colocated too (HI-3046): the Git worktree entry the deleted folder left is proved Combwork's and cleared.
+    expect(fresh).toMatchObject({ ok: true })
   })
 
   it('D: its folder back before Remove…: refused, nothing removed, still kept', async () => {

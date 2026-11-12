@@ -2510,6 +2510,19 @@ PlatformId | JjPlatform` are `workspacePort.ts`' types, so a jj in `project.json
 pool gets jj's port only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`): the tests do; Combwork doesn't
 yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings); the evidence is jj 0.47.1's.
 - **Workspaces are made by `jj workspace add` only** (R2.6): never `jj git init`, never a Git worktree command on them.
+  A colocated workspace's Git worktree entry (`<store>/worktrees/<n>`) outlives `jj workspace forget` when its folder
+  is gone (0.47.1), and Git then refuses an add at that path (HI-3046, design HI-3046/s7–s14). `create` makes a
+  **receipt** of its slot's entry (board_meta `jj_gitlink:<folder>`: the entry's path, file id and birth time, its
+  `gitdir` and `commondir` bytes, the slot's store, folder, workspace and generation), and before the next add at that
+  folder clears an entry there only when the receipt proves it: under the store's lock and the file gate's write
+  admission for the folder and the store, with no workspace listed at the folder or under its name at the single head,
+  the entry is checked synchronously (folder absent, not `locked`, its identity and bytes the receipt's, its real path
+  the store's real path with `worktrees/<n>` below it and `worktrees` the receipt's real folder: no junction), moved aside
+  out of `worktrees` (`<store>/.cw-gitlink-<token>`, the intent journalled first), proved again on what was moved, and
+  only then removed asynchronously. A mismatch puts it back (or lists it as a residue), never deletes it; a restart's
+  resume proves it all again. An entry with no receipt or another identity (a user's worktree at that path) refuses
+  the add before jj runs, naming the entry: the user's to remove or keep. No other entry is touched and no command
+  prunes.
   `add` and `forget` snapshot the workspace they run from and refuse `--ignore-working-copy` (probed), so they run from
   a **control workspace** of Combwork's per project (`<worktrees>/<project>/.cw-jj-control`, named `cw-<project
   hash>-control`, sparse and empty: its snapshot is always empty), never lent, sized or tidied as a slot, its record

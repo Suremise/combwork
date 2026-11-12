@@ -18,8 +18,8 @@
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'original-fs'
-import { lstat, mkdir, readdir, readFile, realpath, rmdir, stat } from 'original-fs/promises'
+import { existsSync, lstatSync, readdirSync, readFileSync, renameSync, statSync } from 'original-fs'
+import { lstat, mkdir, readdir, readFile, realpath, rm, rmdir, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
 import { jjSupported } from '../../shared/jjTool'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -28,7 +28,8 @@ import { jjContextOf, type JjContext } from './jjDetect'
 import { boundaryOf } from './repoBoundary'
 import { readOpHeads } from './jjView'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
-import { jjFileGate, pathKey, rootKey } from './jjFileGate'
+import { jjFileGate, pathKey, rootKey, storeKey } from './jjFileGate'
+import { asideOf, asReceipt, entryIdSync, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import type { OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { agentMsg, type AgentMsg } from '../../shared/agentText'
@@ -55,7 +56,8 @@ export const JJ_REFUSED = {
   moved: 'the repository changed since the check', // i18n-ignore: as above
   uncertain: "a write's result couldn't be read back: decided on the next pass", // i18n-ignore: as above
   notBound: "the slot isn't bound to that card's preparation", // i18n-ignore: as above
-  journal: "the preparation's record can't be read" // i18n-ignore: as above
+  journal: "the preparation's record can't be read", // i18n-ignore: as above
+  gitLink: "a Git worktree entry is still registered for this folder and Combwork can't prove it is its own: it was left as it is, for you to remove or keep" // i18n-ignore: as above
 } as const
 
 /**
@@ -122,8 +124,16 @@ export interface JjPortDeps {
    * must still be exactly the card's submitted work. Absent: never.
    */
   doneByUser?: (store: string, binding: JjBinding) => boolean | Promise<boolean>
-  /** Test hooks, run between steps. */
-  hooks?: { afterForget?: (folder: string) => void | Promise<void> }
+  /**
+   * HI-3046: where a colocated slot's Git worktree receipt is kept (board_meta, by its folder), so an entry its deleted
+   * folder left can be proved Combwork's and cleared before the slot is made again. Absent: no receipt, nothing cleared.
+   */
+  gitLink?: (repo: string, folder: string) => WorkspaceJournal
+  /**
+   * Test hooks, run between steps. `beforeGitLinkAside` runs synchronously between a Git worktree entry's last check and
+   * its move aside; `afterGitLinkAside` right after the move, before the moved entry is proved again (HI-3046).
+   */
+  hooks?: { afterForget?: (folder: string) => void | Promise<void>; beforeGitLinkAside?: (entry: string) => void; afterGitLinkAside?: (aside: string) => void | Promise<void> }
 }
 
 export interface JjWorkspacePort extends WorkspacePort {
@@ -595,6 +605,118 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     return false
   }
 
+  /** A `gitLink` refusal naming the entry and the folder it blocks (HI-3046). */
+  const gitLinkRefused = (entry: string, folder: string): string => `${JJ_REFUSED.gitLink} (${entry}, for ${folder})` // i18n-ignore: as JJ_REFUSED
+
+  /**
+   * One step of clearing a slot's Git worktree entry (HI-3046/s11–s14), under the store's lock: the entry at `at` (`entry`:
+   * in place; `aside`: a clearing's, moved aside before a restart) is removed only when, with the file gate held for the
+   * slot's folder and the store, and nothing awaited between: the operation head is still the one whose listing showed
+   * no workspace at the folder or under the receipt's name, and `provedSync` holds, before the move and again on what
+   * was moved (a replacement or a `locked` between the check and the move is what the second check finds). Then removed
+   * (asynchronously, off main's thread), the gate held until it ends. Null when removed; else why not, and what it left.
+   */
+  const clearAt = async (ctx: JjContext, repo: string, r: GitLinkReceipt, at: string, where: 'entry' | 'aside'): Promise<{ why: string; left?: string } | null> => {
+    const op = await pinned(repo)
+    if (isUnknown(op)) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    const l = await listAt(repo, op)
+    if (isUnknown(l)) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    if (l.some((w) => w.name === r.workspace || samePath(w.root, r.folder))) return { why: 'registered' } // i18n-ignore: a protocol code
+    const [fk, sk] = await Promise.all([pathKey(r.folder), pathKey(ctx.store)])
+    if (!fk || !sk) return { why: 'unreadable' } // i18n-ignore: a protocol code
+    const grant = await jjFileGate.acquire([rootKey(fk), storeKey(sk)], 'exclusive')
+    try {
+      const check = (p: string, w: 'entry' | 'aside'): string | null => (readOpHeads(ctx.jjRepo)?.join() !== op ? 'moved' : provedSync(r, p, w)) // i18n-ignore: a protocol code
+      let aside = at
+      if (where === 'entry') {
+        const before = check(at, 'entry')
+        if (before) return { why: before }
+        aside = asideOf(ctx.store, r.clearing!)
+        deps.hooks?.beforeGitLinkAside?.(at)
+        try {
+          renameSync(at, aside)
+        } catch {
+          return { why: 'rename' } // i18n-ignore: a protocol code
+        }
+        await deps.hooks?.afterGitLinkAside?.(aside)
+      }
+      const after = check(aside, 'aside')
+      if (after) {
+        // What was moved isn't the receipt's entry now: put back under its name when that is still free, else left aside.
+        if (where === 'entry' && !existsSync(at)) {
+          try {
+            renameSync(aside, at)
+            return { why: after }
+          } catch {
+            /* left aside: a residue */
+          }
+        }
+        return { why: after, left: aside }
+      }
+      try {
+        await rm(aside, { recursive: true })
+      } catch {
+        return { why: 'remove', left: aside } // i18n-ignore: a protocol code
+      }
+      return null
+    } finally {
+      grant.release()
+    }
+  }
+
+  /**
+   * Before a colocated slot is made (HI-3046): a Git worktree entry its deleted folder left at `folder` cleared, when it
+   * is provably the one Combwork's receipt names; a clearing interrupted by a restart finished on the same proof. Any
+   * entry there that can't be proved Combwork's is left as it is and the make refused (never an add known to collide).
+   * Null: nothing in the way. Runs under the store's lock.
+   */
+  const clearGitLink = async (repo: string, ctx: JjContext, folder: string): Promise<string | null> => {
+    if (!ctx.colocated) return null
+    const j = deps.gitLink?.(repo, folder) ?? null
+    const raw = j?.read() ?? null
+    const residues = residuesOf(raw)
+    const found = asReceipt(raw)
+    let rec = found && samePath(found.store, ctx.store) && samePath(found.folder, folder) ? found : null
+    const keep = async (left: string, why: string): Promise<void> => {
+      if (!j) return
+      const all = [...residues.filter((x) => !samePath(x.path, left)), { path: left, why }]
+      await j.write(rec ? { ...rec, clearing: undefined, residues: all } : { residues: all })
+    }
+    if (rec?.clearing && j) {
+      // A clearing interrupted: its intent authorises nothing by itself. What was moved aside is removed only on the full
+      // proof now; anything else is a residue.
+      const aside = asideOf(ctx.store, rec.clearing)
+      if (existsSync(aside)) {
+        const r = await clearAt(ctx, repo, rec, aside, 'aside')
+        if (r) {
+          await keep(aside, r.why)
+          return gitLinkRefused(aside, folder)
+        }
+      }
+      rec = { ...rec, clearing: undefined }
+      await j.write(rec)
+    }
+    const links = await linksTo(ctx.store, folder)
+    if (!links) return gitLinkRefused(worktreesOf(ctx.store), folder)
+    if (!links.length) return null
+    if (!j || !rec || links.length !== 1 || !samePath(links[0], rec.entry)) return gitLinkRefused(links[0], folder)
+    const token = randomUUID().replace(/-/g, '').slice(0, 12)
+    rec = { ...rec, clearing: token }
+    await j.write(rec)
+    const r = await clearAt(ctx, repo, rec, rec.entry, 'entry')
+    if (r) {
+      if (r.left) await keep(r.left, r.why)
+      else {
+        rec = { ...rec, clearing: undefined }
+        await j.write(rec)
+      }
+      return gitLinkRefused(r.left ?? rec.entry, folder)
+    }
+    rec = { ...rec, clearing: undefined }
+    await j.write(rec)
+    return null
+  }
+
   /**
    * A slot's completed binding as it stands (HI-2866): its pointer, only while the folder is the one it was made for (its
    * generation) and its working copy descends from the binding's base, read pinned. Null with no binding (none kept, or a
@@ -928,6 +1050,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!from) return step(false, JJ_REFUSED.control)
       const name = nameFor(await repoHash(repo), folder)
       return lockCtx(ctx, async () => {
+        // A Git worktree entry a deleted slot left here (HI-3046): cleared when provably Combwork's, else refused before
+        // the add (which would collide with it in Git and leave a folder behind).
+        const blocked = await clearGitLink(repo, ctx, folder)
+        if (blocked) return step(false, blocked)
+        if (existsSync(folder)) return step(false, JJ_REFUSED.exists)
         // Its parent made first, which jj doesn't make (HI-2870): before the control's proof, so nothing is awaited
         // between the proof's final check and the add (HI-2887).
         await mkdir(dirname(folder), { recursive: true })
@@ -951,6 +1078,17 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         if (isUnknown(wc) || !wc.empty || wc.parents.length !== 1 || wc.parents[0] !== at) return step(false, JJ_REFUSED.identity)
         const there = await jjContextOf(folder, runner)
         if (!('jj' in there) || !samePath(there.jj.store, ctx.store) || !there.jj.linked || there.jj.colocated !== ctx.colocated) return step(false, JJ_REFUSED.identity)
+        // Its Git worktree entry's receipt (HI-3046), replacing an earlier slot's there; residues carried over. None
+        // provable: the old receipt goes, so nothing of this slot's is ever cleared on it.
+        const j = ctx.colocated ? (deps.gitLink?.(repo, folder) ?? null) : null
+        if (j) {
+          const generation = await generationOf(folder)
+          const receipt = generation ? await receiptOf({ store: ctx.store, folder, workspace: name, generation }) : null
+          const residues = residuesOf(j.read())
+          if (receipt) await j.write({ ...receipt, ...(residues.length ? { residues } : {}) })
+          else if (residues.length) await j.write({ residues })
+          else await j.clear()
+        }
         return step(true)
       })
     },
@@ -1273,6 +1411,15 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           }
         }
         await journal.clear()
+        // Its Git worktree entry gone with the forget (HI-3046): its receipt goes too. One jj left (the folder was gone)
+        // keeps it, so the slot's next make can clear that entry.
+        const j = ctx.colocated ? (deps.gitLink?.(repo, folder) ?? null) : null
+        const raw = j?.read() ?? null
+        const rec = asReceipt(raw)
+        if (j && rec && !rec.clearing && entryIdSync(rec.entry) !== rec.entryId) {
+          const residues = residuesOf(raw)
+          await (residues.length ? j.write({ residues }) : j.clear())
+        }
       }
       return step(true)
     },

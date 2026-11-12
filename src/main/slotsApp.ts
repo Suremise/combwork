@@ -301,6 +301,11 @@ export function jjPort(): JjWorkspacePort {
       const journal = ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_control:${repo.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
       return { folder, journal }
     },
+    // HI-3046: a colocated slot's Git worktree receipt, by its folder, beside the control's record.
+    gitLink: (repo, folder) => {
+      const ws = workspaceFor(repo)
+      return ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_gitlink:${folder.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
+    },
     // HI-2887 (Darren's r9: automatic): the project folder held against agent launches while its control is made.
     projectHold: (repo) => holdLaunches(repo),
     // Darren's (a) on HI-2887: a lost control is made again automatically, under the same hold.
