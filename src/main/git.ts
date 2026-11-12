@@ -218,6 +218,7 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   const o = scope?.active ? await scope.route(m) : await thread.run(m)
   if (!scope?.active) gitTestHooks.ended?.(cwd, args)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
+  if (o.msysIncomplete) log.warn(`git ${args[0]} was ended at its time limit, but its Git Bash programs couldn't be looked for (${userText(o.msysIncomplete)}): only its process tree was ended (HI-3047)`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error
   const errCode = err?.code
