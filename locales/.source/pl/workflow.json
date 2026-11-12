@@ -24,6 +24,7 @@
   "workflow.forYou.okBefore": "{card} is approved: OK to merge?",
   "workflow.forYou.passedReview": "{card} passed review: your OK?",
   "workflow.forYou.queueAdvance": "{card} is tested and ready to merge: update {target} in {folder} now?",
+  "workflow.forYou.queueCatchUp": "{card} is merged and on {target}’s remote already: update {target} in {folder} to it now? Decline, and {target} there stays as it is until you pull.",
   "workflow.forYou.queuePublish": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
   "workflow.forYou.queueStuck": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
   "workflow.forYou.review": "{card} waits for your review",

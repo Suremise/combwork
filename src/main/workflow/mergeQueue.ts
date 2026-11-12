@@ -1229,6 +1229,12 @@ export class MergeQueue {
     if (isAgain(cond)) return null
     if (cond === 'retest') return 'again'
     if ('pause' in cond) return this.catchUpPause(target, c, cond.pause, cond.files, undefined, undefined, FOLDER_PAUSES.has(cond.pause) ? folder : undefined)
+    // HI-3092 (Darren's decision): Ask each time asks before the folder moves here too (a card found already on the
+    // remote is Done with no ask before); a publication asked about already carries its approval.
+    if (this.cfg.checkedOutTarget?.() === 'ask') {
+      const ok = await this.catchUpAsked(target, c, folder)
+      if (ok !== 'approved') return ok
+    }
     // Its plan journalled before anything moves (from the local head it found: never an earlier plan's files).
     const plan: CatchUp = { from: c.from, to: c.to, card: c.card, entry: c.entry, folder, files: cond.files, phase: 'files' }
     await this.setCatchUp(target, c.to, plan)
@@ -1251,6 +1257,35 @@ export class MergeQueue {
     this.stillHolds(target)
     if (!(await I.swap(h, target, c.from, c.to))) return this.catchUpRollback(target, ref, folder)
     return this.catchUpConfirm(target, ref, folder)
+  }
+
+  /**
+   * HI-3092: Ask each time's answer for a checked-out target's catch-up, from the card's advance questions about its entry
+   * and result: approved (the publication's own ask, or one asked here) goes on; declined ends the catch-up, the folder
+   * as it is (the user pulls when they want); still open waits (paused `approval`); none asks now, as an advance does.
+   */
+  private async catchUpAsked(target: string, c: CatchUp, folder: string): Promise<'approved' | QueueOutcome | null> {
+    const card = this.wf.store.cardByKey(c.card)
+    if (!card) return 'approved'
+    const mine = (r: { gate: string; entry?: string; result?: string }): boolean => r.gate === QUEUE_ADVANCE_GATE && r.entry === c.entry && r.result === c.to
+    const s = this.wf.state(card)
+    const asked = Object.values(s.made).filter(mine).at(-1)
+    if (asked && !s.requests.some((r) => r.request === asked.request)) {
+      const answer = s.approvals.filter((a) => a.request === asked.request).at(-1)?.answer
+      if (answer === 'approved') return 'approved'
+      if (answer === 'declined') {
+        await this.setCatchUp(target, c.to, null)
+        return null
+      }
+    }
+    const out = await this.catchUpPause(target, c, 'approval', [folder])
+    if (asked && s.requests.some((r) => r.request === asked.request)) return out
+    if (this.paused(target)?.reason !== 'approval' || this.paused(target)?.card !== card.key) return out
+    await this.write(card, (w) => {
+      if (w.state().requests.some(mine)) return
+      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueCatchUp, { card: card.key, target, folder }), { unbound: true, entry: c.entry, revision: c.from, result: c.to })
+    })
+    return out
   }
 
   /** The ref moved under the catch-up: its files back to where they were (phase rollback), and looked at again; refused, terminal. */
@@ -1311,6 +1346,10 @@ export class MergeQueue {
     const asked = s && e ? Object.values(s.made).filter((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === e.id).at(-1) : undefined
     // Lifted only from the approval it is (a Pause queue saved in its place stays, and the queue with it).
     const lift = (): Promise<boolean> => this.wf.locked(() => this.wf.store.clearQueuePause(target, 'approval'))
+    // HI-3092: the owed catch-up's own question (its card Done already), still open: it waits, unless the setting says
+    // Automatically now (the catch-up then goes on, asking nothing). Answered: lifted, and the catch-up reads the answer.
+    const owed = catchUpOf(this.wf.store.meta(catchUpKey(target)))
+    if (card && !e && owed?.card === key && s?.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === owed.entry && r.result === owed.to) && this.cfg.checkedOutTarget?.() !== 'auto') return null
     if (!card || !s || !e || e.target !== target || !asked) {
       return (await lift()) ? this.runOnce(target) : null
     }

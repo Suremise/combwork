@@ -6664,7 +6664,12 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 4. **The owed catch-up** (store meta `queue.catchUp:<target>`, settled before the next entry): a recorded step first, by
    §16.9.2's recovery table (`files`, `ref`, `rollback`, journalled in the meta); then from the local head as it is now
    (another ancestor of the result gets its own journalled plan, never an earlier one's files). Not checked out: a
-   compare-and-swap. Checked out: §16.9.2's conditions, files and ref (Ask each time was asked before publishing). A
+   compare-and-swap. Checked out: §16.9.2's conditions, files and ref. With Ask each time, nothing moves in the folder unasked
+   (HI-3092, Darren's decision): a publication was asked about before it was pushed, and that approval (an advance
+   request on its entry and result) stands; a catch-up with none (a card found already on the remote, Done as merged
+   outside) asks once conditions hold ("{card} is merged and on {target}'s remote already: update {target} in {folder}
+   to it now?", `QUEUE_ADVANCE_GATE` on the Done card's entry), the queue paused `approval` until the answer. Approved,
+   it goes on; declined, the catch-up ends and the folder stays as it is (the user pulls when they want). A
    condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
    A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
    pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with

@@ -22,6 +22,7 @@
   "workflow.forYou.okBefore": "{card} 已批准：可以合并吗？",
   "workflow.forYou.passedReview": "{card} 已通过评审：你批准吗？",
   "workflow.forYou.queueAdvance": "{card} 已测试并准备好合并：现在更新 {folder} 中的 {target} 吗？",
+  "workflow.forYou.queueCatchUp": "{card} 已合并，并且已在 {target} 的远程仓库中：现在将 {folder} 中的 {target} 更新到它吗？拒绝的话，那里的 {target} 将保持原样，直到你执行 pull。",
   "workflow.forYou.queuePublish": "Combwork 已把 {card}（{result}）推送到 {endpoint} 的 {target}，但一直没有收到推送是否送达的回应，而那里的 {target} 现在也没有显示它。如果 {result} 已发布，请批准（之后可能有人移除了它）；如果没有，请拒绝，队列会重新测试 {card}。在你回答之前，{target} 的队列会等待。",
   "workflow.forYou.queueStuck": "{card} 合并到 {target} 的操作在 {folder} 中途停止，{files, plural, other {# 个文件}}停留在两种状态之间，Combwork 不会再改动那里的任何内容。卡片的工作记录部分列出了每个文件及其状态，以及可复制的命令。{how, select, both {要完成它，请在 {project} 中运行 {finish} (PowerShell)；要撤销它，请在 {folder} 中运行 {undo} (PowerShell)。} finish {要完成它，请在 {folder} 中运行 {finish} (PowerShell)。} undo {要撤销它，请在 {folder} 中运行 {undo} (PowerShell)。} other {它的文件既不是原来的样子，也不是合并后的样子：请手动修正。}}然后在这里回答，队列会再检查一次。",
   "workflow.forYou.review": "{card} 等待你评审",
