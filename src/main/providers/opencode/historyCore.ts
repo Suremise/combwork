@@ -1,5 +1,5 @@
 import { spawn as spawnChild, type ChildProcess } from 'child_process'
-import { endTree } from '../../progressReporters/wrapper'
+import { endTreeAsync } from '../../processTree'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
@@ -221,8 +221,12 @@ export interface CoreDeps {
   /** A GET to the run's own server: plainLocalGet's answer (tests: a fake server). */
   get: (url: string, headers: Record<string, string>, signal: AbortSignal, maxBytes: number) => Promise<{ status: number; body: string }>
   spawn: (file: string, args: string[], opts: { env: Record<string, string>; cwd?: string; verbatim?: boolean }) => ChildProcess
-  /** Ends a process and what it started, by identity (cw-progress's endTree, #603/#655). */
-  endTree: (child: ChildProcess) => void
+  /**
+   * Begins ending a process and what it started, by identity (#603/#655), without blocking: off the thread (HI-3009), as
+   * this core runs on main's when its worker's script is missing. Its export settles on the process's close, as before;
+   * a shutdown waits for the teardown it returns (the worker is ended after it).
+   */
+  endTree: (child: ChildProcess) => unknown
   now: () => number
   /** Renames a written temp file over a mirror (tests: one that fails as Windows does while a reader holds the mirror). */
   rename?: (from: string, to: string) => void
@@ -243,7 +247,7 @@ const pauseSync = (ms: number): void => void Atomics.wait(new Int32Array(new Sha
 const defaultDeps: CoreDeps = {
   get: (url, headers, signal, maxBytes) => plainLocalGet(url, headers, signal, maxBytes),
   spawn: (file, args, o) => spawnChild(file, args, { env: o.env, cwd: o.cwd, windowsHide: true, windowsVerbatimArguments: !!o.verbatim, stdio: ['ignore', 'pipe', 'pipe'] }),
-  endTree: (child) => endTree(child),
+  endTree: (child) => endTreeAsync(child).catch(() => undefined),
   now: () => Date.now()
 }
 
@@ -416,7 +420,8 @@ export class HistoryCore {
         this.closed = true
         this.queue = []
         for (const run of [...this.runs.values()]) this.dropRun(run)
-        for (const c of this.children) this.deps.endTree(c)
+        // Their trees ended before the reply: the worker is terminated after it (history.ts, stop).
+        await Promise.all([...this.children].map((c) => this.deps.endTree(c)))
         this.children.clear()
         return true
     }

@@ -23,6 +23,13 @@ import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/
 import { preset } from '../src/shared/workflow/options'
 import { quoteArgMsvc } from '../src/main/platform/signerRules'
 
+// HI-3009: PowerShell started with spawnSync (endTree's blocking listing and ending), recorded; everything else as it is.
+const { psSync } = vi.hoisted(() => ({ psSync: [] as string[] }))
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:child_process')>()
+  return { ...real, spawnSync: (...a: Parameters<typeof real.spawnSync>) => (/powershell/i.test(String(a[0])) && psSync.push(String(a[0])), real.spawnSync(...a)) }
+})
+
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
@@ -771,9 +778,19 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     // The command (git's stand-in) starts a waiter (the signer's) and waits for it; neither ever ends by itself.
     const waiter = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`
     const parent = `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(waiter)}], { stdio: 'inherit' }); c.on('exit', () => process.exit(0))`
+    psSync.length = 0
     const r = await a.runner.run('testMerge', process.execPath, ['-e', parent], { timeoutMs: 5000 })
     expect(r).toMatchObject({ ok: false, timedOut: true })
+    // HI-3009: ended off main's thread (treeEnding), never with endTree's blocking PowerShell; the result once it was over.
+    expect(psSync).toEqual([])
     const pid = Number(readFileSync(pidFile, 'utf8'))
+    expect((() => {
+      try {
+        return process.kill(pid, 0)
+      } catch {
+        return false
+      }
+    })()).toBe(false)
     await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: 30_000, interval: 100 })
     await a.runner.release()
   })

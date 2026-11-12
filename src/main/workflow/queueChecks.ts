@@ -29,7 +29,8 @@ import { join } from 'path'
 import { StringDecoder } from 'string_decoder'
 import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
-import { endTree, resolveCommand, shellSpec } from '../progressReporters/wrapper'
+import { resolveCommand, shellSpec } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
 import { snapshot } from './checks'
 import type { CheckContext, CheckResult } from './mergeQueue'
 import type { ProgressCaller, ProgressStore } from '../progress'
@@ -510,19 +511,24 @@ export const execCommand = (o: { spawn: Spawn; platform: NodeJS.Platform; timeou
     let timedOut = false
     let settled = false
     let after: NodeJS.Timeout | undefined
+    // At its limit its tree is ended off main's thread (HI-3009): the end, and the grace after it, wait for that teardown.
+    const ending = treeEnding(o.platform)
     const done = (e: Omit<CheckEnd, 'output'>): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       clearTimeout(after)
-      resolve({ ...e, timedOut: timedOut || undefined, output: '' })
+      ending.after(() => resolve({ ...e, timedOut: timedOut || undefined, output: '' }))
     }
     const timer = setTimeout(() => {
       timedOut = true
-      if (child) endTree(child, o.platform)
+      ending.end(child)
       // A descendant that got away may keep the output open: the run ends anyway.
-      after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
-      after.unref?.()
+      ending.after(() => {
+        if (settled) return
+        after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
+        after.unref?.()
+      })
     }, o.timeoutMs)
     timer.unref?.()
     try {
