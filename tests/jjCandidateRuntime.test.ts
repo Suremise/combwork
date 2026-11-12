@@ -825,6 +825,79 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
         })
       }
     }
+
+    /** The run's second read of the target (its step's): `move` runs first; from it on, git fails the first read `fails` matches. */
+    const stepRead = (w: World, move: () => void, fails: (args: readonly string[]) => boolean = () => false): (() => void) => {
+      const real = w.deps.integration
+      let n = 0
+      let failed = false
+      w.deps.integration = async () => {
+        const integ = await real()
+        if (!integ || ++n < 2) return integ
+        if (n === 2) move()
+        const git = integ.git
+        return {
+          ...integ,
+          git: async (args: readonly string[]) => {
+            if (failed || !fails(args)) return git(args)
+            failed = true
+            return { ok: false, out: '', err: 'fatal: could not read (HI-3044 test)', buf: Buffer.alloc(0), code: 128 }
+          }
+        }
+      }
+      return () => void (w.deps.integration = real)
+    }
+
+    it('rebase, main onto the user’s work on top of the reviewed commit, that read failing once: nothing built or returned; the next proof makes it Done (HR2)', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true })
+      const { card, P } = await approved(w)
+      reapply(w, card, { style: 'rebase' })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const before = entries(w, card, cycle).length
+      const told: string[] = []
+      const restore = stepRead(
+        w,
+        () => {
+          w.h.jj(w.repo, 'new', P, '-m', 'theirs on top')
+          writeFileSync(join(w.repo, 'theirs.txt'), 'theirs\n')
+          w.h.jj(w.repo, 'commit', '-m', 'theirs on top')
+          w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+        },
+        (args) => args[0] === 'merge-base' && args[1] === '--is-ancestor' && args[2] === P
+      )
+      await jjp.reconcile(w.wf.store.card(card.id), { unknown: (what?: string) => void told.push(String(what)) })
+      restore()
+      expect(w.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').map((f) => (f.data as { reason: string }).reason)).toEqual([])
+      expect(w.wf.state(card).stage).toBe('approved')
+      expect(entries(w, card, cycle)).toHaveLength(before)
+      expect(told.join(' ')).toContain('reviewed:unread')
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      expect(w.wf.state(card).stage).toBe('done')
+      await jjp.afterRun()
+      await jjp.afterRun()
+      expect(left(w, card, cycle)).toEqual([])
+    })
+
+    it('merge, main onto the user’s own commit beside the reviewed one: still built on the new head, offered, not returned', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true })
+      const { card } = await approved(w)
+      reapply(w, card, { style: 'merge' })
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      const cycle = w.wf.state(card).cycle
+      const first = shown(w, card, cycle)!.offer!
+      let theirs = ''
+      const restore = stepRead(w, () => void (theirs = onTarget(w, 'theirs.txt', 'theirs\n')))
+      await jjp.reconcile(w.wf.store.card(card.id), {})
+      restore()
+      const now = shown(w, card, cycle)!.offer!
+      expect(w.store.facts(card.id).some((f) => f.kind === 'IntegrationFailed')).toBe(false)
+      expect(w.wf.state(card).stage).toBe('approved')
+      expect(now.expected).toBe(theirs)
+      expect(now.result).not.toBe(first.result)
+    })
   })
 })
 

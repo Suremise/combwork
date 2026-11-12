@@ -174,8 +174,11 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
   // HI-3044: and so does a head that holds the reviewed revision itself (the user's own way of integrating in that window:
   // main set onto the reviewed commit, or onto work on top of it). A build there is empty (merge, squash: kept as
   // uncertain in the user's log) or not the same change (rebase: the card returned with its work already in the target);
-  // the next run's proof credits the revision in the target.
-  if (await reaches(deps.j4.git, fp.revision, head)) return { none: 'reached' }
+  // the next run's proof credits the revision in the target. Built only on a definite no: a read that fails leaves the card
+  // and its attempts as they are for the next run (HR2's round 1: built on, the work there would return the card).
+  const holds = await ancestry(deps.j4.git, fp.revision, head)
+  if (holds === null) return { unknown: 'reviewed:unread' } // i18n-ignore: a protocol code, for the log
+  if (holds) return { none: 'reached' }
 
   // 3. The current answer for exactly this fingerprint and head, if there is one.
   const live = deps.entries().filter((e) => !e.state && !e.failure && e.record.phase === 'done')
@@ -237,6 +240,18 @@ async function failure(deps: JjCandidateStepDeps, fp: JjCandidateFingerprint, re
 }
 
 const changeOf = (e: JjAttemptEntry): string | null => e.change ?? null
+
+/**
+ * Whether `a` is an ancestor of (or is) `b` in the Git store: true (exit 0), false only on git's own no (exit 1), null when
+ * it can't be read (a failure, another exit code, or no exit code of git's own).
+ */
+async function ancestry(git: JjCandidateDeps['git'], a: string, b: string): Promise<boolean | null> {
+  if (a === b) return true
+  const r = await git(['merge-base', '--is-ancestor', a, b]).catch(() => null)
+  if (!r) return null
+  if (r.ok) return true
+  return r.code === 1 ? false : null
+}
 
 /** Whether `a` is an ancestor of (or is) `b` in the Git store (exit 0); anything else, a read that fails included, is no. */
 async function reaches(git: JjCandidateDeps['git'], a: string, b: string): Promise<boolean> {
