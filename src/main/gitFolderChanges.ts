@@ -17,7 +17,7 @@ import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { changingFolder, inFolder } from './folderFence'
-import { INDEX_BUSY, git, gitErrorLine } from './git'
+import { INDEX_BUSY, git, gitErrorLine, type GitResult } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
@@ -63,7 +63,7 @@ const FENCE = {
  * The most a commit or stash may take (`actMs`): a hook or a signer can wait; a bound for a hung one, never how long it
  * should take. Tests shorten it.
  */
-export const folderChangesBounds = { actMs: 120_000 }
+export const folderChangesBounds = { actMs: 120_000, takeMs: 10_000 }
 
 /** HI-3021: the bound a commit or stash ended at, in seconds, as its refusal says it. */
 const boundSeconds = (): number => Math.round(folderChangesBounds.actMs / 1000)
@@ -134,21 +134,74 @@ const TAKE_RETRY_MS = 100
  * index's lock, tried again while another git holds it). Every other entry is left.
  */
 async function takeEntries(folder: string, copy: string, files: string[]): Promise<{ ok: true } | { ok: false; why: string }> {
-  // Every entry of the copy, those of `files` kept (ls-files takes no pathspecs on its input, and they can be many).
-  const ls = await git(folder, ['ls-files', '-s', '-z', '--full-name'], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: copy } })
-  if (!ls.ok) return { ok: false, why: gitErrorLine(ls.err) || ls.err.trim() }
+  const from = await entriesIn(folder, files, copy)
+  if (!from.ok) return from
   const fmt = await git(folder, ['rev-parse', '--show-object-format'])
   const none = '0'.repeat(fmt.out.trim() === 'sha256' ? 64 : 40)
-  const wanted = new Set(files)
-  const entries = ls.out.split('\0').filter((e) => e && wanted.has(e.slice(e.indexOf('\t') + 1)))
-  const input = [...files.map((p) => `0 ${none}\t${p}`), ...entries].map((l) => `${l}\0`).join('')
-  let r = await git(folder, ['update-index', '-z', '--index-info'], undefined, input)
-  for (let t = 1; t < TAKE_TRIES && !r.ok && INDEX_BUSY.test(r.err); t++) {
+  const input = [...files.map((p) => `0 ${none}\t${p}`), ...from.entries].map((l) => `${l}\0`).join('')
+  // HR2's round 3: no hook from the hooks folder, no fsmonitor, and a bound. Hooks set in git's config can't be turned
+  // off, but git runs post-index-change after it has written the index and given its lock up, so ending one there leaves
+  // no lock; the index is then read to see whether the entries are in.
+  const take = (): Promise<GitResult> => git(folder, [...NO_HOOKS(copy), 'update-index', '-z', '--index-info'], undefined, input, { timeout: folderChangesBounds.takeMs })
+  let r = await take()
+  for (let t = 1; t < TAKE_TRIES && !r.ok && !r.timedOut && INDEX_BUSY.test(r.err); t++) {
     await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
-    r = await git(folder, ['update-index', '-z', '--index-info'], undefined, input)
+    r = await take()
+  }
+  if (r.timedOut) {
+    const now = await entriesIn(folder, files, copy, 'real')
+    if (now.ok && sameEntries(now.entries, from.entries)) return { ok: true }
+    return { ok: false, why: `git update-index didn't finish in ${Math.round(folderChangesBounds.takeMs / 1000)} s` } // i18n-ignore: stands in for git's own (English) words
   }
   // Their stat data stays empty, so git compares their content once more: refreshing it could run a filter unbounded.
   return r.ok ? { ok: true } : { ok: false, why: gitErrorLine(r.err) || r.err.trim() }
+}
+
+/**
+ * HI-3021 (HR2's round 3): git's options for reading and writing an index with nothing of the repository's run: no hook
+ * from a hooks folder (a folder named after the private index, never made) and no fsmonitor.
+ */
+const NO_HOOKS = (copy: string): string[] => ['-c', `core.hooksPath=${copy}.no-hooks`, '-c', 'core.fsmonitor=false']
+
+/** The entries the private index `copy` (or, `real`, the folder's own) has for `files`, as `ls-files -s` says them (mode, object, stage, path). */
+async function entriesIn(folder: string, files: string[], copy: string, which: 'copy' | 'real' = 'copy'): Promise<{ ok: true; entries: string[] } | { ok: false; why: string }> {
+  // Every entry, those of `files` kept (ls-files takes no pathspecs on its input, and they can be many).
+  const ls = await git(folder, [...NO_HOOKS(copy), 'ls-files', '-s', '-z', '--full-name'], undefined, undefined, which === 'copy' ? { env: { ...process.env, GIT_INDEX_FILE: copy } } : {})
+  if (!ls.ok) return { ok: false, why: gitErrorLine(ls.err) || ls.err.trim() }
+  const wanted = new Set(files)
+  return { ok: true, entries: ls.out.split('\0').filter((e) => e && wanted.has(e.slice(e.indexOf('\t') + 1))) }
+}
+
+const sameEntries = (a: string[], b: string[]): boolean => a.length === b.length && [...a].sort().every((e, i) => e === [...b].sort()[i])
+
+/**
+ * HI-3021 (HR2's round 3): whether `now`, HEAD after a commit ended at its bound, is the commit this one made, not one
+ * another git made meanwhile (the real index is free while the commit runs): its parent is the HEAD it started from
+ * (none on an unborn branch), its message is this one's, and its tree has exactly the private index's entries for
+ * `files` (git's commit --only puts the committed content there).
+ */
+async function madeByThis(folder: string, now: string, before: string | null, message: string, copy: string, files: string[]): Promise<boolean> {
+  const parent = await git(folder, ['rev-parse', '-q', '--verify', `${now}^`])
+  if (before === null ? parent.ok : !parent.ok || parent.out.trim() !== before) return false
+  const said = await git(folder, ['log', '-1', '--format=%B', now])
+  if (!said.ok || said.out.trim() !== message.trim()) return false
+  const inCopy = await entriesIn(folder, files, copy)
+  if (!inCopy.ok || inCopy.entries.some((e) => !/\t/.test(e) || e.split(' ')[2]?.split('\t')[0] !== '0')) return false
+  // ls-tree's `mode type object\tpath`, the copy's `mode object 0\tpath`: compared as `mode object\tpath`.
+  const tree = await git(folder, ['ls-tree', '-r', '-z', '--full-tree', now])
+  if (!tree.ok) return false
+  const wanted = new Set(files)
+  const inTree = tree.out.split('\0').filter((e) => e && wanted.has(e.slice(e.indexOf('\t') + 1))).map((e) => {
+    const [meta, path] = [e.slice(0, e.indexOf('\t')), e.slice(e.indexOf('\t') + 1)]
+    const [mode, , object] = meta.split(' ')
+    return `${mode} ${object}\t${path}`
+  })
+  const fromCopy = inCopy.entries.map((e) => {
+    const [meta, path] = [e.slice(0, e.indexOf('\t')), e.slice(e.indexOf('\t') + 1)]
+    const [mode, object] = meta.split(' ')
+    return `${mode} ${object}\t${path}`
+  })
+  return sameEntries(inTree, fromCopy)
 }
 
 /** The environment of these commits: no prompt is ever waited on (a passphrase, credentials, a credential manager). */
@@ -274,9 +327,10 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
       if (!add.ok) throw failed(M.commitFailed, add.err)
     }
     const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
-    // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read and moved says so.
-    const now = r.ok ? await headOf(folder) : r.timedOut ? await headOf(folder) : undefined
-    const made = typeof now === 'string' && (r.ok || now !== before) ? now : null
+    // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read, moved, and proved this
+    // commit's says so (HR2's round 3: another git can commit meanwhile, the real index being free).
+    const now = r.ok || r.timedOut ? await headOf(folder) : undefined
+    const made = typeof now === 'string' && (r.ok || (now !== before && (await madeByThis(folder, now, before, message, copy, files)))) ? now : null
     if (!made) {
       if (r.timedOut) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
       throw failed(M.commitFailed, r.ok ? "git couldn't read HEAD after the commit" : `${r.err}\n${r.out}`) // i18n-ignore: stands in for git's own (English) words

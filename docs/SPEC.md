@@ -6040,9 +6040,14 @@ touched:
   or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
   (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in, tried
   again briefly while another git holds the index; their stat data left empty rather than refreshed, which could run
-  a filter unbounded); every other entry is left. That step failing is said with the commit or stash made (*Git made
+  a filter unbounded); every other entry is left. That step runs nothing of the repository's it can turn off (HR2's
+  round 3: `core.hooksPath` a folder never made, `core.fsmonitor=false`) and is bounded (10 s): a hook set in git's
+  config can't be turned off, but git runs post-index-change once it has written the index and given its lock up, so
+  ending one there leaves no lock, and the index is read to see whether the entries are in. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
-  is as it was. A commit ended after it was made (post-commit: HEAD read and moved) is made; HEAD unreadable before
+  is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
+  round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its
+  message this one's, and its tree's entries for the paths the private index's; HEAD unreadable before
   the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
   unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
   then. **Any number of files** (HI-2983): the paths go to git on its input

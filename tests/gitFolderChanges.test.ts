@@ -389,6 +389,56 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     }
   })
 
+  it("another git commits while this one's pre-commit hook runs, then this one is ended (HR2's round 3): HEAD moved but not by it, so refused, the other commit and the staging left as they are", async () => {
+    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids))
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'b.txt'), 'theirs\n')
+    const before = head()
+    const done = settle('commit', ['a.txt']).catch((e: Error) => e)
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: 20_000 })
+    // The user's own commit meanwhile, with the real index and no hooks.
+    sh(proj, '-c', `core.hooksPath=${fwd(join(tempDir('cw-folderchanges-nohooks-'), 'none'))}`, 'commit', '-q', '-m', 'theirs', '--', 'b.txt')
+    const theirs = head()
+    expect(theirs).not.toBe(before)
+    const err = await done
+    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    expect(head()).toBe(theirs)
+    expect(sh(proj, 'log', '-1', '--format=%s')).toBe('theirs')
+    // a.txt neither committed nor staged as if it were.
+    expect(lines()).toEqual(['M a.txt'])
+    expect(leftovers()).toEqual([])
+  })
+
+  it("the step into the real index runs no hook from the hooks folder, and one set in git's config is bounded (HR2's round 3): made, the index taken in", async () => {
+    changes.folderChangesBounds.takeMs = 2000
+    try {
+      const dir = tempDir('cw-folderchanges-pic-')
+      const fileHook = join(dir, 'file hook ran')
+      const configHook = join(dir, 'config hook ran')
+      // Each only for the real index (no GIT_INDEX_FILE): the private index's commit runs them too.
+      const slow = (marker: string): string => `[ -n "$GIT_INDEX_FILE" ] || { : > "${fwd(marker)}"; "${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'; }`
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', 'post-index-change'), `#!/bin/sh\n${slow(fileHook)}\n`)
+      writeFileSync(join(dir, 'config-hook.sh'), `#!/bin/sh\n${slow(configHook)}\n`)
+      sh(proj, 'config', 'hook.slow.event', 'post-index-change')
+      sh(proj, 'config', 'hook.slow.command', `sh "${fwd(join(dir, 'config-hook.sh'))}"`)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      const done = await settle('commit', ['a.txt', 'new.txt'])
+      expect(done.made).toBe(head())
+      expect(committed()).toEqual(['a.txt', 'new.txt'])
+      expect(existsSync(fileHook)).toBe(false)
+      expect(existsSync(configHook)).toBe(true)
+      sh(proj, 'config', '--unset', 'hook.slow.event')
+      expect(lines()).toEqual([])
+      expect(existsSync(lockPath())).toBe(false)
+    } finally {
+      changes.folderChangesBounds.takeMs = 10_000
+    }
+  })
+
   it("HEAD unreadable before the commit (HR2's round 2): refused before anything runs, never taken for a commit made", async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
