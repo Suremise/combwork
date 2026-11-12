@@ -74,6 +74,7 @@
   "service.folderChanges.changed": "Die Änderungen in {folder} sind nicht mehr die angezeigten. Sieh noch einmal nach.",
   "service.folderChanges.commitFailed": "Git hat nicht committet: {why}",
   "service.folderChanges.commitTimedOut": "Git hat den Commit nicht in {seconds, number} Sekunden abgeschlossen (ein Hook lief noch, oder die Signierung wartete auf eine Antwort), daher hat Combwork ihn und alles, was er gestartet hatte, beendet. Die Dateien und der Index sind wie zuvor.",
+  "service.folderChanges.commitTimedOutMoved": "Git hat den Commit nicht innerhalb von {seconds, number} Sekunden abgeschlossen (ein Hook lief noch oder das Signieren wartete auf eine Antwort), daher hat Combwork ihn beendet, samt allem, was er gestartet hatte. {head, select, none {Combwork konnte den Commit des Branches danach nicht lesen} other {Der Branch ist inzwischen auf {head} gewechselt, und Combwork kann nicht feststellen, ob das dieser Commit ist}}, daher hat es den Index so belassen. Prüfe git log und git status, bevor du weitermachst.",
   "service.folderChanges.deletedKept": "{file} ist zum Entfernen aus Git vorgemerkt: Committe das selbst in Git; Combwork fügt die Datei nicht wieder hinzu.",
   "service.folderChanges.detached": "{folder} ist auf keinem Branch, daher committet Combwork dort nicht.",
   "service.folderChanges.indexBusy": "Ein anderer Git-Befehl verwendet gerade das Repository. Versuche es gleich noch einmal.",

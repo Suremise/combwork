@@ -6201,12 +6201,15 @@ touched:
   can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
   the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
-  is as it was. A commit ended after it was made (post-commit) is made only when HEAD is proved this commit (HR2's
-  round 3: the real index being free, another git can commit meanwhile): its parent the HEAD it started from, its
-  message this one's, and its tree's entries for the paths the private index's; HEAD unreadable before
-  the commit refuses it before anything runs (an unborn branch is not unreadable), so no commit is inferred from an
-  unknown. The refusal says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by
-  then. **Any number of files** (HI-2983): the paths go to git on its input
+  is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
+  more proof), even one made before its post-commit hook was ended: the real index being free, another git can commit
+  meanwhile (HR2's round 3), and a hook's own git, which inherits everything the commit's has, can move HEAD or commit
+  before or after the commit's write (HR2's rounds 1-3 on HI-3075), so nothing proves which made the commit now there.
+  HEAD unreadable before the commit refuses it before anything runs (an unborn branch is not unreadable). The refusal
+  says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by then; *the files and
+  the index are as they were* only while HEAD is where it started. HEAD moved (or unreadable), it names where HEAD is
+  now and that the index was left as it was, for the user to settle (*The branch moved meanwhile, to …, and Combwork
+  can't tell that it is this commit … Check git log and git status*). **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters

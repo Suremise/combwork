@@ -74,6 +74,7 @@
   "service.folderChanges.changed": "{folder} 中的更改已不再是显示的那些。请重新查看。",
   "service.folderChanges.commitFailed": "Git 未提交：{why}",
   "service.folderChanges.commitTimedOut": "Git 未在 {seconds, number} 秒内完成提交（某个钩子仍在运行，或签名在等待应答），因此 Combwork 结束了它及其启动的所有进程。文件和索引保持原样。",
+  "service.folderChanges.commitTimedOutMoved": "Git 未在 {seconds, number} 秒内完成提交（某个钩子仍在运行，或签名正在等待回应），因此 Combwork 结束了它及其启动的所有进程。{head, select, none {Combwork 之后未能读取该分支的提交} other {在此期间分支已移动到 {head}，Combwork 无法判断它是否就是这次提交}}，因此保留了索引原样。继续之前请先查看 git log 和 git status。",
   "service.folderChanges.deletedKept": "{file} 已暂存为从 Git 中移除：请自己在 Git 中提交；Combwork 不会把它加回去。",
   "service.folderChanges.detached": "{folder} 不在任何分支上，因此 Combwork 不会在那里提交。",
   "service.folderChanges.indexBusy": "另一个 git 命令正在使用该仓库。请稍后重试。",

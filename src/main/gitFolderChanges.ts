@@ -43,6 +43,7 @@ const M = {
   indexBusy: msg({ id: 'service.folderChanges.indexBusy', defaultMessage: 'Another git command is using the repository. Try again in a moment.', description: "HI-2944: an error from Commit or Set aside: git's index is locked by another git command." }),
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
   commitTimedOut: msg({ id: 'service.folderChanges.commitTimedOut', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. The files and the index are as they were.", description: "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is." }),
+  commitTimedOutMoved: msg({ id: 'service.folderChanges.commitTimedOutMoved', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.", description: "HI-3075: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands." }),
   indexNotTaken: msg({ id: 'service.folderChanges.indexNotTaken', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.", description: "HI-3021: an error from Commit or Set aside (a paused merge, a start's warning): git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands." }),
   indexKept: msg({ id: 'service.folderChanges.indexKept', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.", description: "HI-3053: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command." }),
   stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
@@ -338,36 +339,6 @@ export function sameEntries(a: readonly string[], b: readonly string[]): boolean
   return x.every((e, i) => e === y[i])
 }
 
-/**
- * HI-3021 (HR2's round 3): whether `now`, HEAD after a commit ended at its bound, is the commit this one made, not one
- * another git made meanwhile (the real index is free while the commit runs): its parent is the HEAD it started from
- * (none on an unborn branch), its message is this one's, and its tree has exactly the private index's entries for
- * `files` (git's commit --only puts the committed content there).
- */
-async function madeByThis(folder: string, now: string, before: string | null, message: string, copy: string, files: string[]): Promise<boolean> {
-  const parent = await git(folder, ['rev-parse', '-q', '--verify', `${now}^`])
-  if (before === null ? parent.ok : !parent.ok || parent.out.trim() !== before) return false
-  const said = await git(folder, ['log', '-1', '--format=%B', now])
-  if (!said.ok || said.out.trim() !== message.trim()) return false
-  const inCopy = await entriesIn(folder, files, copy)
-  if (!inCopy.ok || inCopy.entries.some((e) => !/\t/.test(e) || e.split(' ')[2]?.split('\t')[0] !== '0')) return false
-  // ls-tree's `mode type object\tpath`, the copy's `mode object 0\tpath`: compared as `mode object\tpath`.
-  const tree = await git(folder, ['ls-tree', '-r', '-z', '--full-tree', now])
-  if (!tree.ok) return false
-  const wanted = new Set(files)
-  const inTree = tree.out.split('\0').filter((e) => e && wanted.has(e.slice(e.indexOf('\t') + 1))).map((e) => {
-    const [meta, path] = [e.slice(0, e.indexOf('\t')), e.slice(e.indexOf('\t') + 1)]
-    const [mode, , object] = meta.split(' ')
-    return `${mode} ${object}\t${path}`
-  })
-  const fromCopy = inCopy.entries.map((e) => {
-    const [meta, path] = [e.slice(0, e.indexOf('\t')), e.slice(e.indexOf('\t') + 1)]
-    const [mode, object] = meta.split(' ')
-    return `${mode} ${object}\t${path}`
-  })
-  return sameEntries(inTree, fromCopy)
-}
-
 /** HI-3074: what a commit leaves the index: its paths (those shown, and every path it changed) and its entries for them. */
 interface Made {
   paths: string[]
@@ -527,20 +498,22 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
  * is staged while its file is still in the folder (settleChanges and commitIgnore refuse it first, keptDeleted).
  */
 async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }): Promise<string> {
-  // What the branch was, to tell a commit made before the bound ended git (a post-commit hook); unreadable, nothing runs.
+  // What the branch was, to tell whether a commit ended at its bound moved it; unreadable, nothing runs.
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
     const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, copy, files, untracked, message)
-    // Ended at its bound after the commit was made (in post-commit): it is made. Only a HEAD read, moved, and proved this
-    // commit's says so (HR2's round 3: another git can commit meanwhile, the real index being free).
-    const now = r.ok || r.timedOut ? await headOf(folder) : undefined
-    const made = typeof now === 'string' && (r.ok || (now !== before && (await madeByThis(folder, now, before, message, copy, files)))) ? now : null
-    if (!made) {
-      if (r.timedOut) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
-      throw failed(M.commitFailed, r.ok ? "git couldn't read HEAD after the commit" : `${r.err}\n${r.out}`) // i18n-ignore: stands in for git's own (English) words
+    if (r.timedOut) {
+      // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, whatever HEAD is now: a hook's own git
+      // (which inherits everything this one has) can move HEAD or commit too, and nothing proves which made it. HEAD
+      // where it started: nothing was made. Moved (or unread): said so, where it is now, the index left as it was.
+      const now = await headOf(folder)
+      if (now === before) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
+      log.warn(`A commit in ${userText(folder)} was ended at its bound, HEAD moved meanwhile to ${now ?? '(unread)'}: not credited`)
+      throw combworkError(M.commitTimedOutMoved, { seconds: boundSeconds(), head: typeof now === 'string' ? now.slice(0, 12) : 'none' })
     }
-    if (!r.ok) log.warn(`A commit in ${userText(folder)} was ended at its bound after it was made (${made})`)
+    const made = r.ok ? await headOf(folder) : undefined
+    if (typeof made !== 'string') throw failed(M.commitFailed, r.ok ? "git couldn't read HEAD after the commit" : `${r.err}\n${r.out}`) // i18n-ignore: stands in for git's own (English) words
     // HI-3074: from the commit, never the private index: a pre-commit hook's `git add` (a formatter, a generated file)
     // goes into what git commits, not into the private index.
     const entries = await entriesOfCommit(folder, made, before, files)

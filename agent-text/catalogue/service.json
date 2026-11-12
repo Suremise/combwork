@@ -369,6 +369,11 @@
     "note": "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is.",
     "audience": "both"
   },
+  "service.folderChanges.commitTimedOutMoved": {
+    "text": "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.",
+    "note": "HI-3075: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands.",
+    "audience": "both"
+  },
   "service.folderChanges.deletedKept": {
     "text": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
     "note": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves.",
