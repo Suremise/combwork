@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **The Assistant is told when a card's Merges into won't follow the project** (HI-3017). Asked to move a project and its Todo cards on to the next version, the Assistant sometimes set the cards first: each then had that branch as its own, and stayed there through later changes of the project's branch. Now its reply says the card has a branch of its own and how to have it follow the project's instead (change the project first, then clear the card's).
+
 ## 1.4.0 — 2026-11-11
 
 ### Added

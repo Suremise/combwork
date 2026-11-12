@@ -96,6 +96,7 @@ import { armIntentWatch } from './intentWatch'
 import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
 import { NextVersionPartial, startNextVersion } from './workflow/nextVersion'
 import { projectTargets } from './workflow/targets'
+import { cardTargetSaid } from './cardTargetReply'
 import { withRepoLock } from './repoLock'
 import type { NextVersionResult } from '../shared/types'
 import { lineRepoOps } from './platform/repoOpsPorts'
@@ -3414,6 +3415,15 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
   // Its Merges into (HI-2556): a branch, or null for the project's own; checked by tasks.setTarget.
   const target = body?.target === undefined ? undefined : targetArg(body.target)
+  // HI-3017: a target of its own (one of the project's other targets) is said under the change: it stays there when the
+  // project's target changes, even to it, so setting cards before the project pins them.
+  let ownTargetNote = ''
+  const setCardTarget = async (commit?: () => void): Promise<void> => {
+    const c = await tasks.setTarget(n, target, actor, { commit })
+    const { own, note } = await cardTargetSaid(workspace, n, c.project, target)
+    changes.push(sayStored([API.card.saidTarget, { own: own ? 'yes' : 'no', target: own ?? '' }]))
+    ownTargetNote = note
+  }
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
@@ -3427,10 +3437,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
       changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
-    if (target !== undefined && !moving) {
-      await tasks.setTarget(n, target, actor, { commit })
-      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
-    }
+    if (target !== undefined && !moving) await setCardTarget(commit)
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
@@ -3444,10 +3451,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const moving = target !== undefined && (await tasks.targetMovesInFlight(n).catch(() => false))
   const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || (target !== undefined && !moving) ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
-    if (moving) {
-      await tasks.setTarget(n, target, actor, { commit })
-      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
-    }
+    if (moving) await setCardTarget(commit)
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
     changes.push(...attachedLines(c))
@@ -3458,7 +3462,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   // order and takes it again in it, said as a put-back says it (HI-2267).
   const reply = async (c: TaskCard) => {
     const held = patch.column !== undefined ? await lanes.lanesHolding(requireWorkspace(), [c.number]).catch(() => []) : []
-    const notes = [nudge, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
+    const notes = [nudge, ownTargetNote, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
     return { ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
   }
   if (actor.kind !== 'assistant') {

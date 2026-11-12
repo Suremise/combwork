@@ -106,6 +106,7 @@ export const API = {
     saidReviewed: agentMsg({ id: 'api.card.saidReviewed', text: 'Reviewed' }),
     saidSkipsReview: agentMsg({ id: 'api.card.saidSkipsReview', text: 'Skips review' }),
     saidTarget: agentMsg({ id: 'api.card.saidTarget', text: "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}", note: 'HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project\'s Work merges into.' }),
+    ownTarget: agentMsg({ id: 'api.card.ownTarget', text: "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to null.", note: 'HI-3017: below a card update that gave the card a target other than its project\'s ({default}). Setting cards before the project pinned them, unnoticed (HI-3004\'s trials of assistant-retarget-release).' }),
     setReviewed: agentMsg({ id: 'api.card.setReviewed', text: 'set it to be reviewed' }),
     setSkipReview: agentMsg({ id: 'api.card.setSkipReview', text: 'set it to skip review' }),
     stayInProject: agentMsg({ id: 'api.card.stayInProject', text: 'Cards stay in your project ({project}).' }),

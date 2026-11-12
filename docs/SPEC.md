@@ -2859,7 +2859,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
-  never an empty name (HI-2825). Both name only
+  never an empty name (HI-2825). A card set to one of the project's other targets keeps it through any later change of
+  G7, even to that branch; `cw_update_task`'s reply says so, and how to follow G7 instead (change it first, then clear
+  the card's), HI-3017: setting cards before their project pinned them unnoticed. Both name only
 - **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
   branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
   in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`

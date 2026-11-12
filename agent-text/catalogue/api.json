@@ -289,6 +289,10 @@
   "api.card.overrideArg": {
     "text": "override is '{' \"reason\": \"<why>\" '}', the reason not empty."
   },
+  "api.card.ownTarget": {
+    "text": "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to null.",
+    "note": "HI-3017: below a card update that gave the card a target other than its project's ({default}). Setting cards before the project pinned them, unnoticed (HI-3004's trials of assistant-retarget-release)."
+  },
   "api.card.recordedDecision": {
     "text": "recorded a decision"
   },
