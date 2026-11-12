@@ -68,5 +68,6 @@
   "worktrees.why.notChecked": "未確認",
   "worktrees.why.notListed": "gitが{branch}上のワークツリーとして登録していない",
   "worktrees.why.notMerged": "{into}に未マージのコミット{n, plural, other {#件}}",
-  "worktrees.why.uncommitted": "未コミットのファイル{n, plural, other {#件}}"
+  "worktrees.why.uncommitted": "未コミットのファイル{n, plural, other {#件}}",
+  "worktrees.merge.temporaryLeft": "Combworkは一時フォルダー{folder}を削除できませんでした。「未使用のワークツリー」で削除してください。"
 }

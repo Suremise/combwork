@@ -104,6 +104,44 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     await dialog.locator('[data-action="merge"]').click()
     check("the slot's line is merged into main", !!(await until(async () => (await dialog.count()) === 0 && fs.existsSync(path.join(fx.alpha, 's.txt')), HUNG_MS)) && lib.git(fx.alpha, ['log', '-1', '--format=%s', 'main']).trim() === `Merge ${slotLine}`, lib.git(fx.alpha, ['log', '-3', '--oneline', 'main']))
 
+    // --- HI-3030: into a branch checked out nowhere (release). With signing on and a signer that can't run (repo-local:
+    // nothing of the user's), refused saying why, release unmoved; signing off and a commit-msg hook: merged, the hook run,
+    // no temporary folder left. Both settings undone after.
+    const sh = (args) => lib.git(fx.alpha, args).trim()
+    git(fx.alpha, ['branch', 'release', 'main'])
+    fs.writeFileSync(path.join(lent.slot.folder, 's2.txt'), 'more slot work\n')
+    git(lent.slot.folder, ['add', '-A'])
+    git(lent.slot.folder, ['commit', '-qm', 'More slot work'])
+    const releaseWas = sh(['rev-parse', 'release'])
+    const worktreesWere = sh(['worktree', 'list', '--porcelain']).split(/\r?\n/).filter((l) => l.startsWith('worktree ')).join('|')
+    git(fx.alpha, ['config', 'commit.gpgsign', 'true'])
+    git(fx.alpha, ['config', 'gpg.program', path.join(fx.tools, 'no-such-signer.exe')])
+    const openInto = async (target) => {
+      await row(slotLine).locator('[data-action="merge-branch"]').click()
+      await until(async () => (await dialog.locator('select[data-pick="branch"]').inputValue().catch(() => '')) === slotLine, HUNG_MS)
+      await dialog.locator('select[data-pick="target"]').selectOption(target)
+      return !!(await until(async () => (await text(dialog)).includes(`into ${target}`), HUNG_MS))
+    }
+    check('HI-3030: the dialog on the line, into release (checked out nowhere)', await openInto('release'), await text(dialog))
+    await dialog.locator('[data-action="merge"]').click()
+    check('…signing on, the signer unable to run: refused saying why, release unmoved', !!(await until(async () => /Nothing was merged: .*(sign|gpg)/is.test(await text(dialog)), HUNG_MS)) && sh(['rev-parse', 'release']) === releaseWas, await text(dialog))
+    await shoot(dialog, '2b-merge-elsewhere-unsigned-refused')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await dialog.count()) === 0, HUNG_MS)
+    git(fx.alpha, ['config', '--unset', 'commit.gpgsign'])
+    git(fx.alpha, ['config', '--unset', 'gpg.program'])
+    const hooks = path.join(fx.tools, 'hi3030-hooks')
+    fs.mkdirSync(hooks, { recursive: true })
+    fs.writeFileSync(path.join(hooks, 'commit-msg'), '#!/bin/sh\necho "Hooked: yes" >> "$1"\n')
+    git(fx.alpha, ['config', 'core.hooksPath', hooks.replace(/\\/g, '/')])
+    await openInto('release')
+    await dialog.locator('[data-action="merge"]').click()
+    const merged = await until(async () => (await dialog.count()) === 0 && sh(['rev-parse', 'release']) !== releaseWas, HUNG_MS)
+    check("…then merged into release by git merge: two parents, the repository's commit-msg hook run", !!merged && sh(['log', '-1', '--format=%P', 'release']).split(' ').length === 2 && sh(['log', '-1', '--format=%B', 'release']).includes('Hooked: yes'), sh(['log', '-1', '--format=%H %P%n%B', 'release']))
+    check('…the project folder untouched, no temporary worktree left', sh(['rev-parse', '--abbrev-ref', 'HEAD']) === 'main' && sh(['worktree', 'list', '--porcelain']).split(/\r?\n/).filter((l) => l.startsWith('worktree ')).join('|') === worktreesWere, sh(['worktree', 'list']))
+    await shoot(page, '2c-merged-elsewhere')
+    git(fx.alpha, ['config', '--unset', 'core.hooksPath'])
+
     // --- A card in Review: its line is its work; merged here only after asking, then marked as in main (HI-2709).
     const b2 = await q.agent(fx, h, 'B2', { worktree: true })
     const n = (await inv('tasks:create', { title: 'Card in review', project: 'alpha' })).number

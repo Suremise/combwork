@@ -143,6 +143,10 @@
     "defaultMessage": "{branch} changed while Combwork was merging into it. Nothing was merged: merge again.",
     "description": "Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit)."
   },
+  "worktrees.merge.temporaryLeft": {
+    "defaultMessage": "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "description": "HI-3030: a second line after a merge into a branch checked out nowhere: the temporary folder Combwork made to merge there ({folder}: its path) could not be removed."
+  },
   "worktrees.merge.uncommitted": {
     "defaultMessage": "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",
     "description": "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Combwork merges only committed work; stash is git's word (git stash)."

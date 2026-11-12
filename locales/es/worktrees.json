@@ -68,5 +68,6 @@
   "worktrees.why.notChecked": "no se comprobó",
   "worktrees.why.notListed": "git no lo lista como worktree en la rama {branch}",
   "worktrees.why.notMerged": "{n, plural, one {# commit sin fusionar en {into}} many {# commits sin fusionar en {into}} other {# commits sin fusionar en {into}}}",
-  "worktrees.why.uncommitted": "{n, plural, one {# archivo sin commit} many {# archivos sin commit} other {# archivos sin commit}}"
+  "worktrees.why.uncommitted": "{n, plural, one {# archivo sin commit} many {# archivos sin commit} other {# archivos sin commit}}",
+  "worktrees.merge.temporaryLeft": "Combwork no pudo quitar su carpeta temporal {folder}: quítala en Worktrees sin usar."
 }

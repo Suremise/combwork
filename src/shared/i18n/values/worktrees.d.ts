@@ -37,6 +37,7 @@ interface CombworkMessageValues {
   'worktrees.merge.staged': undefined
   'worktrees.merge.targetElsewhere': { branch: string | number; folder: string | number }
   'worktrees.merge.targetMoved': { branch: string | number }
+  'worktrees.merge.temporaryLeft': { folder: string | number }
   'worktrees.merge.uncommitted': { files: number }
   'worktrees.merge.unknownFiles': undefined
   'worktrees.missing.noAgent': undefined
