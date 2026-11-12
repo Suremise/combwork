@@ -177,20 +177,20 @@ describe('HI-3126: a forward under follow mode reads the remotes', () => {
     expect(view?.forward?.follows).toBeUndefined()
   })
 
-  it('tracking set up any other way is refused, nothing queued: half of it, another local branch, a remote that isn’t there', async () => {
-    const setups: [string, string[][]][] = [
-      ['half', [['config', '--unset', 'branch.main.merge']]],
-      ['local', [['config', 'branch.main.remote', '.'], ['config', 'branch.main.merge', 'refs/heads/1.2.0']]],
-      ['not a branch', [['config', 'branch.main.merge', 'refs/tags/v1']]],
-      ['no such remote', [['config', 'branch.main.remote', 'gone']]]
-    ]
-    for (const [, steps] of setups) {
-      const { w, repo } = await project()
-      for (const s of steps) git(repo, ...s)
-      await expect(ask(w, repo)).rejects.toThrow(/1\.2\.0 isn’t brought up to date with main: Combwork couldn’t read which remote branch main tracks .*, so nothing was queued/)
-      expect(await cards(w, repo)).toBe(0)
-    }
-    // The destination's tracking too.
+  // One project each (a remote and a clone apiece): kept apart, so each is its own test.
+  it.each([
+    ['half of it', [['config', '--unset', 'branch.main.merge']]],
+    ['another local branch', [['config', 'branch.main.remote', '.'], ['config', 'branch.main.merge', 'refs/heads/1.2.0']]],
+    ['a merge ref that isn’t a branch', [['config', 'branch.main.merge', 'refs/tags/v1']]],
+    ['a remote that isn’t there', [['config', 'branch.main.remote', 'gone']]]
+  ])('tracking set up any other way is refused, nothing queued: %s', async (_what, steps) => {
+    const { w, repo } = await project()
+    for (const s of steps) git(repo, ...s)
+    await expect(ask(w, repo)).rejects.toThrow(/1\.2\.0 isn’t brought up to date with main: Combwork couldn’t read which remote branch main tracks .*, so nothing was queued/)
+    expect(await cards(w, repo)).toBe(0)
+  })
+
+  it("the destination's tracking too", async () => {
     const { w, repo } = await project()
     git(repo, 'config', 'branch.1.2.0.remote', '.')
     await expect(ask(w, repo)).rejects.toThrow(/couldn’t read which remote branch 1\.2\.0 tracks/)
