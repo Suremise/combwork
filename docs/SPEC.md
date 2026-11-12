@@ -2665,7 +2665,12 @@ merges under jj.
   in flight, a member's merge queue with work, open slot leases, unfreed copy leases, and (HI-3069) each slot kept for
   a card, `drain.kept`, that isn't of the platform switched to: it could never be lent back after the switch, so its
   card is started and finished first; one already of that platform, left by a switch made before this, never refuses
-  the switch back to it; a member's switch to None counts every kept slot), `otherWorkspace` (the store is a
+  the switch back to it; a member's switch to None counts every kept slot; and (HI-3070) the repository's other
+  projects whose choice is None, never switched with it, through their work still under Git or jj only: cards in
+  flight started under a repository's rules, their merge queue's work, open slot leases, unfreed copies and kept
+  slots, and their running lanes whose recorded ruleset needs a repository (one before its first card starts holds Git's
+  rules for it; a ruleset that can't be read counts), never their None cards or a lane recorded under None; such a
+  project stays None and outside the group), `otherWorkspace` (the store is a
   project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes

@@ -451,6 +451,57 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     }
   })
 
+  it('HI-3070: a project that chose None with Git work still running counts in the drain of its repository’s switch to jj; its None work never does', async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    // Q, never switched: a Git card in flight and a slot lease, then None (its own switch: its card keeps Git's rules).
+    expect(await startCard(w, q, 'q')).toMatchObject({ ok: true })
+    await leaseOk(w, q)
+    expect(await sw.setPlatform(w, q, 'none', { expected: 'git' })).toEqual({ from: 'git', to: 'none' })
+    const check = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(check.refused).toEqual({ why: 'drain' })
+    // Q isn't in the group (it stays None), but its Git work is in the drain.
+    expect(check.store?.group.map((g) => g.name)).toEqual(['p'])
+    expect(check.store?.drain.cards.map((c) => c.project)).toEqual(['q'])
+    expect(check.store?.drain.slots.map((s) => s.project)).toEqual(['q'])
+    await expect(sw.setPlatform(w, p, 'jj', { expected: 'git', token: check.store!.token })).rejects.toThrow()
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'none'])
+    // Q's Git work ended (its card put back, its lease ended), a card started under None in flight instead: the switch goes.
+    const qwf = (await workflowFor(w, q))!
+    const gitCard = qwf.store.cards().find((c) => qwf.state(c).started)!
+    expect(await store.boardWrite(w, async () => qwf.putBack(`#${gitCard.id}`, 'user'))).toMatchObject({ ok: true })
+    await endAll(w, q)
+    expect(await startCard(w, q, 'q')).toMatchObject({ ok: true })
+    const after = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(after.refused).toBeNull()
+    expect(after.store?.drain.cards).toEqual([])
+    expect(await sw.setPlatform(w, p, 'jj', { expected: 'git', token: after.store!.token })).toEqual({ from: 'git', to: 'jj' })
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'none'])
+  })
+
+  it("HI-3070 (HR2's round 1): a None project's Git lane before its first card starts counts; a lane started under None doesn't", async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    // Q, never switched: a Git lane whose one card is still Todo (its ruleset Git's), then None.
+    const qCard = await inWorkspace(w, () => tasks.createTask({ title: 'Lane card', project: 'q' }, user))
+    const gitLane = await lanes.startLane(w, { project: 'q', builder: 'b-q', reviewer: 'r-q', cards: [qCard.number], name: 'git lane', by: 'BQ (q)' })
+    expect(await sw.setPlatform(w, q, 'none', { expected: 'git' })).toEqual({ from: 'git', to: 'none' })
+    const qwf = (await workflowFor(w, q))!
+    expect(qwf.state(qwf.store.card(qCard.number)).stage).toBe('todo')
+    const check = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(check.refused).toEqual({ why: 'drain' })
+    expect(check.store?.drain.lanes.map((l) => [l.project, l.name])).toEqual([['q', 'git lane']])
+    expect(check.store?.drain.cards).toEqual([])
+    await expect(sw.setPlatform(w, p, 'jj', { expected: 'git', token: check.store!.token })).rejects.toThrow()
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['git', 'none'])
+    // The Git lane ended, a lane started under None (its ruleset None's): never in the drain, so the switch goes.
+    await lanes.endLane(w, (gitLane as { lane: { id: string } }).lane.id, { abandoned: true })
+    const noneCard = await inWorkspace(w, () => tasks.createTask({ title: 'None lane card', project: 'q' }, user))
+    await lanes.startLane(w, { project: 'q', builder: 'b-q', reviewer: 'r-q', cards: [noneCard.number], name: 'none lane', by: 'BQ (q)' })
+    const after = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(after.store?.drain.lanes).toEqual([])
+    expect(after.refused).toBeNull()
+    expect(await sw.setPlatform(w, p, 'jj', { expected: 'git', token: after.store!.token })).toEqual({ from: 'git', to: 'jj' })
+  })
+
   it('paused after its begin, then after its drain: nothing of the project is admitted, the other member is told to try again', async () => {
     const { w, p, q } = await members(true)
     for (const point of ['afterBegin', 'afterDrain'] as const) {
