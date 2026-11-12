@@ -6143,15 +6143,18 @@ touched:
   (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in); every
   other entry is left. **Their stat data refreshed** (HI-3056): `--index-info` leaves it empty, and what trusts it
   refused them (the queue's advance, `read-tree -m -u`: *Entry … not uptodate*, so the paused merge paused again as
-  the target moving after a Commit). So the new index is refreshed for those paths alone (`add --refresh`, noHooks),
-  bounded as the commit is (a clean filter may run to compare content), in the scratch file the new index is written
-  to before it goes in (below); ended or failed, the entries go in unrefreshed and it is logged. **Another
+  the target moving after a Commit). So the new index is made, and refreshed for those paths alone (`add --refresh`,
+  noHooks, bounded as the commit is: a clean filter may run to compare content), in a scratch file beside the copy
+  **before the real index is locked** (HR3's round 1: never while a filter runs), from the real index's bytes as read
+  then; ended or failed, the entries go in unrefreshed and it is logged. Under the lock (below) it goes in only while
+  the real index is still exactly those bytes; another git wrote it meanwhile, the new index is made again from its
+  new bytes, up to three times, then under the lock unrefreshed (git's own work alone, no filter). **Another
   git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
-  `git add` of a path being committed can land before that step. So the step takes the real index's lock as git does
-  (`index.lock`, made only if none is there; tried again briefly while another git holds it, and only that lock ever
-  removed), compares each path's real entries with those it had when the copy was taken, writes the new index into a
-  scratch file beside the copy (`update-index` with `GIT_INDEX_FILE`) and renames it in through the lock, as git
-  commits a lock. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
+  `git add` of a path being committed can land before that step. So the new index made in the scratch (`update-index`
+  with `GIT_INDEX_FILE`) compares each path's real entries, in the bytes it is made from, with those it had when the
+  copy was taken; and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
+  there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
+  as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
   in, and the refusal names the commit or stash made and the path kept (*Git made the commit (…), but another git
   command staged a.txt meanwhile, so Combwork kept that staging as it was …*). That step runs nothing of the repository's (HR2's rounds 3 and
   4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,

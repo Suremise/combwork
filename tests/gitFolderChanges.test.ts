@@ -43,6 +43,8 @@ let gitCalls: { args: string[]; timeout?: number }[] | null = null
 let failHeadOnce = false
 /** HI-3053: run with the folder once the next commit or `stash push` is made, before Combwork takes its entries in. */
 let afterMade: ((cwd: string) => void) | null = null
+/** HI-3056: run with the folder before each refresh of the entries taken in (another git writing the real index then). */
+let beforeRefresh: ((cwd: string) => void) | null = null
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
 let failTopIn: { folder: string; empty?: boolean } | null = null
 vi.mock('../src/main/git', async (original) => {
@@ -68,6 +70,7 @@ vi.mock('../src/main/git', async (original) => {
         writeFileSync(join(cwd, lateFile), 'not shown\n')
         lateFile = null
       }
+      if (beforeRefresh && args.includes('add') && args.includes('--refresh')) beforeRefresh(cwd)
       const r = await real.git(cwd, args, max, input, opts)
       if (afterMade && r.ok && (args[0] === 'commit' || (args[0] === 'stash' && args[1] === 'push'))) {
         // HI-3053: another git's work once the commit or stash is made, before its entries are taken into the real index.
@@ -151,6 +154,7 @@ beforeEach(() => {
   failLstatOf = null
   lateFile = null
   afterMade = null
+  beforeRefresh = null
 })
 
 describe('Commit', () => {
@@ -609,7 +613,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       expect(leftovers()).toEqual([])
     })
 
-  it('the refresh of what was taken in runs no hook and is bounded: a clean filter past its bound ended, the entries taken in as they are, the commit said made', async () => {
+  it("the refresh of what was taken in runs no hook, is bounded and never holds the real index (HR3's round 1): the user's git add while its clean filter runs works and is kept; the filter ended at its bound, the commit said made", async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
     const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
     // Slow only for the real index's refresh (the scratch): the private commit's own clean runs at once.
@@ -617,18 +621,50 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    writeFileSync(join(proj, 'b.txt'), 'staged by the user meanwhile\n')
     gitCalls = []
-    const done = await settle('commit', ['a.txt'])
+    const settling = settle('commit', ['a.txt'])
+    // While the refresh's filter runs, the real index is free: the user's own git add works (no index.lock).
+    await vi.waitFor(() => expect(pidsIn(pids).length).toBeGreaterThan(0), { timeout: 20_000 })
+    expect(existsSync(lockPath())).toBe(false)
+    sh(proj, 'add', 'b.txt')
+    const done = await settling
     expect(done.made).toBe(head())
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
     const refresh = gitCalls.filter((c) => c.args.includes('add') && c.args.includes('--refresh'))
     gitCalls = null
-    expect(refresh).toHaveLength(1)
-    expect(refresh[0].timeout).toBe(changes.folderChangesBounds.actMs)
-    expect(refresh[0].args).toContain('core.fsmonitor=false')
+    // Made again once from the index the user's add wrote (its filter slow again, ended again).
+    expect(refresh).toHaveLength(2)
+    for (const r of refresh) {
+      expect(r.timeout).toBe(changes.folderChangesBounds.actMs)
+      expect(r.args).toContain('core.fsmonitor=false')
+    }
     await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
     sh(proj, 'config', '--unset', 'filter.slow.clean')
-    expect(lines()).toEqual([])
+    // The user's staging kept; a.txt taken in.
+    expect(sh(proj, 'show', ':b.txt')).toBe('staged by the user meanwhile')
+    expect(lines()).toEqual(['M  b.txt'])
+    expect(existsSync(lockPath())).toBe(false)
+    expect(leftovers()).toEqual([])
+  })
+
+  it("another git writing the real index during every refresh (HR3's round 1): made again a few times, then taken in under the lock unrefreshed; each of its writes kept, the commit made", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    let n = 0
+    beforeRefresh = (cwd) => {
+      writeFileSync(join(cwd, 'b.txt'), `staged by another git ${++n}\n`)
+      sh(cwd, 'add', 'b.txt')
+    }
+    gitCalls = []
+    const done = await settle('commit', ['a.txt'])
+    const refresh = gitCalls.filter((c) => c.args.includes('add') && c.args.includes('--refresh'))
+    gitCalls = null
+    beforeRefresh = null
+    expect(done.made).toBe(head())
+    expect(refresh).toHaveLength(3)
+    expect(sh(proj, 'show', ':b.txt')).toBe('staged by another git 3')
+    expect(sh(proj, 'show', ':a.txt')).toBe('edit')
+    expect(lines()).toEqual(['M  b.txt'])
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
   })
