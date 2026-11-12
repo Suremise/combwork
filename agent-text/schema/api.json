@@ -1607,6 +1607,9 @@
   "api.queue.forwardArgs": {
     "placeholders": {}
   },
+  "api.queue.nextVersionArgs": {
+    "placeholders": {}
+  },
   "api.queue.notAgents": {
     "placeholders": {
       "what": "plain"

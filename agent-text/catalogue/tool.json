@@ -90,7 +90,8 @@
     "text": "The commit you showed the user for from (or the release): refused if it moved since."
   },
   "tool.branch.arg.from": {
-    "text": "create: where it starts: a branch, tag or commit."
+    "text": "create: where it starts: a branch, tag or commit. nextVersion: Work merges into as you read it (refused if it moved on).",
+    "note": "HI-3114: required for nextVersion too."
   },
   "tool.branch.description": {
     "text": "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.",

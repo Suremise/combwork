@@ -1122,6 +1122,10 @@
   "api.queue.forwardArgs": {
     "text": "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)"
   },
+  "api.queue.nextVersionArgs": {
+    "text": "from is required: the project's Work merges into as you read it, the release the next version starts from (refused if it moved on)",
+    "note": "HI-3114: cw_branch nextVersion without from."
+  },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
   },
