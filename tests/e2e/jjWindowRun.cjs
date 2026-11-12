@@ -456,7 +456,9 @@ const onDb = (fn) => {
     const shopBefore = shopFiles()
     const shopBookmarks = jj(shop, '--ignore-working-copy', 'bookmark', 'list')
     check('after the abandon, the slot is stale', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot5)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+    // Slots and copies reads its list as it opens: opened again, as above.
     await toProject()
+    await section('jjRepo')
     await section('workflow')
     const row5 = page.locator(`[data-slot="${slot5}"]`)
     check('Slots and copies: Stale, with Recover…', !!(await until(async () => (await row5.locator('[data-stale]').count()) === 1 && (await row5.locator('[data-action="recover"]').count()) === 1, HUNG_MS)), await text(row5))
