@@ -830,6 +830,7 @@
       "card": "plain",
       "count": "plural",
       "files": "plain",
+      "setting": "plain",
       "base": "plain",
       "commit": "plain",
       "other": "plain",
