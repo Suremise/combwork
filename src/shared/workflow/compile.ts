@@ -229,6 +229,25 @@ export function targetOfRulesetId(id: string): string | null {
 }
 
 /**
+ * A lane's Merges into (HI-3113), the one reader of a lane's branch: the other target its ruleset id marks, else the one
+ * its recorded ruleset names (G7 as the lane started: it keeps merging there after Work merges into moves on, Start the
+ * next version), null with no ruleset or none readable. `stored` reads a recorded ruleset's options (it may throw).
+ */
+export function laneTargetOf(id: string | null | undefined, stored: (id: string) => { target?: string | null } | null | undefined): string | null {
+  if (!id) return null
+  const marked = targetOfRulesetId(id)
+  if (marked) return marked
+  try {
+    return stored(id)?.target || null
+  } catch {
+    return null
+  }
+}
+
+/** A lane's target as HI-2556's lanes compare it: null when it is the project's own (`def`), Work merges into now. */
+export const otherThanOwn = (target: string | null, def: string | null | undefined): string | null => (target && target !== def ? target : null)
+
+/**
  * The rules of a lane merging into `target` (HI-2556): its base's with G7 set to it, the base found again by its id
  * (`rulesBaseId`). The base itself when `target` is empty or already its G7.
  */

@@ -1,14 +1,15 @@
 import { agentList, agentMsg, say } from './agentText'
 import type { WorkflowOptions } from './workflow/options'
-import { targetOfRulesetId } from './workflow/compile'
+import { laneTargetOf } from './workflow/compile'
 
 /**
  * The options a lane goes by (HI-2832): the project's, with the lane's own Merges into (HI-2556: a lane's `target`, or
  * the target its recorded ruleset marks) where it has one, so its brief names the branch its work goes to and its slot
- * is lent for that branch, never the project's Work merges into. Null while the rules are off.
+ * is lent for that branch, never the project's Work merges into. Null while the rules are off. `stored` reads a recorded
+ * ruleset's options (HI-3113: a lane left on the release by Start the next version is marked nowhere but there).
  */
-export function laneOptions<O extends Pick<WorkflowOptions, 'target'>>(options: O | null, lane: { ruleset?: string; target?: string }): O | null {
-  const target = lane.target || (lane.ruleset ? targetOfRulesetId(lane.ruleset) : null)
+export function laneOptions<O extends Pick<WorkflowOptions, 'target'>>(options: O | null, lane: { ruleset?: string; target?: string }, stored?: (id: string) => { target?: string | null } | null): O | null {
+  const target = lane.target || laneTargetOf(lane.ruleset, stored ?? (() => null))
   return options && target ? { ...options, target } : options
 }
 

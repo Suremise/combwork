@@ -30,7 +30,7 @@ import { portsOf, repoContext } from '../platform/repoPorts'
 import type { RefHold, RefHoldRefused } from '../platform/repoContext'
 import { isUnknown } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
+import { laneTargetOf, targetedOf } from '../../shared/workflow/compile'
 import type { CardState, StageId } from '../../shared/workflow/facts'
 import type { CardRecord } from './factStore'
 import type { Workflow } from './runtime'
@@ -108,7 +108,7 @@ export function laneStill(wf: Workflow, seen: LaneSeen): boolean {
 export function laneOf(wf: Workflow, card: CardRecord): CardMoveCheck['lane'] | undefined {
   const rec = card.lane ? wf.lane(card.lane) : null
   if (!rec || rec.ended || !rec.ruleset) return undefined
-  return { id: rec.id, ruleset: rec.ruleset, target: targetOfRulesetId(rec.ruleset) ?? wf.store.ruleset(rec.ruleset).options.target ?? null }
+  return { id: rec.id, ruleset: rec.ruleset, target: laneTargetOf(rec.ruleset, (r) => wf.store.ruleset(r).options) }
 }
 
 /** Whether a card in `s` could be moved at all (in flight, started on a target, on a line of its own): the first refusal, else null. */

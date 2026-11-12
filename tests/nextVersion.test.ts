@@ -18,6 +18,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const lanes = await import('../src/main/lanes')
+const { laneTarget } = await import('../src/main/laneTarget')
 const form = await import('../src/main/workflow/optionsForm')
 const retarget = await import('../src/main/workflow/retarget')
 const gitRepoMod = await import('../src/main/gitRepo')
@@ -262,6 +263,53 @@ describe('Start the next version (HI-2807)', () => {
     const moved = await inWorkspace(w, () => retarget.retargetApply(w, repo, confirmed, user))
     expect(moved.moved.cards.map((c) => c.number)).toEqual([free.number])
     expect((await workflowFor(w, repo))!.state((await workflowFor(w, repo))!.store.card(started.number)).started?.target).toBe('1.3.0')
+  })
+})
+
+describe('a lane left on the release by Start the next version (HI-3113)', () => {
+  const card = async (w: WS, title: string) => (await inWorkspace(w, () => tasks.createTask({ title, project: 'p' }, user))).number
+  const pin = async (w: WS, repo: string, num: number, target: string) => {
+    const wf = (await workflowFor(w, repo))!
+    await store.boardWrite(w, async () => wf.store.updateCard(num, { target }))
+  }
+
+  it('reads as merging into 1.3.0, as its ruleset recorded it: shown, counted as using it, and its cards checked against it', async () => {
+    const { w, repo } = await project()
+    const [la, lb] = [await card(w, 'Lane A'), await card(w, 'Lane B')]
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb], by: 'You' })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    expect((await options(w, repo)).target).toBe('1.4.0')
+    // Its ruleset id marks no other target: it was started on the project's own.
+    const wf = (await workflowFor(w, repo))!
+    expect(wf.lane(started.lane.id)?.ruleset).not.toContain('~target:')
+    expect(laneTarget(w, { project: 'p', ruleset: wf.lane(started.lane.id)!.ruleset! })).toBe('1.3.0')
+    // The window's and cw_lane's reading: its Merges into named, now that it isn't the project's own.
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.target).toBe('1.3.0')
+    // Counted as using 1.3.0: the release can't be taken out from under it.
+    expect(await inWorkspace(w, () => retarget.referencesTo(w, repo, '1.3.0', () => []))).toContain('B1')
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await expect(inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, otherTargets: ['main'] } }))).rejects.toThrow(/while these use it: B1/)
+    // A lane card's Merges into: the release is the lane's, the next version isn't.
+    expect((await inWorkspace(w, () => tasks.setTarget(lb, '1.3.0', user))).number).toBe(lb)
+    await expect(inWorkspace(w, () => tasks.setTarget(lb, '1.4.0', user))).rejects.toThrow(/lane, which merges into 1\.3\.0/)
+    // A release fix pinned to 1.3.0 joins it; a next-version card doesn't.
+    const fix = await card(w, 'Release fix')
+    await pin(w, repo, fix, '1.3.0')
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb, fix], by: 'You' })
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.cards.map((c) => c.number)).toEqual([la, lb, fix])
+    const next = await card(w, 'Next version')
+    await pin(w, repo, next, '1.4.0')
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb, fix, next], by: 'You' })).rejects.toThrow(/merges into 1\.4\.0, and this lane into 1\.3\.0/)
+  })
+
+  it("counts a lane started on the next version's branch as using it, so the start's undo check finds it", async () => {
+    const { w, repo } = await project()
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    const lc = await card(w, 'On 1.4.0')
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [lc], by: 'You' })
+    // On the project's own, 1.4.0: nothing named in the window, but 1.4.0 is in use.
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.target).toBeUndefined()
+    expect(await inWorkspace(w, () => retarget.referencesTo(w, repo, '1.4.0', () => []))).toContain('B1')
   })
 })
 

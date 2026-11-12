@@ -355,6 +355,8 @@ export const AREAS = [
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
   { paths: ['src/main/laneEdits.ts', 'src/renderer/src/laneEdits.ts', 'src/shared/laneQueueEdit.ts', 'src/shared/laneDay.ts', 'tests/e2e/lanequeue.cjs'], suites: ['lanequeue'] },
+  // HI-3113: a lane's Merges into, read in one place: a branch's uses, a lane's start and slot, its edits, its view.
+  { paths: ['src/main/laneTarget.ts'], suites: ['retarget', 'lanestart', 'lanequeue', 'progresslanes'] },
   // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
   { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.

@@ -4574,7 +4574,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   else G7. From then on that one value is the branch it is made from, its queue and merge, its dependency check and its
   slot. A **lane's** target is recorded in its ruleset: a lane started on another branch records the rules in force with
   G7 set to it (`targetedOf`, id the base's with `~target:<branch>`), so its cards take it as any rule, and old rules
-  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. It is fixed for the lane's life
+  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. A lane started on the project's
+  own records G7 as it was, unmarked, and keeps merging there when G7 moves on (Start the next version: running lanes
+  stay on the release), so a lane's target is read in one place (HI-3113, `laneTargetOf`): the mark, else its recorded
+  ruleset's G7. Every check reads it so (a lane named among a branch's uses, a card's target against its lane's, a
+  card brought into it, a lane's restart, the lane's info, which names it when it isn't G7 now, and the options its
+  start and slot go by). It is fixed for the lane's life
   (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the

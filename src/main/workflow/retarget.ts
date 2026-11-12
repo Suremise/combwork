@@ -18,7 +18,7 @@ import { boardChanged, boardWrite, cardKeys } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
 import { listLanes, withLanesLock } from '../lanes'
 import { projectAgents } from '../../shared/defaults'
-import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
+import { laneTargetOf, targetedOf } from '../../shared/workflow/compile'
 import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
 import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveWhy } from './retargetCard'
@@ -52,7 +52,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   const running = (await listLanes(ws, { project: wf.store.scope.project })).filter((x) => x.state === 'active' || x.state === 'paused')
   const laneTarget = (id: string): string | null => {
     const rec = wf.lane(id)
-    return rec?.ruleset ? (targetOfRulesetId(rec.ruleset) ?? store.ruleset(rec.ruleset).options.target ?? null) : null
+    return laneTargetOf(rec?.ruleset, (r) => store.ruleset(r).options)
   }
   const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
   // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
@@ -283,7 +283,8 @@ export async function referencesTo(ws: WorkspaceService, projectPath: string, br
   const names = new Map(projectAgents(await ws.projectConfig(projectPath)).map((a) => [a.id, a.name] as const))
   for (const id of wf.store.runningLanes()) {
     const rec = wf.lane(id)
-    if (!rec || rec.ended || !rec.ruleset || targetOfRulesetId(rec.ruleset) !== branch) continue
+    // Its branch, marked or as its ruleset recorded it (HI-3113): a lane left on the release by Start the next version too.
+    if (!rec || rec.ended || laneTargetOf(rec.ruleset, (r) => wf.store.ruleset(r).options) !== branch) continue
     const builder = wf.store.laneBuilder(id)
     out.push(builder ? (names.get(builder) ?? builder) : id)
   }
