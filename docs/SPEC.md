@@ -3064,8 +3064,14 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   Darren's decision, 11 Nov): a hand-resolved integration changes the change's diff, so no containment proof holds; the
   user's own move into Done of exactly `prev`'s card cycle (its key: the user's actor, cause `user` or `override`, no
   `Integrated` or `Accepted` that cycle; `workView.ts`'s `doneUnproved`) stands in for containment, nothing else does.
-  The chain must still be exactly `prev`'s submitted commits. The card's Work section says so; no button, no bookmark
-  moved (A). The guard (the fence: the pool's operation, the folder
+  The chain must still be one of the shapes below. The card's Work section says so; no button, no bookmark
+  moved (A). **The chain's shapes:** exactly `prev`'s submitted commits; HI-2913's, the working copy empty directly on
+  `prev`'s base; or (HI-2980, Darren's decision A, 11 Nov, with HR1's full-ancestry proof) **nothing left behind**: the
+  card's commits rewritten as the user integrated them (described, rebased onto a moved target, squashed), so the chain
+  isn't the submitted ids, but the working copy is empty, `prev` has a target that is one known commit T at H, and
+  `::(<ws>@-) ~ ::T` is empty, read pinned at H (all the working copy's ancestry, not only the range over the old base,
+  so unrelated work below it refuses). Unknown or conflicted fails closed. The integration proof (containment, or the
+  user's Done) is still required, separately: neither stands in for the other. The guard (the fence: the pool's operation, the folder
   quiet; the folder's identity; the pointer still exactly `prev`; the head still H) runs after every journal write and
   right before each jj write (HR1, round 1: an await can outlive the holder). The write is marked, `jj
   --config=cw.prep=<mark> new <base>`, its mark journalled with `writing` before it runs, and jj's operation log decides
