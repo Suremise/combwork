@@ -83,6 +83,7 @@ interface CombworkMessageValues {
   'service.filesGit.tooLarge': { file: string | number }
   'service.folderChanges.agentBusy': { agent: string | number; folder: string | number }
   'service.folderChanges.busy': { folder: string | number; what: string | number }
+  'service.folderChanges.caseRename': { from: string | number; to: string | number }
   'service.folderChanges.changed': { folder: string | number }
   'service.folderChanges.commitFailed': { why: string | number }
   'service.folderChanges.commitTimedOut': { seconds: number }
@@ -96,6 +97,7 @@ interface CombworkMessageValues {
   'service.folderChanges.noTarget': { target: string | number }
   'service.folderChanges.nothing': { file: string | number }
   'service.folderChanges.readFailed': { why: string | number }
+  'service.folderChanges.removedForFolder': { file: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
   'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number }
