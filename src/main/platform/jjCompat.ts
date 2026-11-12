@@ -270,6 +270,8 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
   }
   if (attributesFile) sources.push(isAbsolute(attributesFile) ? attributesFile : resolve(root, attributesFile))
   sources.push(join(store, 'info', 'attributes'))
+  /** A tracked attributes file's path and object, by its source on disk. */
+  const indexed = new Map<string, { path: string; oid: string }>()
   const listed = o.separate ? await trackedTree(root, o.separate.jjRepo, deps) : await deps.git(root, ['ls-files', '-z', '-s'])
   if (!listed.ok) {
     unknownAt(a, 'attributes', `git ls-files: ${listed.err}`) // i18n-ignore: what was found, shown as data beside its message
@@ -279,15 +281,24 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     const rows = listed.out.split('\0').filter(Boolean)
     const attrFiles = rows.map((r) => r.split('\t')).filter(([, p]) => p === '.gitattributes' || p?.endsWith('/.gitattributes'))
     if (attrFiles.length > ATTR_FILES_MAX) unknownAt(a, 'attributes', `${attrFiles.length} .gitattributes files`) // i18n-ignore: what was found, shown as data beside its message
-    else for (const [, p] of attrFiles) sources.push(join(root, p))
-    // Untracked ones Git applies too (HI-2978): in a colocated working tree, each one Git lists as untracked and not
-    // ignored; then, in either mode, those beside tracked files on disk, ignored or not (below).
+    else
+      for (const [meta, p] of attrFiles) {
+        sources.push(join(root, p))
+        // Its object, for the copy Git falls back to when the file isn't on disk (HI-3035: deleted, or skip-worktree).
+        const oid = (meta ?? '').split(' ').find((x) => /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(x))
+        if (oid) indexed.set(join(root, p), { path: p, oid })
+      }
+    // Untracked ones Git applies too (HI-2978): in a colocated working tree, each one Git lists as untracked, ignored or
+    // not (HI-3035: an ignored one applies to what is added beside it; an ignored folder is listed as one entry and not
+    // looked into, its files ignored by jj too); then, in either mode, those beside tracked files on disk (below).
     const seen = new Set(attrFiles.map(([, p]) => p))
     if (!o.separate) {
       const others = await deps.git(root, ['ls-files', '-z', '-o', '--exclude-standard', '--', ':(glob)**/.gitattributes'])
+      const ignored = others.ok ? await deps.git(root, ['ls-files', '-z', '-o', '-i', '--exclude-standard', '--directory', '--', ':(glob)**/.gitattributes']) : others
       if (!others.ok) unknownAt(a, 'attributes', `git ls-files -o: ${others.err}`) // i18n-ignore: what was found, shown as data beside its message
+      else if (!ignored.ok) unknownAt(a, 'attributes', `git ls-files -o -i: ${ignored.err}`) // i18n-ignore: what was found, shown as data beside its message
       else {
-        const untracked = others.out.split('\0').filter((p) => p === '.gitattributes' || p.endsWith('/.gitattributes'))
+        const untracked = `${others.out}\0${ignored.out}`.split('\0').filter((p) => p === '.gitattributes' || p.endsWith('/.gitattributes'))
         if (untracked.length + attrFiles.length > ATTR_FILES_MAX) unknownAt(a, 'attributes', `${untracked.length + attrFiles.length} .gitattributes files`) // i18n-ignore: what was found, shown as data beside its message
         else
           for (const p of untracked) {
@@ -319,15 +330,24 @@ export async function assessJj(root: string, store: string, deps0: CompatDeps = 
     for (const r of rows) if (r.startsWith('160000 ')) add(a, 'submodules', `gitlink ${r.split('\t')[1] ?? ''}`)
   }
   for (const src of sources) {
-    const text = await bounded(src)
+    let text = await bounded(src)
+    let named = src
+    // A tracked one not on disk (deleted, or skip-worktree in a sparse checkout): Git applies its index copy (in jj's
+    // separate mode, the working-copy commit's), read from the store and named as Git names it, `:<path>` (HI-3035).
+    const ix = text === null ? indexed.get(src) : undefined
+    if (ix) {
+      named = `:${ix.path}`
+      const blob = await deps.git(root, ['cat-file', 'blob', ix.oid])
+      text = !blob.ok || blob.out.length > ATTR_FILE_MAX ? 'unreadable' : blob.out
+    }
     if (text === null) continue
     if (text === 'unreadable') {
-      unknownAt(a, 'attributes', src)
-      unknownAt(a, 'lfs', src)
+      unknownAt(a, 'attributes', named)
+      unknownAt(a, 'lfs', named)
       continue
     }
     const stockLines = gfw && astextplainStock && src === systemAttributes && samePath(src, gfw.attributes)
-    const u = attributeUses(text, src, stockLines ? gfwStockAttrLine : undefined)
+    const u = attributeUses(text, named, stockLines ? gfwStockAttrLine : undefined)
     for (const x of u.uses) add(a, 'attributes', x)
     for (const x of u.lfs) add(a, 'lfs', x)
   }

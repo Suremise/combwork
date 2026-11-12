@@ -2641,7 +2641,7 @@ merges under jj.
   the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
-  `.gitattributes`, untracked ones (colocated: `ls-files -o --exclude-standard`; in either mode, the one on disk in the root and in each
+  `.gitattributes` (one not on disk, deleted or skip-worktree, read from its index copy, named `:<path>`, HI-3035), untracked ones (colocated: `ls-files -o --exclude-standard`, and the ignored ones `ls-files -o -i --exclude-standard --directory` lists, an ignored folder not looked into since jj ignores its files too, HI-3035; in either mode, the one on disk in the root and in each
   folder holding a tracked file, ignored or not, past 100,000 such folders unknown),
   `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
   without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
