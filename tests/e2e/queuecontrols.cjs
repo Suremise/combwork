@@ -146,7 +146,7 @@ const TARGET = 'integration'
     check('…an override that isn’t the boolean true is refused (400)', loose.status === 400 && /override is true or left out/.test(JSON.stringify(loose.body)), JSON.stringify(loose.body))
     const overridden = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: true })
     const fwdCard = overridden.body?.card
-    check('…with override true it is queued, the override on its card', overridden.status === 200 && overridden.body?.queued === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
+    check('…with override true it is queued, the override on its card, and its reply says so (HI-3087)', overridden.status === 200 && overridden.body?.queued === true && overridden.body?.overridden === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
     const fwdActions = await h.inv('assistant:actions')
     check('…its action says it overrode the direction', fwdActions.some((x) => x.ok && x.kind === 'queue-forward' && /with the user’s override of the release path’s direction/.test(x.text)), JSON.stringify(fwdActions.map((x) => [x.kind, x.text])))
     // --- HI-2927: an old target's queue with a pause (1.0.0: not a target, nothing in it) stays live, so it can be resumed.
