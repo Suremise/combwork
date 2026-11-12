@@ -119,6 +119,13 @@
       "folder": "plain"
     }
   },
+  "workflow.forYou.queueCatchUp": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "folder": "plain"
+    }
+  },
   "workflow.forYou.queuePublish": {
     "placeholders": {
       "card": "plain",
