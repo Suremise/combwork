@@ -123,35 +123,65 @@ export function droppedPlace(rows: readonly QueueRow[], card: number | null, bef
 }
 
 /**
- * Where the focus goes after an edit asked from a lane's rows (HI-3068), once that edit shows, never before: a card taken
- * off (`off`) moves it to `to` (the next card's row, or the lane's own row) once the card's row is gone; a card moved
- * (`move`) keeps it on the card's row once it shows in another place (its row is drawn again). An intent is the latest
- * one asked; an update of the lane that doesn't show it (another window's change, an agent's) leaves it waiting, and one
- * whose edit wasn't made (refused, or nothing to do) is dropped by its own id, so no later update acts on it.
+ * Where the focus goes after an edit asked from a lane's rows (HI-3068), never before that edit shows, nor for anyone
+ * else's change. Only the latest intent counts; one whose edit wasn't made (refused, or nothing to do) is dropped by its
+ * own id, so no later update acts on it.
+ * - A card taken off (`off`): the focused row is gone once the card's row is, whoever took it off, so the focus moves
+ *   then, in that render (HI-3020: never left on the page's body), to `to` (the next card's row, or the lane's own row).
+ *   An update that leaves the card's row there, another's reorder or insertion, leaves it waiting.
+ * - A card moved (`move`): its row drawn again may lose the focus, so it is put back on the card's row, but only for
+ *   this edit made (HR1's round 2: a list index changed by someone else's insertion is no proof): at the answer, if the
+ *   lane is drawn with the card where this move put it (`aim`); else at the next drawing, which the window's read of the
+ *   lanes before the answer (laneEdits' reload) makes one of its result or later.
  */
 export class QueueFocus {
-  private intent: { id: number; kind: 'off' | 'move'; card: number; at: number; to: number | 'lane' } | null = null
+  private intent: { id: number; kind: 'off' | 'move'; card: number; to: number | 'lane'; want: number | null; made: boolean } | null = null
   private seq = 0
+  private seen: readonly number[] | null = null
 
-  /** An edit asked of `card` at place `at` in `list`; returns its id. */
-  ask(kind: 'off' | 'move', card: number, list: readonly number[], to: number | 'lane' = card): number {
-    this.intent = { id: ++this.seq, kind, card, at: list.indexOf(card), to }
+  /** An edit asked of `card` (`to`: where the focus goes when it is taken off); returns its id. */
+  ask(kind: 'off' | 'move', card: number, to: number | 'lane' = card): number {
+    this.intent = { id: ++this.seq, kind, card, to, want: null, made: false }
     return this.seq
   }
 
-  /** The edit `id` answered: not made, its intent goes (if it is still the latest). */
-  settled(id: number, made: boolean): void {
-    if (!made && this.intent?.id === id) this.intent = null
+  /** Where move `id` puts its card, as its edit is made from the rows when its turn comes. */
+  aim(id: number, want: number): void {
+    if (this.intent?.id === id) this.intent.want = want
   }
 
-  /** The lane drawn with `list`: the row (a card) or the lane ('lane') to focus now, or null while its edit doesn't show. */
+  /**
+   * Edit `id` answered. Not made: its intent goes (if still the latest). A move made: the card to focus now if the lane
+   * is drawn with it in its new place already, else null and the next drawing does.
+   */
+  settled(id: number, made: boolean): number | null {
+    const i = this.intent
+    if (!i || i.id !== id) return null
+    if (!made) {
+      this.intent = null
+      return null
+    }
+    if (i.kind === 'off') return null
+    i.made = true
+    if (this.seen && i.want !== null && this.seen.indexOf(i.card) === i.want) {
+      this.intent = null
+      return i.card
+    }
+    return null
+  }
+
+  /** The lane drawn with `list`: the row (a card) or the lane ('lane') to focus now, or null. */
   due(list: readonly number[]): number | 'lane' | null {
+    this.seen = list
     const i = this.intent
     if (!i) return null
-    const at = list.indexOf(i.card)
-    if (i.kind === 'off' ? at >= 0 : at === i.at) return null
+    if (i.kind === 'off') {
+      if (list.includes(i.card)) return null
+      this.intent = null
+      return i.to !== 'lane' && list.includes(i.to) ? i.to : 'lane'
+    }
+    if (!i.made) return null
     this.intent = null
-    if (i.kind === 'move') return at >= 0 ? i.card : null
-    return i.to !== 'lane' && list.includes(i.to) ? i.to : 'lane'
+    return list.includes(i.card) ? i.card : null
   }
 }
