@@ -127,6 +127,11 @@
     "note": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12.",
     "audience": "both"
   },
+  "workflow.forYou.queueCatchUp": {
+    "text": "{card} is merged and on {target}’s remote already: update {target} in {folder} to it now? Decline, and {target} there stays as it is until you pull.",
+    "note": "A For you request (Approve, HI-3092, “The target branch follows its remote”): a card ({card}: a key like AM-12) was found already merged on the remote branch the target ({target}: a branch) follows, so it is Done; the local {target}, checked out in the folder {folder} (its files change there), is behind it. Settings → Advanced → Merge into a checked-out branch: Ask each time, so the queue waits for the user's OK before it updates that folder. Declined: nothing changes there; the user pulls when they want.",
+    "audience": "both"
+  },
   "workflow.forYou.queuePublish": {
     "text": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
     "note": "A For you request (Approve, HI-1183, §16.9.4, “The target branch follows its remote”): the merge queue pushed a merge to the remote, the push’s answer was lost (the network, a crash), and the remote’s branch doesn’t contain it now, so Combwork can’t tell whether it was published and asks. {card} a card key like AM-12; {result} a short commit id; {endpoint} the remote’s address without credentials; {target} the branch.",

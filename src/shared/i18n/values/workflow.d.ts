@@ -26,6 +26,7 @@ interface CombworkMessageValues {
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
   'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
+  'workflow.forYou.queueCatchUp': { card: string | number; target: string | number; folder: string | number }
   'workflow.forYou.queuePublish': { card: string | number; result: string | number; endpoint: string | number; target: string | number }
   'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; files: number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }

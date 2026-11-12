@@ -498,6 +498,92 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(head(e.project)).toBe(head(bare))
   })
 
+  /** Ask each time, the target checked out: A's own commit pushed to the remote by someone else before the queue runs. */
+  async function foundOnRemote() {
+    const f = following({}, { checkedOut: true })
+    const ask: Partial<QueueConfig> = { checkedOutTarget: () => 'ask' }
+    const a = await queued(f.e, 'A', 'a.txt')
+    const revA = (f.e.store.facts(a.id).findLast((x) => x.kind === 'Submitted')!.data as { revision: string }).revision
+    sh(f.e.project, 'push', '-q', f.bare, `${revA}:refs/heads/main`)
+    const before = head(f.e.project)
+    const request = () => f.e.wf.state(f.e.store.card(a.id)).requests.find((r) => r.gate === QUEUE_ADVANCE_GATE)
+    expect((await f.queue(ask).drain('main')).map((o) => o.outcome)).toEqual(['integratedOutside', 'paused'])
+    expect(f.e.wf.state(a).stage).toBe('done')
+    expect(f.e.store.queuePause('main')).toMatchObject({ reason: 'approval', card: a.key })
+    expect(request()?.text).toMatch(/is merged and on main’s remote already: update main in .* to it now\?/)
+    expect(head(f.e.project)).toBe(before)
+    expect(existsSync(join(f.e.project, 'a.txt'))).toBe(false)
+    // Asked once: another run waits, asking nothing new, the pause as it was.
+    const at = f.e.store.queuePause('main')?.at
+    expect(await f.queue(ask).drain('main')).toEqual([])
+    expect(f.e.store.queuePause('main')?.at).toBe(at)
+    expect(f.e.wf.state(a).requests.filter((r) => r.gate === QUEUE_ADVANCE_GATE)).toHaveLength(1)
+    return { ...f, a, ask, before, request }
+  }
+
+  it('HI-3092: Ask each time, a card found already on the remote: Done, and the folder asked about before it moves; approved, caught up', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a, ask, request } = await foundOnRemote()
+    moved(await e.wf.answer(a.key, request()!.request, 'approved'))
+    await queue(ask).drain('main')
+    expect(head(e.project)).toBe(head(bare))
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(request()).toBeUndefined()
+  })
+
+  it('HI-3092: … declined: the folder left as it is, the catch-up ended, the queue goes on', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, queue, a, ask, before, request } = await foundOnRemote()
+    moved(await e.wf.answer(a.key, request()!.request, 'declined'))
+    await queue(ask).drain('main')
+    expect(head(e.project)).toBe(before)
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it('HI-3092 (HR2): main checked out in another folder after the question, the old one approved: that folder isn’t moved; it is asked about, then caught up once approved', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, a, ask, before, request } = await foundOnRemote()
+    const first = request()!
+    sh(e.project, 'checkout', '-q', '--detach')
+    const other = join(tempDir('other-wt-'), 'main')
+    sh(e.project, 'worktree', 'add', '-q', other, 'main')
+    moved(await e.wf.answer(a.key, first.request, 'approved'))
+    await queue(ask).drain('main')
+    // Not moved on the approval of another folder's question: asked again, naming this one.
+    expect(head(other)).toBe(before)
+    expect(existsSync(join(other, 'a.txt'))).toBe(false)
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'approval', card: a.key })
+    const second = request()!
+    expect(second.request).not.toBe(first.request)
+    expect(second.text).toContain(other.replace(/\\/g, '/').split('/').pop()!)
+    moved(await e.wf.answer(a.key, second.request, 'approved'))
+    await queue(ask).drain('main')
+    expect(head(other)).toBe(head(bare))
+    expect(readFileSync(join(other, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('HI-3092 (HR2): the setting switched to Automatically while asked: caught up, and its question closed', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, request } = await foundOnRemote()
+    await queue({ checkedOutTarget: () => 'auto' }).drain('main')
+    expect(head(e.project)).toBe(head(bare))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(request()).toBeUndefined()
+  })
+
+  it('HI-3092 (HR2): the user pulls while asked: the catch-up ends, its question closed, nothing paused', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, queue, ask, request } = await foundOnRemote()
+    sh(e.project, 'pull', '-q', '--ff-only', 'origin', 'main')
+    expect(head(e.project)).toBe(head(bare))
+    await queue(ask).drain('main')
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(request()).toBeUndefined()
+  })
+
   it('a checked-out target is caught up in its folder after the publication; an edit in its way pauses, naming the published card', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following({}, { checkedOut: true })
     const a = await queued(e, 'A', 'a.txt')

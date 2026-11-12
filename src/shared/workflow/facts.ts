@@ -338,8 +338,11 @@ export interface FactData {
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Combwork's own request as data for the window (an agent's words have none). */
-  /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] }
+  /**
+   * `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351);
+   * `folder`: the folder its advance or catch-up would update (HI-3092: an approval covers that folder only).
+   */
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; folder?: string; actions?: AskAction[]; tests?: string[] }
   /**
    * A request closed without an answer (#1638): its card reached Done (`done`), or the agent that asked moved the card
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
