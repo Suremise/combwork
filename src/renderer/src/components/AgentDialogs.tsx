@@ -1032,6 +1032,7 @@ export function MergeDialog() {
               : undefined
         )
         if (r.moveError) notify('warning', tr(msg({ id: 'agents.merged.notMoved', defaultMessage: '{branch} was not moved to {folder, select, yes {the project folder} other {{into}}}', description: "A warning's title after a squash merge: the agent's branch ({branch}) couldn't be moved to the merged branch ({into})." }), where), tr(msg({ id: 'agents.merged.notMovedWhy', defaultMessage: "{why} Its old commits are still on it, so its next merge may conflict with them: {folder, select, yes {ask {agent} to rebase its branch on the project folder's branch} other {ask {agent} to run git rebase {into}}}.", description: "Why the agent's branch wasn't moved ({why}: git's error, a sentence), and what to ask the agent ({agent}) to do: rebase on the project folder's branch ({into}: its name; folder: yes when it isn't known). git rebase is a command: keep it." }), { ...where, why: r.moveError }))
+        if (r.note) notify('warning', r.note)
         if (r.cleanupKept) notify('warning', tr(msg({ id: 'agents.merged.kept', defaultMessage: '{branch} was merged, its worktree kept', description: "A warning's title after a merge: the branch ({branch}) was merged but its worktree couldn't be removed; the message says why." }), where), r.cleanupKept)
         if (r.cleanedUp && !unused) focusAfterRemoving(project, agent.id)
         // The project's unused worktrees, as they are now.

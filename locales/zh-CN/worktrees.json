@@ -68,5 +68,6 @@
   "worktrees.why.notChecked": "未检查",
   "worktrees.why.notListed": "git 未将它列为 {branch} 上的工作树",
   "worktrees.why.notMerged": "{n, plural, other {# 个提交}}未合并到 {into}",
-  "worktrees.why.uncommitted": "{n, plural, other {# 个未提交的文件}}"
+  "worktrees.why.uncommitted": "{n, plural, other {# 个未提交的文件}}",
+  "worktrees.merge.temporaryLeft": "Combwork 无法删除其临时文件夹 {folder}：请在“未使用的工作树”中删除它。"
 }

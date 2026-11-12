@@ -68,5 +68,6 @@
   "worktrees.why.notChecked": "non vérifié",
   "worktrees.why.notListed": "git ne le liste pas comme worktree sur la branche {branch}",
   "worktrees.why.notMerged": "{n, plural, one {# commit non fusionné} many {# commits non fusionnés} other {# commits non fusionnés}} dans la branche {into}",
-  "worktrees.why.uncommitted": "{n, plural, one {# fichier non commité} many {# fichiers non commités} other {# fichiers non commités}}"
+  "worktrees.why.uncommitted": "{n, plural, one {# fichier non commité} many {# fichiers non commités} other {# fichiers non commités}}",
+  "worktrees.merge.temporaryLeft": "Combwork n’a pas pu supprimer son dossier temporaire {folder} : supprime-le dans Worktrees inutilisés."
 }

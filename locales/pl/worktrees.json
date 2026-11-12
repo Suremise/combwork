@@ -68,5 +68,6 @@
   "worktrees.why.notChecked": "niesprawdzone",
   "worktrees.why.notListed": "git nie wymienia go jako worktree na gałęzi {branch}",
   "worktrees.why.notMerged": "{n, plural, one {# commit niescalony} few {# commity niescalone} many {# commitów niescalonych} other {# commita niescalonego}} z gałęzią {into}",
-  "worktrees.why.uncommitted": "{n, plural, one {# plik bez commita} few {# pliki bez commita} many {# plików bez commita} other {# pliku bez commita}}"
+  "worktrees.why.uncommitted": "{n, plural, one {# plik bez commita} few {# pliki bez commita} many {# plików bez commita} other {# pliku bez commita}}",
+  "worktrees.merge.temporaryLeft": "Combwork nie zdołał usunąć swojego tymczasowego folderu {folder}: usuń go w Nieużywanych worktree."
 }

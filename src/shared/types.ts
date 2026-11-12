@@ -2405,6 +2405,8 @@ export interface MergeResult {
   /** After a squash merge, the agent's branch was moved to the merged branch; or why it wasn't. */
   branchMoved?: boolean
   moveError?: string
+  /** Merged, with something to say after (HI-3030: its temporary folder couldn't be removed), in the user's language. */
+  note?: string
 }
 
 /**
