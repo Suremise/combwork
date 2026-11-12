@@ -648,5 +648,6 @@
   "workflow.slots.removedKept": "{slot} est supprimé.",
   "workflow.slots.notRemovedKept": "{slot} n’a pas été supprimé : {why, select, changed {il a changé après l’affichage de la liste (son dossier est revenu, ou il a été recréé)} busy {quelque chose y travaille en ce moment} other {Combwork l’a gardé}}.",
   "workflow.slots.keptForgottenFor": "Gardé pour {card}, mais jj ne liste plus son workspace",
-  "workflow.slots.removeForgottenMessage": "Son dossier va dans la Corbeille tel quel, avec les modifications qu’il contient. {card} repart alors de sa cible, dans un autre slot. Le travail commité ici reste dans le stockage de jj{commit, select, none {.} other { : son dernier commit est {commit}.}}"
+  "workflow.slots.removeForgottenMessage": "Son dossier va dans la Corbeille tel quel, avec les modifications qu’il contient. {card} repart alors de sa cible, dans un autre slot. Le travail commité ici reste dans le stockage de jj{commit, select, none {.} other { : son dernier commit est {commit}.}}",
+  "workflow.slots.state.forgotten": "Non listé par jj"
 }

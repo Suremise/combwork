@@ -420,7 +420,7 @@ const onDb = (fn) => {
     await toProject()
     await section('jjRepo')
     await section('workflow')
-    check('Slots and copies: kept, jj no longer lists its workspace, with Remove…', !!(await until(async () => (await row.locator('[data-action="remove-kept"]').count()) === 1 && /but jj no longer lists its workspace/.test(await text(row)), HUNG_MS)), await text(row))
+    check('Slots and copies: kept, not listed by jj (never "Folder missing"), with Remove…', !!(await until(async () => (await row.locator('[data-action="remove-kept"]').count()) === 1 && /Not listed by jj/.test(await text(row)) && !/Folder missing/.test(await text(row)) && /but jj no longer lists its workspace/.test(await text(row)), HUNG_MS)), await text(row))
     await row.scrollIntoViewIfNeeded()
     await shoot(row, 'slot-kept-forgotten')
     await inEach(row, 'slot-kept-forgotten', (cat) => (cat['workflow.slots.keptForgottenFor'] ?? '').split('{card}').pop().replace(/^[\s:：、，]+/, '').slice(0, 12))

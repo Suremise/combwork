@@ -534,6 +534,7 @@
   "workflow.slots.stale": "Stale: another jj workspace changed it",
   "workflow.slots.state.creating": "Being set up",
   "workflow.slots.state.dirty": "Has changes left in it",
+  "workflow.slots.state.forgotten": "Not listed by jj",
   "workflow.slots.state.gone": "Folder missing",
   "workflow.slots.state.kept": "Holds a card’s commits",
   "workflow.slots.state.lent": "In use",

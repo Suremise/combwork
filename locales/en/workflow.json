@@ -2139,6 +2139,10 @@
     "defaultMessage": "Has changes left in it",
     "description": "A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean."
   },
+  "workflow.slots.state.forgotten": {
+    "defaultMessage": "Not listed by jj",
+    "description": "HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it)."
+  },
   "workflow.slots.state.gone": {
     "defaultMessage": "Folder missing",
     "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it)."
