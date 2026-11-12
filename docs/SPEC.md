@@ -5905,7 +5905,7 @@ release path's direction as it reads now unless its request recorded the user's 
 direction is never handed over (Remove from queue alone ends it), so a builder's card never makes a merge the forward
 rules refuse. One board change
 (`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
-the forward's destination (its Merges into, stored even when it is Work merges into then, HI-2985), linked to it, its description the files in conflict, the returned attempt's
+the forward's destination (its Merges into, stored even when it is Work merges into then, HI-2985), linked to it, its description what came back (the files in conflict, or the merge check that failed: HI-3082), the returned attempt's
 frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by, override?: the forward's request's, HI-2998}, written before its start
 and kept over every cycle; and the forward ended as Remove from queue ends it (Done, an override, never an `Integrated`),
 its comment naming the new card. The forward's intent is refused unless its last entry is still the one read, so a Retry,
@@ -5973,7 +5973,12 @@ with `main`. A forward entry counts as already in the destination only when its 
 (merged or fast-forwarded), never by the same tree or a squash: one whose files the destination holds already (it was
 brought up to date with the release branch, and only the pull request's merge commit is new) is still merged, a `--no-ff`
 merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
-refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
+refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card. A forward's
+resolution is the exception (HI-3082): its merge commit bringing the resolved `source` into its history, the source not
+in its base's, is its work even when it changes no file (the destination's side kept, or a forward returned for a check
+whose merge changes nothing), and the queue merges it as a merge commit. A forward and its resolution count as in the
+destination only by ancestry wherever that is read (`asCardCounts`, workflow/containment.ts: the queue, reconciliation,
+a pass's no-code proposal, an agent's merge report, a dependency, a line's removal), never by its tree or a squash.
 
 **Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
 next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the

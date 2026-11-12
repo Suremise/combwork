@@ -7,6 +7,7 @@ import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harn
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { forwardOf, MERGE_COMMIT, rulesBaseId } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
+import { reconcile } from '../../src/main/workflow/reconcile'
 import { returnedComment } from '../../src/main/workflow/queueState'
 import { overridableEntry, type CardState, type FactData, type QueueEntry } from '../../src/shared/workflow/facts'
 import { GUARD_FNS } from '../../src/shared/workflow/guards'
@@ -462,6 +463,99 @@ describe('a resolution carries the commit it resolves, merged (HI-2999)', () => 
     const said = returnedComment(made.key, failed, { from: 'main', to: '1.2.0', resolution: fwd.key, source }).text
     expect(said).toContain(`the resolution of ${fwd.key} doesn’t contain ${source}`)
     expect(said).toContain(`git merge ${source}`)
+  })
+})
+
+describe('a resolution whose merge changes no file is still submitted (HI-3082)', () => {
+  /** The returned forward's source merged on the resolution's line, its conflict resolved by keeping 1.2.0's side. */
+  function keepOurs(folder: string, source: string, trailer?: string): string {
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict, resolved by keeping the destination's version
+    }
+    const merged = commit(folder, { 'fix.txt': 'the 1.2.0 version\n' }, 'Merge main into 1.2.0, keeping 1.2.0’s fix.txt', trailer ? { trailer } : {})
+    expect(sh(folder, 'rev-list', '--parents', '-n', '1', merged).split(' ').length).toBe(3)
+    expect(sh(folder, 'rev-parse', `${merged}^{tree}`)).toBe(sh(folder, 'rev-parse', '1.2.0^{tree}'))
+    return merged
+  }
+
+  it('in its own slot: submitted, reviewed and merged, the source in 1.2.0 and its file as 1.2.0 had it', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting()
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    keepOurs(started.data!.folder as string, source)
+    // HR2's round 1: observed in each stage before the queue merges it, its same tree never taken as already in 1.2.0.
+    const observe = async (stage: string) => {
+      await reconcile(e.wf, e.wf.store.card(made.id))
+      expect(e.wf.state(made).stage).toBe(stage)
+      expect(e.wf.store.facts(made.id).some((f) => f.kind === 'Integrated')).toBe(false)
+      expect(e.wf.state(made).marks.inTarget ?? null).toBeNull()
+    }
+    await observe('active')
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, kept 1.2.0’s fix.txt' }))
+    expect(e.wf.state(made).stage).toBe('review')
+    await observe('review')
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    // Its pass proposes no no-code: there is something to merge.
+    expect(e.wf.store.facts(made.id).some((f) => f.kind === 'KindProposed')).toBe(false)
+    expect(e.wf.state(made).stage).toBe('merging')
+    await observe('merging')
+    expect(await e.queue().drain('1.2.0')).toMatchObject([{ card: made.key, outcome: 'integrated' }])
+    expect(sh(e.project, 'merge-base', '--is-ancestor', source, '1.2.0')).toBe('')
+    expect(sh(e.project, 'show', '1.2.0:fix.txt')).toBe('the 1.2.0 version')
+  })
+
+  it('in the project folder: submitted', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ folder: 'project', finish: 'committed', slotsUpToDate: false })
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    keepOurs(e.project, source, made.key)
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, kept 1.2.0’s fix.txt' }))
+    expect(e.wf.state(made).stage).toBe('review')
+  })
+
+  it('where the agent merges: its report is refused until the source is in 1.2.0, then accepted', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ finish: 'agentMerges', style: 'merge' })
+    const { card: fwd, source } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const merged = keepOurs(started.data!.folder as string, source)
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, kept 1.2.0’s fix.txt' }))
+    moved(await e.wf.startReview(made.key, R1))
+    moved(await e.wf.verdict(made.key, R1, { pass: true, comment: 'ok' }))
+    // Reported before merging: 1.2.0 has its tree, not the source.
+    const early = await e.wf.reportMerge(made.key, B1)
+    expect(isRefusal(early)).toBe(true)
+    expect(e.wf.store.facts(made.id).some((f) => f.kind === 'Integrated')).toBe(false)
+    await reconcile(e.wf, e.wf.store.card(made.id))
+    expect(e.wf.state(made).stage).not.toBe('done')
+    // Merged now: accepted, the source in 1.2.0.
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    sh(e.project, 'merge', '-q', '--no-ff', '--no-edit', merged)
+    sh(e.project, 'checkout', '-q', '--detach')
+    moved(await e.wf.reportMerge(made.key, B1))
+    expect(e.wf.state(made).stage).toBe('done')
+    expect(sh(e.project, 'merge-base', '--is-ancestor', source, '1.2.0')).toBe('')
+  })
+
+  it('a commit that changes nothing and doesn’t bring the source is still nothing to review', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting()
+    const { card: fwd } = await returned(e)
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    sh(started.data!.folder as string, 'commit', '-q', '--allow-empty', '-m', 'nothing')
+    const r = await e.wf.submit(made.key, B1, { summary: 'nothing' })
+    expect(isRefusal(r) && r.rule).toBe('submit.empty')
+    expect(e.wf.state(made).stage).toBe('active')
   })
 })
 

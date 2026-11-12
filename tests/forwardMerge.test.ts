@@ -696,6 +696,21 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     expect(wf.state(wf.store.card(rc)).overrideEntry).toBeNull()
   })
 
+  it('HI-3082: one returned for a red merge check makes a card that says so, never "resolve the conflict"', async () => {
+    const { w, repo } = await project()
+    await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, mergeChecks: ['lint'], commands: { ...now.workflow!.options.commands, lint: 'lint' } } } })))
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    const fwd = 'card' in made ? made.card : null
+    const wf = (await workflowFor(w, repo))!
+    const red = await inWorkspace(w, () => new MergeQueue(wf, { folder: join(base, `queue-${++n}`), runCheck: async () => ({ ok: false, output: 'lint failed' }) }).drain('1.2.0'))
+    expect(red).toMatchObject([{ outcome: 'returned', reason: 'checks' }])
+    const r = await inWorkspace(w, () => controls.resolveForward(w, fwd!.number, user, 'by hand'))
+    expect(r.card.description).toContain('the merge check lint failed')
+    expect(r.card.description).toContain('fix what made the check fail')
+    expect(r.card.description).toContain('even when the merge changes no file')
+    expect(r.card.description).not.toContain('conflict')
+  })
+
   it("is the user's or the Assistant's, only on a returned forward; one board change, never two cards", async () => {
     const { w, repo } = await conflicting()
     const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
@@ -726,7 +741,8 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     const card = done.card
     expect(card).toMatchObject({ column: 'todo', agent: null, links: [fwd!.number], title: 'Resolve: bring 1.2.0 up to date with main' })
     expect(card.description).toContain(`git merge ${source}`)
-    expect(card.description).toContain('fix0.txt')
+    expect(card.description).toContain('a conflict in fix0.txt')
+    expect(card.description).toContain('resolve the conflict')
     expect(wf.store.card(card.number).target).toBe('1.2.0')
     expect(wf.state(wf.store.card(card.number)).resolves).toMatchObject({ forward: fkey, source })
     // The forward ended, nothing merged; its comment names the new card.

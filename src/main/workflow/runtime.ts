@@ -47,6 +47,7 @@ import { admit } from '../platform/platformFence'
 import { PLATFORM_NAME } from '../../shared/platform/switching'
 import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
+import { asCardCounts } from './containment'
 
 const log = createLogger('workflow')
 
@@ -1437,7 +1438,7 @@ export class Workflow {
         out.push(key)
         continue
       }
-      const c = await this.platform(o).contains(target, { base, revision, key: d.latest?.key })
+      const c = asCardCounts(d, await this.platform(o).contains(target, { base, revision, key: d.latest?.key }))
       if (isUnknown(c)) return c
       if (!c) out.push(key)
     }
@@ -2004,7 +2005,7 @@ export class Workflow {
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
-    const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
+    const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? asCardCounts(s, await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key })) : null
     const nothingToMerge = !!merged && !isUnknown(merged)
     const present = args.startReview ? await this.reviewersPresent(actor) : null
     // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
@@ -2268,7 +2269,7 @@ export class Workflow {
       // Integration needs a non-empty change (§16.4.4).
       if (!rev || !s.approved?.base || rev === s.approved.base) contained = false
       else {
-        const c = await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key }, !isUnknown(th) && th ? th : undefined)
+        const c = asCardCounts(s, await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key }, !isUnknown(th) && th ? th : undefined))
         contained = isUnknown(c) ? c : !!c
         if (!isUnknown(c) && c) method = c.method === 'sameTree' ? 'sameTree' : c.method
       }
@@ -3279,7 +3280,7 @@ export class Workflow {
     const base = s.approved?.base ?? s.latest?.base ?? s.started?.base
     if (!base) return unknown(UNREADABLE.branchedOffTarget)
     // In the target's head the line was compared with (#1376: not read again).
-    const c = await p.contains(b.target, { base, revision: b.head, key: null }, b.targetHead)
+    const c = asCardCounts(s, await p.contains(b.target, { base, revision: b.head, key: null }, b.targetHead))
     if (isUnknown(c)) return c
     if (c) return []
     const from = s.approved?.revision ?? base
