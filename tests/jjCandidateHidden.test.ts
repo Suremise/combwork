@@ -32,7 +32,7 @@ describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit 
       })
 
   /** A target, a card's reviewed commit R in its slot, Combwork's control; `when`: the user's rewrite of R, if any. */
-  async function world(style: JjCandidateStyle, label: string) {
+  async function world(style: JjCandidateStyle, label: string, strict = false) {
     const { repo } = h.repo(`rw${style}${label}`, true)
     const top = resolve(repo, '..')
     writeFileSync(join(repo, 'f.txt'), 'a\n')
@@ -57,7 +57,7 @@ describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit 
     const visible = (): string => read('log', '--no-graph', '-r', '::visible_heads() ~ root()', '-T', 'change_id.short(8) ++ " " ++ commit_id.short(8) ++ (if(divergent, " DIVERGENT", "")) ++ " [" ++ description.first_line() ++ "]|"')
     const reword = (): void => void h.jj(repo, 'describe', '-r', R, '-m', 'card work, reworded by the user after review')
     const entries: JjAttemptEntry[] = []
-    const fp: JjCandidateFingerprint = { cycle: 1, submission: 1, revision: R, base: fBase, key: null, commit: R, target: 'main', ruleset: 'r', style, strict: false, generation: 1, approval: 2 }
+    const fp: JjCandidateFingerprint = { cycle: 1, submission: 1, revision: R, base: fBase, key: null, commit: R, target: 'main', ruleset: 'r', style, strict, generation: 1, approval: 2 }
     const step = (hook?: (p: JjCandidatePoint) => void): ReturnType<typeof jjCandidateStep> =>
       jjCandidateStep(
         {
@@ -105,8 +105,8 @@ describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit 
     })
   }
 
-  for (const style of ['merge', 'squash'] as JjCandidateStyle[]) {
-    const point = (style === 'merge' ? 'run:merge' : 'run:scratch') as JjCandidatePoint
+  for (const style of ['merge', 'squash', 'rebase'] as JjCandidateStyle[]) {
+    const point = (style === 'merge' ? 'run:merge' : style === 'squash' ? 'run:scratch' : 'run:duplicate') as JjCandidatePoint
     it(`${style}, R rewritten right before jj runs its write (after every check): jj makes nothing; nothing divergent or left`, async () => {
       const w = await world(style, 'r')
       let done = false
@@ -119,6 +119,27 @@ describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit 
       expect(done).toBe(true)
       expect('offer' in first).toBe(false)
       clean(w.visible())
+      expect('offer' in (await w.step())).toBe(false)
+      clean(w.visible())
+      expect(w.entries.filter((e) => e.state === 'kept')).toEqual([])
+    })
+  }
+  // HR1's round 1: strict's update (the target past the card's base, so it runs first) through the same guarded writes:
+  // merge's by a merge, squash's by a rebase (its duplicate). A rebase candidate runs no update.
+  for (const style of ['merge', 'squash'] as JjCandidateStyle[]) {
+    it(`strict ${style}, R rewritten right before jj runs the update's write: jj makes nothing; nothing divergent or left`, async () => {
+      const w = await world(style, 's', true)
+      let done = false
+      const first = await w.step((p) => {
+        if (p === 'run:update' && !done) {
+          done = true
+          w.reword()
+        }
+      })
+      expect(done).toBe(true)
+      expect('offer' in first).toBe(false)
+      clean(w.visible())
+      expect(w.visible()).not.toContain('HI-1: update')
       expect('offer' in (await w.step())).toBe(false)
       clean(w.visible())
       expect(w.entries.filter((e) => e.state === 'kept')).toEqual([])

@@ -780,7 +780,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
       if (!suffix.length) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
       await a.phase('writing')
-      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
+      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..(${visibleOne(req.revision)})`, '--onto', visibleOne(req.expected)], { kind: 'duplicate', n: suffix.length, onto: req.expected })
       rec.result = headOf(d.added)!.commit
     } else if (req.style === 'merge') {
       await a.phase('writing')
@@ -891,7 +891,7 @@ export async function prepareJjUpdate(deps: JjCandidateDeps, req: JjUpdateReques
       if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
       if (!suffix.length) return { fail: 'notUpToDate', log: say3(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
       await a.phase('writing')
-      const d = await a.write('update', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
+      const d = await a.write('update', ['duplicate', '-r', `${req.base}..(${visibleOne(req.revision)})`, '--onto', visibleOne(req.expected)], { kind: 'duplicate', n: suffix.length, onto: req.expected })
       rec.result = headOf(d.added)!.commit
     } else {
       await a.phase('writing')
