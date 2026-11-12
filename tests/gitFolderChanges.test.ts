@@ -454,20 +454,28 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n: > "${fwd(marker)}"\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
   }
 
-  it('ended in post-commit, after the commit was made: made, said so, the index taken in (new and edited files committed, nothing left changed)', async () => {
+  // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, even one made before its post-commit hook
+  // was ended: a hook's own git can move HEAD or commit too, and nothing proves which made it. HEAD moved: said so, with
+  // where it is now; the index left as it was, for the user to settle.
+  const moved = (sha: string): string => `The branch moved meanwhile, to ${sha.slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`
+
+  it('ended in post-commit, after the commit was made: not credited; said with where HEAD moved, never "as they were"; the index as it was', async () => {
     slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
     const before = head()
-    const done = await settle('commit', ['a.txt', 'new.txt'])
-    expect(done.made).toBe(head())
+    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
     expect(head()).not.toBe(before)
-    expect(committed()).toEqual(['a.txt', 'new.txt'])
-    expect(lines()).toEqual([])
+    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    expect(String(err)).toContain(moved(head()))
+    expect(String(err)).not.toMatch(/as they were/)
+    // Nothing taken into the index: a.txt and new.txt as they were in it before.
+    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+    expect(sh(proj, 'ls-files', 'new.txt')).toBe('')
     expect(leftovers()).toEqual([])
   })
 
-  it("ended in post-commit while another program holds the real index's lock (HR2's rounds 1 and 2): made, said so, that lock never touched", async () => {
+  it("ended in post-commit while another program holds the real index's lock (HR2's rounds 1 and 2): said with where HEAD moved, that lock never touched", async () => {
     const marker = join(tempDir('cw-folderchanges-post-'), 'started')
     slowPostCommit(marker)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
@@ -481,8 +489,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       fs.writeSync(fd, "not Combwork's")
       const err = await done
       expect(head()).not.toBe(before)
-      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
-      expect(String(err)).toMatch(new RegExp(`Git made the commit \\(${head().slice(0, 12)}\\), but Combwork couldn't update the index`))
+      expect(String(err)).toContain(moved(head()))
       expect(readFileSync(lockPath(), 'utf8')).toBe("not Combwork's")
       expect(leftovers()).toEqual([])
     } finally {
@@ -546,103 +553,42 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(existsSync(lockPath())).toBe(false)
   })
 
-  // HI-3075: a commit-msg hook that rewrites the message (Gerrit's Change-Id) made a commit ended in post-commit "not
-  // ours": "as they were" said, the index not taken, the folder stuck (`MM a.txt`, `D  new.txt`, `?? new.txt`).
-  const changeIdHook = (): void => {
+  // HI-3075: a commit-msg hook that rewrites the message (Gerrit's Change-Id), the commit ended in post-commit: "as they
+  // were" was said though HEAD moved. Now never said once HEAD moved, and whatever moved it is never credited.
+  it('a commit whose message a hook rewrote, ended in post-commit: said with where HEAD moved, never "as they were"', async () => {
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "\\nChange-Id: I0123456789\\n" >> "$1"\n')
-  }
-
-  it('a commit whose message a hook rewrote, ended in post-commit after it was made: recognised as made (its reflog), the index taken in, nothing left changed', async () => {
-    changeIdHook()
     slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
     const before = head()
-    const done = await settle('commit', ['a.txt', 'new.txt'])
+    const err = await settle('commit', ['a.txt', 'new.txt']).catch((e: Error) => e)
     expect(head()).not.toBe(before)
-    expect(done.made).toBe(head())
     expect(sh(proj, 'log', '-1', '--format=%B')).toContain('Change-Id: I0123456789')
-    expect(committed()).toEqual(['a.txt', 'new.txt'])
-    expect(lines()).toEqual([])
-    expect(leftovers()).toEqual([])
-  })
-
-  it("…a post-commit hook that moves HEAD to an older commit of the same parent, its git inheriting the reflog action (HR2's round 1): never taken for this commit; said with where HEAD moved", async () => {
-    // B: a commit that already exists, on the same parent as the one Combwork is about to make.
-    const before = head()
-    const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\ngit reset -q --soft ${b}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
-    writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
-    expect(head()).toBe(b)
-    // The hook's reset carries the action too: proof that HR2's case is what ran.
-    expect(sh(proj, 'reflog', '-1', '--format=%gs')).toMatch(/^commit \(combwork:[0-9a-f-]+\): updating HEAD$/)
-    expect(err).toBeInstanceOf(Error)
-    expect(String(err)).toContain(`The branch moved meanwhile, to ${b.slice(0, 12)}, and Combwork can't tell that it is this commit`)
-    // Not taken from B: the index as it was (a.txt unstaged against the commit Combwork made, which is B's parent's child).
-    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
-    expect(leftovers()).toEqual([])
-  })
-
-  it("…a pre-commit hook that moves HEAD to an older commit of the same parent and hangs, before any commit is written (HR2's round 2): never taken for this commit", async () => {
-    const before = head()
-    const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\ngit reset -q --soft ${b}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
-    writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
-    expect(head()).toBe(b)
-    expect(sh(proj, 'reflog', '-1', '--format=%gs')).toMatch(/^commit \(combwork:[0-9a-f-]+\): updating HEAD$/)
-    expect(err).toBeInstanceOf(Error)
-    expect(String(err)).toContain(`The branch moved meanwhile, to ${b.slice(0, 12)}, and Combwork can't tell that it is this commit`)
-    expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
-    expect(leftovers()).toEqual([])
-  })
-
-  // HR2's round 2: only what was written to HEAD's reflog since the commit started is read, and only so much.
-  const reflogHook = (then: string): void => {
-    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
-    writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n"${fwd(process.execPath)}" -e '${then}'\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
-  }
-  for (const [name, then] of [
-    ['rewritten shorter (expired) after the commit', 'require("fs").writeFileSync(".git/logs/HEAD", "")'],
-    ['grown by more than the most read (64 KB) after the commit', 'require("fs").appendFileSync(".git/logs/HEAD", ("x".repeat(99) + "\\t" + "y".repeat(99) + "\\n").repeat(400))']
-  ] as const)
-    it(`…HEAD's reflog ${name}: can't tell, so said with where HEAD moved`, async () => {
-      reflogHook(then)
-      writeFileSync(join(proj, 'a.txt'), 'edit\n')
-      const before = head()
-      const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
-      expect(head()).not.toBe(before)
-      expect(String(err)).toContain(`The branch moved meanwhile, to ${head().slice(0, 12)}, and Combwork can't tell that it is this commit`)
-      expect(leftovers()).toEqual([])
-    })
-
-  it("…HEAD's reflog given lines that aren't moves after the commit: they are left out, the commit's own entry found, made", async () => {
-    reflogHook('require("fs").appendFileSync(".git/logs/HEAD", "not a move\\n\\nnor this\\n")')
-    writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    const done = await settle('commit', ['a.txt'])
-    expect(done.made).toBe(head())
-    expect(lines()).toEqual([])
-  })
-
-  it('…with no reflog kept (core.logAllRefUpdates=false): not proved, so said with where HEAD moved, never "as they were"; the index left as it was', async () => {
-    sh(proj, 'config', 'core.logAllRefUpdates', 'false')
-    rmSync(join(proj, '.git', 'logs'), { recursive: true, force: true })
-    changeIdHook()
-    slowPostCommit(join(tempDir('cw-folderchanges-post-'), 'started'))
-    writeFileSync(join(proj, 'a.txt'), 'edit\n')
-    const before = head()
-    const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
-    expect(head()).not.toBe(before)
-    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
-    expect(String(err)).toContain(`The branch moved meanwhile, to ${head().slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`)
+    expect(String(err)).toContain(moved(head()))
     expect(String(err)).not.toMatch(/as they were/)
     expect(leftovers()).toEqual([])
-    expect(existsSync(lockPath())).toBe(false)
   })
+
+  // HR2's rounds 1-3: a hook's own git moving HEAD or committing, before or after the commit's write, then hanging.
+  for (const [name, hook, body] of [
+    ['a post-commit hook that moves HEAD to an older commit of the same parent', 'post-commit', 'git reset -q --soft "$B"'],
+    ['a pre-commit hook that moves HEAD to an older commit of the same parent, before any commit is written', 'pre-commit', 'git reset -q --soft "$B"'],
+    ["a pre-commit hook that makes a commit of its own with this commit's message in it", 'pre-commit', 'git commit -q --allow-empty --no-verify -m "Commit changes before merging AB-1, by the hook"']
+  ] as const)
+    it(`…${name}, then hangs: never credited; said with where HEAD moved, the index as it was`, async () => {
+      const before = head()
+      const b = sh(proj, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'B, made before')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', hook), `#!/bin/sh\nB=${b}\n${body}\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const err = await settle('commit', ['a.txt']).catch((e: Error) => e)
+      expect(head()).not.toBe(before)
+      expect(err).toBeInstanceOf(Error)
+      expect(String(err)).toContain(moved(head()))
+      expect(sh(proj, 'show', ':a.txt')).toBe(sh(proj, 'show', `${before}:a.txt`))
+      expect(leftovers()).toEqual([])
+    })
 
   // HI-3074: a pre-commit hook's `git add` goes into what git commits, not the private index, so the index taken from the
   // private index left the folder changed (a formatter: `MM a.txt`) or a removal invented (a generated file: `D gen.txt`).
