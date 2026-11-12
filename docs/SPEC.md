@@ -6645,7 +6645,12 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
    holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
    folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
-   cleared, which let the reconciler mark the card `LeftTarget`). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
+   cleared, which let the reconciler mark the card `LeftTarget`), its files never rolled back while any of them is as
+   the user's new head has it (HI-3090: a commit of some or all of what the catch-up had staged had its files rolled
+   back under it, a staged deletion left in the folder; what is still staged is kept as it is). A recorded step whose listed files are all as they were before it (the user's
+   `git reset --hard` or `git stash` after a stop, or the folder switched to another branch before anything moved),
+   which the table reads as its terminal state, has nothing of it left: its phase dropped, it is looked at again as a
+   fresh one (HI-3090: paused needing the user, with no command, over a clean folder). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
    (`QueuePauseInfo.catchUp`, `catchUpPaused`): its folder's changes are offered Set Aside only (stashed "before
    bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
    local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card

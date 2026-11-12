@@ -14,7 +14,7 @@ import { FactStore } from '../../src/main/workflow/factStore'
 import { pushLogKey, pushLogOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { memoryTransportStore } from '../../src/main/workflow/transportSnapshots'
-import { QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE } from '../../src/shared/workflow/facts'
+import { QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
 const extra: FactStore[] = []
@@ -48,11 +48,11 @@ function following(o: Partial<WorkflowOptions> = {}, opts: { checkedOut?: boolea
   return { e, bare, transport, queue }
 }
 
-async function queued(e: Env, title: string, file: string, text = `${title}\n`) {
+async function queued(e: Env, title: string, file: string, text = `${title}\n`, more: Record<string, string> = {}) {
   const card = e.wf.createCard({ title })
   const s = await e.wf.start(card.key, B1)
   moved(s)
-  commit(s.data!.folder as string, { [file]: text }, title)
+  commit(s.data!.folder as string, { [file]: text, ...more }, title)
   moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   return card
 }
@@ -672,6 +672,95 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(head(e.project)).toBe(head(bare))
     expect(contains(e.project, e.wf.state(a).integrated!.result)).toBe(true)
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  /** A published, Done; Combwork stopped inside its catch-up into the checked-out main at `at` (journalled). */
+  async function stoppedIn(at: 'beforeCatchUpRef' | 'beforeCatchUpFiles', more: Record<string, string> = {}) {
+    const f = following({}, { checkedOut: true })
+    const a = await queued(f.e, 'A', 'a.txt', 'A\n', more)
+    await expect(f.queue({ hooks: { [at]: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect(f.e.wf.state(a).stage).toBe('done')
+    expect(catchUpOf(f.e.store.meta(catchUpKey('main')))?.phase).toBe(at === 'beforeCatchUpRef' ? 'ref' : 'files')
+    return { ...f, a }
+  }
+
+  for (const [how, tidy] of [
+    ['git reset --hard', (p: string) => void sh(p, 'reset', '-q', '--hard')],
+    ['git stash -u', (p: string) => void sh(p, 'stash', 'push', '-q', '-u')]
+  ] as const) {
+    it(`HI-3090: stopped between its files and its ref, the user tidies the folder (${how}): run again, caught up, never stuck`, { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, bare, transport, a } = await stoppedIn('beforeCatchUpRef')
+      expect(sh(e.project, 'status', '--porcelain')).toBe('A  a.txt')
+      tidy(e.project)
+      expect(sh(e.project, 'status', '--porcelain')).toBe('')
+      await restarted(e, transport).drain('main')
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(e.wf.state(e.store.card(a.id)).requests.some((r) => r.gate === QUEUE_STUCK_GATE)).toBe(false)
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+      expect(head(e.project)).toBe(head(bare))
+      expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+      expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    })
+  }
+
+  it('HI-3090: stopped before its files moved, the user switches the folder to another branch: run again, main brought there (not checked out), the folder untouched', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, bare, transport } = await stoppedIn('beforeCatchUpFiles')
+    sh(e.project, 'switch', '-q', '-c', 'mine')
+    await restarted(e, transport).drain('main')
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+    expect(sh(e.project, 'branch', '--show-current')).toBe('mine')
+    expect(existsSync(join(e.project, 'a.txt'))).toBe(false)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it('HI-3090: stopped between its files and its ref, the user commits what it staged: never rolled back under that commit; still owed, paused remoteDiverged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, transport, a } = await stoppedIn('beforeCatchUpRef')
+    sh(e.project, 'commit', '-q', '-m', 'whatever this was')
+    const mine = head(e.project)
+    await restarted(e, transport).drain('main')
+    expect(head(e.project)).toBe(mine)
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'remoteDiverged', card: a.key })
+    const owed = catchUpOf(e.store.meta(catchUpKey('main')))
+    expect(owed).toMatchObject({ card: a.key })
+    expect(owed?.phase).toBeUndefined()
+  })
+
+  it('HI-3090 (HR2): a published merge that changes no file, stopped inside its catch-up, the folder then switched to another branch: run again, main brought there, never stuck', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    // A result that changes no file in the local target (a forward merge after a release, say) journals `files: []`. A
+    // card can't be published with no change of its own here (its submission is refused, and one already on the target
+    // is integrated outside), so the stop is a real one before its files moved, and its journal is the one Combwork
+    // writes for such a result: its list empty.
+    const { e, bare, transport } = await stoppedIn('beforeCatchUpFiles')
+    const journal = catchUpOf(e.store.meta(catchUpKey('main')))!
+    e.store.setMeta(catchUpKey('main'), JSON.stringify({ ...journal, files: [] }))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ phase: 'files', files: [] })
+    sh(e.project, 'switch', '-q', '-c', 'mine')
+    await restarted(e, transport).drain('main')
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    expect(head(e.project)).toBe(head(bare))
+    expect(sh(e.project, 'branch', '--show-current')).toBe('mine')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it('HI-3090 (HR1): stopped between its files and its ref, the user commits only one of the two files it staged: the committed one never rolled back; the other kept staged; paused remoteDiverged', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+    const { e, transport, a } = await stoppedIn('beforeCatchUpRef', { 'b.txt': 'B\n' })
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  a.txt\nA  b.txt')
+    sh(e.project, 'commit', '-q', '--only', '-m', 'mine', '--', 'a.txt')
+    const mine = head(e.project)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  b.txt')
+    await restarted(e, transport).drain('main')
+    expect(head(e.project)).toBe(mine)
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
+    expect(readFileSync(join(e.project, 'b.txt'), 'utf8')).toBe('B\n')
+    // No staged deletion of the user's committed a.txt; b.txt left staged at the result, as it was.
+    expect(sh(e.project, 'status', '--porcelain')).toBe('A  b.txt')
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'remoteDiverged', card: a.key })
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))?.phase).toBeUndefined()
   })
 
   it('HI-3089: Resume of a catch-up whose remote can’t be read, nothing else queued: still paused (fetchFailed, git’s words), never cleared silently; read again, caught up', { timeout: GIT_HEAVY_MS * 2 }, async () => {
