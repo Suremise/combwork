@@ -372,7 +372,25 @@ function jjRepo(dir, o = {}) {
     await answered()
     check('…and loose still shows its history, Refresh enabled, not Reading…', (await looseShows(looseHist)) && !/Reading…/.test(await text(looseHist)), await text(looseHist))
     await shoot(page.locator('.vc-view'), 'history-after-switch')
+
     await slowNext('')
+
+    // --- While a switch's read is out (HI-3038): back to shop with its read held in main (CW_TEST_HOLD_IPC) until the
+    // suite lets it go, its History shows Reading…, never loose's rows relabelled as shop's. Looked at while the read
+    // can't answer, not polled for the state that ends it, nor raced against a delay (HR3's round 1).
+    const holdIpc = (v) => app.evaluate((_e, x) => void (x ? (process.env.CW_TEST_HOLD_IPC = x) : delete process.env.CW_TEST_HOLD_IPC), v)
+    const held = (channel) => app.evaluate((_e, c) => globalThis.__cwHeldIpc?.[c] ?? 0, channel)
+    await holdIpc('jj:history')
+    try {
+      await page.getByText('shop', { exact: true }).first().click()
+      check('switched back to shop, its History read held in main', !!(await until(async () => (await head.textContent())?.includes(shop) && (await held('jj:history')) >= 1, HUNG_MS)), `${await text(head)} (held ${await held('jj:history')})`)
+      await answered()
+      const during = await text(shopHist)
+      check("…while shop's read is held, its History shows Reading…, not loose's history", /Reading…/.test(during) && !/main work/.test(during), during)
+    } finally {
+      await holdIpc('')
+    }
+    check("…let go, shop's own", !!(await until(async () => /feature/.test(await text(shopHist)) && !(await shopHist.locator('[data-action="jj-refresh"]').isDisabled()), HUNG_MS)), await text(shopHist))
 
     // --- Back to Git: refused while jj's state can't go back, then made.
     await toTab('shop')

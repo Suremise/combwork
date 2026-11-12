@@ -171,7 +171,9 @@ function useJjRead<T>(read: () => Promise<JjView<T>>, key: string): { data: JjVi
   const reload = useCallback(() => {
     const g = ++gen.current
     const live = (): boolean => gen.current === g
-    setS((p) => ({ ...p, key, loading: true }))
+    // Another project's data is never this one's (HI-3038): a switch shows Reading… until this project's read answers;
+    // a Refresh of the same project keeps what it shows meanwhile.
+    setS((p) => (p.key === key ? { ...p, loading: true } : { key, data: null, error: null, loading: true, stamp: p.stamp }))
     // Each finished read counts (HI-2869): what reads beside the section (Repository's panels) reads again with it.
     read().then(
       (data) => live() && setS((p) => ({ key, data, error: null, loading: false, stamp: p.stamp + 1 })),
