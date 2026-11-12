@@ -87,7 +87,7 @@ describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back t
     const text = JSON.stringify(start)
     expect(text).toContain('it is a jj slot from before the repository switched to Git: switch the repository back to jj')
     expect(text).not.toContain('something works in it now')
-    expect(pool.keptPreview(1)).toEqual({ wait: expect.stringContaining('switch the repository back to jj') })
+    expect(await pool.keptPreview(1)).toEqual({ wait: expect.stringContaining('switch the repository back to jj') })
     // Its folder there: Remove… of a gone one doesn't apply (changed), and the slot and its commit stay.
     expect(await pool.removeKeptGone(row.name, pool.keptRecord(row.name)!)).toEqual({ ok: false, why: 'changed' })
     expect(existsSync(join(row.folder, 'one.txt'))).toBe(true)
@@ -156,7 +156,7 @@ describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back t
     const start = JSON.stringify(await pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' }))
     expect(start).toContain('switch the repository back to jj')
     expect(start).not.toContain('remove it')
-    expect(pool.keptPreview(1)).toEqual({ wait: expect.stringContaining('switch the repository back to jj') })
+    expect(await pool.keptPreview(1)).toEqual({ wait: expect.stringContaining('switch the repository back to jj') })
   })
 })
 
