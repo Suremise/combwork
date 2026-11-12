@@ -30,7 +30,7 @@ import { GIT_PREFIX, withoutGitRoute } from '../git'
 import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
 import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
-import { endTree } from '../progressReporters/wrapper'
+import { treeEnding } from '../processTree'
 import { withoutWriteFence, type FactStore, type QueueLease, type QueueProc, type QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
@@ -435,11 +435,13 @@ export class QueueRunner {
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let timedOut = false
     let atTimeout: string | undefined
+    // At its bound the tree is ended off main's thread (HI-3009); the result waits for that teardown to be over.
+    const ending = treeEnding()
     const timer = timeoutMs
       ? setTimeout(() => {
           timedOut = true
           atTimeout = Buffer.concat(err).toString('utf8')
-          endTree(child)
+          ending.end(child)
         }, timeoutMs)
       : undefined
     // HI-2042: the launcher itself ended by a signal (no code) is kept as one, apart from its bound's.
@@ -455,6 +457,7 @@ export class QueueRunner {
       child.once('error', () => res(-1))
     })
     clearTimeout(timer)
+    await ending.ended()
     const stderr = Buffer.concat(err).toString('utf8').trim()
     // HI-2020: the launcher's own line (its nonce) when the command's start failed; a 127 without it is the command's.
     const nonce = this.nonces.get(child)

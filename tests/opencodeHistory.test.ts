@@ -4,7 +4,7 @@
 // cost handling (history.ts). The non-null usage/limits answer is from 2.2.6's openapi.json, never observed: labelled so.
 import { readFileSync, existsSync, writeFileSync, mkdirSync, utimesSync, openSync, closeSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, forkCopies, inconsistentBreakdowns, mirrorState, opencodeImageData, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, subagentSessions, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
 import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreDeps, type CoreEvent } from '../src/main/providers/opencode/historyCore'
 import { OpencodeHistory, historyWorkerForTests } from '../src/main/providers/opencode/history'
@@ -636,6 +636,51 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
       await new Promise((r) => s.close(r))
     }
   }, 60_000)
+})
+
+describe("an export's tree ended off the thread (HI-3009, HR1 round 1)", () => {
+  it('an export whose root closes while its tree is still being ended settles, and a shutdown answers, only once that teardown is over', async () => {
+    // endTree as endTreeAsync behaves: the root ended at once, the rest of its tree (held by the gate) still being ended.
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((r) => (release = r))
+    const ends: number[] = []
+    let rootClosed = false
+    const core = new HistoryCore(() => undefined, {
+      get: async () => ({ status: 404, body: '{}' }),
+      spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }),
+      endTree: (c) => {
+        ends.push(c.pid ?? 0)
+        c.once('close', () => (rootClosed = true))
+        c.kill()
+        return gate
+      },
+      now: () => Date.now()
+    })
+    const home = tempDir('cw-oc-teardown-')
+    const sid = 'ses_tearTEARtearTEARtearTEARte'
+    const begun = join(home, 'started.txt')
+    // Ended at its bound: an export that never writes anything.
+    await ask(core, { type: 'bounds', bounds: { exportMs: 300 } })
+    await ask(core, { type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setInterval(() => {}, 1000)`], env: childEnv() } })
+    await vi.waitFor(() => expect(rootClosed).toBe(true), { timeout: 20_000, interval: 20 })
+    // Its root has closed, its teardown not over: the export is still tracked and unsettled.
+    let idle = false
+    const idled = ask(core, { type: 'idle' }).then(() => (idle = true))
+    let answered = false
+    const shutdown = ask(core, { type: 'shutdown' }).then(() => (answered = true))
+    for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r))
+    expect((core as any).children.size).toBe(1)
+    expect(idle).toBe(false)
+    expect(answered).toBe(false)
+    // The shutdown waits for the teardown begun, never starting another.
+    expect(ends).toHaveLength(1)
+    release()
+    await shutdown
+    await idled
+    expect(answered && idle).toBe(true)
+    expect(ends).toHaveLength(1)
+    expect((core as any).children.size).toBe(0)
+  }, 30_000)
 })
 
 describe("a refused removal gives the root back (HI-2762, HR1 round 2)", () => {

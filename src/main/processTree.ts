@@ -108,8 +108,38 @@ export async function endTreeAsync(child: ChildProcess, platform = process.platf
   }
 }
 
+/** A command's tree ended at most once, off the thread (treeEnding's). */
+export interface TreeEnding {
+  /** Begins ending `child`'s tree (endTreeAsync); later calls, or none given, do nothing. */
+  end(child: ChildProcess | undefined): void
+  /** Runs `fn` once the teardown begun is over, or at once when none began: an outcome given after an end still comes after the tree has gone. */
+  after(fn: () => void): void
+  /** Settles once the teardown begun is over (at once when none began). */
+  ended(): Promise<void>
+}
+
 /**
- * Ends the command and everything it started (#549). On Windows a command that isn't an .exe runs through cmd.exe (npm,
+ * How a caller on main's thread ends a command's tree (HI-3009, after HI-2997's jj runner): endTreeAsync, never endTree's
+ * spawnSync (about 2.4 s of the thread for PowerShell's listing and ending), and whatever waited on the tree having ended
+ * (an outcome, a time-out's grace) waits on the teardown instead. Never rejects.
+ */
+export function treeEnding(platform = process.platform): TreeEnding {
+  let teardown: Promise<void> | null = null
+  return {
+    end: (child) => {
+      if (child && !teardown) teardown = endTreeAsync(child, platform).catch(() => undefined)
+    },
+    after: (fn) => {
+      if (teardown) void teardown.then(fn)
+      else fn()
+    },
+    ended: () => teardown ?? Promise.resolve()
+  }
+}
+
+/**
+ * Ends the command and everything it started (#549). Blocks the thread it runs on (two spawnSync PowerShell runs): only for
+ * cw-progress's own process; Combwork's main process uses treeEnding (HI-3009, tests/endTreeImports.test.ts). On Windows a command that isn't an .exe runs through cmd.exe (npm,
  * a .cmd server): ending cmd alone would leave the server running, holding its port, its folder and the output pipes,
  * so the whole tree goes: listed with start times (treeToEnd: never an older process whose parent id is only a reused
  * number, as `taskkill /T` would end, #655) and each ended as the process it was when listed. If that can't run, the

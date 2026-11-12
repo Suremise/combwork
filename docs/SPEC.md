@@ -6109,6 +6109,14 @@ as for agents; a process it follows is first written to the lease's journal (a f
 and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
 job and recorded in `combwork.db`.
 
+**Ending a tree never blocks main's thread** (HI-3009, after jj's HI-2997): a bound or a cancel that ends a command's
+whole tree (the runner's bounded commands, the queue's bounded git, a check's or a slot warming's command, a card's
+focused pick, the submodules and LFS step's git, an OpenCode export) lists and ends it with PowerShell runs it awaits
+(`treeEnding` over `endTreeAsync`, `processTree.ts`), never `spawnSync`, which held main's thread, and so every pane's
+typing, for about 2.4 s each time. What came after the tree ended still does: the result, a time-out's grace, an OpenCode
+worker's shutdown reply. Only cw-progress's own process keeps the blocking `endTree` (`tests/endTreeImports.test.ts`, in check:repo;
+`tests/treeEndingOffThread.test.ts` for each caller's behaviour).
+
 **The runner's git** (HI-2079): its git commands with no time bound (reads, and its writes in its own folder and refs)
 run in one **git host** per lease, a process put in the job and recorded as a launcher is, before it runs anything; each
 git is its child, so in the job from its start. A git then costs git's own start only (about 80 ms less per command,
