@@ -6094,13 +6094,19 @@ touched:
   …*), even when they are every change in the folder: a stash with no paths would also take a change made after the
   check, never shown (HR1, HI-2983), so Set aside always names exactly the paths shown. **Refused by name too:** an untracked repository of its own inside the folder (git lists it whole, `nested/`),
   never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
-  submodule, yourself*). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  submodule, yourself*). And a registered submodule whose only changes are inside it (HI-3023: nothing staged, its
+  recorded commit the one checked out, edited or untracked files in it; porcelain v2 `S.M.`, `S..U`), which neither
+  `commit --only` nor `stash push` has anything of (they failed with git's *On branch main*, nothing said): *… is a
+  submodule whose changes are inside it … Commit them or set them aside inside …*. `WorktreeNow.insideOnly` names
+  such submodules; they stay in `dirty` (work held in the folder, for every check of a clean folder). Its new commit
+  made inside is a change of the folder like any other. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
   file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
 - **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a
   lane's (`cw_lane start`) read the target's folder (the adapter's `targetChanges`; Git only) and, when it has
-  uncommitted changes, warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
+  uncommitted changes (never a submodule changed only inside it, HI-3023: nothing there to commit or set aside, and a
+  merge pauses on it only if it changes that submodule's commit), warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
   notification in the project's window (five paths, then how many more) with **Commit**, **Set Aside** (on all the
   files found) and **Show Changes**; once a minute for the same folder and files (64 remembered). Never a refusal: git
   may merge over files the card doesn't touch. **Only where a merge is to come** (HI-2984, `targetChangesApply`): the

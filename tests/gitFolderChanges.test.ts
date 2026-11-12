@@ -730,6 +730,54 @@ describe('an untracked repository of its own inside the folder', () => {
   })
 })
 
+// HI-3023: a registered submodule whose only changes are inside it (` M sub`, porcelain v2 `S.M.` or `S..U`) has nothing
+// the folder can commit or stash: it was listed, and Commit and Set Aside failed with git's "On branch main".
+describe('a submodule changed only inside it', () => {
+  const listed = (): Promise<string[] | undefined> => inWorkspace(w, () => new GitPlatform({ cfg: { project: proj } } as unknown as ConstructorParameters<typeof GitPlatform>[0]).targetChanges('main')).then((t) => t?.files.sort())
+  beforeEach(() => {
+    const sub = join(base, `sub${n}`)
+    mkdirSync(sub, { recursive: true })
+    gitRepo(sub)
+    commit(sub, { 's.txt': 's\n' }, 'sub')
+    sh(proj, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', sub.replace(/\\/g, '/'), 'sub')
+    sh(proj, 'commit', '-q', '-m', 'add sub')
+  })
+
+  for (const [name, change] of [
+    ['an edited file', () => writeFileSync(join(proj, 'sub', 's.txt'), 'edited inside\n')],
+    ['an untracked file', () => writeFileSync(join(proj, 'sub', 'untracked.txt'), 'u\n')]
+  ] as const)
+    it(`${name} inside: not in the start's warning, Commit and Set Aside refused by name, nothing done`, async () => {
+      change()
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['M a.txt', 'M sub'])
+      const now = await worktreeNow(proj)
+      if (isUnknown(now)) throw new Error('unknown')
+      expect(now.insideOnly).toEqual(['sub'])
+      expect(now.dirty).toContain('sub') // still work held in the folder, for whatever else asks whether it's clean
+      expect(await listed()).toEqual(['a.txt'])
+      const before = [head(), status(), sh(proj, 'stash', 'list')]
+      for (const shown of [['sub'], ['a.txt', 'sub']])
+        for (const action of ['commit', 'setAside'] as const) await expect(settle(action, shown)).rejects.toThrow(/^sub is a submodule whose changes are inside it/)
+      expect([head(), status(), sh(proj, 'stash', 'list')]).toEqual(before)
+      // Only the inside changes: alone, there is nothing to warn about.
+      sh(proj, 'checkout', '--', 'a.txt')
+      expect(await listed()).toBeUndefined()
+    })
+
+  it('its new commit is listed and committed as usual', async () => {
+    writeFileSync(join(proj, 'sub', 's.txt'), 'edited inside\n')
+    sh(join(proj, 'sub'), 'commit', '-q', '-am', 'inside')
+    const now = await worktreeNow(proj)
+    if (isUnknown(now)) throw new Error('unknown')
+    expect(now.insideOnly).toBeUndefined()
+    expect(await listed()).toEqual(['sub'])
+    await settle('commit', ['sub'])
+    expect(committed()).toEqual(['sub'])
+    expect(status()).toBe('')
+  })
+})
+
 describe("Files' Commit it", () => {
   it('commits .gitignore alone, as it is now, with another file changed beside it', async () => {
     writeFileSync(join(proj, '.gitignore'), 'node_modules/\n/reference/\n')

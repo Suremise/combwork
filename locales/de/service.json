@@ -80,6 +80,7 @@
   "service.folderChanges.midOperation": "Git ist in {folder} mitten in {state, select, merge {einem Merge} rebase {einem Rebase} cherryPick {einem Cherry-Pick} other {einem Revert}}. Schließe den Vorgang zuerst ab oder brich ihn ab.",
   "service.folderChanges.moved": "Wo {target} ausgecheckt ist, hat sich inzwischen geändert. Sieh noch einmal nach.",
   "service.folderChanges.nestedRepo": "{folder} ist ein eigenes Git-Repository in diesem, daher committet Combwork es nicht und legt es nicht beiseite. Trage es selbst in .gitignore ein oder füge es als Submodul hinzu.",
+  "service.folderChanges.submoduleInside": "{folder} ist ein Submodul, dessen Änderungen in ihm selbst liegen, daher kann Combwork sie hier weder committen noch beiseitelegen. Committe sie oder lege sie in {folder} beiseite, und committe dann bei Bedarf dessen neuen Commit hier.",
   "service.folderChanges.noTarget": "{target} ist jetzt in keinem Ordner dieses Projekts ausgecheckt: Dort gibt es nichts zu committen oder beiseitezulegen.",
   "service.folderChanges.nothing": "{file} hat keine Änderungen zum Committen.",
   "service.folderChanges.readFailed": "Git konnte die Änderungen des Ordners nicht lesen: {why}",

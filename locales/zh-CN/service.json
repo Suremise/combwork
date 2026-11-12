@@ -80,6 +80,7 @@
   "service.folderChanges.midOperation": "Git 正在 {folder} 中进行{state, select, merge {合并} rebase {变基} cherryPick {拣选（cherry-pick）} other {还原（revert）}}。请先完成或中止该操作。",
   "service.folderChanges.moved": "检出 {target} 的位置在此期间发生了变化。请重新查看。",
   "service.folderChanges.nestedRepo": "{folder} 是位于此仓库内的独立 Git 仓库，因此 Combwork 不会提交或搁置它。请自己将它添加到 .gitignore，或作为子模块添加。",
+  "service.folderChanges.submoduleInside": "{folder} 是一个子模块，其更改位于它内部，因此 Combwork 无法在此提交或搁置这些更改。请在 {folder} 内提交或搁置它们，然后如有需要，在此提交它的新提交。",
   "service.folderChanges.noTarget": "{target} 现在未在此项目的任何文件夹中检出：那里没有可提交或搁置的内容。",
   "service.folderChanges.nothing": "{file} 没有可提交的更改。",
   "service.folderChanges.readFailed": "Git 无法读取文件夹的更改：{why}",
