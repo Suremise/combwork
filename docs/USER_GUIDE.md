@@ -1295,7 +1295,7 @@ With no lanes and no merge going on, the panel is just the runs, as before.
 In the **Lanes** tab, open a running lane (the chevron before its name) to change its cards yourself, without asking the Assistant or the builder:
 
 - **Move a card:** drag a card waiting its turn by its row to another place; a line shows where it goes. With the keyboard, Tab to the card (or its key or ×) and press **Alt+Up** or **Alt+Down**.
-- **Take a card off:** the **×** at the end of its row, or **Delete** on it. It goes back to the board, in Todo: nothing is deleted.
+- **Take a card off:** the **×** at the end of its row, or **Delete** on it. It goes back to the board, in Todo: nothing is deleted. Holding Delete down takes only that card off; the focus then moves to the next card.
 - **Add a card:** **Add Card…** at the end of the cards opens a search: type part of a key or a title, then click a card or press **Enter** for the first. Or drag a card from the board (the **Tasks** view) onto the lane's row, where it goes last, or into its open cards, where you drop it. A card given to another agent is taken off that agent, so the lane takes it. A lane has at most 50 cards: take one off before adding another.
 - **Only cards still waiting their turn move.** The card being worked shows a lock, and it and the cards before it (done, in review, approved) keep their places: a card dropped on one of them stays where it was.
 

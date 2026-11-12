@@ -8841,7 +8841,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     here, the local day): in the Lanes tab, a running lane's open cards show its working list (its queued list when it
     has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down, on its row or
     its key or ×; HI-2970: inside the opened cards they never move the lane, which takes them on its own row only), comes off
-    with × or Delete (back to the board, never deleted); Add Card… searches the project's Todo cards by key or title, and
+    with × or Delete (back to the board, never deleted; HI-3068: a held Delete takes one card, its repeats ignored, and
+    the focus moves to the next card's row, or the lane's, only once the lane shows it off: another update of the lane
+    meanwhile leaves it waiting, and a refused or skipped edit, a move too, leaves it where it was, `QueueFocus`); Add Card… searches the project's Todo cards by key or title, and
     a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
     (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
     on hold, another agent's) keeps its places in every edit; the card in flight shows a lock. Over a row of that start,
