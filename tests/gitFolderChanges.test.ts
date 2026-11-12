@@ -6,7 +6,7 @@
 // in throwaway repositories.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
@@ -224,6 +224,93 @@ describe('Set aside', () => {
     const err = await settle('setAside', ['a.txt']).catch((e: Error) => e)
     expect(String(err)).toMatch(/aren't the ones shown/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+  })
+})
+
+// HI-3021: a commit or stash past its bound (a slow hook, a signer nobody answers) had git.exe alone ended: on Windows it
+// never removed the index.lock it held, so every git after failed on it, and the hook ran on. Now git's whole tree is
+// ended, the lock it left removed (only one proved its own), the intent-to-add entries taken out, and the refusal says so.
+describe('a commit or stash past its bound (HI-3021)', () => {
+  const lockPath = (): string => join(proj, '.git', 'index.lock')
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  /**
+   * A shell script that starts two node processes, one in the background and one it waits on, each writing its pid to
+   * `pids` and running 30 s (past any bound here): a hook's node, npm or gpg. Native programs, as hooks run: one of Git
+   * Bash's own (its sleep) is started outside Windows' process tree, where no tree walk finds it.
+   */
+  const slowScript = (pids: string): string => {
+    const node = `"${process.execPath.replace(/\\/g, '/')}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${pids.replace(/\\/g, '/')}"`
+    return `#!/bin/sh\n${node} &\n${node}\n`
+  }
+  const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((n) => n > 0) : [])
+  let bound = 0
+  beforeEach(() => {
+    bound = changes.folderChangesBounds.actMs
+    changes.folderChangesBounds.actMs = 3000
+  })
+  afterEach(() => {
+    changes.folderChangesBounds.actMs = bound
+  })
+
+  it('Commit with a pre-commit hook slower than the bound: the hook ended too, no lock left, the files and the index as they were, said', async () => {
+    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids))
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    const before = head()
+    const err = await settle('commit', ['new.txt', 'a.txt']).catch((e: Error) => e)
+    expect(String(err)).toMatch(/didn't finish the commit in 3 seconds/)
+    expect(String(err)).not.toMatch(/lock on the repository is still there/)
+    expect(existsSync(lockPath())).toBe(false)
+    // The hook's shell and its sleep: two processes, both ended with git.
+    expect(pidsIn(pids)).toHaveLength(2)
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    expect(head()).toBe(before)
+    expect(status().split('\n').map((l) => l.trim()).sort()).toEqual(['?? new.txt', 'M a.txt'])
+    // The folder is usable again: Commit (no hook now) and the user's own git add.
+    rmSync(join(proj, '.git', 'hooks', 'pre-commit'))
+    await settle('commit', ['new.txt'])
+    expect(committed()).toEqual(['new.txt'])
+    sh(proj, 'add', 'a.txt')
+  })
+
+  it('Set Aside held up past the bound (a clean filter): ended, no lock left, said; the files on disk as they were', async () => {
+    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
+    writeFileSync(filter, slowScript(pids))
+    sh(proj, 'config', 'filter.slow.clean', `sh "${filter.replace(/\\/g, '/')}"`)
+    writeFileSync(join(proj, '.git', 'info', 'attributes'), 'new.txt filter=slow\n')
+    writeFileSync(join(proj, 'new.txt'), 'new\n')
+    const err = await settle('setAside', ['new.txt']).catch((e: Error) => e)
+    expect(String(err)).toMatch(/didn't finish setting the changes aside in 3 seconds/)
+    expect(String(err)).not.toMatch(/lock on the repository is still there/)
+    expect(existsSync(lockPath())).toBe(false)
+    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    expect(read('new.txt')).toBe('new\n')
+    sh(proj, 'add', 'a.txt')
+  })
+
+  it("the lock is removed only when proved its own: made after the command started and before its bound came", async () => {
+    writeFileSync(lockPath(), '')
+    const born = (await import('fs')).statSync(lockPath()).birthtimeMs
+    // Made before the command started (another git's): left.
+    expect(await changes.clearOwnLock(lockPath(), born + 1, born + 10_000)).toBe(false)
+    // Made once the bound had come (a git started after the end): left.
+    expect(await changes.clearOwnLock(lockPath(), born - 10_000, born)).toBe(false)
+    expect(existsSync(lockPath())).toBe(true)
+    // Made while it ran: removed.
+    expect(await changes.clearOwnLock(lockPath(), born - 1, born + 10_000)).toBe(true)
+    expect(existsSync(lockPath())).toBe(false)
+    // None there: nothing left.
+    expect(await changes.clearOwnLock(lockPath(), born - 1, born + 10_000)).toBe(true)
   })
 })
 

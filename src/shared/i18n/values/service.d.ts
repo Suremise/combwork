@@ -85,6 +85,7 @@ interface CombworkMessageValues {
   'service.folderChanges.busy': { folder: string | number; what: string | number }
   'service.folderChanges.changed': { folder: string | number }
   'service.folderChanges.commitFailed': { why: string | number }
+  'service.folderChanges.commitTimedOut': { seconds: number; lockLeft: string; lock: string | number }
   'service.folderChanges.deletedKept': { file: string | number }
   'service.folderChanges.detached': { folder: string | number }
   'service.folderChanges.indexBusy': undefined
@@ -96,6 +97,7 @@ interface CombworkMessageValues {
   'service.folderChanges.readFailed': { why: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
+  'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number; lockLeft: string; lock: string | number }
   'service.folderChanges.tooManyToSetAside': { count: number; folder: string | number }
   'service.folderChanges.unplaced': { folder: string | number }
   'service.folderChanges.wrongBranch': { folder: string | number; target: string | number }

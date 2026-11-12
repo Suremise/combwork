@@ -335,6 +335,10 @@
     "defaultMessage": "Git did not commit: {why}",
     "description": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were."
   },
+  "service.folderChanges.commitTimedOut": {
+    "defaultMessage": "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. The files are as they were.{lockLeft, select, yes { Git's lock on the repository is still there ({lock}): delete it once no git command is running.} other {}}",
+    "description": "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook. {lockLeft} is yes when git's lock file ({lock}, a path ending in index.lock) is still there and wasn't Combwork's own to remove; the user deletes it. Keep git as it is."
+  },
   "service.folderChanges.deletedKept": {
     "defaultMessage": "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.",
     "description": "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves."
@@ -378,6 +382,10 @@
   "service.folderChanges.stashPartial": {
     "defaultMessage": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
     "description": "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command."
+  },
+  "service.folderChanges.stashTimedOut": {
+    "defaultMessage": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.{lockLeft, select, yes { Git's lock on the repository is still there ({lock}): delete it once no git command is running.} other {}}",
+    "description": "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. {lockLeft} is yes when git's lock file ({lock}, a path ending in index.lock) is still there and wasn't Combwork's own to remove. Keep git stash list as it is: a command."
   },
   "service.folderChanges.tooManyToSetAside": {
     "defaultMessage": "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.",

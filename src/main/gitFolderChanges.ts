@@ -8,14 +8,14 @@
 // (`commit --only`, `stash push`): a path whose removal from Git is staged while its file is still in the folder (Files'
 // Stop Tracking, `git rm --cached`), which either would put back, is refused by name before anything runs (HI-2982;
 // Darren, 11 Nov 2026).
-import { lstat } from 'original-fs/promises'
+import { lstat, unlink } from 'original-fs/promises'
 import { join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { changingFolder, inFolder } from './folderFence'
-import { INDEX_BUSY, git, gitErrorLine } from './git'
+import { INDEX_BUSY, git, gitErrorLine, type GitResult } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
@@ -40,6 +40,8 @@ const M = {
   unplaced: msg({ id: 'service.folderChanges.unplaced', defaultMessage: "Git didn't say which repository {folder} is in, so Combwork doesn't commit .gitignore while it can't check the agents working there. Try again.", description: "HI-2962: an error from Files' Commit it after Exclude from Git: a project folder ({folder}, a path) inside the same repository couldn't be placed by git (it answered nothing), so nothing was committed. Keep .gitignore: a file name." }),
   indexBusy: msg({ id: 'service.folderChanges.indexBusy', defaultMessage: 'Another git command is using the repository. Try again in a moment.', description: "HI-2944: an error from Commit or Set aside: git's index is locked by another git command." }),
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
+  commitTimedOut: msg({ id: 'service.folderChanges.commitTimedOut', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. The files are as they were.{lockLeft, select, yes { Git's lock on the repository is still there ({lock}): delete it once no git command is running.} other {}}", description: "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook. {lockLeft} is yes when git's lock file ({lock}, a path ending in index.lock) is still there and wasn't Combwork's own to remove; the user deletes it. Keep git as it is." }),
+  stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.{lockLeft, select, yes { Git's lock on the repository is still there ({lock}): delete it once no git command is running.} other {}}", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. {lockLeft} is yes when git's lock file ({lock}, a path ending in index.lock) is still there and wasn't Combwork's own to remove. Keep git stash list as it is: a command." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
@@ -54,8 +56,53 @@ const FENCE = {
   ignore: agentMsg({ id: 'folderChanges.fence.ignore', text: 'a commit of .gitignore', note: "HI-2944: what changes the project folder while Files' Commit it commits .gitignore." })
 }
 
-/** The most a commit or stash may take: a hook or a signer can wait; a bound for a hung one, never how long it should take. */
-const ACT_MS = 120_000
+/**
+ * The most a commit or stash may take (`actMs`): a hook or a signer can wait; a bound for a hung one, never how long it
+ * should take. Tests shorten it.
+ */
+export const folderChangesBounds = { actMs: 120_000 }
+
+/** A commit's or stash's outcome: git's, and when it was ended at its bound, the index lock it left that wasn't proved its own. */
+type ActResult = GitResult & { lockLeft?: string }
+
+/** HI-3021: the index lock of the folder's own index (a linked worktree's is its own), as an absolute path; null when git can't say. */
+async function indexLockOf(folder: string): Promise<string | null> {
+  const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index.lock'])
+  return r.ok && r.out.trim() ? resolve(r.out.trim()) : null
+}
+
+/**
+ * HI-3021: removes `lock` when it is the one Combwork's own git left, ended at its bound (on Windows a git ended from
+ * outside never removes it, and every git after fails on it): made after that git started (`from`) and before its bound
+ * came (`until`), when it was still running. A git started after the end makes a later one, left alone; none of
+ * Combwork's own runs there meanwhile (the repository lock and the folder's fence). True when no lock is left.
+ */
+export async function clearOwnLock(lock: string, from: number, until: number): Promise<boolean> {
+  const s = await lstat(lock).catch((e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' ? null : undefined))
+  if (s === null) return true
+  if (!s?.isFile() || s.birthtimeMs < from || s.birthtimeMs >= until) return false
+  log.warn(`Removing the index lock ${userText(lock)} that Combwork's own git left when it was ended at its bound`)
+  return unlink(lock).then(
+    () => true,
+    (e: NodeJS.ErrnoException) => e?.code === 'ENOENT'
+  )
+}
+
+/**
+ * A commit or stash, bounded by `folderChangesBounds.actMs`, with no prompt waited on. At the bound git's whole tree is
+ * ended (git.ts) and the index lock it left removed when proved its own (clearOwnLock); one that isn't is `lockLeft`.
+ */
+async function actGit(folder: string, args: string[], input: string): Promise<ActResult> {
+  const lock = await indexLockOf(folder)
+  const bound = folderChangesBounds.actMs
+  const from = Date.now()
+  const r = await git(folder, args, undefined, input, { env: quietEnv(), timeout: bound })
+  if (!r.timedOut || !lock || (await clearOwnLock(lock, from, from + bound))) return r
+  return { ...r, lockLeft: lock }
+}
+
+/** HI-3021: what a commit or stash ended at its bound says: the bound, and the lock left when there is one. */
+const timedOutParams = (r: ActResult): { seconds: number; lockLeft: string; lock: string } => ({ seconds: Math.round(folderChangesBounds.actMs / 1000), lockLeft: r.lockLeft ? 'yes' : 'no', lock: r.lockLeft ?? '' })
 
 /** The environment of these commits: no prompt is ever waited on (a passphrase, credentials, a credential manager). */
 const quietEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' })
@@ -174,10 +221,15 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
     const add = await git(folder, ['add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked))
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
-  const r = await git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
+  const r = await actGit(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], pathsIn(files))
   if (!r.ok) {
     // The files as they were: the intent-to-add entries this call made taken out again (the working tree never touched).
-    if (untracked.length) await git(folder, ['reset', '--quiet', ...PATHS_IN], undefined, pathsIn(untracked))
+    if (untracked.length) {
+      const undo = await git(folder, ['reset', '--quiet', ...PATHS_IN], undefined, pathsIn(untracked))
+      // HI-3021: one that couldn't be undone (the index locked) is said in the log: the file stays, listed added.
+      if (!undo.ok) log.warn(`The intent-to-add entries of a refused commit in ${userText(folder)} weren't taken out: ${userText(gitErrorLine(undo.err))}`)
+    }
+    if (r.timedOut) throw combworkError(M.commitTimedOut, timedOutParams(r))
     throw failed(M.commitFailed, `${r.err}\n${r.out}`)
   }
   const head = await git(folder, ['rev-parse', 'HEAD'])
@@ -219,9 +271,14 @@ async function stashTop(folder: string): Promise<string | null> {
  */
 async function setAsidePaths(folder: string, files: string[], message: string): Promise<string> {
   const before = await stashTop(folder)
-  const r = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env: quietEnv(), timeout: ACT_MS })
+  const r = await actGit(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], pathsIn(files))
   const after = await stashTop(folder)
   const made = after && after !== before ? after : null
+  if (!r.ok && r.timedOut) {
+    // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
+    if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended at its bound: ${made}`)
+    throw combworkError(M.stashTimedOut, { ...timedOutParams(r), made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' })
+  }
   if (!r.ok) {
     if (made) {
       log.warn(`A stash was made in ${userText(folder)} before git failed: ${made}`)

@@ -6028,7 +6028,13 @@ touched:
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) undoes only the
   intent-to-add entries it made and loses nothing. Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
-  after it made one is said with that stash, kept. **Any number of files** (HI-2983): the paths go to git on its input
+  after it made one is said with that stash, kept. **Bounded** (HI-3021): a commit or stash still running after two
+  minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
+  timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
+  running), then the `index.lock` it left removed when proved its own (made after that git started and before its
+  bound came; a git started since makes a later one, left alone), the intent-to-add entries taken out, and the
+  refusal saying so (*Git didn't finish the commit in 120 seconds …*), naming any stash made by then and a lock it
+  couldn't prove its own for the user to delete. **Any number of files** (HI-2983): the paths go to git on its input
   (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
   32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
   push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
