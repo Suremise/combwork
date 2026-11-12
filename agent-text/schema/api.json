@@ -388,6 +388,13 @@
   "api.card.overrideArg": {
     "placeholders": {}
   },
+  "api.card.ownTarget": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "default": "plain"
+    }
+  },
   "api.card.recordedDecision": {
     "placeholders": {}
   },

@@ -23,6 +23,7 @@ const { agentActor } = await import('../src/shared/workflow/facts')
 const { preset } = await import('../src/shared/workflow/options')
 const { compile, mustCompile, rulesBaseId, skipReviewOf, targetedOf, targetOfRulesetId, baseRulesetId } = await import('../src/shared/workflow/compile')
 const { cardTarget, workBadges } = await import('../src/main/workflow/cardWork')
+const { cardTargetSaid } = await import('../src/main/cardTargetReply')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -176,6 +177,22 @@ describe("a card's Merges into", () => {
     expect(cardTarget(w, later.number)).toBeNull()
     await expect(inWorkspace(w, () => tasks.setTarget(later.number, '1.2.0', agent))).rejects.toThrow(/Only the user or the Assistant/)
     expect((await inWorkspace(w, async () => workBadges(w))).find((b) => b.card === made.number)?.target).toBe('1.2.0')
+  })
+
+  it('says a target of its own stays when the project changes, and how to have it follow (HI-3017)', async () => {
+    const { w } = await project()
+    const c = await card(w, 'Set before the project')
+    await inWorkspace(w, () => tasks.setTarget(c.number, '1.2.0', assistant))
+    const own = await inWorkspace(w, () => cardTargetSaid(w, c.number, 'p', '1.2.0'))
+    expect(own.own).toBe('1.2.0')
+    expect(own.note).toContain('now has a target of its own, 1.2.0')
+    expect(own.note).toContain('now main')
+    expect(own.note).toMatch(/change project\.workflow\.target first, then set the card's target to null/)
+    // The project's own, by name or none: it follows, nothing to say.
+    for (const raw of ['main', null]) {
+      await inWorkspace(w, () => tasks.setTarget(c.number, raw, assistant))
+      expect(await inWorkspace(w, () => cardTargetSaid(w, c.number, 'p', raw))).toEqual({ own: null, note: '' })
+    }
   })
 
   it('changes only while its branch has no work: refused started, allowed put back with none of its own', async () => {
