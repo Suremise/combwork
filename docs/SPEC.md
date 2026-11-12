@@ -8897,7 +8897,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     its Undo refused; one of Done cards only ended it at once). Add Card… searches the project's Todo cards by key or title, and
     a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
     (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
-    on hold, another agent's) keeps its places in every edit; the card in flight shows a lock. Over a row of that start,
+    on hold, another agent's) keeps its places in every edit that moves or brings in a card; a card in it still
+    waiting (not started, nobody else's) can be taken off, by × or Delete or Move here, the rest keeping its order, and
+    its Undo puts it back there (HI-3067, Darren's decision, 12 Nov); the card in flight shows a lock. Over a row of that start,
     where nothing can go, a drag shows no line and a drop does nothing (HI-2969: it went last before).
     - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
       `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a

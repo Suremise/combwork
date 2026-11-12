@@ -401,9 +401,16 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         // refused here, nothing saved. A list of none can't be read back (the lane vanished), and one of Done cards only
         // ends the lane at once; ending it is End Lane's or Abandon Lane's.
         if ((p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)) && !hasWork(ws, x.next)) refuse(ws, 409, M.lastCard, { card: cardRef(p.card!), lane: pairOf(x.lane) })
-        keepsFixed(ws, x.lane, was, x.next, p.card)
+        // A card not started can be taken off wherever it is (HI-3067, Darren's decision): off its lane, or Move here's
+        // from its source, even inside the fixed start (before a card on hold or another agent's), which keeps its order;
+        // queuedHere checked the card is waiting. Moves and cards brought in keep the fixed start's places.
+        const takenOff = p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)
+        // An undo's cards brought back go back where they were, the lane as the edit left it (its revision): the fixed
+        // start is checked without them (one taken off from inside it comes back there), each checked by its token below.
+        const kept = (list: readonly number[], from: readonly number[]): number[] => (x.restore ? list.filter((n) => from.includes(n)) : [...list])
+        if (!takenOff) keepsFixed(ws, x.lane, was, kept(x.next, was), p.card)
         // An undo sets the applied list back too: its fixed start kept there as well.
-        if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)
+        if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, kept(x.restore.cards, x.lane.cards), p.card)
         keepsDependencies(ws, x.lane, was, x.next)
         // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, from
         // the lane it leaves in this undo; its earlier work, assignment and history are checked against the token below.
