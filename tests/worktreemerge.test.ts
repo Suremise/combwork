@@ -134,6 +134,20 @@ describe('mergeWorktree (#1347)', () => {
     })
   }
 
+  // HR1's round 1 on HI-3030: git merge answers "Already up to date" for a branch the target has (merged before):
+  // that is success with the target where it was, never "Nothing was merged".
+  it('merging again a branch a target checked out nowhere has already: done, the target unmoved, nothing left', async () => {
+    const { project, a } = await twoBranches()
+    run(project, 'branch', 'release')
+    const listed = worktrees(project)
+    const first = await mergeWorktree(project, a, { squash: false, message: 'into release', target: 'release' })
+    const release = run(project, 'rev-parse', 'release').trim()
+    expect(first).toEqual({ ok: true, mergeCommit: release })
+    expect(await mergeWorktree(project, a, { squash: false, message: 'again', target: 'release' })).toEqual({ ok: true, mergeCommit: release })
+    expect(run(project, 'rev-parse', 'release').trim()).toBe(release)
+    expect(worktrees(project)).toEqual(listed)
+  })
+
   it('refuses a target checked out in another folder, and a target that does not exist', async () => {
     const { project, a, b } = await twoBranches()
     const r = await mergeWorktree(project, a, { squash: false, message: 'A', target: b.branch })

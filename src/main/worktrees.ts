@@ -607,11 +607,19 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
   }
   const head = await git(tmp, ['rev-parse', 'HEAD'])
   const made = head.ok ? head.out.trim() : ''
+  // Nothing to merge (its work in the target already: git merge says it is up to date, HR1's round 1): done, the target
+  // where it was, as a merge into the checked-out branch answers it.
+  if (made === from) {
+    const left = await removed()
+    log.info(`${userText(wt.branch)} is in ${userText(into)} already (not checked out): nothing to merge`)
+    const done = await afterMerge(projectPath, wt, into, from, squash && !!moveBranch)
+    return left ? { ...done, note: left } : done
+  }
   // Moved only from the tip it was merged on (update-ref's compare and swap): a target that moved meanwhile is left as it is.
-  const moved = made && made !== from ? await git(projectPath, ['update-ref', '-m', `combwork: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) : null // i18n-ignore: a reflog line, git's
+  const moved = made ? await git(projectPath, ['update-ref', '-m', `combwork: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) : null // i18n-ignore: a reflog line, git's
   const left = await removed()
   if (!moved?.ok) {
-    const why = !made || made === from ? tr(M.nothingMerged, { why: head.err || 'git rev-parse' }) : tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Combwork was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) // i18n-ignore: a git command, as it is
+    const why = !made ? tr(M.nothingMerged, { why: head.err || 'git rev-parse' }) : tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Combwork was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) // i18n-ignore: a git command, as it is
     return { ok: false, error: left ? `${why}\n${left}` : why }
   }
   log.info(`Merged ${userText(wt.branch)} into ${userText(into)} (not checked out)${squash ? ' (squash)' : ''}`)
