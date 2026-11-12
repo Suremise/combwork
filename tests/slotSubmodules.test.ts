@@ -33,13 +33,24 @@ afterEach(() => {
 
 const g = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'protocol.file.allow=always', '-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid', ...args], { cwd, env: RUN_ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
-/** A project whose submodule libs/s (one commit) has, with `nested`, its own submodule nn. */
-function project(nested = false): { ws: string; p: string } {
+/**
+ * A project whose submodule libs/s (one commit) has, with `nested`, its own submodule nn. `releaseTag`: the
+ * submodule's remote has a tag v1.0 (lightweight or annotated) on a commit none of its branches holds (a release
+ * whose branch was deleted), fetched with the clone.
+ */
+function project(nested = false, releaseTag?: 'light' | 'annotated'): { ws: string; p: string } {
   const base = tempDir('slot-sub-')
   const ws = join(base, 'ws')
   const p = gitRepo(join(ws, 'project'))
   const sub = gitRepo(join(base, 'sub'))
   commit(sub, { 'v.txt': '1\n' }, 'one')
+  if (releaseTag) {
+    g(sub, 'switch', '-q', '-c', 'release')
+    commit(sub, { 'rel.txt': 'r\n' }, 'release 1.0')
+    g(sub, 'tag', ...(releaseTag === 'annotated' ? ['-a', '-m', 'v1.0'] : []), 'v1.0')
+    g(sub, 'switch', '-q', 'main')
+    g(sub, 'branch', '-q', '-D', 'release')
+  }
   if (nested) {
     const nest = gitRepo(join(base, 'nest'))
     commit(nest, { 'n.txt': 'n\n' }, 'nest')
@@ -79,8 +90,8 @@ function pool(ws: string, p: string, renamer?: SlotRenamer): SlotPool {
 }
 
 /** A slot lent once and released: its submodule set up by the files step, free again. `edit` runs in it before the release. */
-async function usedSlot(nested = false, edit?: (folder: string, p: string) => void): Promise<{ pool: SlotPool; name: string; folder: string; p: string }> {
-  const { ws, p } = project(nested)
+async function usedSlot(nested = false, edit?: (folder: string, p: string) => void, releaseTag?: 'light' | 'annotated'): Promise<{ pool: SlotPool; name: string; folder: string; p: string }> {
+  const { ws, p } = project(nested, releaseTag)
   const pl = pool(ws, p)
   const r = await pl.lend({ agent: 'a1', card: 1 }, { target: 'main' })
   if (!r.ok) throw new Error(JSON.stringify(r.refusal))
@@ -120,6 +131,30 @@ describe('HI-3026: a slot whose submodule the files step set up', { timeout: 120
     expect(JSON.stringify(kept)).toContain('submodule libs/s/modules/nn has commits')
     expect(existsSync(join(folder, 'libs', 's', 'nn', 'wip.txt'))).toBe(false)
     expect(g(join(folder, 'libs', 's', 'nn'), 'rev-parse', 'wip')).toMatch(/^[0-9a-f]{40}$/)
+  })
+
+  it.each(['light', 'annotated'] as const)("HI-3077: its remote's %s tag on a commit no branch holds, fetched with the clone: removed", async (kind) => {
+    const { pool: pl, name, folder } = await usedSlot(false, (f) => expect(g(join(f, 'libs', 's'), 'tag', '-l')).toBe('v1.0'), kind)
+    expect(await pl.remove(name)).toBeNull()
+    expect(existsSync(folder)).toBe(false)
+  })
+
+  it("HI-3077: beside the remote's tag, a local tag on an unpushed commit: kept", async () => {
+    const { pool: pl, name, folder } = await usedSlot(false, (f) => unpushed(join(f, 'libs', 's'), (d) => g(d, 'tag', 'mine')), 'light')
+    expect(JSON.stringify(await pl.remove(name))).toContain("submodule libs/s has commits that aren't on its remote")
+    expect(existsSync(join(folder, 'libs', 's', 'v.txt'))).toBe(true)
+  })
+
+  it("HI-3077: the remote's tag name moved locally to an unpushed commit: kept, the remote's object no proof", async () => {
+    const { pool: pl, name, folder } = await usedSlot(false, (f) => unpushed(join(f, 'libs', 's'), (d) => g(d, 'tag', '-f', 'v1.0')), 'light')
+    expect(JSON.stringify(await pl.remove(name))).toContain("submodule libs/s has commits that aren't on its remote")
+    expect(existsSync(join(folder, 'libs', 's', 'v.txt'))).toBe(true)
+  })
+
+  it("HI-3077: the remote's tag, but the remote can't be read: kept, couldn't check", async () => {
+    const { pool: pl, name, folder } = await usedSlot(false, (f) => g(join(f, 'libs', 's'), 'remote', 'set-url', 'origin', join(tempDir('slot-sub-gone-'), 'missing')), 'light')
+    expect(JSON.stringify(await pl.remove(name))).toContain("couldn't check submodule libs/s")
+    expect(existsSync(join(folder, 'libs', 's', 'v.txt'))).toBe(true)
   })
 
   it("an untracked file inside the submodule, hidden by the user's ignore setting from the slot's own check: kept", async () => {
