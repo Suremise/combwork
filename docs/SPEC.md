@@ -8804,11 +8804,16 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     where nothing can go, a drag shows no line and a drop does nothing (HI-2969: it went last before).
     - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
       `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a
-      queued list edits that list. **Cancel Change** drops the queued list only, as an edit whose list is the applied
-      one (HI-2943), checked as every edit is: a card the queued change took off that another running lane holds now
-      (Move here after a queued reorder) stays there, left out; each other card it brings back is checked as any card
-      brought in (To do, the project's, its target, no work kept from a start since: with no record from before its
-      removal, any kept work refuses it), and given to nobody or the lane's builder, else refused with nothing changed. The builders of the lanes it
+      queued list edits that list. **Cancel Change** always drops the queued list (HI-3062), whatever it held: the lane's
+      list becomes its applied one, its own, with none of an edit's list checks (which compared it with the queued list:
+      a queued reorder of the card in flight, or one leaving out a held card, refused it). Each card the queued change
+      took off comes back in its place unless it can't now, decided under the board's lock on the board as it is then;
+      one that can't stays where it is (left out, `LaneEditResult.leftOut`, named in the notification): missing,
+      archived or another project's, held by another running lane (Move here after a queued reorder, HI-2943), given
+      to an agent other than the builder, started (Doing, Review, Passed, whoever has it), or in To do keeping work from
+      a start. One in To do with none, Done or on hold comes back. The lane's own card in flight (the first of the
+      applied list started and not another's) always stays, even when the queued list left it out. Saved at once,
+      never queued (not through `applyLaneList`), changing no card's assignment, column or facts. The builders of the lanes it
       changed are started on them if they aren't running, as an update by the user or the Assistant does.
     - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
       one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);

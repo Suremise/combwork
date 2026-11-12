@@ -172,38 +172,141 @@ describe('editLanes (HI-2898)', () => {
     expect(f.pending).toBeUndefined()
     expect(listOf(g)).toEqual([x, t])
     expect([f, g].filter((r) => listOf(r).includes(t))).toHaveLength(1)
-    // A card the queued change took off that has started since (on no lane): refused, nothing changed.
-    const [d, e] = [await make('D'), await make('E')]
-    const l = await start('b3', [d, e])
-    await doing(d, 'b3')
-    // F added behind D, then E taken off: still queued (not a plain removal of the applied list), E back on the board.
-    // A lane's revision before its first edit is 0 (its record has none yet).
-    const revOf = async (): Promise<number> => (await raw(l.id)).listRev ?? 0
-    const f2 = await make('F')
-    await edit({ op: 'add', lane: l.id, rev: await revOf(), card: f2, at: 1 })
-    const queued = (await raw(l.id)).pending!
-    await edit({ op: 'remove', lane: l.id, rev: await revOf(), card: e })
-    const left = queued.filter((n) => n !== e)
-    expect((await raw(l.id)).pending).toEqual(left)
-    /** Cancel refused with `why`, and nothing changed: the lane's lists and E as they were. */
-    const refused = async (why: RegExp): Promise<void> => {
-      const [laneBefore, cardBefore] = [await raw(l.id), await card(e)]
-      await expect(edit({ op: 'cancel', lane: l.id, rev: await revOf() })).rejects.toThrow(why)
-      const [laneAfter, cardAfter] = [await raw(l.id), await card(e)]
-      expect([laneAfter.cards, laneAfter.pending, laneAfter.listRev]).toEqual([laneBefore.cards, laneBefore.pending, laneBefore.listRev])
-      expect([cardAfter.column, cardAfter.agent ?? null, cardAfter.history.length]).toEqual([cardBefore.column, cardBefore.agent ?? null, cardBefore.history.length])
+  })
+
+  describe('Cancel change always drops the queued list (HI-3062)', () => {
+    /**
+     * B3's lane [D in flight, E]; F added behind D and E taken off, queued ([D, F]); then `change` to E (or `between`,
+     * the same made between the plan and the board's change). Cancel: the queued list gone at once, E put back or left
+     * out (`back`), and E itself (column, agent, history, archive) untouched by the cancel.
+     */
+    const cancelAfter = async (change: (e: number) => Promise<unknown>, back: boolean, o: { between?: boolean; undoRefused?: RegExp } = {}): Promise<void> => {
+      const [d, e, f] = [await make('D'), await make('E'), await make('F')]
+      const l = await start('b3', [d, e])
+      await doing(d, 'b3')
+      const revOf = async (): Promise<number> => (await raw(l.id)).listRev ?? 0
+      await edit({ op: 'add', lane: l.id, rev: await revOf(), card: f, at: 1 })
+      await edit({ op: 'remove', lane: l.id, rev: await revOf(), card: e })
+      expect((await raw(l.id)).pending).toEqual([d, f])
+      if (!o.between) await change(e)
+      else
+        edits.laneEditHooks.planned = async () => {
+          edits.laneEditHooks.planned = async () => undefined
+          await change(e)
+        }
+      const was = o.between ? null : await card(e)
+      const r = await edit({ op: 'cancel', lane: l.id, rev: await revOf() })
+      const rec = await raw(l.id)
+      expect(rec.pending).toBeUndefined()
+      expect(rec.cards).toEqual(back ? [d, e] : [d])
+      expect(r.leftOut).toEqual(back ? undefined : [e])
+      expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null, rev: rec.listRev }])
+      const now = await card(e)
+      if (was) expect([now.column, now.agent ?? null, now.history.length, now.archived ?? false]).toEqual([was.column, was.agent ?? null, was.history.length, was.archived ?? false])
+      // Its undo still puts the queued list back, with its own checks: refused, nothing changed, where they refuse it.
+      if (o.undoRefused) {
+        await expect(edit({ op: 'undo', undo: r.undo! })).rejects.toThrow(o.undoRefused)
+        expect((await raw(l.id)).pending).toBeUndefined()
+      } else {
+        await edit({ op: 'undo', undo: r.undo! })
+        expect((await raw(l.id)).pending).toEqual([d, f])
+      }
+      await lanes.endLane(w, l.id, { abandoned: true })
     }
-    // Given to another agent since it left (still in To do, never started): never taken from them (HR1's round 1).
-    await run(() => tasks.updateTask(e, { agent: 'b2' }, user))
-    await refused(/changed since/)
-    await run(() => tasks.updateTask(e, { agent: null }, user))
-    // Started outside the lane: not in To do.
-    await doing(e, 'b1')
-    await refused(/isn’t in To do/)
-    // Then back in To do, given to nobody: its start stays in its facts, and that work keeps it off (HR1's round 1).
-    await run(() => tasks.updateTask(e, { column: 'todo', agent: null }, user))
-    await refused(/keeps work/)
-    expect((await raw(l.id)).pending).toEqual(left)
+
+    it('a queued list from another start that puts a card before the card in flight: the applied list back', async () => {
+      const [a, b, c] = [await make('A'), await make('B'), await make('C')]
+      const l = await start('b1', [a, b, c])
+      await doing(a, 'b1')
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b, a, c], by: 'the user' })
+      const rec = await raw(l.id)
+      expect(rec.pending).toEqual([b, a, c])
+      const r = await edit({ op: 'cancel', lane: l.id, rev: rec.listRev! })
+      expect((await raw(l.id)).cards).toEqual([a, b, c])
+      expect((await raw(l.id)).pending).toBeUndefined()
+      expect(r.leftOut).toBeUndefined()
+    })
+
+    it('a queued list that left out a held card before the card in flight, and a Done one: put back', async () => {
+      const [d, a, b, c, z] = [await make('D'), await make('A'), await make('B'), await make('C'), await make('Z')]
+      const l = await start('b1', [z, d, a, b])
+      await doing(z, 'b1')
+      await run(() => tasks.updateTask(z, { column: 'done' }, user))
+      await run(() => tasks.updateTask(d, { column: 'hold' }, user))
+      await doing(a, 'b1')
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, c, b], by: 'the user' })
+      const rec = await raw(l.id)
+      expect(rec.pending).toEqual([a, c, b])
+      const r = await edit({ op: 'cancel', lane: l.id, rev: rec.listRev! })
+      expect((await raw(l.id)).cards).toEqual([z, d, a, b])
+      expect((await raw(l.id)).pending).toBeUndefined()
+      expect(r.leftOut).toBeUndefined()
+    })
+
+    it('a queued list that left out the card in flight: kept, the lane is working on it', async () => {
+      const [a, b, c] = [await make('A'), await make('B'), await make('C')]
+      const l = await start('b1', [a, b])
+      await doing(a, 'b1')
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b, c], by: 'the user' })
+      const rec = await raw(l.id)
+      expect(rec.pending).toEqual([b, c])
+      const r = await edit({ op: 'cancel', lane: l.id, rev: rec.listRev! })
+      expect((await raw(l.id)).cards).toEqual([a, b])
+      expect((await raw(l.id)).pending).toBeUndefined()
+      expect(r.leftOut).toBeUndefined()
+    })
+
+    it("a card the window's queued change added, given to another agent since: dropped with it, left with that agent", async () => {
+      const [a, b, c, d] = [await make('A'), await make('B'), await make('C'), await make('D')]
+      const l = await start('b1', [a, b, c])
+      await doing(a, 'b1')
+      await edit({ op: 'add', lane: l.id, rev: 0, card: d, at: 1 })
+      await run(() => tasks.updateTask(d, { agent: 'b3' }, user))
+      await edit({ op: 'cancel', lane: l.id, rev: (await raw(l.id)).listRev! })
+      expect((await raw(l.id)).cards).toEqual([a, b, c])
+      expect((await raw(l.id)).pending).toBeUndefined()
+      expect((await card(d)).agent).toBe('b3')
+    })
+
+    it('a card the queued change took off, still in To do with no work: put back in its place', async () => {
+      await cancelAfter(async () => undefined, true)
+    })
+
+    it('a card the queued change took off, Done or on hold since: put back in its place', async () => {
+      // Undo would then put a card before one that keeps its place now: Undo's own check refuses it.
+      await cancelAfter((e) => run(() => tasks.updateTask(e, { column: 'hold' }, user)), true, { undoRefused: /keep their places/ })
+      await cancelAfter(async (e) => {
+        await doing(e, 'b1')
+        await run(() => tasks.updateTask(e, { column: 'done', agent: null }, user))
+      }, true, { undoRefused: /keep their places/ })
+    })
+
+    it('a card the queued change took off, then given to another agent: left out, theirs (HR1 on HI-2943)', async () => {
+      await cancelAfter((e) => run(() => tasks.updateTask(e, { agent: 'b2' }, user)), false)
+    })
+
+    it("a card the queued change took off, then started: left out whoever has it, the lane's builder or nobody", async () => {
+      await cancelAfter((e) => doing(e, 'b3'), false)
+      await cancelAfter((e) => run(() => tasks.updateTask(e, { column: 'doing', agent: null }, user)), false)
+      await cancelAfter((e) => doing(e, 'b1'), false)
+      await cancelAfter((e) => run(() => tasks.updateTask(e, { column: 'review', agent: 'b3' }, user)), false)
+      await cancelAfter((e) => run(() => tasks.updateTask(e, { column: 'passed', agent: null }, user)), false)
+    })
+
+    it('a card the queued change took off, started and back in To do: left out, it keeps work (HR1 on HI-2943)', async () => {
+      await cancelAfter(async (e) => {
+        await doing(e, 'b1')
+        await run(() => tasks.updateTask(e, { column: 'todo', agent: null }, user))
+      }, false)
+    })
+
+    it('a card the queued change took off, archived: left out', async () => {
+      await cancelAfter((e) => run(() => tasks.archiveTask(e, true, { actor: user })), false)
+    })
+
+    it('a card started between the plan and the board change: left out, decided under the lock', async () => {
+      await cancelAfter((e) => doing(e, 'b3'), false, { between: true })
+    })
   })
 
   it('removes a queued card back to the board, and undoes it', async () => {

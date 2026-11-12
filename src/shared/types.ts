@@ -4546,6 +4546,8 @@ export interface LaneEditResult {
    */
   lanes: { lane: string; queuedAfter: number | null; rev: number }[]
   undo: LaneEditUndo | null
+  /** Cancel Change (HI-3062): the cards its queued change took off that couldn't come back now, left where they are. */
+  leftOut?: number[]
 }
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */

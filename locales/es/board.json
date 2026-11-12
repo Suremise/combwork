@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "Descartar",
   "board.laneEdit.done": "{op, select, move {{card} movida en {lane}} add {{card} agregada a {lane}} remove {{card} quitada de {lane}} transfer {{card} movida a {lane}} cancel {Se canceló el cambio pendiente de {lane}} other {Deshecho}}",
   "board.laneEdit.handle": "Arrastra para mover {card}, o presiona Alt+Flecha arriba y Alt+Flecha abajo; Supr la quita",
+  "board.laneEdit.leftOut": "{n, plural, one {{cards} se queda donde está: ahora no puede volver al carril.} many {{cards} se quedan donde están: ahora no pueden volver al carril.} other {{cards} se quedan donde están: ahora no pueden volver al carril.}}",
   "board.laneEdit.locked": "{card} está en marcha: conserva su lugar",
   "board.laneEdit.moveHere": "Mover aquí",
   "board.laneEdit.noMatch": "Ninguna tarjeta de Pendiente coincide.",

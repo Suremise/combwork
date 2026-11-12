@@ -460,6 +460,7 @@
   "board.laneEdit.dismiss": "关闭",
   "board.laneEdit.done": "{op, select, move {已在 {lane} 中移动 {card}} add {已将 {card} 添加到 {lane}} remove {已将 {card} 移出 {lane}} transfer {已将 {card} 移到 {lane}} cancel {已取消 {lane} 的待定更改} other {已撤销}}",
   "board.laneEdit.handle": "拖动可移动 {card}，或按 Alt+Up 和 Alt+Down；按 Delete 可将其移出",
+  "board.laneEdit.leftOut": "{n, plural, other {{cards} 留在原处：现在无法回到通道中。}}",
   "board.laneEdit.locked": "{card} 正在进行中：保持原位",
   "board.laneEdit.moveHere": "移到这里",
   "board.laneEdit.noMatch": "待办中没有匹配的卡片。",
