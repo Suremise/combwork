@@ -177,20 +177,29 @@ export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map
 /**
  * What a project's work in flight still works under (HI-2694, HR1's s11 point 1): the options of each distinct ruleset its
  * cards out of Hold, Todo and Done (not archived) have recorded facts under (every cycle's and override's: a superset of
- * each card's own), and its running lanes' (`lane_runs`); and the stages those cards are in. One snapshot of combwork.db.
- * Null when the board has no facts yet or a ruleset can't be read: nothing is known, so nothing is hidden for it.
+ * each card's own), and its running lanes' (`lane_runs`); and the stages those cards are in, each with the options of its
+ * own cards' rulesets (HI-3014: a stage keeps a tool only under the rules of the cards in it; `sets` [] for cards with
+ * none recorded). One snapshot of combwork.db. Null when the board has no facts yet or a ruleset can't be read: nothing
+ * is known, so nothing is hidden for it.
  */
-export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: string[]; allOff: boolean } | null {
+export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: { stage: string; sets: WorkflowToolOptions[] }[]; allOff: boolean } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
     const cards = prepared(db, "SELECT number, col, stage FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND col NOT IN ('hold', 'todo', 'done')").all(project) as Row[]
-    const stages = [...new Set(cards.map((r) => String(r.stage ?? CATEGORY_STAGE[r.col as Category] ?? '')))].filter((s) => s && s !== 'hold' && s !== 'todo' && s !== 'done')
     const ids = new Set<string>()
-    if (cards.length) for (const r of prepared(db, 'SELECT DISTINCT ruleset FROM card_facts WHERE ruleset IS NOT NULL AND card IN (SELECT value FROM json_each(?))').all(JSON.stringify(cards.map((c) => c.number))) as Row[]) ids.add(String(r.ruleset))
+    // Each card's own rulesets, by its number.
+    const own = new Map<number, string[]>()
+    if (cards.length) {
+      for (const r of prepared(db, 'SELECT DISTINCT card, ruleset FROM card_facts WHERE ruleset IS NOT NULL AND card IN (SELECT value FROM json_each(?))').all(JSON.stringify(cards.map((c) => c.number))) as Row[]) {
+        ids.add(String(r.ruleset))
+        own.set(Number(r.card), [...(own.get(Number(r.card)) ?? []), String(r.ruleset)])
+      }
+    }
     if (prepared(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'lane_runs'").get()) {
       for (const r of prepared(db, "SELECT r.ruleset FROM lane_runs r JOIN lanes l ON l.id = r.lane WHERE l.state = 'active' AND l.project = ? COLLATE NOCASE AND r.ruleset IS NOT NULL").all(project) as Row[]) ids.add(String(r.ruleset))
     }
     const options: WorkflowToolOptions[] = []
+    const byId = new Map<string, WorkflowToolOptions>()
     let off = false
     for (const id of ids) {
       const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
@@ -207,9 +216,20 @@ export function workRetained(ws: WorkspaceService, project: string): { options: 
       } catch {
         return null
       }
-      options.push({ review: o.review, finish: o.finish, focusedTests: !!o.focusedTests, okBefore: { mode: typeof o.okBefore?.mode === 'string' ? o.okBefore.mode : 'never' } })
+      const t: WorkflowToolOptions = { review: o.review, finish: o.finish, focusedTests: !!o.focusedTests, okBefore: { mode: typeof o.okBefore?.mode === 'string' ? o.okBefore.mode : 'never' } }
+      options.push(t)
+      byId.set(id, t)
     }
-    return { options, stages, allOff: off }
+    // Each stage once for each distinct set of rulesets its cards are under.
+    const stages = new Map<string, { stage: string; sets: WorkflowToolOptions[] }>()
+    for (const r of cards) {
+      const stage = String(r.stage ?? CATEGORY_STAGE[r.col as Category] ?? '')
+      if (!stage || stage === 'hold' || stage === 'todo' || stage === 'done') continue
+      const rs = [...new Set(own.get(Number(r.number)) ?? [])].sort()
+      const k = JSON.stringify([stage, rs])
+      if (!stages.has(k)) stages.set(k, { stage, sets: rs.map((id) => byId.get(id)!) })
+    }
+    return { options, stages: [...stages.values()], allOff: off }
   })
 }
 

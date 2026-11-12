@@ -7527,7 +7527,10 @@ repeating them (#533) [note §8].
   (Review keeps the review tools, Approved and Merging the merge report) past what those options allow: the merge report
   only where one of those sets finishes in a way its handler takes it (Combwork merges, the agent merges, not checked), so
   an Approved card under You integrate or Committed is done keeps nothing (`WORKFLOW_TOOL_STAGES`' `under`; HI-3008: each
-  jj card's Approved restarted its builder, or asked to, for a tool it could never use). Nothing hidden when the
+  jj card's Approved restarted its builder, or asked to, for a tool it could never use). A stage keeps a tool only under
+  the rules of the cards in it (HI-3014: each card's own recorded rulesets, the project's options now for a card with none),
+  never another set's: a Solo card moved into Approved can't borrow the merge report from the project's not-checked
+  options, which it isn't under. Nothing hidden when the
   rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
   included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
   be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database
