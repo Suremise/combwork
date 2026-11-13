@@ -83,6 +83,7 @@
   "service.folderChanges.midOperation": "Git jest w folderze {folder} w trakcie {state, select, merge {scalania} rebase {rebase’u} cherryPick {cherry-picka} other {revertu}}. Najpierw dokończ lub przerwij tę operację.",
   "service.folderChanges.moved": "Folder, w którym wybrana jest gałąź {target}, zmienił się w międzyczasie. Sprawdź ponownie.",
   "service.folderChanges.nestedRepo": "{folder} to osobne repozytorium Gita wewnątrz tego, więc Combwork nie robi jego commita ani go nie odkłada. Dodaj je samodzielnie do .gitignore albo jako submoduł.",
+  "service.folderChanges.stashUnproved": "Git odłożył zmiany, ale Combwork nie potrafi stwierdzić, który stash jest jego: w tej samej chwili inny git utworzył stash o tej samej nazwie albo jednego z nich nie dało się odczytać. Zanim przejdziesz dalej, sprawdź git stash list i pliki.",
   "service.folderChanges.submoduleAdded": "{folder} to submoduł dodany tutaj, którego Git nie potrafi odłożyć. Zamiast tego zrób jego commit.",
   "service.folderChanges.submoduleDeleted": "{folder} to submoduł, którego folder usunięto, a tego Git nie potrafi odłożyć. Zamiast tego zrób commit jego usunięcia albo przywróć go poleceniem git submodule update -- {path}.",
   "service.folderChanges.submoduleInside": "{folder} to submoduł, którego zmiany są w nim samym, więc Combwork nie może tu zrobić ich commita ani ich odłożyć. Zrób ich commit albo odłóż je wewnątrz {folder}, a potem, jeśli chcesz, zrób tu commit jego nowego commita.",

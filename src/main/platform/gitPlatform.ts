@@ -25,7 +25,7 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
 import { isUnknown, unknown, withDetail, type Containment, type Maybe, type Unknown } from './types'
 import { isAgain } from './again'
-import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
+import { destinationOf, fetchHeadOf, projectHost, REMOTE_PLACEHOLDER, upstreamRemedyOf } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
 import { shellLine } from '../../shared/workflow/queue'
@@ -275,6 +275,8 @@ export class GitPlatform implements PlatformAdapter {
     const h = projectHost(this.project)
     const d = await destinationOf(h, target)
     if (isAgain(d)) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.again.message)
+    // HI-3128: a target that tracks nothing at all (a new version's branch, made here only) is refused with what to run.
+    if ('pause' in d && d.pause === 'noUpstream' && (await this.untracked(target))) return this.noUpstreamRefusal(target)
     if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
     const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
     const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
@@ -287,6 +289,27 @@ export class GitPlatform implements PlatformAdapter {
       if (!behind) return unknown(UNREADABLE.remoteBehind, { target, endpoint: d.snapshot.display })
     }
     return f.head
+  }
+
+  /** HI-3128: whether `branch` tracks nothing at all (neither its remote nor its merge setting set): not half set up. */
+  private async untracked(branch: string): Promise<boolean> {
+    const h = projectHost(this.project)
+    for (const key of [`branch.${branch}.remote`, `branch.${branch}.merge`]) {
+      const r = await h.run(this.project, ['config', '--get', key])
+      if (r.timedOut || r.notRun || r.code !== 1 || r.out.trim()) return false
+    }
+    return true
+  }
+
+  /**
+   * HI-3128: a start refused for a target with no upstream under follow mode (`platform.noUpstream`), with the commands
+   * that give it one (UpstreamRemedy, read locally), never "check Provider Setup".
+   */
+  private async noUpstreamRefusal(target: string): Promise<Unknown> {
+    const m = await upstreamRemedyOf(projectHost(this.project), target)
+    const u = unknown(UNREADABLE.remoteSetup, { target })
+    const values = m.kind === 'unusable' ? { target, how: m.why, remote: m.remote ?? REMOTE_PLACEHOLDER, publish: '', track1: '', track2: '' } : { target, how: m.kind, remote: m.remote ?? REMOTE_PLACEHOLDER, publish: m.publish, track1: m.track[0], track2: m.track[1] }
+    return { ...u, rule: 'platform.noUpstream', ruleValues: values }
   }
 
   /** Whether a start here asks for a slot (#1438): the app's lending, while the rules are enforced. */
@@ -541,7 +564,7 @@ export class GitPlatform implements PlatformAdapter {
     }
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = await this.untrailered(card, s)
-    if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
+    if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o, s.resolves?.source)
     const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
   }
@@ -686,12 +709,14 @@ export class GitPlatform implements PlatformAdapter {
    * G12: the first commit not authored with the project's identity, as git reads it now (HI-2266: G12's saved value only
    * means "on"; the Git tab or git config changes the identity, and the guard expects the new one), or `missing`.
    */
-  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<{ commit: string; email: string } | 'missing' | null>> {
+  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions, source?: string): Promise<Maybe<{ commit: string; email: string } | 'missing' | null>> {
     if (!o.identity) return null
     const id = await G.identity(this.project)
     if (isUnknown(id)) return id
     if (!id) return 'missing'
-    const list = await G.commits(this.project, `${base}..${revision}`)
+    // HI-3145: a forward's resolution merges its source, as its builder is told to: the source's own commits (another
+    // author's on the release, say) aren't this card's work. Its merge commit, and any commit it makes, are still checked.
+    const list = await G.commits(this.project, `${base}..${revision}`, source ? { except: [source] } : {})
     if (isUnknown(list)) return list
     const mine = commits ? list.filter((c) => commits.includes(c.commit)) : list
     const bad = mine.find((c) => c.email.toLowerCase() !== id.email.toLowerCase())

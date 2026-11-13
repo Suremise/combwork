@@ -40,8 +40,10 @@ export function gitConfigCount(v: string): number | null {
  * A signer's words that say it needs someone (a passphrase, a pinentry, an agent with the key unlocked). "No private key
  * found for public key": ssh-keygen given a key's .pub file, whose private half only an agent holds, with none holding it
  * (HI-2867): someone has to load it.
+ * "Couldn't get agent socket" and "Couldn't find key in agent": the same for a literal key (`key::ssh-ed25519 …` or the
+ * bare `ssh-ed25519 …`, HI-2933), which git passes to ssh-keygen with -U, so that only an agent may hold it (HI-3110).
  */
-export const NEEDS = /passphrase|pinentry|no gpg-agent|agent.*not running|can't connect to the agent|agent refused|inappropriate ioctl|no tty|cannot open \/dev\/tty|operation cancelled|could not open a connection to your authentication agent|no private key found for public key/i
+export const NEEDS = /passphrase|pinentry|no gpg-agent|agent.*not running|can't connect to the agent|agent refused|inappropriate ioctl|no tty|cannot open \/dev\/tty|operation cancelled|could not open a connection to your authentication agent|no private key found for public key|couldn't get agent socket|couldn't find key in agent/i
 
 /** The known installations among `roots` (Git for Windows' folders) and the environment's: Git's gpg and ssh-keygen, GnuPG's (Gpg4win), Windows' OpenSSH. */
 export function knownSignerPaths(roots: readonly string[], env: NodeJS.ProcessEnv): string[] {

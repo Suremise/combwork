@@ -360,6 +360,7 @@
   "main.server.url.scheme": "URLはhttps://（このPC上のサーバーならhttp://）で始める必要があります。",
   "main.server.url.userinfo": "URLにはユーザー名やパスワードを含められません。キーは専用の欄に入力してください。",
   "main.storage.claimed": "このフォルダーは再びセッションに属しています。",
+  "main.storage.launchInUse": "そのエージェントが再びプロジェクトに追加されたか、起動中です",
   "main.storage.noLonger": "{path}：対象外になりました",
   "main.storage.purgeChanged": "プレビューの後に変更されました。",
   "main.storage.purgeClaimed": "再びセッションに属しています。",

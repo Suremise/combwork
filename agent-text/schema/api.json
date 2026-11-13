@@ -1020,7 +1020,8 @@
       "to": "plain",
       "from": "plain",
       "override": "select",
-      "ahead": "plural"
+      "ahead": "plural",
+      "aheadTotal": "plain"
     }
   },
   "api.done.forwardResolved": {
@@ -1036,7 +1037,8 @@
     "placeholders": {
       "to": "plain",
       "from": "plain",
-      "ahead": "plural"
+      "ahead": "plural",
+      "aheadTotal": "plain"
     }
   },
   "api.done.freshRetried": {

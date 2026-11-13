@@ -203,7 +203,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
   // jj in the Version Control tab and the switch (HI-2799).
-  { paths: ['tests/e2e/jjCandidateChecksRun.cjs', 'src/main/workflow/jjCandidateChecks.ts', 'src/main/workflow/jobSpawn.ts', 'src/main/copiesApp.ts', 'src/main/workflow/queueChecks.ts'], suites: ['jjchecks', 'jjchecksnc'] },
+  { paths: ['tests/e2e/jjCandidateChecksRun.cjs', 'src/main/workflow/jjCandidateChecks.ts', 'src/main/jjSetupStamp.ts', 'src/main/workflow/jobSpawn.ts', 'src/main/copiesApp.ts', 'src/main/workflow/queueChecks.ts'], suites: ['jjchecks', 'jjchecksnc'] },
   { paths: ['tests/e2e/jjCandidateRun.cjs', 'src/main/platform/jjCandidateStep.ts', 'src/main/workflow/jjCandidateReturn.ts', 'src/main/platform/jjCandidates.ts'], suites: ['jjcandidate', 'jjcandidatenc'] },
   { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts', 'src/main/platform/jjFileGate.ts'], suites: ['jjslot-claude', 'jjwindow', 'jjwindownc', 'slotpool', 'slotrelease', 'jjview'] },
   { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts', 'src/main/jjWindow.ts'], suites: ['jjview', 'jjwindow', 'jjwindownc', 'jjstale', 'jjstalenc', 'jjlane', 'jjlanenc', 'vcswitch', 'jjcandidate', 'jjcandidatenc'] },
@@ -446,6 +446,8 @@ export const AREAS = [
   // Hook tokens per launch (#345): the hook server, and hook commands reading their header from the auth file.
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },
+  // HI-3144: removed agents' launch folders, swept as a workspace opens and listed by Clean Up (storage checks both).
+  { paths: ['src/main/launchFolders.ts', 'src/main/launchFolderNames.ts'], suites: ['storage'] },
   { paths: ['src/renderer/src/components/Purge.tsx'], suites: ['purge'] },
   { paths: ['src/main/antivirus.ts', 'src/shared/antivirus.ts', 'src/renderer/src/components/Antivirus.tsx'], suites: ['antivirus', 'performance', 'repairdefender'] },
   { paths: ['src/shared/tipPlacement.ts'], suites: ['tooltips'] },

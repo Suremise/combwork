@@ -1885,6 +1885,16 @@ export class SlotPool {
     return { slot: k.slot.name, platform: k.slot.platform ?? 'git', now: this.port.platform, gone: folderAbsentSync(k.slot.folder) }
   }
 
+  /**
+   * HI-3132: a card's committed work kept in a slot of its pool's own version control (HI-2995): its name and folder, so
+   * a start placing the card anywhere else is refused naming it (the workflow's `platform.keptElsewhere`). Null with none.
+   */
+  keptHere(card: number): { slot: string; folder: string } | null {
+    const k = this.store.keptSlotFor(card)
+    if (!k || (k.slot.platform ?? 'git') !== this.port.platform) return null
+    return { slot: k.slot.name, folder: k.slot.folder }
+  }
+
   slotOf(lease: SlotLease | string): Slot | null {
     const l = typeof lease === 'string' ? this.store.lease(lease) : lease
     return l ? this.store.slot(l.slot) : null

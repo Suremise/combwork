@@ -76,6 +76,35 @@ const SAMPLE: RefusalValues = {
   // platform.offLine (HI-3010): where the card's folder is instead (a detached head is rendered on its own below).
   where: 'other',
   on: 'main',
+  // platform.detachedFolder (HI-3104): the branch to check out, found ('no', none it could name, is rendered on its own below).
+  has: 'yes',
+  branch: 'main',
+  // platform.keptAcross, platform.keptElsewhere (HI-3069): the kept slot, the version control now, its folder there.
+  slot: 'slot-b',
+  now: 'Git',
+  gone: 'no',
+  // platform.slotLeft: whether Combwork could tell the slot is still the card's.
+  unknown: 'no',
+  // platform.jjRefused: what jj's check found (its forms are its own test's).
+  count: 2,
+  setting: 'none()',
+  base: 'a3f2c1d',
+  other: 'AM-7',
+  max: '1MiB',
+  // move.doingNobody, move.notFromHere's reviewer, submit.empty, submit.trailer: their remaining values.
+  also: 'no',
+  back: 'no',
+  changes: 'no',
+  at: 'head',
+  // platform.keptLine (HI-3112): the branch a card's kept line was made from, which its lane's target isn't.
+  kept: '1.4.0',
+  // platform.noUpstream (HI-3128): a remote it can name and the commands that give the target an upstream (its other
+  // forms are rendered on their own below).
+  how: 'ready',
+  remote: 'origin',
+  publish: 'git push -u origin 1.5.0',
+  track1: 'git fetch origin 1.5.0',
+  track2: 'git branch -u origin/1.5.0 1.5.0',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
@@ -100,6 +129,11 @@ describe('the workflow text in every locale', () => {
 
   it('renders every refusal in each locale with sample values: no placeholder left, no English where a translation exists', async () => {
     const english = Object.fromEntries((Object.keys(REFUSALS) as RuleId[]).map((rule) => [rule, refusalLines(rule, SAMPLE, WINDOW)]))
+    // English first (HI-3147): a value the samples lack leaves a message unformatted in every language, English too.
+    for (const rule of Object.keys(REFUSALS) as RuleId[]) {
+      const e = english[rule]
+      messages(rule).forEach((m, i) => expect([e.message, e.next, ...(e.change !== null ? [e.change] : [])][i], `en ${m.id}`).not.toMatch(/[{}]/))
+    }
     for (const code of LOCALES) {
       const cat = await loadCatalogue(code)
       setLanguage(code, cat, code)
@@ -181,6 +215,33 @@ describe('the workflow text in every locale', () => {
       for (const line of [pending.message, pending.next, held.message, held.next, other.message, other.next]) expect(line, code).not.toMatch(/[{}]/)
       expect(held.next, code).toBe(told)
       expect(pending.next, code).not.toBe(other.next)
+    }
+  })
+
+  it("renders both branches of platform.detachedFolder's {has} select in English and every locale: its branch by name, or how to check one out (HI-3104, HI-3147)", async () => {
+    const found = { card: 'AM-12', head: 'bd6ff9d', has: 'yes', branch: 'main' }
+    const none = { card: 'AM-12', head: 'bd6ff9d', has: 'no', branch: '' }
+    for (const code of ['en', ...LOCALES]) {
+      setLanguage(code, code === 'en' ? {} : await loadCatalogue(code), code)
+      const [a, b] = [refusalLines('platform.detachedFolder', found, WINDOW), refusalLines('platform.detachedFolder', none, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(a.message, code).toContain('bd6ff9d')
+      expect(a.next, code).toContain('git switch main')
+      expect(b.next, code).toContain('git switch -c')
+      expect(b.next, code).not.toContain('main')
+    }
+  })
+
+  it("renders each form of platform.noUpstream's {how} select in English and every locale, its commands as they are (HI-3128, HI-3147)", async () => {
+    const ready = { card: 'AM-12', target: '1.5.0', how: 'ready', remote: 'origin', publish: 'git push -u origin 1.5.0', track1: 'git fetch origin 1.5.0', track2: 'git branch -u origin/1.5.0 1.5.0' }
+    const forms = [ready, { ...ready, how: 'choose', remote: '<remote>' }, { ...ready, how: 'shallow', publish: '', track1: '', track2: '' }, { ...ready, how: 'other', publish: '', track1: '', track2: '' }]
+    for (const code of ['en', ...LOCALES]) {
+      setLanguage(code, code === 'en' ? {} : await loadCatalogue(code), code)
+      const shown = forms.map((v) => refusalLines('platform.noUpstream', v, WINDOW))
+      for (const l of shown) for (const line of [l.message, l.next]) expect(line, code).not.toMatch(/[{}]/)
+      for (const l of shown.slice(0, 2)) for (const cmd of [ready.publish, ready.track1, ready.track2]) expect(l.next, code).toContain(cmd)
+      expect(shown[2].next, code).toContain('git fetch --unshallow')
+      expect(new Set(shown.map((l) => l.next)).size, code).toBe(4)
     }
   })
 

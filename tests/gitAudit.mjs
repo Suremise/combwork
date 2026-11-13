@@ -282,7 +282,7 @@ export const SEAMS = {
   'src/main/slots': { calls: { lineHistory: 3, slotWorkspaces: 2 }, why: "the pool's reuse proof and folders: the pool's platform (R4, HI-2792)" },
   'src/main/workflow/focusedRun': { calls: { lineHistory: 1 }, why: "a focused pick's path changes: reached only with lines, its caller not carrying the platform (R6)" },
   'src/main/workflow/mergeQueue': { calls: { lineHistory: 1, queueIntegration: 2 }, why: "the project's identity and the owed push: the queue's work no card names (R8, HI-2792)" },
-  'src/main/workflow/nextVersion': { calls: { lineRepoReads: 2, lineRepoOps: 2 }, why: "Start the next version: the window's repository reads and operations (R2, R3)" },
+  'src/main/workflow/nextVersion': { calls: { lineRepoReads: 2, lineRepoOps: 2, queueIntegration: 1 }, why: "Start the next version: the window's repository reads and operations (R2, R3); HI-3128: the new branch's upstream remedy under follow mode" },
   'src/main/workflow/optionsForm': { calls: { lineHistory: 2 }, why: "the default target for kept targets and a changed form: reached with the project's path alone (HI-2792)" },
   'src/main/workflow/queueChecks': { calls: { lineHistory: 2 }, why: "the queue's check brackets (R6)" },
   'src/main/workflow/queueChecksApp': { calls: { slotWorkspaces: 1 }, why: "the queue's folder's submodules and LFS step: a worktree made as slots are, their platform's (HI-1182)" },

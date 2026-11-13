@@ -41,6 +41,8 @@ const M = {
   kindArchivedAttachments: msg({ id: 'workspace.storage.kindArchivedAttachments', defaultMessage: 'Attachments of archived sessions', description: 'Clean Up, a group of what goes.' }),
   kindOrphanAttachments: msg({ id: 'workspace.storage.kindOrphanAttachments', defaultMessage: 'Attachments of deleted sessions', description: 'Clean Up, a group of what goes; and its choice.' }),
   kindArchivedBackup: msg({ id: 'workspace.storage.kindArchivedBackup', defaultMessage: 'Backups of archived sessions (the CLI still has them)', description: 'Clean Up, a group of what goes.' }),
+  kindLaunchFolder: msg({ id: 'workspace.storage.kindLaunchFolder', defaultMessage: 'Launch folders of removed agents', description: 'Clean Up, a group of what goes; and its choice (HI-3144).' }),
+  launchFoldersDesc: msg({ id: 'workspace.storage.launchFoldersDesc', defaultMessage: 'What Combwork generated for the launches of agents since removed (.combwork/launch-…). A current agent’s, and one starting or running, is never touched.', description: 'Under a Clean Up choice (HI-3144). Keep .combwork/launch-… as it is (the folders’ names).' }),
   kindGoneBackup: msg({ id: 'workspace.storage.kindGoneBackup', defaultMessage: 'Last copies of archived sessions (deletes them)', description: 'Clean Up, a group of what goes.' }),
   moved: msg({ id: 'workspace.storage.moved', defaultMessage: 'Moved {count, plural, one {# item} other {# items}} ({size}) to the Recycle Bin', description: 'A notice after Clean Up ({size}: "12 MB").' }),
   nothingRemoved: msg({ id: 'workspace.storage.nothingRemoved', defaultMessage: 'Nothing was removed', description: 'A notice after Clean Up when nothing went.' }),
@@ -276,7 +278,8 @@ const KIND_LABEL: Record<CleanupItem['kind'], Msg> = {
   'archived-attachments': M.kindArchivedAttachments,
   'orphan-attachments': M.kindOrphanAttachments,
   'archived-backup': M.kindArchivedBackup,
-  'gone-backup': M.kindGoneBackup
+  'gone-backup': M.kindGoneBackup,
+  'launch-folder': M.kindLaunchFolder
 }
 
 /** A days field that commits a whole number from 1 to 3650 (keeps the last good one while typing). */
@@ -309,10 +312,11 @@ export function CleanupDialog({ path, name, onClose, onDone }: { path: string; n
   const [backupsOn, setBackupsOn] = useState(DEFAULT_CLEANUP.archivedBackupsDays !== null)
   const [backupDays, setBackupDays] = useState(DEFAULT_CLEANUP.archivedBackupsDays ?? 90)
   const [gone, setGone] = useState(DEFAULT_CLEANUP.goneBackups)
+  const [launch, setLaunch] = useState(DEFAULT_CLEANUP.launchFolders ?? true)
   const [items, setItems] = useState<CleanupItem[] | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const action = useBusy()
-  const opts: CleanupOptions = { archivedAttachmentsDays: attachmentsOn ? attachmentDays : null, orphanAttachments: orphans, archivedBackupsDays: backupsOn ? backupDays : null, goneBackups: gone }
+  const opts: CleanupOptions = { archivedAttachmentsDays: attachmentsOn ? attachmentDays : null, orphanAttachments: orphans, archivedBackupsDays: backupsOn ? backupDays : null, goneBackups: gone, launchFolders: launch }
   const key = JSON.stringify(opts)
 
   // The preview follows the options (a moment after the last change).
@@ -391,6 +395,7 @@ export function CleanupDialog({ path, name, onClose, onDone }: { path: string; n
           tr(M.oldBackupsDesc)
         )}
         {option(gone, setGone, tr(M.goneBackups), tr(M.goneBackupsDesc), true)}
+        {option(launch, setLaunch, tr(M.kindLaunchFolder), tr(M.launchFoldersDesc))}
       </div>
       {gone && (
         <div className="banner danger">

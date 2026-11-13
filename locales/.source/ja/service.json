@@ -101,6 +101,7 @@
   "service.folderChanges.stashFailed": "Git did not set the changes aside: {why}",
   "service.folderChanges.stashPartial": "Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}",
   "service.folderChanges.stashTimedOut": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.",
+  "service.folderChanges.stashUnproved": "Git set changes aside, but Combwork can't tell which stash is its own: another git made a stash of the same name at that moment, or one of them couldn't be read. Check git stash list and the files before going on.",
   "service.folderChanges.submoduleAdded": "{folder} is a submodule added here, which Git can't set aside. Commit it instead.",
   "service.folderChanges.submoduleDeleted": "{folder} is a submodule whose folder was deleted, which Git can't set aside. Commit its removal instead, or bring it back with git submodule update -- {path}.",
   "service.folderChanges.submoduleInside": "{folder} is a submodule whose changes are inside it, so Combwork can't commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.",

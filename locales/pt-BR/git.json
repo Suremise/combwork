@@ -262,7 +262,7 @@
   "git.signing.formatName": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
   "git.signing.heading": "Assinatura",
   "git.signing.howGpg": "Para assinar sem supervisão com gpg, deixe o gpg-agent guardar a frase secreta: defina default-cache-ttl e max-cache-ttl em gpg-agent.conf e depois assine uma vez manualmente (um commit seu) para desbloqueá-la por esse tempo.",
-  "git.signing.howSsh": "Para assinar sem supervisão com SSH, mantenha a chave no agente OpenSSH do Windows: configure o serviço “OpenSSH Authentication Agent” para iniciar automaticamente e inicie-o, execute ssh-add com sua chave uma vez e aponte user.signingkey para o arquivo .pub dela.",
+  "git.signing.howSsh": "Para assinar sem supervisão com SSH, mantenha a chave no agente OpenSSH do Windows: configure o serviço “OpenSSH Authentication Agent” para iniciar automaticamente e inicie-o, execute ssh-add com sua chave uma vez, aponte user.signingkey para o arquivo .pub dela e defina gpg.ssh.program como C:/Windows/System32/OpenSSH/ssh-keygen.exe (o ssh-keygen do próprio Git for Windows não alcança esse agente).",
   "git.signing.key": "Chave",
   "git.signing.limits": "Uma verificação bem-sucedida diz apenas que este assinador assinou agora há pouco. Um agente já em execução, um smartcard ou uma chave de hardware ainda podem pedir algo do jeito deles.",
   "git.signing.needsSomeone": "Pediria uma frase secreta: a assinatura precisa de alguém presente agora, então a fila de merge pausa antes de cada merge assinado até você desbloquear a chave.",

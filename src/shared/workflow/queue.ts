@@ -130,6 +130,23 @@ export function shellLine(args: string[]): string {
   return args.map((a) => (/^[A-Za-z0-9._/:=+-]+$/.test(a) ? a : `'${a.replace(/'/g, "''")}'`)).join(' ')
 }
 
+/** HI-3128: what stands for a remote Combwork can't name in an upstream remedy's commands: marked, never a guess. */
+export const REMOTE_PLACEHOLDER = '<remote>'
+
+/**
+ * HI-3128: the commands giving `branch` the upstream follow mode needs, for `remote` (null: the placeholder, unquoted so
+ * it reads as one to replace). `publish` creates it there by an explicit refspec (a tag of the same name makes a bare
+ * name ambiguous) and sets what it tracks; `track` sets the two settings follow mode reads, whatever the remote's fetch
+ * mapping. The branch is named in each, so the checked-out branch is never touched.
+ */
+export function upstreamCommands(remote: string | null, branch: string): { publish: string; track: [string, string] } {
+  const SENTINEL = 'CWREMOTEPLACEHOLDER'
+  const r = remote ?? SENTINEL
+  const line = (args: string[]): string => shellLine(args).split(SENTINEL).join(REMOTE_PLACEHOLDER)
+  const ref = `refs/heads/${branch}`
+  return { publish: line(['git', 'push', '-u', r, `${ref}:${ref}`]), track: [line(['git', 'config', `branch.${branch}.remote`, r]), line(['git', 'config', `branch.${branch}.merge`, ref])] }
+}
+
 /**
  * The state an advance into a checked-out target was left in (§16.9.2's terminal state, #1351): the folder, the branch
  * its HEAD named (null: none, a detached HEAD) and the target's ref (null: unreadable) as Combwork found them, the advance's

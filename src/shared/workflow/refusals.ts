@@ -2,7 +2,7 @@
 // under the card's ruleset, and where the rule is changed. Three whole sentences, each its own message, never glued from
 // pieces; agents get them in English (`refusal`), the window shows them translated (`refusalLines`), each a line.
 
-import { agentText, englishText } from '../advanced'
+import { agentText, englishText, withValues, type Text, type TextPart, type TextValues } from '../advanced'
 import { currentChain } from '../agentText'
 import { msg, type Msg } from '../i18n/msg'
 import type { StoredText } from '../types'
@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.slotLeft' | 'platform.jjRefused' | 'platform.switching' | 'platform.changed' | 'platform.keptAcross' | 'platform.noTarget' | 'platform.detachedFolder' | 'platform.keptLine' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.slotLeft' | 'platform.jjRefused' | 'platform.switching' | 'platform.changed' | 'platform.keptAcross' | 'platform.keptElsewhere' | 'platform.noTarget' | 'platform.detachedFolder' | 'platform.keptLine' | 'platform.noUpstream' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -204,6 +204,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.platform.detachedFolder.message', defaultMessage: '{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.', description: 'HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it after switching back to Git), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id.' }),
     msg({ id: 'workflow.refused.platform.detachedFolder.next', defaultMessage: '{has, select, yes {Check out its branch in the project folder (git switch {branch}), then start it again.} other {Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c), then start it again.}}', description: 'HI-3104: the next step after a start refused because the project folder is on no branch. has (select): yes when Combwork found the branch to check out ({branch}, its name), other when it found none it could name. git switch and git switch -c are commands: keep them as they are. Translate both whole sentences.' })
   ),
+  'platform.noUpstream': r(
+    msg({ id: 'workflow.refused.platform.noUpstream.message', defaultMessage: '{card} can’t start: {target} tracks no remote branch, and with “The target branch follows its remote” on each card starts from its remote.', description: 'HI-3128: a refused start under the workflow option “The target branch follows its remote” (its name: use its words): the branch work merges into ({target}) has no upstream, as a new version’s branch made by Start the next version has, so there is no remote head to start from. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.platform.noUpstream.next', defaultMessage: '{how, select, ready {If {remote} hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {target} should follow. If it hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow), then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.} other {The remote {target} would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.}}', description: 'HI-3128: the next step after a start refused for a target with no upstream under “The target branch follows its remote” (its name: use its words). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is then a placeholder such as <remote>, which the user replaces); shallow, the repository is a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are. Combwork runs none of them: the user does.' })
+  ),
   'platform.keptLine': r(
     msg({ id: 'workflow.refused.platform.keptLine.message', defaultMessage: '{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.', description: 'HI-3112: a refused start: the card was started before, put back, and its branch (made from {kept}, the branch it merged into then) is kept, so it keeps merging into {kept}; but the card is in a lane whose cards merge into {target}. {card} is a card key like AM-12; {kept} and {target} are branch names.' }),
     msg({ id: 'workflow.refused.platform.keptLine.next', defaultMessage: 'Take it out of the lane and start it on its own, to merge into {kept}; or make a new card for {target}.', description: 'HI-3112: the next step after a start refused because the card’s kept branch ({kept}) isn’t its lane’s ({target}). {kept} and {target} are branch names.' })
@@ -211,6 +215,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'platform.keptAcross': r(
     msg({ id: 'workflow.refused.platform.keptAcross.message', defaultMessage: "{card} can't start: its committed work from before it was put back is kept in slot {slot}, a {platform} slot from before the repository switched to {now}.", description: 'HI-3069: a refused start: the card was put back with commits under one version control, kept for it in its slot, and the repository has since switched to the other, so that slot can’t be lent back and the card would start without its work. {card} is a card key like AM-12; {slot} a slot’s name; {platform} and {now} are Git or jj (keep them).' }),
     msg({ id: 'workflow.refused.platform.keptAcross.next', defaultMessage: '{gone, select, yes {Its folder is gone, so nothing of it is left to go on with: remove the slot (Version Control → Slots and copies, Remove…), and {card} starts afresh from its target.} other {Switch the repository back to {platform} to go on with {card} in that slot.}}', description: 'HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key.' })
+  ),
+  'platform.keptElsewhere': r(
+    msg({ id: 'workflow.refused.platform.keptElsewhere.message', defaultMessage: "{card} can't start there: its committed work from before it was put back is kept in slot {slot}, and it starts only in that slot.", description: 'HI-3132: a refused start: the card was put back with commits, kept for it in slot {slot} (a name), and this start would have put it somewhere else (the project folder, or across a wait for that slot), without that work. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.platform.keptElsewhere.next', defaultMessage: 'Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.', description: 'HI-3132: the next step after that refusal: once the slot {slot} is free (nothing works in it), starting the card {card} again lends it that slot with the work kept in it.' })
   ),
   'platform.targetGone': r(
     msg({ id: 'workflow.refused.platform.targetGone.message', defaultMessage: '{card} was started on {target}, which no longer exists in this repository.', description: 'HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12.' }),
@@ -455,9 +463,12 @@ const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
   'submit.trailer': { at: 'head' } // i18n-ignore: select keys, never shown
 }
 
-/** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
-export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
-  const t = REFUSALS[rule]
+/**
+ * A refusal's values as its texts take them, formatted by `f`: a value that is a message of its own (a `why`, a `what`)
+ * as its sentence, earlier refusals' missing values, stages and names, and a `cause`'s whole {why} (HI-3136: one place,
+ * so every reader of a refusal fills it alike, never a placeholder or a blank).
+ */
+export function refusalValues(rule: RuleId, values: RefusalValues, f: RefusalFormat): Record<string, string | number> {
   // A refusal recorded before its rule's text took a value has none of it: the value its text had before (#1654).
   const vals: Record<string, string | number> = { ...VALUES_BEFORE[rule] }
   for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
@@ -481,6 +492,33 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
+  return vals
+}
+
+/**
+ * A refusal's message as data (HI-3136, HR1's round 1): what a WorkflowRefusedError carries, for the log and agents in
+ * English and for the window in the language it shows. Its values as `refusalValues` takes them, but kept as messages
+ * (a value that is a message of its own, a stage, a cause's {why}), so each follows the language of the sentence around
+ * it, never left a placeholder or a blank. The window reads it as the user does, agents and the log as an agent.
+ */
+export function refusalText(rule: RuleId, values: RefusalValues): Text {
+  const vals: TextValues = { ...VALUES_BEFORE[rule] }
+  // A stored message (and the messages inside its values) as a message with its values: storedLineText's own reading of
+  // a stored line, whose ids it knows, giving data here rather than words.
+  const asData = ((m: Msg, v?: Record<string, string | number>) => (v ? { m, values: v } : m)) as unknown as RefusalFormat['one']
+  for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? ((workflowLine(v, asData) as unknown as Text | null) ?? '') : v
+  const stage = (x: string): TextPart => (isStageId(x) ? STAGE_TEXT[x] : x)
+  if (typeof vals.stage === 'string') vals.stage = stage(vals.stage)
+  if (vals.stages !== undefined) vals.stages = { list: String(vals.stages).split(', ').filter(Boolean).map(stage) }
+  if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = { m: WHY[values.cause as keyof typeof WHY], values: { n: (vals.n as number | undefined) ?? 0, q: (vals.q as number | undefined) ?? 0 } }
+  const m = REFUSALS[rule].message
+  return { shown: withValues(m, { ...vals, reader: 'you' }), agent: withValues(m, { ...vals, reader: 'agent' }) }
+}
+
+/** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
+export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
+  const t = REFUSALS[rule]
+  const vals = refusalValues(rule, values, f)
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
   const queued = rule === 'merge.combworkMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null

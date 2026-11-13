@@ -360,6 +360,7 @@
   "main.server.url.scheme": "La URL debe empezar por https:// (o http:// para un servidor en este PC).",
   "main.server.url.userinfo": "La URL no puede contener un nombre de usuario ni una contraseña: indica la clave en su propio campo.",
   "main.storage.claimed": "La carpeta vuelve a pertenecer a una sesión.",
+  "main.storage.launchInUse": "su agente vuelve a ser del proyecto o se está iniciando",
   "main.storage.noLonger": "{path}: ya no cumple los requisitos",
   "main.storage.purgeChanged": "Cambió desde la vista previa.",
   "main.storage.purgeClaimed": "Vuelve a pertenecer a una sesión.",

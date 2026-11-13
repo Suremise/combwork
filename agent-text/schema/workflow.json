@@ -872,6 +872,18 @@
       "platform": "plain"
     }
   },
+  "workflow.refused.platform.keptElsewhere.message": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain"
+    }
+  },
+  "workflow.refused.platform.keptElsewhere.next": {
+    "placeholders": {
+      "slot": "plain",
+      "card": "plain"
+    }
+  },
   "workflow.refused.platform.keptLine.message": {
     "placeholders": {
       "card": "plain",
@@ -892,6 +904,22 @@
   },
   "workflow.refused.platform.noTarget.next": {
     "placeholders": {}
+  },
+  "workflow.refused.platform.noUpstream.message": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.noUpstream.next": {
+    "placeholders": {
+      "how": "select",
+      "remote": "plain",
+      "target": "plain",
+      "publish": "plain",
+      "track1": "plain",
+      "track2": "plain"
+    }
   },
   "workflow.refused.platform.offLine.message": {
     "placeholders": {
@@ -1246,6 +1274,26 @@
     }
   },
   "workflow.refused.verdict.reviewing.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.why.passes": {
+    "placeholders": {
+      "n": "number",
+      "q": "plural"
+    }
+  },
+  "workflow.refused.why.requeueLimit": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "workflow.refused.why.requeueNotTransient": {
+    "placeholders": {}
+  },
+  "workflow.refused.why.stale": {
+    "placeholders": {}
+  },
+  "workflow.refused.why.userOk": {
     "placeholders": {}
   },
   "workflow.roundChoice": {

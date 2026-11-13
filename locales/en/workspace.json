@@ -2083,9 +2083,17 @@
     "defaultMessage": "Last copies of archived sessions (deletes them)",
     "description": "Clean Up, a group of what goes."
   },
+  "workspace.storage.kindLaunchFolder": {
+    "defaultMessage": "Launch folders of removed agents",
+    "description": "Clean Up, a group of what goes; and its choice (HI-3144)."
+  },
   "workspace.storage.kindOrphanAttachments": {
     "defaultMessage": "Attachments of deleted sessions",
     "description": "Clean Up, a group of what goes; and its choice."
+  },
+  "workspace.storage.launchFoldersDesc": {
+    "defaultMessage": "What Combwork generated for the launches of agents since removed (.combwork/launch-…). A current agent’s, and one starting or running, is never touched.",
+    "description": "Under a Clean Up choice (HI-3144). Keep .combwork/launch-… as it is (the folders’ names)."
   },
   "workspace.storage.loadTarget": {
     "defaultMessage": "the storage sizes",
@@ -2190,6 +2198,10 @@
   "workspace.storage.refresh": {
     "defaultMessage": "Refresh",
     "description": "Storage: measures again."
+  },
+  "workspace.storage.removedAgent": {
+    "defaultMessage": "Removed agent {id}",
+    "description": "Storage, a launch folder to clean up (HI-3144): its agent was removed. {id} is the agent’s id (a-1234abcd)."
   },
   "workspace.storage.reviewInChanges": {
     "defaultMessage": "Review in Changes",

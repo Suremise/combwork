@@ -362,6 +362,7 @@ interface CombworkMessageValues {
   'main.server.url.scheme': undefined
   'main.server.url.userinfo': undefined
   'main.storage.claimed': undefined
+  'main.storage.launchInUse': undefined
   'main.storage.noLonger': { path: string | number }
   'main.storage.purgeChanged': undefined
   'main.storage.purgeClaimed': undefined

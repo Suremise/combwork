@@ -83,6 +83,7 @@
   "service.folderChanges.midOperation": "Git ist in {folder} mitten in {state, select, merge {einem Merge} rebase {einem Rebase} cherryPick {einem Cherry-Pick} other {einem Revert}}. Schließe den Vorgang zuerst ab oder brich ihn ab.",
   "service.folderChanges.moved": "Wo {target} ausgecheckt ist, hat sich inzwischen geändert. Sieh noch einmal nach.",
   "service.folderChanges.nestedRepo": "{folder} ist ein eigenes Git-Repository in diesem, daher committet Combwork es nicht und legt es nicht beiseite. Trage es selbst in .gitignore ein oder füge es als Submodul hinzu.",
+  "service.folderChanges.stashUnproved": "Git hat Änderungen beiseitegelegt, aber Combwork kann nicht sagen, welcher Stash sein eigener ist: Ein anderes Git hat im selben Moment einen Stash mit demselben Namen angelegt, oder einer davon ließ sich nicht lesen. Prüfe git stash list und die Dateien, bevor du weitermachst.",
   "service.folderChanges.submoduleAdded": "{folder} ist ein hier hinzugefügtes Submodul, und das kann Git nicht beiseitelegen. Committe es stattdessen.",
   "service.folderChanges.submoduleDeleted": "{folder} ist ein Submodul, dessen Ordner gelöscht wurde, und das kann Git nicht beiseitelegen. Committe stattdessen sein Entfernen, oder hole es mit git submodule update -- {path} zurück.",
   "service.folderChanges.submoduleInside": "{folder} ist ein Submodul, dessen Änderungen in ihm selbst liegen, daher kann Combwork sie hier weder committen noch beiseitelegen. Committe sie oder lege sie in {folder} beiseite, und committe dann bei Bedarf dessen neuen Commit hier.",

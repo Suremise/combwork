@@ -83,6 +83,7 @@
   "service.folderChanges.midOperation": "{folder}でGitが{state, select, merge {マージ} rebase {リベース} cherryPick {チェリーピック} other {リバート}}の途中です。先に完了するか中止してください。",
   "service.folderChanges.moved": "{target}がチェックアウトされている場所がその間に変わりました。もう一度確認してください。",
   "service.folderChanges.nestedRepo": "{folder}はこのリポジトリ内にある独立したGitリポジトリのため、Combworkはコミットも退避もしません。自分で.gitignoreに追加するか、サブモジュールとして追加してください。",
+  "service.folderChanges.stashUnproved": "Git は変更を退避しましたが、どの stash が Combwork 自身のものか判別できません。同じ瞬間に別の git が同じ名前の stash を作ったか、そのうちの一つを読み取れませんでした。続ける前に git stash list とファイルを確認してください。",
   "service.folderChanges.submoduleAdded": "{folder}はここで追加されたサブモジュールで、Gitはこれを退避できません。代わりにコミットしてください。",
   "service.folderChanges.submoduleDeleted": "{folder}はフォルダーが削除されたサブモジュールで、Gitはこれを退避できません。代わりにその削除をコミットするか、git submodule update -- {path}で元に戻してください。",
   "service.folderChanges.submoduleInside": "{folder}は変更がその内部にあるサブモジュールのため、Combworkはここでコミットも退避もできません。{folder}の中でコミットまたは退避し、必要ならその新しいコミットをここでコミットしてください。",

@@ -444,6 +444,35 @@ describe('a resolution carries the commit it resolves, merged (HI-2999)', () => 
     expect(e.wf.state(made).stage).toBe('review')
   })
 
+  it("HI-3145: with the project's identity required, the source's commits by someone else aren't the resolution's: it submits; its own commit by someone else is refused", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = conflicting({ identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
+    // On main (the source): a teammate's commit, made outside Combwork.
+    sh(e.project, 'checkout', '-q', 'main')
+    const theirs = commit(e.project, { 'notes.txt': 'a teammate\n' }, 'a teammate’s change', { email: 'teammate@example.invalid' })
+    sh(e.project, 'checkout', '-q', '--detach')
+    const { card: fwd, source } = await returned(e)
+    expect(sh(e.project, 'merge-base', '--is-ancestor', theirs, source)).toBe('')
+    const { made } = await resolveOnBuilder(e, fwd)
+    const started = await e.wf.start(made.key, B1)
+    moved(started)
+    const folder = started.data!.folder as string
+    try {
+      sh(folder, 'merge', '-q', '--no-edit', source)
+    } catch {
+      // the conflict
+    }
+    commit(folder, { 'fix.txt': 'the 1.2.0 version, with the release fix\n' }, 'Merge main into 1.2.0, resolved')
+    // A commit of its own by someone else: still refused, naming it.
+    const mine = commit(folder, { 'extra.txt': 'extra\n' }, 'not the project’s identity', { email: 'someone@example.invalid' })
+    const refused = await e.wf.submit(made.key, B1, { summary: 'merged main, resolved fix.txt' })
+    expect(isRefusal(refused) && refused.rule).toBe('submit.identity')
+    expect(JSON.stringify(refused)).toContain(mine.slice(0, 7))
+    // Without it: submitted, the teammate's commit in its history not counted as its own.
+    sh(folder, 'reset', '-q', '--hard', 'HEAD~1')
+    moved(await e.wf.submit(made.key, B1, { summary: 'merged main, resolved fix.txt' }))
+    expect(e.wf.state(made).stage).toBe('review')
+  })
+
   it("the queue returns one approved without it (however it got there), nothing merged, its builder told to merge", { timeout: GIT_HEAVY_MS }, async () => {
     const e = conflicting()
     const { card: fwd, source } = await returned(e)

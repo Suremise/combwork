@@ -158,7 +158,7 @@ Darren, 5 Nov: a complete, **one-way** conversion to Combwork's names. What 1.0 
     attachments/cards/<card number>/<time>_<name>  # files kept with a card (HI-1700); never a session's: Clean Up and Purge pass them by
     removed/              # only after Remove from Combwork (§6.7): manifest.json, cards.json, handovers/
     project.json.bak      # last good copy (see §2)
-    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit
+    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit; a removed agent's goes (HI-3144, §4.2.1)
       plugin/.claude-plugin/plugin.json
       plugin/skills/<skill>/...     # copies of enabled Combwork skills
       mcp.json
@@ -177,7 +177,8 @@ Worktrees Combwork creates for agents live **next to the workspace**, in `<Works
 
 - **Project Settings → Storage** (also for the Assistant's home, from Settings → Workspace) shows the sizes of `.combwork/sessions`, `.combwork/archive`, `.combwork/attachments` and each agent's worktree, and their total; under the backups' and the archive's sizes, what they hold before compression (#1110: `sessionsRaw`, `archiveRaw`, each `.gz` counted by the size its gzip trailer records), when that is more. The CLIs' own transcripts aren't counted. Main measures in the background (`storage.ts`): a directory at a time, links and junctions not followed, yielding to the event loop every few hundred entries; one measurement per project at a time, and the last result comes back at once until **Refresh**. Attachment and worktree folders are cached per folder by modified time (a folder that hasn't changed counts its files as before; its subfolders are still checked); backups and the archive are measured afresh. The Storage pages pass a request with each call and abandon it when they close or measure again (`storage:abandon`, after the new call is sent): the abandoned call fails, and a measurement no call waits for any more stops between entries, leaving no result (the folders it finished stay cached). A request is its window's (by its web contents): only that window abandons it, and closing the window or reloading its page, which run none of the page's clean-up, abandons all of its requests (#260). Calls that reuse a request id while one under it still runs share it: abandoning it stops every one of their waits, and it goes with the last of them (#299). A call without a request (none in the UI today) can't be abandoned and keeps its measurement going. An `.asar` file counts as a file of its size.
 - **Settings → Workspace → Storage**: the workspace's total and every project, the Assistant included, biggest first, ten to a page (a data table, #250), each opening its Storage page (the Assistant's opens in place).
-- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has. Age is the session's last activity.
+- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has; launch folders of removed agents (on: HI-3144, below). Age is the session's last activity.
+- **Launch folders of removed agents** (HI-3144, Darren 13 Nov; `launchFolders.ts`): a `.combwork/launch-<agent id>` is only what launches generated for that agent, so it goes when the agent no longer is the project's: with **Remove Agent**, in a sweep as each workspace opens (folders from before HI-3144, or left by a crash; and any set aside by a removal that stopped part way), and from Clean Up, listed with its size (to the Recycle Bin there; otherwise deleted). Only a real folder named exactly `launch-<id>` is touched, never a link, a file or anything else in `.combwork`; never a current agent's (its project.json read just before, and none when that file is missing or unreadable) nor one whose agent is starting or running. Launch and removal share one guard (`whileRemovingLaunchFolder`): once a removal qualifies, a launch of that agent waits for it to end before writing its folder (`launchFolderFree`, the Claude adapter's `prepareLaunch`), and each move qualifies again, the Recycle Bin's retries of a held folder included (`trash`'s `still`), so an agent added back or started meanwhile stops it with nothing changed (HR2's round 1). Deleted, it is renamed aside (`.removing-<hex>`) and removed under that name; to the Recycle Bin (Clean Up) it goes under its own name. Only Claude Code keeps such a folder: Codex and Copilot's skill copies have their own clean-up (§16.10.7), OpenCode's launch config is private and removed as its launch ends, and Antigravity's profile goes with Remove Agent (`agentRemoved`, HI-2731).
 - A preview lists every file and its size and the total before anything is removed (`storage:cleanupPreview`). Applying it (`storage:cleanup`, with the listed paths) plans again and removes only listed items that still qualify (a session resumed or unarchived meanwhile is skipped and reported); a session's backups go only if every copy of it was listed. Each session is reserved while its files go (a resume of it is refused until then: "Clean Up is removing files of this session") and checked with both of its backups locked, again right before they go (still archived, not running or starting, its copies exactly the ones listed); an image folder is checked the same way just before it goes. Anything else is skipped. A backup goes only after what its session used has been read and saved on its record (`keptUsage`; a session whose only copy it was then moves it to `deletedUsage` as it is deleted), so its totals survive a failure partway; if that can't be read or saved, the backup stays and is reported. Everything goes to the Recycle Bin. Running sessions and sessions that aren't archived are never touched, nor `~/.claude` or `~/.codex`.
 - Usage totals don't change: what a session used is recorded in the usage history (§9) before any of its copies goes, and stays there once the copies and the record are gone; a session whose usage can't be recorded keeps its copies. Removing the last copy deletes the session as Delete does (§6.2).
 - **Purge…** (#1138, decision 7 of #1106; scope confirmed by Darren, 20 Oct) removes **everything Combwork keeps per session**, only when asked, for one session (the Sessions tab's **Purge Combwork's Files…**, on Combwork's own sessions that aren't running), a project or the Assistant (**Project Settings → Storage**, beside Clean Up…) or the workspace (**Settings → Workspace → Storage**: every project's and the Assistant's). What it covers (`planPurge`, `shared/storage.ts`): each session's backups (active and archived, compressed or not); what is left of them (`.spare`, a half-made `.<pid>-<time>.tmp`, an archive's `.archiving`/`.previous`/`.archived`: the files of `.combwork/sessions` and `.combwork/archive` named for a session, nothing else there); each of its attachments (the plain files of its folder in `.combwork/attachments`); the old usage on its record (`keptUsage`); and what is left of sessions Combwork no longer has: their files, their attachments (`run-<runId>` folders too) and their kept usage (`deletedUsage`). A leftover that may be a session's **only copy** is kept and counted ("1 leftover file is kept…"): one of a session the CLI no longer has, with no backup of it in that folder, which is what Combwork stopping in the middle of a delete or a move leaves (a `.spare`, a set-aside `.previous`); nothing restores it by itself, and it stays until the session is deleted. **There is no option to clear the usage history: it always stays, so totals never change.** Never the CLIs' files (`~/.claude`, `~/.codex`, `~/.copilot`), the session records themselves (but see last copies), the `deleted` list that keeps the CLIs' sessions hidden, worktrees, or anything of a running or starting session (the preview says how many it left alone).
@@ -2475,7 +2476,17 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      moment still B1's;
   4. t0 once the write record has settled; the command; t1 once it has settled again;
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
-     complete, the stat snapshot again (unequal or unreadable: `changed`);
+     complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
+     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
+     worktree; colocated (the pool adds it `--colocate`), jj registers it in `.git/worktrees` with a relative `gitdir`,
+     which the observer's `foldersOf` resolves against the wrong folder (HI-3160), so either way its own folder has no
+     write record today and the stat snapshot decides. (Once HI-3160 is fixed the write record decides there, and
+     `jjCounts` has no ignore filter: HI-3158 adds one to both paths, landing with or before it.) Nothing there knows what jj
+     ignores: a write inside a folder that is already there (an `out/` an earlier build made) changes none of the
+     snapshot's lines and is credited; a run that makes or removes an entry in the workspace's root or in a folder holding
+     a tracked file changes that folder's time and is `changed`, ignored or not. So a build's first run that makes its
+     output folder there isn't credited and the next is; one that deletes its output folder and makes it again each run
+     never is. A candidate's merge check in a check copy is decided the same way (its retry is the run after);
   6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
      operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
      state);
@@ -3408,6 +3419,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
   for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
   card's record goes; the binding unreadable, for the recorded card as before.
+  **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
+  else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
+  runtime's `keptHere`, checked right after the plan, any slot lent for it given back). Waiting for that slot stays a
+  wait for an agent's or a lane's start (`start.slotAvailable`), but the user's start across that wait, which would
+  start the card where its builder is, is refused too, an override included: under jj (whose cards always use slots)
+  that drag was the one way a card started in the project folder without its kept work.
   **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
   store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
   platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,
@@ -3679,9 +3696,20 @@ and s11 (HR1's OK).
   (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
   unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
   current.
-- **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
-  transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
-  checks anew under the new key (`restart`).
+- **The setup command** is read with a stamp of the setup command itself (HI-3122, `jjSetupStamp.ts`: a hash of
+  project.json's `worktreeSetup`, read synchronously only when the file's identity changed since the last look, by one
+  plain read and parse that never waits: HR3's round 1, no kept-file recovery on main's thread; a file caught mid-save
+  gives an unread stamp, new each time, never kept and never equal to any (HR3's round 2), and nothing is made or
+  published under one (`knownStamp`), so a check started or published across it fails closed and is looked at again); the
+  publishing transaction reads the stamp again and refuses a result made under a setup since changed, and the next look
+  starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
+  project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running
+  check as invalid.
+- **Unsettled checks are always looked at again** (HI-3122): at the end of each pass, every candidate whose checks are
+  still shown running, waiting or failing gets its next look at its retry time, or at the bounded retry (`againMs(0)`,
+  30 s) when it has none ahead, whatever ended its turn (an invalid run, a restart refused for an unknown or changed setup,
+  any early exit): the look runs the checks anew under the key then, or not at all once the candidate has gone. Before,
+  nothing asked again, and the checks stayed shown running.
 - **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
   progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
   card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at
@@ -4723,7 +4751,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   branch deleted after the window's check is caught; branches named already are never re-checked. The section shows
   each such branch under its field with *doesn't exist: create it from [branch ▾]* (a branch made without switching)
   and holds Save until it exists. **Start the next version…** (Workflow, under G7, shown while G7 reads as a version:
-  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable) does in one hold, the
+  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable; HI-3128: under G21 the
+  dialog says the new branch is made here only and tracks no remote branch, with the commands that give it one for the
+  name typed, §16.9.4's remedy, its remote read locally; nothing is pushed) does in one hold, the
   repository's lock then the turn of workflow writes, inside it the save's core and never the public wrapper
   (`startNextVersion`, `workflow/nextVersion.ts`): the release checked to be G7 still and its head the commit the dialog
   showed (`pinnedStart`), the new branch made there (`makeBranchAt`, atomic), then one save with G7 the new branch and
@@ -6106,7 +6136,9 @@ a Remove or another Resolve meanwhile leaves no card. `source` is that attempt's
 now. The new card is an ordinary card: agents start it (it has no `ForwardRequested`), its review, checks and merge
 queue are its rules', except that a card with a `ForwardResolution` merges as a merge commit always
 (`mergeCommitOf`: G6 merge, its id the base's marked `~mergeCommit`, `rulesBaseId` reading through it), so a squash or
-rebase project never drops the source's history from the destination.
+rebase project never drops the source's history from the destination. Its checks of its own commits leave out the
+source's (HI-3145): G12's identity check reads `base..revision` without `source`'s history (`git log … ^source`), so a
+teammate's commit on the release isn't counted as the card's; its merge commit and any commit it makes are checked.
 
 It merges into its `to` alone (HI-2985): Work merges into moving on after it is made (Start the next version) leaves it
 there. Its Merges into set to any other branch is refused (`tasks.setTarget`), a version retarget keeps it and its lane
@@ -6316,8 +6348,23 @@ touched:
   too). Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
-  its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named
-  *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
+  its intent-to-add entries only ever in the private index (below). The commit made is the one git's own summary
+  names (`[main 1a2b3c4] …`, its last such line, the object as short as `core.abbrev` allows (4) and the branch one
+  word, `]` and all: git prints it after the post-commit hook; the commit is run without
+  `--quiet` for it), found on the branch since the HEAD it started from (first parents, at most 50 back), never HEAD
+  alone (HI-3125: another git's commit right after it, or just before it, maybe with the same message) nor its message
+  (HR1's round 1: a commit-msg hook may rewrite it, a ticket prefix); with no summary to read, the newest there with
+  that message. Git saying it committed with none there is said, not credited. Set aside: `stash push --include-untracked` with those paths, named
+  *Combwork: set aside before merging HI-12 [cw:3fa9c1]*: after the card's words, a mark of this Set Aside's own
+  (`[cw:` six random hex digits `]`), so it is told by what it made (HI-3125): the one stash not among those there as
+  it started whose subject is exactly that message. Never the stash ref having moved (another git's stash just before or
+  after it moves it too), nor a message another git can reuse (HR1's rounds 1 and 2, HR2's round 3: the shown path
+  stashed by another git in Combwork's words just before its push, which then saved nothing, holds every path shown and
+  was taken for it). None: nothing was made (below). The stashes unreadable after the push, or two with its mark: never
+  guessed, refused (*Git set changes aside, but Combwork can't tell which stash is its own … Check git stash list and
+  the files*), the stashes kept and the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just
+  before: git says so and exits 0) is never done: refused as the changes not being those shown any more, or as git
+  not setting them aside. Git failing
   after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in
   neither the index nor the folder), made the stash then died on it, every try; it is given the new side alone, which
   stashes the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives
@@ -6335,8 +6382,12 @@ touched:
   asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly
   that entry, and each is ended with the tree, only while it is provably the process MSYS named (the same winpid
   before and after the read, listed afterwards with a start no later than the time taken before the search's first
-  read, the usual start-time check when ended). A search
-  that fails ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
+  read, the usual start-time check when ended). Reading the environment of a native process while it is still starting
+  (another lane's `npx`, run from Git Bash) ends the shell reading it outright (HI-3065: exit status 256, nothing said;
+  seen as a slow hook's `sleep` left running after the bound, about one search in fifty while other lanes start
+  processes). So the script names each entry (`x <pid>`) before reading its environment, and a search that died on one
+  is run again with that entry skipped (its environment unread, as any unreadable entry's), at most three runs. A search
+  that fails otherwise, or every time, ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
   and (as for native programs) one whose parent had exited and that carries no marker. **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
   `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
   (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too, by a step bounded as the commit
@@ -6360,7 +6411,8 @@ touched:
   git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
   `git add` of a path being committed can land before that step. So the new index made in the scratch (`update-index`
   with `GIT_INDEX_FILE`) compares each path's real entries, in the bytes it is made from, with those it had when the
-  copy was taken; and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
+  copy was taken, flags and all (HI-3125: `ls-files -s -v`, so a skip-worktree or assume-unchanged flag another git sets
+  meanwhile is a change of that entry, kept and said, where `--index-info` would remake it without); and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
   there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
   as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
   in, and the result's warning names the commit or stash made and the path kept (*Git made the commit (…), but another git
@@ -6886,6 +6938,32 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
 
+**A target with no upstream** (HI-3128; the design agreed with HR3 and HR2 on the card, s7 to s17). A branch made here
+only (Start the next version's) tracks nothing, and follow mode needs it to: Combwork never publishes it or sets what it
+tracks (no `--set-upstream`, no config written). A target that tracks nothing at all (neither `branch.<b>.remote` nor
+`.merge` set, as git says it) refuses a start `platform.noUpstream`, and pauses the queue `noUpstream`, each with what the
+user runs (`UpstreamRemedy`, read locally, `upstreamCommands`, rendered by `shellLine`, the branch named in each so the
+checked-out branch is never touched): **publish**, `git push -u <remote> refs/heads/<b>:refs/heads/<b>` (an explicit
+refspec: a tag of the release's name makes a bare one ambiguous), when the remote hasn't it; **track**, `git config
+branch.<b>.remote <remote>` and `git config branch.<b>.merge refs/heads/<b>`, the two settings follow mode reads, when it
+has (whatever the remote's fetch mapping: `--set-upstream-to` refuses a ref outside it). The remote is named only when it
+is known (the branch's own `branch.<b>.remote`, else the branch it was made from's, each one git knows, else the
+repository's only remote); otherwise a marked placeholder, `<remote>`, and words asking the user to choose, never
+`origin` guessed. A named remote follow mode can't use (not exactly one push address) or a shallow repository: no
+commands, what to set up first. Tracking half set up keeps the remote setup's refusal. The pause carries the remedy's
+kind as its one file (a select key) and the commands as its message line. Removing the card a pause about the target's
+setup names (`noUpstream`, `remoteAmbiguous`, `remoteUnsupported`, `fetchFailed` with no catch-up owed) clears it in the
+same write; the next entry meets the same cause and pauses naming itself.
+
+**An owed catch-up once G21 is off** (HI-3128). The catch-up then never asks the remote (its look and HI-3041's checks
+are off): the local target is the target again. Every other rule is as above (the recovery table, HI-3039, HI-3090,
+`needsYou`, unknown reads keeping the journal); a recorded swap is finished by compare and swap from where it was; a
+fresh one behind is brought in; a fresh one the local target has moved away from (it owns no files: nothing journalled
+in a folder) is dropped, nothing moved or forced, the user's commits kept, and the reconciler reads the card against the
+local target from then on. A remainder HI-3090 left staged still pauses the next entry (`staged`) until the user settles
+it. With G21 on and the remote gone for good, the hold stays (HI-3041), and its pause (`fetchFailed` naming the
+published card) says both ways out: fix the remote, or turn G21 off and resume.
+
 **Returns** (HI-3127; the design agreed with HR3 on the card, s7, s11 and s14). A card returned from a tested merge (a
 conflict, strict's update, red checks or a hook) whose attempt was tested on a remote head the local target hasn't got
 names it: `IntegrationFailed.onto` (that commit) and `remote` (`<remote>/<branch>`, a name, never an address), and its
@@ -6973,8 +7051,9 @@ isn't checked). Once per entry pass; Resume is a new one. `needsSomeone` and `co
 
 **The Git view** (Version Control → Branches & remotes → **Signing**, under Commit identity, read-only): the settings
 above and the check's outcome, checked when shown at most once a minute per folder (callers share one), and **Check
-again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent;
-gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
+again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent,
+signed with Windows' own `ssh-keygen` as `gpg.ssh.program`: Git for Windows' reads only `SSH_AUTH_SOCK`, never that agent's
+pipe, measured by Darren on 13 Nov, HI-3110; gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
 optional `signing` (jj has none, so nothing is shown).
 
 **The view's checks, their lifecycle** (HR1's round 1):
@@ -7034,7 +7113,10 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
-  section). A signer ended at its bound says so instead, never claiming a prompt.
+  section). A signer ended at its bound says so instead, never claiming a prompt. Among those words, ssh-keygen's own
+  for a key only an agent can hold: "No private key found for public key" (a `.pub` path) and, for a literal key
+  (`key::ssh-ed25519 …` or the bare form), which git passes with `-U`, "Couldn't get agent socket" and "Couldn't find
+  key in agent" (HI-3110).
 - **The off switch:** Advanced → **Agents' signed commits never wait for a passphrase** (on by default), read at launch.
 - **Not measured** (recorded as limitations, the user's machine left alone): Gpg4win's gpg (not installed where it was
   built; the same GnuPG options), and Windows' ssh-agent service with a detached signer (loading a key would change the

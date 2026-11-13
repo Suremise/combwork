@@ -73,6 +73,11 @@ describe('msysMatches: which marked MSYS programs are ended (HI-3047)', () => {
     // The original, started before the search, still listed: taken.
     expect(msysMatches(said(2000, 'a 7 100', 'm 7 100', 'b 7 100'), [p(100, 500)])).toEqual([p(100, 500)])
   })
+  it('the entries named before each environment read (x, HI-3065) are nothing by themselves', () => {
+    expect(msysMatches(said(3000, 'a 7 100', 'x 6', 'x 7', 'm 7 100', 'b 7 100'), list)).toEqual([p(100, 1000)])
+    expect(msysMatches(said(3000, 'a 7 100', 'x 7', 'b 7 100'), list)).toEqual([])
+  })
+
   it('malformed or cut short: null (the search incomplete), never a guess', () => {
     expect(msysMatches([at(3000), 'a 7 100', 'm 7 100'].join('\n'), list)).toBeNull()
     expect(msysMatches(['a 7 100', 'm 7 100', 'b 7 100', 'end'].join('\n'), list)).toBeNull()
@@ -122,6 +127,39 @@ describe.skipIf(!isWin)('bounded: the search ended at its limits, nothing left (
   })
   it("a shell that isn't there: an error", async () => {
     expect(await findMsysMarked({ mark: 'ab', bin: join(tempDir('msys-none-'), 'usr', 'bin') })).toMatchObject({ error: expect.stringMatching(/couldn't run/) })
+  })
+
+  // HI-3065: the shell dies reading a native process's environment while that process is still starting (exit status
+  // 256, its output cut at that entry's `x` line): searched again with that entry skipped.
+  describe('a search that dies reading an entry (HI-3065)', () => {
+    const died = (...lines: string[]) => ({ error: 'it exited with 256', exited: true as const, partial: [at(3000), ...lines].join('\n') + '\n' })
+    /** A runner answering each call in turn, keeping the skipped pids each was given (after the marker). */
+    const runner = (...answers: Awaited<ReturnType<typeof boundedOutput>>[]) => {
+      const skips: string[][] = []
+      const run = (async (_file: string, args: string[]) => (skips.push(args.slice(4)), answers.shift()!)) as unknown as typeof boundedOutput
+      return { run, skips }
+    }
+    it('run again with that entry skipped, then answered', async () => {
+      const ok = { out: said(3000, 'a 7 100', 'x 7', 'm 7 100', 'b 7 100') }
+      const { run, skips } = runner(died('a 7 100', 'a 9 300', 'x 7', 'x 9'), ok)
+      expect(await findMsysMarked({ mark: 'ab', bin: 'C:\\Git\\usr\\bin' }, run)).toEqual(ok)
+      expect(skips).toEqual([[], ['9']])
+    })
+    it('each entry it dies on skipped in turn, at most three runs; then the error, as before', async () => {
+      const { run, skips } = runner(died('x 9'), died('x 11'), died('x 12'))
+      expect(await findMsysMarked({ mark: 'ab', bin: 'C:\\Git\\usr\\bin' }, run)).toEqual({ error: 'it exited with 256' })
+      expect(skips).toEqual([[], ['9'], ['9', '11']])
+    })
+    it('dying elsewhere (no entry named last), on an entry skipped already, or ended at its bound: the error at once', async () => {
+      for (const first of [died('a 7 100'), { error: 'it ran past its time limit' }, { error: 'it exited with 3', exited: true as const, partial: '' }]) {
+        const { run, skips } = runner(first)
+        expect(await findMsysMarked({ mark: 'ab', bin: 'C:\\Git\\usr\\bin' }, run)).toEqual({ error: first.error })
+        expect(skips).toHaveLength(1)
+      }
+      const { run, skips } = runner(died('x 9'), died('x 9'))
+      expect(await findMsysMarked({ mark: 'ab', bin: 'C:\\Git\\usr\\bin' }, run)).toEqual({ error: 'it exited with 256' })
+      expect(skips).toEqual([[], ['9']])
+    })
   })
 })
 
@@ -202,6 +240,16 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(winpids).toEqual([exact])
     const list = [exact, ...others].map((pid) => p(pid, 0))
     expect(msysMatches(out, list)).toEqual([p(exact, 0)])
+    // HI-3065: each entry named (`x`) before its environment is read; one given to skip is neither named nor read.
+    const msysPid = out.split(/\r?\n/).find((l) => l.startsWith('m '))!.split(' ')[1]
+    expect(out).toContain(`\nx ${msysPid}\n`)
+    // Through findMsysMarked (its own retries: another lane's process starting meanwhile is this very case), the pid to
+    // skip added to what it is given.
+    const skipped = await findMsysMarked({ mark, bin: bin! }, (file, args, o) => boundedOutput(file, [...args, msysPid], o))
+    const out2 = 'out' in skipped ? skipped.out : ''
+    expect(out2.trim().split(/\r?\n/).at(-1)).toBe('end')
+    expect(out2).not.toMatch(new RegExp(`^(x|m) ${msysPid}( |$)`, 'm'))
+    expect(out2).toMatch(new RegExp(`^a ${msysPid} `, 'm'))
   }, 60_000)
 })
 

@@ -35,7 +35,8 @@ afterEach(() => {
 })
 
 type Failed = FactData['IntegrationFailed']
-const base: Failed = { entry: 'HI-7/e3', revision: 'abc1234', target: 'main', reason: 'conflict', transient: false }
+const REMOTE_HEAD = '0123456789abcdef0123456789abcdef01234567'
+const base: Failed ={ entry: 'HI-7/e3', revision: 'abc1234', target: 'main', reason: 'conflict', transient: false }
 /** Every kind of return, with what a test passes in it. */
 const FAILURES: Failed[] = [
   { ...base, files: ['src/a.ts', 'src/b.ts'], logPath: 'C:/logs/q.log', log: 'one\ntwo\nthree' },
@@ -64,7 +65,10 @@ const FAILURES: Failed[] = [
   { ...base, reason: 'focused', focused: { why: 'noProof', tests: ['e2e:real-chat'] } as never },
   { ...base, reason: 'focused', focused: { why: 'newProof', tests: ['e2e:packaged'] } as never },
   { ...base, reason: 'focused', focused: { why: 'noRunner' } as never },
-  { ...base, reason: 'focused' }
+  { ...base, reason: 'focused' },
+  // HI-3127 (HI-3151): under follow mode, tested on the remote's head the local target lacks: a conflict, and a red check.
+  { ...base, onto: REMOTE_HEAD, remote: 'origin/main' },
+  { ...base, reason: 'checks', check: 'quick', onto: REMOTE_HEAD, remote: 'origin/main' }
 ]
 const STATES: QueueState[] = [
   { state: 'queued', target: 'main', position: 2 },
@@ -85,7 +89,7 @@ const STATES: QueueState[] = [
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */
-const VALUES = ['no-such-signer', '128', 'HI-7','HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
+const VALUES = ['no-such-signer', '128', 'HI-7','HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown', '—', 'line 3', 'lines 1, 2', REMOTE_HEAD, 'origin/main',...FAILURES.flatMap((f) => f.files ?? [])]
 
 function queueTexts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []

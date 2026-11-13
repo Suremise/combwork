@@ -488,7 +488,16 @@ const onDb = (fn) => {
     check('…the confirmation: jj no longer lists it, its folder to the Recycle Bin with any changes', !!(await until(async () => (await askFree.count()) === 1 && /jj no longer lists/.test(await text(askFree)) && /Recycle Bin/.test(await text(askFree)), HUNG_MS)), await text(page.locator('.dialog')))
     await shoot(askFree, 'remove-forgotten-free-confirm')
     await askFree.getByRole('button', { name: 'Remove', exact: true }).click()
-    check('…removed: the slot and its folder gone', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder), HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+    // A process still leaving the folder (B1's stopped session) refuses it for now (`process`): the user tries again.
+    check('…removed: the slot and its folder gone', !!(await until(async () => {
+      if (!(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder)) return true
+      if ((await row6.locator('[data-action="remove-forgotten"]').count()) === 1 && (await page.locator('.dialog').count()) === 0) {
+        // The row may go as it is clicked (the removal under way): a short try, never a wait.
+        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: 2000 }).catch(() => undefined)
+        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: 2000 }).catch(() => undefined)
+      }
+      return null
+    }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
 
     // HI-3099: card 2 afresh in a slot, an unrecorded edit left there, put back; then the user commits twice in the
     // project folder and discards old operations (`jj op abandon`). The slot shows stale with Recover…, which mends it with
@@ -536,6 +545,38 @@ const onDb = (fn) => {
     }, HUNG_MS)
     check('…recovered: not stale any more, its edit in the folder', !!recovered5 && fs.existsSync(path.join(w5.folder, 'wip.txt')) && fs.readFileSync(path.join(w5.folder, 'wip.txt'), 'utf8') === 'unrecorded before the abandon\n', JSON.stringify({ slots: await inv('slots:list', shop), toasts: await text(page.locator('.toasts')) }))
     check('…the project folder as the user left it, its bookmarks too, and jj works there', JSON.stringify(shopFiles()) === JSON.stringify(shopBefore) && jj(shop, '--ignore-working-copy', 'bookmark', 'list') === shopBookmarks && /Working copy/.test(jj(shop, 'status')), JSON.stringify({ before: shopBefore, now: shopFiles() }))
+
+    // HI-3132: card 2's work is kept in its slot (the recovered edit above), and that slot can't be lent now (a run still
+    // writing there: this suite's own process, recorded as its writer). The user drags card 2 to Doing; the board asks to
+    // start it across the slot's rule; Move Anyway is refused naming the slot: never started where B1 is (the project
+    // folder) without that work, which stays in the slot.
+    const kept7 = await until(async () => (await inv('slots:list', shop)).find((s) => s.keptFor === n2 && !s.lease) ?? null, HUNG_MS)
+    check('card 2: its work kept in its slot', !!kept7, JSON.stringify(await inv('slots:list', shop)))
+    const keptFiles7 = fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()
+    const held7 = await inv('slots:test', shop, { op: 'writer', slot: kept7.name, agent: b1.id, run: 'hi3132-probe', pid: process.pid, started: Math.round(Date.now() - process.uptime() * 1000) })
+    check('…that slot held: a run still writing in it', held7 === true, JSON.stringify(held7))
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    const tile7 = page.locator(`.task-card[data-task="${n2}"]`)
+    const doing7 = page.locator('.board-column[data-column="doing"]')
+    check('…card 2 on the board, in To Do', !!(await until(async () => (await tile7.count()) === 1 && (await tile7.evaluate((e) => e.closest('.board-column')?.getAttribute('data-column')).catch(() => null)) === 'todo', HUNG_MS)))
+    await tile7.dragTo(doing7.locator('.board-column-body'))
+    // The board's Move to Active: given to B1 and started (Assign and start), as the user starts a card.
+    const move7 = page.locator('.dialog', { hasText: `Move ${key2} to Active` })
+    check('…the board asks whom to give it to', !!(await until(async () => (await move7.count()) === 1, HUNG_MS)), await text(page.locator('body')))
+    await move7.getByText('Assign and start', { exact: true }).click()
+    // With Assign and start chosen, the dialog's button is Start.
+    await move7.getByRole('button', { name: 'Start', exact: true }).click()
+    // Refused in the dialog naming the slot, with no Move Anyway offered: the refusal is the start's own, never a rule
+    // an override skips (the slot rule's wait would have offered one).
+    const refused7 = move7.filter({ hasText: `kept in slot ${kept7.name}, and it starts only in that slot` })
+    check('…refused in the dialog, naming the slot, nothing to start anyway', !!(await until(async () => (await refused7.count()) === 1, HUNG_MS)) && (await page.locator('.dialog', { hasText: 'anyway?' }).count()) === 0, await text(page.locator('body')))
+    await shoot(refused7, 'kept-elsewhere-refused')
+    console.log(`INFO HI-3132 refusal shown: ${(await refused7.innerText().catch(() => '')).replace(/\s+/g, ' ')}`)
+    await refused7.getByRole('button', { name: 'Cancel' }).click()
+    const facts7 = (await inv('tasks:facts', n2)).map((f) => f.kind)
+    const work7 = await inv('tasks:work', n2).catch(() => null)
+    check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
+    check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
 
   } finally {
     await app.close().catch(() => undefined)

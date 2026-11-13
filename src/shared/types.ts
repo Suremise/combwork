@@ -1708,6 +1708,12 @@ export interface NextVersionPlan {
   listed: boolean
   /** What can follow the proposed branch, both going on (started cards and running lanes stay); null: nothing on the release. */
   retarget: RetargetPreview | null
+  /**
+   * HI-3128: under follow mode, the new branch is made here only and tracks no remote branch: the remote Combwork can name
+   * for it (`from`'s, else the only one; null: none), and whether follow mode can use it (`unusable`: several push
+   * addresses, or a shallow clone). The window renders the commands for the name typed (upstreamCommands).
+   */
+  upstream?: { kind: 'ready' | 'choose' | 'unusable'; remote: string | null; why?: 'ambiguous' | 'shallow' }
 }
 
 /** HI-2807: what Start the next version did. */
@@ -3578,10 +3584,12 @@ export interface CleanupOptions {
   archivedBackupsDays: number | null
   /** Backups of archived sessions the CLI no longer has: the session is deleted (its usage still counts). */
   goneBackups: boolean
+  /** Launch folders of removed agents (HI-3144: `.combwork/launch-<id>`). */
+  launchFolders?: boolean
 }
 
 export interface CleanupItem {
-  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup'
+  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup' | 'launch-folder'
   path: string
   bytes: number
   sessionId?: string

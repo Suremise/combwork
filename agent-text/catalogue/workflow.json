@@ -1034,6 +1034,16 @@
     "note": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key.",
     "audience": "both"
   },
+  "workflow.refused.platform.keptElsewhere.message": {
+    "text": "{card} can't start there: its committed work from before it was put back is kept in slot {slot}, and it starts only in that slot.",
+    "note": "HI-3132: a refused start: the card was put back with commits, kept for it in slot {slot} (a name), and this start would have put it somewhere else (the project folder, or across a wait for that slot), without that work. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.keptElsewhere.next": {
+    "text": "Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.",
+    "note": "HI-3132: the next step after that refusal: once the slot {slot} is free (nothing works in it), starting the card {card} again lends it that slot with the work kept in it.",
+    "audience": "both"
+  },
   "workflow.refused.platform.keptLine.message": {
     "text": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
     "note": "HI-3112: a refused start: the card was started before, put back, and its branch (made from {kept}, the branch it merged into then) is kept, so it keeps merging into {kept}; but the card is in a lane whose cards merge into {target}. {card} is a card key like AM-12; {kept} and {target} are branch names.",
@@ -1052,6 +1062,16 @@
   "workflow.refused.platform.noTarget.next": {
     "text": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
     "note": "HI-3106: the next step after a start refused for no target bookmark: the user chooses it in the window. Version Control, Workflow and Work merges into are names in the window: as translated there.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.noUpstream.message": {
+    "text": "{card} can’t start: {target} tracks no remote branch, and with “The target branch follows its remote” on each card starts from its remote.",
+    "note": "HI-3128: a refused start under the workflow option “The target branch follows its remote” (its name: use its words): the branch work merges into ({target}) has no upstream, as a new version’s branch made by Start the next version has, so there is no remote head to start from. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.noUpstream.next": {
+    "text": "{how, select, ready {If {remote} hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {target} should follow. If it hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow), then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.} other {The remote {target} would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.}}",
+    "note": "HI-3128: the next step after a start refused for a target with no upstream under “The target branch follows its remote” (its name: use its words). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is then a placeholder such as <remote>, which the user replaces); shallow, the repository is a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are. Combwork runs none of them: the user does.",
     "audience": "both"
   },
   "workflow.refused.platform.offLine.message": {
@@ -1422,6 +1442,31 @@
   "workflow.refused.verdict.reviewing.next": {
     "text": "Start the review first, then give your verdict.",
     "note": "The next step after a verdict without a started review.",
+    "audience": "both"
+  },
+  "workflow.refused.why.passes": {
+    "text": "{n, number} of {q, plural, one {# reviewer} other {# reviewers}} passed it.",
+    "note": "The {why} of a refused merge: not enough distinct reviewers passed the revision. {n} and {q} are numbers.",
+    "audience": "both"
+  },
+  "workflow.refused.why.requeueLimit": {
+    "text": "it was sent back unchanged {n, plural, one {# time} other {# times}} already.",
+    "note": "The {why} of a refused requeue: the limit of unchanged requeues was reached. {n} is how many.",
+    "audience": "both"
+  },
+  "workflow.refused.why.requeueNotTransient": {
+    "text": "its last merge failed for a reason in the work (a conflict, red checks or a hook), which needs a new revision.",
+    "note": "The {why} of a refused requeue: the merge failure wasn't transient. Starts lower case: it follows a colon.",
+    "audience": "both"
+  },
+  "workflow.refused.why.stale": {
+    "text": "its pass is stale.",
+    "note": "The {why} of a refused merge or requeue: the revision's pass no longer holds.",
+    "audience": "both"
+  },
+  "workflow.refused.why.userOk": {
+    "text": "it waits for the OK before merging.",
+    "note": "The {why} of a refused merge: the user's approval is missing.",
     "audience": "both"
   },
   "workflow.roundChoice": {

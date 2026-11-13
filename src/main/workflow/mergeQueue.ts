@@ -780,6 +780,12 @@ export class MergeQueue {
     delete: (entry: string): void => void followTested.delete(followKey(this.project, entry))
   }
 
+  /** HI-3128: whether the project's targets follow their remotes now (the options as they are), for an owed catch-up. */
+  private followsNow(): boolean {
+    const o = this.wf.cfg.options()
+    return merges(o.platform) && o.finish === 'combworkMerges' && o.followRemote === true
+  }
+
   /** Whether the target follows its remote, as the project's options are now (G21 isn't a rule), on a platform that can. */
   private follows(card: CardRecord, s: CardState): boolean {
     const o = this.wf.cfg.options()
@@ -798,7 +804,13 @@ export class MergeQueue {
     const h = this.host({})
     const d = await I.destination!(h, target)
     if (isAgain(d)) return d
-    if ('pause' in d) return { pause: d.pause, ...(d.files?.length ? { files: d.files } : {}) }
+    if ('pause' in d) {
+      // HI-3128: no upstream: what gives it one, read locally (the remedy's kind as the pause's one "file", a select key;
+      // its commands on the line below, as git's own words are shown), never a guessed remote.
+      const m = d.pause === 'noUpstream' ? await I.upstreamRemedy?.(this.project, target) : undefined
+      if (m) return { pause: d.pause, files: [m.kind === 'unusable' ? m.why : m.kind], ...(m.kind === 'unusable' ? (m.remote ? { message: m.remote } : {}) : { message: [m.publish, ...m.track].join('\n') }) }
+      return { pause: d.pause, ...(d.files?.length ? { files: d.files } : {}) }
+    }
     const f = await I.fetchHead!(h, d.snapshot, fetchPin(entry.id))
     if ('failed' in f) return { pause: 'fetchFailed', message: f.failed }
     if (f.head !== local) {
@@ -1067,7 +1079,9 @@ export class MergeQueue {
         return null
       }
       const folder = c.folder
-      const look = c.entry !== published
+      // HI-3128: with follow mode off now, the remote is never asked: the local target is the target again, and the
+      // published merge (a commit of the queue's, in this repository) is brought into it by the rules below alone.
+      const look = c.entry !== published && this.followsNow()
       const r = c.phase && folder ? await this.guarded(folder, () => this.catchUpRecorded(target, c, folder, look)) : await this.catchUpFresh(target, c, look)
       if (r !== 'again') return r
     }
@@ -1181,6 +1195,10 @@ export class MergeQueue {
     // still owed (HI-2988: dropping it left the published merge out of the local target, all looking well): paused
     // `remoteDiverged`, naming the published card, until the user brings the local target in line with its remote.
     if (!behind) {
+      // HI-3128: follow mode off: nothing of this catch-up's is in a folder (no phase), and there is no remote to be behind,
+      // so it is dropped: nothing moved or forced, the user's commits kept; the reconciler reads the card against the
+      // local target from then on.
+      if (!this.followsNow()) return done()
       // HI-3041: unless the remote no longer has the result either (a force-push took the published merge off it): then
       // there is nothing to catch up to, and the catch-up ends (the reconciler marks the card as having left its target,
       // and the queue goes on); a pause there could never be put right. Unknown: paused as before.

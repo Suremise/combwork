@@ -1694,6 +1694,12 @@ class SessionManager {
     return [...this.live.values()].filter((l) => mine(l.state.projectPath)).length + [...this.starting.values()].filter((p) => mine(p.projectPath)).length
   }
 
+  /** Whether an agent of a project runs or is starting (HI-3144: its launch folder is never removed then). */
+  activeOrStarting(projectPath: string, agentId: string): boolean {
+    const id = liveId(projectPath, agentId)
+    return this.live.has(id) || this.starting.has(id)
+  }
+
   /** One agent's session; without agentId, the project's first running agent's. */
   liveFor(projectPath: string, agentId?: string): LiveSessionState | null {
     if (agentId) return this.live.get(liveId(projectPath, agentId))?.state ?? null

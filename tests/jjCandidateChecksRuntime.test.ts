@@ -463,6 +463,77 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
         expect(x.runs.length - runs).toBe(2)
       })
     }
+
+    it('HI-3122: the stamp changed under a running check, its setup command the same: invalid, nothing published, then tried again by itself and passed', async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS })
+      // The retry's look comes soon; nothing else asks for one.
+      x.h.againMs = () => 50
+      let once = true
+      x.h.hook = async (p) => {
+        if (p === 'beforeCheck:lint' && once) {
+          once = false
+          // Its stamp moves on (as any change to what it reads would), the setup command itself unchanged: the key stays.
+          x.setSetup('')
+        }
+      }
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(x.leases.map((l) => l.given)).toContain('invalid')
+    })
+
+    it("HI-3122 (HR3's round 2): a setup command read as unknown: nothing run or passed under it; known again, the next look passes", async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS })
+      x.h.againMs = () => 50
+      let known = false
+      x.h.knownStamp = () => known
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks?.state).not.toBe('passed')
+      expect(x.leases).toEqual([])
+      known = true
+      await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
+    })
+
+    it("HI-3122 (HR3's round 3): the setup command changed and read as unknown: the restart refused, then looked at again by itself, and passed once known", async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS })
+      const retry = vi.fn(() => 50)
+      x.h.againMs = retry
+      let known = true
+      x.h.knownStamp = () => known
+      // The first setup read sets the checks up under the old key; then the command moves on and reads as unknown.
+      const setup = x.h.setup
+      let reads = 0
+      x.h.setup = async () => {
+        const r = await setup()
+        if (++reads === 1) {
+          x.setSetup(`${NODE} -e "0"`)
+          known = false
+        }
+        return r
+      }
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      await vi.waitFor(() => expect(reads).toBeGreaterThanOrEqual(2), { timeout: REAL_JJ_MS, interval: 50 })
+      await vi.waitFor(() => expect(retry).toHaveBeenCalled(), { timeout: REAL_JJ_MS, interval: 50 })
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks?.state).not.toBe('passed')
+      // Known again: the retry's look, with nothing else asking, restarts the checks under the new key and passes.
+      known = true
+      await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
+    })
   })
 
   describe.runIf(process.platform === 'win32')("HR1's round 1, in real jobs (colocated)", () => {
