@@ -604,10 +604,23 @@ const onDb = (fn) => {
     check("Save…'s Retarget: card 2 and its slot listed as staying on main, its work kept there", !!(await until(async () => /These stay on main/.test(await text(retarget8)) && /its work is kept on main/.test(await text(keptCard8)) && (await text(keptCard8)).includes(key2) && /its work is kept on main/.test(await text(keptSlot8)), HUNG_MS)), await text(save8))
     check('…nothing listed to move (no lane, started card or slot)', (await retarget8.locator('[data-retarget-move]').count()) === 0, await text(retarget8))
     await shoot(retarget8, 'retarget-kept')
-    await inEach(retarget8, 'retarget-kept', (cat) => {
-      const m = /\bkept \{([^}]*)\{from\}/.exec(cat['workflow.form.retargetKeep'] ?? '')
-      return m ? m[1].trim().slice(0, 14) : null
-    })
+    // A translated screen: Save… shows the language it was opened in, so it is closed, the window spoken to in German,
+    // and opened again; then back in English for the save.
+    const reopen8 = async () => {
+      await page.keyboard.press('Escape')
+      await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
+      await form8.locator('[data-action="save"]').click()
+      await save8.waitFor({ timeout: HUNG_MS })
+    }
+    const de8 = catalogue('de')
+    const deKept8 = (/\bkept \{([^}]*)\{from\}/.exec(de8['workflow.form.retargetKeep'] ?? '') ?? [])[1]?.trim() ?? ''
+    await speak({ ...english, code: 'de', locale: 'de', messages: de8 })
+    await reopen8()
+    check('de: Save…\'s Retarget, card 2 and its slot staying, in German', !!deKept8 && !!(await until(async () => (await text(keptCard8)).includes(deKept8) && (await text(keptSlot8)).includes(deKept8), HUNG_MS)), await text(retarget8))
+    await shoot(retarget8, 'retarget-kept-de')
+    await speak(english)
+    await reopen8()
+    check('…in English again', !!(await until(async () => /its work is kept on main/.test(await text(keptCard8)), HUNG_MS)), await text(retarget8))
     await save8.getByRole('button', { name: 'Save', exact: true }).click()
     await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('the project\'s target changed to next, saved from Save…', !!(await until(async () => (await inv('workflow:form', shop))?.options?.target === 'next' || (await inv('workflow:form', shop))?.effective?.target === 'next', HUNG_MS)), JSON.stringify(await inv('workflow:form', shop)).slice(0, 400))
