@@ -487,11 +487,14 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       expect(readFileSync(join(a.folder, 'half.txt'), 'utf8')).toBe('half\n')
       expect(w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()).toBe(heads)
       expect(await w.port.line(a.folder)).toBe(s.started!.line)
-      // Put back again, its target changed: its earlier work is in the slot on main, so the start is refused.
+      // Put back again, its target changed: its earlier work is in the slot on main, so the start is refused, naming
+      // both (HI-3129: the kept slot's bookmark against its Merges into, never "couldn't read the target").
       w.h.jj(w.repo, 'bookmark', 'create', 'other', '-r', 'main')
       moved(await w.wf.putBack(card.key, B1, { why: 'retarget' }))
       w.store.updateCard(card.id, { target: 'other' })
-      expect(refusedBy(await w.wf.start(card.key, B1), 'platform.unknown').message).toMatch(/other/)
+      const r = refusedBy(await w.wf.start(card.key, B1), 'platform.keptOnTarget')
+      expect(r.message).toMatch(/other/)
+      expect(r.values).toMatchObject({ why: 'mismatch', target: 'main', now: 'other' })
     })
 
     it('pins: a foreign ref at another oid untouched, at the same oid held not owned, an interrupted create uncertain; an older record never over a newer', async () => {
