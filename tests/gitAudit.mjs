@@ -293,6 +293,7 @@ export const SEAMS = {
   'src/main/workflow/retarget': { calls: { lineHistory: 1 }, why: "the retarget preview (R6)" },
   'src/main/workflow/runLink': { calls: { lineHistory: 2 }, why: "a run's checked-out revision, before its card is known (HI-2792)" },
   'src/main/workflow/targets': { calls: { lineHistory: 3 }, why: "a lane's target and own-work reads, and empty lines dropped (R6)" },
+  'src/main/workflow/keptLine': { calls: { lineHistory: 1 }, why: "HI-3112: a put-back card's line read against the target it would follow (R6)" },
   'src/main/workspaceMove': { calls: { slotWorkspaces: 4, slotRelocation: 1 }, why: "Repair's worktree steps: the pool's platform's relocation (HI-2792; §16.3.6's gate: relocation)" }
 }
 

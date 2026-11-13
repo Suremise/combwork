@@ -323,6 +323,36 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
     await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
     check('…and 1.3.0 is still listed', ((await inv('workflow:form', fx.alpha))?.options?.otherTargets ?? []).includes('1.3.0'), JSON.stringify((await inv('workflow:form', fx.alpha))?.options?.otherTargets))
+
+    // --- HI-3112: a card started on 1.4.0 (Work merges into now), a commit on its line, put back. Work merges into set to
+    // integration in the tab: Save…'s Retarget lists it as staying, its branch made from 1.4.0. Screenshots in both themes.
+    const b12 = await q.agent(fx, h, 'B12')
+    const n12 = (await inv('tasks:create', { title: 'Put back with work', project: 'alpha' })).number
+    const st12 = await q.startCard(fx, h, b12, n12)
+    check('HI-3112: a card started on 1.4.0 in a slot of its own', st12.status === 200 && st12.body?.data?.target === '1.4.0' && !!b12.folder && b12.folder !== fx.alpha, JSON.stringify(st12.body))
+    fs.writeFileSync(path.join(b12.folder, 'kept.txt'), 'kept\n')
+    lib.git(b12.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(b12.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Kept'])
+    const back12 = await q.act(fx, h, b12, n12, 'put-back', { why: 'later' })
+    check('…a commit on its line, put back', back12.status === 200 && (await card(n12))?.column === 'todo', JSON.stringify(back12.body))
+    const key12 = await keyOf(n12)
+    await targetInput.waitFor({ timeout: HUNG_MS })
+    await targetInput.fill('integration')
+    await targetInput.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    await save.waitFor({ timeout: HUNG_MS })
+    const keptRow = save.locator(`[data-retarget-keep="${key12}"]`)
+    const keptText = await waitHung(async () => ((await keptRow.count()) ? text(keptRow) : null)).catch(() => null)
+    check("…Save…'s Retarget lists it as staying: its branch was made from 1.4.0", !!keptText && /its branch was made from 1\.4\.0, so it keeps merging there/.test(keptText), (await text(save)).slice(0, 600))
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await save.screenshot({ path: path.join(fx.shots, `retarget-kept-line-${t}.png`) }).catch(() => undefined)
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
