@@ -61,6 +61,8 @@ let failHeadOnce = false
 let afterMade: ((cwd: string) => void) | null = null
 /** HI-3125: run with the folder just before the next commit or `stash push` (another git's work at that moment). */
 let beforeAct: ((cwd: string) => void) | null = null
+/** HI-3125 (HR1's round 2): a git command that fails as unreadable, while it matches (null: none). */
+let failGit: ((args: string[]) => boolean) | null = null
 /** HI-3056: run with the folder before each refresh of the entries taken in (another git writing the real index then). */
 let beforeRefresh: ((cwd: string) => void) | null = null
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
@@ -89,6 +91,7 @@ vi.mock('../src/main/git', async (original) => {
         lateFile = null
       }
       if (beforeRefresh && args.includes('add') && args.includes('--refresh')) beforeRefresh(cwd)
+      if (failGit?.(args)) return { ok: false, code: 128, out: '', err: 'fatal: unable to read the object', buf: Buffer.alloc(0) }
       if (beforeAct && (args[0] === 'commit' || (args[0] === 'stash' && args[1] === 'push'))) {
         const then = beforeAct
         beforeAct = null
@@ -181,6 +184,7 @@ beforeEach(() => {
   afterMade = null
   beforeRefresh = null
   beforeAct = null
+  failGit = null
 })
 
 // HI-3125 (hunt 7's round 3): another git (the user's terminal, an agent) at the very moment of the commit or stash.
@@ -247,9 +251,48 @@ describe('another git at the same moment (HI-3125)', () => {
   it("reads the commit git's summary names: the last summary line, whatever a hook printed before it", () => {
     expect(changes.reportedCommit('[main 1a2b3c4] Commit changes before merging AB-1\n 1 file changed, 1 insertion(+)\n')).toBe('1a2b3c4')
     expect(changes.reportedCommit('[main (root-commit) 1a2b3c4d] first\n')).toBe('1a2b3c4d')
-    expect(changes.reportedCommit('[detached HEAD 0123456789abcdef] x\n')).toBe('0123456789abcdef')
+    // Detached (its words in the user's language): never read, as Commit refuses a detached HEAD before it runs.
+    expect(changes.reportedCommit('[detached HEAD 0123456789abcdef] x\n')).toBeUndefined()
     expect(changes.reportedCommit('[hook] said this\n[main abcdef1] ours\n')).toBe('abcdef1')
     expect(changes.reportedCommit('')).toBeUndefined()
+    // HR1's round 2: as short as core.abbrev allows; a branch name with `]` in it; a subject that looks like one.
+    expect(changes.reportedCommit('[main 97f0] checked: work\n')).toBe('97f0')
+    expect(changes.reportedCommit('[feat]x 1a2b3c4] y\n')).toBe('1a2b3c4')
+    expect(changes.reportedCommit('[main 1a2b3c4] fix deadbeef] x\n')).toBe('1a2b3c4')
+  })
+
+  it('the hook rewriting the message with core.abbrev=4 (a four-character summary): the commit made, named', async () => {
+    sh(proj, 'config', 'core.abbrev', '4')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "checked: %s\\n" "$(head -n 1 "$1")" > "$1.new" && mv "$1.new" "$1"\n')
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(subject(done.made)).toBe('checked: Commit changes before merging AB-1')
+    expect(status()).toBe('')
+  })
+
+  it("Set Aside saving nothing while another git makes two stashes of its name, neither holding the paths shown: never credited", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'shown, then taken back\n')
+    writeFileSync(join(proj, 'b.txt'), 'b\nchanged\n')
+    writeFileSync(join(proj, '.gitignore'), 'node_modules/\nc/\n')
+    beforeAct = (cwd) => {
+      sh(cwd, 'checkout', '--', 'a.txt')
+      sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'b.txt')
+      sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', '.gitignore')
+    }
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/aren't the ones shown any more/)
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', 'On main: Combwork: set aside before merging AB-1'])
+    expect(status()).toBe('')
+  })
+
+  it("a stash whose contents can't be read: never taken for its own, said; the stash kept, the real index as it was", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    failGit = (args) => args[0] === 'diff-tree' && args.some((a) => a.endsWith('^1'))
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/^Git set changes aside, but Combwork can't tell which stash is its own/)
+    failGit = null
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1'])
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('set aside by Combwork')
   })
 
   it("a commit-msg hook rewriting the message (a ticket prefix): the commit made, named, and its entries taken in", async () => {

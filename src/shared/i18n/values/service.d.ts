@@ -103,6 +103,7 @@ interface CombworkMessageValues {
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
   'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number }
+  'service.folderChanges.stashUnproved': undefined
   'service.folderChanges.submoduleAdded': { folder: string | number }
   'service.folderChanges.submoduleDeleted': { folder: string | number; path: string | number }
   'service.folderChanges.submoduleInside': { folder: string | number }

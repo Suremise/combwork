@@ -407,6 +407,10 @@
     "defaultMessage": "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.",
     "description": "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command."
   },
+  "service.folderChanges.stashUnproved": {
+    "defaultMessage": "Git set changes aside, but Combwork can't tell which stash is its own: another git made a stash of the same name at that moment, or one of them couldn't be read. Check git stash list and the files before going on.",
+    "description": "HI-3125: an error from Set Aside (a paused merge, a start's warning): git's stash ran, but another git command (the user's terminal, an agent) made a stash with the same name at the same moment, or git couldn't show what one holds, so Combwork can't say which stash holds the changes and doesn't treat any as done. Keep git stash list as it is: a command."
+  },
   "service.folderChanges.submoduleAdded": {
     "defaultMessage": "{folder} is a submodule added here, which Git can't set aside. Commit it instead.",
     "description": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a newly added submodule; git's stash can't set it aside, so nothing was done. Commit works for it."

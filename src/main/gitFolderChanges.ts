@@ -64,6 +64,7 @@ const M = {
   submoduleDeleted: msg({ id: 'service.folderChanges.submoduleDeleted', defaultMessage: "{folder} is a submodule whose folder was deleted, which Git can't set aside. Commit its removal instead, or bring it back with git submodule update -- {path}.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose folder was deleted (not through git); git's stash can't set that aside, so nothing was done. Committing records its removal; git submodule update checks it out again. Keep git submodule update as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --." }),
   submoduleOther: msg({ id: 'service.folderChanges.submoduleOther', defaultMessage: "{folder} is a submodule, and Git can't set aside a submodule's change. Commit it instead.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule changed in another way (renamed, say); git's stash can't set a submodule's change aside, so nothing was done. Commit works for it." }),
   tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
+  stashUnproved: msg({ id: 'service.folderChanges.stashUnproved', defaultMessage: "Git set changes aside, but Combwork can't tell which stash is its own: another git made a stash of the same name at that moment, or one of them couldn't be read. Check git stash list and the files before going on.", description: "HI-3125: an error from Set Aside (a paused merge, a start's warning): git's stash ran, but another git command (the user's terminal, an agent) made a stash with the same name at the same moment, or git couldn't show what one holds, so Combwork can't say which stash holds the changes and doesn't treat any as done. Keep git stash list as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
 
@@ -632,11 +633,13 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
 
 /**
  * HI-3125 (HR1's round 1): the commit a `git commit` says it made, from its summary (`[main 1a2b3c4] …`, or
- * `[main (root-commit) …]`, `[detached HEAD …]`), which git prints last, after its post-commit hook: the last such line's
+ * `[main (root-commit) …]`), which git prints last, after its post-commit hook: the last such line's
  * object, abbreviated as git makes it unique. Undefined: none printed.
  */
 export function reportedCommit(out: string): string | undefined {
-  const all = [...out.matchAll(/^\[[^\]\n]* ([0-9a-f]{7,64})\] /gm)]
+  // HR1's round 2: the branch as one word (a branch name has no space, but may have `]`), `(root-commit)` after it on a
+  // first commit, then the object as short as `core.abbrev` allows (4). Never detached here: Commit refuses that first.
+  const all = [...out.matchAll(/^\[[^ \n]+(?: \(root-commit\))? ([0-9a-f]{4,64})\] /gm)]
   return all.at(-1)?.[1]
 }
 
@@ -785,18 +788,38 @@ async function stashesNow(folder: string): Promise<{ oid: string; subject: strin
  * subject is that message (`On <branch>: <message>`), the newest. Never the stash ref having moved: another git's stash
  * just before or after it (the user's own) moves it too, and a push that saved nothing moves it not at all.
  */
-async function ownStash(folder: string, before: ReadonlySet<string>, message: string, paths: readonly string[]): Promise<string | null> {
+async function ownStash(folder: string, before: ReadonlySet<string>, message: string, paths: readonly string[]): Promise<string | null | 'unproved'> {
   const now = await stashesNow(folder)
-  const mine = (now ?? []).filter((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))
-  if (mine.length < 2) return mine[0]?.oid ?? null
-  // HR1's round 1: another stash with the same message at the same moment (no hook rewrites a stash's, and Combwork's
-  // own are one at a time under the repository's lock): the one that holds exactly the paths this one set aside.
-  const want = [...paths].sort().join('\0')
+  if (!now) return 'unproved'
+  const mine = now.filter((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))
+  // HR1's rounds 1 and 2: its message alone isn't its own (another git can stash with the same at that moment), so each
+  // is proved by what it holds: something, and nothing but the paths this one was given (git stashes only those). Not
+  // one proved (none readable as such): not made. Two, or one unreadable with none proved: not known, never guessed.
+  const allowed = new Set(paths)
+  let unread = false
+  const proved: string[] = []
   for (const s of mine) {
-    const r = await git(folder, ['stash', 'show', '--name-only', '--include-untracked', '-z', s.oid])
-    if (r.ok && r.out.split('\0').filter(Boolean).sort().join('\0') === want) return s.oid
+    const held = await stashPaths(folder, s.oid)
+    if (!held) unread = true
+    else if (held.length && held.every((p) => allowed.has(p))) proved.push(s.oid)
   }
-  return mine[0].oid
+  if (proved.length === 1 && !unread) return proved[0]
+  return proved.length || unread ? 'unproved' : null
+}
+
+/**
+ * The paths a stash holds: those its worktree commit and its index commit (its second parent: a file added then
+ * deleted on disk is only there) change from its base (renames as their two sides), and its untracked files' commit's
+ * (its third parent, when it has one). Null: unreadable. Plumbing, as every git has it.
+ */
+async function stashPaths(folder: string, oid: string): Promise<string[] | null> {
+  const diff = (to: string) => git(folder, ['diff-tree', '-r', '-z', '--no-renames', '--name-only', '--no-commit-id', `${oid}^1`, to])
+  const [work, index] = [await diff(oid), await diff(`${oid}^2`)]
+  if (!work.ok || !index.ok) return null
+  const third = await git(folder, ['rev-parse', '-q', '--verify', `${oid}^3`])
+  const untracked = third.ok && third.out.trim() ? await git(folder, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', third.out.trim()]) : null
+  if (untracked && !untracked.ok) return null
+  return [...new Set([...work.out.split('\0'), ...index.out.split('\0'), ...(untracked?.out.split('\0') ?? [])].filter(Boolean))]
 }
 
 /**
@@ -831,7 +854,14 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
       if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
     }
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
-    const stash = await ownStash(folder, before, message, stashed)
+    // Proved by the paths it holds: those it was given, and a rename's other side (HI-3022), all of `files`.
+    const own = await ownStash(folder, before, message, files)
+    if (own === 'unproved') {
+      // HR1's round 2: never another git's stash taken for its own, nor its index step run on one; the stashes kept.
+      log.warn(`A stash "${userText(message)}" in ${userText(folder)}: which is Combwork's can't be told (another git's of the same name, or one unreadable)`)
+      throw combworkError(M.stashUnproved)
+    }
+    const stash = own
     if (stash && pushed.ok && renamedFrom.length) pushed = await restoreOldSides(folder, env, renamedFrom)
     // HI-3059: a stash made is said made, whatever its index step gives (logged there too, should git's own failure be
     // what is said below).

@@ -390,6 +390,9 @@
       "stash": "plain"
     }
   },
+  "service.folderChanges.stashUnproved": {
+    "placeholders": {}
+  },
   "service.folderChanges.submoduleAdded": {
     "placeholders": {
       "folder": "plain"
