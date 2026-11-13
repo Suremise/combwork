@@ -35,7 +35,7 @@ import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor } from '../platform/releaseReads'
-import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
@@ -141,7 +141,8 @@ export interface KeptAcross {
 }
 
 /** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
-export const shownPlatform = (p: string): string => ({ git: 'Git', jj: 'jj', none: 'None' })[p] ?? p // i18n-ignore: product names, the same in every language
+/** A platform's product name, the same in every language (HI-3140: its descriptor's). */
+export const shownPlatform = (p: string): string => platformName(p)
 
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 

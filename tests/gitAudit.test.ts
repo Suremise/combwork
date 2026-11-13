@@ -4,11 +4,11 @@
 // call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
 // (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
 // scripts/gitInventory.mjs prints the audit.
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, JJ_HOMES, NOT_PLATFORM, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
 type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
@@ -111,6 +111,55 @@ const n = (platform: string) => platform !== 'none'
     expect(run({ [registry]: `${text(registry)}
 const r = (platform: string) => platform === 'none'
 ` }).switches).toEqual([])
+  })
+
+  it("fails every platform id's switch however it is written, and leaves descriptor, registration and presentation data alone (HI-3140)", () => {
+    const options = 'src/shared/workflow/options.ts'
+    const added = (code: string): string[] => run({ [options]: `${text(options)}\n${code}\n` }).switches
+    const one = ["src/shared/workflow/options: 1 switches on a platform's id, listed 0"]
+    for (const code of [
+      "const a = (p: { platform: string }) => p.platform === 'jj'",
+      "const b = (p: string) => 'git' !== p",
+      'const c = (to: string) => to === "none"',
+      "const d = (id: string) => id === 'none'",
+      'const e = (to: string) => to == `none`',
+      "const f = (p: string) => { switch (p) { case 'jj': return 1 } return 0 }",
+      "const g = (d: object) => 'jj' in d",
+      "const h = (x: string) => revisionShort('jj', x)",
+      "const i = PLATFORMS['git'].name",
+      'const j = PLATFORMS.jj.name'
+    ])
+      expect(added(code), code).toEqual(one)
+    // Allowed: another enum's `none` by its field's name, a comparison of two variables, prose and other strings, a
+    // registration by id (not a descriptor helper), and data keyed by the platform.
+    for (const code of [
+      "const k = (o: { review: string }) => o.review === 'none'",
+      'const l = (a: string, b: string) => a === b',
+      "// a comment saying platform === 'jj'\nconst m = 'jj is a platform'",
+      "const n = () => registerWorkspacePort('jj', port)",
+      'const o2: Record<string, number> = { jj: 1, git: 2, none: 3 }',
+      "const q = (b: object) => 'none' in b"
+    ])
+      expect(added(code), code).toEqual([])
+  })
+
+  it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
+    const app = 'src/main/slotsApp.ts'
+    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
+    const cards = 'src/main/jjCards.ts'
+    expect(run({ [cards]: `${text(cards)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
+    expect(run({ [cards]: `${text(cards)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/jjCards: 1 switches on a platform's id, listed 0"])
+  })
+
+  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a jj home, a listed switch (HI-3140)', () => {
+    const tiles = 'src/renderer/src/components/AgentTiles.tsx'
+    expect(run({ [tiles]: text(tiles).replace("x !== 'none'", "x !== 'auto'") }).switches).toEqual(["src/renderer/src/components/AgentTiles: 0 switches on a platform's id, listed 1"])
+    const scan = 'src/renderer/src/components/Antivirus.tsx'
+    const noScan = text(scan).replace(/status\.scan === 'none'/g, 'status.scan === null').replace(/case 'none':/g, "case 'off':")
+    expect(run({ [scan]: noScan }).switches).toEqual(['NOT_PLATFORM scan: no comparison uses it (stale)'])
+    expect(Object.keys(JJ_HOMES as Record<string, unknown>).every((f) => existsSync(join(root, `${f}.ts`)) || existsSync(join(root, `${f}.tsx`)))).toBe(true)
+    expect(Object.values(SWITCHES as Record<string, { class?: string }>).filter((s) => !['data', 'historic', 'gitUi', 'schema'].includes(s.class ?? '')).length).toBe(0)
+    expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

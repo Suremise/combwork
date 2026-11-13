@@ -32,7 +32,7 @@ import { jjFileGate, pathKey, rootKey, storeKey } from './jjFileGate'
 import { asideOf, asReceipt, entryIdSync, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import { untrackedPaths } from './jjUntracked'
-import type { HeldWork, OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import type { HeldWork, OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceRefusal, WorkspaceStep } from './workspacePort'
 import { agentMsg, type AgentMsg } from '../../shared/agentText'
 import { carriesBinding, chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
@@ -66,6 +66,13 @@ export const JJ_REFUSED = {
   journal: "the preparation's record can't be read", // i18n-ignore: as above
   gitLink: "a Git worktree entry is still registered for this folder and Combwork can't prove it is its own: it was left as it is, for you to remove or keep" // i18n-ignore: as above
 } as const
+
+/** HI-3115: jj's refusals for what its slot holds: the card's pending cycle waits on them (said once on the card), never fails. */
+const JJ_HELD: ReadonlySet<string> = new Set([JJ_REFUSED.unintegrated, JJ_REFUSED.notIntegrated, JJ_REFUSED.divergent, JJ_REFUSED.notEmpty, JJ_REFUSED.journal])
+
+/** What one of jj's refusals means to the slot pool (HI-3140, WorkspacePort.refusal; HI-2913, HI-3115). */
+export const jjRefusal = (err: string): WorkspaceRefusal | null =>
+  err === JJ_REFUSED.fence ? 'fence' : err === JJ_REFUSED.uncertain ? 'uncertain' : err === JJ_REFUSED.stale ? 'stale' : JJ_HELD.has(err) ? 'held' : null
 
 /**
  * HI-3003: the slot pool's failures in jj's words (WorkspacePort.says): a jj slot's agent was told of git, branches and
@@ -1230,6 +1237,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   const port: JjWorkspacePort = {
     platform: 'jj',
     says: JJ_SAYS,
+    refusal: jjRefusal,
     nameFor: (repo, folder) => nameFor(createHash('sha256').update(resolve(repo).toLowerCase()).digest('hex').slice(0, 8), folder),
     pinned,
     headsNow: async (folder) => {

@@ -185,6 +185,7 @@ export const EDGES = [
   { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
   { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
   { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
+  { file: 'src/main/platform/jjStoreSide', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "a switch back to Git checks the jj repository beside the Git store a member names (HI-3034; HI-3140 moved it from storeSwitch): the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -299,39 +300,164 @@ export const SEAMS = {
 }
 
 /**
- * A switch on a platform's id (`platform === 'git'`, `d.platform !== 'none'`), HI-2822's grep: SPEC §16.3.6's rule 2 says a
- * caller asks a port or reads the descriptor (a capability, its integration, deliverables, repository or operations).
+ * A switch on a platform's id (HI-2822's rule, HI-3140's parsed scan): SPEC §16.3.6's rule 2 says a caller asks a port or
+ * reads the descriptor (a capability, its integration, deliverables, repository, operations, presentation), never the
+ * id. Found with TypeScript's parser, so quotes, operand order and spelling don't hide one, and prose never counts:
+ * - a comparison (`===`, `!==`, `==`, `!=`, either side) with a platform id's string literal;
+ * - a `case` of one;
+ * - `'<id>' in x` (a platform's own shape read by its key; `none` is every union's "nothing" member, `{ none }`, so not);
+ * - a platform id given to a descriptor helper (`revisionShort('jj', …)`, `hasCapability('git', …)`) or read off
+ *   `PLATFORMS` by name (`PLATFORMS.jj`, `PLATFORMS['git']`).
+ * `none` is also other enums' value (`review === 'none'`): a comparison or case with it is exempt only when the other
+ * side's name is one NOT_PLATFORM lists, with why; any other spelling (`to`, `id`, `p`…) counts.
  */
-const SWITCH = /platform\)?\s*[!=]==?\s*'(git|none)'/g
 
-/** Where a switch belongs: the descriptors, the platforms' adapters and the registry that picks between them. */
-const SWITCH_HOME = /^src\/(shared\/platform\/descriptors|main\/platform\/(registry|adapters|adapter|git[A-Z]?\w*|none[A-Z]?\w*))$/
+/** The platform ids, read from the descriptors' own type (a new one is scanned for without editing this file). */
+export function platformIds(root, over = {}) {
+  const file = 'src/shared/platform/descriptors.ts'
+  const text = over[file] ?? readFileSync(join(root, file), 'utf8')
+  const m = /export type PlatformId = ([^\n]+)/.exec(text)
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : []
+}
+
+/**
+ * Field names whose `=== 'none'` is another enum's, never a platform's, each with why. Only names of a field or a
+ * variable naming that enum: a generic one (`id`, `to`, `p`, `s`) is never listed, so its comparison counts. A name no
+ * comparison uses any more fails as stale.
+ */
+export const NOT_PLATFORM = {
+  review: "a workflow's review option (G3)",
+  why: "an account choice's reason",
+  kind: "a connection choice's or usage reading's kind",
+  state: "a key matcher's or a GitHub login's state",
+  route: "a notice's route",
+  bannerScope: "a notice's pop-up scope",
+  how: "a live mode switch's way, or a lane bar's round kind",
+  response: "a hook's response kind",
+  mode: "the taskbar progress bar's mode",
+  cache: "a storage reading's cache state",
+  skip: "a close command plan's skip reason",
+  scan: "the antivirus scan's state",
+  liveModeSwitch: "a provider descriptor's capability"
+}
+
+/** The descriptor helpers that take a platform's id: one given by name is a switch. */
+const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation', 'hasGate', 'ownsWorkspaces', 'platformName', 'ruleKeyOf'])
+
+/** Where a switch belongs, whole: the platform layer (its descriptors and presentation, its ports and their registries) and Git's own modules. */
+const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) || isGitModule(f)
+
+/**
+ * jj's modules outside the platform layer (HI-3140's §D), exempt for jj's own id only: a comparison on another id there
+ * still counts, so shared logic can't hide in them. `compose`: jj's work composed with the app's services; `jjUi`: jj's
+ * page and the window's jj reads and types.
+ */
+export const JJ_HOMES = {
+  'src/main/jjCards': { class: 'compose', why: "jj's card work composed with the app's services (HI-2868): platform code imports no app module" },
+  'src/main/jjSetupStamp': { class: 'compose', why: "what a jj candidate's checks depend on in project.json (HI-3122), jjCards' helper" },
+  'src/main/jjPublish': { class: 'compose', why: "main's host of jj's publish worker (HI-2882)" },
+  'src/main/jjPublishWorker': { class: 'compose', why: "jj's publish worker thread, a build entry beside gitWorker and repoLockWorker" },
+  'src/main/jjWindow': { class: 'jjUi', why: "the window's reads and actions for jj cards (HI-2869), behind ipc's jj channels" },
+  'src/renderer/src/views/JjSections': { class: 'jjUi', why: "jj's page in the Version Control tab, as GitTab is Git's" },
+  'src/shared/jjViews': { class: 'jjUi', why: "jj's page's view types, as shared/gitRepo is Git's" },
+  'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
+}
+
+/** The name an operand reads as (`a.b?.platform!` → platform), or null for any other expression. */
+function nameOf(n) {
+  while (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n)) n = n.expression
+  if (ts.isIdentifier(n)) return n.text
+  if (ts.isPropertyAccessExpression(n)) return n.name.text
+  return null
+}
+
+const COMPARE = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken])
+
+/** One file's switches: each `{ id, line }`; `exempt` collects the NOT_PLATFORM names it used. */
+export function fileSwitches(file, text, ids, exempt) {
+  const quoted = new RegExp(`['"\`](${ids.join('|')})['"\`]`)
+  if (!quoted.test(text)) return []
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const idOf = (n) => (n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && ids.includes(n.text) ? n.text : null)
+  const out = []
+  const add = (id, n) => out.push({ id, line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1 })
+  const versus = (id, other, n) => {
+    const name = nameOf(other) ?? ''
+    if (id === 'none' && Object.hasOwn(NOT_PLATFORM, name)) return void exempt?.add(name)
+    add(id, n)
+  }
+  const visit = (n) => {
+    if (ts.isBinaryExpression(n)) {
+      const op = n.operatorToken.kind
+      if (COMPARE.has(op)) {
+        const l = idOf(n.left)
+        const r = idOf(n.right)
+        if (l) versus(l, n.right, n)
+        else if (r) versus(r, n.left, n)
+      } else if (op === ts.SyntaxKind.InKeyword && idOf(n.left) && idOf(n.left) !== 'none') add(idOf(n.left), n)
+    } else if (ts.isCaseClause(n) && idOf(n.expression)) {
+      versus(idOf(n.expression), n.parent.parent.expression, n)
+    } else if (ts.isCallExpression(n) && HELPERS.has(nameOf(n.expression) ?? '')) {
+      for (const a of n.arguments) if (idOf(a)) add(idOf(a), n)
+    } else if (ts.isElementAccessExpression(n) && nameOf(n.expression) === 'PLATFORMS' && idOf(n.argumentExpression)) {
+      add(idOf(n.argumentExpression), n)
+    } else if (ts.isPropertyAccessExpression(n) && nameOf(n.expression) === 'PLATFORMS' && ids.includes(n.name.text)) {
+      add(n.name.text, n)
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return out
+}
+
+/** switchCounts' answers per file, by its text. */
+const switchesParsed = new Map()
+
+/**
+ * Each file's count of switches on a platform's id outside their home (a jj home's on jj's own id left out). `used`
+ * collects the NOT_PLATFORM names the files used, and `files` every file read.
+ */
+export function switchCounts(root, over = {}, used = new Set(), files = new Set()) {
+  const ids = platformIds(root, over)
+  const out = {}
+  for (const { file, text } of filesOf(root, over)) {
+    const f = file.replace(/\.tsx?$/, '')
+    files.add(f)
+    if (SWITCH_HOME(f)) continue
+    // Each file's answer kept by its text and the ids (a test's runs reparse only the file it changes).
+    const key = `${root}|${file}|${ids.join(',')}`
+    let kept = switchesParsed.get(key)
+    if (kept?.text !== text) {
+      const exempt = new Set()
+      kept = { text, found: fileSwitches(file, text, ids, exempt), exempt }
+      switchesParsed.set(key, kept)
+    }
+    for (const n of kept.exempt) used.add(n)
+    const found = kept.found.filter((s) => !(JJ_HOMES[f] && s.id === 'jj'))
+    if (found.length) out[f] = found.length
+  }
+  return out
+}
 
 /**
  * The switches left outside their home, per file, each justified (HI-2822): Git-facing text that names Git, and Git's own
  * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
  */
 export const SWITCHES = {
-  'src/main/copies': { n: 1, why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
-  'src/main/slots': { n: 1, why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
-  'src/main/workflow/platformSwitch': { n: 1, why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
-  'src/main/workflow/storeSwitch': { n: 1, why: "a project's repository store is read as Git's common directory (Git's, or colocated jj's): Git's data (HI-2799)" },
-  'src/main/servers': { n: 1, why: "the project's status names what was found in Git's words for agents (`git at {root}`, api.project.vcsGit): Git-facing text" },
-  'src/main/workflow/commitMessageStep': { n: 2, why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): historic, Git's data alone" },
-  'src/renderer/src/views/VersionControl': { n: 1, why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
-  'src/renderer/src/views/VersionControlHeader': { n: 1, why: "the tab's fact line says the folder is a Git repository at its root (git.vc.fact.repo, .subfolder): Git-facing text" }
-}
-
-/** Each file's count of switches on a platform's id, outside their home. */
-export function switchCounts(root, over = {}) {
-  const out = {}
-  for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    if (SWITCH_HOME.test(f)) continue
-    const n = [...text.matchAll(SWITCH)].length
-    if (n) out[f] = n
-  }
-  return out
+  'src/main/copies': { n: 2, class: 'data', why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
+  'src/main/slots': { n: 2, class: 'data', why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
+  'src/main/combworkMove': { n: 2, class: 'historic', why: "1.1's .hive → .combwork move fixes git's exclude lines in a Git repository (HI-2462): its boundary read as Git's" }, // old-name: the 1.1 folder move's input, named as it was
+  'src/main/nameUpgradeProjects': { n: 2, class: 'historic', why: "1.1's name upgrade moves a Git repository's refs and exclude line (HI-2594): its boundary read as Git's" },
+  'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
+  'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
+  'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
+  'src/shared/workflow/compile': { n: 1, class: 'historic', why: "HI-2874's one-time drop of the retired guard start.platformReady, which only jj rulesets had: jj's data alone" },
+  'src/main/jjSetupStamp': { n: 2, class: 'data', why: "a jj candidate's setup stamp's command id `none` (no setup command, HI-3122): not a platform" },
+  'src/main/workflow/storeSwitch': { n: 6, class: 'data', why: "a project's store read (`none`: no repository found), as storeOf and mapStores answer it: not a platform" },
+  'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
+  'src/renderer/src/components/WorkflowOptions': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" },
+  'src/renderer/src/views/VersionControl': { n: 1, class: 'gitUi', why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
+  'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
 }
 
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
@@ -353,7 +479,12 @@ export function audit(root, over = {}) {
     const want = SEAMS[file]?.calls ?? {}
     return [...new Set([...Object.keys(have), ...Object.keys(want)])].filter((s) => (have[s] ?? 0) !== (want[s] ?? 0)).map((s) => `${file}: ${s}() ×${have[s] ?? 0}, listed ×${want[s] ?? 0}`)
   })
-  const switched = switchCounts(root, over)
+  const used = new Set()
+  const files = new Set()
+  const switched = switchCounts(root, over, used, files)
   const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
+  // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has, a jj home that is gone.
+  switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
+  switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
   return { found, unlisted, stale, extraNames, seams, switches }
 }

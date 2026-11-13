@@ -51,11 +51,10 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { FenceDb, HeldWork, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, HeldWork, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceRefusal, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
-import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { isJjLineKey } from './platform/jjSlotPrep'
-import { isPlatformId } from '../shared/platform/descriptors'
+import { isPlatformId, ownsWorkspaces, platformName } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
@@ -93,14 +92,10 @@ export interface KeptAcross {
   gone: boolean
 }
 
-/** A version control's name in agent text. */
-// agent-protocol: product names, the same in every dialect
-const VC_NAME: Record<string, string> = { git: 'Git', jj: 'jj', none: 'None' } // i18n-ignore: product names, agent-facing
-
 /** HI-3069: the kept refusal for a slot made under another version control than `now`, naming its way on. */
 function keptAcrossText(s: Pick<Slot, 'name' | 'platform' | 'folder'>, now: string): string {
-  const platform = VC_NAME[s.platform ?? 'git'] ?? (s.platform ?? 'git')
-  return say(T.kept, { slot: s.name, why: say(T.keptPlatform, { platform, now: VC_NAME[now] ?? now, gone: folderAbsentSync(s.folder) ? 'yes' : 'no' }) })
+  const platform = platformName(s.platform ?? 'git')
+  return say(T.kept, { slot: s.name, why: say(T.keptPlatform, { platform, now: platformName(now), gone: folderAbsentSync(s.folder) ? 'yes' : 'no' }) })
 }
 
 /**
@@ -301,8 +296,8 @@ export type PrepareResult = { ok: true; revision: string } | { retry: string; he
 /** HI-3010: an in-place preparation's `retry` (the log's words): what is left waits for the slot's builder. */
 export const NOT_IN_PLACE = 'not in place: it waits for its builder' // agent-protocol: a log line's detail, never sent to an agent
 
-/** HI-3115: jj's refusals for what its slot holds: the card's pending cycle waits on them (said once on the card), never fails. */
-const JJ_HELD: ReadonlySet<string> = new Set([JJ_REFUSED.unintegrated, JJ_REFUSED.notIntegrated, JJ_REFUSED.divergent, JJ_REFUSED.notEmpty, JJ_REFUSED.journal])
+/** What a port's refusal means to the pool (HI-3140, WorkspacePort.refusal): null for none, or a port without meanings (Git's). */
+const refusalOf = (port: WorkspacePort, err: string | undefined): WorkspaceRefusal | null => (err !== undefined && port.refusal?.(err)) || null
 
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
@@ -2384,7 +2379,7 @@ export class SlotPool {
   async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<RecoverOutcome>, held?: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }): Promise<RecoverOutcome> {
     const seen = this.store.slot(name)
     if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
-    if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
+    if (!ownsWorkspaces(seen.platform ?? 'git') || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
     const open = this.store.openLease(name)
     // What holds it, for the log (HI-2913: a refused Recover… says why there); the answer stays `busy`.
     const holds = seen.op ? `operation ${seen.op.kind}` : seen.writer ? `writer ${seen.writer.run}` : (held ? open?.id !== held.lease : !!open) ? `lease ${open?.id ?? 'none'}` : seen.state === 'creating' || seen.state === 'removing' ? seen.state : null // agent-protocol: a log line's detail, never sent to an agent
@@ -2481,7 +2476,7 @@ export class SlotPool {
     if (isUnknown(h.target) || !h.target) return 'failed'
     // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
     // with the folder quiet, the target read again right before it. Git ignores the options.
-    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
+    const owned = ownsWorkspaces(port.platform) ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
     const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
@@ -3027,13 +3022,13 @@ export class SlotPool {
           // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
           const d = await this.dirtyOwned(slot, token)
           // HI-3115: a port that records the folder itself (jj's) decides on edits there: its own refusal, which is the
-          // pending cycle's wait (JJ_HELD), never a failure. Unreadable, as before.
+          // pending cycle's wait (its `held` refusals), never a failure. Unreadable, as before.
           if (isUnknown(d) || (d.length && !this.port.record)) {
             await end()
             // A stale jj workspace (HI-2913) said as itself, with its way out; else Git's words as before.
-            if (isUnknown(d) && d.detail === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
+            if (isUnknown(d) && refusalOf(this.port, d.detail) === 'stale') return { error: sayStored(T.stale, { slot: name }), stale: true }
             // Something still in the folder when jj's record was asked (HI-2913: a session or process): not now, never a failure.
-            if (isUnknown(d) && (d.detail === 'busy' || d.detail === JJ_REFUSED.fence)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
+            if (isUnknown(d) && (d.detail === 'busy' || refusalOf(this.port, d.detail) === 'fence')) return { retry: sayStored(T.prepareBusy, { slot: name }) }
             return { error: isUnknown(d) ? sayFor(this.port, 'filesUnread', { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
@@ -3082,7 +3077,7 @@ export class SlotPool {
             if (inPlace) return onLine ? this.port.lineAtBase!(slot.folder, p.line, p.base, leaseId) : this.port.branchHere!(slot.folder, p.line, p.base, lease.from)
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
-            const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
+            const owned = ownsWorkspaces(this.port.platform) ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
             return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn, ...owned })
           }
           const r = await (p.around ? p.around(sw) : sw())
@@ -3100,11 +3095,12 @@ export class SlotPool {
             // jj's (HI-2913): quiet lost during its owned write, or a result to decide on the next pass, is a wait; a stale
             // workspace found there is said as itself.
             const err = r.err.trim()
-            if (this.port.platform === 'jj' && (err === JJ_REFUSED.fence || err === JJ_REFUSED.uncertain)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
-            if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
+            const refused = refusalOf(this.port, err)
+            if (refused === 'fence' || refused === 'uncertain') return { retry: sayStored(T.prepareBusy, { slot: name }) }
+            if (refused === 'stale') return { error: sayStored(T.stale, { slot: name }), stale: true }
             // HI-3115: what the slot holds (work over the last card's, its divergence, its record unreadable) is the card's
             // pending cycle's wait, said on the card once, never a failure that locks the card out: corrected, the next pass prepares.
-            if (this.port.platform === 'jj' && JJ_HELD.has(err)) return { retry: sayFor(this.port, 'switchFailed', { slot: name, error: err }), held: err, ...(r.held ? { heldWork: r.held } : {}) }
+            if (refused === 'held') return { retry: sayFor(this.port, 'switchFailed', { slot: name, error: err }), held: err, ...(r.held ? { heldWork: r.held } : {}) }
             return { error: sayFor(this.port, 'switchFailed', { slot: name, error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)
@@ -3576,7 +3572,7 @@ export class SlotPool {
     if (t === head) return null
     // A jj slot's commits are its store's (HI-2866): §16.3.2's test asked of that Git store (a non-colocated project folder
     // has no Git of its own); a Git slot's of the project, as before.
-    const repo = port.platform === 'jj' && s.identity?.store ? s.identity.store : this.deps.project
+    const repo = ownsWorkspaces(port.platform) && s.identity?.store ? s.identity.store : this.deps.project
     const base = await lineHistory().mergeBase(repo, t, head)
     if (isUnknown(base) || !base) return { why: 'cantCheck', detail: sayStored(T.noBase, { target }) }
     const c = await lineHistory().contains(repo, target, { base, revision: head }, t)

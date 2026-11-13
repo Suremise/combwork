@@ -1,5 +1,6 @@
 import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
+import { allRuleKeys } from '../shared/platform/descriptors'
 import { assistantSkillsLine, controlRules, combworkInstructions, journalRule, platformRule, sessionContract } from '../shared/combworkGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
@@ -29,8 +30,8 @@ function guidanceHash(): string {
       combworkInstructions('{project}', 'agent'),
       combworkInstructions('{project}', 'agent', false),
       combworkInstructions('', 'assistant'),
-      platformRule('jj'),
-      platformRule('jj-separate'),
+      // Each platform's rule (HI-3140: the descriptors' keys, in their order: jj, jj-separate).
+      ...allRuleKeys().map((k) => platformRule(k)),
       controlRules('look'),
       controlRules('agents'),
       controlRules('projects'),

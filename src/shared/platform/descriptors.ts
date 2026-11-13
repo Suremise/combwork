@@ -66,6 +66,8 @@ export type Deliverables = 'commits' | 'paths'
 
 export interface PlatformDescriptor {
   id: PlatformId
+  /** HI-3140: its product name, the same in every language (agent text and logs; the window's is `PLATFORM_NAME`). */
+  name: string
   capabilities: readonly Capability[]
   /** How integration combines approved work: the options, stages and finishers a project's workflow has follow it. */
   integration: Integration
@@ -94,6 +96,23 @@ export interface PlatformDescriptor {
   changeShort?: (id: string) => string
   /** The compatibility gates still closed on this platform (SPEC §16.3.6): what it refuses, shown as not supported. */
   gates: readonly Gate[]
+  /**
+   * HI-3140: whether its workspaces are recorded by its own commands (jj, HI-2795): a slot's or copy's row carries the
+   * workspace's identity, preparing and detaching one are owned writes (the row's identity, the operation's fence), a
+   * stale one is recovered by the user (Recover…), and a slot's commits are its row's store's. Git's worktrees are none of these.
+   */
+  ownedWorkspaces: boolean
+  /**
+   * HI-3140: the version control rule its projects' agents get after the session contract (HI-2800, combworkGuidance's
+   * platformRule): every key it can give, in the guidance revision's order, and the one a project gets from what
+   * detection finds in its folder. Absent: no rule (Git, None).
+   */
+  guidance?: { keys: readonly string[]; key: (d: Detection | null) => string }
+  /**
+   * HI-3140: whether git's own read of a folder this platform detected may disagree with detection for good (jj: a
+   * repository colocated with Git reads as one to git, HI-2799), so the Version Control tab never asks detection to catch up.
+   */
+  detectionSteady: boolean
 }
 
 /** A refusal's remedies (HI-2792): each a command as the agent types it. */
@@ -118,15 +137,53 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
+  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] },
+  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] },
   // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No integration, ever,
   // under Darren's option A (HI-2794: no automatic advance, the user integrates), and no operation in the window (R5.2):
   // jj itself changes bookmarks. Every gate is closed until its J card's evidence opens it.
-  jj: { id: 'jj', capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'], integration: 'user', deliverables: 'commits', repository: true, defaultTarget: false, operations: [], revisionShort: short12, changeShort: short12, gates: GATES }
+  // Its workspaces are its own commands' records (HI-2795, HI-2866), and its agents get the jj rule (HI-2800): `jj`, or
+  // `jj-separate` for a repository with no Git working copy beside it (HI-2896).
+  jj: {
+    id: 'jj',
+    name: 'jj',
+    capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'],
+    integration: 'user',
+    deliverables: 'commits',
+    repository: true,
+    defaultTarget: false,
+    operations: [],
+    revisionShort: short12,
+    changeShort: short12,
+    gates: GATES,
+    ownedWorkspaces: true,
+    guidance: { keys: ['jj', 'jj-separate'], key: (d) => (d?.jj && !d.jj.colocated ? 'jj-separate' : 'jj') },
+    detectionSteady: true
+  }
 }
+
+/** Every platform id, in the descriptors' order (HI-3140: the audit and the registries read them from here). */
+export const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[]
+
+/** Whether a platform's workspaces are its own commands' records (HI-3140, `ownedWorkspaces`): Git's rows read as before. */
+export const ownsWorkspaces = (platform: PlatformId | null | undefined): boolean => !!platform && isPlatformId(platform) && PLATFORMS[platform].ownedWorkspaces
+
+/** A platform's product name (HI-3140), or what was given when it names none Combwork has (a row from a later version). */
+export const platformName = (platform: string): string => (isPlatformId(platform) ? PLATFORMS[platform].name : platform)
+
+/**
+ * The version control rule's key for a project (HI-3140, `guidance`): null for a platform with none, `detect` asked
+ * only for one that has one (it reads the folder).
+ */
+export const ruleKeyOf = (platform: string | null | undefined, detect: () => Detection | null): string | null => {
+  const g = platform && isPlatformId(platform) ? PLATFORMS[platform].guidance : undefined
+  return g ? g.key(detect()) : null
+}
+
+/** Every rule key a platform can give, in the descriptors' order (the guidance revision hashes their texts). */
+export const allRuleKeys = (): string[] => PLATFORM_IDS.flatMap((p) => PLATFORMS[p].guidance?.keys ?? [])
 
 export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)
 

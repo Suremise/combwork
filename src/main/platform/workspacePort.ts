@@ -32,6 +32,13 @@ export type SlotWord = 'branchUnread' | 'filesUnread' | 'lineUnread' | 'switchFa
  * J9a) or by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`), never `slotWorkspaces` (Git's).
  */
 export type JjPlatform = Extract<PlatformId, 'jj'>
+/**
+ * HI-3140: what a platform's refusal means to the slot pool: `fence`, the operation lost the folder's quiet (a wait);
+ * `uncertain`, a write's result to decide on the next pass (a wait while preparing); `stale`, the workspace is stale
+ * (said as itself, with Recover…); `held`, what the slot holds is the card's pending cycle's wait (HI-3115), never a failure.
+ */
+export type WorkspaceRefusal = 'fence' | 'uncertain' | 'stale' | 'held'
+
 /** The platforms a workspace port can be: a project's. */
 export type WorkspacePlatform = PlatformId
 
@@ -217,6 +224,11 @@ export interface WorkspacePort {
   platform: WorkspacePlatform
   /** HI-3003: the pool's failures in this platform's words (SlotWord); absent, or a word left out: the pool's own. */
   says?: Partial<Record<SlotWord, AgentMsg>>
+  /**
+   * HI-3140: what one of this platform's refusals (a step's error, an unknown read's detail) means to the pool (jj's,
+   * HI-2913 and HI-3115): null, or absent (Git's), when it means nothing beyond its text.
+   */
+  refusal?(err: string): WorkspaceRefusal | null
 
   // Inspection: no side effects on the repository.
   /** The store's workspaces, the project's own folder included; null when they can't be listed (never an empty list). */

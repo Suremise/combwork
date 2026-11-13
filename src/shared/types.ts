@@ -1965,8 +1965,11 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
-  /** HI-2869: the platform that made it (jj's, when not Git's), and, for a jj slot, stale (another workspace rewrote it). */
-  platform?: 'jj'
+  /**
+   * HI-2869: the platform that made it, when its workspaces are its own commands' records (jj's; HI-3140: `ownedWorkspaces`),
+   * and, for such a slot, stale (another workspace rewrote it).
+   */
+  platform?: PlatformId
   stale?: true
   /** HI-3135: a stale jj slot whose checkout's operation the user's `jj op abandon` discarded (absent: another workspace rewrote it). */
   staleWhy?: 'abandoned'

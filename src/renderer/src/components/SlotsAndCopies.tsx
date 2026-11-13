@@ -448,6 +448,9 @@ function Field({ value, placeholder, onCommit, multiline }: { value: string; pla
 }
 
 /** A stale jj slot recovered, the user's explicit action (HI-2869, J9a's `slots:recoverStale`), after their confirmation. */
+/** A revision of a slot whose workspaces are its platform's own records (HI-3140: only such a slot is recovered or kept), as that platform shows it. */
+const slotRevision = (s: SlotView, id: string): string => (s.platform ? revisionShort(s.platform, id) : id)
+
 async function recoverSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
   const aside = `${s.folder.replace(/[\\/][^\\/]+$/, '')}${s.folder.includes('\\') ? '\\' : '/'}.cw-recovery${s.folder.includes('\\') ? '\\' : '/'}${s.name}`
   if (!(await confirm({ title: tr(T.recoverTitle, { slot: s.name }), message: tr(T.recoverMessage), list: [aside], confirmLabel: tr(T.recover).replace('…', '') }))) return
@@ -455,7 +458,7 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
   reload()
   // HI-3134: the folder's commit still in jj beside the one jj gives the slot now: both named, with what to do.
   if (!r.ok && r.why === 'divergent' && 'divergent' in r && r.divergent) {
-    const d = { folder: revisionShort('jj', r.divergent.folder), head: revisionShort('jj', r.divergent.head) }
+    const d = { folder: slotRevision(s, r.divergent.folder), head: slotRevision(s, r.divergent.head) }
     await confirm({ title: tr(T.divergentTitle, { slot: s.name }), message: tr(T.divergent, { ...d, same: r.divergent.same ? 'yes' : 'no' }), okOnly: true, content: <div data-recover-divergent="">{tr(T.divergentNext, d)}</div> }) // i18n-ignore: select keys
     return
   }
@@ -470,7 +473,7 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
     copies.length ? tr(T.recoveredPutBack, { n: done.restored }) : null,
     done.asides.length ? tr(T.recoveredAsides, { n: done.asides.length, files: fmt.list(done.asides.map((a) => full(a.copy))) }) : null,
     done.keptDeleted.length ? tr(T.recoveredKeptDeleted, { n: done.keptDeleted.length, files: fmt.list(done.keptDeleted) }) : null,
-    done.divergent ? tr(T.recoveredDivergent, { commit: revisionShort('jj', done.divergent) }) : null
+    done.divergent ? tr(T.recoveredDivergent, { commit: slotRevision(s, done.divergent) }) : null
   ].filter((x): x is string => !!x)
   await confirm({
     title: tr(T.recoveredTitle, { slot: s.name }),
@@ -496,7 +499,7 @@ async function removeForgottenSlot(projectPath: string, s: SlotView, reload: () 
 async function removeKeptSlot(projectPath: string, s: SlotView, card: (n: number) => string, reload: () => void): Promise<void> {
   const kept = s.keptGone
   if (!kept || s.keptFor === undefined) return
-  const commit = kept.commit ? revisionShort('jj', kept.commit) : 'none' // i18n-ignore: a select key
+  const commit = kept.commit ? slotRevision(s, kept.commit) : 'none' // i18n-ignore: a select key
   const message = tr(kept.forgotten ? T.removeForgottenMessage : T.removeKeptMessage, { card: card(s.keptFor), commit })
   if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message, confirmLabel: tr(T.removeKept).replace('…', '') }))) return
   // The mode confirmed goes with it (HI-3097): a folder missing then but back now, or the reverse, is refused `changed`.
