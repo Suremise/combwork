@@ -50,11 +50,46 @@ function Until($what, [scriptblock]$cond, $secs = 300) {
   throw "timed out waiting for: $what"
 }
 
-# Presses keys into a process's windows until it exits (a shown installer: the resume question, its finish page): $first
-# once, if given (No to the question), then $keys each time (OK, Finish).
-function Start-Presser($p, [string]$keys = '{ENTER}', [string]$first = '') {
-  $cmd = "`$sh = New-Object -ComObject WScript.Shell; `$k = '$first'; while (-not (Get-Process -Id $($p.Id) -ErrorAction SilentlyContinue).HasExited) { if (`$sh.AppActivate($($p.Id))) { if (`$k) { `$sh.SendKeys(`$k); `$k = '' } else { `$sh.SendKeys('$keys') } }; Start-Sleep -Milliseconds 1500 }"
-  Start-Process powershell -ArgumentList '-NoProfile', '-Command', $cmd -PassThru -WindowStyle Hidden
+# Clicks buttons in a process's dialogs until it exits (a shown installer: the resume question, its pages), by control
+# ID with BM_CLICK, so nothing depends on which window has the focus: $first once, when a visible, enabled one is found
+# (7, No to the question), then any of $then each time (6 Yes, 1 OK/Next/Finish, 2 Cancel).
+$presser = @'
+param([int]$TargetPid, [string]$First = '', [string]$Then = '6,1')
+Add-Type @"
+using System; using System.Collections.Generic; using System.Runtime.InteropServices;
+public static class CwUi {
+  delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetDlgItem(IntPtr h, int id);
+  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  public static bool Click(int pid, int[] ids) {
+    var wins = new List<IntPtr>();
+    EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) wins.Add(h); return true; }, IntPtr.Zero);
+    foreach (var w in wins) foreach (var id in ids) {
+      var b = GetDlgItem(w, id);
+      if (b != IntPtr.Zero && IsWindowVisible(b) && IsWindowEnabled(b)) { PostMessage(b, 0x00F5, IntPtr.Zero, IntPtr.Zero); return true; }
+    }
+    return false;
+  }
+}
+"@
+$ids = { param($s) [int[]]@($s -split ',' | Where-Object { $_ } | ForEach-Object { [int]$_ }) }
+$todo = & $ids $First
+$always = & $ids $Then
+while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
+  if ($todo.Count) { if ([CwUi]::Click($TargetPid, $todo)) { $todo = @() } }
+  else { [CwUi]::Click($TargetPid, $always) | Out-Null }
+  Start-Sleep -Milliseconds 1500
+}
+'@
+Set-Content 'C:\out\presser.ps1' $presser
+function Start-Presser($p, [int[]]$then = @(6, 1), [int[]]$first = @()) {
+  $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'C:\out\presser.ps1', '-TargetPid', $p.Id, '-Then', ($then -join ','))
+  if ($first.Count) { $a += @('-First', ($first -join ',')) }
+  Start-Process powershell -ArgumentList $a -PassThru -WindowStyle Hidden
 }
 # The Run value's command, run as a sign-in runs it: its executable and its arguments.
 function Start-RunValue($scope) {
@@ -62,6 +97,14 @@ function Start-RunValue($scope) {
   if (-not $cmd -or -not $cmd.StartsWith('"')) { throw "no Run value to run ($cmd)" }
   $q = $cmd.IndexOf('"', 1)
   return Start-Process -FilePath $cmd.Substring(1, $q - 1) -ArgumentList $cmd.Substring($q + 1).Trim() -PassThru
+}
+# The Run value's command run to its end, Yes to its question (as at a sign-in, a person answering): its exit code.
+function Finish-RunValue($scope) {
+  $p = Start-RunValue $scope
+  $k = Start-Presser $p
+  $c = Wait-Exit $p
+  Stop-Process -Id $k.Id -ErrorAction SilentlyContinue
+  return $c
 }
 # Combwork started from its folder, then stopped (only that one, by its path).
 function Starts($folder) {
@@ -77,7 +120,7 @@ function Starts($folder) {
 function Want($case) { return ($Only.Count -eq 0 -or $Only -contains $case) }
 function Reset {
   Get-Process | Where-Object { $_.Path -and $_.Path -like '*\Combwork.exe' } | Stop-Process -Force -ErrorAction SilentlyContinue
-  foreach ($d in @($userDir, $machineDir, 'C:\Custom Apps\CW')) {
+  foreach ($d in @($userDir, $machineDir, 'C:\Custom Apps\My Combwork', 'C:\Custom Apps\CW\Combwork', 'C:\Custom Apps\CW')) {
     $un = Get-ChildItem -LiteralPath $d -Filter 'Uninstall*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($un) { $p = Start-Process -FilePath $un.FullName -ArgumentList '/S', "_?=$d" -PassThru; $p.WaitForExit(120000) | Out-Null }
     if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
@@ -106,13 +149,19 @@ function Trusted($path) { (& powershell -NoProfile -ExecutionPolicy Bypass -File
 # A standard user, for the per-machine probes.
 $stdUser = 'cwprobe'
 $stdPass = 'Cw!' + [guid]::NewGuid().ToString('N').Substring(0, 10)
-& net.exe user $stdUser /delete 2>&1 | Out-Null
+& cmd.exe /c "net user $stdUser /delete >nul 2>&1"
 & net.exe user $stdUser $stdPass /add | Out-Null
 $stdCred = New-Object System.Management.Automation.PSCredential("$env:COMPUTERNAME\$stdUser", (ConvertTo-SecureString $stdPass -AsPlainText -Force))
-# A command as that user: its exit code.
-function AsStd([string]$command) {
+# An action as that user: "allowed" if it ran without an error, else "denied". (A process started with -Credential
+# gives back no exit code: the answer comes in a file that user can write.)
+function AsStd([string]$action) {
+  $res = 'C:\Users\Public\cwprobe.txt'
+  Remove-Item $res -ErrorAction SilentlyContinue
+  $command = "`$ErrorActionPreference = 'Stop'; `$r = try { $action; 'allowed' } catch { 'denied' }; Set-Content '$res' `$r"
   $p = Start-Process powershell -Credential $stdCred -ArgumentList '-NoProfile', '-Command', $command -PassThru -WindowStyle Hidden -WorkingDirectory 'C:\'
-  return (Wait-Exit $p 120)
+  $p.WaitForExit(120000) | Out-Null
+  Until 'the probe answering' { Test-Path $res } 30
+  return (Get-Content $res -Raw).Trim()
 }
 
 Set-Content $out "interrupted update checks $(Get-Date -Format o)"
@@ -135,7 +184,7 @@ if (Want 'b') {
 Reset
 InstallOld 'user'
 $p = Run 'new-setup.exe' @()
-$k = Start-Presser $p '{ESC}'
+$k = Start-Presser $p @(2, 6)
 $c = Wait-Exit $p 120
 Stop-Process -Id $k.Id -ErrorAction SilentlyContinue
 Say ((IsOld $userDir) -and -not (RunValue 'user') -and -not (Test-Path $userRec)) '(b) cancelled on the scope page: nothing armed, the old copy kept' "exit $c"
@@ -159,7 +208,7 @@ Stop-Process -Id $k.Id -ErrorAction SilentlyContinue
 Say (-not $early -and (RunValue 'user') -eq $want -and (PayloadHash 'user') -eq $newHash) '(c) the resumed run interrupted too (Run value run by hand): the Run value and the copy are unchanged' "ended early: $early"
 # Declined: No keeps it for the next sign-in.
 $p = Start-RunValue 'user'
-$k = Start-Presser $p '{ENTER}' 'n'
+$k = Start-Presser $p @(1, 2) @(7)
 $c = Wait-Exit $p 120
 Stop-Process -Id $k.Id -ErrorAction SilentlyContinue
 Say ($c -eq 8 -and (RunValue 'user') -eq $want -and (PayloadHash 'user') -eq $newHash) '(c) declined at the question (Run value run by hand): exit 8, recovery kept' "exit $c"
@@ -179,12 +228,14 @@ Say ($c -eq 0 -and -not (Test-Path $userRec) -and -not (RunValue 'user')) '(c) t
 if (Want 'd') {
 # (d) A custom folder: kept by the recovery, with its scope.
 Reset
-$custom = 'C:\Custom Apps\CW'
+# Its name has Combwork in it: a shown install (the resumed run) appends \Combwork to a folder that doesn't (electron-
+# builder's instFilesPre), as any shown update of such an install does.
+$custom = 'C:\Custom Apps\My Combwork'
 InstallOld 'user' $custom
 Interrupt-Update 'user' @('--updated', '/S') $custom
 $cmd = RunValue 'user'
 Say ($cmd -like "*--cw-resume --updated /currentuser /D=$custom") '(d) a custom folder: the Run value names it and the scope' "Run value '$cmd'"
-$c = Wait-Exit (Start-RunValue 'user')
+$c = Finish-RunValue 'user'
 Say ($c -eq 0 -and (IsNew $custom) -and -not (Test-Path $userDir) -and -not (RunValue 'user')) '(d) ...the resumed run (Run value run by hand) installs it there' "exit $c"
 }
 
@@ -210,7 +261,7 @@ Set-Content (Join-Path $userRec 'junk.txt') 'makes staging refuse'
 $c = Wait-Exit (Run 'new-setup.exe' @('/S'))
 Say ($c -eq 7 -and (RunValue 'user') -eq $cmd -and (PayloadHash 'user') -eq $hash) '(g) a second installer refused while a recovery is armed: its Run value and copy unchanged' "exit $c"
 Remove-Item (Join-Path $userRec 'junk.txt')
-$c = Wait-Exit (Start-RunValue 'user')
+$c = Finish-RunValue 'user'
 Say ($c -eq 0 -and (IsNew $userDir) -and -not (RunValue 'user')) '(g) ...and that recovery (Run value run by hand) still finishes' "exit $c"
 }
 
@@ -222,20 +273,21 @@ Interrupt-Update 'machine' @('--updated', '/S') $machineDir
 $cmd = RunValue 'machine'
 Say ($cmd -like "`"$machineRec\Combwork-Setup.exe`" --cw-resume --updated /allusers /D=$machineDir" -and (PayloadHash 'machine') -eq $newHash -and -not (RunValue 'user')) '(f) per-machine interrupted: an HKLM Run value with /allusers, the copy in ProgramData' "Run value '$cmd'"
 Say ((Trusted $machineRec) -and (Trusted (Split-Path $machineRec)) -and (Trusted (Payload 'machine'))) '(f) ...the folders and the copy pass the trust check' "$(Sddl $machineRec)"
-$w = AsStd "try { [IO.File]::WriteAllText('$(Payload 'machine')', 'x'); exit 1 } catch { exit 0 }"
-$n = AsStd "try { [IO.File]::WriteAllText('$machineRec\x.txt', 'x'); exit 1 } catch { exit 0 }"
-$r = AsStd "try { Rename-Item -LiteralPath '$machineRec' -NewName 'moved'; exit 1 } catch { exit 0 }"
-Say ($w -eq 0 -and $n -eq 0 -and $r -eq 0 -and (PayloadHash 'machine') -eq $newHash) '(f) a standard user cannot replace the copy, add a file or rename the folder' "denied: write $w, create $n, rename $r (0 = denied)"
-$c = Wait-Exit (Start-RunValue 'machine')
+$ok = AsStd "Get-ChildItem -LiteralPath '$machineRec' | Out-Null"
+$w = AsStd "[IO.File]::WriteAllText('$(Payload 'machine')', 'x')"
+$n = AsStd "[IO.File]::WriteAllText('$machineRec\x.txt', 'x')"
+$r = AsStd "Rename-Item -LiteralPath '$machineRec' -NewName 'moved'"
+Say ($ok -eq 'allowed' -and $w -eq 'denied' -and $n -eq 'denied' -and $r -eq 'denied' -and (PayloadHash 'machine') -eq $newHash) '(f) a standard user can read the folder but not replace the copy, add a file or rename it' "read $ok; write $w, create $n, rename $r"
+$c = Finish-RunValue 'machine'
 Say ($c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(f) the resumed run (Run value run by hand) finishes the per-machine install' "exit $c"
 
 # (f) A recovery folder a standard user made first (their own, their full control): refused, and left as it was.
 Reset
 InstallOld 'machine'
-$code = AsStd "New-Item -ItemType Directory -Force '$machineRec' | Out-Null; exit 0"
+$code = AsStd "New-Item -ItemType Directory -Force '$machineRec' | Out-Null"
 $before = Sddl $machineRec
 $c = Wait-Exit (Run 'new-setup.exe' @('--updated', '/S'))
-Say ($code -eq 0 -and $c -eq 7 -and (Sddl $machineRec) -eq $before -and (IsOld $machineDir) -and -not (RunValue 'machine')) "(f) a standard user's recovery folder: refused, its owner and ACL unchanged, the old copy kept" "exit $c; $before"
+Say ($code -eq 'allowed' -and $c -eq 7 -and (Sddl $machineRec) -eq $before -and (IsOld $machineDir) -and -not (RunValue 'machine')) "(f) a standard user's recovery folder: refused, its owner and ACL unchanged, the old copy kept" "exit $c; $before"
 
 # (f) A child junction out of a trusted recovery folder: refused, its target untouched.
 Reset
@@ -249,7 +301,7 @@ $canary = (Sddl 'C:\canary') + (Sddl 'C:\canary\canary.txt') + (Get-FileHash 'C:
 $c = Wait-Exit (Run 'new-setup.exe' @('/S', '/allusers'))
 Say ($c -eq 7 -and ((Sddl 'C:\canary') + (Sddl 'C:\canary\canary.txt') + (Get-FileHash 'C:\canary\canary.txt').Hash) -eq $canary -and (RunValue 'machine') -eq $cmd -and (PayloadHash 'machine') -eq $hash) '(f) a junction inside the recovery folder: refused, its target and the armed recovery untouched' "exit $c"
 & cmd.exe /c rmdir "$machineRec\x" | Out-Null
-$c = Wait-Exit (Start-RunValue 'machine')
+$c = Finish-RunValue 'machine'
 Say ($c -eq 0 -and (IsNew $machineDir)) '(f) ...and the armed recovery (Run value run by hand) still finishes' "exit $c"
 
 # (f) ProgramData\Combwork itself a junction: refused, its target untouched.
@@ -265,37 +317,49 @@ Say ($c -eq 7 -and ((Sddl 'C:\canary2') + (Get-FileHash 'C:\canary2\canary.txt')
 }
 
 if (Want 'lock') {
-# (lock) The machine recovery lock held from another session (a SYSTEM scheduled task: session 0), released by the test.
+# (lock) The machine recovery lock, Global\CombworkRecovery-<APP_GUID>-machine, held by another process. A holder
+# (powershell) takes it with default security and keeps it until the test writes C:\out\lock-release.txt (bounded at
+# 5 minutes as a clean-up only); -System runs it as SYSTEM in session 0 (a scheduled task).
 $lock = "Global\CombworkRecovery-$guid-machine"
 $holder = @"
-`$s = New-Object System.Security.AccessControl.MutexSecurity
-`$s.AddAccessRule((New-Object System.Security.AccessControl.MutexAccessRule('S-1-5-32-544', 'FullControl', 'Allow')))
 `$created = `$false
-`$m = New-Object System.Threading.Mutex(`$true, '$lock', [ref]`$created, `$s)
+`$m = New-Object System.Threading.Mutex(`$true, '$lock', [ref]`$created)
 Set-Content 'C:\out\lock-held.txt' "`$created `$((Get-Process -Id `$PID).SessionId)"
 for (`$i = 0; `$i -lt 3000 -and -not (Test-Path 'C:\out\lock-release.txt'); `$i++) { Start-Sleep -Milliseconds 100 }
 `$m.ReleaseMutex()
+Set-Content 'C:\out\lock-done.txt' 'done'
 "@
 Set-Content 'C:\out\lock-holder.ps1' $holder
-function Start-Holder {
-  Remove-Item 'C:\out\lock-held.txt', 'C:\out\lock-release.txt' -ErrorAction SilentlyContinue
-  & schtasks.exe /Create /F /TN cwlock /RU SYSTEM /SC ONCE /ST 23:59 /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\out\lock-holder.ps1" | Out-Null
-  & schtasks.exe /Run /TN cwlock | Out-Null
-  Until 'the holder holding the lock' { Test-Path 'C:\out\lock-held.txt' } 60
-  Log "holder: $(Get-Content 'C:\out\lock-held.txt')"
+function Start-Holder([switch]$System) {
+  Remove-Item 'C:\out\lock-held.txt', 'C:\out\lock-release.txt', 'C:\out\lock-done.txt' -ErrorAction SilentlyContinue
+  if ($System) {
+    & schtasks.exe /Create /F /TN cwlock /RU SYSTEM /SC ONCE /ST 23:59 /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\out\lock-holder.ps1" | Out-Null
+    & schtasks.exe /Run /TN cwlock | Out-Null
+  } else {
+    Start-Process powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'C:\out\lock-holder.ps1' -WindowStyle Hidden | Out-Null
+  }
+  Until 'the holder saying it holds the lock' { try { $script:held = Get-Content 'C:\out\lock-held.txt' -ErrorAction Stop; [bool]$script:held } catch { $false } } 60
+  Log "holder (created, session): $script:held"
 }
-function Stop-Holder { Set-Content 'C:\out\lock-release.txt' 'go'; Until 'the holder gone' { -not ((& schtasks.exe /Query /TN cwlock /FO CSV | Select-String 'Running')) } 60; & schtasks.exe /Delete /F /TN cwlock | Out-Null }
+function Stop-Holder {
+  Set-Content 'C:\out\lock-release.txt' 'go'
+  Until 'the holder letting go' { Test-Path 'C:\out\lock-done.txt' } 60
+  & cmd.exe /c "schtasks /Delete /F /TN cwlock >nul 2>&1"
+}
+# Whether an installer is waiting on the lock: running, nothing armed and the old copy in place, throughout a 10 s look.
+function Waiting($p) {
+  for ($i = 0; $i -lt 100; $i++) { if ($p.HasExited -or (RunValue 'machine') -or -not (IsOld $machineDir)) { return $false }; Start-Sleep -Milliseconds 100 }
+  return $true
+}
 
 Reset
 InstallOld 'machine'
 Start-Holder
 $p = Run 'new-setup.exe' @('--updated', '/S')
-# It waits: still running after 15 s, nothing armed, the old copy in place. Then released by the test, it goes on.
-Start-Sleep -Seconds 15
-$waiting = -not $p.HasExited -and -not (RunValue 'machine') -and (IsOld $machineDir)
+$waiting = Waiting $p
 Stop-Holder
 $c = Wait-Exit $p
-Say ($waiting -and $c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(lock) another session holding the machine lock: the update waits, then installs once it is let go' "waiting: $waiting; exit $c"
+Say ($waiting -and $c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(lock) the machine lock held: the update waits, then installs once the test lets it go' "waiting: $waiting; exit $c"
 
 Reset
 InstallOld 'machine'
@@ -305,9 +369,18 @@ $c = Wait-Exit (Run 'new-short-setup.exe' @('--updated', '/S')) 180
 $took = ((Get-Date) - $t0).TotalSeconds
 Stop-Holder
 Say ($c -eq 7 -and $took -ge 18 -and (IsOld $machineDir) -and -not (RunValue 'machine') -and -not (Test-Path $machineRec)) '(lock) held past the wait (20 s build): refused with exit 7, nothing changed' "exit $c; took $([int]$took) s"
+
+# Held from session 0 by SYSTEM: the installer's CreateMutexW meets that object (one name across sessions: it is denied
+# it, rather than making a new one) and, unable to wait on it, refuses at once: fail closed, nothing changed.
+Reset
+InstallOld 'machine'
+Start-Holder -System
+$c = Wait-Exit (Run 'new-setup.exe' @('--updated', '/S')) 180
+Stop-Holder
+Say ($script:held -like '* 0' -and $c -eq 7 -and (IsOld $machineDir) -and -not (RunValue 'machine') -and -not (Test-Path $machineRec)) '(lock) held from session 0 by SYSTEM, which this installer may not open: refused with exit 7, nothing changed' "exit $c; holder $script:held"
 }
 
 Reset
-& net.exe user $stdUser /delete | Out-Null
+& cmd.exe /c "net user $stdUser /delete >nul 2>&1"
 Add-Content $out "done: $fails failed"
 exit $(if ($fails) { 1 } else { 0 })
