@@ -2434,6 +2434,27 @@ export class SlotPool {
    * it is, or needn't be.
    */
   /** The card a slot's binding names now (HI-3057: the card a lane went on to in it), or null: none, or the port can't tell. */
+  /**
+   * HI-3130: a lane's lease on a slot it took back for a kept card (HI-3032) has just prepared its next card there: the
+   * kept record follows the slot's binding (the port's `heldCard`) to that card, under this operation's fence, so the
+   * earlier card (its work in the target, or the lane couldn't have prepared another: HI-3057) isn't tied to a slot
+   * another card works in, and the lane's end keeps it for that card as before. Only a record at the slot's generation;
+   * the binding unreadable, left as it was.
+   */
+  private async keptFollows(name: string, token: string, kind: SlotLease['kind']): Promise<void> {
+    if (kind !== 'lane') return
+    const s = this.store.slot(name)
+    const was = s ? this.store.keptRecord(name) : null
+    if (!s || !was || !s.identity || was.generation !== s.identity.generation) return
+    const card = await this.laneCard(s)
+    if (card === null || card === was.card) return
+    const generation = s.identity.generation
+    await this.store.fenced(name, token, (db) => {
+      db.prepare("UPDATE board_meta SET value = ? WHERE key = ? AND json_extract(value, '$.card') = ? AND json_extract(value, '$.generation') = ?").run(JSON.stringify({ card, generation }), heldKey(this.store.project, name), was.card, generation) // agent-protocol: SQL
+    })
+    log.info(`${userText(name)}'s kept record follows its lane to #${card} (was #${was.card})`)
+  }
+
   private async laneCard(s: Slot): Promise<number | null> {
     const port = this.portOf(s)
     return s.identity && port.heldCard ? await port.heldCard(s.folder, s.identity) : null
@@ -3073,6 +3094,7 @@ export class SlotPool {
             return { error: sayFor(this.port, 'switchFailed', { slot: name, error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)
+          await this.keptFollows(name, token, lease.kind)
           files = await filesNeed()
           if (typeof files === 'object') {
             await end()

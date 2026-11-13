@@ -3418,7 +3418,11 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   lease on a kept slot ending with the work still not in the target keeps it again for the recorded card (its
   generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
   for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
-  card's record goes; the binding unreadable, for the recorded card as before.
+  card's record goes; the binding unreadable, for the recorded card as before. The record follows the binding while the
+  lane still works there too (HI-3130): each preparation of the lane's next card in that slot (`keptFollows`, after the
+  port's prepare, under its operation's fence, only a record at the slot's generation) rewrites it to the card the
+  binding names, so the earlier card (its work in the target: the lane can't prepare another over it, HI-3057) starts
+  elsewhere at once, dry or real, never refused as kept in a slot another card works in.
   **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
   else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
   runtime's `keptHere`, checked right after the plan, any slot lent for it given back). Waiting for that slot stays a
