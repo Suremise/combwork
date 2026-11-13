@@ -6,8 +6,9 @@
 // shows that agent alone. A prompt counts at You, by the word only. The map follows Hide finished, in the project's tab
 // and the workspace's view; a turns read only the map wanted, held in main while the map is turned off, applies nothing
 // once released. An agent set up while the shared map shows gets its context ring once it starts (HI-2929; a 0.9 worktree
-// agent: NOT RUN on a packaged build, CW_EXE, where the rest runs). The Show toggles are kept. Both themes, wide and
-// narrow. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
+// agent: NOT RUN on a packaged build, CW_EXE, where the rest runs). The Show toggles are kept. HI-3179: long paths and
+// a long tool name stay inside their hexes (a file name, cut in its middle), wide and narrow; Last actions under the
+// graph at full width; the split beside the list dragged, kept and reset. Both themes, wide and narrow. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -275,6 +276,89 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await page.keyboard.press('Escape')
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'single', HUNG_MS, 250)
     await shoot('5-single-light')
+
+    // --- HI-3179: the long names of Darren's screenshot. Each hex's text stays inside its outline (a path by its file
+    // name, cut in its middle; the whole on hover); Last actions under the graph at full width; the split beside the
+    // list dragged, kept and reset.
+    await turn('hb1', 'tool Read lanequeue-shots/ended-today-long-narrowest.png then tool Edit installer/interrupted.ps1 then tool mcp__windows-sandbox__sandbox_screenshot')
+    check('the long names reach their stations', !!(await lib.until(async () => /ended-today-long-narrowest\.png/.test((await station('read').locator('title').textContent()) ?? '') && /interrupted\.ps1/.test((await station('edit').locator('title').textContent()) ?? ''), HUNG_MS, 250)), String(await station('read').locator('title').textContent().catch(() => '')))
+    // Each text's box (the SVG's own units) against its hex's outline; the centre's against its own.
+    const textsOutside = () =>
+      map.evaluate((m) => {
+        const inside = (pts, x, y) => {
+          let c = false
+          for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) if (pts[i][1] > y !== pts[j][1] > y && x < ((pts[j][0] - pts[i][0]) * (y - pts[i][1])) / (pts[j][1] - pts[i][1]) + pts[i][0]) c = !c
+          return c
+        }
+        const out = []
+        for (const g of m.querySelectorAll('.activity-map-station, .activity-map-centre')) {
+          const pts = g.querySelector(':scope > polygon').getAttribute('points').trim().split(/\s+/).map((p) => p.split(',').map(Number))
+          for (const t of g.querySelectorAll(':scope > text')) {
+            const b = t.getBBox()
+            if (![[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].every(([x, y]) => inside(pts, x, y))) out.push(`${g.dataset.station ?? 'centre'}: ${t.textContent}`)
+          }
+        }
+        return out
+      })
+    const lastOf = (s) => station(s).locator('.activity-map-station-last').textContent()
+    // Fitted by its drawn width (HR1's round 2): how much of its start shows is the font's; its shape is not.
+    const cutAs = (text, start, end) => typeof text === 'string' && text.startsWith(start) && text.endsWith(`…${end}`) && !text.includes('/')
+    check('Read shows the file name alone, cut in its middle', cutAs(await lastOf('read'), 'ended-t', '.png'), await lastOf('read'))
+    check('…Edit too', cutAs(await lastOf('edit'), 'interru', '.ps1'), await lastOf('edit'))
+    check('…a long tool name cut in its middle, its start and end kept', /…/.test(await lastOf('tools')) && /^\S+…\S+$/.test(await lastOf('tools')), await lastOf('tools'))
+    check('…the whole on the hover', /lanequeue-shots\/ended-today-long-narrowest\.png/.test(await station('read').locator('title').textContent()))
+    const boardBox = () => page.locator('.activity-map-board').boundingBox()
+    const feedBox = () => feed.boundingBox()
+    for (const [width, label] of [[1500, 'wide'], [900, 'narrow']]) {
+      await lib.fitWindow(app, page, { width, height: 900 })
+      await page.waitForFunction((w) => window.innerWidth === w, width)
+      check(`${label}: no hex text crosses its outline`, !!(await lib.until(async () => (await textsOutside()).length === 0, HUNG_MS, 250)), JSON.stringify(await textsOutside()))
+      const [b, f, m] = [await boardBox(), await feedBox(), await map.boundingBox()]
+      check(`${label}: Last actions under the graph, at the map's full width`, !!b && !!f && !!m && f.y >= b.y + b.height - 1 && f.width >= m.width - 24 - 2, JSON.stringify({ b, f, m }))
+      await shoot(`7-long-names-${label}-light`)
+    }
+    // Wide characters (HR1's rounds 1 and 2), drawn by fallback fonts: a CJK file name and a full-width one, then a flag
+    // sequence's and a wide Arabic ligature's, each fitted by its drawn width, never cut inside a character, and inside
+    // its hex. (The fake CLI's tool names are ASCII only: a wide tool name, cut by the same function, is
+    // tests/activityMap.test.ts's.)
+    const titleOf = async (s) => (await station(s).locator('title').textContent().catch(() => '')) ?? ''
+    const wideTurns = [
+      { label: 'CJK and full-width', read: `dir/${'日'.repeat(20)}.ps1`, edit: `dir/ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, readStart: '日', readEnd: '.ps1', editStart: 'ｆ', editEnd: '.txt', shot: '7b-wide-names' },
+      { label: 'flags and a ligature', read: `dir/${'🇬🇧'.repeat(20)}.ps1`, edit: `dir/${'ﷺ'.repeat(12)}.md`, readStart: '🇬🇧', readEnd: '.ps1', editStart: 'ﷺ', editEnd: '.md', shot: '7c-flags' }
+    ]
+    for (const w of wideTurns) {
+      await turn('hb1', `tool Read ${w.read} then tool Edit ${w.edit}`)
+      const [readName, editName] = [w.read.split('/').pop(), w.edit.split('/').pop()]
+      check(`${w.label}: the names reach their stations, whole on the hover`, !!(await lib.until(async () => (await titleOf('read')).includes(readName) && (await titleOf('edit')).includes(editName), HUNG_MS, 250)), `${await titleOf('read')} | ${await titleOf('edit')}`)
+      check(`…each cut in its middle between characters, its extension kept`, cutAs(await lastOf('read'), w.readStart, w.readEnd) && cutAs(await lastOf('edit'), w.editStart, w.editEnd) && [...(await lastOf('read')).split('…')[0]].length % [...w.readStart].length === 0, `${await lastOf('read')} | ${await lastOf('edit')}`)
+      for (const [width, label] of [[1500, 'wide'], [900, 'narrow']]) {
+        await lib.fitWindow(app, page, { width, height: 900 })
+        await page.waitForFunction((x) => window.innerWidth === x, width)
+        check(`…${label}: no text crosses its hex's outline`, !!(await lib.until(async () => (await textsOutside()).length === 0, HUNG_MS, 250)), JSON.stringify(await textsOutside()))
+        await shoot(`${w.shot}-${label}-light`)
+      }
+    }
+    // Wide again: the map beside the list, the split at its right edge.
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    const list = page.locator('.activity-body > .activity-list, .activity-body > .pane-empty').first()
+    check('wide: the map beside the list', !!(await lib.until(async () => {
+      const [m, l] = [await map.boundingBox(), await list.boundingBox()]
+      return m && l && Math.abs(m.x + m.width - l.x) <= 2 ? true : null
+    }, HUNG_MS, 250)))
+    const split = map.locator(':scope > .pane-resizer')
+    const wasW = (await map.boundingBox()).width
+    const svgWas = (await page.locator('.activity-map-svg').boundingBox()).height
+    const sb = await split.boundingBox()
+    await page.mouse.move(sb.x + sb.width / 2, sb.y + 100)
+    await page.mouse.down()
+    await page.mouse.move(sb.x + sb.width / 2 + 160, sb.y + 100, { steps: 6 })
+    await page.mouse.up()
+    check('the split drags: the map 160 px wider', !!(await lib.until(async () => Math.abs((await map.boundingBox()).width - (wasW + 160)) <= 3, HUNG_MS, 250)), `${wasW} → ${(await map.boundingBox()).width}`)
+    check('…kept as the app\'s other splits are', !!(await lib.until(async () => Math.abs(((await inv('ui:get')).panes?.activityMap ?? 0) - (wasW + 160)) <= 3, HUNG_MS, 250)), JSON.stringify((await inv('ui:get')).panes?.activityMap))
+    check('…and the graph fills what it gained', (await page.locator('.activity-map-svg').boundingBox()).height >= svgWas - 1)
+    await shoot('8-split-dragged-light')
+    await split.dblclick()
+    check('…a double-click puts it back', !!(await lib.until(async () => Math.abs((await map.boundingBox()).width - wasW) <= 3 && (await inv('ui:get')).panes?.activityMap == null, HUNG_MS, 250)), String((await map.boundingBox()).width))
     await lib.fitWindow(app, page, { width: 900, height: 900 })
     const above = await lib.until(async () => {
       const m = await map.boundingBox()

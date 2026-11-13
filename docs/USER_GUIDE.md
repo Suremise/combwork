@@ -542,14 +542,14 @@ Combwork only ever ends processes the agent's session started: never one you sta
 
 #### The Activity map <a id="the-activity-map"></a>
 
-Above the list (beside it when the tab is wide), the **map** draws the same activity as a honeycomb: the agent in the centre, and around it six stations its tool calls go to:
+Above the list (beside it when the tab is wide: drag the line between them to give the map more or less room, double-click it for the default), the **map** draws the same activity as a honeycomb: the agent in the centre, and around it six stations its tool calls go to:
 
 - **You**: its prompts; outlined in red, *Needs you*, while it waits for your answer or permission.
 - **Read**: reading and searching files. **Edit**: changing files (red while Combwork's file lock blocks one of its edits).
 - **Shell**: commands, with the program running now. **Agents**: subagents and background tasks.
 - **Tools**: everything else: the web, skills, Combwork's own tools and other MCP tools.
 
-Each station counts the calls of the agent's current turn and names the last one. Live, each new call sends a dot out along its spoke and back when it ends; a spoke thickens with the calls of the last ten minutes, and a station turns red when a call failed. **Last actions** beside it lists the newest calls. The map shows names, never content: a file by its last two folders, a web page by its host, a command only as its tool. A command's arguments, a search's words or a prompt never appear on it.
+Each station counts the calls of the agent's current turn and names the last one. Live, each new call sends a dot out along its spoke and back when it ends; a spoke thickens with the calls of the last ten minutes, and a station turns red when a call failed. **Last actions**, always under the map at its full width, lists the newest calls. The map shows names, never content: a file by its last two folders (on a station, by its name alone, cut in the middle when it is long: point at the station for the whole), a web page by its host, a command only as its tool. A command's arguments, a search's words or a prompt never appear on it.
 
 - **One agent** in **Agents ▾**: its own map, with its context as a ring around it (the share of its context window, as its pane's footer shows it): amber from 70 %, red from 90 %.
 - The map shows the agents the tabs do: **Agents ▾**, **Cards ▾** and **Hide finished** narrow it as they narrow the list, and with nothing shown there's no map.

@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationOf, stationTitle, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -479,5 +479,59 @@ describe("a station's hover: whole messages in every language (HI-2930)", () => 
       expect(c['activity.map.stationTip'], code).toMatch(/\{hasLast, select, yes \{\{last\}\} other \{[^{}]+\}\}$/)
       expect(c['activity.map.stationTipPending'], code).toMatch(/\{status, select, notReported \{[^{}]+\} other \{[^{}]+\}\}$/)
     }
+  })
+})
+
+describe("a station's last call in its hex (HI-3179)", () => {
+  it("shows a path's file name alone on Read and Edit, cut in its middle keeping its extension when still too long", () => {
+    expect(STATION_LAST_CHARS).toBe(12)
+    expect(stationLastShown('installer/interrupted.ps1', 'read')).toBe('interru….ps1')
+    expect(stationLastShown('installer\\interrupted.ps1', 'edit')).toBe('interru….ps1')
+    expect(stationLastShown('docs/USER_GUIDE.md', 'edit')).toBe('USER_GUI….md')
+    expect(stationLastShown('lanequeue-shots/ended-today-long-narrowest.png', 'read')).toBe('ended-t….png')
+    expect(stationLastShown('src/a.ts', 'read')).toBe('a.ts')
+  })
+  it('keeps the count of more files, inside the same width', () => {
+    const s = stationLastShown('installer/interrupted.ps1 +2', 'edit')
+    expect(s).toBe('inte….ps1 +2')
+    expect([...s].length).toBeLessThanOrEqual(STATION_LAST_CHARS)
+  })
+  it('cuts a long tool name in its middle, its start and end kept; a short one, a host or a path elsewhere as it is', () => {
+    expect(stationLastShown('sandbox_screenshot', 'tools')).toBe('sandbox…shot')
+    expect(stationLastShown('sandbox_run', 'tools')).toBe('sandbox_run')
+    expect(stationLastShown('node.exe', 'shell')).toBe('node.exe')
+    expect(stationLastShown('a/b', 'tools')).toBe('a/b')
+  })
+  it('counts a wide character (CJK, full-width, an emoji) as two columns, and never cuts inside one (HR1’s round 1)', () => {
+    expect(textColumns('interru….ps1')).toBe(12)
+    expect(textColumns('日本')).toBe(4)
+    expect(textColumns('ＡＢ')).toBe(4)
+    expect(textColumns('👩‍💻')).toBe(2)
+    expect(textColumns('é')).toBe(1)
+    expect(stationLastShown(`dir/${'日'.repeat(20)}.ps1`, 'read')).toBe('日日日….ps1')
+    expect(stationLastShown('ツール'.repeat(5), 'tools')).toBe('ツール…ール')
+    expect(stationLastShown('日本語.md', 'edit')).toBe('日本語.md')
+    const emoji = stationLastShown('👩‍💻'.repeat(10), 'tools')
+    expect(emoji).toBe('👩‍💻👩‍💻👩‍💻…👩‍💻👩‍💻')
+    expect(textColumns(emoji)).toBeLessThanOrEqual(STATION_LAST_CHARS)
+  })
+  it('counts a flag, a letter with a combining accent and any other character a fallback font may draw as two (HR1’s round 2)', () => {
+    expect(textColumns('🇬🇧')).toBe(2)
+    expect(textColumns('é')).toBe(2)
+    expect(textColumns('ق')).toBe(2)
+    expect(textColumns('Ωж—…')).toBe(4)
+    expect(stationLastShown(`dir/${'🇬🇧'.repeat(20)}.ps1`, 'read')).toBe('🇬🇧🇬🇧🇬🇧….ps1')
+  })
+  it('fits by the width the map measures when it gives one, cutting between characters as before', () => {
+    // A font drawing every character the same width: 13 fit.
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 13)).toBe('interrup….ps1')
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 15)).toBe('interrupted.ps1')
+    // Too narrow for its extension: its start alone, with the ellipsis.
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 4)).toBe('int…')
+    // The "+2" counts inside what the map measures.
+    expect(stationLastShown('installer/interrupted.ps1 +2', 'edit', (t) => [...t].length <= 13)).toBe('inter….ps1 +2')
+  })
+  it('never shows more than its columns', () => {
+    for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md', `${'日'.repeat(20)}.ps1`, `ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, `한국어파일이름입니다.ts`, `a${'日'.repeat(9)}b`, `${'🇬🇧'.repeat(20)}.ps1`, `${'é'.repeat(20)}.md`, `${'ﷺ'.repeat(10)}`]) for (const st of ['read', 'tools'] as const) expect(textColumns(stationLastShown(s, st)), s).toBeLessThanOrEqual(STATION_LAST_CHARS)
   })
 })

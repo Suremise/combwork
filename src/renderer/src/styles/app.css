@@ -8432,26 +8432,27 @@ button.agent-place:hover {
     border-left: 1px solid var(--border-subtle);
   }
 }
+/* The map (HI-3179, Darren's decision): the graph and its agents' strip, Last actions always under them at full width.
+   Under the list (a narrow view) it is as tall as its graph allows; beside it (a wide view) its width is the split's,
+   dragged at its right edge and kept, and the graph fills what Last actions leaves. */
 .activity-map {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 10px 12px;
-  align-items: flex-start;
   overflow: auto;
 }
-@container (max-width: 640px) {
-  .activity-map {
-    flex-direction: column;
-  }
+.activity-map > .pane-resizer {
+  display: none;
 }
 .activity-map-board {
   display: flex;
   flex-direction: column;
   gap: 6px;
   flex: 0 0 auto;
-  width: 440px;
-  max-width: 100%;
+  min-width: 0;
 }
 .activity-map-svg {
   display: block;
@@ -8460,8 +8461,24 @@ button.agent-place:hover {
   max-height: 46vh;
 }
 @container (min-width: 900px) {
+  .activity-body.with-map > .activity-map {
+    flex: 0 0 var(--activity-map-width, 560px);
+    min-width: 320px;
+    max-width: calc(100% - 280px);
+    overflow: hidden;
+  }
+  .activity-map > .pane-resizer {
+    display: block;
+    right: 0;
+  }
+  .activity-map-board {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
   .activity-map-svg {
-    max-height: calc(100vh - 230px);
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
   }
 }
 .activity-map-comb polygon {
@@ -8647,19 +8664,13 @@ button.agent-place:hover {
   stroke-dasharray: 2 2;
 }
 .activity-map-feed {
-  flex: 0 0 220px;
+  flex: 0 0 auto;
   min-width: 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 12px;
-}
-@container (max-width: 640px) {
-  .activity-map-feed {
-    flex-basis: auto;
-    width: min(440px, 100%);
-  }
 }
 .activity-map-feed h4 {
   margin: 0 0 6px;

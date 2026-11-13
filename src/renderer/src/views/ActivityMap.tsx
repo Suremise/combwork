@@ -3,7 +3,7 @@
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, stationTitle, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, stationLastShown, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -15,6 +15,7 @@ import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
 import { useStore } from '../store'
 import { cx } from '../util'
+import { PaneResizer, usePaneSize } from '../components/Resizer'
 import type { MapShow } from '../activityView'
 
 /**
@@ -204,6 +205,35 @@ const hexPoints = (x0: number, y0: number, r: number): string =>
 const hexPath = (x0: number, y0: number, r: number): string => `M${hexPoints(x0, y0, r).split(' ').join('L')}Z`
 const short = (s: string, n = 24): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
+/**
+ * The map's width beside the list (HI-3179), the split between them: dragged, kept as the app's other splits are
+ * (`ui:setPane`), double-click for the default; the list keeps `keep` pixels. Under the list (a narrow view) it has none.
+ */
+const MAP_PANE = { key: 'activityMap', width: 560, min: 320, max: 1400, keep: 280 }
+
+/**
+ * The width a station's last call has (HI-3179, HR1's rounds 1 and 2): the hex's inner width at that line
+ * (STATION_R × √3 ≈ 90 units, its sides upright there) less a margin each side. In the SVG's own units, as its font
+ * size (the CSS's 10.5px) is.
+ */
+const LAST_WIDTH = 78
+const LAST_FONT_PX = 10.5
+let measurer: CanvasRenderingContext2D | null | undefined
+
+/**
+ * Whether a text fits a station's hex by its drawn width (HR1's HI-3179 round 2: counting characters missed glyphs a
+ * fallback font draws wider): measured in the station's own font, a canvas drawing as the SVG does (its fallback fonts
+ * too). Null where nothing can measure: stationLastShown's columns bound then.
+ */
+function lastFits(): TextFits | null {
+  if (measurer === undefined) measurer = document.createElement('canvas').getContext('2d')
+  if (!measurer) return null
+  const ctx = measurer
+  const family = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace'
+  ctx.font = `${LAST_FONT_PX}px ${family}`
+  return (t) => ctx.measureText(t).width <= LAST_WIDTH
+}
+
 /** The faint comb behind the map: drawn once. */
 const COMB = (() => {
   const r = 22
@@ -241,8 +271,11 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const working = model.agents.filter((a) => a.state === 'working').length
   const waiting = model.agents.filter((a) => a.waiting).length
   const stationName = (s: MapStation): string => tr(M.station, { station: s })
+  // Beside the list (a wide view), its width is the user's (HI-3179): a split dragged as the app's others, kept.
+  const width = usePaneSize(MAP_PANE.key, MAP_PANE.width)
   return (
-    <div className={cx('activity-map', mode === 'shared' && 'shared')} data-mode={mode}>
+    <div className={cx('activity-map', mode === 'shared' && 'shared')} data-mode={mode} style={{ '--activity-map-width': `${width}px` } as React.CSSProperties}>
+      <PaneResizer paneKey={MAP_PANE.key} min={MAP_PANE.min} max={MAP_PANE.max} keep={MAP_PANE.keep} />
       <div className="activity-map-board">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr(M.mapLabel)} className="activity-map-svg">
           <g className="activity-map-comb" aria-hidden="true">
@@ -336,7 +369,7 @@ function Station({ view: st, name, colours }: { view: MapStationView; name: stri
       </text>
       {last && st.status === 'ok' && (
         <text x={p.x} y={p.y + 20} className="activity-map-station-last">
-          {short(last)}
+          {stationLastShown(last, st.station, lastFits() ?? undefined)}
         </text>
       )}
       {colours.size > 1 &&

@@ -239,6 +239,67 @@ export function stationTitle(st: Pick<MapStationView, 'status' | 'count' | 'heat
   return tr(TIP.stationTip, { station: name, n: st.count, heat: st.heat, hasLast: last ? 'yes' : 'no', last })
 }
 
+/**
+ * The columns a station's last call has inside its hex when its drawn width can't be measured (HI-3179: tests, no
+ * canvas): its inner width at that line, less a margin, in the map's monospace at its size. The map itself fits by the
+ * drawn width (ActivityMap's `lastFits`); this is the conservative bound beside it (`textColumns`).
+ */
+export const STATION_LAST_CHARS = 12
+
+/** Whether a text fits a station's hex: by its drawn width in the map, else by its columns (`textColumns`). */
+export type TextFits = (text: string) => boolean
+const columnsFit: TextFits = (t) => textColumns(t) <= STATION_LAST_CHARS
+
+/**
+ * A station's last call as its hex shows it (HI-3179; its hover has it whole): a path's file name alone (Read and Edit,
+ * "+2" for more files kept), and anything that doesn't fit cut in its middle between characters (graphemes), its start
+ * and its end kept (a file's extension, or a tool name's last letters): `interrupted.ps1` → `interru….ps1`.
+ */
+export function stationLastShown(last: string, station: MapStation, fits: TextFits = columnsFit): string {
+  const more = /^(.*?)( \+\d+)$/.exec(last)
+  const label = more ? more[1] : last
+  const extra = more ? more[2] : ''
+  const shown = (station === 'read' || station === 'edit') && /[\\/]/.test(label) ? (label.split(/[\\/]/).filter(Boolean).pop() ?? label) : label
+  return middleCut(shown, (t) => fits(t + extra)) + extra
+}
+
+/** A text's characters as the reader sees them (graphemes: an emoji with its modifiers, a flag's pair, a letter with its accents). */
+function graphemes(s: string): string[] {
+  return typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((x) => x.segment) : [...s]
+}
+
+/**
+ * The characters a monospace font draws one column wide (HR1's HI-3179 rounds 1 and 2): a single code point of Latin
+ * (with its supplements and extensions), Greek, Cyrillic, or the dashes, quotes and ellipsis. Any other character (CJK,
+ * full-width, an emoji, a flag, a letter with a combining accent, a script the font hasn't, drawn by a fallback font)
+ * counts two: more than most take, so a bound, never an estimate.
+ */
+const NARROW = /^[ -~ -ɏͰ-ӿ‐-‧]$/u
+
+/** How many monospace columns `s` takes at most: a narrow character (`NARROW`) one, any other two. */
+export function textColumns(s: string): number {
+  return graphemes(s).reduce((n, g) => n + (NARROW.test(g) ? 1 : 2), 0)
+}
+
+/**
+ * `s` as `fits` allows it, cut in the middle between characters: its start (as much as fits), an ellipsis, and its end
+ * (its extension, else its last few characters).
+ */
+function middleCut(s: string, fits: TextFits): string {
+  if (fits(s)) return s
+  const all = graphemes(s)
+  const ext = /\.[A-Za-z0-9]{1,5}$/.exec(s)?.[0]
+  let tail = ext ?? ''
+  if (!ext) for (let i = all.length - 1; i >= 0 && textColumns(all[i] + tail) <= 4; i--) tail = all[i] + tail
+  if (!fits(`…${tail}`)) tail = ''
+  let head = ''
+  for (const g of all) {
+    if (!fits(`${head}${g}…${tail}`)) break
+    head += g
+  }
+  return `${head}…${tail}`
+}
+
 export interface MapAgentView {
   key: string
   name: string
