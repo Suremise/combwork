@@ -25,6 +25,11 @@ export interface BoundedOptions {
   argv0?: string
   /** HI-2947: `args` are Windows' command line as given (quoted by the caller, as git quotes them). */
   verbatim?: boolean
+  /**
+   * HI-3208: no console (a terminal) of its own or its parent's (`detached`), as cw-sign starts a signer: Windows' own
+   * ssh-keygen asks for a locked key's passphrase on any console it has, a hidden one included, and waits there.
+   */
+  noConsole?: boolean
 }
 
 export function boundedSpawn(file: string, args: string[], o: BoundedOptions): Promise<QueueGitResult> {
@@ -33,7 +38,7 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
   return new Promise((res) => {
     let child: ChildProcess
     try {
-      child = spawn(file, args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: [o.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}) })
+      child = spawn(file, args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: [o.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(o.noConsole ? { detached: true } : {}) })
     } catch (e) {
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }

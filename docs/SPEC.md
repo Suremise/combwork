@@ -7211,6 +7211,9 @@ never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`
 - ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
   written to a temp file as git does, a path's
   `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
+- Either runs with no console (detached, HI-3208), as cw-sign runs it: Windows' own ssh-keygen asks a locked key's
+  passphrase on any console it has, a hidden one too (what Windows gives a console program started by Electron's main or
+  by the merge queue's launcher), and waited there until the bound (`couldNotComplete` where `needsSomeone` was right).
 - Either is started as git starts it (HI-2947): git's command line written out as is, each word quoted with
   `quote_arg_msvc`, so Git's own MSYS2 gpg and ssh-keygen get a `'`, `*`, `?` or `{` (a key or temp folder under
   `C:\Users\O'Brien`) as a commit would give it, never as Node's quoting would. The same in the merge queue's run and in
