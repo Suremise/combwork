@@ -117,20 +117,28 @@ export const RUN_MARK_VAR = 'COMBWORK_RUN'
 export const MSYS_FIND_BOUNDS = { timeoutMs: 3000, maxBuffer: 1024 * 1024 }
 
 /**
- * The script findMsysMarked runs in that Git's sh.exe, the marker as `$1` (argv, never put into the script). Builtins
- * only (for, read, [, echo, cd), no command substitution, pipe, subshell or background job: it starts no process, so
- * ending the shell at its bound leaves nothing behind. First the time, before any read (`t`, `$EPOCHREALTIME`); then three
- * passes over `/proc`: each MSYS pid's winpid (`a`); the pids with an environment entry exactly `COMBWORK_RUN=$1`,
- * compared whole, NUL-separated (`m`); each pid's winpid again (`b`); then `end`. It prints ids and the time only.
+ * The script findMsysMarked runs in that Git's sh.exe, the marker as `$1` (argv, never put into the script), then the
+ * MSYS pids whose environment it must not read (HI-3065, below). Builtins only (for, read, [, echo, cd, if), no command
+ * substitution, pipe, subshell or background job: it starts no process, so ending the shell at its bound leaves nothing
+ * behind. First the time, before any read (`t`, `$EPOCHREALTIME`); then three passes over `/proc`: each MSYS pid's
+ * winpid (`a`); the pids with an environment entry exactly `COMBWORK_RUN=$1`, compared whole, NUL-separated (`m`), each
+ * pid named first (`x`); each pid's winpid again (`b`); then `end`. It prints ids and the time only.
+ *
+ * HI-3065: reading `/proc/<pid>/environ` of a native Windows process while it is still starting (another lane's `npx`,
+ * run from Git Bash) ends the shell reading it outright (exit status 256, no trap run, nothing said), for as long as
+ * that process takes to start. The `x` line before each read names the entry it died on.
  */
 export const MSYS_FIND_SCRIPT = [
   'cd /proc || exit 3',
   'echo "t $EPOCHREALTIME"',
   'for d in [0-9]*; do read -r w < "$d/winpid" && echo "a $d $w"; done 2>/dev/null',
-  `for d in [0-9]*; do while IFS= read -r -d '' e; do if [ "$e" = "${RUN_MARK_VAR}=$1" ]; then read -r w < "$d/winpid" && echo "m $d $w"; break; fi; done < "$d/environ"; done 2>/dev/null`,
+  `for d in [0-9]*; do k=; for s in "$@"; do [ "$s" = "$d" ] && k=1; done; if [ -z "$k" ]; then echo "x $d"; while IFS= read -r -d '' e; do if [ "$e" = "${RUN_MARK_VAR}=$1" ]; then read -r w < "$d/winpid" && echo "m $d $w"; break; fi; done < "$d/environ"; fi; done 2>/dev/null`,
   'for d in [0-9]*; do read -r w < "$d/winpid" && echo "b $d $w"; done 2>/dev/null',
   'echo end'
 ].join('\n')
+
+/** HI-3065: how many times findMsysMarked's search is run, each time it dies reading an entry, that entry then skipped. */
+export const MSYS_FIND_TRIES = 3
 
 /**
  * The processes of `list` that MSYS_FIND_SCRIPT's output says carry the marker, or null when the output is malformed or
@@ -149,6 +157,8 @@ export function msysMatches(out: string, list: ListedProcess[]): ListedProcess[]
   const after = new Map<number, number>()
   const matched: [number, number][] = []
   for (const l of lines.slice(1, -1)) {
+    // The entry about to be read (HI-3065): nothing found by itself.
+    if (/^x \d+$/.test(l)) continue
     const m = /^([amb]) (\d+) (\d+)$/.exec(l)
     if (!m) return null
     const [pid, win] = [Number(m[2]), Number(m[3])]
@@ -167,9 +177,10 @@ export function msysMatches(out: string, list: ListedProcess[]): ListedProcess[]
 
 /**
  * `file` with `args`, its output once it exits, bounded: ended (it alone: findMsysMarked's starts nothing) past
- * `timeoutMs` or `maxBuffer`, and then an error. Hidden, no shell, the environment given.
+ * `timeoutMs` or `maxBuffer`, and then an error. Hidden, no shell, the environment given. An error from its own exit
+ * (`exited`, not ended here) has what it printed by then (`partial`).
  */
-export function boundedOutput(file: string, args: string[], o: { timeoutMs: number; maxBuffer: number; env: NodeJS.ProcessEnv }): Promise<{ out: string } | { error: string; pid?: number }> {
+export function boundedOutput(file: string, args: string[], o: { timeoutMs: number; maxBuffer: number; env: NodeJS.ProcessEnv }): Promise<{ out: string } | { error: string; pid?: number; exited?: true; partial?: string }> {
   return new Promise((res) => {
     let c: ChildProcess | undefined
     try {
@@ -177,7 +188,8 @@ export function boundedOutput(file: string, args: string[], o: { timeoutMs: numb
         if (!err) return res({ out: String(stdout) })
         const e = err as Error & { code?: unknown; killed?: boolean }
         const why = e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? 'its output passed the cap' : e.killed ? 'it ran past its time limit' : typeof e.code === 'number' ? `it exited with ${e.code}` : `it couldn't run (${String(e.code ?? 'error')})` // i18n-ignore: for the log
-        res({ error: why, ...(c?.pid ? { pid: c.pid } : {}) })
+        const exited = typeof e.code === 'number' && !e.killed
+        res({ error: why, ...(c?.pid ? { pid: c.pid } : {}), ...(exited ? { exited: true as const, partial: String(stdout ?? '') } : {}) })
       })
     } catch (e) {
       res({ error: `it couldn't run (${(e as Error).message})` }) // i18n-ignore: for the log
@@ -185,10 +197,22 @@ export function boundedOutput(file: string, args: string[], o: { timeoutMs: numb
   })
 }
 
-/** Asks that MSYS installation's sh.exe which of its programs carry the marker (MSYS_FIND_SCRIPT), bounded (MSYS_FIND_BOUNDS). */
-export function findMsysMarked(m: MsysMark): Promise<{ out: string } | { error: string }> {
+/**
+ * Asks that MSYS installation's sh.exe which of its programs carry the marker (MSYS_FIND_SCRIPT), bounded
+ * (MSYS_FIND_BOUNDS). HI-3065: a shell that died reading an entry's environment (its output's last line `x <pid>`) is
+ * run again with that entry skipped, up to MSYS_FIND_TRIES times: its environment unread, as an entry unreadable any
+ * other way, and every other one searched. Died elsewhere, ended at its bound, or still dying: the error, as before.
+ */
+export async function findMsysMarked(m: MsysMark, run: typeof boundedOutput = boundedOutput): Promise<{ out: string } | { error: string }> {
   const env = { SystemRoot: process.env.SystemRoot || 'C:\\Windows', PATH: m.bin }
-  return boundedOutput(join(m.bin, 'sh.exe'), ['-c', MSYS_FIND_SCRIPT, 'sh', m.mark], { ...MSYS_FIND_BOUNDS, env })
+  const skip: string[] = []
+  for (let t = 1; ; t++) {
+    const r = await run(join(m.bin, 'sh.exe'), ['-c', MSYS_FIND_SCRIPT, 'sh', m.mark, ...skip], { ...MSYS_FIND_BOUNDS, env })
+    if ('out' in r) return r
+    const at = r.exited ? /^x (\d+)$/.exec(r.partial?.trim().split(/\r?\n/).at(-1) ?? '')?.[1] : undefined
+    if (!at || skip.includes(at) || t >= MSYS_FIND_TRIES) return { error: r.error }
+    skip.push(at)
+  }
 }
 
 /**

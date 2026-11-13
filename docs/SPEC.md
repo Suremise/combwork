@@ -6343,8 +6343,12 @@ touched:
   asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly
   that entry, and each is ended with the tree, only while it is provably the process MSYS named (the same winpid
   before and after the read, listed afterwards with a start no later than the time taken before the search's first
-  read, the usual start-time check when ended). A search
-  that fails ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
+  read, the usual start-time check when ended). Reading the environment of a native process while it is still starting
+  (another lane's `npx`, run from Git Bash) ends the shell reading it outright (HI-3065: exit status 256, nothing said;
+  seen as a slow hook's `sleep` left running after the bound, about one search in fifty while other lanes start
+  processes). So the script names each entry (`x <pid>`) before reading its environment, and a search that died on one
+  is run again with that entry skipped (its environment unread, as any unreadable entry's), at most three runs. A search
+  that fails otherwise, or every time, ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
   and (as for native programs) one whose parent had exited and that carries no marker. **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
   `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
   (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too, by a step bounded as the commit
