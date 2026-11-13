@@ -566,14 +566,13 @@ const onDb = (fn) => {
     await move7.getByText('Assign and start', { exact: true }).click()
     // With Assign and start chosen, the dialog's button is Start.
     await move7.getByRole('button', { name: 'Start', exact: true }).click()
-    const ask7 = page.locator('.dialog', { hasText: 'anyway?' })
-    check('…the board asks to start it across the slot rule', !!(await until(async () => (await ask7.count()) === 1, HUNG_MS)), await text(page.locator('body')))
-    await shoot(ask7, 'kept-elsewhere-ask')
-    await ask7.getByRole('button', { name: 'Move Anyway' }).click()
-    const refused7 = page.locator('.toast', { hasText: `kept in slot ${kept7.name}` })
-    check('…Move Anyway refused, naming the slot', !!(await until(async () => (await refused7.count()) > 0, HUNG_MS)), await text(page.locator('.toasts')))
-    await shoot(refused7.first(), 'kept-elsewhere-refused')
-    console.log(`INFO HI-3132 refusal shown: ${(await refused7.first().innerText().catch(() => '')).replace(/\s+/g, ' ')}`)
+    // Refused in the dialog naming the slot, with no Move Anyway offered: the refusal is the start's own, never a rule
+    // an override skips (the slot rule's wait would have offered one).
+    const refused7 = move7.filter({ hasText: `kept in slot ${kept7.name}, and it starts only in that slot` })
+    check('…refused in the dialog, naming the slot, nothing to start anyway', !!(await until(async () => (await refused7.count()) === 1, HUNG_MS)) && (await page.locator('.dialog', { hasText: 'anyway?' }).count()) === 0, await text(page.locator('body')))
+    await shoot(refused7, 'kept-elsewhere-refused')
+    console.log(`INFO HI-3132 refusal shown: ${(await refused7.innerText().catch(() => '')).replace(/\s+/g, ' ')}`)
+    await refused7.getByRole('button', { name: 'Cancel' }).click()
     const facts7 = (await inv('tasks:facts', n2)).map((f) => f.kind)
     const work7 = await inv('tasks:work', n2).catch(() => null)
     check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
