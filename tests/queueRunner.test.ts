@@ -669,8 +669,8 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     try {
       const dir = tempDir('qr-key-')
       const key = join(dir, 'id_ed25519')
-      const made = await a.runner.run('testMerge', sysKeygen, ['-q', '-t', 'ed25519', '-N', 'secret', '-C', 'test', '-f', key], { timeoutMs: 30_000, noConsole: true })
-      expect(made).toMatchObject({ ok: true, code: 0 })
+      const keyMade = await a.runner.run('testMerge', sysKeygen, ['-q', '-t', 'ed25519', '-N', 'secret', '-C', 'test', '-f', key], { timeoutMs: 30_000, noConsole: true })
+      expect(keyMade).toMatchObject({ ok: true, code: 0 })
       const payload = join(dir, 'payload')
       writeFileSync(payload, 'x\n')
       // Bounded well past the check's few seconds: a run that waited would end there, timed out.

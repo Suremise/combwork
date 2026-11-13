@@ -40,10 +40,10 @@ const sshKeygen = (): string => keygen
 
 /** Windows' own ssh-keygen (OpenSSH for Windows), where it is installed. */
 const SYS_KEYGEN = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh-keygen.exe')
-/** An ed25519 key pair in a folder of its own: with a passphrase when given, made by `keygen` (Git's unless said). */
-function keyPair(passphrase = '', keygen = sshKeygen()): { key: string; pub: string } {
+/** An ed25519 key pair in a folder of its own: with a passphrase when given, made by `maker` (Git's unless said). */
+function keyPair(passphrase = '', maker = sshKeygen()): { key: string; pub: string } {
   const key = slash(join(tempDir('key-'), 'id_ed25519'))
-  execFileSync(keygen, ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
+  execFileSync(maker, ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
   return { key, pub: `${key}.pub` }
 }
 
