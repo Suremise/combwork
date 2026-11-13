@@ -476,6 +476,7 @@
   "git.vc.store.conflictedCommit": "Le commit {commit} stocke des conflits : résous-les avec jj.",
   "git.vc.store.copy": "{project} : {kind, select, review {copie de relecture} other {copie de vérification}} {copy}",
   "git.vc.store.kept": "{project} : le travail commité de {card}, gardé dans l’emplacement {slot} pour son prochain démarrage : démarre {card} et termine-la",
+  "git.vc.store.carried": "{project} : le travail antérieur de {card} est sur {line}{state, select, ahead {, avec des commits que sa cible ne contient pas} other {, et Combwork n’a pas pu savoir si sa cible le contient}}. Après le basculement, {card} repart de zéro depuis sa cible : récupère ce travail toi-même si tu le veux.",
   "git.vc.store.detached": "{project} : son dossier n’est sur aucune branche (son HEAD est détaché à {head}) et le restera après le basculement. Bascule-y sur la branche de son travail (git switch) avant que ses cartes démarrent dans le dossier du projet.",
   "git.vc.store.drain": "Encore en cours sur ce dépôt (le changement attend que tout soit terminé) :",
   "git.vc.store.fallback": "Avant de revenir à Git :",

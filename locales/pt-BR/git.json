@@ -476,6 +476,7 @@
   "git.vc.store.conflictedCommit": "O commit {commit} guarda conflitos: resolva com o jj.",
   "git.vc.store.copy": "{project}: {kind, select, review {cópia de revisão} other {cópia de verificação}} {copy}",
   "git.vc.store.kept": "{project}: o trabalho com commit de {card}, reservado no slot {slot} para quando ele começar de novo: comece {card} e termine-o",
+  "git.vc.store.carried": "{project}: o trabalho anterior de {card} está em {line}{state, select, ahead {, com commits que o destino não tem} other {, e o Combwork não conseguiu saber se o destino o tem}}. Após a troca, {card} recomeça do zero a partir do destino: traga esse trabalho você mesmo, se quiser.",
   "git.vc.store.detached": "{project}: a pasta dele não está em nenhum branch (o HEAD está desanexado em {head}) e continua assim após a troca. Mude ali para o branch do trabalho dele (git switch) antes que os cartões comecem na pasta do projeto.",
   "git.vc.store.drain": "Ainda em execução neste repositório (a mudança espera até tudo terminar):",
   "git.vc.store.fallback": "Antes de voltar para o Git:",

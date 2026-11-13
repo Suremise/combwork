@@ -435,6 +435,7 @@ interface CombworkMessageValues {
   'git.vc.stepNotice.text': { n: number; projects: string | number }
   'git.vc.store.autocrlf': { command: string | number }
   'git.vc.store.card': { project: string | number; card: string | number; title: string | number }
+  'git.vc.store.carried': { project: string | number; card: string | number; line: string | number; state: string }
   'git.vc.store.clear': { gate: string | number }
   'git.vc.store.conflictedBookmark': { name: string | number }
   'git.vc.store.conflictedCommit': { commit: string | number }

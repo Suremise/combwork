@@ -46,6 +46,7 @@ import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 import { admit } from '../platform/platformFence'
 import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
+import { earlierWork, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
 
 const log = createLogger('workflow')
@@ -120,6 +121,9 @@ export interface Effects {
 }
 
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
+/** HI-3107: a card's earlier work on another version control's line, said to agents (a start's warning, the card's comment). */
+export const earlierWorkText = (card: string, e: EarlierLine, now: PlatformId): string => say(W.earlierWork, { card, line: e.line, now: shownPlatform(now), state: e.state, target: e.target ?? '' })
+
 /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross): its platform's and the project's now. */
 export interface KeptAcross {
   slot: string
@@ -129,7 +133,7 @@ export interface KeptAcross {
 }
 
 /** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
-const shownPlatform = (p: string): string => ({ git: 'Git', jj: 'jj', none: 'None' })[p] ?? p // i18n-ignore: product names, the same in every language
+export const shownPlatform = (p: string): string => ({ git: 'Git', jj: 'jj', none: 'None' })[p] ?? p // i18n-ignore: product names, the same in every language
 
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 
@@ -214,6 +218,8 @@ export interface WorkflowConfig {
    * chosen (`platform.keptAcross`). Left out, none.
    */
   keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
+  /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
+  earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
@@ -371,6 +377,7 @@ const W = {
   blocked: agentMsg({ id: 'runtime.start.blocked', text: '{card} is blocked: {why}', note: "A start's warning: the card is blocked. {why}: the block's reason, in its author's words." }),
   targetChanges: agentMsg({ id: 'runtime.start.targetChanges', text: "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.", note: "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more." }),
   moreFiles: agentMsg({ id: 'runtime.start.moreFiles', text: '{files} and {more} more', note: 'HI-2944: a list of paths cut at three, and how many more there are.' }),
+  earlierWork: agentMsg({ id: 'runtime.start.earlierWork', text: "{card} has earlier work on {line}, from before its project switched to {now}: {state, select, ahead {commits its target {target} doesn't hold} other {Combwork couldn't tell whether its target holds it}}. It isn't in the folder this start gives it: look at that line and bring in what you need, or leave it.", note: 'HI-3107: a start’s warning (never a refusal): the card ran before under another version control (Git, say, before the repository switched to jj), and its line from then still has (ahead) or may have (other: it couldn’t be read) work its target lacks; the new start begins afresh from its target. {line} and {target} are branch or bookmark names; {now} is the version control in force (Git, jj).' }),
   slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
   slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)." }),
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
@@ -474,6 +481,8 @@ interface StartGathered {
   warnings: string[]
   /** A slot's lease lent for this start (#1438): given back if the start isn't written. */
   lent: string | null
+  /** HI-3107: its earlier work on lines of another version control, said once the start is written. */
+  earlier: EarlierLine[]
   /** None (HI-2340): the generation its whole-project read was made under; another at the write, it is gathered again. */
   baselineGen?: number
 }
@@ -1130,6 +1139,8 @@ export class Workflow {
       if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+      // HI-3107: written, its earlier work is said where the user and its builder read it (a comment, a notice).
+      if (g.earlier.length) void Promise.resolve(this.cfg.earlierWork?.(card, g.earlier, g.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
     } finally {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
@@ -1175,6 +1186,9 @@ export class Workflow {
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     if (dry) delete data.lease
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
+    // HI-3107: work from cycles under another version control, left on its line, said (never carried, never refused).
+    const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project).catch(() => []) : []
+    for (const e of earlier) warnings.push(earlierWorkText(card.key, e, o.platform))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
     // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
@@ -1187,7 +1201,7 @@ export class Workflow {
     }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, earlier, ...(baselineGen !== undefined ? { baselineGen } : {}) }
   }
 
   /**

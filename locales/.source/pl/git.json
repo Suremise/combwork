@@ -434,6 +434,7 @@
   "git.vc.stepNotice.text": "{n, plural, one {{projects} was added: how do you work?} other {{projects} were added: how do you work?}} A preset sets up a workflow in one click.",
   "git.vc.store.autocrlf": "Git converts line endings here (core.autocrlf). If this repository doesn’t need that, turn it off for it alone: run {command} in it, then Check Again.",
   "git.vc.store.card": "{project}: {card} {title}, in flight",
+  "git.vc.store.carried": "{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts afresh from its target: bring that work in yourself if you want it.",
   "git.vc.store.clear": "{gate}: not used",
   "git.vc.store.conflictedBookmark": "Bookmark {name} is conflicted: resolve it with jj.",
   "git.vc.store.conflictedCommit": "Commit {commit} stores conflicts: resolve them with jj.",

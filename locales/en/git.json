@@ -1735,6 +1735,10 @@
     "defaultMessage": "{project}: {card} {title}, in flight",
     "description": "A card started and not done, in the switch’s warning (HI-2799). {card} is its key."
   },
+  "git.vc.store.carried": {
+    "defaultMessage": "{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts afresh from its target: bring that work in yourself if you want it.",
+    "description": "HI-3107: a hint in the warning before switching to jj: a card not in flight ran before under Git, and its branch from then has (ahead) or may have (other: it couldn’t be read) work its target lacks; the card will start without it. {card} is a card key; {line} a branch name."
+  },
   "git.vc.store.clear": {
     "defaultMessage": "{gate}: not used",
     "description": "A feature jj doesn’t support, not used by this repository (HI-2799). {gate} is its name."

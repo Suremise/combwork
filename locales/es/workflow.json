@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "“Nadie revisa su propio trabajo” no puede estar desactivado mientras un agente revisor comprueba el trabajo.",
   "workflow.contradiction.subfolderTarget": "Este proyecto está dentro de un repositorio más grande: indica la rama en la que se fusiona su trabajo.",
   "workflow.contradiction.upToDateNeedsSlots": "Los slots solo se actualizan cuando cada tarjeta tiene su propia carpeta.",
+  "workflow.earlierWork.message": "{n, plural, one {Su línea de antes del cambio a {now}, {lines}, tiene} many {Sus líneas de antes del cambio a {now}, {lines}, tienen} other {Sus líneas de antes del cambio a {now}, {lines}, tienen}} trabajo que su destino quizá no tenga. La tarjeta empieza desde su destino sin él: revisa ese trabajo e incorpora lo que necesites, o déjalo. Su builder recibe el aviso en la tarjeta.",
+  "workflow.earlierWork.title": "{card} empezó de cero: su trabajo anterior está en {line}",
   "workflow.forYou.decidedAfterMerge": "La tarjeta {card} recibió una decisión después de fusionarse: ¿necesita un seguimiento?",
   "workflow.forYou.focusedSkip": "Las pruebas específicas de {card} se omitieron al fusionarla: {tests}. ¿Fusionarla con ellas omitidas?",
   "workflow.forYou.lineAsk": "{line} todavía tiene el trabajo de {card}, fusionado con squash en {target}: aprueba y Combwork actualiza la rama una vez, o rechaza y hazlo tú antes de que empiece {next}.",

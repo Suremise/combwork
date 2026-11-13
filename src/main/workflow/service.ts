@@ -21,7 +21,7 @@ import { combworkError } from '../combworkError'
 import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
-import { msg } from '../../shared/i18n'
+import { fmt, msg, tr } from '../../shared/i18n'
 import { declaresPaths, type PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
@@ -30,7 +30,10 @@ import { locksSettled } from './lockRecord'
 import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { Workflow, type KeptAcross, type SlotForStart } from './runtime'
+import { earlierWorkText, shownPlatform, Workflow, type KeptAcross, type SlotForStart } from './runtime'
+import type { EarlierLine } from './earlierWork'
+import { tell } from '../notify'
+import { commentAsCombwork } from '../tasks'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
@@ -88,6 +91,22 @@ export interface SlotStarts {
   standIn?: (ws: WorkspaceService, project: string, agent: string) => Promise<{ path: string; base: string | null } | null>
 }
 let slotStarts: SlotStarts | null = null
+const EARLIER = {
+  title: msg({ id: 'workflow.earlierWork.title', defaultMessage: '{card} started afresh: its earlier work is on {line}', description: 'HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then still has work the new start doesn’t include. {card} is a card key; {line} a branch or bookmark name.' }),
+  message: msg({ id: 'workflow.earlierWork.message', defaultMessage: '{n, plural, one {Its line from before the switch to {now}, {lines}, has} other {Its lines from before the switch to {now}, {lines}, have}} work its target may not hold. The card starts from its target without it: look at that work and bring in what you need, or leave it. Its builder is told on the card.', description: 'HI-3107: the notice’s text: {lines} lists branch or bookmark names, {n} how many; {now} is the version control in force (Git, jj). The builder gets the same as a comment on the card.' })
+}
+
+/**
+ * HI-3107: a start written with earlier work on another version control's lines: a comment on the card from Combwork
+ * (which its builder's start task carries, and the user sees on the card), once per start, and a notice to the user.
+ */
+async function sayEarlierWork(ws: WorkspaceService, projectPath: string, card: CardRecord, lines: EarlierLine[], now: PlatformId): Promise<void> {
+  const text = lines.map((e) => earlierWorkText(card.key, e, now)).join('\n\n')
+  const starts = (await workflowFor(ws, projectPath).catch(() => null))?.store.facts(card.id).filter((f) => f.kind === 'Started').length ?? 0
+  await commentAsCombwork(card.id, text, ws, () => true, `earlier-work:${card.id}:${starts}`)
+  tell({ kind: 'warning', level: 'warning', title: tr(EARLIER.title, { card: card.key, line: lines[0].line }), message: tr(EARLIER.message, { n: lines.length, lines: fmt.list(lines.map((e) => e.line)), now: shownPlatform(now) }), apiTitle: EARLIER.title.defaultMessage, projectPath })
+}
+
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
 }
@@ -215,6 +234,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
     keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
+    earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // jj's card work (HI-2868), composed once for the project while slots run.

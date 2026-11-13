@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "“Ninguém revisa o próprio trabalho” não pode ser desativado enquanto um agente revisor verifica o trabalho.",
   "workflow.contradiction.subfolderTarget": "Este projeto está dentro de um repositório maior: indique o branch em que o trabalho dele é mesclado.",
   "workflow.contradiction.upToDateNeedsSlots": "Os slots só são atualizados quando cada cartão tem a própria pasta.",
+  "workflow.earlierWork.message": "{n, plural, one {A linha dele de antes da troca para {now}, {lines}, tem} other {As linhas dele de antes da troca para {now}, {lines}, têm}} trabalho que o destino talvez não tenha. O cartão começa do destino sem ele: veja esse trabalho e traga o que precisar, ou deixe-o. O builder dele é avisado no cartão.",
+  "workflow.earlierWork.title": "{card} recomeçou do zero: o trabalho anterior está em {line}",
   "workflow.forYou.decidedAfterMerge": "O cartão {card} recebeu uma decisão depois do merge: ele precisa de uma continuação?",
   "workflow.forYou.focusedSkip": "Testes específicos de {card} foram pulados no seu merge: {tests}. Fazer o merge com eles pulados?",
   "workflow.forYou.lineAsk": "{line} ainda tem o trabalho de {card}, mesclado com squash em {target}: aprove e o Combwork atualiza o branch uma vez, ou recuse e faça você mesmo antes de {next} começar.",

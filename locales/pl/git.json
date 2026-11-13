@@ -476,6 +476,7 @@
   "git.vc.store.conflictedCommit": "Commit {commit} przechowuje konflikty: rozwiąż je za pomocą jj.",
   "git.vc.store.copy": "{project}: {kind, select, review {kopia do recenzji} other {kopia do sprawdzeń}} {copy}",
   "git.vc.store.kept": "{project}: zatwierdzona praca karty {card}, zachowana w slocie {slot} na jej ponowny start: uruchom kartę {card} i ją dokończ",
+  "git.vc.store.carried": "{project}: wcześniejsza praca karty {card} jest na {line}{state, select, ahead {, z commitami, których jej cel nie zawiera} other {, a Combwork nie mógł ustalić, czy jej cel ją zawiera}}. Po przełączeniu karta {card} zacznie od nowa od swojego celu: jeśli chcesz tę pracę, wprowadź ją sam.",
   "git.vc.store.detached": "{project}: jego folder nie jest na żadnej gałęzi (HEAD odłączony przy {head}) i pozostanie tak po przełączeniu. Przełącz go tam na gałąź jego pracy (git switch), zanim jego karty wystartują w folderze projektu.",
   "git.vc.store.drain": "Nadal działa na tym repozytorium (przełączenie czeka, aż wszystko się zakończy):",
   "git.vc.store.fallback": "Przed powrotem do Gita:",

@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "评审者智能体检查工作时，不能关闭“任何人都不评审自己的工作”。",
   "workflow.contradiction.subfolderTarget": "此项目位于更大的仓库内：请指定其工作要合并到的分支。",
   "workflow.contradiction.upToDateNeedsSlots": "只有每张卡片都有自己的文件夹时，槽位才会更新。",
+  "workflow.earlierWork.message": "{n, plural, other {切换到 {now} 之前的 {lines} 中有目标可能未包含的工作。卡片将从其目标开始，不包含这些工作：查看这些工作并引入所需内容，或保持不变。其构建者会在卡片上收到通知。}}",
+  "workflow.earlierWork.title": "{card} 已重新开始：它之前的工作在 {line} 上",
   "workflow.forYou.decidedAfterMerge": "{card} 合并后又做出了决定：需要后续跟进吗？",
   "workflow.forYou.focusedSkip": "{card} 合并时跳过了部分针对性测试：{tests}。要在跳过它们的情况下合并吗？",
   "workflow.forYou.lineAsk": "{line} 上仍有 {card} 的工作，已以压缩合并方式合并到 {target}：批准则由 Combwork 将分支更新一次，拒绝则请在 {next} 开始前自己处理。",

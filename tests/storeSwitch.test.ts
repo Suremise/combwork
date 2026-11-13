@@ -362,6 +362,27 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect((refused as InstanceType<typeof SwitchRefusedError>).refusal).toEqual({ why: 'drain' })
   })
 
+  it("HI-3107: the switch to jj names a Git card put back with work on its line its target lacks; nothing once the target holds it", async () => {
+    const { w, p } = await workspace({ p: 'git', q: 'git' })
+    const ws = join(p, '..')
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'main' } } }), { existing: true })
+    git(ws, 'switch', '-q', '-c', 'feature')
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Git work', project: 'p' }, user))
+    const wf = (await workflowFor(w, p))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ ok: true })
+    writeFileSync(join(p, 'work.txt'), 'w\n')
+    git(ws, 'add', '-A')
+    git(ws, 'commit', '-qm', 'git work')
+    expect(await store.boardWrite(w, async () => wf.putBack(`#${card.number}`, 'user'))).toMatchObject({ ok: true })
+    const check = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(check.store?.carried).toEqual([{ project: 'p', card: card.number, line: 'feature', state: 'ahead' }])
+    expect(check.refused).toBeNull()
+    // Its work merged into main: nothing to say.
+    git(ws, 'switch', '-q', 'main')
+    git(ws, 'merge', '-q', '--ff-only', 'feature')
+    expect((await sw.checkPlatformSwitch(w, p, 'jj')).store?.carried).toBeUndefined()
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!
