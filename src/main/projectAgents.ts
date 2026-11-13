@@ -43,6 +43,7 @@ import { agentBranch, chooseSpace, reusableBranches, type BranchHome } from '../
 import { projectPreferences } from './workflow/preferences'
 import { legacyWorktree } from './agentFolders'
 import { legacySetupPending } from '../shared/agentFolders'
+import { removeLaunchFolder } from './launchFolders'
 
 const log = createLogger('agents')
 
@@ -610,6 +611,8 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
   if (home) {
     for (const p of allProviders()) await p.agentRemoved?.(agentId, home).catch((e) => log.warn(`Could not send ${userText(def.name)}'s ${p.descriptor.name} profile to the Recycle Bin`, e))
   }
+  // Its launch folder (HI-3144: what a launch generated for it alone, made again at each) goes too.
+  await removeLaunchFolder(projectPath, agentId).catch((e) => log.warn(`Could not remove ${userText(def.name)}'s launch folder`, e))
   return result
 }
 

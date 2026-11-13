@@ -63,6 +63,14 @@
     "text": "{card} is blocked: {why}",
     "note": "A start's warning: the card is blocked. {why}: the block's reason, in its author's words."
   },
+  "runtime.start.earlierUnread": {
+    "text": "Combwork couldn't read {card}'s earlier starts, so it can't tell whether work from before (on a line of another version control) was left behind: if the card ran before, check its earlier line before bringing in what you need.",
+    "note": "HI-3107: a start’s warning (never a refusal): the card’s recorded starts couldn’t be read, so its earlier work can’t be looked for; said rather than taken for none (HR2)."
+  },
+  "runtime.start.earlierWork": {
+    "text": "{card} has earlier work on {line}, {from, select, known {from before its project switched to {now}} other {from a start whose version control Combwork couldn't read}}: {state, select, ahead {commits its target {target} doesn't hold} other {Combwork couldn't tell whether its target holds it}}. Combwork leaves it on that line and doesn't carry it in, though this start's target may hold it by now: check whether your folder has it before bringing in what you need, or leave it.",
+    "note": "HI-3107: a start’s warning (never a refusal): the card ran before under another version control (Git, say, before the repository switched to jj; from other: its start’s ruleset couldn’t be read), and its line from then has (ahead) or may have (other: it couldn’t be read) work the target recorded then lacked. Never claims the new folder lacks it (its new target, or a kept folder, may hold it). {line} and {target} are branch or bookmark names; {now} is the version control in force (Git, jj)."
+  },
   "runtime.start.laneStarted": {
     "text": "Combwork started {card} for you, as your lane's next card: carry on with it.",
     "note": "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning."

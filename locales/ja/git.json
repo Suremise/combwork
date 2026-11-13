@@ -476,6 +476,7 @@
   "git.vc.store.conflictedCommit": "コミット{commit}に競合が保存されています。jjで解決してください。",
   "git.vc.store.copy": "{project}：{kind, select, review {レビュー用コピー} other {チェック用コピー}} {copy}",
   "git.vc.store.kept": "{project}：{card} のコミット済みの作業が、再開時のためにスロット {slot} に保持されています。{card} を開始して完了してください",
+  "git.vc.store.carried": "{what, select, line {{project}：{card}の以前の作業は{line}にあります{state, select, ahead {（ターゲットに含まれていないコミットがあります）} other {（ターゲットに含まれているかどうかを判断できませんでした）}}。切り替え後、{card}はそのラインではなくターゲットから始まります。その時点でターゲットにその作業が含まれていなければ、自分で取り込んでください。} card {{project}：Combworkは{card}の以前の開始を読み取れなかったため、以前の作業が別のラインに残っているかどうか判断できません。切り替え後、{card}はターゲットから始まります。開始する前に確認してください。} other {{project}：Combworkはカードの以前の開始を読み取れなかったため、以前の作業が別のラインに残っているカードがあるかどうか判断できません。切り替え後、カードはターゲットから始まります。開始する前に確認してください。}}",
   "git.vc.store.detached": "{project}：フォルダーがどのブランチにもなく（HEADが{head}で切り離されています）、切り替え後もそのままです。プロジェクトフォルダーでカードを開始する前に、そこで作業のブランチをチェックアウトしてください（git switch）。",
   "git.vc.store.drain": "このリポジトリでまだ実行中です（すべて終了するまで切り替えは待機します）：",
   "git.vc.store.fallback": "Gitに戻す前に：",

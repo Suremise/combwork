@@ -581,14 +581,14 @@ describe("the merge queue's candidate (HR2's round 2): LFS files from the card's
   for (const style of ['merge', 'squash', 'rebase'] as const) {
     it(`a ${style} with the setting on runs no smudge in the queue's folder`, async () => {
       const { p, E, R } = strictFilterProject(`queue-lfs-${style}`)
-      const out = await gitIntegration.candidate(host(p, join(root, `queue-lfs-${style}-folder`), true), { card: 'HI-1', base: E, revision: R, expected: E, style, message: async () => 'merge' })
+      const out = await gitIntegration.candidate(host(p, join(root, `queue-lfs-${style}-folder`), true), { card: 'HI-1', base: E, revision: R, expected: E, target: 'main', style, message: async () => 'merge' })
       expect(out, JSON.stringify(out)).toHaveProperty('result')
     })
   }
 
   it('off, the folder is checked out as before (the smudge runs, and here fails)', async () => {
     const { p, E, R } = strictFilterProject('queue-lfs-off')
-    const out = await gitIntegration.candidate(host(p, join(root, 'queue-lfs-off-folder'), false), { card: 'HI-1', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    const out = await gitIntegration.candidate(host(p, join(root, 'queue-lfs-off-folder'), false), { card: 'HI-1', base: E, revision: R, expected: E, target: 'main', style: 'merge', message: async () => 'merge' })
     expect(out).not.toHaveProperty('result')
     expect(JSON.stringify(out)).toContain('smudge filter lfs failed')
   })
@@ -622,7 +622,7 @@ describe("the merge queue's candidate (HR2's round 2): LFS files from the card's
     const E = g(p, 'rev-parse', 'main')
     const R = g(p, 'rev-parse', 'card')
     const folder = join(root, 'queue-real-lfs-folder')
-    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R, expected: E, target: 'main', style: 'merge', message: async () => 'merge' })
     expect(out, JSON.stringify(out)).toHaveProperty('result')
     expect(readFileSync(join(folder, 'big.bin'), 'utf8')).toMatch(/^version https:\/\/git-lfs/)
     expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
@@ -641,7 +641,7 @@ describe("HI-3027: the queue's folder, its submodule set up by the files step, a
     const R0 = commitAll(p, 'earlier card', { 'other.txt': 'x\n' })
     g(p, 'switch', '-q', 'main')
     const folder = join(root, `${name}-folder`)
-    const first = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R0, expected: E, style: 'merge', message: async () => 'merge' })
+    const first = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-1', base: E, revision: R0, expected: E, target: 'main', style: 'merge', message: async () => 'merge' })
     expect(first, JSON.stringify(first)).toHaveProperty('result')
     expect(await prepareGitFiles(exec(), { folder, project: p, disposable: true })).toEqual({ ok: true, ran: true })
     expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
@@ -668,7 +668,7 @@ describe("HI-3027: the queue's folder, its submodule set up by the files step, a
     it(`a ${style} of a card that vendors the submodule gets its test merge`, async () => {
       const { p, E, folder } = await queued(`q3027-${style}`)
       const R = vendor(p, 'vendor')
-      const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, style, message: async () => 'merge' })
+      const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, target: 'main', style, message: async () => 'merge' })
       expect(out, JSON.stringify(out)).toHaveProperty('result')
       await vendored(p, folder)
     })
@@ -682,7 +682,7 @@ describe("HI-3027: the queue's folder, its submodule set up by the files step, a
     g(p, 'switch', '-q', '-c', 'adds')
     const R = commitAll(p, 'files at its path', { 'libs/s/new.txt': 'new\n' })
     g(p, 'switch', '-q', 'main')
-    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E2, revision: R, expected: E2, style: 'merge', message: async () => 'merge' })
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E2, revision: R, expected: E2, target: 'main', style: 'merge', message: async () => 'merge' })
     expect(out, JSON.stringify(out)).toHaveProperty('result')
     expect(readdirSync(join(folder, 'libs', 's'))).toEqual(['new.txt'])
   })
@@ -704,7 +704,7 @@ describe("HI-3027: the queue's folder, its submodule set up by the files step, a
     g(p, 'switch', '-q', '-c', 'card')
     const R = commitAll(p, 'card', { 'card.txt': 'c\n' })
     g(p, 'switch', '-q', 'main')
-    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, style: 'merge', message: async () => 'merge' })
+    const out = await gitIntegration.candidate(host(p, folder, true), { card: 'HI-2', base: E, revision: R, expected: E, target: 'main', style: 'merge', message: async () => 'merge' })
     expect(out, JSON.stringify(out)).toHaveProperty('result')
     expect(readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')).toBe('1\n')
     expect(existsSync(join(folder, 'libs', 's', '.git'))).toBe(true)

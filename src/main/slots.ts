@@ -2950,8 +2950,10 @@ export class SlotPool {
         }
         const there = on === p.line
         const inPlace = !!p.inPlace
-        // In place (HI-3010): only a detached slot gets its line so; on another line, it waits for its builder.
-        if (inPlace && !there && (on !== null || !this.port.branchHere)) {
+        // In place (HI-3010): a detached slot gets its line where its head is; on another line (HI-3116: the last card's,
+        // its work merged), made at the base by ref transactions alone. Neither possible: it waits for its builder.
+        const onLine = inPlace && !there && on !== null
+        if (inPlace && !there && (onLine ? !this.port.lineAtBase : !this.port.branchHere)) {
           await end()
           return { retry: NOT_IN_PLACE }
         }
@@ -2971,13 +2973,18 @@ export class SlotPool {
             return { error: isUnknown(d) ? sayFor(this.port, 'filesUnread', { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
-        const had = there ? null : await this.port.lineHead(slot.folder, p.line)
-        if (isUnknown(had)) {
+        const head = there && !this.port.lineAtBase ? null : await this.port.lineHead(slot.folder, p.line)
+        // HEAD naming the line (HI-3116: a pass's T2 applied, its answer lost, say) is prepared only while that line
+        // resolves: absent or unreadable, never "prepared" (HR2's round 1), nothing written. Only where a line is a branch
+        // (a port with `lineAtBase`: Git's); jj's preparation keys have no head of their own (lineHead: null).
+        if (isUnknown(head) || (there && !head && !!this.port.lineAtBase)) {
           await end()
           return { error: sayFor(this.port, 'lineUnread', { what: p.line }) }
         }
+        const had = there ? null : head
         // A line made before (a card started again) is switched to, which can change files: that waits for its builder.
-        if (inPlace && had) {
+        // On the last card's line (HI-3116), `lineAtBase` decides: its own line from a pass cut short is carried on.
+        if (inPlace && had && !onLine) {
           await end()
           return { retry: NOT_IN_PLACE }
         }
@@ -3008,7 +3015,7 @@ export class SlotPool {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last(inPlace ? p.inPlace : p.ready)
             if (notYet) return { notYet }
-            if (inPlace) return this.port.branchHere!(slot.folder, p.line, p.base, lease.from)
+            if (inPlace) return onLine ? this.port.lineAtBase!(slot.folder, p.line, p.base, leaseId) : this.port.branchHere!(slot.folder, p.line, p.base, lease.from)
             // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
             // the lease and the card's target. Git ignores them.
             const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}

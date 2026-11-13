@@ -522,7 +522,9 @@ interface CombworkMessageValues {
   'workspace.storage.kindArchivedAttachments': undefined
   'workspace.storage.kindArchivedBackup': undefined
   'workspace.storage.kindGoneBackup': undefined
+  'workspace.storage.kindLaunchFolder': undefined
   'workspace.storage.kindOrphanAttachments': undefined
+  'workspace.storage.launchFoldersDesc': undefined
   'workspace.storage.loadTarget': undefined
   'workspace.storage.looking': undefined
   'workspace.storage.measured': { when: string | number }
@@ -549,6 +551,7 @@ interface CombworkMessageValues {
   'workspace.storage.project': undefined
   'workspace.storage.purge': undefined
   'workspace.storage.refresh': undefined
+  'workspace.storage.removedAgent': { id: string | number }
   'workspace.storage.reviewInChanges': undefined
   'workspace.storage.size': undefined
   'workspace.storage.skipped': { count: number }

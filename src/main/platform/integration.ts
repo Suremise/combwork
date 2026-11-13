@@ -92,7 +92,7 @@ export interface CandidateHost {
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
-  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus> }
+  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus>; onTarget?: Promise<string[] | Again> }
   /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
   skipSmudge?: () => Promise<boolean>
 }
@@ -123,7 +123,7 @@ export interface IntegrationPort {
    * is ready (a branch's own messages: its read after the workspace's). A failure leaves the workspace clean at the head;
    * the result is kept on the card's queue pin.
    */
-  candidate(h: CandidateHost, c: CandidateOf & { style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
+  candidate(h: CandidateHost, c: CandidateOf & { target: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
 
   // The advance (§16.9.2, R4.1, R4.7): the steps between its journal's phases, and the reads it decides on.
 
@@ -183,6 +183,8 @@ export interface IntegrationPort {
    * Listed with the card's pins (`cardPins`), dropped once the card is archived. Absent: no remote to follow.
    */
   keepTested?(h: CandidateHost, card: string, commit: string): Promise<Again | null>
+  /** HI-3128: the commands that give `branch` an upstream follow mode can use (UpstreamRemedy), `from` the branch it was made from. */
+  upstreamRemedy?(project: string, branch: string, from?: string): Promise<UpstreamRemedy>
   /** The platform's own removal of one of the queue's workspaces (its guard is the runner's); whether it succeeded. */
   removeWorkspace(project: string, folder: string): Promise<boolean>
   /** The platform's record of workspaces gone from disk tidied (after a removal). */
@@ -215,6 +217,16 @@ export interface IntegrationPort {
 
 /** Why follow mode can't use a target's remote (HI-1183): it tracks none, it has several push URLs or none, or the sealed context can't reach its objects. */
 export type FollowSetupPause = 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported'
+
+/**
+ * HI-3128: what the user runs to give a branch with no upstream the one follow mode needs, read locally only (no fetch,
+ * nothing run or changed). `ready`: a remote Combwork can name (the branch's own, else `from`'s, else the repository's only
+ * one) that follow mode can use; `choose`: none it can name, the commands with the placeholder `<remote>`; `unusable`: the
+ * named remote has several push addresses (or none), or the repository is shallow: no commands, the setup to fix first.
+ * `publish` creates it there and sets what it tracks; `track` (two commands) sets the two settings follow mode reads,
+ * whatever the remote's fetch mapping. Each rendered with shellLine, the branch named explicitly.
+ */
+export type UpstreamRemedy = { kind: 'ready' | 'choose'; remote: string | null; publish: string; track: [string, string] } | { kind: 'unusable'; remote: string | null; why: 'ambiguous' | 'shallow' }
 
 /**
  * Follow mode's captured transport (HI-1183, §16.9.4): the endpoint (its exact URL, which may hold credentials), the full

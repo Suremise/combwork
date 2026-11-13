@@ -279,6 +279,13 @@ export interface WorkspacePort {
    * already). Git's only: absent, the pool waits for the slot's builder and prepares it as before.
    */
   branchHere?(folder: string, line: string, base: string, since: string): Promise<WorkspaceStep>
+  /**
+   * HI-3116: where the folder is on another branch (the last card's line) whose tree is `base`'s, a new `line` made at
+   * `base` and checked out there, changing no file or index entry (git's ref transactions, read back). A line already
+   * there is carried on only when provably `lease`'s own. Refused, nothing written, otherwise (and below git 2.46).
+   * Git's only: absent, the pool waits for the slot's builder and prepares it as before.
+   */
+  lineAtBase?(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

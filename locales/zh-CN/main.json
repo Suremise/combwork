@@ -360,6 +360,7 @@
   "main.server.url.scheme": "URL 必须以 https:// 开头（此电脑上的服务器可用 http://）。",
   "main.server.url.userinfo": "URL 中不能包含用户名或密码：请在单独的字段中填写密钥。",
   "main.storage.claimed": "该文件夹又属于某个会话了。",
+  "main.storage.launchInUse": "其代理又回到了项目中，或正在启动",
   "main.storage.noLonger": "{path}：已不再符合条件",
   "main.storage.purgeChanged": "自预览以来它已发生变化。",
   "main.storage.purgeClaimed": "它又属于某个会话了。",

@@ -362,6 +362,71 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect((refused as InstanceType<typeof SwitchRefusedError>).refusal).toEqual({ why: 'drain' })
   })
 
+  it("HI-3107: the switch to jj names a Git card put back with work on its line its target lacks; nothing once the target holds it", async () => {
+    const { w, p } = await workspace({ p: 'git', q: 'git' })
+    const ws = join(p, '..')
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'main' } } }), { existing: true })
+    git(ws, 'switch', '-q', '-c', 'feature')
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Git work', project: 'p' }, user))
+    const wf = (await workflowFor(w, p))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b-p')))).toMatchObject({ ok: true })
+    writeFileSync(join(p, 'work.txt'), 'w\n')
+    git(ws, 'add', '-A')
+    git(ws, 'commit', '-qm', 'git work')
+    expect(await store.boardWrite(w, async () => wf.putBack(`#${card.number}`, 'user'))).toMatchObject({ ok: true })
+    const check = await sw.checkPlatformSwitch(w, p, 'jj')
+    expect(check.store?.carried).toEqual([{ project: 'p', card: card.number, line: 'feature', state: 'ahead' }])
+    expect(check.refused).toBeNull()
+    // HR2's controls: what can't be read is said as unknown, never taken for no work. Its start's ruleset unreadable:
+    // the line, its version control unknown; the card's starts unreadable: the card, its line unknown.
+    const ruleset = wf.store.ruleset.bind(wf.store)
+    wf.store.ruleset = () => {
+      throw new Error('EIO')
+    }
+    try {
+      expect((await sw.checkPlatformSwitch(w, p, 'jj')).store?.carried).toEqual([{ project: 'p', card: card.number, line: 'feature', state: 'unknown' }])
+    } finally {
+      wf.store.ruleset = ruleset
+    }
+    const facts = wf.store.facts.bind(wf.store)
+    wf.store.facts = (id: number) => {
+      if (id === card.number) throw new Error('EIO')
+      return facts(id)
+    }
+    // The card's starts unreadable: its state can't be read either, so the switch's check fails (seen), never a list
+    // without it. (Read once and lost by the earlier-work read alone: the card is listed, its line unknown, below.)
+    try {
+      await expect(sw.checkPlatformSwitch(w, p, 'jj')).rejects.toThrow('EIO')
+      wf.store.facts = (id: number) => {
+        if (id === card.number && new Error().stack?.includes('earlierWork')) throw new Error('EIO')
+        return facts(id)
+      }
+      expect((await sw.checkPlatformSwitch(w, p, 'jj')).store?.carried).toEqual([{ project: 'p', card: card.number, line: null, state: 'unknown' }])
+    } finally {
+      wf.store.facts = facts
+    }
+    // …and through a start: started again on another line, its earlier start's ruleset unreadable, the start's warning
+    // still names that line, its version control unread (HR2's start-delivery control).
+    git(ws, 'switch', '-q', '-c', 'feature-2', 'main')
+    wf.store.ruleset = (id: string) => {
+      if (new Error().stack?.includes('earlierWork')) throw new Error('EIO')
+      return ruleset(id)
+    }
+    try {
+      const again = await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b-p')))
+      expect(again).toMatchObject({ ok: true })
+      expect((again as { warnings?: string[] }).warnings?.join('\n')).toMatch(/has earlier work on feature, from a start whose version control Combwork couldn't read: Combwork couldn't tell whether its target holds it/)
+    } finally {
+      wf.store.ruleset = ruleset
+    }
+    expect(await store.boardWrite(w, async () => wf.putBack(`#${card.number}`, 'user'))).toMatchObject({ ok: true })
+    git(ws, 'switch', '-q', 'feature')
+    // Its work merged into main: nothing to say.
+    git(ws, 'switch', '-q', 'main')
+    git(ws, 'merge', '-q', '--ff-only', 'feature')
+    expect((await sw.checkPlatformSwitch(w, p, 'jj')).store?.carried).toBeUndefined()
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

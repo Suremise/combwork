@@ -14,6 +14,7 @@ import type { TextPart } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { gitProblemData, gitProblemText } from '../shared/gitTool'
 import { copyDir, isDir, placeKey, samePlace } from './fsutil'
+import { targetSigning } from './branchConfig'
 import { branchOfRef, git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import { errorText, combworkError, shownError } from './combworkError'
@@ -611,14 +612,23 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
     const why = (r.err || r.out).trim() || tr(M.gitFailed, { command })
     return { ok: false, error: [tr(M.nothingMerged, { why }), tr(M.hooksElsewhere, { branch: into }), left].filter(Boolean).join('\n') }
   }
+  // HI-3111: the target's signing settings (an `includeIf onbranch:` one too), read in this temporary worktree with its
+  // HEAD on the target for the read alone and detached at the target's tip again; unreadable, nothing is merged.
+  const onIt = await targetSigning((cwd, args) => git(cwd, args), tmp, into, from)
+  if ('failed' in onIt) {
+    const left = await removed()
+    const why = tr(M.nothingMerged, { why: onIt.failed })
+    return { ok: false, error: left ? `${why}\n${left}` : why }
+  }
+  const signing = onIt.args
   if (squash) {
     // HI-3108: --ff, as above: the repository's merge.ff has nothing to say about a squash.
-    const m = await git(tmp, ['merge', '--squash', '--ff', tip.out.trim()])
+    const m = await git(tmp, [...signing, 'merge', '--squash', '--ff', tip.out.trim()])
     if (!m.ok) return refused(m, 'git merge --squash', ['reset', '--merge']) // i18n-ignore: a git command, as it is
-    const c = await git(tmp, ['commit', '-m', message])
+    const c = await git(tmp, [...signing, 'commit', '-m', message])
     if (!c.ok) return refused(c, 'git commit', ['reset', '--merge']) // i18n-ignore: a git command, as it is
   } else {
-    const m = await git(tmp, ['merge', '--no-ff', '-m', message, tip.out.trim()])
+    const m = await git(tmp, [...signing, 'merge', '--no-ff', '-m', message, tip.out.trim()])
     if (!m.ok) return refused(m, 'git merge', ['merge', '--abort']) // i18n-ignore: a git command, as it is
   }
   const head = await git(tmp, ['rev-parse', 'HEAD'])

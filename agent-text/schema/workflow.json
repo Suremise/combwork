@@ -902,6 +902,22 @@
   "workflow.refused.platform.noTarget.next": {
     "placeholders": {}
   },
+  "workflow.refused.platform.noUpstream.message": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.noUpstream.next": {
+    "placeholders": {
+      "how": "select",
+      "remote": "plain",
+      "target": "plain",
+      "publish": "plain",
+      "track1": "plain",
+      "track2": "plain"
+    }
+  },
   "workflow.refused.platform.offLine.message": {
     "placeholders": {
       "card": "plain",
@@ -914,8 +930,10 @@
   "workflow.refused.platform.offLine.next": {
     "placeholders": {
       "where": "select",
-      "line": "plain",
-      "on": "plain"
+      "lineArg": "plain",
+      "made": "select",
+      "start": "plain",
+      "onArg": "plain"
     }
   },
   "workflow.refused.platform.slotLeft.message": {

@@ -158,7 +158,7 @@ Darren, 5 Nov: a complete, **one-way** conversion to Combwork's names. What 1.0 
     attachments/cards/<card number>/<time>_<name>  # files kept with a card (HI-1700); never a session's: Clean Up and Purge pass them by
     removed/              # only after Remove from Combwork (§6.7): manifest.json, cards.json, handovers/
     project.json.bak      # last good copy (see §2)
-    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit
+    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit; a removed agent's goes (HI-3144, §4.2.1)
       plugin/.claude-plugin/plugin.json
       plugin/skills/<skill>/...     # copies of enabled Combwork skills
       mcp.json
@@ -177,7 +177,8 @@ Worktrees Combwork creates for agents live **next to the workspace**, in `<Works
 
 - **Project Settings → Storage** (also for the Assistant's home, from Settings → Workspace) shows the sizes of `.combwork/sessions`, `.combwork/archive`, `.combwork/attachments` and each agent's worktree, and their total; under the backups' and the archive's sizes, what they hold before compression (#1110: `sessionsRaw`, `archiveRaw`, each `.gz` counted by the size its gzip trailer records), when that is more. The CLIs' own transcripts aren't counted. Main measures in the background (`storage.ts`): a directory at a time, links and junctions not followed, yielding to the event loop every few hundred entries; one measurement per project at a time, and the last result comes back at once until **Refresh**. Attachment and worktree folders are cached per folder by modified time (a folder that hasn't changed counts its files as before; its subfolders are still checked); backups and the archive are measured afresh. The Storage pages pass a request with each call and abandon it when they close or measure again (`storage:abandon`, after the new call is sent): the abandoned call fails, and a measurement no call waits for any more stops between entries, leaving no result (the folders it finished stay cached). A request is its window's (by its web contents): only that window abandons it, and closing the window or reloading its page, which run none of the page's clean-up, abandons all of its requests (#260). Calls that reuse a request id while one under it still runs share it: abandoning it stops every one of their waits, and it goes with the last of them (#299). A call without a request (none in the UI today) can't be abandoned and keeps its measurement going. An `.asar` file counts as a file of its size.
 - **Settings → Workspace → Storage**: the workspace's total and every project, the Assistant included, biggest first, ten to a page (a data table, #250), each opening its Storage page (the Assistant's opens in place).
-- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has. Age is the session's last activity.
+- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has; launch folders of removed agents (on: HI-3144, below). Age is the session's last activity.
+- **Launch folders of removed agents** (HI-3144, Darren 13 Nov; `launchFolders.ts`): a `.combwork/launch-<agent id>` is only what launches generated for that agent, so it goes when the agent no longer is the project's: with **Remove Agent**, in a sweep as each workspace opens (folders from before HI-3144, or left by a crash; and any set aside by a removal that stopped part way), and from Clean Up, listed with its size (to the Recycle Bin there; otherwise deleted). Only a real folder named exactly `launch-<id>` is touched, never a link, a file or anything else in `.combwork`; never a current agent's (its project.json read just before, and none when that file is missing or unreadable) nor one whose agent is starting or running. Launch and removal share one guard (`whileRemovingLaunchFolder`): once a removal qualifies, a launch of that agent waits for it to end before writing its folder (`launchFolderFree`, the Claude adapter's `prepareLaunch`), and each move qualifies again, the Recycle Bin's retries of a held folder included (`trash`'s `still`), so an agent added back or started meanwhile stops it with nothing changed (HR2's round 1). Deleted, it is renamed aside (`.removing-<hex>`) and removed under that name; to the Recycle Bin (Clean Up) it goes under its own name. Only Claude Code keeps such a folder: Codex and Copilot's skill copies have their own clean-up (§16.10.7), OpenCode's launch config is private and removed as its launch ends, and Antigravity's profile goes with Remove Agent (`agentRemoved`, HI-2731).
 - A preview lists every file and its size and the total before anything is removed (`storage:cleanupPreview`). Applying it (`storage:cleanup`, with the listed paths) plans again and removes only listed items that still qualify (a session resumed or unarchived meanwhile is skipped and reported); a session's backups go only if every copy of it was listed. Each session is reserved while its files go (a resume of it is refused until then: "Clean Up is removing files of this session") and checked with both of its backups locked, again right before they go (still archived, not running or starting, its copies exactly the ones listed); an image folder is checked the same way just before it goes. Anything else is skipped. A backup goes only after what its session used has been read and saved on its record (`keptUsage`; a session whose only copy it was then moves it to `deletedUsage` as it is deleted), so its totals survive a failure partway; if that can't be read or saved, the backup stays and is reported. Everything goes to the Recycle Bin. Running sessions and sessions that aren't archived are never touched, nor `~/.claude` or `~/.codex`.
 - Usage totals don't change: what a session used is recorded in the usage history (§9) before any of its copies goes, and stays there once the copies and the record are gone; a session whose usage can't be recorded keeps its copies. Removing the last copy deletes the session as Delete does (§6.2).
 - **Purge…** (#1138, decision 7 of #1106; scope confirmed by Darren, 20 Oct) removes **everything Combwork keeps per session**, only when asked, for one session (the Sessions tab's **Purge Combwork's Files…**, on Combwork's own sessions that aren't running), a project or the Assistant (**Project Settings → Storage**, beside Clean Up…) or the workspace (**Settings → Workspace → Storage**: every project's and the Assistant's). What it covers (`planPurge`, `shared/storage.ts`): each session's backups (active and archived, compressed or not); what is left of them (`.spare`, a half-made `.<pid>-<time>.tmp`, an archive's `.archiving`/`.previous`/`.archived`: the files of `.combwork/sessions` and `.combwork/archive` named for a session, nothing else there); each of its attachments (the plain files of its folder in `.combwork/attachments`); the old usage on its record (`keptUsage`); and what is left of sessions Combwork no longer has: their files, their attachments (`run-<runId>` folders too) and their kept usage (`deletedUsage`). A leftover that may be a session's **only copy** is kept and counted ("1 leftover file is kept…"): one of a session the CLI no longer has, with no backup of it in that folder, which is what Combwork stopping in the middle of a delete or a move leaves (a `.spare`, a set-aside `.previous`); nothing restores it by itself, and it stays until the session is deleted. **There is no option to clear the usage history: it always stays, so totals never change.** Never the CLIs' files (`~/.claude`, `~/.codex`, `~/.copilot`), the session records themselves (but see last copies), the `deleted` list that keeps the CLIs' sessions hidden, worktrees, or anything of a running or starting session (the preview says how many it left alone).
@@ -4713,7 +4714,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   branch deleted after the window's check is caught; branches named already are never re-checked. The section shows
   each such branch under its field with *doesn't exist: create it from [branch ▾]* (a branch made without switching)
   and holds Save until it exists. **Start the next version…** (Workflow, under G7, shown while G7 reads as a version:
-  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable) does in one hold, the
+  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable; HI-3128: under G21 the
+  dialog says the new branch is made here only and tracks no remote branch, with the commands that give it one for the
+  name typed, §16.9.4's remedy, its remote read locally; nothing is pushed) does in one hold, the
   repository's lock then the turn of workflow writes, inside it the save's core and never the public wrapper
   (`startNextVersion`, `workflow/nextVersion.ts`): the release checked to be G7 still and its head the commit the dialog
   showed (`pinnedStart`), the new branch made there (`makeBranchAt`, atomic), then one save with G7 the new branch and
@@ -4934,6 +4937,19 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
   never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
   the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
+  HI-3107 (design HI-3107/s7): a card's committed work from cycles under a version control whose lines are branches (the
+  descriptor's `defaultTarget`: Git's), left on its line when the repository switched to another (jj), is said, never
+  carried or refused: `earlierWork` (workflow/earlierWork.ts) reads the card's recorded starts (`Started`, `Adopted`, each
+  by the ruleset it was decided under; one whose ruleset can't be read is listed `unknown`, its version control null, never
+  guessed; a later start under the one in force on the same line, or the line of the start being made, is the card's own), each line once against the target
+  its last start recorded, through that version control's own ports (`lineHead`, the history's `mergeBase` and
+  `contains`): gone or held by its target is no work; work its target lacks is `ahead`; anything unread or unproved is
+  `unknown`, said with that doubt, never dropped; the card's starts unread is `UNREAD` (line null), said as such (HR2).
+  The texts never claim the new folder lacks the work (its new target, or a kept folder, may hold it): they say it is
+  left on its line, not carried in, and to check the folder first. The switch's warning lists such cards not in flight (code cards, Todo
+  or On hold; `StoreSwitch.carried`); a start under the new version control warns its actor, and once written comments
+  on the card as Combwork (its builder's start task carries the card) and tells the user (`workflow.earlierWork.*`). jj's
+  line keys and kept work aren't read (HI-3069 holds those).
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains
@@ -5851,6 +5867,14 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
      Since HI-1185, a check before each step that signs (§16.9.5) pauses it up front, before anything is committed.
+     HI-3111: as configured *on the target*: the queue's folder and the Merge dialog's temporary worktree are detached,
+     where `includeIf "onbranch:…"` matches nothing, so when any onbranch condition is reachable (one `git config` a
+     round), the signing keys (`commit.gpgsign`, `gpg.*`, `user.signingkey`) are read by git in that same worktree with
+     its HEAD pointed at the target for the read alone (`targetSigning`, branchConfig.ts: its gitdir conditions,
+     config.worktree, scope order and nested includes as git evaluates them) and passed as `-c` to the signing check and
+     every command that commits. The folder must be detached at the expected commit first, and is read back so after
+     (HEAD written back as a detached one when git itself can't); any step failing is `again` (the dialog: nothing
+     merged), never "unsigned", and the next round's `folderAt` detaches the folder before anything.
    **Built [#1350]:**
    - **Identity:** the repository's own (`git config user.name` / `user.email`: local, then
      global), G12 on or off (HI-2266: G12's saved value never stands in for it), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
@@ -6855,6 +6879,32 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
 
+**A target with no upstream** (HI-3128; the design agreed with HR3 and HR2 on the card, s7 to s17). A branch made here
+only (Start the next version's) tracks nothing, and follow mode needs it to: Combwork never publishes it or sets what it
+tracks (no `--set-upstream`, no config written). A target that tracks nothing at all (neither `branch.<b>.remote` nor
+`.merge` set, as git says it) refuses a start `platform.noUpstream`, and pauses the queue `noUpstream`, each with what the
+user runs (`UpstreamRemedy`, read locally, `upstreamCommands`, rendered by `shellLine`, the branch named in each so the
+checked-out branch is never touched): **publish**, `git push -u <remote> refs/heads/<b>:refs/heads/<b>` (an explicit
+refspec: a tag of the release's name makes a bare one ambiguous), when the remote hasn't it; **track**, `git config
+branch.<b>.remote <remote>` and `git config branch.<b>.merge refs/heads/<b>`, the two settings follow mode reads, when it
+has (whatever the remote's fetch mapping: `--set-upstream-to` refuses a ref outside it). The remote is named only when it
+is known (the branch's own `branch.<b>.remote`, else the branch it was made from's, each one git knows, else the
+repository's only remote); otherwise a marked placeholder, `<remote>`, and words asking the user to choose, never
+`origin` guessed. A named remote follow mode can't use (not exactly one push address) or a shallow repository: no
+commands, what to set up first. Tracking half set up keeps the remote setup's refusal. The pause carries the remedy's
+kind as its one file (a select key) and the commands as its message line. Removing the card a pause about the target's
+setup names (`noUpstream`, `remoteAmbiguous`, `remoteUnsupported`, `fetchFailed` with no catch-up owed) clears it in the
+same write; the next entry meets the same cause and pauses naming itself.
+
+**An owed catch-up once G21 is off** (HI-3128). The catch-up then never asks the remote (its look and HI-3041's checks
+are off): the local target is the target again. Every other rule is as above (the recovery table, HI-3039, HI-3090,
+`needsYou`, unknown reads keeping the journal); a recorded swap is finished by compare and swap from where it was; a
+fresh one behind is brought in; a fresh one the local target has moved away from (it owns no files: nothing journalled
+in a folder) is dropped, nothing moved or forced, the user's commits kept, and the reconciler reads the card against the
+local target from then on. A remainder HI-3090 left staged still pauses the next entry (`staged`) until the user settles
+it. With G21 on and the remote gone for good, the hold stays (HI-3041), and its pause (`fetchFailed` naming the
+published card) says both ways out: fix the remote, or turn G21 off and resume.
+
 **Returns** (HI-3127; the design agreed with HR3 on the card, s7, s11 and s14). A card returned from a tested merge (a
 conflict, strict's update, red checks or a hook) whose attempt was tested on a remote head the local target hasn't got
 names it: `IntegrationFailed.onto` (that commit) and `remote` (`<remote>/<branch>`, a name, never an address), and its
@@ -7549,8 +7599,21 @@ Whether a conversation may resume there is its **hold** (none: it may):
     counted as before it) must be the base or behind it, else the preparation that waits for its builder runs. A free
     slot waits at its last target's head, which can be past the base with another target's work (an integration branch
     over main; a local target ahead of the remote in follow mode), and a stray commit on a free slot is no card's; no
-    reflog (turned off, expired) is a refusal too. What is left (a line made before, another line there, submodules and LFS files, an
-    install) waits for its builder as above. Before, a builder told of its lane's next card another way (a wake, the
+    reflog (turned off, expired) is a refusal too. **On the last card's line** (HI-3116; design HI-3116/s19, agreed with
+    HR1 and HR3), as when that card went Done while its builder was in a turn, the next line is made at the base by ref
+    transactions alone (`lineAtBase`), never a checkout: only while HEAD names a branch whose commit's tree is the base's
+    (the last card's work merged, by merge, squash or fast-forward; equal content, the old line and any commit on it kept).
+    T1 (`update-ref --stdin`, reflog message `combwork: next line for lease <id>`) creates the line at the base while the
+    old line is still where it was read; T2 (`--no-deref`) attaches HEAD while it still names the old line and the new one
+    is still at the base (git can't take both in one transaction). Each is all or nothing; read back after, never
+    "prepared" otherwise. A line already there is carried on only when provably that lease's (its reflog's one entry ours,
+    still at the base); anything else is left exactly as it is. A commit landing on the old line between T1 and T2 stays
+    there, its changes staged on the new line. Hooks and fsmonitor off as for `branchHere`. Below git 2.46 (no
+    `symref-update`), nothing is tried: it waits for its builder, logged once. What is left (a line made before and not
+    provably the lease's, another line whose files aren't the base's, submodules and LFS files, an install) waits for its
+    builder as above. **A submit off the card's line** (`platform.offLine`) says how to make the line from the card's own
+    start (`git switch -c <line> <start>`, its Started base) when it doesn't exist yet, and to switch back when it does;
+    its commands' arguments as typed in PowerShell (`shellLine`). Before, a builder told of its lane's next card another way (a wake, the
     Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its
     submission moved the card on, the preparation gave up, and the line never existed (HI-2997: passed, then stale at
     the merge). With
