@@ -698,6 +698,9 @@ async function requestCloseWindow(e: CombworkWindow, done: AlreadyAsked = {}): P
  * it closes as the last window's X does: to the tray, or quitting.
  */
 function closeWindowOnly(e: CombworkWindow, done: AlreadyAsked): Promise<void> {
+  // Never an install from it (HI-3167, HR1's round 1): a pending quit's Install now included, which a later end of that
+  // quit would otherwise still carry out.
+  clearInstall()
   if (combworkWindows().length > 1) return requestCloseWindow(e, done)
   if (config.settings.general.closeToTray) {
     e.win.hide()

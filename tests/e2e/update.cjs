@@ -74,12 +74,18 @@ const exits = (a) => {
   a.process().once('exit', () => (gone = true))
   return () => lib.until(async () => gone, HUNG_MS)
 }
-/** Sets the fake agent working for `secs` seconds ("please work N"), waited for (HI-3167). */
-const busy = async (inv, proj, agent, secs) => {
-  const working = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'working'
-  await lib.sendPrompt(inv, lib.ptyKey(proj, agent.id), `please work ${secs}`, { submitted: working })
+/**
+ * Sets the fake agent working until the test lets it go (HI-3167, HR1's round 1): its turn holds until `hold` is made in
+ * its home (holduntil, released by `letGo`), so no step after it races the turn's end. Waited for.
+ */
+const busy = async (inv, proj, agent, hold) => {
+  const status = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status
+  const working = async () => (await status()) === 'working'
+  await lib.sendPrompt(inv, lib.ptyKey(proj, agent.id), `please work 1 holduntil ${hold}`, { submitted: working, ready: async () => (await status()) === 'ready' })
   return lib.until(working, HUNG_MS)
 }
+/** Lets a held turn end (busy's `hold`), in the fake's home. */
+const letGo = (home, hold) => fs.writeFileSync(path.join(home, hold), '')
 const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profile, 'logs', 'combwork.log'), 'utf8') } catch { return '' } }
 
 ;(async () => {
@@ -265,7 +271,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('HI-2427: cancelled, nothing installs and Combwork goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
   // HI-3167: the quit that goes ahead asks about the update in its dialog, beside the agents (Install now chosen to begin
   // with); Install now is kept through Quit when the agent finishes, then installs it over the older copy (test mode: none).
-  check('HI-3167: the agent is set working', await busy(inv, path.join(gWs, 'alpha'), agent, 6))
+  check('HI-3167: the agent is set working, held', await busy(inv, path.join(gWs, 'alpha'), agent, 'upd-g-go'))
   const exitedG = exits(app)
   await inv('app:quit')
   const gDialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
@@ -274,6 +280,8 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('HI-3167: …and says not to shut down until the installer says it has finished', (await gDialog.locator('.quit-update').innerText()).includes("Don't shut down or restart the PC until the installer says it has finished"))
   await page.screenshot({ path: path.join(scratch, 'upd-9-quit-update.png') })
   await gDialog.locator('button', { hasText: 'Quit when' }).click()
+  check('HI-3167: the quit waits for the agent, Install now chosen', await waitFor(async () => (await inv('app:quitState')).pending === true, HUNG_MS) && /Install now chosen for 9\.1\.1/.test(log('upd-g')) && !/would install/.test(log('upd-g')))
+  letGo(path.join(scratch, 'upd-g-claude'), 'upd-g-go')
   await exitedG()
   check('#1647, HI-3167: Install now, kept through Quit when the agent finishes, installs it over the older copy (test mode: no install)', /Test mode: would install 9.1.1 \(Install now\), the installer shown/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
 
@@ -290,14 +298,17 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   const hAgent = await lib.addAgent(inv, path.join(hWs, 'alpha'))
   await inv('session:start', path.join(hWs, 'alpha'), { agentId: hAgent.id })
   await lib.acceptClaudeTrust(inv, path.join(hWs, 'alpha'), hAgent.id)
-  check('HI-3167: no update yet, the agent working', (await inv('update:state')).status !== 'ready' && (await busy(inv, path.join(hWs, 'alpha'), hAgent, 12)))
+  const hHome = path.join(scratch, 'upd-h-claude')
+  check('HI-3167: no update yet, the agent working, held', (await inv('update:state')).status !== 'ready' && (await busy(inv, path.join(hWs, 'alpha'), hAgent, 'upd-h-go')))
   const exitedH = exits(app)
   await inv('app:quit')
   const hDialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
   check('HI-3167: the quit dialog has no update to offer', (await waitFor(async () => (await hDialog.count()) === 1, HUNG_MS)) && (await hDialog.locator('.quit-update').count()) === 0)
   await hDialog.locator('button', { hasText: 'Quit when' }).click()
+  check('HI-3167: the quit waits for the agent', await waitFor(async () => (await inv('app:quitState')).pending === true, HUNG_MS))
   await inv('update:check')
-  check('HI-3167: the update downloaded while the quit waits', await waitFor(async () => (await inv('update:state').catch(() => null))?.status === 'ready', HUNG_MS))
+  check('HI-3167: the update downloaded while the quit waits', await waitFor(async () => (await inv('update:state').catch(() => null))?.status === 'ready', HUNG_MS) && (await inv('app:quitState')).pending === true)
+  letGo(hHome, 'upd-h-go')
   await exitedH()
   check('HI-3167: …and the quit, never asked about it, installs nothing', !/would install/.test(log('upd-h')) && /Leaving by app\.quit/.test(log('upd-h')), log('upd-h').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
   for (const answer of ['Next time', 'Install now']) {
@@ -315,6 +326,44 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
     await exited()
     const said = log('upd-h').slice(before)
     check(`HI-3167 (${answer}): ${answer === 'Next time' ? 'quits without installing' : 'installs it, the installer shown (test mode: no install)'}`, answer === 'Next time' ? !/would install/.test(said) : /Test mode: would install 9.1.1 \(Install now\), the installer shown/.test(said), said.split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-4).join(' | '))
+  }
+
+  // 10. HI-3167 (HR1's round 1): Close this window only takes back a pending quit's Install now. Two windows; Install now and
+  // Quit when the agent finishes; the first window shown again with a file left unsaved; the turn ends, and the quit's last
+  // look at unsaved files asks there: Close this window only. The quit then goes ahead, and installs nothing.
+  {
+    ;({ app, page, inv } = await launch('upd-h', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000', CW_TEST_RESOURCES: older, ...hClaude }))
+    await waitFor(async () => (await inv('update:state')).status === 'ready', HUNG_MS)
+    await inv('session:start', path.join(hWs, 'alpha'), { agentId: hAgent.id })
+    check('HI-3167 (window only): the agent working, held', await busy(inv, path.join(hWs, 'alpha'), hAgent, 'upd-h-window-go'))
+    const second = app.waitForEvent('window', { timeout: HUNG_MS })
+    await inv('window:new')
+    await second
+    check('HI-3167 (window only): two windows open', await waitFor(async () => (await inv('window:count')) === 2, HUNG_MS))
+    const before = log('upd-h').length
+    const exitedW = exits(app)
+    await inv('app:quit')
+    // The quit dialog is the window last used's: either one.
+    const asking = async () => {
+      for (const p of app.windows()) if ((await p.locator('.dialog', { hasText: 'Quit Combwork' }).count().catch(() => 0)) === 1) return p
+      return null
+    }
+    const shownIn = await lib.until(asking, HUNG_MS)
+    const first = shownIn?.locator('.dialog', { hasText: 'Quit Combwork' })
+    check('HI-3167 (window only): the quit offers the update, Install now chosen', !!first && (await first.locator('.quit-update-choice button.active').innerText()).includes('Install now'))
+    await first?.locator('button', { hasText: 'Quit when' }).click()
+    check('HI-3167 (window only): the quit waits, with Install now', await waitFor(async () => (await inv('app:quitState')).pending === true, HUNG_MS) && /Install now chosen for 9\.1\.1/.test(log('upd-h').slice(before)))
+    // The workspace's window shown again (as the tray's Show Combwork does; a test copy never takes the focus), and a file left
+    // unsaved there, as its page reports one.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => /upd-h-ws/.test(w.getTitle()))?.showInactive())
+    await inv('files:setUnsaved', [path.join(hWs, 'alpha', 'notes.md')])
+    letGo(hHome, 'upd-h-window-go')
+    const only = page.locator('.dialog button', { hasText: 'Close this window only' })
+    check('HI-3167 (window only): the turn ends, and the last look at unsaved files offers Close this window only', await waitFor(async () => (await only.count()) === 1, HUNG_MS))
+    await only.click()
+    await exitedW()
+    const said = log('upd-h').slice(before)
+    check('HI-3167 (window only): the quit goes ahead and installs nothing', !/would install/.test(said) && /Leaving by app\.quit/.test(said), said.split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-4).join(' | '))
   }
 
   server.close()
