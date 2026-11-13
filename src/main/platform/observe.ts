@@ -18,7 +18,7 @@
 import { watch, readFileSync, existsSync, statSync, type FSWatcher } from 'original-fs'
 import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
-import { git, readRefsOffMain } from '../git'
+import { readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
