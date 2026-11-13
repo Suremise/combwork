@@ -258,8 +258,10 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
 !define CW_RECOVERY_STAGED "Combwork-Setup.new.exe"
 ; How long a held recovery lock is waited for (ms): 10 minutes, or 20 s in an installer built for the Sandbox's lock check
 ; (CW_TEST_SHORT_RECOVERY_WAIT=1 in npm run dist's environment; a release never sets it).
+; That build also writes C:\out\recovery-wait.txt as it starts waiting (the Sandbox's out folder): the check's signal.
 !if "$%CW_TEST_SHORT_RECOVERY_WAIT%" == "1"
   !define /ifndef CW_RECOVERY_WAIT_MS 20000
+  !define CW_RECOVERY_WAIT_SIGNAL "C:\out\recovery-wait.txt"
 !else
   !define /ifndef CW_RECOVERY_WAIT_MS 600000
 !endif
@@ -349,10 +351,11 @@ Function cwUserSid
   Pop $1
 FunctionEnd
 
-; Refuses the install before anything is removed: the message, with the step ($R2), and exit 7. Only this run's staged
-; copy is removed; the recovery folder's Combwork-Setup.exe and the Run value are left as they are.
+; Refuses the install before anything is removed: the message, with the step ($R2), and exit 7. It deletes nothing: a
+; refusal can come before this run holds the lock or after recovery.ps1 found the path untrusted (a junction), so a file
+; there may be another installer's, or outside the recovery folder. recovery.ps1 removes a copy it staged itself, and the
+; one step after it that can fail with a staged copy (the swap) removes it there.
 Function cwRefuseRecovery
-  Delete "$cwRecoveryDir\${CW_RECOVERY_STAGED}"
   DetailPrint "Recovery not armed: $R2"
   MessageBox MB_OK|MB_ICONSTOP "$(combworkRecoveryFailed)$\r$\n$\r$\n$R2" /SD IDOK
   SetErrorLevel 7
@@ -437,6 +440,12 @@ Function cwArmRecovery
   ${EndIf}
   ${If} $4 = 183
     DetailPrint "Waiting for the recovery lock $2"
+    !ifdef CW_RECOVERY_WAIT_SIGNAL
+      ; A test build's only: says it has reached the wait, so the Sandbox check lets the holder go after it, not on a timer.
+      FileOpen $5 "${CW_RECOVERY_WAIT_SIGNAL}" w
+      FileWrite $5 "$2"
+      FileClose $5
+    !endif
     System::Call 'kernel32::WaitForSingleObject(p r3, i ${CW_RECOVERY_WAIT_MS}) i.r5'
     ${If} $5 <> 0
     ${AndIf} $5 <> 0x80
@@ -467,6 +476,8 @@ Function cwArmRecovery
     System::Call 'kernel32::MoveFileExW(w "$cwRecoveryDir\${CW_RECOVERY_STAGED}", w "$cwRecoveryDir\${CW_RECOVERY_FILE}", i 9) i.r7 ?e'
     Pop $8
     ${If} $7 = 0
+      ; This run's own copy: staged by recovery.ps1 just now, under the lock held, in a folder it checked.
+      Delete "$cwRecoveryDir\${CW_RECOVERY_STAGED}"
       StrCpy $R2 "Couldn't put the copy in place in $cwRecoveryDir (error $8)."
       Call cwRefuseRecovery
     ${EndIf}

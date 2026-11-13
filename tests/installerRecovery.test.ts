@@ -147,18 +147,31 @@ describe("the installer's recovery order (installer.nsh, HI-3172)", () => {
     }
     expect(arm).toContain('"Global\\CombworkRecovery-${APP_GUID}-machine"')
     expect(arm).toContain('"Global\\CombworkRecovery-${APP_GUID}-$R1"')
-    const order = [at('${If} $1 > 259'), at('CreateMutexW'), at('WaitForSingleObject'), at('recovery.ps1'), at('MoveFileExW'), at('WriteRegStr HKLM'), at('ReadRegStr $1 HKLM'), at('StrCpy $cwRecoveryArmed "1"')]
+    const order = [at('${If} $1 > 259'), at('CreateMutexW'), at('WaitForSingleObject'), at('-File "$PLUGINSDIR\\recovery.ps1"'), at('MoveFileExW'), at('WriteRegStr HKLM'), at('ReadRegStr $1 HKLM'), at('StrCpy $cwRecoveryArmed "1"')]
     expect([...order].sort((a, b) => a - b)).toEqual(order)
   })
 
-  it('a refusal removes only its own staged copy, never the armed recovery, and quits with 7', () => {
+  it('a refusal deletes nothing (it may not own what is there); only a failed swap removes the copy it just staged', () => {
+    // HR1's round 1: a refusal before the lock, or after recovery.ps1 found a junction, mustn't delete another
+    // installer's staged copy, nor one through the junction.
     const refuse = fn('cwRefuseRecovery')
-    expect(refuse).toContain('Delete "$cwRecoveryDir\\${CW_RECOVERY_STAGED}"')
-    expect(refuse).not.toContain('${CW_RECOVERY_FILE}')
-    expect(refuse).not.toMatch(/DeleteRegValue|RMDir/)
+    expect(refuse).not.toMatch(/Delete |DeleteRegValue|RMDir/)
     expect(refuse).toMatch(/SetErrorLevel 7\r?\n\s*Quit/)
-    // And nothing else in the arming deletes or clears one.
-    expect(fn('cwArmRecovery')).not.toMatch(/Delete |DeleteRegValue|RMDir/)
+    const arm = fn('cwArmRecovery')
+    const deletes = [...arm.matchAll(/^\s*(Delete |DeleteRegValue|RMDir).*$/gm)].map((m) => m[0].trim())
+    expect(deletes).toEqual(['Delete "$cwRecoveryDir\\${CW_RECOVERY_STAGED}"'])
+    // That one is in the swap's failure, after recovery.ps1 said "staged" (it ran under the lock, in a folder it checked).
+    const at = arm.indexOf(deletes[0])
+    expect(arm.lastIndexOf('${If} $7 == "staged"', at)).toBeGreaterThan(arm.indexOf('recovery.ps1'))
+    expect(arm.lastIndexOf('MoveFileExW', at)).toBeGreaterThan(arm.lastIndexOf('${If} $7 == "staged"', at))
+    expect(arm.slice(arm.lastIndexOf('MoveFileExW', at), at)).toMatch(/\$\{If\} \$7 = 0\r?\n\s*;[^\n]*\r?\n\s*$/)
+  })
+
+  it('recovery.ps1 removes a staged copy only if it made it', () => {
+    const ps1 = readFileSync(SCRIPT, 'utf8')
+    expect(ps1).toMatch(/if \(\$script:stagedHere\) \{ try \{ Remove-Item -LiteralPath \(Join-Path \$Dir \$Staged\)/)
+    // Set only once every check of the folder has passed, just before the copy.
+    expect(ps1.indexOf('$script:stagedHere = $true')).toBeGreaterThan(ps1.indexOf('EnumerateFileSystemEntries'))
   })
 
   it('a shown install arms after its last page that can be cancelled; a finished one disarms', () => {

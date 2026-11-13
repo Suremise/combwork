@@ -110,12 +110,11 @@ function Finish-RunValue($scope) {
 function Starts($folder) {
   $exe = Join-Path $folder 'Combwork.exe'
   Start-Process -FilePath $exe | Out-Null
-  $ok = $false
-  for ($i = 0; $i -lt 200; $i++) { if (Get-Process | Where-Object { $_.Path -eq $exe -and -not $_.HasExited }) { $ok = $true; break }; Start-Sleep -Milliseconds 100 }
-  Start-Sleep -Seconds 5
-  $alive = [bool](Get-Process | Where-Object { $_.Path -eq $exe })
+  # Started means its window shows (a Combwork.exe of that folder with a window title), polled, 60 s at most.
+  $ok = $true
+  try { Until "Combwork's window from $folder" { Get-Process | Where-Object { $_.Path -eq $exe -and $_.MainWindowTitle } } 60 } catch { $ok = $false }
   Get-Process | Where-Object { $_.Path -eq $exe } | Stop-Process -Force -ErrorAction SilentlyContinue
-  return ($ok -and $alive)
+  return $ok
 }
 function Want($case) { return ($Only.Count -eq 0 -or $Only -contains $case) }
 function Reset {
@@ -304,16 +303,20 @@ Say ($c -eq 7 -and ((Sddl 'C:\canary') + (Sddl 'C:\canary\canary.txt') + (Get-Fi
 $c = Finish-RunValue 'machine'
 Say ($c -eq 0 -and (IsNew $machineDir)) '(f) ...and the armed recovery (Run value run by hand) still finishes' "exit $c"
 
-# (f) ProgramData\Combwork itself a junction: refused, its target untouched.
+# (f) ProgramData\Combwork itself a junction: refused, its target untouched, the exact staged file name under it
+# included (HR1's round 1: a refusal's clean-up must not delete through the junction).
 Reset
 InstallOld 'machine'
-New-Item -ItemType Directory -Force 'C:\canary2' | Out-Null
+New-Item -ItemType Directory -Force 'C:\canary2\resume' | Out-Null
 Set-Content 'C:\canary2\canary.txt' 'canary'
-$canary = (Sddl 'C:\canary2') + (Get-FileHash 'C:\canary2\canary.txt').Hash
+Set-Content 'C:\canary2\resume\Combwork-Setup.new.exe' 'not this installer''s'
+$canary = { (Sddl 'C:\canary2') + (Get-FileHash 'C:\canary2\canary.txt').Hash + (Get-FileHash 'C:\canary2\resume\Combwork-Setup.new.exe' -ErrorAction SilentlyContinue).Hash + ((Get-ChildItem -Recurse -Force 'C:\canary2').Name -join ',') }
+$before = & $canary
 & cmd.exe /c mklink /J (Join-Path $env:ProgramData 'Combwork') 'C:\canary2' | Out-Null
 $c = Wait-Exit (Run 'new-setup.exe' @('--updated', '/S'))
-Say ($c -eq 7 -and ((Sddl 'C:\canary2') + (Get-FileHash 'C:\canary2\canary.txt').Hash) -eq $canary -and -not (Test-Path 'C:\canary2\resume') -and (IsOld $machineDir)) '(f) ProgramData\Combwork a junction: refused, its target untouched' "exit $c"
+Say ($c -eq 7 -and (& $canary) -eq $before -and (IsOld $machineDir)) '(f) ProgramData\Combwork a junction: refused, its target untouched, a Combwork-Setup.new.exe under it kept' "exit $c"
 & cmd.exe /c rmdir (Join-Path $env:ProgramData 'Combwork') | Out-Null
+Remove-Item -LiteralPath 'C:\canary2' -Recurse -Force
 }
 
 if (Want 'lock') {
@@ -346,29 +349,55 @@ function Stop-Holder {
   Until 'the holder letting go' { Test-Path 'C:\out\lock-done.txt' } 60
   & cmd.exe /c "schtasks /Delete /F /TN cwlock >nul 2>&1"
 }
-# Whether an installer is waiting on the lock: running, nothing armed and the old copy in place, throughout a 10 s look.
-function Waiting($p) {
-  for ($i = 0; $i -lt 100; $i++) { if ($p.HasExited -or (RunValue 'machine') -or -not (IsOld $machineDir)) { return $false }; Start-Sleep -Milliseconds 100 }
-  return $true
+# The short build (new-short-setup.exe) writes C:\out\recovery-wait.txt as it starts waiting on the lock: the cases
+# poll for that, then let the holder go (or don't), never a timer.
+$signal = 'C:\out\recovery-wait.txt'
+function Until-Waiting($p) {
+  Until 'the installer waiting on the recovery lock' { (Test-Path $signal) -or $p.HasExited } 180
+  return ((Test-Path $signal) -and -not $p.HasExited -and -not (RunValue 'machine') -and (IsOld $machineDir))
 }
 
 Reset
 InstallOld 'machine'
 Start-Holder
-$p = Run 'new-setup.exe' @('--updated', '/S')
-$waiting = Waiting $p
+Remove-Item $signal -ErrorAction SilentlyContinue
+$p = Run 'new-short-setup.exe' @('--updated', '/S')
+$waiting = Until-Waiting $p
 Stop-Holder
 $c = Wait-Exit $p
-Say ($waiting -and $c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(lock) the machine lock held: the update waits, then installs once the test lets it go' "waiting: $waiting; exit $c"
+Say ($waiting -and $c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(lock) the machine lock held: the update waits on it (its signal seen), then installs once the test lets it go' "waiting: $waiting; exit $c"
 
 Reset
 InstallOld 'machine'
 Start-Holder
+Remove-Item $signal -ErrorAction SilentlyContinue
+$p = Run 'new-short-setup.exe' @('--updated', '/S')
+$waiting = Until-Waiting $p
 $t0 = Get-Date
-$c = Wait-Exit (Run 'new-short-setup.exe' @('--updated', '/S')) 180
+$c = Wait-Exit $p 180
 $took = ((Get-Date) - $t0).TotalSeconds
 Stop-Holder
-Say ($c -eq 7 -and $took -ge 18 -and (IsOld $machineDir) -and -not (RunValue 'machine') -and -not (Test-Path $machineRec)) '(lock) held past the wait (20 s build): refused with exit 7, nothing changed' "exit $c; took $([int]$took) s"
+Say ($waiting -and $c -eq 7 -and $took -ge 15 -and (IsOld $machineDir) -and -not (RunValue 'machine') -and -not (Test-Path $machineRec)) '(lock) held past the wait (20 s build): refused with exit 7, nothing changed' "exit $c; $([int]$took) s after its signal"
+
+# (lock) HR1's round 1: a recovery armed, a Combwork-Setup.new.exe in the folder (another installer's, staging), the lock
+# held: a second installer that times out refuses and deletes nothing: the staged file, the copy and the Run value kept.
+Reset
+InstallOld 'machine'
+Interrupt-Update 'machine' @('--updated', '/S') $machineDir
+$cmd = RunValue 'machine'; $hash = PayloadHash 'machine'
+Set-Content (Join-Path $machineRec 'Combwork-Setup.new.exe') 'another installer staging'
+$staged = (Get-FileHash (Join-Path $machineRec 'Combwork-Setup.new.exe')).Hash
+Start-Holder
+Remove-Item $signal -ErrorAction SilentlyContinue
+$p = Run 'new-short-setup.exe' @('/S', '/allusers')
+$waiting = Until-Waiting $p
+$c = Wait-Exit $p 180
+Stop-Holder
+$kept = (Get-FileHash (Join-Path $machineRec 'Combwork-Setup.new.exe') -ErrorAction SilentlyContinue).Hash
+Say ($c -eq 7 -and $kept -eq $staged -and (RunValue 'machine') -eq $cmd -and (PayloadHash 'machine') -eq $hash) "(lock) timed out with another installer's staged copy there: refused, that copy, the armed copy and the Run value kept" "exit $c; signal seen: $(Test-Path $signal)"
+Remove-Item (Join-Path $machineRec 'Combwork-Setup.new.exe')
+$c = Finish-RunValue 'machine'
+Say ($c -eq 0 -and (IsNew $machineDir) -and -not (RunValue 'machine')) '(lock) ...and that recovery (Run value run by hand) still finishes' "exit $c"
 
 # Held from session 0 by SYSTEM: the installer's CreateMutexW meets that object (one name across sessions: it is denied
 # it, rather than making a new one) and, unable to wait on it, refuses at once: fail closed, nothing changed.
