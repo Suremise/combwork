@@ -7018,7 +7018,10 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
   words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
   change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
-  section). A signer ended at its bound says so instead, never claiming a prompt.
+  section). A signer ended at its bound says so instead, never claiming a prompt. Among those words, ssh-keygen's own
+  for a key only an agent can hold: "No private key found for public key" (a `.pub` path) and, for a literal key
+  (`key::ssh-ed25519 …` or the bare form), which git passes with `-U`, "Couldn't get agent socket" and "Couldn't find
+  key in agent" (HI-3110).
 - **The off switch:** Advanced → **Agents' signed commits never wait for a passphrase** (on by default), read at launch.
 - **Not measured** (recorded as limitations, the user's machine left alone): Gpg4win's gpg (not installed where it was
   built; the same GnuPG options), and Windows' ssh-agent service with a detached signer (loading a key would change the
