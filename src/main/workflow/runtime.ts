@@ -1190,7 +1190,7 @@ export class Workflow {
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
     // HI-3107: work from cycles under another version control, left on its line, said (never carried, never refused).
     const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project, data.line).catch((e: unknown) => (log.warn(`#${card.id}: its earlier work couldn't be read`, e), [UNREAD])) : []
-    if (earlier.length) log.info(`#${card.id} has earlier work: ${earlier.map((e) => `${e.line === null ? 'its starts unread' : userText(e.line)} (${e.state})`).join(', ')}`)
+    if (earlier.length) log.info(`#${card.id} has earlier work: ${earlier.map((e) => `${e.line === null ? 'its starts unread' : userText(e.line)} (${e.state})`).join(', ')}`) // i18n-ignore: a log line
     for (const e of earlier) warnings.push(earlierWorkText(card.key, e, o.platform))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
