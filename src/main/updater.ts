@@ -46,10 +46,11 @@ let restartForUpdate: (version: string) => void = () => undefined
 /** HI-3167: the user's say to install, for one quit and one version (updateConsent.ts). */
 const consent = new InstallConsent()
 /**
- * About how long an update's install takes, for the quit dialog's line (HI-3167): measured in Windows Sandbox (from the
- * installer's start to its finish page). The finish page, not this, says it is safe to shut down.
+ * About how long an update's install takes, for the quit dialog's line (HI-3167): measured in Windows Sandbox on 13 Nov,
+ * 1.2.0-beta.1 updated to a 1.4.0 build, from the installer's start to its finish page: 29 s and 49 s (its window after
+ * 5 to 12 s, the progress page 24 to 37 s), so about 45. The finish page, not this, says it is safe to shut down.
  */
-export const INSTALL_SECONDS = 30
+export const INSTALL_SECONDS = 45
 /** The check in progress was started by the user, so its result is shown even if nothing is found. */
 let manualCheck = false
 
