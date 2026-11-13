@@ -378,7 +378,10 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
         const factsBox = facts.getBoundingClientRect()
         const right = Math.max(...[...facts.children].map((f) => f.getBoundingClientRect().right))
         const whole = [...facts.children].every((f) => f.scrollWidth <= f.clientWidth + 1 || f.tagName === 'BUTTON')
-        const measured = { lines: Math.round(topBox.height / pair.height), factsLines: Math.round(factsBox.height / pair.height), oneLine: Math.abs(factsBox.top - pair.top) < pair.height / 2, inside: right <= topBox.right + 1 && topBox.right <= list.right + 1, whole }
+        // Lines by where items sit (their middles), not by height: the commit's button is taller than a line of text.
+        const linesOf = (els) => els.map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => (r.top + r.bottom) / 2).sort((a, b) => a - b).filter((y, i, ys) => i === 0 || y - ys[i - 1] > pair.height / 2).length
+        const items = [...t.children].flatMap((c) => (c === facts ? [...facts.children] : [c]))
+        const measured = { lines: linesOf(items), factsLines: linesOf([...facts.children]), oneLine: Math.abs(factsBox.top - pair.top) < pair.height / 2, inside: right <= topBox.right + 1 && topBox.right <= list.right + 1, whole }
         if (said && took) took.textContent = was
         return measured
       })
@@ -399,6 +402,12 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     check(`…with the longest "${longestRan}", still inside, each fact whole (${label})`, long.every((r) => r.inside && r.whole && r.factsLines <= 2), JSON.stringify(long.filter((r) => !r.inside || !r.whole || r.factsLines > 2).slice(0, 3)))
     await painted()
     await page.screenshot({ path: path.join(shots, `ended-today-long-${label}.png`) })
+    // Its top too: the newest, the merged lane with its commit.
+    await endedList.evaluate((el) => {
+      el.scrollTop = 0
+    })
+    await painted()
+    await page.screenshot({ path: path.join(shots, `ended-today-long-${label}-top.png`) })
   }
 
   await app.close().catch(() => undefined)
