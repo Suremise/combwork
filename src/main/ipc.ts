@@ -140,7 +140,7 @@ import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
-import { rulesetsNow } from './workflow/rulesets'
+import { rulesNow } from './workflow/rulesets'
 import { poolFor, recoverStaleSlot, removeForgottenSlot, removeKeptSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
@@ -1000,8 +1000,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const ws = currentWorkspace()
       if (!ws.path) return []
       // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
-      const now = await rulesetsNow(ws)
-      return ws.path ? workBadges(ws, now) : []
+      const now = await rulesNow(ws)
+      return ws.path ? workBadges(ws, now.ids, now.at) : []
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)

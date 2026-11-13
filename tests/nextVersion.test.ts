@@ -24,6 +24,8 @@ const retarget = await import('../src/main/workflow/retarget')
 const gitRepoMod = await import('../src/main/gitRepo')
 const nv = await import('../src/main/workflow/nextVersion')
 const { workflowFor } = await import('../src/main/workflow/service')
+const { rulesNow } = await import('../src/main/workflow/rulesets')
+const cardWork = await import('../src/main/workflow/cardWork')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { preset } = await import('../src/shared/workflow/options')
 const { settingEntry } = await import('../src/shared/settingsCatalog')
@@ -314,6 +316,25 @@ describe('a lane left on the release by Start the next version (HI-3113)', () =>
     const f = await inWorkspace(w, () => form.workflowForm(w, repo))
     await inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, style: f.options.style === 'squash' ? 'merge' : 'squash' } }))
     expect([(await view()).target, (await view()).oldRules]).toEqual(['1.3.0', true])
+  })
+
+  it("its cards aren't old rules for its Merges into alone (HI-3161); a real rule change since still marks them", async () => {
+    const { w, repo } = await project()
+    const la = await card(w, 'Lane A')
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la], by: 'You' })
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${la}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    // As the window reads them (ipc's tasks:workBadges).
+    const badge = async () => {
+      const now = await rulesNow(w)
+      return cardWork.workBadges(w, now.ids, now.at).find((b) => b.card === la)!
+    }
+    // In flight under the lane's ruleset, which recorded G7 1.3.0 unmarked; the project's is on 1.4.0 now.
+    expect([(await badge()).stage, (await badge()).oldRules]).toEqual(['active', false])
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, style: f.options.style === 'squash' ? 'merge' : 'squash' } }))
+    expect((await badge()).oldRules).toBe(true)
   })
 
   it("counts a lane started on the next version's branch as using it, so the start's undo check finds it", async () => {
