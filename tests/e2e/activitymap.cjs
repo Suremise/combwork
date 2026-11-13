@@ -220,7 +220,6 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check("a click on HB2's ring shows its map alone", !!(await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)))
     check('…the selection kept: the same Agents ▾, the same tabs', (await pickText()) === selection && (await page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab').count()) === 2, `${await pickText()} (was ${selection})`)
     check('…the strip still lists both agents, HB2 marked', (await rings.count()) === 2 && JSON.stringify((await marked()).map((t) => /HB2/.test(t))) === '[true]', JSON.stringify(await marked()))
-    check("…and the list shows HB2's tab", !!(await lib.until(async () => (await page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab[aria-selected="true"]').innerText().catch(() => '')).includes('HB2'), HUNG_MS, 250)))
     await shoot('3b-strip-picked-dark')
     await rings.filter({ hasText: 'HB1' }).click()
     check('a click on another ring switches to it, the selection still kept', !!(await lib.until(() => shownAlone('HB1'), HUNG_MS, 250)) && (await pickText()) === selection && (await rings.count()) === 2)

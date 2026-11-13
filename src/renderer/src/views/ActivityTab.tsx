@@ -343,15 +343,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts) : undefined), [alone, entries, drawn.contexts])
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
-  // Its tab in the list too, so the list beside shows its work.
-  const pickMapAgent = useCallback(
-    (key: string) => {
-      if (alone === key) return setShownAgent(null)
-      setShownAgent(key)
-      setView({ tab: key })
-    },
-    [alone, setView]
-  )
+  const pickMapAgent = useCallback((key: string) => setShownAgent(alone === key ? null : key), [alone])
 
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
   // subagent's too), and the map's.

@@ -428,15 +428,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts) : undefined), [alone, entries, drawn.contexts])
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
-  // Its tab in the list too (the tab's key is the agent's host-qualified key, as the map's).
-  const pickMapAgent = useCallback(
-    (key: string) => {
-      if (alone === key) return setShownAgent(null)
-      setShownAgent(key)
-      setView({ tab: key })
-    },
-    [alone, setView]
-  )
+  const pickMapAgent = useCallback((key: string) => setShownAgent(alone === key ? null : key), [alone])
 
   // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {
