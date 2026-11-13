@@ -173,7 +173,9 @@ describe.skipIf(!jjExe)("a jj lane's next card, its builder at work before its s
     writeFileSync(join(c.row.folder, 'draft.txt'), 'not recorded\n')
     const ops = w.h.jj(c.row.folder, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"')
     const held = await w.pool.heldEarly(c.lent.lease.id, c.line2, w.h.id(w.repo, 'main'))
-    expect(held).toMatchObject({ why: 'extra', commits: [early], edits: null })
+    expect(held?.work).toMatchObject({ why: 'extra', commits: [early], edits: null })
+    // HI-3165: with the port's own code for it, one its refusal reads as held work.
+    expect(w.port.refusal!(held!.code)).toBe('held')
     expect(w.h.jj(c.row.folder, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"')).toBe(ops)
   })
 

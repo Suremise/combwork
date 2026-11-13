@@ -1483,8 +1483,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const wc = await wcAt(folder, op, o.identity.workspace)
       if (isUnknown(wc)) return null
       const held = await heldAt(folder, op, prev, prev.base, wc.commit, true, base)
-      return held.why === 'extra' && held.commits.length ? held : null
+      return held.why === 'extra' && held.commits.length ? { code: JJ_REFUSED.unintegrated, work: held } : null
     },
+    // HI-3165: a preparation's key (`jj:…`) is this port's, prepared under its store's lock, which it takes itself.
+    lineIsKey: (line) => isJjLineKey(line),
+    ownPreparationLock: true,
     prepare: async (folder, line, base, o = {}) => {
       const k = parseJjLineKey(line)
       if (!k || !base || !o.lease) return step(false, JJ_REFUSED.line)
