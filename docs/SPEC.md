@@ -3670,9 +3670,20 @@ and s11 (HR1's OK).
   (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
   unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
   current.
-- **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
-  transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
-  checks anew under the new key (`restart`).
+- **The setup command** is read with a stamp of the setup command itself (HI-3122, `jjSetupStamp.ts`: a hash of
+  project.json's `worktreeSetup`, read synchronously only when the file's identity changed since the last look, by one
+  plain read and parse that never waits: HR3's round 1, no kept-file recovery on main's thread; a file caught mid-save
+  gives an unread stamp, new each time, never kept and never equal to any (HR3's round 2), and nothing is made or
+  published under one (`knownStamp`), so a check started or published across it fails closed and is looked at again); the
+  publishing transaction reads the stamp again and refuses a result made under a setup since changed, and the next look
+  starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
+  project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running
+  check as invalid.
+- **Unsettled checks are always looked at again** (HI-3122): at the end of each pass, every candidate whose checks are
+  still shown running, waiting or failing gets its next look at its retry time, or at the bounded retry (`againMs(0)`,
+  30 s) when it has none ahead, whatever ended its turn (an invalid run, a restart refused for an unknown or changed setup,
+  any early exit): the look runs the checks anew under the key then, or not at all once the candidate has gone. Before,
+  nothing asked again, and the checks stayed shown running.
 - **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
   progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
   card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at

@@ -10,8 +10,8 @@
 // - the card's lease and slot rows, read synchronously in the write under way (the final Submitted transaction's);
 // - the pins' ownership records in board_meta.
 
-import { basename, join } from 'path'
-import { statSync } from 'original-fs'
+import { knownStamp, setupStampOf } from './jjSetupStamp'
+import { basename } from 'path'
 import { git } from './git'
 import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
@@ -125,14 +125,15 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
     // HI-2938: the merge checks on a candidate: a check copy of the project's pool at the candidate's commit, its job
     // holding every process (jobSpawn), the merge queue's runner placed in the copy (Stop ends the lease's job).
     candidateChecks: {
-      // The setup command with project.json's identity read just before it (a change between them changes the stamp
-      // read after: the result's publication then refuses, HR1's round 1 finding 3).
+      // The setup command with its stamp read just before it (a change between them changes the stamp read after: the
+      // result's publication then refuses, HR1's round 1 finding 3; HI-3122: the command's own, not the file's).
       setup: async () => {
         const stamp = setupStamp()
         const setup = (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
         return { setup, stamp }
       },
       setupStamp: () => setupStamp(),
+      knownStamp: (stamp) => knownStamp(stamp),
       lease: async (card, revision) => {
         const r = await candidateCheckLease(ws, projectPath, card, revision)
         if (!('lease' in r)) return r
@@ -149,14 +150,12 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
     }
   }
 
-  /** project.json's identity now (its file id, size and time), synchronously: one stat. */
+  /**
+   * HI-3122: the stamp of the project's setup command now, synchronously (jjSetupStamp.ts): what else project.json gains
+   * (an agent's new conversation, any other setting) leaves it as it was, so it no longer ends a running check.
+   */
   function setupStamp(): string {
-    try {
-      const st = statSync(join(projectPath, '.combwork', 'project.json'))
-      return `${st.ino}:${st.size}:${st.mtimeMs}`
-    } catch {
-      return 'none'
-    }
+    return setupStampOf(projectPath)
   }
 
   /** The queue's runner for a check copy: its runs in the copy (stoppable), each run its lease's ref as it starts. */

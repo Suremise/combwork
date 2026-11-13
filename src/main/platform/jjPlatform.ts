@@ -179,6 +179,8 @@ export interface JjChecksHost {
    */
   setup(): Promise<{ setup: string; stamp: string }>
   setupStamp(): string
+  /** HI-3122: whether a stamp is a read setup command's (false: unread now, which nothing may be made under). Absent: all are. */
+  knownStamp?(stamp: string): boolean
   lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
   /**
    * HI-2950: the free check copies still at a candidate's commit moved onto the head it was built on, so it can be dropped
@@ -798,7 +800,10 @@ export class JjPlatform implements PlatformAdapter {
       const setup = read.setup
       const o = wf.rulesetOf(card0, s).options
       const key = checksKeyOf(o, setup)
-      const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // HI-3122 (HR3's round 2): a setup command read as unknown (project.json caught mid-save) never stands for itself:
+      // nothing is made or published under it.
+      const setupNow = (): boolean => host.knownStamp?.(read.stamp) !== false && host.setupStamp() === read.stamp
+      const at = { fp, attempt: offer.attempt, key, setup, setupStill: setupNow }
       // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each; none after a
       // restart under a new key (HR1's round 1: the restart clears them, so the delay counts from there too).
       let misses = shown.checks.misses ?? 0
@@ -822,7 +827,7 @@ export class JjPlatform implements PlatformAdapter {
         const st = wf.state(c)
         // The offer's state read unknown (an operation during its read) isn't invalid (HI-2991): only a definite answer ends
         // a check; what it comes to is published only while the offer is read current.
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerState(fp.target, offer)) !== 'not'
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && setupNow() && (await this.offerState(fp.target, offer)) !== 'not'
       }
       let done = 0
       const out = await runCandidateChecks(
@@ -864,6 +869,18 @@ export class JjPlatform implements PlatformAdapter {
         await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500), retryMs })
         later = Math.min(later ?? Infinity, retryMs)
       }
+    }
+    // HI-3122 (the Assistant's note after HR3's round 3): whatever ended a card's turn in this pass (an invalid run, a
+    // restart refused for an unknown or changed setup, or any early exit to come), a card whose checks are still unsettled
+    // (shown running, waiting or failing) gets its next look at its retry time, or at the bounded retry (`againMs(0)`)
+    // when it has none ahead: never only when something else asks for one, which left its checks shown running.
+    for (const card0 of wf.store.cards()) {
+      if (host.signal?.aborted) return
+      if (card0.stage !== 'approved') continue
+      const c = candidateShown(wf, card0, wf.state(card0), project, undefined, true)?.checks
+      if (!c || (c.state !== 'running' && c.state !== 'waiting' && c.state !== 'failing')) continue
+      const ahead = c.state === 'running' ? undefined : c.retryAt
+      later = Math.min(later ?? Infinity, ahead !== undefined && ahead > Date.now() ? ahead - Date.now() : (host.againMs?.(0) ?? 30_000))
     }
     if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
       if (r.timer) clearTimeout(r.timer)
