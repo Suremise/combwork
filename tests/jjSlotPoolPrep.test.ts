@@ -594,9 +594,13 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.h.jj(row.folder, 'commit', '-m', 'card 2, too early')
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
-        expect(r1, JSON.stringify(r1)).toMatchObject({ error: expect.stringMatching(/isn't its last card's integrated work/) })
+        // Refused, the work kept (HI-2923); since HI-3115 (Darren's decision B) as the cycle's wait, never a failure, with
+        // what is there: the early commit alone, never card 1's.
+        expect(r1, JSON.stringify(r1)).toMatchObject({ retry: expect.stringMatching(/isn't its last card's integrated work/), heldWork: { why: 'extra', commits: [expect.any(String)] } })
+        expect(r1).not.toHaveProperty('error')
+        expect((r1 as { heldWork: { commits: string[] } }).heldWork.commits).not.toContain(R)
         // HI-3003: in jj's words, naming no git, branch or switch (it said "git switch: …").
-        const said = (r1 as { error: string }).error
+        const said = (r1 as { retry: string }).retry
         expect(said).toMatch(new RegExp(`^jj couldn't prepare ${row.name} for the card: `))
         expect(said).not.toMatch(/\bgit\b|branch|switch/i)
         expect(await w.port.line(row.folder)).toBe(key1)

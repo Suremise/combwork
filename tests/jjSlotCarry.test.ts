@@ -62,9 +62,13 @@ describe.skipIf(!jjExe)(`a jj card started again in its own slot (jj ${TESTED_JJ
       writeFileSync(join(row.folder, 'a.txt'), 'a\n')
       w.h.jj(row.folder, 'commit', '-m', 'card 1, first part')
       writeFileSync(join(row.folder, 'b.txt'), 'half done\n')
-      // Another card's preparation in the slot: the edit isn't its own, refused as before (nothing changes).
+      // Another card's preparation in the slot: the edit isn't its own, refused as before (nothing changes); since HI-3115
+      // (Darren's decision B) as that card's wait, with what is there, never a failure.
       expect(await w.port.carries!(row.folder, jjLineKey(ws, 2, 1), base, { identity: row.identity!, target: 'main' })).toBe(false)
-      expect(await w.pool.prepare(lent.lease.id, { line: jjLineKey(ws, 2, 1), base, install: false, target: 'main' })).toMatchObject({ error: expect.stringMatching(/committed/) })
+      const other = await w.pool.prepare(lent.lease.id, { line: jjLineKey(ws, 2, 1), base, install: false, target: 'main' })
+      expect(other).toMatchObject({ held: expect.stringMatching(/integrated work/), heldWork: { why: 'extra' } })
+      expect(other).not.toHaveProperty('error')
+      expect(readFileSync(join(row.folder, 'b.txt'), 'utf8')).toBe('half done\n')
       // Card 1 put back and started again: the same slot, target and base, its next start's key. Carried, the edit kept.
       const again = jjLineKey(ws, 1, 2)
       expect(await w.port.carries!(row.folder, again, base, { identity: row.identity!, target: 'main' })).toBe(true)

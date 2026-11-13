@@ -32,7 +32,7 @@ import { jjFileGate, pathKey, rootKey, storeKey } from './jjFileGate'
 import { asideOf, asReceipt, entryIdSync, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
 import { untrackedPaths } from './jjUntracked'
-import type { OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import type { HeldWork, OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { agentMsg, type AgentMsg } from '../../shared/agentText'
 import { carriesBinding, chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
@@ -954,6 +954,26 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   }
 
   /**
+   * HI-3115 (decision B, design s42): what a jj slot holds over the last card's work, read pinned at `op`, as the frozen
+   * evidence for its wait's advice: the commits over `over` (the previous binding's base) up to the working copy `tip`
+   * that are neither in the previous binding's target (its commit at `op`) nor any of its submitted commits, oldest first;
+   * the working copy itself when it holds edits (`tipEmpty` false; never from a read that didn't record it). `select` the
+   * same set as a revset of full ids only (no `@`, no bookmark), still naming that work after the slot changes. A read
+   * that fails: `cantInspect`, no ids.
+   */
+  const heldAt = async (folder: string, op: string, prev: JjBinding | null, over: string, tip: string, tipEmpty: boolean, base: string): Promise<HeldWork> => {
+    const none: HeldWork = { why: 'cantInspect', commits: [], edits: null, select: null, base, target: prev?.target ?? null } // i18n-ignore: a reason code, not text
+    const T = prev?.target ? await bookmarkAt(folder, op, prev.target) : null
+    if (isUnknown(T)) return none
+    const subs = prev?.submitted ?? []
+    const select = [`(${over}::${tip})`, T ? `::${T}` : over, ...(subs.length ? [`(${subs.join('|')})`] : []), ...(tipEmpty ? [tip] : [])].join(' ~ ')
+    const out = await read(folder, op, ['log', '--no-graph', '--reversed', '-r', select, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revisionIn, { folder }))
+    if (isUnknown(out)) return none
+    const ids = lines(out)
+    return { why: 'extra', commits: ids.filter((c) => c !== tip), edits: tipEmpty ? null : tip, select, base, target: prev?.target ?? null } // i18n-ignore: a reason code, not text
+  }
+
+  /**
    * A slot moved onto `next.base` for a binding, as an owned, journalled write (HI-2866/s10 §2, s13; HR1's round 1):
    * under the store's lock, the journal planned with the pointer it starts from (`prev`) and taken up by this attempt (a
    * fresh `run`), then the folder recorded, its chain over `prev`'s base checked (exactly `prev`'s submitted commits,
@@ -1127,7 +1147,8 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           const left = await read(folder, H, ['log', '--no-graph', '-n', '1', '-r', `::(${revsetName(ws)}@-) ~ ::${T}`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revisionIn, { folder }))
           return !isUnknown(left) && lines(left).length === 0
         }
-        if (!onPrevBase && !chainIsBinding(chain, j.prev) && !(await inTarget())) return keptStep(await refuse(JJ_REFUSED.unintegrated))
+        // HI-3115 (decision B): refused as before, with the evidence of what is there for the card's wait's advice.
+        if (!onPrevBase && !chainIsBinding(chain, j.prev) && !(await inTarget())) return { ...keptStep(await refuse(JJ_REFUSED.unintegrated)), held: await heldAt(folder, H, j.prev, over, wc.commit, wc.empty, bound.base) }
         if (j.prev?.submitted.length) {
           const prev = j.prev
           const contained = async (): Promise<boolean> => {
@@ -1138,7 +1159,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
             return !isUnknown(c) && !!c
           }
           // Not proved (HI-2924): the user's own Done on exactly that card cycle stands for it.
-          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return keptStep(await refuse(JJ_REFUSED.notIntegrated))
+          if (!(await contained()) && !(prev.key && deps.doneByUser && (await deps.doneByUser(store, prev)))) return { ...keptStep(await refuse(JJ_REFUSED.notIntegrated)), held: { why: 'notIntegrated', commits: [], edits: null, select: null, base: bound.base, target: prev.target } } // i18n-ignore: a reason code, not text
         }
         const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
         if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)
@@ -1401,6 +1422,24 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const prep = ctx && samePath(ctx.store, o.identity.store) ? (deps.prep?.(ctx.store) ?? null) : null
       const ptr = prep ? prep.pointer(ctx!.store, o.identity.workspace) : null
       return ptr !== 'unreadable' && carriesBinding(ptr, { card: k.card, key: line, generation: o.identity.generation, target: o.target ?? null, base })
+    },
+    // HI-3115 (decision B, design s42): committed work over the last card's in a slot whose builder is still running,
+    // read without recording the folder (never a snapshot while it works there): evidence to hold the card's preparation
+    // without ending that run. Edits can't be seen this way (the preparation's own record finds them). Null: nothing such,
+    // no previous binding, or it can't be read (the preparation then decides, as before).
+    heldEarly: async (folder, line, base, o) => {
+      const k = parseJjLineKey(line)
+      if (!k || !o.identity || k.workspace !== o.identity.workspace) return null
+      const ctx = await contextOf(folder)
+      const prep = ctx && samePath(ctx.store, o.identity.store) ? (deps.prep?.(ctx.store) ?? null) : null
+      const prev = prep ? prep.pointer(ctx!.store, o.identity.workspace) : null
+      if (!prev || prev === 'unreadable' || prev.key === line) return null
+      const op = await pinned(folder)
+      if (isUnknown(op)) return null
+      const wc = await wcAt(folder, op, o.identity.workspace)
+      if (isUnknown(wc)) return null
+      const held = await heldAt(folder, op, prev, prev.base, wc.commit, true, base)
+      return held.why === 'extra' && held.commits.length ? held : null
     },
     prepare: async (folder, line, base, o = {}) => {
       const k = parseJjLineKey(line)

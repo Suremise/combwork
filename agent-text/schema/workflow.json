@@ -846,12 +846,15 @@
       "base": "plain",
       "commit": "plain",
       "other": "plain",
-      "max": "number"
+      "max": "number",
+      "state": "select"
     }
   },
   "workflow.refused.platform.jjRefused.next": {
     "placeholders": {
-      "why": "select"
+      "why": "select",
+      "state": "select",
+      "told": "plain"
     }
   },
   "workflow.refused.platform.keptAcross.message": {

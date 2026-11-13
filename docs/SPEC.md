@@ -3167,7 +3167,23 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   unintegrated work, a lost fence, a replaced folder, a binding changed meanwhile (`superseded`), the head or target
   moved. A fence lost after the write keeps the journal at `written`, for the holder's next attempt to confirm and
   publish. A crash resumes from the journal's phase by the same reading; a retry after publication recognises its own
-  binding and writes nothing.
+  binding and writes nothing. **Work found there early** (HI-3115; Darren's decision B of 13 Nov, design HI-3115/s42 agreed
+  with HR1): the protection of extra work stands (HI-2913, HI-2923, HI-2924, HI-2980 A, HI-2981): a slot holding more
+  than the previous binding is never prepared over. Its refusal (`unintegrated`, `notIntegrated`, `divergent`, `notEmpty`,
+  `journal`) is the pending cycle's wait, never `SlotPrepareFailed`: nothing there is changed, and once the slot is clear
+  the next pass prepares the same cycle, with no put-back. With it comes the evidence, frozen at the inspected operation
+  (`HeldWork`): the commits over the previous binding's base up to the working copy that are neither in its target (its
+  commit there) nor any of its submitted commits, and the working copy's own commit when it holds edits; `select` the
+  same set as a revset of full ids only, never `@` or a bookmark. A builder idle in the slot is checked first without
+  recording the folder (`heldEarly`: committed work only), so a hold for it doesn't end its run; edits are found by the
+  preparation's own record, after its run is ended. The hold is said once per cycle and reason (a `SlotPrepareHeld`
+  fact, with the sentence said), on the card and in the builder's wake: what is there, `jj new <base>` to set it aside
+  where it is, and once prepared `jj rebase -r <frozen selection> -B '@'` (or `jj squash --from <edits> --into '@'`) to
+  bring back what belongs to the card, its arguments as typed in PowerShell; more than 20 commits are counted and
+  selectable with `jj log -r <frozen selection>`. Not integrated: integrate it, or the user's own Done on exactly that
+  cycle (HI-2924). Unreadable: no ids or commands. A builder stopped for the record is named, with how to resume it. A
+  submit before the slot is prepared is told to end its turn (`unbound`, `pending`), or, held, the hold's own sentence
+  (`held`); one bound to another card since keeps today's refusal.
 - **Composition:** jj's port is registered by the app with its dependencies (`slotsApp.ts`: the control workspace's
   record and the bindings in the workspace database, the store's repository lock, re-entrant within one async context so
   a jj write inside a held lock runs straight through, the Recycle Bin, the project folder's quiet, containment on the

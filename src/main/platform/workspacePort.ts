@@ -98,9 +98,27 @@ export interface WorkspaceHeads {
 }
 
 /** What a step that changes a workspace or a line answered: done, or not with the tool's own words (`err`, as it said them). */
+/**
+ * HI-3115 (decision B, design HI-3115/s42): what keeps a jj card's slot from being prepared, frozen at the operation it was
+ * read at, so the advice built from it still names the same work after the slot changes. `extra`: commits over the last
+ * card's that are neither in its target nor any of its submitted commits (`commits`, oldest first), and the working
+ * copy's own commit when it holds edits (`edits`); `select` the frozen revset of them all (full ids only). `notIntegrated`:
+ * the last card's work isn't in its target yet. `cantInspect`: what it holds couldn't be read (no ids, no commands).
+ */
+export interface HeldWork {
+  why: 'extra' | 'notIntegrated' | 'cantInspect'
+  commits: string[]
+  edits: string | null
+  select: string | null
+  base: string
+  target: string | null
+}
+
 export interface WorkspaceStep {
   ok: boolean
   err: string
+  /** HI-3115: a jj preparation refused for what the slot holds: the evidence for its wait's advice. */
+  held?: HeldWork
   /**
    * A refused detach because the slot holds its binding's own work not in the target yet (HI-2995; jj: the chain not
    * integrated, or not the binding's): kept for its card, not a refusal to retry. Never set for a transient one (the
@@ -297,6 +315,11 @@ export interface WorkspacePort {
    * Git's only: absent, the pool waits for the slot's builder and prepares it as before.
    */
   lineAtBase?(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep>
+  /**
+   * HI-3115: committed work over the last card's in a slot whose builder still runs there, read without recording the
+   * folder; null when there's none or it can't be read. jj's only: absent, the preparation decides after its record.
+   */
+  heldEarly?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null }): Promise<HeldWork | null>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

@@ -297,6 +297,26 @@ export class JjPlatform implements PlatformAdapter {
     return d && 'jj' in d ? d.jj : null
   }
 
+  /**
+   * HI-3115: where the card's cycle (its last Started) stands with its slot's preparation, for a submit's `unbound`
+   * advice: `pending` (no `SlotPrepared` yet: end the turn, the slot is prepared once the builder is idle), `held` (its
+   * preparation waits on what the slot holds: the hold's own sentence, its last `SlotPrepareHeld`), else `other` (bound
+   * to another card since: today's advice). Unreadable: `other`.
+   */
+  private slotState(card: CardRecord): { state: 'pending' | 'held' | 'other'; told: string } {
+    try {
+      const facts = this.wf?.store.facts(card.id) ?? []
+      const at = facts.findLastIndex((f) => f.kind === 'Started')
+      if (at < 0) return { state: 'other', told: '' }
+      const since = facts.slice(at + 1)
+      if (since.some((f) => f.kind === 'SlotPrepared')) return { state: 'other', told: '' }
+      const held = since.findLast((f) => f.kind === 'SlotPrepareHeld')
+      return held ? { state: 'held', told: (held.data as FactData['SlotPrepareHeld']).told } : { state: 'pending', told: '' }
+    } catch {
+      return { state: 'other', told: '' }
+    }
+  }
+
   private refused(card: CardRecord, why: JjWhy, values: Record<string, string | number> = {}): GuardRefusal {
     return { rule: 'platform.jjRefused', values: { card: card.key, why, ...values } }
   }
@@ -564,7 +584,7 @@ export class JjPlatform implements PlatformAdapter {
       at = got.value
     } else {
       const owner = this.ownerOf(card, s, true)
-      if (!owner) return { ok: false, refusal: this.refused(card, 'unbound') }
+      if (!owner) return { ok: false, refusal: this.refused(card, 'unbound', this.slotState(card)) }
       const b = await jjBoundary({ ...ctx, folder }, owner, { lock: d.lock(ctx.store) }, this.runner())
       // New files jj left out for its size limit (HI-2973): the work isn't all recorded, named for the agent to commit
       // (raising the limit) or ignore.
@@ -592,7 +612,7 @@ export class JjPlatform implements PlatformAdapter {
     // The slot's binding: still this card's line, at its generation, its base an ancestor of P.
     const bound = await port.binding(folder)
     if (isUnknown(bound)) return { ok: false, refusal: this.unknownRefusal(card, bound, 'submit') }
-    if (!bound || bound.key !== s.started.line) return { ok: false, refusal: this.refused(card, 'unbound') }
+    if (!bound || bound.key !== s.started.line) return { ok: false, refusal: this.refused(card, 'unbound', this.slotState(card)) }
     const base0 = bound.base
     if (P.commit === base0) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'none' } } }
     const chainOut = await reads.run(op, ['log', '--no-graph', '--reversed', '-r', `(${base0}::${P.commit}) ~ ${base0}`, '-n', String(CHAIN_MAX + 1), '-T', COMMIT_TEMPLATE])

@@ -1213,6 +1213,24 @@
       "platform": "plain"
     }
   },
+  "service.slots.held": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "kind": "select",
+      "target": "plain",
+      "why": "plain",
+      "hasCommits": "select",
+      "ids": "plain",
+      "more": "plural",
+      "selectArg": "plain",
+      "hasEdits": "select",
+      "at": "plain",
+      "base": "plain",
+      "stopped": "select",
+      "builder": "plain"
+    }
+  },
   "service.slots.notPrepared": {
     "placeholders": {
       "slot": "plain",
