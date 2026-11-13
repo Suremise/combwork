@@ -584,8 +584,46 @@ const onDb = (fn) => {
     onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))
     jj(shop, 'bookmark', 'create', 'next', '-r', 'main')
     jj(shop, 'bookmark', 'create', 'release-x', '-r', 'main')
-    const opts8 = await inv('workflow:setOptions', shop, { preset: null, options: { review: 'you', noSelfReview: false, folder: 'slots', finish: 'userIntegrates', target: 'next' } })
-    check('the project\'s target changed to next', !!opts8 && !opts8.error, JSON.stringify(opts8))
+    // HI-3152: the user changes Work merges into to next in the Workflow tab and opens Save…: its Retarget lists card 2 and
+    // its kept slot as staying on main, each with its reason (`kept`), read through jj, and nothing that jj can't move.
+    // Screenshots in both themes, and in each language. Then Save.
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    const form8 = page.locator('.workflow-form')
+    const targetInput8 = form8.locator('.workflow-option[data-option="target"] input')
+    await targetInput8.waitFor({ timeout: HUNG_MS })
+    await targetInput8.fill('next')
+    await targetInput8.press('Enter')
+    await form8.locator('[data-action="save"]').click()
+    const save8 = page.locator('.dialog', { has: page.locator('.workflow-save') })
+    await save8.waitFor({ timeout: HUNG_MS })
+    const retarget8 = save8.locator('[data-retarget]')
+    const keptCard8 = retarget8.locator(`[data-retarget-keep="${key2}"]`)
+    const keptSlot8 = retarget8.locator(`[data-retarget-keep="${kept7.name}"]`)
+    check("Save…'s Retarget: card 2 and its slot listed as staying on main, its work kept there", !!(await until(async () => /These stay on main/.test(await text(retarget8)) && /its work is kept on main/.test(await text(keptCard8)) && (await text(keptCard8)).includes(key2) && /its work is kept on main/.test(await text(keptSlot8)), HUNG_MS)), await text(save8))
+    check('…nothing listed to move (no lane, started card or slot)', (await retarget8.locator('[data-retarget-move]').count()) === 0, await text(retarget8))
+    await shoot(retarget8, 'retarget-kept')
+    // A translated screen: Save… shows the language it was opened in, so it is closed, the window spoken to in German,
+    // and opened again; then back in English for the save.
+    const reopen8 = async () => {
+      await page.keyboard.press('Escape')
+      await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
+      await form8.locator('[data-action="save"]').click()
+      await save8.waitFor({ timeout: HUNG_MS })
+    }
+    const de8 = catalogue('de')
+    const deKept8 = (/\bkept \{([^}]*)\{from\}/.exec(de8['workflow.form.retargetKeep'] ?? '') ?? [])[1]?.trim() ?? ''
+    await speak({ ...english, code: 'de', locale: 'de', messages: de8 })
+    await reopen8()
+    check('de: Save…\'s Retarget, card 2 and its slot staying, in German', !!deKept8 && !!(await until(async () => (await text(keptCard8)).includes(deKept8) && (await text(keptSlot8)).includes(deKept8), HUNG_MS)), await text(retarget8))
+    await shoot(retarget8, 'retarget-kept-de')
+    await speak(english)
+    await reopen8()
+    check('…in English again', !!(await until(async () => /its work is kept on main/.test(await text(keptCard8)), HUNG_MS)), await text(retarget8))
+    await save8.getByRole('button', { name: 'Save', exact: true }).click()
+    await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('the project\'s target changed to next, saved from Save…', !!(await until(async () => (await inv('workflow:form', shop))?.options?.target === 'next' || (await inv('workflow:form', shop))?.effective?.target === 'next', HUNG_MS)), JSON.stringify(await inv('workflow:form', shop)).slice(0, 400))
     await showBoard(page)
     await openByTitle(page, n2)
     const field8 = page.locator('#card-target')

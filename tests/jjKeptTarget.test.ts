@@ -46,6 +46,23 @@ async function keptThenRetargeted(w: World, keptFor: 'slot-a' | 'slot-b' = 'slot
 const startedTarget = (w: World, card: number): string | null | undefined => w.wf.state(card).started?.target
 
 describe.skipIf(!jjExe)('a jj card with kept work after the project\'s target changed (HI-3129)', { timeout: 120_000 }, () => {
+  // HI-3152: why a target change leaves free jj slots alone. A slot last used on main, lent for a card on next (ahead of
+  // main), is prepared at next's head: the start bases it on its card's bookmark, whatever the slot held before.
+  it.each([true, false])("a slot used on main, lent for a card on next: prepared at next's head (colocated: %s)", async (colocated) => {
+    const w = await world(colocated)
+    const first = await started(w, 'on main')
+    moved(await w.wf.putBack(first.key, B1))
+    w.h.jj(w.repo, '--ignore-working-copy', 'new', '--no-edit', 'main', '-m', 'ahead')
+    const ahead = w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'latest(description(exact:"ahead\n"))', '-T', 'commit_id').trim()
+    w.h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'create', 'next', '-r', ahead)
+    opts.target = 'next'
+    const card = w.wf.createCard({ title: 'on next' })
+    moved(await w.wf.start(card.key, B1))
+    expect(w.wf.state(card.id).started).toMatchObject({ target: 'next', base: ahead })
+    expect(await w.prepare(card.id)).toEqual({ ok: true, err: '' })
+    expect(w.h.id(w.slots['slot-a'].folder, '@-')).toBe(ahead)
+  })
+
   it.each([true, false])('starts on the bookmark its work is on; a fresh card on the new one (colocated: %s)', async (colocated) => {
     const w = await world(colocated)
     const k = await keptThenRetargeted(w)
