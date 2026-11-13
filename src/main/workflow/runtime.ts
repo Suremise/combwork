@@ -1187,7 +1187,8 @@ export class Workflow {
     if (dry) delete data.lease
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
     // HI-3107: work from cycles under another version control, left on its line, said (never carried, never refused).
-    const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project).catch(() => []) : []
+    const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project).catch((e: unknown) => (log.warn(`#${card.id}: its earlier work couldn't be read`, e), [])) : []
+    if (earlier.length) log.info(`#${card.id} has earlier work: ${earlier.map((e) => `${userText(e.line)} (${e.state})`).join(', ')}`)
     for (const e of earlier) warnings.push(earlierWorkText(card.key, e, o.platform))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
@@ -2854,6 +2855,8 @@ export class Workflow {
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
       }
+      // HI-3107: a start written by the move (a board drag, the Assistant's move), its earlier work said as start's is.
+      if (!out && gs && !opts.dry && gs.earlier.length && this.state(card).stage === 'active') void Promise.resolve(this.cfg.earlierWork?.(card, gs.earlier, gs.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
     } finally {
       // A slot lent for its start and not started with (asked, refused, undone): given back (#1438).
