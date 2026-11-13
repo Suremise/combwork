@@ -548,7 +548,7 @@ const onDb = (fn) => {
     check('…that slot held: a run still writing in it', held7 === true, JSON.stringify(held7))
     await page.getByRole('button', { name: 'Task Board' }).click()
     const tile7 = page.locator(`.task-card[data-task="${n2}"]`)
-    const doing7 = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Doing' }) })
+    const doing7 = page.locator('.board-column[data-column="doing"]')
     check('…card 2 on the board, in To Do', !!(await until(async () => (await tile7.count()) === 1 && (await tile7.evaluate((e) => e.closest('.board-column')?.getAttribute('data-column')).catch(() => null)) === 'todo', HUNG_MS)))
     await tile7.dragTo(doing7.locator('.board-column-body'))
     const ask7 = page.locator('.dialog', { hasText: 'anyway?' })
