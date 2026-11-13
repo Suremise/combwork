@@ -97,6 +97,8 @@ let chimesPlayed = 0
 ;(window as unknown as { __cwChimes?: () => number }).__cwChimes = () => chimesPlayed
 // The bell's list as the tests read it (HI-2320): each entry, whether it was quiet (no pop-up), its buttons and what it says once resolved.
 ;(window as unknown as { __cwBell?: () => unknown[] }).__cwBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
+// How many usage changes the window has taken in (HI-3182): a test waits for one to land.
+;(window as unknown as { __cwUsageBumps?: () => number }).__cwUsageBumps = () => Object.values(get().usageVersion).reduce((a, b) => a + b, 0)
 
 function handleEvent(e: CombworkEvent): void {
   switch (e.type) {
