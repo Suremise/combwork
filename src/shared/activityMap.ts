@@ -239,6 +239,34 @@ export function stationTitle(st: Pick<MapStationView, 'status' | 'count' | 'heat
   return tr(TIP.stationTip, { station: name, n: st.count, heat: st.heat, hasLast: last ? 'yes' : 'no', last })
 }
 
+/**
+ * The characters a station's last call has inside its hex (HI-3179): its inner width at that line, less a margin, in
+ * the map's monospace at its size (ActivityMap's STATION_R and the CSS's 10.5px; tests/e2e/activitymap.cjs measures it).
+ */
+export const STATION_LAST_CHARS = 12
+
+/**
+ * A station's last call as its hex shows it (HI-3179; its hover has it whole): a path's file name alone (Read and Edit,
+ * "+2" for more files kept), and anything still longer than `max` characters cut in its middle, its start and its end
+ * kept (a file's extension, or a tool name's last letters): `interrupted.ps1` → `interru….ps1`.
+ */
+export function stationLastShown(last: string, station: MapStation, max = STATION_LAST_CHARS): string {
+  const more = /^(.*?)( \+\d+)$/.exec(last)
+  const label = more ? more[1] : last
+  const extra = more ? more[2] : ''
+  const shown = (station === 'read' || station === 'edit') && /[\\/]/.test(label) ? (label.split(/[\\/]/).filter(Boolean).pop() ?? label) : label
+  return middleCut(shown, Math.max(4, max - extra.length)) + extra
+}
+
+/** `s` in at most `max` characters, cut in the middle: its start, an ellipsis, and its end (its extension, if it has one). */
+function middleCut(s: string, max: number): string {
+  const chars = [...s]
+  if (chars.length <= max) return s
+  const ext = /\.[A-Za-z0-9]{1,5}$/.exec(s)?.[0]
+  const tail = ext && ext.length <= max - 4 ? ext.length : Math.min(4, Math.floor((max - 1) / 2))
+  return `${chars.slice(0, max - 1 - tail).join('')}…${chars.slice(-tail).join('')}`
+}
+
 export interface MapAgentView {
   key: string
   name: string
