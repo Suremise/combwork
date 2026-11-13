@@ -5067,6 +5067,12 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
   never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
   the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
+  HI-3141: a slots start waiting for a slot takes the slots path's target in its provisional plan (what the start's
+  evidence read), whatever the project folder's head, so it is refused `start.slotAvailable` as a wait, never
+  `evidence.changed`. The user's start across that wait is built in the project folder: on no branch, the plan's
+  `acrossWait` (`platform.detachedFolder`, as above) refuses it, the user's start only. And the release reads' `watch`
+  (HI-3148) finds a project's refs as git does (`commonDirFast`): a project inside a repository, with no `.git` of its
+  own (a workspace kept in git), was refused `start.releaseUnknown` at every start onto a target.
   HI-3107 (design HI-3107/s7): a card's committed work from cycles under a version control whose lines are branches (the
   descriptor's `defaultTarget`: Git's), left on its line when the repository switched to another (jj), is said, never
   carried or refused: `earlierWork` (workflow/earlierWork.ts) reads the card's recorded starts (`Started`, `Adopted`, each

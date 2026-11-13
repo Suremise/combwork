@@ -11,7 +11,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Disposable, ObserveEvent } from './observe'
-import type { Containment, Maybe } from './types'
+import type { Containment, Maybe, Unknown } from './types'
 import type { TargetChanges } from '../../shared/types'
 
 /** What a start records of the platform: the card's folder, line, base and target (None: its manifests). */
@@ -30,6 +30,12 @@ export interface StartPlan {
   fresh?: boolean
   /** Slots: none could be lent now, in English (why it waits for one): the start is refused `start.slotAvailable`. */
   slotWait?: string
+  /**
+   * HI-3141: with `slotWait`, why a user's start across that wait (built where the card's agent is, the project folder)
+   * can't be made there: a platform refusal (its `rule` and `ruleValues`), returned for that start only. A wait stays
+   * a wait for anyone else's start.
+   */
+  acrossWait?: { rule: NonNullable<Unknown['rule']>; ruleValues?: Unknown['ruleValues'] }
   manifest?: Manifest
   deliverables?: Manifest
   /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */

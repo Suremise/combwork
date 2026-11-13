@@ -32,8 +32,9 @@ export const gitReleaseReads: ReleaseReads = {
   // The refs `released` reads, from the repository's common dir with no git process: the exact tags, the line's head and
   // the main line's (main, master). A pack of loose refs (git gc) changes nothing it reads: refSync reads both.
   async watch(projectPath, line) {
-    const common = G.commonDirSync(projectPath)
-    if (!common) return null
+    // HI-3141: a project inside a repository (no `.git` of its own: a workspace kept in git) asks git where its refs are.
+    const common = await G.commonDirFast(projectPath)
+    if (isUnknown(common)) return null
     const refs = [...releaseTagNames(line).map((n) => `refs/tags/${n}`), `refs/heads/${line}`, 'refs/heads/main', 'refs/heads/master']
     return () => refs.map((r) => `${r}=${refSync(common, r) ?? '-'}`).join('|')
   },

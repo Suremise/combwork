@@ -249,7 +249,7 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
       expect(JSON.stringify(r)).not.toMatch(/git switch (main|undefined|null|HEAD)\b/)
     })
 
-    it('a no-code card, and a slots start waiting for a slot: never refused for the project folder’s head', async () => {
+    it('a no-code card, and a slots start waiting for a slot: never refused for the project folder’s head, but the user’s start across the wait is (HI-3141)', async () => {
       const { w, p } = await workspace({ p: 'git', q: 'git' })
       git(wsOf(p), 'checkout', '-q', '--detach')
       const noCode = await inWorkspace(w, () => tasks.createTask({ title: 'Look only', project: 'p', kind: 'no-code' }, user))
@@ -259,13 +259,25 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
       const service = await import('../src/main/workflow/service')
       service.setSlotStarts({ leaseFor: async () => ({ wait: 'every slot is in use' }), unused: async () => undefined })
       try {
+        // HI-3141: an agent's start waits for a slot, said as that whatever the project folder's head (the provisional
+        // plan takes the slots path's target, as the evidence read it), never evidence.changed nor the detached refusal.
         const busy = await startCard(w, p, 'p')
-        expect(busy).not.toMatchObject({ rule: 'platform.detachedFolder' })
-        // As before this card (the provisional plan's target is the folder's line, none when detached, so the evidence
-        // read first differs: evidence.changed, carded separately); never the detached refusal.
-        expect(busy).toMatchObject({ refused: true, rule: 'evidence.changed' })
+        expect(busy).toMatchObject({ refused: true, rule: 'start.slotAvailable' })
+        // The user's start, and across the wait (built where the agent is): the folder on no branch refuses it as any
+        // build there is (HI-3104's), never a card started on no branch.
+        const card = await inWorkspace(w, () => tasks.createTask({ title: 'Started by the user', project: 'p' }, user))
+        const fresh = (await workflowFor(w, p))!
+        expect(await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user'))).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+        const across = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user', { drag: { by: 'user', reason: 'start it anyway', ask: false } }))
+        expect(across).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+        expect(JSON.stringify(across)).toContain('Check out its branch in the project folder (git switch main)')
+        expect(fresh.state(fresh.store.card(card.number)).started).toBeFalsy()
         git(wsOf(p), 'checkout', '-q', 'main')
         expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'start.slotAvailable' })
+        // On its branch, the user's start across the wait goes through, in the project folder, merging into main.
+        const ok = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user', { drag: { by: 'user', reason: 'start it anyway', ask: false } }))
+        expect(ok).not.toMatchObject({ refused: true })
+        expect(fresh.state(fresh.store.card(card.number)).started).toMatchObject({ folder: 'project', line: 'main', target: 'main' })
       } finally {
         service.setSlotStarts(null)
       }

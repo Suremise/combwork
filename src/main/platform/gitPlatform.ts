@@ -163,7 +163,12 @@ export class GitPlatform implements PlatformAdapter {
         // A slot waited for: the plan is provisional, the card isn't built in the project folder (HR2's HI-3104 design:
         // never refused for that folder's head). No slot here at all: it is built there, so its head is checked.
         const here = await this.projectPlan(card, o, !got)
-        return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
+        if (!got || isUnknown(here)) return here
+        // HI-3141: its target as this path resolved it (what the start's evidence read), whatever the folder's head, so
+        // the wait is said as a wait. A user's start across it is built in the project folder: on no branch, refused there
+        // as any build there is (HI-3104's `platform.detachedFolder`), never a card on no branch.
+        const across = card.kind !== 'no-code' && here.line === null && here.base ? await this.detachedRefusal(card, o, here.base) : null
+        return { ...here, target, slotWait: got.wait, ...(across?.rule ? { acrossWait: { rule: across.rule, ...(across.ruleValues ? { ruleValues: across.ruleValues } : {}) } } : {}) }
       }
       // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
       const followed = await this.followedHead(o, target, dry)

@@ -2,7 +2,7 @@
 // named exactly v<line> or <line>, in the line's history, and the line merged into the default line (main, master or
 // trunk). An annotated tag's date is its own; a lightweight tag has none. Anything unreadable is unknown.
 import { execFileSync } from 'child_process'
-import { writeFileSync } from 'fs'
+import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
@@ -80,6 +80,21 @@ describe('Git: whether a line is released (HI-3148)', () => {
     const before = check()
     git(r, 'pack-refs', '--all')
     expect(check()).toBe(before)
+  })
+
+  // HI-3141: a project inside a repository (no `.git` of its own: a workspace kept in git) is watched as its repository.
+  it('watch: a project folder inside its repository reads the repository’s refs', async () => {
+    const r = repo()
+    const sub = join(r, 'project')
+    mkdirSync(sub)
+    writeFileSync(join(sub, 'x.txt'), 'x\n')
+    const check = await reads.watch(sub, '1.4.0')
+    expect(check).not.toBeNull()
+    const first = check!()
+    expect(first).toBe((await reads.watch(r, '1.4.0'))!())
+    git(r, 'tag', '-a', 'v1.4.0', '-m', 'release', '1.4.0')
+    expect(check!()).not.toBe(first)
+    expect(await reads.released(sub, '1.4.0')).toBeNull()
   })
 
   it('a repository it can’t read: unknown, never "not released"', async () => {
