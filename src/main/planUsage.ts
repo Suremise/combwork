@@ -47,35 +47,41 @@ function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): 
 
 /**
  * Which of two readings of one period was taken later, where their sessions' reports tell (HI-3181): one taken after the
- * other's session had already reported it. Null when they can't be ordered. A reading kept from before HI-3181 was taken
- * at or before its report.
+ * other's session had already reported it, or after its own run launched (HI-3187: a run launched since the other was
+ * taken, its first report included). Null when they can't be ordered. A reading kept from before HI-3181 was taken at or
+ * before its report.
  */
 function newer(kept: PlanLimit, next: PlanLimit): 'kept' | 'next' | null {
   const takenBy = (l: PlanLimit): string | undefined => l.firstSeenAt ?? l.reportedAt
   // A reading taken after a report that came at or after the other was taken (HR3's round 2: equal is a session changing
   // its figure on the report right after the one that gave the kept one).
   const after = (a: string | undefined, b: string | undefined): boolean => !!a && !!b && Date.parse(a) >= Date.parse(b)
-  if (after(next.changedAfter, takenBy(kept))) return 'next'
-  if (after(kept.changedAfter, takenBy(next))) return 'kept'
+  if (after(takenAfter(next), takenBy(kept))) return 'next'
+  if (after(takenAfter(kept), takenBy(next))) return 'kept'
   return null
 }
+
+/** The latest a reading is known to have been taken after (HI-3181, HI-3187): its session's report before, or its run's launch. */
+const takenAfter = (l: PlanLimit): string | undefined => later(l.changedAfter, l.takenAfter)
 
 /**
  * Two readings of the same allowance (#383): the later period's; within one, the newer where their reports tell
  * (HI-3181: a usage reset lowers the share mid-period), else the higher; said as the latest report said it. A reading
  * that can't be dated (a session's first report, or one forgotten) never replaces one that can (HR1's round 1): it may be
- * from before a drop the dated one shows.
+ * from before a drop the dated one shows. Its run's launch orders a reading only when the launch came after the kept one
+ * was taken (HI-3187); otherwise it is still undated (HR1's round 1: two runs' launches and calls interleave, so a run
+ * launched later can still relay a reading from before the drop).
  */
 function mergeSame(kept: PlanLimit, next: PlanLimit): PlanLimit {
   if (!kept.resetsAt || !next.resetsAt) return described(next, kept)
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
   const order = newer(kept, next)
-  const undatedOverDated = !next.changedAfter && !!kept.changedAfter
+  const undatedOverDated = !next.changedAfter && !!takenAfter(kept)
   if (order === 'next' || (order === null && !undatedOverDated && next.usedPercent >= kept.usedPercent)) return described({ ...next, resetsAt }, kept)
   // The reading kept, its figures, who reported them and how old it is.
   const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt }
-  for (const k of ['used', 'reportedAt', 'reportedBy', 'firstSeenAt', 'changedAfter'] as const) {
+  for (const k of ['used', 'reportedAt', 'reportedBy', 'firstSeenAt', 'changedAfter', 'takenAfter'] as const) {
     if (kept[k] === undefined) delete out[k]
     else (out as unknown as Record<string, unknown>)[k] = kept[k]
   }
@@ -99,16 +105,17 @@ const SESSION_READINGS_KEPT = 500
  * How old each limit's reading in a session's report is (HI-3181), from that session's earlier reports. Claude Code's
  * status line carries no reading time, and a session repeats its latest API call's reading until it calls again
  * (tests/fixtures/planusage-2026-10-19.json): a figure the session hadn't reported before was taken since its report
- * before; one it repeats is as old as its first report of it. Exported for tests (`memo` there).
+ * before; one it repeats is as old as its first report of it. `launchedAt` (HI-3187): its run's launch, where every
+ * reading of a run was taken since (capabilities.planUsageSinceLaunch). Exported for tests (`memo` there).
  */
-export function readingAges(session: string, report: PlanUsage, memo = sessionReadings): Record<string, { firstSeenAt: string; changedAfter?: string }> {
-  const ages: Record<string, { firstSeenAt: string; changedAfter?: string }> = {}
+export function readingAges(session: string, report: PlanUsage, memo = sessionReadings, launchedAt?: string): Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> {
+  const ages: Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> = {}
   for (const l of report.limits) {
     const key = `${session}\n${l.id}`
     const prev = memo.get(key)
     const same = prev && prev.usedPercent === l.usedPercent && samePeriod(prev.resetsAt, l.resetsAt)
     const age = same ? { firstSeenAt: prev.firstSeenAt, ...(prev.changedAfter ? { changedAfter: prev.changedAfter } : {}) } : { firstSeenAt: report.updatedAt, ...(prev ? { changedAfter: prev.lastAt } : {}) }
-    ages[l.id] = age
+    ages[l.id] = launchedAt ? { ...age, takenAfter: launchedAt } : age
     memo.delete(key)
     memo.set(key, { usedPercent: l.usedPercent, resetsAt: l.resetsAt, ...age, lastAt: report.updatedAt })
   }
@@ -168,6 +175,7 @@ export function mergePlanUsage(kept: PlanUsage | undefined, report: PlanUsage, n
     const out: PlanLimit = { ...l, reportedAt: report.updatedAt, ...(reportedBy ? { reportedBy } : {}) }
     delete out.firstSeenAt
     delete out.changedAfter
+    delete out.takenAfter
     return { ...out, ...ages?.[l.id] }
   })
   const ids = new Set(stamped.map((l) => l.id))
@@ -254,7 +262,8 @@ const shownValues = (u: PlanUsage | null | undefined): string =>
  * Providers report plan usage often (Claude Code with every status-line update, many times a minute while
  * agents work). What mergePlanUsage keeps is in memory (saved with the config on quit and with any other
  * change); it is only written to disk when a shown value changes, and then at most once a minute. `reportedBy` is the
- * reporting session's agent, for the status bar's tooltip.
+ * reporting session's agent, for the status bar's tooltip; `session`, its run, and `launchedAt`, when that run launched
+ * if the provider's readings are all its own run's (readingAges).
  *
  * A session launched on a connection (HI-1756) reports that connection's own limits: kept by its id
  * (`connectionPlanUsage`), never mixed into its CLI's, and warned of per connection (`connection:<id>:<limit>`), the
@@ -263,7 +272,7 @@ const shownValues = (u: PlanUsage | null | undefined): string =>
  * session launched as the login the connection is signed in as now. One still running as another (a login kept since,
  * or changed in a pane) or whose login its launch couldn't tell is left out: it never fills another login's figures.
  */
-export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string, connection?: { id: string; name: string; login?: string }, session?: string): void {
+export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string, connection?: { id: string; name: string; login?: string }, session?: string, launchedAt?: string): void {
   if (connection && (!connection.login || connection.login !== connectionLoginNow(connection.id))) return
   const c = config.get()
   const kept = connection ? c.connectionPlanUsage?.[connection.id] : c.planUsage[provider]
@@ -271,8 +280,8 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
   const stale = !!connection && !!kept && (kept as ConnectionPlanUsage).login !== connection.login
   if (stale) forgetConnectionUsage(connection.id)
   const prev = stale ? undefined : kept
-  // How old its readings are (HI-3181), from this session's reports of this login's or this CLI's figures.
-  const ages = session ? readingAges(`${session}\n${connection ? `${connection.id}\n${connection.login}` : provider}`, report) : undefined
+  // How old its readings are (HI-3181), from this session's reports of this login's or this CLI's figures, and its launch.
+  const ages = session ? readingAges(`${session}\n${connection ? `${connection.id}\n${connection.login}` : provider}`, report, sessionReadings, launchedAt) : undefined
   const usage = mergePlanUsage(prev, report, Date.now(), reportedBy, ages)
   const changed = shownValues(prev) !== shownValues(usage)
   if (connection) c.connectionPlanUsage = { ...c.connectionPlanUsage, [connection.id]: { ...usage, login: connection.login } }

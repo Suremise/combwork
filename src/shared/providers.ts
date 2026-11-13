@@ -88,6 +88,12 @@ export interface ProviderCapabilities {
    */
   remoteHookPolicy?: boolean
   /**
+   * Every plan usage reading a run reports comes from that run's own API calls, so was taken after its launch (HI-3187:
+   * Claude Code's status line has no rate limits until its process calls the API, fresh or resumed). Not Codex, whose
+   * resumed rollout can carry a reading days old.
+   */
+  planUsageSinceLaunch?: boolean
+  /**
    * The CLI signs in on a GitHub host (HI-2779: Copilot): it follows the workspace's and project's GitHub host settings,
    * and Provider Setup checks its sign-in per host in use (AgentInstallInfo.hostChecks), with Sign in per host.
    */

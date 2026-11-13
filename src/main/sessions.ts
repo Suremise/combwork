@@ -6389,8 +6389,9 @@ class SessionManager {
     const answered = (d.stopsAnswered ?? []).map(Date.parse).filter((t) => t >= started)
     if (answered.length) l.stopsAnswered = [...(l.stopsAnswered ?? []), ...answered].slice(-STOPS_KEPT)
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
-    // The connection it launched on (HI-1756): its usage is that login's.
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId)
+    // The connection it launched on (HI-1756): its usage is that login's. Its launch dates its readings where they are all
+    // its own run's (HI-3187).
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId, providerDescriptor(l.state.provider).capabilities.planUsageSinceLaunch ? l.state.startedAt : undefined)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {

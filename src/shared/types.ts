@@ -735,9 +735,12 @@ export interface PlanLimit {
    * How old the reading kept is (HI-3181), from its session's reports, which carry no time of their own: taken at or before
    * `firstSeenAt` (the session's first report of this figure), and after `changedAfter` (its report before, of another
    * figure; absent for a session's first). Two readings so ordered: the newer one is what it is now, even lower.
+   * `takenAfter` (HI-3187): its run's launch, where the provider's readings all come from the run's own API calls
+   * (capabilities.planUsageSinceLaunch), so a run's first report is dated too.
    */
   firstSeenAt?: string
   changedAfter?: string
+  takenAfter?: string
   /**
    * Which part of the plan it covers, where a provider has several limits of one window (HI-2734: agy's weekly quotas):
    * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
