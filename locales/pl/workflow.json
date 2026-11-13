@@ -662,5 +662,7 @@
   "workflow.slots.keptForgottenFor": "Zachowany dla karty {card}, ale jj nie wymienia już jego workspace’u",
   "workflow.slots.removeForgottenMessage": "Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim. Karta {card} zacznie wtedy od nowa od swojego celu, w innym slocie. Praca zatwierdzona tutaj zostaje w magazynie jj{commit, select, none {.} other {: jej ostatni commit to {commit}.}}",
   "workflow.slots.state.forgotten": "Niewymieniony przez jj",
-  "workflow.slots.removeForgottenFree": "jj nie wymienia już workspace’u {slot}. Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim."
+  "workflow.slots.removeForgottenFree": "jj nie wymienia już workspace’u {slot}. Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim.",
+  "workflow.refused.platform.keptElsewhere.message": "Karta {card} nie może się tam rozpocząć: jej zatwierdzona praca sprzed odłożenia jest zachowana w slocie {slot} i karta zaczyna się tylko w tym slocie.",
+  "workflow.refused.platform.keptElsewhere.next": "Poczekaj, aż slot {slot} będzie wolny, a potem uruchom kartę {card} ponownie: dostanie z powrotem ten slot razem ze swoją pracą."
 }

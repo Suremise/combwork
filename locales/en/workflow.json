@@ -1479,6 +1479,14 @@
     "defaultMessage": "{gone, select, yes {Its folder is gone, so nothing of it is left to go on with: remove the slot (Version Control → Slots and copies, Remove…), and {card} starts afresh from its target.} other {Switch the repository back to {platform} to go on with {card} in that slot.}}",
     "description": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key."
   },
+  "workflow.refused.platform.keptElsewhere.message": {
+    "defaultMessage": "{card} can't start there: its committed work from before it was put back is kept in slot {slot}, and it starts only in that slot.",
+    "description": "HI-3132: a refused start: the card was put back with commits, kept for it in slot {slot} (a name), and this start would have put it somewhere else (the project folder, or across a wait for that slot), without that work. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.keptElsewhere.next": {
+    "defaultMessage": "Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.",
+    "description": "HI-3132: the next step after that refusal: once the slot {slot} is free (nothing works in it), starting the card {card} again lends it that slot with the work kept in it."
+  },
   "workflow.refused.platform.keptLine.message": {
     "defaultMessage": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
     "description": "HI-3112: a refused start: the card was started before, put back, and its branch (made from {kept}, the branch it merged into then) is kept, so it keeps merging into {kept}; but the card is in a lane whose cards merge into {target}. {card} is a card key like AM-12; {kept} and {target} are branch names."

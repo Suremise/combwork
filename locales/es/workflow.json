@@ -662,5 +662,7 @@
   "workflow.slots.keptForgottenFor": "Reservado para {card}, pero jj ya no lista su workspace",
   "workflow.slots.removeForgottenMessage": "Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga. {card} empieza entonces de nuevo desde su destino, en otro slot. El trabajo que confirmó aquí se queda en el almacén de jj{commit, select, none {.} other {: su último commit es {commit}.}}",
   "workflow.slots.state.forgotten": "jj no lo lista",
-  "workflow.slots.removeForgottenFree": "jj ya no lista el workspace de {slot}. Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga."
+  "workflow.slots.removeForgottenFree": "jj ya no lista el workspace de {slot}. Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga.",
+  "workflow.refused.platform.keptElsewhere.message": "{card} no puede empezar ahí: el trabajo que confirmó antes de devolverla se guarda en el slot {slot}, y solo empieza en ese slot.",
+  "workflow.refused.platform.keptElsewhere.next": "Espera a que {slot} esté libre y vuelve a empezar {card}: recupera ese slot, con su trabajo."
 }

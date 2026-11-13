@@ -662,5 +662,7 @@
   "workflow.slots.keptForgottenFor": "Für {card} aufbewahrt, aber jj führt seinen Workspace nicht mehr",
   "workflow.slots.removeForgottenMessage": "Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin. {card} beginnt dann neu von seinem Ziel aus, in einem anderen Slot. Die hier committete Arbeit bleibt in jjs Speicher{commit, select, none {.} other {: ihr letzter Commit ist {commit}.}}",
   "workflow.slots.state.forgotten": "Nicht in jj geführt",
-  "workflow.slots.removeForgottenFree": "jj führt den Workspace von {slot} nicht mehr. Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin."
+  "workflow.slots.removeForgottenFree": "jj führt den Workspace von {slot} nicht mehr. Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin.",
+  "workflow.refused.platform.keptElsewhere.message": "{card} kann dort nicht starten: seine committete Arbeit von vor dem Zurücklegen wird im Slot {slot} aufbewahrt, und es startet nur in diesem Slot.",
+  "workflow.refused.platform.keptElsewhere.next": "Warte, bis {slot} frei ist, und starte {card} dann erneut: Es bekommt diesen Slot mit seiner Arbeit zurück."
 }

@@ -81,6 +81,8 @@ export interface SlotStarts {
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
   /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross), else null. */
   keptAcross?: (ws: WorkspaceService, project: string, card: number) => Promise<KeptAcross | null>
+  /** HI-3132: a card's kept slot of the project's own version control (SlotPool.keptHere), else null. */
+  keptHere?: (ws: WorkspaceService, project: string, card: number) => Promise<{ slot: string; folder: string } | null>
   /**
    * After #1441's migration: an agent's adopted worktree (its carried slot) while what it is kept for (the lane running at
    * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
@@ -222,6 +224,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // HI-3118: a submit from a slot asks whether its lease still holds it for the card, of the pool that lent it.
     slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
     keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
+    keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // jj's card work (HI-2868), composed once for the project while slots run.

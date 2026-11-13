@@ -662,5 +662,7 @@
   "workflow.slots.keptForgottenFor": "Gardé pour {card}, mais jj ne liste plus son workspace",
   "workflow.slots.removeForgottenMessage": "Son dossier va dans la Corbeille tel quel, avec les modifications qu’il contient. {card} repart alors de sa cible, dans un autre slot. Le travail commité ici reste dans le stockage de jj{commit, select, none {.} other { : son dernier commit est {commit}.}}",
   "workflow.slots.state.forgotten": "Non listé par jj",
-  "workflow.slots.removeForgottenFree": "jj ne liste plus le workspace de {slot}. Son dossier va dans la Corbeille tel quel, avec les modifications qu’il contient."
+  "workflow.slots.removeForgottenFree": "jj ne liste plus le workspace de {slot}. Son dossier va dans la Corbeille tel quel, avec les modifications qu’il contient.",
+  "workflow.refused.platform.keptElsewhere.message": "{card} ne peut pas démarrer là : son travail commité avant sa remise est gardé dans l’emplacement {slot}, et elle ne démarre que dans cet emplacement.",
+  "workflow.refused.platform.keptElsewhere.next": "Attends que {slot} soit libre, puis redémarre {card} : elle récupère cet emplacement, avec son travail."
 }
