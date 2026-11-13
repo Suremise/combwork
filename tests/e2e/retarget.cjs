@@ -297,6 +297,8 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const top11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"] .progress-lane-top`)
     const into = await waitHung(async () => ((await top11.locator('[data-lane-target="1.3.0"]').count()) === 1 ? true : null)).catch(() => null)
     check('…the lane stays on 1.3.0, and its header says "into 1.3.0"', !!into, await text(top11))
+    // HI-3142: its Merges into alone isn't old rules: no such mark.
+    check('…and no "old rules" mark for that alone (HI-3142)', (await top11.locator('[data-mark="old-rules"]').count()) === 0, await text(top11))
     // Start's notification covers the panel's foot, where the lane is: closed first.
     for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
     await waitHung(async () => (await page.locator('.toast').count()) === 0)
@@ -353,6 +355,21 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
     await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
+
+    // --- HI-3142: a real rule change since (the merge style) marks the lane left on 1.3.0 old rules, its Merges into kept.
+    const now = (await inv('workflow:form', fx.alpha)).options
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...now, style: now.style === 'squash' ? 'merge' : 'squash' } })
+    if (!(await panel.isVisible().catch(() => false))) await page.locator('.progress-rail').click()
+    await panel.locator('.progress-tab[data-tab="lanes"]').click()
+    const marked = await waitHung(async () => ((await top11.locator('[data-mark="old-rules"]').count()) === 1 ? true : null)).catch(() => null)
+    check('HI-3142: a real rule change since marks it old rules, "into 1.3.0" kept', !!marked && (await top11.locator('[data-lane-target="1.3.0"]').count()) === 1, await text(top11))
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await panel.screenshot({ path: path.join(fx.shots, `retarget-lane-old-rules-${t}.png`) }).catch(() => undefined)
+    }
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
