@@ -95,7 +95,7 @@
     "note": "HI-3114: required for nextVersion too."
   },
   "tool.branch.arg.offer": {
-    "text": "A release offer’s id: nextVersion answers it; dismissOffer puts it off (the user’s Not now).",
+    "text": "A release offer’s id: nextVersion answers it; dismissOffer puts it off (Not now).",
     "note": "HI-3155: cw_branch’s offer argument."
   },
   "tool.branch.description": {
@@ -698,7 +698,7 @@
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."
   },
   "tool.updateSetting.arg.offer": {
-    "text": "The release offer this answers (its id).",
+    "text": "A release offer’s id it answers.",
     "note": "HI-3155: cw_update_setting’s offer argument (project.workflow.target or otherTargets)."
   },
   "tool.updateSetting.arg.value": {
