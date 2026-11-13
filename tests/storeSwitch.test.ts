@@ -762,6 +762,39 @@ describe("a fence member's switch to None is drained (HI-2974)", () => {
     }
   })
 
+  it.each(['project', 'slots'] as const)('HI-3132: a card whose work is kept in a slot of the project\'s own version control starts only there, cards in the %s folder', async (folder) => {
+    const { w, p } = await members(true)
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder } } }), { existing: true })
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Kept here', project: 'p' }, user))
+    const slot = await keptSlot(w, p, card.number, 'git')
+    const { poolFor } = await import('../src/main/slotsApp')
+    const service = await import('../src/main/workflow/service')
+    // The slot's start waits for that slot (something works in it), as slotForStart says of a kept slot it can't lend now.
+    service.setSlotStarts({ leaseFor: async () => ({ wait: `${slot} is busy` }), unused: async () => undefined, keptAcross: async (ws, project, cardId) => (await poolFor(ws, project)).keptAcross(cardId), keptHere: async (ws, project, cardId) => (await poolFor(ws, project)).keptHere(cardId) })
+    try {
+      const fresh = (await workflowFor(w, p))!
+      const byAgent = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, agentActor('b-p')))
+      if (folder === 'project') {
+        // Never in the project folder, without the work its slot holds.
+        expect(byAgent).toMatchObject({ refused: true, rule: 'platform.keptElsewhere' })
+        expect(JSON.stringify(byAgent)).toContain(`kept in slot ${slot}`)
+      } else {
+        // An agent's start waits for its slot, as before.
+        expect(byAgent).toMatchObject({ refused: true, rule: 'start.slotAvailable' })
+      }
+      // The user's start, and the user's start across the rules, never leave the work behind: refused naming the slot.
+      expect(await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user'))).toMatchObject({ refused: true, rule: 'platform.keptElsewhere' })
+      const across = await store.boardWrite(w, async () => fresh.start(`#${card.number}`, 'user', { drag: { by: 'user', reason: 'start it anyway', ask: false } }))
+      expect(across).toMatchObject({ refused: true, rule: 'platform.keptElsewhere' })
+      expect(JSON.stringify(across)).toContain(`Wait until ${slot} is free`)
+      expect(fresh.state(fresh.store.card(card.number)).started).toBeFalsy()
+      // Another card starts as before.
+      expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.keptElsewhere' })
+    } finally {
+      service.setSlotStarts(null)
+    }
+  })
+
   it('HI-3070: a project that chose None with Git work still running counts in the drain of its repository’s switch to jj; its None work never does', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'git' })
     // Q, never switched: a Git card in flight and a slot lease, then None (its own switch: its card keeps Git's rules).

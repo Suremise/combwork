@@ -667,5 +667,7 @@
   "workflow.slots.keptForgottenFor": "{card} 用に保持されていますが、jj はそのワークスペースをもう一覧に表示しません",
   "workflow.slots.removeForgottenMessage": "フォルダーは中の変更も含めてそのままごみ箱に移動されます。{card} はその後、別のスロットでターゲットから新たに始まります。ここでコミットした作業は jj のストアに残ります{commit, select, none {。} other {（最後のコミットは {commit}）。}}",
   "workflow.slots.state.forgotten": "jj に一覧表示されていない",
-  "workflow.slots.removeForgottenFree": "jj は {slot} のワークスペースをもう一覧に表示しません。フォルダーは中の変更も含めてそのままごみ箱に移動されます。"
+  "workflow.slots.removeForgottenFree": "jj は {slot} のワークスペースをもう一覧に表示しません。フォルダーは中の変更も含めてそのままごみ箱に移動されます。",
+  "workflow.refused.platform.keptElsewhere.message": "{card} はそこでは開始できません。戻される前にコミットされた作業がスロット {slot} に保持されており、そのスロットでのみ開始します。",
+  "workflow.refused.platform.keptElsewhere.next": "{slot} が空くまで待ってから、{card} をもう一度開始してください。作業とともにそのスロットが戻されます。"
 }

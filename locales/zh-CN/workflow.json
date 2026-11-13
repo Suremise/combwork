@@ -667,5 +667,7 @@
   "workflow.slots.keptForgottenFor": "为 {card} 保留，但 jj 已不再列出它的工作区",
   "workflow.slots.removeForgottenMessage": "它的文件夹会原样移到回收站，包括其中的所有更改。之后 {card} 会在另一个槽位中从它的目标重新开始。它在这里提交的工作仍保留在 jj 的存储中{commit, select, none {。} other {：最后一个提交是 {commit}。}}",
   "workflow.slots.state.forgotten": "未被 jj 列出",
-  "workflow.slots.removeForgottenFree": "jj 已不再列出 {slot} 的工作区。它的文件夹会原样移到回收站，包括其中的所有更改。"
+  "workflow.slots.removeForgottenFree": "jj 已不再列出 {slot} 的工作区。它的文件夹会原样移到回收站，包括其中的所有更改。",
+  "workflow.refused.platform.keptElsewhere.message": "{card} 不能在那里开始：它被放回之前提交的工作保留在槽位 {slot} 中，它只能在那个槽位开始。",
+  "workflow.refused.platform.keptElsewhere.next": "等 {slot} 空闲后再次开始 {card}：它会拿回那个槽位及其中的工作。"
 }

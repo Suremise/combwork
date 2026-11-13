@@ -667,5 +667,7 @@
   "workflow.slots.keptForgottenFor": "Reservado para {card}, mas o jj não lista mais o workspace dele",
   "workflow.slots.removeForgottenMessage": "A pasta dele vai para a Lixeira como está, com as alterações que houver nela. {card} então recomeça a partir do destino, em outro slot. O trabalho que ele commitou aqui fica no armazenamento do jj{commit, select, none {.} other {: o último commit é {commit}.}}",
   "workflow.slots.state.forgotten": "Não listado pelo jj",
-  "workflow.slots.removeForgottenFree": "O jj não lista mais o workspace de {slot}. A pasta dele vai para a Lixeira como está, com as alterações que houver nela."
+  "workflow.slots.removeForgottenFree": "O jj não lista mais o workspace de {slot}. A pasta dele vai para a Lixeira como está, com as alterações que houver nela.",
+  "workflow.refused.platform.keptElsewhere.message": "{card} não pode começar aí: o trabalho commitado antes de ele ser devolvido está reservado no slot {slot}, e ele só começa nesse slot.",
+  "workflow.refused.platform.keptElsewhere.next": "Espere {slot} ficar livre e comece {card} de novo: ele recebe esse slot de volta, com o trabalho."
 }

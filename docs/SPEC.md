@@ -3393,6 +3393,12 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
   for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
   card's record goes; the binding unreadable, for the recorded card as before.
+  **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
+  else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
+  runtime's `keptHere`, checked right after the plan, any slot lent for it given back). Waiting for that slot stays a
+  wait for an agent's or a lane's start (`start.slotAvailable`), but the user's start across that wait, which would
+  start the card where its builder is, is refused too, an override included: under jj (whose cards always use slots)
+  that drag was the one way a card started in the project folder without its kept work.
   **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
   store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
   platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,

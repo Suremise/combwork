@@ -219,6 +219,12 @@ export interface WorkflowConfig {
    * chosen (`platform.keptAcross`). Left out, none.
    */
   keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
+  /**
+   * HI-3132: the card's committed work kept in a slot of the project's own version control (HI-2995): the slot and its
+   * folder. A start placing the card anywhere else (the project folder, its builder's own, a user's start across a slot
+   * wait) is refused naming it (`platform.keptElsewhere`). Left out, none.
+   */
+  keptHere?: (card: CardRecord) => Promise<{ slot: string; folder: string } | null>
   /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
   earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
@@ -1187,6 +1193,16 @@ export class Workflow {
     const { existing, slotWait, fresh, baselineGen, carried, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
+    // HI-3132: its work kept in a slot of the project's own version control: it starts there or not at all. A plan
+    // placing it anywhere else (the project folder, its builder's own) is refused naming the slot, as keptAcross is;
+    // waiting for that slot stays a wait for an agent's or a lane's start, but a user's start across that wait (which
+    // would start it where it is) is refused too: an override of the slot's rule never leaves the work behind.
+    const here = card.kind === 'no-code' ? null : await this.cfg.keptHere?.(card)
+    const elsewhere = !!here && (planned.folder === 'project' || resolvePath(planned.folder).toLowerCase() !== resolvePath(here.folder).toLowerCase())
+    if (here && elsewhere && (!slotWait || actor === 'user')) {
+      if (lent) await this.slotUnused(card, lent)
+      return { rule: 'platform.keptElsewhere', values: { card: card.key, slot: here.slot } }
+    }
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
