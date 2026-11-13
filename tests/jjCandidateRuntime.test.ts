@@ -1124,6 +1124,27 @@ describe.skipIf(!jjExe)('HI-3150: a dropped candidate the user’s jj op restore
     expect(saved[0].state).toBeUndefined()
   })
 
+  it("HR2's round 1: a row due for something else (a retained checks journal, its copy still held): the restored candidate revived at once, dropped once the copy frees", async () => {
+    const { w, card, cycle, c, jjp } = await restoredAfterSweep(true)
+    // A checks journal kept for the same ended cycle, its lease still out; and its check copy not parked yet.
+    await w.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(`jj_candidate_checks:p-jj:${card.key.toLowerCase()}:${cycle}:held`, JSON.stringify({ lease: 'held-copy' })))
+    let held = true
+    const checks = w.deps.candidateChecks
+    w.deps.candidateChecks = { ...(checks as NonNullable<typeof checks>), leaseFreed: async () => !held, parkCopies: async () => !held }
+    await jjp.sweepEnded()
+    // Tracked live at once (never left `dropped`), its abandon waiting for the copy.
+    expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBeUndefined()
+    expect(visible(w, c.result)).toBe(true)
+    await jjp.sweepEnded()
+    expect(visible(w, c.result)).toBe(true)
+    // The copy freed: the next sweep drops it.
+    held = false
+    await jjp.sweepEnded()
+    expect(visible(w, c.result)).toBe(false)
+    expect(pinsOf(w, card, c.attempt)).toEqual([])
+    expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+  })
+
   describe('interrupted after its revival (colocated)', () => {
     for (const [at, point] of [
       ["after a new pin's intent, before it is made", (p: string) => p.startsWith('beforePin:') && p.includes('/r')],

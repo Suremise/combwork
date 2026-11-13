@@ -3798,9 +3798,9 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   any interruption after it is resumed by the ordinary drop paths. The drop (`dropJjAttempt`) pins again each owned
   visible commit no pin holds (`<prefix>r<n>`, as adopted successors are) before its guarded abandon: what the target
   reaches is kept (and settles `kept` for good: `JjDropped.dropped.reached`), as is anything the user built on it.
-  **Where it is noticed:** the live cycle's step, before its drops; ended cycles through the sweep, whose otherwise
-  settled rows (no live entry, candidate or checks rows) with dropped entries are nominated by one visibility read of
-  the owned commits of every such row the page already scanned, in chunks of 256 (`visibleCommits`), evidence only: a
+  **Where it is noticed:** the live cycle's step, before its drops; ended cycles through the sweep, every row the page already scanned with dropped entries (settled or due for
+  something else, a retained checks journal or a live sibling: HR2's round 1) nominated by one visibility read of
+  the owned commits of every such row, in chunks of 256 (`visibleCommits`), evidence only: a
   read jj can't make admits none, read again next run. No new scan or timer; journals cleared since are out of reach.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
