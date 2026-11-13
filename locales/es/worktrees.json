@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git no pudo comprobar si el worktree tiene cambios sin commit (git status falló en {folder}). Corrígelo y vuelve a fusionar.",
   "worktrees.merge.caseAlias": "Las ramas {branch} y {other} solo se diferencian en mayúsculas y minúsculas, que Windows no distingue, así que no se fusionó nada. Cambia el nombre de una de ellas y después fusiona.",
   "worktrees.merge.detached": "La carpeta del proyecto no está en ninguna rama (HEAD desacoplado). Primero cambia a la rama en la que fusionar.",
+  "worktrees.merge.hooksElsewhere": "Si lo rechazó uno de los hooks del repositorio: se ejecutaron en una copia temporal de {branch}, que no tiene ninguno de los archivos sin seguimiento de la carpeta del proyecto (node_modules, por ejemplo). Cambia a {branch} en la carpeta del proyecto y fusiona allí para ejecutarlos con todo en su sitio.",
   "worktrees.merge.intoItself": "{branch} no se puede fusionar en sí misma.",
   "worktrees.merge.noTarget": "No existe la rama {branch} en la que fusionar.",
   "worktrees.merge.notRemoved": "Se fusionó, pero no se quitó el worktree",
