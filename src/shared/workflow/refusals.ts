@@ -463,9 +463,12 @@ const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
   'submit.trailer': { at: 'head' } // i18n-ignore: select keys, never shown
 }
 
-/** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
-export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
-  const t = REFUSALS[rule]
+/**
+ * A refusal's values as its texts take them, formatted by `f`: a value that is a message of its own (a `why`, a `what`)
+ * as its sentence, earlier refusals' missing values, stages and names, and a `cause`'s whole {why} (HI-3136: one place,
+ * so every reader of a refusal fills it alike, never a placeholder or a blank).
+ */
+export function refusalValues(rule: RuleId, values: RefusalValues, f: RefusalFormat): Record<string, string | number> {
   // A refusal recorded before its rule's text took a value has none of it: the value its text had before (#1654).
   const vals: Record<string, string | number> = { ...VALUES_BEFORE[rule] }
   for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
@@ -489,6 +492,16 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
+  return vals
+}
+
+/** A refusal's values filled in English (the text a WorkflowRefusedError carries for the log and the window, HI-3136). */
+export const refusalValuesInEnglish = (rule: RuleId, values: RefusalValues): Record<string, string | number> => refusalValues(rule, values, IN_ENGLISH)
+
+/** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
+export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
+  const t = REFUSALS[rule]
+  const vals = refusalValues(rule, values, f)
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
   const queued = rule === 'merge.combworkMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null

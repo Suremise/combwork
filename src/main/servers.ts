@@ -4980,9 +4980,14 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
  * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
+  // A refusal's `error` is its `message`, word for word (HI-3136: the same sentence, filled as the reader's).
+  if (e instanceof tasks.WorkflowRefusedError) {
+    const refused = refusalBody(e.refusal)
+    return { status: errorStatus(e), body: { error: refused.message, ...refused } }
+  }
   // agent-protocol: a CombworkError's text, carried by httpFrom: its messages are found where it was thrown
   const error = e instanceof HttpError && e.text !== undefined ? agentText(e.text) : agentError(e)
-  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
+  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined) } }
 }
 
 /**
