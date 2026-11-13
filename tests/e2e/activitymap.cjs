@@ -238,11 +238,20 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
-    if ((await head.getByRole('button', { name: 'Pause', exact: true }).count()) === 1) await head.getByRole('button', { name: 'Pause', exact: true }).click()
+    // The snapshot is taken once the window has both agents finished, live (HI-3184): main says idle before the window's
+    // tick takes the state and its process read in, so a Refresh soon after HB2's turn could freeze HB2 still working.
+    if ((await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1) await head.getByRole('button', { name: 'Play', exact: true }).click()
+    await head.locator('.activity-hide input').check()
+    await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250)
+    await head.locator('.activity-hide input').uncheck()
+    await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+    await head.getByRole('button', { name: 'Pause', exact: true }).click()
     await head.getByRole('button', { name: 'Refresh', exact: true }).click()
     await lib.until(async () => (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1 && (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
     await head.locator('.activity-hide input').check()
-    check('the project tab, frozen, Hide finished on and both agents idle: no map, as the list shows nothing', !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250)))
+    const hidden = !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250))
+    const shownState = async () => JSON.stringify({ map: await map.count(), mode: await map.getAttribute('data-mode').catch(() => null), empty: await page.locator('.activity-tab .pane-empty').count(), tabs: await page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab').allInnerTexts(), live: (await inv('session:live')).map((x) => [x.agentId, x.status]), now: await inv('activity:now', alpha) })
+    check('the project tab, frozen, Hide finished on and both agents idle: no map, as the list shows nothing', hidden, hidden ? '' : await shownState())
     await head.locator('.activity-hide input').uncheck()
     check('…Hide finished off, still frozen: the shared map again', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)) && (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1)
 
