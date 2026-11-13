@@ -9,10 +9,10 @@
 // file too (a folder-only rule then doesn't cover it: it counts). The residual is Darren's decision on HI-3158 (13 Nov,
 // option 2): a file named as an ignored folder, made and gone again before its event is read, passes as the folder.
 
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'original-fs/promises'
-import { tmpdir } from 'os'
+import { lstat } from 'original-fs/promises'
 import { join } from 'path'
 import { git } from '../git'
+import { shadowCheckIgnore } from './gitShadowIgnore'
 
 /** What an entry was: a folder, something else, or `?` where it couldn't be read (it then counts). */
 export type EntryKind = 'd' | 'f' | '?'
@@ -67,33 +67,12 @@ export async function gitIgnoredByKind(folder: string, paths: string[], recorded
 }
 
 /**
- * check-ignore by the kind each path is asked as, never by what is on disk now (jjIgnoredEntries.ts' ignoredByKind,
- * with the folder's own git dir and index): in a work tree of its own holding only the `.gitignore` files on the paths'
- * way, where nothing else is, a path with a slash is a folder and one without a file.
+ * check-ignore by the kind each path is asked as, never by what is on disk now (gitShadowIgnore.ts, HI-3175), with the
+ * folder's own git dir and its index, so a tracked path is never ignored.
  */
 async function askedByKind(folder: string, rels: string[]): Promise<Set<string> | null> {
   if (!rels.length) return new Set()
   const gd = await git(folder, ['rev-parse', '--absolute-git-dir'])
   if (!gd.ok || !gd.out.trim()) return null
-  const shadow = await mkdtemp(join(tmpdir(), 'combwork-ignore-'))
-  try {
-    const folders = new Set<string>(['.'])
-    for (const p of rels) {
-      const parts = p.replace(/\/$/, '').split('/').slice(0, -1)
-      for (let i = 1; i <= parts.length; i++) folders.add(parts.slice(0, i).join('/'))
-    }
-    for (const f of folders) {
-      const text = await readFile(join(folder, f, '.gitignore')).catch((e: unknown) => (absent(e) ? null : undefined))
-      if (text === undefined) return null
-      if (text === null) continue
-      await mkdir(join(shadow, f), { recursive: true })
-      await writeFile(join(shadow, f, '.gitignore'), text)
-    }
-    const r = await git(shadow, [`--git-dir=${gd.out.trim()}`, `--work-tree=${shadow}`, 'check-ignore', '-z', '--stdin'], undefined, rels.join('\0'))
-    // Exit 1: none of them is ignored. Anything else is Git failing.
-    if (!r.ok && r.code !== 1) return null
-    return new Set(r.out.split('\0').filter(Boolean))
-  } finally {
-    await rm(shadow, { recursive: true, force: true }).catch(() => undefined)
-  }
+  return shadowCheckIgnore(folder, gd.out.trim(), rels, true)
 }
