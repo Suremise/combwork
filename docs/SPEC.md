@@ -9141,7 +9141,17 @@ where it ran) and counts for a card's submission only if all of these hold; othe
 - the folder was clean when it started (§16.3.2's dirty), and is clean and at the same checkout when it ends;
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
-  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it.
+  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it,
+  nor one deleting them (HI-3173, `gitIgnoredByKind.ts`): Git's folder-only rules (`out/`) match a path without a slash
+  only when it is a folder on disk, so each path of the record is asked by every kind it had during the run, in a work
+  tree of its own holding only the `.gitignore` files on its way, with the folder's git dir and index (a tracked path
+  is never ignored). Its kinds: each event's entry as read soon after the event came (8 reads at a time, at most 4096
+  events waiting however many name one path, past which an event stays unread; a closed watch drops its queue;
+  settling waits for the reads, up to its cap), a folder where the record has paths under it, and, where
+  an event's entry wasn't read or none of those says, what is on disk now and a file too. It is ignored only as every
+  one: a deleted `out/` is, a file `out` the run wrote and replaced with an `out/` folder isn't. Its residual is
+  HI-3158's (Darren, 13 Nov, option 2): a file named as an ignored folder, made and gone again before its event is
+  read, passes as the folder; and an empty ignored folder deleted counts, as nothing says it was a folder.
   Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them. A write
   is the run's by the file's own times, not when its event came in (HI-1767): a check copy's reset or the target merged
   in just before the start, whose events came in after it under load, isn't (its file last written before the start,
