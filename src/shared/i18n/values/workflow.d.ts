@@ -532,6 +532,7 @@ interface CombworkMessageValues {
   'workflow.slots.recoveredPutBack': { n: number }
   'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
+  'workflow.slots.removeForgottenFree': { slot: string | number }
   'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
   'workflow.slots.removeKept': undefined
   'workflow.slots.removeKeptMessage': { card: string | number; commit: string }

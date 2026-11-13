@@ -661,5 +661,6 @@
   "workflow.slots.notRemovedKept": "{slot} no se quitó: {why, select, changed {cambió después de mostrarse la lista (su carpeta volvió, o se creó de nuevo)} busy {algo trabaja en él ahora} other {Combwork lo conservó}}.",
   "workflow.slots.keptForgottenFor": "Reservado para {card}, pero jj ya no lista su workspace",
   "workflow.slots.removeForgottenMessage": "Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga. {card} empieza entonces de nuevo desde su destino, en otro slot. El trabajo que confirmó aquí se queda en el almacén de jj{commit, select, none {.} other {: su último commit es {commit}.}}",
-  "workflow.slots.state.forgotten": "jj no lo lista"
+  "workflow.slots.state.forgotten": "jj no lo lista",
+  "workflow.slots.removeForgottenFree": "jj ya no lista el workspace de {slot}. Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga."
 }

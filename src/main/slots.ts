@@ -3408,6 +3408,55 @@ export class SlotPool {
   }
 
   /**
+   * Whether a slot kept for no card shows a workspace the user forgot (HI-3103): its state one a forgotten workspace's
+   * slot is left in (`forgettable`), its folder there and jj positively not listing it (`present()` false; unknown: no).
+   * The window's read, for its Remove…; `removeForgotten` decides again.
+   */
+  async forgottenFree(s: Slot): Promise<boolean> {
+    return forgettable(s) && !this.store.keptRecord(s.name) && (await folderThere(s.folder)) && (await this.present(s)) === false
+  }
+
+  /**
+   * A slot kept for no card whose workspace the user forgot outside Combwork, its folder left (HI-3103, HI-3097's way for
+   * one that isn't kept): removed by the user's explicit Remove… (Slots and copies), its folder to the Recycle Bin whole,
+   * any changes in it included. Only as the window showed it: `generation`, the slot's. Eligible only while no kept
+   * record names it (one kept since goes through Remove… for a kept slot), it is idle in a state such a slot is left in
+   * (`forgettable`: ready until a lend tries it, then its setup failed, or gone, or dirty) at that generation in the
+   * project's own platform, its folder is there and jj positively doesn't list it (`present()` false: unknown refuses);
+   * all of it checked again under the removal's operation. Then `remove`'s `forgotten`: the session, in-flight and
+   * process guards on every attempt, the port proving the absence afresh right before the trash. `changed` otherwise,
+   * for the user to look again.
+   */
+  async removeForgotten(name: string, generation: string): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
+    const same = (s: Slot | null): boolean => !!s && forgettable(s) && (s.platform ?? 'git') === this.port.platform && this.hasPort(s) && !this.store.keptRecord(s.name) && s.identity?.generation === generation
+    const eligible = async (s: Slot | null): Promise<boolean> => same(s) && (await folderThere(s!.folder)) && (await this.present(s!)) === false
+    const seen = this.store.slot(name)
+    if (!(await eligible(seen))) return { ok: false, why: 'changed' }
+    let changed = false
+    const kept = await this.remove(
+      name,
+      async (slot, token) => {
+        // The row as read before its removal began (`removing` now, by this operation), the same conditions again, and
+        // the platform's fence admitting it.
+        const admits = await this.store
+          .fenced(name, token, (db) => {
+            admitOrThrow(db, this.store.project, slot.platform ?? 'git')
+            return true
+          })
+          .catch(() => false)
+        const ok = (await eligible(slot)) && admits
+        changed = !ok
+        return ok
+      },
+      { keptForgotten: true }
+    )
+    if (changed) return { ok: false, why: 'changed' }
+    if (kept) return { ok: false, why: 'kept', kept }
+    log.info(`Removed slot ${userText(name)}, its workspace forgotten outside Combwork: its folder to the Recycle Bin`)
+    return { ok: true }
+  }
+
+  /**
    * The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it.
    * `forgotten` (HI-3097, `remove`'s `keptForgotten`): the session, in-flight and process guards only.
    */
@@ -3508,6 +3557,15 @@ const quieting = new Map<string, Promise<boolean>>()
  * freed, a free one marked gone or made again) while the check still has it. A check only renames while it is in
  * `quieting`, and the look is in the same tick as finding none, so it never sees one mid-check.
  */
+/**
+ * A state a slot whose workspace the user forgot is left in, idle (HI-3103): ready (nothing looks again until a lend
+ * tries it), its setup failed then (`creating` with its error: "not listed"), gone, or dirty. Never lent, removing or a
+ * `creating` still being made.
+ */
+function forgettable(s: Slot): boolean {
+  return s.state === 'ready' || s.state === 'gone' || s.state === 'dirty' || (s.state === 'creating' && !!s.warmError)
+}
+
 export async function folderThere(folder: string): Promise<boolean> {
   const key = folder.toLowerCase()
   for (let going = quieting.get(key); going; going = quieting.get(key)) {

@@ -474,6 +474,22 @@ const onDb = (fn) => {
       return (await inv('slots:list', shop)).find((s) => s.name === slot6 && s.state === 'ready') ?? null
     }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
 
+    // HI-3103: that slot, kept for no card, its workspace then forgotten by the user (its folder left): Slots and copies
+    // says jj no longer lists it, with Remove…; confirmed (the Recycle Bin named), the slot and its folder go.
+    jj(shop, 'workspace', 'forget', w6.workspace)
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    check('Slots and copies: a free slot not listed by jj, with Remove…', !!(await until(async () => (await row6.locator('[data-action="remove-forgotten"]').count()) === 1 && /Not listed by jj/.test(await text(row6)), HUNG_MS)), await text(row6))
+    await row6.scrollIntoViewIfNeeded()
+    await shoot(row6, 'slot-forgotten-free')
+    await row6.locator('[data-action="remove-forgotten"]').click()
+    const askFree = page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` })
+    check('…the confirmation: jj no longer lists it, its folder to the Recycle Bin with any changes', !!(await until(async () => (await askFree.count()) === 1 && /jj no longer lists/.test(await text(askFree)) && /Recycle Bin/.test(await text(askFree)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(askFree, 'remove-forgotten-free-confirm')
+    await askFree.getByRole('button', { name: 'Remove', exact: true }).click()
+    check('…removed: the slot and its folder gone', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder), HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+
     // HI-3099: card 2 afresh in a slot, an unrecorded edit left there, put back; then the user commits twice in the
     // project folder and discards old operations (`jj op abandon`). The slot shows stale with Recover…, which mends it with
     // the edit kept; the project folder's files are as the user left them, and theirs to use.
