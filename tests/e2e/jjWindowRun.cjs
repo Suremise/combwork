@@ -482,7 +482,10 @@ const onDb = (fn) => {
     // track is the slot's work. B1's submission is refused naming the setting; put back, the slot shows it has changes
     // and the pool's removal (Changes → Unused worktrees' Remove for a colocated slot) refuses it, the file kept.
     jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'none()')
-    // A card of its own (no slot kept for it), so its slot shows only this.
+    // A card of its own (no slot kept for it), so its slot shows only this. Card 2 to Done first: its kept slot (the
+    // shop's one slot) goes back to the pool for it.
+    const done2 = await inv('tasks:move', n2, 'done', { confirm: true, reason: 'jjwindow: card 2 done, its slot back to the pool' }).catch((e) => ({ error: String(e) }))
+    check('card 2 to Done: its kept slot back in the pool', !!(await until(async () => (await inv('slots:list', shop)).some((s) => s.keptFor === undefined && s.state === 'ready' && !s.lease), HUNG_MS)), JSON.stringify({ done2, slots: await inv('slots:list', shop) }))
     const n3 = (await inv('tasks:create', { title: 'Shop untracked', project: 'shop', agent: b1.id })).number
     const key3 = (await card(n3)).key
     const givenRe3 = new RegExp(`Giving \\S*B1\\S* #${n3} in`, 'g')
