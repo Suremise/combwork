@@ -399,6 +399,28 @@ describe('jj check credit: the bracket with races at each barrier', () => {
     expect(await bracket(g, { log: unknownLog, run: () => writeFileSync(join(g.root, 'a.txt'), 'a longer edit\n') })).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
   })
 
+  it('HI-3158: a write record leaves out what jj ignores (its Git store’s rules); the revision’s files and anything else count, and with no store it stands', async () => {
+    const withStore = (): FakeRepo => {
+      const f = new FakeRepo()
+      // A Git-backed store as jj makes one: `store/type`, `store/git_target`, and a bare Git folder (no git run).
+      const store = join(f.jjRepo, 'store')
+      mkdirSync(join(store, 'git', 'objects'), { recursive: true })
+      mkdirSync(join(store, 'git', 'refs'))
+      writeFileSync(join(store, 'git', 'HEAD'), 'ref: refs/heads/main\n')
+      writeFileSync(join(store, 'type'), 'git\n')
+      writeFileSync(join(store, 'git_target'), 'git\n')
+      writeFileSync(join(f.root, '.gitignore'), 'out/\n*.txt\n')
+      return f
+    }
+    const said = (paths: string[]) => logSays({ changed: true, paths })
+    expect(await bracket(withStore(), { log: said(['out/bundle.js', 'out\\chunk.js']) })).toEqual({ revision: commit(1), tested: commit(1) })
+    expect(await bracket(withStore(), { log: said(['out/bundle.js', ':edit']) })).toMatchObject({ whyNot: 'changed', why: 'end:written', changes: [':edit'] })
+    expect(await bracket(withStore(), { log: said(['out/bundle.js', 'new.js']) })).toMatchObject({ whyNot: 'changed', why: 'end:written', changes: ['new.js'] })
+    // a.txt matches `*.txt` but is the revision's: it counts.
+    expect(await bracket(withStore(), { log: said(['a.txt', 'b.txt']) })).toMatchObject({ whyNot: 'changed', why: 'end:written', changes: ['a.txt'] })
+    expect(await bracket(new FakeRepo(), { log: said(['out/bundle.js']) })).toMatchObject({ whyNot: 'changed', why: 'end:written', changes: ['out/bundle.js'] })
+  })
+
   it('a colocated Git change (a plain commit jj has not imported) during the run, or during the end boundary, is moved', async () => {
     const colocated = (): FakeRepo => {
       const f = new FakeRepo()
