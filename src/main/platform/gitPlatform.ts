@@ -25,7 +25,7 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
 import { isUnknown, unknown, withDetail, type Containment, type Maybe, type Unknown } from './types'
 import { isAgain } from './again'
-import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
+import { destinationOf, fetchHeadOf, projectHost, REMOTE_PLACEHOLDER, upstreamRemedyOf } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
 
@@ -274,6 +274,8 @@ export class GitPlatform implements PlatformAdapter {
     const h = projectHost(this.project)
     const d = await destinationOf(h, target)
     if (isAgain(d)) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.again.message)
+    // HI-3128: a target that tracks nothing at all (a new version's branch, made here only) is refused with what to run.
+    if ('pause' in d && d.pause === 'noUpstream' && (await this.untracked(target))) return this.noUpstreamRefusal(target)
     if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
     const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
     const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
@@ -286,6 +288,27 @@ export class GitPlatform implements PlatformAdapter {
       if (!behind) return unknown(UNREADABLE.remoteBehind, { target, endpoint: d.snapshot.display })
     }
     return f.head
+  }
+
+  /** HI-3128: whether `branch` tracks nothing at all (neither its remote nor its merge setting set): not half set up. */
+  private async untracked(branch: string): Promise<boolean> {
+    const h = projectHost(this.project)
+    for (const key of [`branch.${branch}.remote`, `branch.${branch}.merge`]) {
+      const r = await h.run(this.project, ['config', '--get', key])
+      if (r.timedOut || r.notRun || r.code !== 1 || r.out.trim()) return false
+    }
+    return true
+  }
+
+  /**
+   * HI-3128: a start refused for a target with no upstream under follow mode (`platform.noUpstream`), with the commands
+   * that give it one (UpstreamRemedy, read locally), never "check Provider Setup".
+   */
+  private async noUpstreamRefusal(target: string): Promise<Unknown> {
+    const m = await upstreamRemedyOf(projectHost(this.project), target)
+    const u = unknown(UNREADABLE.remoteSetup, { target })
+    const values = m.kind === 'unusable' ? { target, how: m.why, remote: m.remote ?? REMOTE_PLACEHOLDER, publish: '', track1: '', track2: '' } : { target, how: m.kind, remote: m.remote ?? REMOTE_PLACEHOLDER, publish: m.publish, track1: m.track[0], track2: m.track[1] }
+    return { ...u, rule: 'platform.noUpstream', ruleValues: values }
   }
 
   /** Whether a start here asks for a slot (#1438): the app's lending, while the rules are enforced. */

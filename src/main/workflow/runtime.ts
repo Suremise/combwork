@@ -540,6 +540,9 @@ const undo = (g: GuardRefusal): never => {
   throw new DragUndone(g)
 }
 
+/** HI-3128: the queue pauses about a target's setup, not a card: Remove from queue of the card one names clears it. */
+const SETUP_PAUSES = new Set(['noUpstream', 'remoteAmbiguous', 'remoteUnsupported', 'fetchFailed'])
+
 export class Workflow {
   readonly store: FactStore
   readonly none: NoneAdapter
@@ -2910,12 +2913,22 @@ export class Workflow {
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       const e = openEntry(w.state())
+      // HI-3128: a pause about its target's setup (no upstream, its remote unusable, a fetch that failed) naming this card,
+      // in this write: cleared with it, unless a catch-up owes it (the published card's, not this one's). The next entry
+      // meets the same cause, if it lasts, and pauses naming itself; a pause about the card itself is left as it is.
+      const clearSetupPause = (target: string): void => {
+        const p = this.store.queuePause(target) as { reason: string; card: string } | null
+        if (p && p.card === card.key && SETUP_PAUSES.has(p.reason) && !this.store.meta(`queue.catchUp:${target}`)) this.store.setQueuePause(target, null)
+      }
       // A forward merge (HI-2679), queued or returned: it ends, not merged (Done with no `Integrated`), unless it is
       // advancing now (whose outcome the queue records, in the same lock).
       if (w.state().forward && w.state().stage !== 'done') {
         if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
         w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
-        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+        if (e) {
+          w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+          clearSetupPause(e.target)
+        }
         w.move('done', 'user')
         return null
       }
@@ -2923,6 +2936,7 @@ export class Workflow {
       if (e.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+      clearSetupPause(e.target)
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
       this.wake(w, w.state().started?.builder, stored(W.removed, { card: card.key, by: by === 'user' ? 'user' : 'assistant', reason: reason ? `: ${reason}` : '' }))

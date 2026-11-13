@@ -26,6 +26,7 @@ import { saveWorkflowOptions, workflowForm } from './optionsForm'
 import { retargetPreview } from './retarget'
 import { projectTargets } from './targets'
 import { workflowWrite } from './writes'
+import { queueIntegration } from '../platform/integrationPorts'
 
 const log = createLogger('nextVersion')
 
@@ -60,7 +61,11 @@ export async function nextVersionPlan(ws: WorkspaceService, projectPath: string)
   const found = from ? await lineRepoReads().resolveStart(projectPath, from) : null
   const start = found?.kind === 'branch' ? found : null
   const name = nextVersionName(from) ?? ''
-  return { from, start, name, base: { preset: form.preset, options: form.own }, listed: (form.options.otherTargets ?? []).includes(from), retarget: name && from ? await previewFor(ws, projectPath, from, name) : null }
+  // HI-3128: under follow mode, what the new branch needs before its first card (read locally; nothing pushed or set).
+  const o = form.options
+  const follows = o.finish === 'combworkMerges' && o.followRemote === true && from ? await queueIntegration().upstreamRemedy?.(projectPath, name || from, from) : undefined
+  const upstream = follows ? { kind: follows.kind, remote: follows.remote, ...(follows.kind === 'unusable' ? { why: follows.why } : {}) } : undefined
+  return { from, start, name, base: { preset: form.preset, options: form.own }, listed: (form.options.otherTargets ?? []).includes(from), retarget: name && from ? await previewFor(ws, projectPath, from, name) : null, ...(upstream ? { upstream } : {}) }
 }
 
 /** What can follow `to` from `from` with both going on (`ongoing`), or null when nothing is on `from`. */

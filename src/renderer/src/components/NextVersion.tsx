@@ -5,6 +5,7 @@ import { call, errorMessage } from '../api'
 import { offered, repoOp } from '../repoOps'
 import { confirm, notify } from '../store'
 import { cx } from '../util'
+import { REMOTE_PLACEHOLDER, upstreamCommands } from '@shared/workflow/queue'
 import { RetargetDetails, retargetSkippedText } from './WorkflowOptions'
 
 // HI-2807 (SPEC §16.6.2, §16.13.2): Start the next version, and a missing target's offer to create itself, in a
@@ -20,6 +21,7 @@ const M = {
   stepAdd: msg({ id: 'workflow.nextVersion.stepAdd', defaultMessage: 'Add {from} to Other branches work can merge into', description: 'HI-2807: a step the Start the next version dialog lists. Other branches work can merge into is an option’s name: as translated there.' }),
   stepListed: msg({ id: 'workflow.nextVersion.stepListed', defaultMessage: '{from} stays in Other branches work can merge into', description: 'HI-2807: a step the Start the next version dialog lists, when the release branch is listed there already.' }),
   stepTarget: msg({ id: 'workflow.nextVersion.stepTarget', defaultMessage: 'Work merges into: {from} → {name}', description: 'HI-2807: a step the Start the next version dialog lists: the option Work merges into (as translated there) moves from {from} to {name}.' }),
+  upstream: msg({ id: 'workflow.nextVersion.upstream', defaultMessage: '{name} is made here only and tracks no remote branch, which “The target branch follows its remote” needs before its first card starts. {how, select, ready {Publish it to {remote}: {publish}. Or, if {remote} has it already, set what it tracks: {track1}, then {track2}.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {name} should follow. Publish it there: {publish}. Or, if it has it already, set what it tracks: {track1}, then {track2}.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow) first, then publish {name}.} other {The remote it would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {name}.}}', description: 'HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are.' }),
   stays: msg({ id: 'workflow.nextVersion.stays', defaultMessage: 'Running lanes and started cards stay on {from}.', description: 'HI-2807: under the steps in the Start the next version dialog: what doesn’t move.' }),
   noStart: msg({ id: 'workflow.nextVersion.noStart', defaultMessage: '{from} isn’t a branch in this repository, so nothing can start from it.', description: 'HI-2807: the Start the next version dialog when the release branch doesn’t exist.' }),
   enterName: msg({ id: 'workflow.nextVersion.enterName', defaultMessage: 'Name the next version’s branch', description: 'HI-2807: an error in the Start the next version dialog: the name box is empty.' }),
@@ -38,6 +40,13 @@ const M = {
 interface Draft {
   name: string
   retarget: Set<'on'>
+}
+
+/** HI-3128: what the new branch needs under follow mode, its commands rendered for the name typed. */
+function upstreamNote(u: NonNullable<NextVersionPlan['upstream']>, name: string): string {
+  const c = upstreamCommands(u.remote, name)
+  const how = u.kind === 'unusable' ? (u.why === 'shallow' ? 'shallow' : 'ambiguous') : u.kind // i18n-ignore: select keys
+  return tr(M.upstream, { name, how, remote: u.remote ?? REMOTE_PLACEHOLDER, publish: c.publish, track1: c.track[0], track2: c.track[1] })
 }
 
 function NextVersionForm({ projectPath, plan, retarget, onName }: { projectPath: string; plan: NextVersionPlan; retarget: Set<'on'>; onName: (name: string) => void }) {
@@ -73,6 +82,7 @@ function NextVersionForm({ projectPath, plan, retarget, onName }: { projectPath:
         <li data-step="target">{tr(M.stepTarget, { from: plan.from, name: shown })}</li>
       </ul>
       <div className="s-desc">{tr(M.stays, { from: plan.from })}</div>
+      {plan.upstream && <div className="s-desc" data-note="upstream">{upstreamNote(plan.upstream, shown)}</div>}
       {plan.retarget && <RetargetDetails preview={{ ...plan.retarget, to: shown }} choice={retarget} onChange={() => redraw((n) => n + 1)} />}
     </div>
   )

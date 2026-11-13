@@ -15,6 +15,7 @@ import { pushLogKey, pushLogOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { memoryTransportStore } from '../../src/main/workflow/transportSnapshots'
 import { queueLine, queueOrder, queueStateOf } from '../../src/main/workflow/queueState'
+import { tr } from '../../src/shared/i18n'
 import { QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
@@ -1063,7 +1064,164 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(contains(e.project, result)).toBe(true)
     expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
   })
+
+  describe('HI-3128: a target with no upstream, and an owed catch-up once follow mode is off', () => {
+    /** The queue's git, failing the test's expectation on any read of the remote (follow mode off asks none). */
+    const noRemote = (asked: string[]) => gitWith((args, run) => {
+      if (args[0] === 'fetch' || args[0] === 'ls-remote' || args.includes('fetch')) asked.push(args.join(' '))
+      return run()
+    })
+
+    it('the noUpstream pause names its remedy and the commands; removing its card clears it, the next card pauses naming itself', { timeout: GIT_HEAVY_MS }, async () => {
+      const { e, queue } = following()
+      sh(e.project, 'branch', '--unset-upstream', 'main')
+      const a = await queued(e, 'A', 'a.txt')
+      expect(await queue().drain('main')).toMatchObject([{ card: a.key, outcome: 'paused', reason: 'noUpstream' }])
+      const p = e.store.queuePause('main')!
+      expect(p).toMatchObject({ reason: 'noUpstream', card: a.key, files: ['ready'] })
+      expect(p.message?.split('\n')).toEqual(['git push -u origin refs/heads/main:refs/heads/main', 'git config branch.main.remote origin', 'git config branch.main.merge refs/heads/main'])
+      moved(await e.wf.removeFromQueue(a.key, 'not now'))
+      expect(e.store.queuePause('main')).toBeNull()
+      const b = await queued(e, 'B', 'b.txt')
+      expect(await queue().drain('main')).toMatchObject([{ card: b.key, outcome: 'paused', reason: 'noUpstream' }])
+      expect(e.store.queuePause('main')).toMatchObject({ card: b.key })
+      // A pause about the card itself is left as it is when another card is removed.
+      const c = await queued(e, 'C', 'c.txt')
+      moved(await e.wf.removeFromQueue(c.key, 'not this one'))
+      expect(e.store.queuePause('main')).toMatchObject({ card: b.key, reason: 'noUpstream' })
+    })
+
+    it('follow mode off, the remote gone: a fresh catch-up behind is brought in without the remote; the held cards merge locally', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, bare, queue, a } = await caughtOnAFile()
+      del(join(e.project, 'a.txt'))
+      const b = await queued(e, 'B', 'b.txt')
+      sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+      queue().resume('main')
+      await queue().drain('main')
+      expect(e.store.queuePause('main')).toMatchObject({ reason: 'fetchFailed', card: a.key })
+      const result = head(bare)
+      e.options.followRemote = false
+      const asked: string[] = []
+      const q = queue({ git: noRemote(asked) })
+      q.resume('main')
+      await q.drain('main')
+      expect(asked).toEqual([])
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+      expect(contains(e.project, result)).toBe(true)
+      expect(e.wf.state(b).stage).toBe('done')
+      const c = await queued(e, 'C', 'c.txt')
+      await queue({ git: noRemote(asked) }).drain('main')
+      expect(e.wf.state(c).stage).toBe('done')
+      expect(asked).toEqual([])
+    })
+
+    it('follow mode off: a fresh catch-up the local target has moved away from is dropped, nothing forced, the user’s commit kept', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, queue, a } = await caughtOnAFile()
+      sh(e.project, 'add', '--intent-to-add', '--', ':(top,literal)a.txt')
+      sh(e.project, 'commit', '--only', '--quiet', '-m', 'mine', '--', ':(top,literal)a.txt')
+      const mine = head(e.project)
+      e.options.followRemote = false
+      const asked: string[] = []
+      const q = queue({ git: noRemote(asked) })
+      q.resume('main')
+      await q.drain('main')
+      expect(asked).toEqual([])
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+      expect(head(e.project)).toBe(mine)
+      expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('mine\n')
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(e.wf.state(a).stage).toBe('done')
+    })
+
+    for (const at of ['beforeCatchUpFiles', 'beforeCatchUpRef'] as const) {
+      it(`follow mode off: a catch-up recorded at ${at === 'beforeCatchUpRef' ? 'its ref' : 'its files'}, the target unchanged, completes with no remote`, { timeout: GIT_HEAVY_MS * 2 }, async () => {
+        const { e, bare, transport, a } = await stoppedIn(at)
+        const result = e.wf.state(a).integrated!.result
+        expect(head(bare)).toBe(result)
+        sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+        e.options.followRemote = false
+        const asked: string[] = []
+        await restarted(e, transport, { git: noRemote(asked) }).drain('main')
+        expect(asked).toEqual([])
+        expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+        expect(head(e.project)).toBe(result)
+        expect(sh(e.project, 'status', '--porcelain')).toBe('')
+        expect(e.store.queuePause('main')).toBeNull()
+      })
+    }
+
+    it('follow mode off: recorded, the user then pulled a commit holding the result: settled, nothing moved back', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, bare, transport } = await stoppedIn('beforeCatchUpFiles')
+      const top = theirs(bare)
+      sh(e.project, 'pull', '-q', '--ff-only', 'origin', 'main')
+      expect(head(e.project)).toBe(top)
+      sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+      e.options.followRemote = false
+      const asked: string[] = []
+      await restarted(e, transport, { git: noRemote(asked) }).drain('main')
+      expect(asked).toEqual([])
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+      expect(head(e.project)).toBe(top)
+      expect(sh(e.project, 'status', '--porcelain')).toBe('')
+    })
+
+    it('follow mode off: recorded, the user committed one of its two staged files: the remainder stays staged, byte for byte; the next card waits on it (staged) until the user sets it aside', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, transport } = await stoppedIn('beforeCatchUpRef', { 'b.txt': 'B\n' })
+      sh(e.project, 'commit', '-q', '--only', '-m', 'mine', '--', 'a.txt')
+      const mine = head(e.project)
+      const staged = sh(e.project, 'ls-files', '-s', '--', 'b.txt')
+      const c = await queued(e, 'C', 'c.txt')
+      sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+      e.options.followRemote = false
+      const asked: string[] = []
+      await restarted(e, transport, { git: noRemote(asked) }).drain('main')
+      expect(asked).toEqual([])
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+      expect(head(e.project)).toBe(mine)
+      expect([sh(e.project, 'ls-files', '-s', '--', 'b.txt'), readFileSync(join(e.project, 'b.txt'), 'utf8'), sh(e.project, 'status', '--porcelain')]).toEqual([staged, 'B\n', 'A  b.txt'])
+      expect(e.wf.state(c).stage).not.toBe('done')
+      expect(e.store.queuePause('main')).toMatchObject({ reason: 'staged', card: c.key, files: ['b.txt'] })
+      // The user sets it aside; resumed, C merges into the local main.
+      sh(e.project, 'stash', 'push', '-q', '--', 'b.txt')
+      const q = restarted(e, transport, { git: noRemote(asked) })
+      q.resume('main')
+      await q.drain('main')
+      expect(e.wf.state(c).stage).toBe('done')
+      expect(asked).toEqual([])
+    })
+
+    it('follow mode off: a recovery read that fails keeps the journal unchanged and holds the next card; read again, it settles', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { e, transport } = await stoppedIn('beforeCatchUpRef', { 'b.txt': 'B\n' })
+      sh(e.project, 'commit', '-q', '--only', '-m', 'mine', '--', 'a.txt')
+      const journal = catchUpOf(e.store.meta(catchUpKey('main')))
+      const c = await queued(e, 'C', 'c.txt')
+      e.options.followRemote = false
+      let fail = true
+      const git = gitWith((args, run) => (fail && args[0] === 'status' ? Promise.resolve({ ok: false, out: '', err: 'fatal: index.lock', code: 128 }) : run()))
+      await restarted(e, transport, { git }).drain('main')
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toEqual(journal)
+      expect(e.wf.state(c).stage).not.toBe('done')
+      fail = false
+      await restarted(e, transport, { git }).drain('main')
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
+    })
+
+    it('follow mode on, the remote gone: still held (HI-3041), the pause naming both ways out', { timeout: GIT_HEAVY_MS * 2 }, async () => {
+      const { pauseText } = await import('../../src/shared/progressQueue')
+      const { e, queue, a } = await caughtOnAFile()
+      del(join(e.project, 'a.txt'))
+      sh(e.project, 'remote', 'set-url', 'origin', slash(join(tempDir('gone-'), 'nowhere.git')))
+      queue().resume('main')
+      await queue().drain('main')
+      expect(catchUpOf(e.store.meta(catchUpKey('main')))).toMatchObject({ card: a.key })
+      const p = e.store.queuePause('main')!
+      const text = pauseText({ reason: p.reason, card: p.card, files: p.files ?? [], by: null, at: null, catchUp: true }, 'main', tr, (x) => x.join(', '))
+      expect(text).toContain(`${a.key}’s published merge still has to be brought into the local main`)
+      expect(text).toContain('turn off “The target branch follows its remote” and resume')
+    })
+  })
 })
+
 describe('HI-3127: a card returned for what only the remote has', () => {
   /** A card adding `file` in its builder's folder, submitted; the folder too. */
   async function inFolder(e: Env, title: string, file: string, text: string) {

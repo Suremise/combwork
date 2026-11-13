@@ -4699,7 +4699,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   branch deleted after the window's check is caught; branches named already are never re-checked. The section shows
   each such branch under its field with *doesn't exist: create it from [branch ▾]* (a branch made without switching)
   and holds Save until it exists. **Start the next version…** (Workflow, under G7, shown while G7 reads as a version:
-  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable) does in one hold, the
+  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable; HI-3128: under G21 the
+  dialog says the new branch is made here only and tracks no remote branch, with the commands that give it one for the
+  name typed, §16.9.4's remedy, its remote read locally; nothing is pushed) does in one hold, the
   repository's lock then the turn of workflow writes, inside it the save's core and never the public wrapper
   (`startNextVersion`, `workflow/nextVersion.ts`): the release checked to be G7 still and its head the commit the dialog
   showed (`pinnedStart`), the new branch made there (`makeBranchAt`, atomic), then one save with G7 the new branch and
@@ -6821,6 +6823,32 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 **Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
+
+**A target with no upstream** (HI-3128; the design agreed with HR3 and HR2 on the card, s7 to s17). A branch made here
+only (Start the next version's) tracks nothing, and follow mode needs it to: Combwork never publishes it or sets what it
+tracks (no `--set-upstream`, no config written). A target that tracks nothing at all (neither `branch.<b>.remote` nor
+`.merge` set, as git says it) refuses a start `platform.noUpstream`, and pauses the queue `noUpstream`, each with what the
+user runs (`UpstreamRemedy`, read locally, `upstreamCommands`, rendered by `shellLine`, the branch named in each so the
+checked-out branch is never touched): **publish**, `git push -u <remote> refs/heads/<b>:refs/heads/<b>` (an explicit
+refspec: a tag of the release's name makes a bare one ambiguous), when the remote hasn't it; **track**, `git config
+branch.<b>.remote <remote>` and `git config branch.<b>.merge refs/heads/<b>`, the two settings follow mode reads, when it
+has (whatever the remote's fetch mapping: `--set-upstream-to` refuses a ref outside it). The remote is named only when it
+is known (the branch's own `branch.<b>.remote`, else the branch it was made from's, each one git knows, else the
+repository's only remote); otherwise a marked placeholder, `<remote>`, and words asking the user to choose, never
+`origin` guessed. A named remote follow mode can't use (not exactly one push address) or a shallow repository: no
+commands, what to set up first. Tracking half set up keeps the remote setup's refusal. The pause carries the remedy's
+kind as its one file (a select key) and the commands as its message line. Removing the card a pause about the target's
+setup names (`noUpstream`, `remoteAmbiguous`, `remoteUnsupported`, `fetchFailed` with no catch-up owed) clears it in the
+same write; the next entry meets the same cause and pauses naming itself.
+
+**An owed catch-up once G21 is off** (HI-3128). The catch-up then never asks the remote (its look and HI-3041's checks
+are off): the local target is the target again. Every other rule is as above (the recovery table, HI-3039, HI-3090,
+`needsYou`, unknown reads keeping the journal); a recorded swap is finished by compare and swap from where it was; a
+fresh one behind is brought in; a fresh one the local target has moved away from (it owns no files: nothing journalled
+in a folder) is dropped, nothing moved or forced, the user's commits kept, and the reconciler reads the card against the
+local target from then on. A remainder HI-3090 left staged still pauses the next entry (`staged`) until the user settles
+it. With G21 on and the remote gone for good, the hold stays (HI-3041), and its pause (`fetchFailed` naming the
+published card) says both ways out: fix the remote, or turn G21 off and resume.
 
 **Returns** (HI-3127; the design agreed with HR3 on the card, s7, s11 and s14). A card returned from a tested merge (a
 conflict, strict's update, red checks or a hook) whose attempt was tested on a remote head the local target hasn't got
