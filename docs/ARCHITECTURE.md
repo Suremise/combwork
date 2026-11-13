@@ -331,6 +331,32 @@ the descriptor's workflow facts (`merges()`, `accepts()`, `deliversCommits()`, `
 `shared/platform/descriptors.ts`; jj's integration is `user`, neither merging nor accepting: HI-2799's option A), a
 capability, a gate or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one,
 a changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+**Version control stays pluggable** (HI-3140): jj's last id switches outside the platform layer went behind data and
+ports, as Git's had. The descriptor adds `name`, `ownedWorkspaces` (a row's identity, owned writes, the user's Recover…,
+a slot's store), `guidance` (the agents' rule keys, `ruleKeyOf`, `allRuleKeys`) and `detectionSteady`. The workspace
+port adds `refusal` (what a platform's refusal means to the slot pool). The window's words per platform are
+`shared/platform/presentation.ts` (`PLATFORM_VIEW`, `factOf`), the Agent API's `platform/agentPresentation.ts`
+(`FOUND`). A switch between platforms on one store asks each one's side (`platform/storeSides.ts`, jj's in
+`jjStoreSide.ts`), and the app composes the ports that need its services in `slotsApp.ts`'s `APP_PORTS`. The form's
+finish and folder choices are `formFinishes`/`formFolders` (`shared/workflow/options.ts`). jj's modules outside the
+layer stay where they are, each for its reason: `jjCards.ts`, `jjSetupStamp.ts`, `jjPublish.ts` and its worker are
+composition (platform code imports no app module); `jjWindow.ts`, `views/JjSections.tsx`, `shared/jjViews.ts` and
+`shared/jjTool.ts` are jj's page, its reads and its types, as Git's are; `schema/jjPublishStep.ts` is the database's
+history. jj's candidate checks and words moved into the layer (`platform/jjCandidateChecks.ts`, `jjCandidateReturn.ts`):
+the workflow's candidate pass (`reconcile.ts`) gets them through its reconcile port (`CandidateWords`, JjPlatform's), and
+their old `workflow/` paths only re-export them for the tests (the audit's `COMPAT_ONLY` fails a module under `src` that
+imports one). Every import of a jj platform module from outside the layer and jj's homes is an edge in the audit's
+`JJ_EDGES`, with the names it may take, as Git's are in `EDGES` (slot preparation's two jj reads are `defect`s, HI-3165).
+The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
+given to a descriptor helper or read off `PLATFORMS`), every id read from `PlatformId`. It exempts the platform layer and
+Git's modules, jj's homes above for jj's own id only, and another enum's `none` by the field names `NOT_PLATFORM`
+lists; each exemption no longer used fails as stale. `tests/platformCapabilities.test.ts` pins each answer to the id
+switch it replaced. **A fourth platform** adds its `PlatformId` and `PLATFORMS` entry, its port modules in `platform/`
+with their registry rows (workspace, history, repository reads and operations, integration, release reads, adapters),
+an `APP_PORTS` maker if its port needs the app's services, its `PLATFORM_VIEW` and `FOUND` rows and its `PLATFORM_NAME`
+(typecheck names each `Record<PlatformId, …>`), a `StoreSide` if it shares a store with another, its page's sections,
+and its words in every locale. Slots, sessions, the workflow, the queue, servers and the Version Control tab's header
+are not edited.
 jj (1.5.0's J0, HI-2793; SPEC §16.3.6, jj's runner and detection) is not a platform yet: `platform/jjRunner.ts` is its
 bounded runner (the standalone `jj.exe`, its version against `resources/tested-vcs.json` through `shared/jjTool.ts`,
 reads with `--ignore-working-copy` and config overrides, an output cap, a time limit, cancellation and shutdown, each

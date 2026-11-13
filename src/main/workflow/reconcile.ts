@@ -26,8 +26,8 @@ import { staleWake } from './queueState'
 import { catchUpKey, catchUpOf } from './mergeQueue'
 import { inTargetNow } from '../../shared/workflow/workView'
 import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
-import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
-import { checksKeyOf } from './jjCandidateChecks'
+import type { WorkflowOptions } from '../../shared/workflow/options'
+import type { StoredText } from '../../shared/types'
 import { asCardCounts } from './containment'
 
 export interface ReconcileHooks {
@@ -536,7 +536,21 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
  * a later head carries the approved pass (J3's `jjSameRevision`, with the merge base it found), and J5's proof for the
  * approved submission (`jjContains`: its containment, its provenance and its retained bundle, or why not).
  */
+/**
+ * HI-3140: a candidate's platform's own words and keys (jj's, platform/jjCandidateReturn.ts and jjCandidateChecks.ts),
+ * given by its reconcile port: the key its merge checks run under, the entry an IntegrationFailed names, and what a
+ * returned card's builder and card are told.
+ */
+export interface CandidateWords {
+  checksKey(options: WorkflowOptions, setup: string): string
+  entry(attempt: string): string
+  wake(key: string, f: FactData['IntegrationFailed']): string
+  comment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText }
+}
+
 export interface JjReconcilePorts {
+  /** HI-3140: the candidate's words and keys (CandidateWords). */
+  words: CandidateWords
   headNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
   /** Unknown (a read that couldn't be made, a view that moved): never taken for "not the same" (HR1's round 1). */
   same(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }, head: string): Promise<{ same: boolean; base: string | null } | { unknown: string }>
@@ -693,7 +707,7 @@ export type JjChecksUpdate =
  * still at the candidate's head and the candidate still its recorded commit (read just before; false fails closed).
  * A red check returns the card to its builder (`IntegrationFailed`, as the queue's red check does). Whether it wrote.
  */
-export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string; setupStill?: () => boolean }, u: JjChecksUpdate, current: boolean): Promise<boolean> {
+export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string; setupStill?: () => boolean }, u: JjChecksUpdate, current: boolean, words: CandidateWords): Promise<boolean> {
   if (!current) return false
   const key = candidateKey(project, card.key, at.fp.cycle)
   let wrote = false
@@ -701,7 +715,7 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const now = wf.store.card(card.id)
     const st = w.state()
     if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
-    if (checksKeyOf(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
     // The setup command still the one the key was made with (finding 3): project.json unchanged since it was read.
     if (at.setupStill && !at.setupStill()) return
     let rec: JjCandidateShown | null = null
@@ -716,14 +730,14 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const r = rec as JjCandidateShown | null
     if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || !r.checks || (!('restart' in u) && r.checks.key !== at.key)) return
     if ('red' in u) {
-      const failed: FactData['IntegrationFailed'] = { entry: jjCandidateEntry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
+      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
       w.fact('IntegrationFailed', failed)
       w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
       wrote = true
       if (!wf.cfg.reconcileActs) return
       w.move('active', 'derived')
-      wf.wake(w, st.started?.builder, jjReturnedWake(card.key, failed))
-      w.action('comment', { ...jjReturnedComment(card.key, failed) })
+      wf.wake(w, st.started?.builder, words.wake(card.key, failed))
+      w.action('comment', { ...words.comment(card.key, failed) })
       return
     }
     const c = r.checks!
@@ -748,13 +762,13 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
 }
 
 /** HI-2938's Run Checks Again: a stopped or failing candidate's checks running again, under the same validity (s11 §1). */
-export async function checksAgain(wf: Workflow, card: CardRecord, project: string, setup: string, current: boolean): Promise<boolean> {
+export async function checksAgain(wf: Workflow, card: CardRecord, project: string, setup: string, current: boolean, words: CandidateWords): Promise<boolean> {
   const s = wf.state(card)
   const rec = candidateShown(wf, card, s, project, undefined, true)
   if (!rec?.offer || !rec.checks || (rec.checks.state !== 'stopped' && rec.checks.state !== 'failing')) return false
   const fp = candidateFingerprint(wf, card, s)
   if (!fp) return false
-  return publishCandidateChecks(wf, card, project, { fp, attempt: rec.offer.attempt, key: rec.checks.key, setup }, { progress: { done: 0 } }, current)
+  return publishCandidateChecks(wf, card, project, { fp, attempt: rec.offer.attempt, key: rec.checks.key, setup }, { progress: { done: 0 } }, current, words)
 }
 
 /**
@@ -847,13 +861,13 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   const f = step.returned
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
-    const failed: FactData['IntegrationFailed'] = { entry: jjCandidateEntry(f.attempt), revision: fp.revision, target: fp.target, reason: f.reason === 'conflict' ? 'conflict' : 'notUpToDate', transient: false, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log.slice(-4000) } : {}), ...(f.conflicts?.files.length ? { conflicts: f.conflicts } : {}) } // i18n-ignore: a failure's code, not text
+    const failed: FactData['IntegrationFailed'] = { entry: ports.words.entry(f.attempt), revision: fp.revision, target: fp.target, reason: f.reason === 'conflict' ? 'conflict' : 'notUpToDate', transient: false, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log.slice(-4000) } : {}), ...(f.conflicts?.files.length ? { conflicts: f.conflicts } : {}) } // i18n-ignore: a failure's code, not text
     w.fact('IntegrationFailed', failed)
     w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
     if (!wf.cfg.reconcileActs) return
     w.move('active', 'derived')
-    wf.wake(w, w.state().started?.builder, jjReturnedWake(card.key, failed))
-    w.action('comment', { ...jjReturnedComment(card.key, failed) })
+    wf.wake(w, w.state().started?.builder, ports.words.wake(card.key, failed))
+    w.action('comment', { ...ports.words.comment(card.key, failed) })
   })
 }
 

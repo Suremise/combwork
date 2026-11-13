@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import type { PlatformId } from '@shared/platform/descriptors'
+import { merges, type PlatformId } from '@shared/platform/descriptors'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { allOff, PRESETS, preset, type OptionKey, type PresetId } from '@shared/workflow/options'
 import { optionTitle, PRESET_TEXT } from '@shared/workflow/optionTexts'
@@ -44,8 +44,8 @@ export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow:
     const was = workflow?.[p]
     const chosen = choice === 'allOff' ? null : (choice as PresetId)
     const s = templateWorkflowOf(chosen ? preset(p, chosen) : allOff(p), chosen)
-    // Its check names kept: a preset made for no project names none.
-    const names = { ...(was?.options.preChecks ? { preChecks: was.options.preChecks } : {}), ...(p === 'git' && was?.options.mergeChecks ? { mergeChecks: was.options.mergeChecks } : {}) }
+    // Its check names kept: a preset made for no project names none. Merge checks where work merges (Git's; HI-3140: by the descriptor).
+    const names = { ...(was?.options.preChecks ? { preChecks: was.options.preChecks } : {}), ...(merges(p) && was?.options.mergeChecks ? { mergeChecks: was.options.mergeChecks } : {}) }
     set(p, { ...s, options: { ...s.options, ...names } })
   }
   return (

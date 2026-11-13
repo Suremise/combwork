@@ -247,6 +247,16 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
 }
 
 /**
+ * The finishes the options form offers a platform, in its order (HI-3140, by the descriptor, never the id): the user's
+ * integration alone where the user integrates (jj, HI-2799: option A), else Git's four (the form's list since P5's queue,
+ * #1355; None's form shows them too, as before).
+ */
+export const formFinishes = (platform: PlatformId): readonly Finisher[] => (!merges(platform) && !accepts(platform) ? ['userIntegrates'] : ['combworkMerges', 'agentMerges', 'committed', 'notChecked'])
+
+/** The folders the options form offers a platform, in its order (HI-3140): slots only where the gate sharedFolder is closed (jj, HI-2799). */
+export const formFolders = (platform: PlatformId): readonly FolderMode[] => (hasGate(platform, 'sharedFolder') ? ['slots'] : ['slots', 'project'])
+
+/**
  * Every check and balance off (§16.6.4): cards move freely, facts are still recorded. Also a new project's options
  * before a preset is chosen (§16.7.4). None has no G17, so no level sets it there.
  */

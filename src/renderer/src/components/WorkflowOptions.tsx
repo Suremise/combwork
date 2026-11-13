@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
 import { ManyAgentsNote } from './ManyAgentsNote'
@@ -631,10 +631,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
-        // Combwork merges since P5's queue (#1355).
-        // jj (HI-2799, option A): the user integrates, the only finish it has.
-        if (platform === 'jj') return select('finish', [['userIntegrates', tr(V.finish.userIntegrates)]])
-        return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
+        // Combwork merges since P5's queue (#1355); jj (HI-2799, option A): the user integrates, the only finish it has
+        // (HI-3140: the platform's, formFinishes).
+        return select('finish', formFinishes(platform).map((f) => [f, tr(V.finish[f as keyof typeof V.finish])]))
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
@@ -642,9 +641,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'commitMessage':
         return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
-        // jj (HI-2799): slots only, the shared folder a closed gate (sharedFolder).
-        if (platform === 'jj') return select('folder', [['slots', tr(V.folder.slots)]])
-        return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
+        // jj (HI-2799): slots only, the shared folder a closed gate (sharedFolder; HI-3140: formFolders).
+        return select('folder', formFolders(platform).map((f) => [f, tr(V.folder[f])]))
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])
       case 'target':

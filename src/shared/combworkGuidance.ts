@@ -14,7 +14,7 @@
  * code chooses which message; the words, and every variant a setting chooses, are the message's (an ICU select).
  */
 // With its extension: tests' scripts load this file in plain Node (replysize.cjs, scenarios.cjs), which needs it.
-import { agentList, agentMsg, say } from './agentText/index.ts'
+import { agentList, agentMsg, say, type AgentMsg } from './agentText/index.ts'
 
 /** Settings → Assistant → Control (AssistantControl). */
 type AssistantControlLevel = 'look' | 'agents' | 'projects'
@@ -308,16 +308,12 @@ export function journalRule(scope: readonly string[]): string {
  * index or a branch confuses jj (HI-2781's probes). Under decision A (HI-2794) the user integrates. How a jj card's work
  * is committed, submitted and reviewed is the bundled skills' (work-on-card, card-loop, review-agent-work). A jj
  * repository with no Git working copy (HI-2896) gets its own variant (`jj-separate`: platformRuleKey).
- * Empty for every other platform.
+ * Empty for every other key. The keys are the platforms' (HI-3140: a descriptor's `guidance`, `ruleKeyOf`); the texts are here.
  */
-export const platformRule = (platform: string | null | undefined): string => (platform === 'jj' ? say(A.jj) : platform === 'jj-separate' ? say(A.jjSeparate) : '')
+export const platformRule = (key: string | null | undefined): string => (key && Object.hasOwn(PLATFORM_RULES, key) ? say(PLATFORM_RULES[key]!) : '')
 
-/**
- * The key platformRule takes for a project (HI-2896): its platform, and for jj whether its repository has a Git working
- * copy beside it (`jj`, colocated) or none (`jj-separate`), from what detection found in its folder.
- */
-export const platformRuleKey = (platform: string | null | undefined, detected?: { jj?: { colocated: boolean } } | null): string | null =>
-  platform === 'jj' && detected?.jj && !detected.jj.colocated ? 'jj-separate' : (platform ?? null)
+/** Each platform rule key's text (HI-3140): the keys a descriptor's `guidance` gives (`jj`, and `jj-separate` for HI-2896). */
+const PLATFORM_RULES: Record<string, AgentMsg> = { jj: A.jj, 'jj-separate': A.jjSeparate }
 
 /** The instructions with the project's version control rule after them, when it has one (platformRule). */
 export function withPlatformRule(instructions: string, platform: string | null | undefined): string {

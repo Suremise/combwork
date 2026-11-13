@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PlatformSwitchCheck, ProjectInfo, WorkflowForm } from '@shared/types'
 import { needsRepository, type PlatformId, type PlatformOffer, type ProjectPlatform } from '@shared/platform/descriptors'
+import { detectedCaution, factOf, PLATFORM_VIEW } from '@shared/platform/presentation'
 import { DETAILED_REFUSALS as DETAILED, PLATFORM_NAME, switchAtConfirm, switchRefused, switchRefusalText } from '@shared/platform/switching'
 import { StoreSwitchDetails } from './StoreSwitchDetails'
 import { FORM_OPTIONS } from '@shared/workflow/options'
@@ -24,15 +25,6 @@ export const M = {
   choice: msg({ id: 'git.vc.choice', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control).' }),
   previewTip: msg({ id: 'git.vc.previewTip', defaultMessage: 'Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.', description: 'Tooltip of Git in the None · Git choice atop the Version Control tab of a project whose folder has no repository of its own: clicking it shows Git’s page, which only offers Initialise repository… (keep it as translated on that button).' }),
   switchTip: msg({ id: 'git.vc.switchTip', defaultMessage: 'Switch this project to {platform}, from its next card. Combwork shows what changes first.', description: 'Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git.' }),
-  repo: msg({ id: 'git.vc.fact.repo', defaultMessage: 'This folder is a Git repository at {root}.', description: 'Atop the Version Control tab: what Combwork found in the project folder. {root} is the repository root (glossary 2.1: repository root).' }),
-  subfolder: msg({ id: 'git.vc.fact.subfolder', defaultMessage: 'This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.', description: 'Atop the Version Control tab, when the project is a subfolder of a larger repository. {root} is that repository’s root.' }),
-  noRepo: msg({ id: 'git.vc.fact.none', defaultMessage: 'This folder has no version control.', description: 'Atop the Version Control tab, when the project folder has no repository.' }),
-  other: msg({ id: 'git.vc.fact.other', defaultMessage: '{vcs} found: not supported yet, so this project uses None.', description: 'Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1.' }),
-  otherGit: msg({ id: 'git.vc.fact.otherGit', defaultMessage: '{vcs} found in this folder: not supported yet.', description: 'Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do.' }),
-  jjRepo: msg({ id: 'git.vc.fact.jj', defaultMessage: 'This folder is a jj repository at {root}, {colocated, select, yes {colocated with Git} other {not colocated with Git}}.', description: 'Atop the Version Control tab (HI-2799, HI-2896): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj, not colocated that Git’s data is inside .jj (both are supported). Keep jj and Git.' }),
-  jjInGit: msg({ id: 'git.vc.fact.jjInGit', defaultMessage: 'This folder is a jj repository at {root}, not colocated, inside the Git repository at {git}: Combwork can’t use jj here.', description: 'Atop the Version Control tab (HI-2896): a jj (Jujutsu) repository whose Git data is inside .jj, in a folder that is itself inside a Git working tree ({git}); git commands in it would reach that repository, so jj isn’t offered. Keep jj and Git.' }),
-  jjGone: msg({ id: 'git.vc.fact.jjGone', defaultMessage: 'The jj repository is gone from this folder.', description: 'Atop the Version Control tab of a project using jj (Jujutsu, HI-2799) whose .jj folder was removed or moved. Keep jj.' }),
-  gone: msg({ id: 'git.vc.fact.gone', defaultMessage: 'The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.', description: 'Atop the Version Control tab of a Git project whose .git was removed or moved.' }),
   workflow: msg({ id: 'git.vc.workflow', defaultMessage: 'Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}', description: 'A link atop the Version Control tab: the project’s workflow, its version control ({platform}: None or Git) and its preset ({preset}: Solo, Pair, Team); Custom when the options were changed after it. Opens the Workflow section. Glossary 2.1: workflow, preset, Custom.' }),
   workflowTip: msg({ id: 'git.vc.workflowTip', defaultMessage: 'Show the workflow options', description: 'Tooltip of the "Workflow: Git · Team" link atop the Version Control tab.' })
 }
@@ -43,10 +35,7 @@ const S = {
   repositoryGone: msg({ id: 'git.vc.offer.repositoryGone', defaultMessage: 'The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.', description: 'An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back.' }),
   jjFound: msg({ id: 'git.vc.offer.jjFound', defaultMessage: 'jj found at {root}: switch to jj?', description: 'An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj.' }),
   jjGone: msg({ id: 'git.vc.offer.jjGone', defaultMessage: 'The jj repository is gone: switch this project back to {platform}?', description: 'An offer atop the Version Control tab of a project using jj (HI-2799) whose .jj folder is gone. {platform} is Git or None. Keep jj.' }),
-  switchJj: msg({ id: 'git.vc.offer.switchJj', defaultMessage: 'Switch to jj…', description: 'A button of the offer to switch a project to jj (Jujutsu, HI-2799): shows what changes, then asks. The … says it asks first: keep it. Keep jj.' }),
   otherFound: msg({ id: 'git.vc.offer.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1.' }),
-  switchGit: msg({ id: 'git.vc.offer.switchGit', defaultMessage: 'Switch…', description: 'A button of the offer to switch a project to Git (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it.' }),
-  switchNone: msg({ id: 'git.vc.offer.switchNone', defaultMessage: 'Switch to None…', description: 'A button of the offer to switch a project to None, no version control (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it. None: glossary 2.1.' }),
   notNow: msg({ id: 'git.vc.offer.notNow', defaultMessage: 'Not Now', description: 'A button of the offer to switch version control (atop the Version Control tab): hides the offer until Combwork starts again.' }),
   title: msg({ id: 'git.vc.switch.title', defaultMessage: 'Switch {project} to {platform}?', description: 'Title of the warning before switching a project’s version control. {project} is its name, {platform} None or Git.' }),
   what: msg({ id: 'git.vc.switch.what', defaultMessage: 'From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.', description: 'The warning before switching a project’s version control: what changes. {to} and {from} are None or Git.' }),
@@ -222,7 +211,7 @@ function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectI
       <span className="vc-offer-text">{text}</span>
       <span className="vc-offer-actions">
         <button type="button" className="btn small primary" data-action="vc-offer-switch" onClick={() => void switchPlatform(project, platform, o.offer)}>
-          {tr(o.offer === 'git' ? S.switchGit : o.offer === 'jj' ? S.switchJj : S.switchNone)}
+          {tr(PLATFORM_VIEW[o.offer].switchTo)}
         </button>
         <button
           type="button"
@@ -242,16 +231,9 @@ function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectI
 
 /** What Combwork finds in the folder, in the tab's words. */
 function factText(p: ProjectPlatform): string {
-  const d = p.detected
-  // Git still in force: what was found, not yet what it uses (the offer under the header says that).
-  if (d.other) return tr(p.id === 'git' ? M.otherGit : M.other, { vcs: d.other })
-  // jj (HI-2799): colocated or not (HI-2896), one inside a Git working tree, and a jj project whose repository is gone.
-  if (d.platform === 'jj') return d.jj?.inGit ? tr(M.jjInGit, { root: d.root ?? '', git: d.jj.inGit }) : tr(M.jjRepo, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' })
-  if (p.id === 'jj') return tr(M.jjGone)
-  // The repository its platform needs (Git's) gone from the folder.
-  if (needsRepository(p.id) && d.platform !== p.id) return tr(M.gone)
-  if (d.platform === 'git' && d.root) return tr(d.subfolder ? M.subfolder : M.repo, { root: d.root })
-  return tr(M.noRepo)
+  // HI-3140: each platform's own facts (presentation.ts).
+  const f = factOf(p)
+  return tr(f.m, f.values)
 }
 
 /** The preset the options came from, and whether they were changed since (Custom), as the form shows them. */
@@ -304,13 +286,13 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
                 </button>
               )
             // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved.
-            if (onPreview && !needsRepository(platform) && id !== 'jj') {
+            if (onPreview && !needsRepository(platform) && PLATFORM_VIEW[id].previewable) {
               const button = (
                 <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(needsRepository(id))}>
                   {tr(PLATFORM_NAME[id])}
                 </button>
               )
-              return id === 'git' ? (
+              return needsRepository(id) ? (
                 <Tooltip key={id} content={tr(M.previewTip)}>
                   {button}
                 </Tooltip>
@@ -331,7 +313,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
           })}
         </div>
         {project.platform && !offer && (
-          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (needsRepository(platform) && project.platform.detected.platform !== platform) || (project.platform.detected.platform === 'jj' && !!project.platform.detected.jj?.inGit) ? 'caution' : null)} data-vc-fact="">
+          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (needsRepository(platform) && project.platform.detected.platform !== platform) || detectedCaution(project.platform.detected) ? 'caution' : null)} data-vc-fact="">
             {factText(project.platform)}
           </span>
         )}

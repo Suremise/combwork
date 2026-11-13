@@ -6,7 +6,7 @@
 // on it switches together, after a drain and, to jj, a compatibility assessment): main's checks, said here as reasons.
 
 import { msg, type Msg } from '../i18n/msg'
-import { needsRepository, type Detection, type Gate, type PlatformId } from './descriptors'
+import { needsRepository, platformName, type Detection, type Gate, type PlatformId } from './descriptors'
 
 /** A platform's name as Combwork shows it (glossary 2.1). */
 export const PLATFORM_NAME: Record<PlatformId, Msg> = {
@@ -85,9 +85,6 @@ export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal |
   return found.platform === to ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
 }
 
-/** A repository platform's name as a refusal's value (product names, the same in every language: HI-3072's `storeRuns`). */
-const REPO_PLATFORM_NAME: Record<PlatformId, string> = { none: 'None', git: 'Git', jj: 'jj' } // i18n-ignore: product names, kept in every language
-
 /** The refusals a switch's dialog shows with their lists (the warning's details), Check Again reading them afresh. */
 export const DETAILED_REFUSALS: ReadonlySet<SwitchRefusal['why']> = new Set<SwitchRefusal['why']>(['gates', 'fallback', 'drain', 'memberDrain', 'memberNoJj', 'otherWorkspace', 'switching'])
 
@@ -126,7 +123,7 @@ export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<s
     case 'otherFound':
       return { m: SWITCH_REFUSED.otherFound, values: { vcs: r.vcs } }
     case 'storeRuns':
-      return { m: SWITCH_REFUSED.storeRuns, values: { platform: REPO_PLATFORM_NAME[r.platform] } }
+      return { m: SWITCH_REFUSED.storeRuns, values: { platform: platformName(r.platform) } }
     case 'jjTool':
       return { m: SWITCH_REFUSED.jjTool, values: { state: r.state } }
     case 'jjToolBack':

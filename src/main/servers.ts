@@ -37,6 +37,7 @@ import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
 import { API } from './apiText'
+import { FOUND } from './platform/agentPresentation'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
@@ -719,7 +720,8 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : d.platform === 'jj' ? say(API.project.vcsJj, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' }) : 'none'
+  // HI-3140: what was found in the platform's own words (its row in agentPresentation.ts).
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : FOUND[d.platform](d)
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 

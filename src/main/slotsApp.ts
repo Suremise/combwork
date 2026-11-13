@@ -47,7 +47,7 @@ import { historyFor } from './platform/historyPorts'
 import { takeStores } from './repoLock'
 import { trash } from './trash'
 import { holdLaunches } from './launchHolds'
-import type { PlatformId } from '../shared/platform/descriptors'
+import { hasCapability, isPlatformId, ownsWorkspaces, type PlatformId } from '../shared/platform/descriptors'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
@@ -336,6 +336,12 @@ export function jjPort(): JjWorkspacePort {
 }
 
 /**
+ * The workspace ports the app composes with its own dependencies, by platform (HI-3140): each made and registered the
+ * first time a project needs it (its platform, or a row left by a switch). Git's needs none (workspacePorts.ts has it).
+ */
+const APP_PORTS: Partial<Record<PlatformId, () => WorkspacePort>> = { jj: jjPort }
+
+/**
  * A stale jj slot recovered, the user's explicit action (HI-2866; the window's Recover…, J9c): J2's `recoverStale` under
  * the pool's operation of the slot, the preserved bytes outside every workspace (the project's worktrees folder's
  * `.cw-recovery`). A protocol code when refused. A slot a lease still holds (HI-2913) goes through slotCards' `recoverHeldSlot`:
@@ -366,19 +372,26 @@ const platformKey = (ws: WorkspaceService, projectPath: string): string => `${(w
 ${projectPath.toLowerCase()}`
 async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<void> {
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
-  const p = cfg?.platform
+  const p = cfg?.platform && isPlatformId(cfg.platform) ? cfg.platform : null
   // HI-2936: a project switched from jj keeps its idle jj slots and copies: their port is registered while any is left,
-  // so its pools settle, keep or remove them by jj (R2.6), never failing a Git lending for want of it.
-  if (p === 'jj' || (cfg && heldByJj(ws, cfg.id ?? basename(projectPath)))) jjPort()
-  platforms.set(platformKey(ws, projectPath), p === 'jj' ? 'jj' : 'git')
+  // so its pools settle, keep or remove them by jj (R2.6), never failing a Git lending for want of it. HI-3140: by the
+  // platforms whose ports the app composes (APP_PORTS), the project's own and each one its rows still name.
+  const needed = new Set<PlatformId>(p ? [p] : [])
+  if (cfg) for (const q of rowPlatforms(ws, cfg.id ?? basename(projectPath))) needed.add(q)
+  for (const q of needed) APP_PORTS[q]?.()
+  platforms.set(platformKey(ws, projectPath), p && hasCapability(p, 'isolation') ? p : 'git')
 }
-/** Whether a project's board still has a jj slot or copy (HI-2936); false when the board can't be read. */
-function heldByJj(ws: WorkspaceService, project: string): boolean {
-  if (!ws.path) return false
+/**
+ * The platforms a project's slot and copy rows name beyond Git's (HI-2936, HI-3140: a row records its platform only
+ * beyond Git's, the column's default); none when the board can't be read.
+ */
+function rowPlatforms(ws: WorkspaceService, project: string): PlatformId[] {
+  if (!ws.path) return []
   try {
-    return !!boardConn(ws).read((db) => db.prepare("SELECT 1 FROM slots WHERE project = ? AND platform = 'jj' UNION ALL SELECT 1 FROM copies WHERE project = ? AND platform = 'jj' LIMIT 1").get(project, project)) // i18n-ignore: SQL
+    const rows = boardConn(ws).read((db) => db.prepare('SELECT platform FROM slots WHERE project = ? AND platform IS NOT NULL UNION SELECT platform FROM copies WHERE project = ? AND platform IS NOT NULL').all(project, project)) as { platform: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => r.platform).filter(isPlatformId)
   } catch {
-    return false
+    return []
   }
 }
 /** The port a project's new slots and copies are made with now (Git's unless the project uses jj). */
@@ -985,7 +998,7 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const held = !!w && (await writerHeld(w))
       // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's. Not read while
       // the pool works on the slot or it owes a settle (HI-2912, slotStaleView.ts): its last answer for that folder.
-      const jj = s.platform === 'jj'
+      const jj = ownsWorkspaces(s.platform)
       const stale = jj ? await view.staleOf(s.name) : false
       // Kept for a card (HI-2995), dirty; or with its folder gone (HI-3032), or there but its workspace no longer listed
       // (HI-3097, `forgotten`): its record, for Remove….
@@ -994,7 +1007,7 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
       // HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove….
       const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
     })
   )
 }

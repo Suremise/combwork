@@ -18,7 +18,7 @@
 
 import { createHash, randomUUID } from 'crypto'
 import { lstat } from 'original-fs/promises'
-import { basename, dirname, join } from 'path'
+import { basename, join } from 'path'
 import { listLanes, rawLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
@@ -38,8 +38,7 @@ import { resolvedOf, workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { commonGitDir } from '../repoLock'
-import { boundaryOf } from '../platform/repoBoundary'
-import { gitAbove, jjOf } from '../vcsDetect'
+import { leavingSides, noStoreFor, STORE_SIDES } from '../platform/storeSides'
 import { readKeptJson } from '../fsutil'
 import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { SlotStore } from '../slots'
@@ -47,10 +46,8 @@ import { CopyStore } from '../copies'
 import { boardConn, holder } from '../slotsApp'
 import { tell } from '../notify'
 import { fmt, msg, tr } from '../../shared/i18n'
-import { assessJj, REPO_GATES } from '../platform/jjCompat'
-import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows, pinnedContextOf } from '../platform/jjViews'
-import { isJjUnknown, JjReads } from '../platform/jjReads'
-import { jjRunner, type JjRunner } from '../platform/jjRunner'
+// jj's fallback read, kept here for its callers and tests (HI-3140 moved jj's side to platform/jjStoreSide.ts).
+export { fallbackOf, retryMoved } from '../platform/jjStoreSide'
 import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, membershipOf, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type FenceOwner, type Meta, type Snap } from '../platform/platformFence'
 import { metaOf, projectIdOf } from '../platform/fenceAdmit'
 
@@ -75,12 +72,10 @@ async function storeOf(path: string): Promise<string | 'none'> {
  */
 async function storeRead(path: string): Promise<string | 'none' | 'unknown'> {
   const d = projectPlatform(path, 'none').detected
-  if (d.platform === 'jj' && d.root && !d.jj?.colocated) {
-    if (d.jj?.inGit) return 'none'
-    const b = await boundaryOf(d.root)
-    return 'jj' in b ? storeKey(b.jj.store) : 'unknown' in b ? 'unknown' : 'none'
-  }
-  const root = d.platform === 'git' || d.platform === 'jj' ? d.root : null
+  // A platform that reads its store its own way (jj's non-colocated repository, HI-2896; HI-3140: its side's).
+  const own = (await STORE_SIDES[d.platform]?.storeRead?.(d)) ?? null
+  if (own !== null) return own
+  const root = needsRepository(d.platform) ? d.root : null
   if (!root) return 'none'
   const s = await commonGitDir(root).catch(() => null)
   // A store whose folder isn't a git folder (a `.git` file naming a missing one, read textually: HR1's round 1) proves
@@ -151,7 +146,8 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
       const id = projectIdOf(cfg, p.path)
       if (s === 'unknown' || s === 'none' ? memberStoreOf(ws, id) !== store : s !== store) continue
     }
-    if (!isSelf && from === 'none') {
+    // A project whose choice needs no repository (None): a bystander (HI-3140: by the descriptor, never the id).
+    if (!isSelf && !needsRepository(from)) {
       bystanders.push({ id: projectIdOf(cfg, p.path), path: p.path, name: p.name, from })
       continue
     }
@@ -244,124 +240,6 @@ async function bystanderDrain(ws: WorkspaceService, m: Member, to: PlatformId, d
   for (const k of new SlotStore(boardConn(ws), m.id).keptSlots()) if (k.platform !== to) d.kept.push({ project: m.name, slot: k.slot, card: k.card })
 }
 
-/** jj itself confirms the repository on exactly this store, colocated or not (HI-2896), with the tested jj (s11 §3c). */
-async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
-  // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
-  const d = await pinnedContextOf(path)
-  if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code, never shown as text
-  if ('jjUnknown' in d) return d.jjUnknown === 'tool' ? { why: 'jjTool', state: jjRunner.readinessNow().state } : { why: 'jjUnknown', code: d.jjUnknown } // i18n-ignore: a code, never shown as text
-  if (storeKey(d.ctx.store) !== store) return { why: 'jjUnknown', code: 'disagrees' } // i18n-ignore: a code, never shown as text
-  return null
-}
-
-/**
- * A non-colocated repository's slots folder (`<workspace>.worktrees\<project>`) inside a Git working tree (HI-2896): its
- * slots and copies would be too, and a git command run in one would reach that tree. Null when it isn't (or colocated).
- */
-function slotsInGit(ws: WorkspaceService, path: string): SwitchRefusal | null {
-  const d = projectPlatform(path, 'none').detected
-  if (d.platform !== 'jj' || d.jj?.colocated || !ws.path) return null
-  const git = gitAbove(join(ws.worktreesRoot, basename(path), 'slot'))
-  return git ? { why: 'jjInGit', root: git } : null // i18n-ignore: a code, never shown as text
-}
-
-/** To jj: each repository gate's finding, and jj's own limits (always). */
-async function gatesOf(path: string, store: string): Promise<GateCheck[]> {
-  const root = projectPlatform(path, 'none').detected.root ?? path
-  // Not colocated (HI-2896): Git is asked of the store inside .jj, and the tracked files are jj's (assessJj's `separate`).
-  const b = await boundaryOf(root)
-  if ('unknown' in b) return REPO_GATES.map((g): GateCheck => ({ gate: g, unknown: `jj: ${b.unknown}` })) // i18n-ignore: what was found, shown as data beside its message
-  const a = 'jj' in b ? await assessJj(root, b.jj.store, undefined, { separate: { jjRepo: b.jj.jjRepo } }) : await assessJj(root, store)
-  return REPO_GATES.map((g): GateCheck => {
-    const f = a[g]
-    return 'clear' in f ? { gate: g, clear: true } : 'uses' in f ? { gate: g, uses: f.uses, ...(f.autocrlf ? { autocrlf: true as const } : {}) } : { gate: g, unknown: f.unknown }
-  })
-}
-
-/**
- * A member other than the one asked whose folder holds no jj workspace (HI-3034): a `git worktree` of the repository, or
- * one nested inside its jj workspace (HI-2976), which jj doesn't know. Made a jj project by the group's switch, it would
- * be one with no jj repository, so the switch is refused naming it. Null when every member is a jj workspace.
- */
-function memberWithoutJj(path: string, members: readonly Member[]): SwitchRefusal | null {
-  const m = members.find((x) => x.path.toLowerCase() !== path.toLowerCase() && !jjOf(x.path))
-  return m ? { why: 'memberNoJj', project: m.name } : null // i18n-ignore: a code, never shown as text
-}
-
-/**
- * The folder whose jj repository a switch back to Git checks (HI-3034): the asked project's own when it is a jj
- * workspace, else a member's that is, else the working tree beside the repository's Git folder when it has a `.jj` (the
- * asked project a `git worktree` of a colocated repository that isn't itself a project). The asked folder when none has
- * one: the repository's `.jj` is gone (HI-2975), and nothing is left to check.
- */
-async function jjSideOf(path: string, members: readonly Member[]): Promise<string> {
-  if (jjOf(path)) return path
-  const member = members.find((m) => jjOf(m.path))
-  if (member) return member.path
-  const gitDir = await commonGitDir(path).catch(() => null)
-  return gitDir && jjOf(dirname(gitDir))?.colocated ? dirname(gitDir) : path
-}
-
-const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly string[]).includes(g))
-
-/**
- * Back to Git (s11 §3): one operation head, no conflicted local bookmark, every local bookmark exported (its `@git` and
- * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
- */
-export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Promise<FallbackProblem[]> {
-  return retryMoved(() => fallbackOnce(path, runner))
-}
-
-/** How many times a fallback read that raced a moving operation head is made (HI-3105). */
-const MOVED_TRIES = 3
-
-/**
- * HI-3105: a fallback read that only raced jj's operation head moving (its own work after a put-back, the user's command:
- * its sole problem `unknown` `moved`) made again, at most `tries` times in all, before it is shown as a problem; any other
- * answer is the answer at once.
- */
-export async function retryMoved(read: () => Promise<FallbackProblem[]>, tries = MOVED_TRIES): Promise<FallbackProblem[]> {
-  let problems: FallbackProblem[] = []
-  for (let attempt = 0; attempt < tries; attempt++) {
-    problems = await read()
-    if (!(problems.length === 1 && problems[0].code === 'unknown' && /^moved\b/.test(problems[0].detail))) return problems
-  }
-  return problems
-}
-
-/** One fallback read (fallbackOf's). */
-async function fallbackOnce(path: string, runner: JjRunner): Promise<FallbackProblem[]> {
-  // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
-  const d = await pinnedContextOf(path, runner)
-  if ('jjUnknown' in d && d.jjUnknown === 'heads') return [{ code: 'heads', n: Number(d.detail) || 0 }]
-  // No jj repository (its .jj gone, HI-2975): nothing to export and nothing that can conflict, so Git is ready as it is.
-  if ('none' in d) return []
-  if (!('ctx' in d)) return [{ code: 'unknown', detail: d.jjUnknown }]
-  const c = d.ctx
-  const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
-  const r = await reads.pinned(async (op) => {
-    const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_TEMPLATE])
-    if (isJjUnknown(out)) return out
-    const rows = parseBookmarkRows(out)
-    if (!rows) return { jjUnknown: 'malformed' as const, detail: 'bookmarkList' } // i18n-ignore: a code or SQL, never shown as text
-    const conflicted = await reads.run(op, ['log', '--no-graph', '-r', 'conflicts() & ::bookmarks()', '-n', '5', '-T', 'commit_id ++ "\\n"'])
-    if (isJjUnknown(conflicted)) return conflicted
-    return { rows, conflicted: conflicted.split('\n').filter(Boolean) }
-  })
-  if (isJjUnknown(r)) return [{ code: 'unknown', detail: `${r.jjUnknown}${r.detail ? `: ${r.detail}` : ''}`.slice(0, 300) }]
-  const out: FallbackProblem[] = []
-  const git = await gitBranches(c.store)
-  if (!git) return [{ code: 'unknown', detail: 'gitRefs' }] // i18n-ignore: a code or SQL, never shown as text
-  const tracked = new Map(r.value.rows.filter((b) => b.remote === 'git').map((b) => [b.name, b.commit]))
-  for (const b of r.value.rows) {
-    if (b.remote !== null) continue
-    if (b.conflict) out.push({ code: 'conflictedBookmark', name: b.name })
-    else if (b.commit && (tracked.get(b.name) !== b.commit || git.get(b.name) !== b.commit)) out.push({ code: 'notExported', name: b.name })
-  }
-  for (const commit of r.value.conflicted) out.push({ code: 'conflictedCommit', commit })
-  return out
-}
-
 /**
  * HI-3072: the version control the repository of `path` runs now, when its fence's members (settled) use one other than
  * `to` (a Git worktree project going back to Git on a repository its other projects switched to jj): a project there
@@ -424,29 +302,40 @@ async function carriedWork(ws: WorkspaceService, members: readonly Member[], to:
 export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
   const g = await groupOf(ws, path)
   const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
-  if (!g) return { refused: { why: to === 'jj' ? 'noJj' : 'noGit' }, store: none } // i18n-ignore: a code or SQL, never shown as text
+  if (!g) return { refused: { why: noStoreFor(to) }, store: none }
   const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members, to, g.bystanders) }
   const carried = await carriedWork(ws, g.members, to)
   if (carried.length) store.carried = carried
   let refused: SwitchRefusal | null = null
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text
-  if (to === 'jj') {
-    refused ??= slotsInGit(ws, path)
-    refused ??= memberWithoutJj(path, g.members)
-    refused ??= await (storeSwitchSeams.repo?.ready ?? jjReady)(path, g.store)
-    store.gates = await (storeSwitchSeams.repo?.gates ?? gatesOf)(path, g.store)
-    store.unsupported = UNSUPPORTED
+  // HI-3140: the checks are the platforms' own (storeSides.ts): coming to `to`, its side's; else (back to Git) those of
+  // every side the store leaves.
+  const arrive = STORE_SIDES[to]?.arrive
+  if (arrive) {
+    refused ??= arrive.slotsInGit(path, ws.path ? join(ws.worktreesRoot, basename(path), 'slot') : null)
+    refused ??= arrive.membersWithout(path, g.members)
+    refused ??= await (storeSwitchSeams.repo?.ready ?? arrive.ready)(path, g.store)
+    store.gates = await (storeSwitchSeams.repo?.gates ?? arrive.gates)(path, g.store)
+    store.unsupported = [...arrive.unsupported]
     if (!refused && store.gates.some((x) => !('clear' in x))) refused = { why: 'gates' } // i18n-ignore: a code or SQL, never shown as text
   } else {
     // The repository's jj state, whichever member asks (HI-3034): a member with no .jj of its own reads none.
-    store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(await jjSideOf(path, g.members))
+    store.fallback = []
+    let tool: string | null = null
+    for (const side of leavingSides()) {
+      const leave = side.leave!
+      const found = await (storeSwitchSeams.repo?.fallback ?? leave.fallback)(await leave.sideOf(path, g.members))
+      store.fallback.push(...found)
+      // jj missing or not the tested version (HI-2975): the repository's readiness can't be checked.
+      if (tool === null && found.some((f) => f.code === 'unknown' && /^tool(:|$)/.test(f.detail))) tool = leave.toolState()
+    }
     // HI-3104: the members whose folder is on no branch now (a colocated jj repository's head is detached), said beside.
     const detached = await detachedMembers(g.members, to)
     if (detached.length) store.detached = detached
-    // jj missing or not the tested version (HI-2975): the repository's readiness can't be checked, so the switch is
-    // refused saying the way out (install the tested jj, or remove .jj once done with it), not as a list's `unknown`.
-    if (!refused && store.fallback.some((f) => f.code === 'unknown' && /^tool(:|$)/.test(f.detail))) refused = { why: 'jjToolBack', state: jjRunner.readinessNow().state } // i18n-ignore: a code or SQL, never shown as text
+    // A tool that can't check: refused saying the way out (install the tested jj, or remove .jj once done with it), not
+    // as a list's `unknown`.
+    if (!refused && tool !== null) refused = { why: 'jjToolBack', state: tool } // i18n-ignore: a code or SQL, never shown as text
     if (!refused && store.fallback.length) refused = { why: 'fallback' } // i18n-ignore: a code or SQL, never shown as text
   }
   if (!refused && !drainEmpty(store.drain)) refused = { why: 'drain' } // i18n-ignore: a code or SQL, never shown as text
@@ -486,7 +375,7 @@ export const storeSwitchSeams: {
  */
 export async function storeSwitch(ws: WorkspaceService, path: string, from: PlatformId, to: PlatformId, o: { token?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
   const g0 = await groupOf(ws, path)
-  if (!g0) throw refusalError({ why: to === 'jj' ? 'noJj' : 'noGit' }) // i18n-ignore: a code or SQL, never shown as text
+  if (!g0) throw refusalError({ why: noStoreFor(to) })
   const paths = g0.members.map((m) => m.path)
   return withFolderRepoLocks(paths, () => workflowWrite(() => switchLocked(ws, path, from, to, o)), { quiet: true, project: path })
 }
@@ -494,7 +383,7 @@ export async function storeSwitch(ws: WorkspaceService, path: string, from: Plat
 async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId, to: PlatformId, o: { token?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {
   // A dead owner's switch of this store is settled first, under this same lock (s20 §2).
   const g = await groupOf(ws, path)
-  if (!g) throw refusalError({ why: to === 'jj' ? 'noJj' : 'noGit' }) // i18n-ignore: a code or SQL, never shown as text
+  if (!g) throw refusalError({ why: noStoreFor(to) })
   await recoverStore(ws, g.store)
   const self = g.members.find((m) => m.path.toLowerCase() === path.toLowerCase())!
   if (self.from !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[self.from] }, { kind: 'conflict' })
