@@ -1075,12 +1075,12 @@
     "audience": "both"
   },
   "service.lanes.releaseUnknown": {
-    "text": "Combwork couldn’t check whether {target} is released ({what}), so the lane wasn’t started. Try again once the repository can be read; for work that has to go on now, the user or the Assistant can start it anyway.",
+    "text": "Combwork couldn’t check whether {target} is released ({what}). Try again once the repository can be read; for work that has to go on now, the user or the Assistant can start it anyway.",
     "note": "HI-3148: a lane’s start refused: whether its branch ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read).",
     "audience": "both"
   },
   "service.lanes.released": {
-    "text": "{target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}), so the lane wasn’t started. {has, select, yes {Did you mean {suggest}? Start it on {suggest}; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.}}",
+    "text": "{target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}). {has, select, yes {Did you mean {suggest}? Start it on {suggest}; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.}}",
     "note": "HI-3148: a lane’s start refused: the branch it would work on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}). With dated yes, the tag’s own date. With has yes, {suggest} is a branch that exists and isn’t released.",
     "audience": "both"
   },
