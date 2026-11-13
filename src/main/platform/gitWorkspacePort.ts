@@ -175,8 +175,8 @@ export async function lineAtBase(folder: string, line: string, base: string, lea
   const there = await read(['rev-parse', '--verify', '-q', target])
   if (there) {
     // A line already there (T1 done, T2 not): carried on only when provably this lease's, at the base.
-    const log = await read(['reflog', 'show', '--format=%H%x09%gs', target, '--'])
-    const entries = log ? log.split(/\r?\n/).filter(Boolean) : []
+    const reflog = await read(['reflog', 'show', '--format=%H%x09%gs', target, '--'])
+    const entries = reflog ? reflog.split(/\r?\n/).filter(Boolean) : []
     if (there !== baseOid || entries.length !== 1 || entries[0] !== `${baseOid}\t${note}`) return no(`${line} is there already, not provably this lease's`) // i18n-ignore: a log line's detail, never shown
   } else {
     await lineAtBaseHooks.beforeCreate?.()
