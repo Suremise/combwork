@@ -241,6 +241,23 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Back in Todo for what follows, as it was before Combwork's start.
     if (cStarted) await inv('tasks:move', c.number, 'todo', { confirm: true, reason: 'the e2e puts it back' })
 
+    // --- HI-3168: a lane of B1's while the first lane's card (in Doing) still holds slot-a (below) says which slot and
+    // card it waits for, in its status and its row in the Progress panel's Lanes tab. Abandoned before the slot is freed.
+    const heldKey = (await card(chosen[0]))?.key
+    const waitOn = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c.number], note: '' })
+    check('a lane of B1’s while its first lane’s card holds slot-a waits for a slot', !!waitOn?.waitingForSlot && (await card(chosen[0]))?.column === 'doing', JSON.stringify({ waitingForSlot: waitOn?.waitingForSlot, held: (await card(chosen[0]))?.column }))
+    const heldStatus = await until(async () => {
+      const s = (await lanes()).find((l) => l.id === waitOn?.lane?.id)?.status
+      return s?.reason === 'slot' && s.held === 'card' && s.slot === 'slot-a' && s.heldFor === chosen[0] && s.agent === 'B1' ? s : null
+    }, HUNG_MS)
+    check('…its status names slot-a, B1 and the card holding it', !!heldStatus, JSON.stringify((await lanes()).find((l) => l.id === waitOn?.lane?.id)?.status))
+    const heldWhy = panel.locator(`.progress-tab-lanes .progress-lane[data-lane="${waitOn?.lane?.id}"] .progress-lane-why`)
+    const heldSaid = `waiting for a slot: B1 still builds in slot-a for ${heldKey}, which keeps it until that card is Done or put back`
+    check(`…its row in the Progress panel says "${heldSaid}"`, !!(await until(async () => ((await heldWhy.textContent().catch(() => '')) ?? '') === heldSaid, HUNG_MS)), await heldWhy.textContent().catch(() => ''))
+    await shoot('lane-slot-card', panel)
+    if (waitOn?.lane?.id) await inv('lanes:end', waitOn.lane.id, true)
+    check('…abandoned, its card never started', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === waitOn?.lane?.id)?.state === 'abandoned', HUNG_MS)) && (await card(c.number))?.column === 'todo', JSON.stringify(await card(c.number)))
+
     // --- B1's slot freed for the lanes that follow (HI-3162). The first lane ended with its card in Doing, and that card
     // keeps its lease on slot-a (HI-3118), so every later lane of B1's is refused a slot (one agent, one slot: "this
     // agent already builds in slot-a for" that card) and waits for one, paused, "waiting for a slot": none of their cards is

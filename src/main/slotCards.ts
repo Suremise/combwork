@@ -506,7 +506,7 @@ function pruneLaneHolds(): void {
 /** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
 export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
   const h = laneHolds.get(laneHoldKey(wsPath, lane))
-  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
+  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.card !== undefined ? { card: h.card } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
 }
 
 /**
@@ -2133,7 +2133,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
     if (stopped()) return
     const key = laneHoldKey(wsPath, lane)
     const was = laneHolds.get(key)
-    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.broker === h.broker && was.idle === h.idle : !was) return
+    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.card === h.card && was.broker === h.broker && was.idle === h.idle : !was) return
     if (h) {
       ownLaneHolds(ws, life)
       laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane, life })
@@ -2143,10 +2143,13 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
   const ids = new Set(waiting.map((l) => l.id))
   for (const h of [...laneHolds.values()]) if (h.ws === wsPath.toLowerCase() && h.project === project && !ids.has(h.lane)) setHold(h.lane, null)
   let held = false
+  const builderOf = new Map(waiting.map((l) => [l.id, l.builder.name]))
   try {
     await lendWaiting(ws, projectPath, pool, waiting, stopped, (lane, r) => {
       if (r?.why === 'busy') held = true
-      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : null)
+      // Its builder already building in a slot for a card (HI-3168: one agent, one slot; that card's end is a board
+      // change, which passes again): which slot and card, for its status. No retry needed.
+      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : r?.why === 'agentLeased' && r.card !== null ? { slot: r.slot, held: 'card', agent: builderOf.get(lane) ?? '', card: r.card } : null)
     })
   } finally {
     // A held slot looked at again after a pause, until it is lent or held no more; otherwise its tries forgotten.

@@ -81,6 +81,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'slot', slot: 'slot-b', held: 'session', agent: 'B1' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'session' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'slot', slot: 'slot-b', held: 'card', agent: 'B1', heldFor: 7 }),
     status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer', idle: true }),
     status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer' }),
     // HI-2468: a refused start, its slot held.

@@ -589,6 +589,7 @@
   "board.lanes.waitsFresh": "等待中：{agent} 空闲后将在新对话中开始",
   "board.lanes.waitsLink": "点击显示。",
   "board.lanes.waitsPreparing": "等待中：正在准备 {slot}",
+  "board.lanes.waitsSlotCard": "等待槽位：{agent} 仍在 {slot} 中处理 {heldFor}，该卡片完成或被放回待办之前，{slot} 一直归它所有",
   "board.lanes.waitsSlotHeld": "等待 {slot}：{held, select, session {{agent} 的会话仍在其中} broker {仍有进程打开着其中的文件或文件夹：Windows Sandbox 的代理程序（{broker}）正以它为工作文件夹{idle, select, yes {，且没有正在运行的 Sandbox} no {，且有 Sandbox 正在运行} other {}}} other {仍有进程打开着其中的文件或文件夹}}",
   "board.lanes.waitsStart": "{card} 等待开始：{why, select, watching {{agent} 正在等待其他工作} queued {Combwork 的一行内容正在发往 {agent}} failed {{agent} 上次启动失败} refused {其启动暂时被拒绝，Combwork 会再试} other {{agent} 正处于一个回合中}}",
   "board.lanes.waitsStartHeld": "{card} 等待开始：{slot} 仍在使用中，其启动暂时被拒绝（{held, select, session {{agent} 的会话仍在其中} left {{agent} 的上次运行在其中留下了仍在运行的 {program}{more, plural, =0 {} other {及另外 # 个}}} lastRun {不确定 {agent} 在其中的上次运行是否已结束} broker {仍有进程打开着其中的文件或文件夹：Windows Sandbox 的代理程序（{broker}）正以它为工作文件夹{idle, select, yes {，且没有正在运行的 Sandbox} no {，且有 Sandbox 正在运行} other {}}} other {仍有进程打开着其中的文件或文件夹}}），Combwork 会再试",

@@ -97,6 +97,10 @@ describe('a lane on slots (#1438)', () => {
     expect([held.state, held.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'session', agent: 'CB1' }])
     expect(laneLine(held)).toContain("waiting for slot-a: CB1's session is still in it")
     const process = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'process' } })
+    // HI-3168: its builder already builds in slot-a for another card (an ended lane's card in flight): which slot and card.
+    const byCard = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'card', agent: 'B1', card: 7 } })
+    expect([byCard.state, byCard.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'card', agent: 'B1', heldFor: 7 }])
+    expect(laneLine(byCard)).toContain('waiting for a slot: B1 still builds in slot-a for #7, which keeps it until that card is Done or put back')
     expect(laneLine(process)).toContain('waiting for slot-a: a process still has a file or folder in it open')
     // HI-2467: Windows Sandbox's broker seen working in it, idle, a Sandbox running, or that not known.
     const broker = (idle?: boolean) => laneLine(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', ...(idle !== undefined ? { idle } : {}) } }))

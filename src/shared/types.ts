@@ -4681,7 +4681,9 @@ export interface LaneStatus {
   /** preparing (#1446): the slot being prepared; slot (HI-2466), and startWait `refused` (HI-2468): the free slot it was refused as held. */
   slot?: string
   /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Combwork tries again until it is free. */
-  held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
+  held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun' | 'card'
+  /** slot, held `card` (HI-3168): the card whose lease holds the slot (`agent` builds it there; Done or put back frees it). */
+  heldFor?: number
   /** startWait `refused`, held `left` (HI-2468): the first program by name that `heldBy`'s last run left running in the slot. */
   program?: string
   /** held `left` (HI-2468): how many more it left running beyond `program`. */
