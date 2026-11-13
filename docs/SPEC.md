@@ -5774,7 +5774,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    (merged by hand meanwhile) uses the reviewed revision. G8's `integrate.upToDate` guard has no input from the queue:
    the queue brings the work up to date instead of refusing it.
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
-   at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
+   at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash --ff` + commit: the `--ff`, as the Merge dialog's squash says it too,
+   so a repository's `merge.ff` never refuses a squash, which makes no merge commit: HI-3108) with the
    message `AM-12: <title>` and trailers `Combwork-Card: AM-12`, `Combwork-Revision: <rev>`, `Combwork-Reviewed-By: <reviewer>`;
    the result on a temporary ref `refs/cw/queue/<entry>` [P1].
    **The branch's own message (G19, built [HI-1697]):** with *Commit message* set to the branch's own, the merge commit
