@@ -588,8 +588,18 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
   // signed nothing). In a temporary detached worktree at the target's tip, beside the merge queue's, removed after.
   const tmp = join(await temporaryRoot(projectPath), `merge-${randomUUID().slice(0, 8)}`)
   const add = await git(projectPath, ['worktree', 'add', '--detach', tmp, from])
-  if (!add.ok) return fail(add.err || 'git worktree add') // i18n-ignore: a git command, as it is
   const removed = async (): Promise<string | null> => ((await git(projectPath, ['worktree', 'remove', '--force', tmp])).ok ? null : tr(M.temporaryLeft, { folder: tmp }))
+  if (!add.ok) {
+    // HI-3109: git made it and then a post-checkout hook failed (its status is git's): the checkout is there, at the
+    // target's tip, so the merge goes on in it. Anything else is refused, and whatever git made of it goes first.
+    const at = existsSync(tmp) ? await git(tmp, ['rev-parse', '--verify', 'HEAD']) : null
+    if (!at?.ok || at.out.trim() !== from) {
+      const left = existsSync(tmp) ? await removed() : null
+      const why = tr(M.nothingMerged, { why: add.err || 'git worktree add' }) // i18n-ignore: a git command, as it is
+      return { ok: false, error: left ? `${why}\n${left}` : why }
+    }
+    log.info(`The temporary merge folder for ${userText(into)} was made, but its post-checkout hook failed: merging there all the same (${userText(add.err.trim())})`)
+  }
   /** Refused: git's own words (a hook, the signer), what it started undone in the temporary folder, which then goes. */
   const refused = async (r: { err: string; out: string }, command: string, undo: string[]): Promise<MergeResult> => {
     await git(tmp, undo)
