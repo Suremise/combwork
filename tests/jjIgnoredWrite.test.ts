@@ -8,11 +8,12 @@
 //   not credited (`changed`), whether jj ignores the entry or not. A first build's new `out/`, a `__pycache__/` beside a
 //   tracked `.py`: the run after it is credited. A build that deletes its output folder and makes it again each time never is.
 // Colocated and not, the same: the slot's own folder is never watched either way.
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
+import { isAbsolute, join, resolve } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { Observer } from '../src/main/platform/observe'
+import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { isUnknown } from '../src/main/platform/types'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor } from '../src/main/platform/jjChecks'
@@ -43,7 +44,23 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       // The slot: a jj workspace of its own, at the card's revision (an empty @ on it), as the pool makes one.
       const slot = join(parent, 'slot-a')
       const R = h.jj(project, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id').trim()
-      h.jj(project, 'workspace', 'add', '--name', 'slot-a', '-r', R, slot)
+      // As the pool's add (jjWorkspacePort.ts): colocation as the project's (HR1's round 1), full sparse patterns.
+      h.jj(project, 'workspace', 'add', slot, '--name', 'slot-a', '-r', R, '--sparse-patterns', 'full', colocate ? '--colocate' : '--no-colocate')
+      // HR1's round 1: what the slot is to Git. Colocated, jj gives it a .git of its own; the Observer's write records are
+      // the Git worktrees its repository lists (repoRefs' foldersOf: the main folder and .git/worktrees/*): never the slot.
+      expect(existsSync(join(slot, '.git'))).toBe(colocate)
+      if (colocate) {
+        const listed = readRepoRefs(join(resolve(realpathSync.native(project)), '.git'), 100).folders.map((f) => resolve(f.folder).toLowerCase())
+        // jj registers it in .git/worktrees with a relative gitdir; foldersOf resolves that against the process's own
+        // folder, not the git dir, so the folder it watches isn't the slot (HI-3121's finding, carded): the slot's own
+        // folder has no write record, and the stat snapshot decides, as below.
+        const common = join(resolve(realpathSync.native(project)), '.git')
+        const gitdir = readFileSync(join(common, 'worktrees', 'slot-a', 'gitdir'), 'utf8').trim()
+        console.log('slot .git is a', statSync(join(slot, '.git')).isDirectory() ? 'folder' : 'file', '; worktrees/slot-a/gitdir:', gitdir, '; the repository lists', listed)
+        expect(isAbsolute(gitdir)).toBe(false)
+        expect(listed).toContain(resolve(realpathSync.native(project)).toLowerCase())
+        expect(listed).not.toContain(resolve(realpathSync.native(slot)).toLowerCase())
+      }
       const root = resolve(realpathSync.native(slot))
       const d = await jjContextOf(root, h.runner)
       if (!('jj' in d)) throw new Error(`not detected: ${JSON.stringify(d)}`)

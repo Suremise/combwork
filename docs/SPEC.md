@@ -2477,8 +2477,11 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   4. t0 once the write record has settled; the command; t1 once it has settled again;
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
      complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
-     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own, no Git worktree, so the
-     observer keeps no write record for it and the stat snapshot decides, colocated or not. Nothing there knows what jj
+     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
+     worktree; colocated (the pool adds it `--colocate`), jj registers it in `.git/worktrees` with a relative `gitdir`,
+     which the observer's `foldersOf` resolves against the wrong folder (HI-3160), so either way its own folder has no
+     write record today and the stat snapshot decides. (Once HI-3160 is fixed the write record decides there, and
+     `jjCounts` has no ignore filter: HI-3158 adds one to both paths, landing with or before it.) Nothing there knows what jj
      ignores: a write inside a folder that is already there (an `out/` an earlier build made) changes none of the
      snapshot's lines and is credited; a run that makes or removes an entry in the workspace's root or in a folder holding
      a tracked file changes that folder's time and is `changed`, ignored or not. So a build's first run that makes its
