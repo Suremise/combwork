@@ -6,7 +6,7 @@
 // (`gitdir:` conditions), its config.worktree, nested includes and `onbranch:` against the target. Only the signing keys
 // are passed on, as `-c` (their effective value on the target: a `-c` wins over every file). Any step failing is
 // unknown, never "no signing": the caller commits nothing.
-import { writeFile } from 'original-fs/promises'
+import { readFile, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 
 /** A git run in a folder: the queue's host and worktrees.ts's `git` both answer so. */
@@ -44,37 +44,57 @@ export async function targetSigning(run: BranchConfigRun, folder: string, target
   if ('failed' in before) return before
   const not = notDetachedAt(before, folder, at)
   if (not) return { failed: not }
-  let read: { args: string[] } | { failed: string }
-  const attached = await run(folder, ['symbolic-ref', 'HEAD', `refs/heads/${target}`])
-  if (!attached.ok) read = failedOf(attached, 'git symbolic-ref') // i18n-ignore: a git command, as it is
-  else {
-    const r = await run(folder, ['config', '--null', '--get-regexp', SIGNING])
-    if (r.code === 1) read = { args: [] }
-    else if (!r.ok) read = failedOf(r, 'git config') // i18n-ignore: a git command, as it is
+  const attachedTo = `ref: refs/heads/${target}`
+  let read: { args: string[] } | { failed: string } = { failed: 'not read' } // i18n-ignore: a detail, never shown alone
+  // What the read threw (a cancellation, a lost lease): thrown again once HEAD is detached again (HR3's round 1).
+  let thrown: { error: unknown } | null = null
+  try {
+    const attached = await run(folder, ['symbolic-ref', 'HEAD', `refs/heads/${target}`])
+    if (!attached.ok) read = failedOf(attached, 'git symbolic-ref') // i18n-ignore: a git command, as it is
     else {
-      // --null: each entry "key\nvalue\0" ("key\0": no value, true); the last value of a key is its effective one.
-      const values = new Map<string, string>()
-      for (const entry of r.out.split('\0').filter(Boolean)) {
+      const r = await run(folder, ['config', '--null', '--get-regexp', SIGNING])
+      if (r.code === 1) read = { args: [] }
+      else if (!r.ok) read = failedOf(r, 'git config') // i18n-ignore: a git command, as it is
+      // --null: each entry "key\nvalue\0" ("key\0": no value, true). Every assignment replayed in git's order, never
+      // one a key (HR3's round 1): aliases of one setting (gpg.program, gpg.openpgp.program) are decided by which came
+      // last of either, and a `-c` sequence in that order ends where git's own reading does.
+      else read = { args: r.out.split('\0').filter(Boolean).flatMap((entry) => {
         const nl = entry.indexOf('\n')
-        values.set(nl < 0 ? entry : entry.slice(0, nl), nl < 0 ? 'true' : entry.slice(nl + 1))
-      }
-      read = { args: [...values].flatMap(([k, v]) => ['-c', `${k}=${v}`]) }
+        return ['-c', nl < 0 ? `${entry}=true` : `${entry.slice(0, nl)}=${entry.slice(nl + 1)}`]
+      }) }
     }
+  } catch (e) {
+    thrown = { error: e }
   }
-  // Detached at `at` again, whatever happened above, and read back so: until it is, nothing may commit. A config git
-  // can't read on the target (an onbranch include it can't open) stops every git there, update-ref too: HEAD is then
-  // written back as git keeps a detached one (its commit in the worktree's HEAD file), so the folder never stays on it.
-  const restored = await run(folder, ['update-ref', '--no-deref', '-m', 'combwork: signing read (HI-3111)', 'HEAD', at]) // i18n-ignore: a reflog line, git's
-  if (!restored.ok) {
+  // Detached at `at` again on every way out (thrown or not), and read back so: until it is, nothing may commit. A config
+  // git can't read on the target (an onbranch include it can't open) stops every git there, update-ref too: HEAD is then
+  // written back as git keeps a detached one (its commit in this worktree's own HEAD file, read above while detached),
+  // and only while that file is still what this read set it to: never another holder's change.
+  let restoreFailed: string | null = null
+  try {
+    const restored = await run(folder, ['update-ref', '--no-deref', '-m', 'combwork: signing read (HI-3111)', 'HEAD', at]) // i18n-ignore: a reflog line, git's
+    if (!restored.ok) restoreFailed = failedOf(restored, 'git update-ref').failed // i18n-ignore: a git command, as it is
+  } catch (e) {
+    restoreFailed = (e as Error)?.message || 'git update-ref failed' // i18n-ignore: a git command, as it is
+  }
+  if (restoreFailed !== null) {
+    const file = join(before.gitDir, 'HEAD')
     try {
-      await writeFile(join(before.gitDir, 'HEAD'), `${at}\n`)
+      if ((await readFile(file, 'utf8')).trim() === attachedTo) await writeFile(file, `${at}\n`)
     } catch (e) {
-      return { failed: `${failedOf(restored, 'git update-ref').failed}; ${(e as Error).message}` } // i18n-ignore: a git command, as it is
+      restoreFailed = `${restoreFailed}; ${(e as Error).message}`
     }
-    if ('args' in read) read = failedOf(restored, 'git update-ref') // i18n-ignore: a git command, as it is
   }
-  const after = await headOf(run, folder)
+  let after: Awaited<ReturnType<typeof headOf>>
+  try {
+    after = await headOf(run, folder)
+  } catch (e) {
+    throw thrown ? thrown.error : e
+  }
+  if (thrown) throw thrown.error
   if ('failed' in after) return after
   const still = notDetachedAt(after, folder, at)
-  return still ? { failed: still } : read
+  if (still) return { failed: restoreFailed ? `${restoreFailed}; ${still}` : still }
+  // Restored only by the file write: detached as it should be, but git's own restore failed, so nothing commits now.
+  return restoreFailed !== null ? { failed: restoreFailed } : read
 }

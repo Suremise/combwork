@@ -139,6 +139,47 @@ describe('the target branch’s signing settings, read in the merge’s own work
     expect(await targetSigning(restoreFails, folder, 'release', at)).toEqual({ failed: 'injected restore' })
     expect(detachedAt(folder, at)).toBe(true)
     expect(run(repo, 'rev-parse', 'release')).toBe(at)
+    // HR3's round 1: thrown, not answered (a cancellation, a lost lease). The read throwing: HEAD detached again first,
+    // then the same error thrown.
+    const cancelled = new Error('cancelled')
+    const readThrows: BranchConfigRun = async (cwd, args) => {
+      if (args[0] === 'config' && args.includes('^(commit\\.gpgsign|gpg\\..*|user\\.signingkey)$')) throw cancelled
+      return runner(cwd, args)
+    }
+    await expect(targetSigning(readThrows, folder, 'release', at)).rejects.toBe(cancelled)
+    expect(detachedAt(folder, at)).toBe(true)
+    // The restore throwing: HEAD written back detached (it was still this read's), unknown, nothing committed.
+    const restoreThrows: BranchConfigRun = async (cwd, args) => {
+      if (args[0] === 'update-ref') throw new Error('restore cancelled')
+      return runner(cwd, args)
+    }
+    expect(await targetSigning(restoreThrows, folder, 'release', at)).toEqual({ failed: 'restore cancelled' })
+    expect(detachedAt(folder, at)).toBe(true)
+    // Both throwing: detached again, and the read's error is the one thrown.
+    const bothThrow: BranchConfigRun = async (cwd, args) => (args[0] === 'update-ref' ? Promise.reject(new Error('restore cancelled')) : readThrows(cwd, args))
+    await expect(targetSigning(bothThrow, folder, 'release', at)).rejects.toBe(cancelled)
+    expect(detachedAt(folder, at)).toBe(true)
+    // Neither the target nor the user's folder moved; the next attempt reads as usual.
+    expect(run(repo, 'rev-parse', 'release')).toBe(at)
+    expect(run(repo, 'branch', '--show-current')).toBe('main')
+    expect(values(await targetSigning(runner, folder, 'release', at))).toEqual({ 'commit.gpgsign': 'true' })
+    expect(detachedAt(folder, at)).toBe(true)
+  })
+
+  it('replays the signing settings in git’s order, so of two names for one setting the one git takes last wins (HR3’s round 1)', async () => {
+    const { repo, folder, at } = repoWithDetached()
+    // gpg.program and gpg.openpgp.program name the same signer: the later of the two counts. On release the include's
+    // gpg.program comes last, so git there runs "missing-gpg-third"; read back through the -c's, the same.
+    run(repo, 'config', 'gpg.program', 'missing-gpg-first')
+    run(repo, 'config', 'gpg.openpgp.program', 'missing-gpg-second')
+    writeFileSync(join(repo, '.git', 'rel.cfg'), '[gpg]\n\tprogram = missing-gpg-third\n')
+    run(repo, 'config', 'includeIf.onbranch:release.path', 'rel.cfg')
+    const r = await targetSigning(runner, folder, 'release', at)
+    if ('failed' in r) throw new Error(r.failed)
+    const tried = spawnSync('git', [...r.args, '-c', 'commit.gpgsign=true', '-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'commit', '--allow-empty', '-q', '-m', 'x'], { cwd: folder, encoding: 'utf8', windowsHide: true })
+    expect(tried.status).not.toBe(0)
+    expect(`${tried.stderr}`).toMatch(/missing-gpg-third/)
+    expect(detachedAt(folder, at)).toBe(true)
   })
 })
 
