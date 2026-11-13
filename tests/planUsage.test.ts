@@ -416,6 +416,18 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
       expect(weekly(kept)).toBe(78)
     })
 
+    it("after a drop, a session's first report or a forgotten session's repeat, higher, can't raise it back (HR1's round 1)", () => {
+      const memo = new Map()
+      let kept = run(undefined, [['A', 96], ['A', 96], ['A', 77]], memo)
+      expect(weekly(kept)).toBe(77)
+      // B, never seen (or forgotten: a restart, the memo's cap), reports its older 96% and repeats it; A repeats its 77%.
+      kept = run(kept, [['B', 96], ['A', 77], ['B', 96], ['A', 77]], memo, at + 3 * 60_000)
+      expect(weekly(kept)).toBe(77)
+      // B's figure changing shows it read since: its next call's reading counts.
+      kept = run(kept, [['B', 78]], memo, at + 7 * 60_000)
+      expect(weekly(kept)).toBe(78)
+    })
+
     it("a session's first report, or an older one it repeats, still never lowers the figure (#383)", () => {
       const memo = new Map()
       // A reads 98% now; B, resumed, reports its older 96% and repeats it: kept at 98%.

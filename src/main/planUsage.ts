@@ -60,14 +60,17 @@ function newer(kept: PlanLimit, next: PlanLimit): 'kept' | 'next' | null {
 
 /**
  * Two readings of the same allowance (#383): the later period's; within one, the newer where their reports tell
- * (HI-3181: a usage reset lowers the share mid-period), else the higher; said as the latest report said it.
+ * (HI-3181: a usage reset lowers the share mid-period), else the higher; said as the latest report said it. A reading
+ * that can't be dated (a session's first report, or one forgotten) never replaces one that can (HR1's round 1): it may be
+ * from before a drop the dated one shows.
  */
 function mergeSame(kept: PlanLimit, next: PlanLimit): PlanLimit {
   if (!kept.resetsAt || !next.resetsAt) return described(next, kept)
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
   const order = newer(kept, next)
-  if (order === 'next' || (order === null && next.usedPercent >= kept.usedPercent)) return described({ ...next, resetsAt }, kept)
+  const undatedOverDated = !next.changedAfter && !!kept.changedAfter
+  if (order === 'next' || (order === null && !undatedOverDated && next.usedPercent >= kept.usedPercent)) return described({ ...next, resetsAt }, kept)
   // The reading kept, its figures, who reported them and how old it is.
   const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt }
   for (const k of ['used', 'reportedAt', 'reportedBy', 'firstSeenAt', 'changedAfter'] as const) {
