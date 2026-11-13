@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -502,7 +502,20 @@ describe("a station's last call in its hex (HI-3179)", () => {
     expect(stationLastShown('node.exe', 'shell')).toBe('node.exe')
     expect(stationLastShown('a/b', 'tools')).toBe('a/b')
   })
-  it('never shows more than its characters', () => {
-    for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md']) for (const st of ['read', 'tools'] as const) expect([...stationLastShown(s, st)].length, s).toBeLessThanOrEqual(STATION_LAST_CHARS)
+  it('counts a wide character (CJK, full-width, an emoji) as two columns, and never cuts inside one (HR1’s round 1)', () => {
+    expect(textColumns('interru….ps1')).toBe(12)
+    expect(textColumns('日本')).toBe(4)
+    expect(textColumns('ＡＢ')).toBe(4)
+    expect(textColumns('👩‍💻')).toBe(2)
+    expect(textColumns('é')).toBe(1)
+    expect(stationLastShown(`dir/${'日'.repeat(20)}.ps1`, 'read')).toBe('日日日….ps1')
+    expect(stationLastShown('ツール'.repeat(5), 'tools')).toBe('ツール…ール')
+    expect(stationLastShown('日本語.md', 'edit')).toBe('日本語.md')
+    const emoji = stationLastShown('👩‍💻'.repeat(10), 'tools')
+    expect(emoji).toBe('👩‍💻👩‍💻👩‍💻…👩‍💻👩‍💻')
+    expect(textColumns(emoji)).toBeLessThanOrEqual(STATION_LAST_CHARS)
+  })
+  it('never shows more than its columns', () => {
+    for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md', `${'日'.repeat(20)}.ps1`, `ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, `한국어파일이름입니다.ts`, `a${'日'.repeat(9)}b`]) for (const st of ['read', 'tools'] as const) expect(textColumns(stationLastShown(s, st)), s).toBeLessThanOrEqual(STATION_LAST_CHARS)
   })
 })

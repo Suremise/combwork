@@ -240,15 +240,16 @@ export function stationTitle(st: Pick<MapStationView, 'status' | 'count' | 'heat
 }
 
 /**
- * The characters a station's last call has inside its hex (HI-3179): its inner width at that line, less a margin, in
- * the map's monospace at its size (ActivityMap's STATION_R and the CSS's 10.5px; tests/e2e/activitymap.cjs measures it).
+ * The columns a station's last call has inside its hex (HI-3179): its inner width at that line, less a margin, in the
+ * map's monospace at its size (ActivityMap's STATION_R and the CSS's 10.5px; tests/e2e/activitymap.cjs measures it). A
+ * column is one monospace character; a wide one (CJK, full-width, an emoji) takes two (`textColumns`).
  */
 export const STATION_LAST_CHARS = 12
 
 /**
  * A station's last call as its hex shows it (HI-3179; its hover has it whole): a path's file name alone (Read and Edit,
- * "+2" for more files kept), and anything still longer than `max` characters cut in its middle, its start and its end
- * kept (a file's extension, or a tool name's last letters): `interrupted.ps1` → `interru….ps1`.
+ * "+2" for more files kept), and anything wider than `max` columns cut in its middle, its start and its end kept (a
+ * file's extension, or a tool name's last letters), never inside a character: `interrupted.ps1` → `interru….ps1`.
  */
 export function stationLastShown(last: string, station: MapStation, max = STATION_LAST_CHARS): string {
   const more = /^(.*?)( \+\d+)$/.exec(last)
@@ -258,13 +259,46 @@ export function stationLastShown(last: string, station: MapStation, max = STATIO
   return middleCut(shown, Math.max(4, max - extra.length)) + extra
 }
 
-/** `s` in at most `max` characters, cut in the middle: its start, an ellipsis, and its end (its extension, if it has one). */
+/**
+ * Wide characters (HR1's HI-3179 round 1): East Asian wide and full-width (Hangul Jamo, CJK and its punctuation, kana,
+ * Hangul syllables, compatibility ideographs, full-width forms, the supplementary ideographs) and emoji. Their fallback
+ * glyphs are about twice a monospace character's width, so each counts two columns (a little more than they take).
+ */
+const WIDE = /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦\u{1f300}-\u{1faff}\u{20000}-\u{3fffd}]|\p{Extended_Pictographic}/u
+
+/** A text's characters as the reader sees them (graphemes: an emoji with its modifiers, a letter with its accents), each with its columns. */
+function graphemes(s: string): { g: string; w: number }[] {
+  const parts = typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((x) => x.segment) : [...s]
+  return parts.map((g) => ({ g, w: WIDE.test(g) ? 2 : 1 }))
+}
+
+/** How many monospace columns `s` takes: a wide character two (`WIDE`), any other one. */
+export function textColumns(s: string): number {
+  return graphemes(s).reduce((n, c) => n + c.w, 0)
+}
+
+/** `s` in at most `max` columns, cut in the middle between characters: its start, an ellipsis, and its end (its extension, if it has one). */
 function middleCut(s: string, max: number): string {
-  const chars = [...s]
-  if (chars.length <= max) return s
+  const all = graphemes(s)
+  if (all.reduce((n, c) => n + c.w, 0) <= max) return s
   const ext = /\.[A-Za-z0-9]{1,5}$/.exec(s)?.[0]
-  const tail = ext && ext.length <= max - 4 ? ext.length : Math.min(4, Math.floor((max - 1) / 2))
-  return `${chars.slice(0, max - 1 - tail).join('')}…${chars.slice(-tail).join('')}`
+  // Its end: the extension when it leaves the start room, else up to a few columns of its last characters.
+  const tailBudget = ext && ext.length <= max - 4 ? ext.length : Math.min(4, Math.floor((max - 1) / 2))
+  const tail: string[] = []
+  let used = 0
+  for (let i = all.length - 1; i >= 0 && used + all[i].w <= tailBudget; i--) {
+    tail.unshift(all[i].g)
+    used += all[i].w
+  }
+  // Its start: whatever fits in the rest, less the ellipsis's column.
+  const head: string[] = []
+  let left = max - 1 - used
+  for (const c of all) {
+    if (c.w > left) break
+    head.push(c.g)
+    left -= c.w
+  }
+  return `${head.join('')}…${tail.join('')}`
 }
 
 export interface MapAgentView {
