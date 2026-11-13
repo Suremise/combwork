@@ -6948,7 +6948,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   past branch at a time, picked from a drop-down (the newest version first), its history below, with **Purge history…**
   for it and **Purge all…** for every past branch listed, each asked first (a danger confirmation naming the branches:
   it can't be undone; the cards keep their own records). `queue:purgeHistory` takes exactly the branches the dialog
-  named, and in one board write checks each is still a past branch's queue (none of the project's targets, nothing
+  named, the whole list (never cut short; a list that isn't one, or over 10,000, is refused whole), and in one board
+  write, holding project.json's lock too (the lock order: the board, then the file) while it reads the project's
+  targets, so no change of them lands between the check and the write, checks each is still a past branch's queue (none of the project's targets, nothing
   queued or testing, no card in flight, no pause, no Combwork running it, no push of its merges pending, a history to
   purge; targets unreadable refuse it), or writes nothing and says which and why. Purged, a branch gets a mark (board
   meta `queue.purged:<branch>`, the time): its requests and outcomes at or before it are no longer its queue's (not

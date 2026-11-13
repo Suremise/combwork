@@ -909,6 +909,9 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     expect(wf.store.queuePauseLog('1.1.0').length).toBeGreaterThan(0)
     // The listing as the window keeps it (viewsKept), read before the purge.
     expect(await pastOf(w, repo, true)).toEqual(['1.1.0', '1.2.0'])
+    // The forwards' moves to Done each scheduled a reconciliation (its TargetMoved): run now, before the facts are taken.
+    const { reconcileNow } = await import('../src/main/workflow/reconciler')
+    await reconcileNow(w, repo)
     const facts = await factsOf(w, repo, cards)
     await purge(w, repo, ['1.1.0'])
     // Read again at once: the kept listing isn't served (the board's revision moved).
@@ -975,6 +978,52 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.2.0', null)))
     await purge(w, repo, ['1.1.0'])
     expect(await pastOf(w, repo)).toEqual(['1.2.0'])
+  })
+
+  it('a confirmed branch made a target while the purge waits for the board refuses the whole list, nothing written (HR1’s round 1)', async () => {
+    const { purgedKey, pauseLogKey } = await import('../src/main/workflow/queueLogs')
+    const { writesAt } = await import('../src/main/dbWrites')
+    const { placeKey } = await import('../src/main/fsutil')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    // 1.2.0 gets a pause log, so "nothing written" covers its logs too.
+    await inWorkspace(w, () => controls.pauseQueue(w, repo, '1.2.0', 'user'))
+    await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.2.0', null)))
+    const log = wf.store.meta(pauseLogKey('1.2.0'))
+    expect(log).not.toBeNull()
+    // The board held; once the purge waits for it (a second write counted), 1.1.0 becomes one of the project's targets
+    // in the held write, which then lets go.
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const held = inWorkspace(w, () =>
+      store.boardWrite(w, async () => {
+        await gate
+        await w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['1.4.0', 'next', '1.1.0'] } } }))
+      })
+    )
+    const purging = purge(w, repo, ['1.2.0', '1.1.0'])
+    await vi.waitFor(() => expect(writesAt(placeKey(dirname(repo)), dirname(repo))).toBe(2))
+    release()
+    await held
+    await expect(purging).rejects.toThrow('Nothing was purged: 1.1.0 is a branch work merges into now.')
+    expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0')), wf.store.meta(pauseLogKey('1.2.0'))]).toEqual([null, null, log])
+  })
+
+  it('takes the whole list the window sends, never cut short: one ineligible branch among 201 refuses all (HR1’s round 1)', async () => {
+    const { purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    const target = (t: unknown): string => String(t)
+    // 201 branches: the two past ones, 198 more names, and last 1.5.0, a current target.
+    const list = ['1.1.0', '1.2.0', ...Array.from({ length: 198 }, (_, i) => `old-${i}`), '1.5.0']
+    expect(controls.purgeTargetsOf(list, target)).toEqual(list)
+    // An oversized list, or no list, is refused whole.
+    expect(() => controls.purgeTargetsOf(Array.from({ length: controls.PURGE_MAX + 1 }, (_, i) => `b${i}`), target)).toThrow(/at most/)
+    expect(() => controls.purgeTargetsOf('1.1.0', target)).toThrow(/at most/)
+    await expect(purge(w, repo, ['1.1.0', '1.2.0', '1.5.0'])).rejects.toThrow('Nothing was purged: 1.5.0 is a branch work merges into now.')
+    await expect(purge(w, repo, list)).rejects.toThrow(/Nothing was purged/)
+    expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0'))]).toEqual([null, null])
+    expect(await pastOf(w, repo)).toEqual(['1.1.0', '1.2.0'])
   })
 
   it("refuses when the project's targets can't be read, nothing written", async () => {

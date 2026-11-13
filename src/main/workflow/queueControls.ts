@@ -24,6 +24,8 @@ import { forwardNow, type ForwardPair } from './forwardNow'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
+import { withFileLock } from '../fsutil'
+import { CW_DIR } from '../../shared/defaults'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
 import { onCombworkEvent } from '../events'
@@ -455,6 +457,15 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
 }
 
 const PURGE_REFUSED = msg({ id: 'service.queue.purgeRefused', defaultMessage: "Nothing was purged: {target} {why, select, current {is a branch work merges into now} live {has work in its merge queue again} pushes {still has merges waiting to be pushed} other {has no merge queue history to purge}}.", description: "HI-3177: an error from Version Control → Merge queue → Past branches' Purge: a branch's queue ({target}: its name) can't be purged now, and why; nothing was purged, the other branches asked for included. Keep the select keys." })
+/** HI-3177: the branches a purge may name at most (Purge all's list): more is refused whole, never cut short. */
+export const PURGE_MAX = 10_000
+
+/** HI-3177: Purge's branches as the window sent them: every one checked, the whole list or none (HR1's round 1). */
+export function purgeTargetsOf(v: unknown, target: (t: unknown) => string): string[] {
+  if (!Array.isArray(v) || v.length > PURGE_MAX) throw new CombworkError({ lines: [`Purge names its branches as a list of at most ${PURGE_MAX}`] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
+  return v.map(target)
+}
+
 const PURGE_UNKNOWN = msg({ id: 'service.queue.purgeUnknown', defaultMessage: "Nothing was purged: Combwork can't read which branches this project merges into right now. Try again in a moment.", description: "HI-3177: an error from Version Control → Merge queue → Past branches' Purge when the project's target branches can't be read (no Git workflow now, or git's default branch unreadable for a moment)." })
 
 /**
@@ -465,14 +476,17 @@ const PURGE_UNKNOWN = msg({ id: 'service.queue.purgeUnknown', defaultMessage: "N
  * mark hides what came before it (queueTargets, recentOutcomes), and its queue-only logs (pauses, settled pushes, returns
  * seen) are deleted; its cards keep their own facts. Pending pushes and the catch-up state are operational: a pending
  * push refuses the purge, and the catch-up state is never touched.
+ *
+ * The project's targets (its options, else git's default) are read inside the board's write and project.json's lock
+ * (the lock order: the board, then the file), so no change of Work merges into or Other branches work can merge into
+ * lands between the check and the write (HR1's round 1: never a snapshot from before the wait).
  */
 export async function purgeQueueHistory(ws: WorkspaceService, projectPath: string, targets: readonly string[]): Promise<void> {
   const wanted = [...new Set(targets)]
   if (!wanted.length) return
   const wf = await needWorkflow(ws, projectPath)
-  // The project's targets are its options and git's default, not the board's: read before the write, as markPast does.
-  const named = await projectTargets(ws, projectPath).catch(() => null)
-  await wf.locked(() => {
+  await wf.locked(() => withFileLock(join(projectPath, CW_DIR, 'project.json'), async () => {
+    const named = await projectTargets(ws, projectPath).catch(() => null)
     if (!named) throw combworkError(PURGE_UNKNOWN)
     const current = [named.default, ...named.others]
     // Read in this write, never from a kept listing (viewsKept): the board as it is now.
@@ -493,7 +507,7 @@ export async function purgeQueueHistory(ws: WorkspaceService, projectPath: strin
       store.deleteMeta(pushLogKey(t))
       store.forgetQueueSeen(entries)
     }
-  })
+  }))
   for (const t of wanted) queueChanged(ws, projectPath, t)
 }
 
