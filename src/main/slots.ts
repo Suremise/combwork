@@ -985,6 +985,33 @@ export class SlotStore {
   }
 
   /**
+   * A lane's lease as its lane is over (HI-3118), decided in one write from what that write reads: the lease still open
+   * and its lane's, and `decide` (the caller's reading of the lane and its cards in the same transaction). Not over, or
+   * unreadable (null): nothing. Over with no card of the lane's cycle on this lease: it ends, as `end` ends one. Over with
+   * exactly one such card in flight: the lease becomes that card's in place (same id, slot and agent), so the card keeps
+   * its slot and work and its Started cycle stays bound to it. More than one: nothing ends, the slot stays protected,
+   * and the caller is told which.
+   */
+  async laneOver(lease: string, why: string, decide: (db: DatabaseSync, lane: string) => { over: boolean; cards: readonly number[] } | null): Promise<{ ended: SlotLease } | { card: SlotLease } | { ambiguous: number[] } | null> {
+    return this.conn.write((db) => {
+      const r = db.prepare("SELECT * FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL AND kind = 'lane'").get(lease, this.project) as Row | undefined
+      if (!r || !r.lane) return null
+      const d = decide(db, r.lane as string)
+      if (!d || !d.over) return null
+      if (d.cards.length > 1) return { ambiguous: [...d.cards] }
+      if (d.cards.length === 1) {
+        const card = d.cards[0]
+        db.prepare("UPDATE slot_leases SET kind = 'card', card = ?, lane = NULL WHERE id = ? AND ended_at IS NULL AND kind = 'lane'").run(card, lease)
+        return { card: { ...leaseOfRow(r), kind: 'card' as const, card, lane: null } }
+      }
+      const at = this.iso()
+      db.prepare('UPDATE slot_leases SET ended_at = ?, why = ? WHERE id = ?').run(at, why, lease)
+      db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, r.slot)
+      return { ended: { ...leaseOfRow(r), to: at, why } }
+    })
+  }
+
+  /**
    * An ended lease's last revision (#1434): the slot's head once nothing of the lease writes there any more (its lease
    * ended and its writer gone), where its conversations may resume by hand. Only while it is still the slot's newest
    * lease, ended, with no writer on the slot and none recorded yet: a slot lent again since keeps its own. Whether it was.
@@ -2041,6 +2068,19 @@ export class SlotPool {
    * Ends a lease and looks at its slot once no operation holds it. Whether it was ended. `check`: the caller's condition,
    * decided in the write that ends it (false: it stays open).
    */
+  /**
+   * A lane's lease as its lane is over (HI-3118, SlotStore.laneOver): ended as `release` ends one (its writer drained,
+   * the slot settled), kept as its one card in flight's lease, or left protected when several claim it.
+   */
+  async releaseLane(lease: string, why: string, decide: Parameters<SlotStore['laneOver']>[2]): Promise<Awaited<ReturnType<SlotStore['laneOver']>>> {
+    const r = await this.store.laneOver(lease, why, decide)
+    if (!r || !('ended' in r)) return r
+    const slot = this.store.slot(r.ended.slot)
+    if (slot) this.deps.ended?.(r.ended, slot)
+    await this.drained(r.ended.slot)
+    return r
+  }
+
   async release(lease: string, why: string, check?: () => boolean): Promise<boolean> {
     const ended = await this.store.end(lease, why, check)
     if (!ended) return false
@@ -3368,6 +3408,55 @@ export class SlotPool {
   }
 
   /**
+   * Whether a slot kept for no card shows a workspace the user forgot (HI-3103): its state one a forgotten workspace's
+   * slot is left in (`forgettable`), its folder there and jj positively not listing it (`present()` false; unknown: no).
+   * The window's read, for its Remove…; `removeForgotten` decides again.
+   */
+  async forgottenFree(s: Slot): Promise<boolean> {
+    return forgettable(s) && !this.store.keptRecord(s.name) && (await folderThere(s.folder)) && (await this.present(s)) === false
+  }
+
+  /**
+   * A slot kept for no card whose workspace the user forgot outside Combwork, its folder left (HI-3103, HI-3097's way for
+   * one that isn't kept): removed by the user's explicit Remove… (Slots and copies), its folder to the Recycle Bin whole,
+   * any changes in it included. Only as the window showed it: `generation`, the slot's. Eligible only while no kept
+   * record names it (one kept since goes through Remove… for a kept slot), it is idle in a state such a slot is left in
+   * (`forgettable`: ready until a lend tries it, then its setup failed, or gone, or dirty) at that generation in the
+   * project's own platform, its folder is there and jj positively doesn't list it (`present()` false: unknown refuses);
+   * all of it checked again under the removal's operation. Then `remove`'s `forgotten`: the session, in-flight and
+   * process guards on every attempt, the port proving the absence afresh right before the trash. `changed` otherwise,
+   * for the user to look again.
+   */
+  async removeForgotten(name: string, generation: string): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
+    const same = (s: Slot | null): boolean => !!s && forgettable(s) && (s.platform ?? 'git') === this.port.platform && this.hasPort(s) && !this.store.keptRecord(s.name) && s.identity?.generation === generation
+    const eligible = async (s: Slot | null): Promise<boolean> => same(s) && (await folderThere(s!.folder)) && (await this.present(s!)) === false
+    const seen = this.store.slot(name)
+    if (!(await eligible(seen))) return { ok: false, why: 'changed' }
+    let changed = false
+    const kept = await this.remove(
+      name,
+      async (slot, token) => {
+        // The row as read before its removal began (`removing` now, by this operation), the same conditions again, and
+        // the platform's fence admitting it.
+        const admits = await this.store
+          .fenced(name, token, (db) => {
+            admitOrThrow(db, this.store.project, slot.platform ?? 'git')
+            return true
+          })
+          .catch(() => false)
+        const ok = (await eligible(slot)) && admits
+        changed = !ok
+        return ok
+      },
+      { keptForgotten: true }
+    )
+    if (changed) return { ok: false, why: 'changed' }
+    if (kept) return { ok: false, why: 'kept', kept }
+    log.info(`Removed slot ${userText(name)}, its workspace forgotten outside Combwork: its folder to the Recycle Bin`)
+    return { ok: true }
+  }
+
+  /**
    * The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it.
    * `forgotten` (HI-3097, `remove`'s `keptForgotten`): the session, in-flight and process guards only.
    */
@@ -3468,6 +3557,15 @@ const quieting = new Map<string, Promise<boolean>>()
  * freed, a free one marked gone or made again) while the check still has it. A check only renames while it is in
  * `quieting`, and the look is in the same tick as finding none, so it never sees one mid-check.
  */
+/**
+ * A state a slot whose workspace the user forgot is left in, idle (HI-3103): ready (nothing looks again until a lend
+ * tries it), its setup failed then (`creating` with its error: "not listed"), gone, or dirty. Never lent, removing or a
+ * `creating` still being made.
+ */
+function forgettable(s: Slot): boolean {
+  return s.state === 'ready' || s.state === 'gone' || s.state === 'dirty' || (s.state === 'creating' && !!s.warmError)
+}
+
 export async function folderThere(folder: string): Promise<boolean> {
   const key = folder.toLowerCase()
   for (let going = quieting.get(key); going; going = quieting.get(key)) {

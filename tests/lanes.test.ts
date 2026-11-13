@@ -501,7 +501,8 @@ describe('the lanes service', () => {
     const [c1] = [await make('N1')]
     const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
     await lanes.endLane(w, ended.id, {})
-    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.`)
+    // Ended by the user with its card still in Todo (HI-3118): said so, never "all its cards are Done".
+    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} was ended with #${c1.number} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with that card.`)
     const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
     await lanes.endLane(w, abandoned.id, { abandoned: true })
     await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)

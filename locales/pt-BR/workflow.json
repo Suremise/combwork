@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "“Ninguém revisa o próprio trabalho” não pode ser desativado enquanto um agente revisor verifica o trabalho.",
   "workflow.contradiction.subfolderTarget": "Este projeto está dentro de um repositório maior: indique o branch em que o trabalho dele é mesclado.",
   "workflow.contradiction.upToDateNeedsSlots": "Os slots só são atualizados quando cada cartão tem a própria pasta.",
+  "workflow.earlierWork.message": "{read, select, yes {{n, plural, one {A linha anterior dele, {lines}, pode ter trabalho que faltava no destino:} other {As linhas anteriores dele, {lines}, podem ter trabalho que faltava no destino:}} o Combwork deixa esse trabalho lá e não o traz.} other {O Combwork não conseguiu ler os inícios anteriores do cartão, então não sabe se ficou trabalho de antes numa linha própria.}} Veja o que a pasta do cartão tem (o destino talvez já tenha esse trabalho) e traga o que precisar, ou deixe-o. O builder dele é avisado no cartão.",
+  "workflow.earlierWork.title": "{read, select, yes {{card}: o trabalho anterior está em {line}} other {{card}: não foi possível ler o trabalho anterior}}",
   "workflow.forYou.decidedAfterMerge": "O cartão {card} recebeu uma decisão depois do merge: ele precisa de uma continuação?",
   "workflow.forYou.focusedSkip": "Testes específicos de {card} foram pulados no seu merge: {tests}. Fazer o merge com eles pulados?",
   "workflow.forYou.lineAsk": "{line} ainda tem o trabalho de {card}, mesclado com squash em {target}: aprove e o Combwork atualiza o branch uma vez, ou recuse e faça você mesmo antes de {next} começar.",
@@ -368,6 +370,8 @@
   "workflow.refused.platform.targetGone.next": "Você ou o Assistant podem movê-lo para outro branch mantendo o trabalho: defina o “Mescla em” dele ou redirecione O trabalho é mesclado em.",
   "workflow.refused.platform.offLine.message": "A pasta de {card} não está no seu branch {line}: {where, select, detached {o HEAD dela está desanexado em {head}} other {ela está em {on}}}, então o trabalho ali não é o que o cartão faria merge.",
   "workflow.refused.platform.offLine.next": "{where, select, detached {Coloque os commits no branch do cartão: git switch -c {line} se ele ainda não existir; senão, git switch {line} e git cherry-pick dos commits feitos fora dele. Depois envie de novo.} other {Volte com git switch {line} e faça ali git cherry-pick dos commits do cartão feitos em {on}. Depois envie de novo.}}",
+  "workflow.refused.platform.slotLeft.message": "{unknown, select, yes {O Combwork não conseguiu saber se o slot {slot} ({folder}) ainda é do cartão {card}, então ele não foi enviado.} other {O slot {slot} ({folder}) não é mais do cartão {card}: o Combwork encerrou o empréstimo dele ali, então o trabalho nessa pasta pode ser agora de outro cartão.}}",
+  "workflow.refused.platform.slotLeft.next": "{unknown, select, yes {Tente de novo daqui a pouco.} other {Devolva o cartão e comece-o de novo: ele recebe um slot próprio, com o trabalho com commit se o slot foi reservado para ele.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {O repositório Git do projeto sumiu: restaure-o ou mude o projeto para Nenhum na aba Controle de versão dele (a partir do próximo cartão).} other {O repositório Git do projeto sumiu: peça ao usuário para restaurá-lo ou para mudar o projeto para Nenhum na aba Controle de versão dele (a partir do próximo cartão).}}",
   "workflow.refused.queue.advancing.message": "O cartão {card} está sendo mesclado em {target} agora: ele não pode mais ser removido da fila de merge.",
   "workflow.refused.queue.advancing.next": "Espere o merge terminar. Se a mudança não for desejada, reverta-a em {target}.",
@@ -662,5 +666,6 @@
   "workflow.slots.notRemovedKept": "{slot} não foi removido: {why, select, changed {ele mudou depois que a lista foi mostrada (a pasta voltou, ou ele foi criado de novo)} busy {algo está trabalhando nele agora} other {o Combwork o manteve}}.",
   "workflow.slots.keptForgottenFor": "Reservado para {card}, mas o jj não lista mais o workspace dele",
   "workflow.slots.removeForgottenMessage": "A pasta dele vai para a Lixeira como está, com as alterações que houver nela. {card} então recomeça a partir do destino, em outro slot. O trabalho que ele commitou aqui fica no armazenamento do jj{commit, select, none {.} other {: o último commit é {commit}.}}",
-  "workflow.slots.state.forgotten": "Não listado pelo jj"
+  "workflow.slots.state.forgotten": "Não listado pelo jj",
+  "workflow.slots.removeForgottenFree": "O jj não lista mais o workspace de {slot}. A pasta dele vai para a Lixeira como está, com as alterações que houver nela."
 }

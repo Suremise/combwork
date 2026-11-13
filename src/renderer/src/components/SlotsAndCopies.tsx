@@ -68,6 +68,7 @@ const T = {
   keptGoneFor: msg({ id: 'workflow.slots.keptGoneFor', defaultMessage: 'Kept for {card}, but its folder is missing', description: 'HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it.' }),
   forgottenState: msg({ id: 'workflow.slots.state.forgotten', defaultMessage: 'Not listed by jj', description: 'HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it).' }),
   keptForgottenFor: msg({ id: 'workflow.slots.keptForgottenFor', defaultMessage: 'Kept for {card}, but jj no longer lists its workspace', description: 'HI-3097: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), but its jj workspace was forgotten outside Combwork (jj workspace forget), its folder left in place, so the card can’t get it back. Remove… beside it ends it.' }),
+  removeForgottenFree: msg({ id: 'workflow.slots.removeForgottenFree', defaultMessage: 'jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.', description: 'HI-3103: the confirmation before removing a jj slot kept for no card whose workspace was forgotten outside Combwork (jj workspace forget), its folder still there: the whole folder, uncommitted changes included, goes to the Recycle Bin. {slot} is the slot’s name.' }),
   removeForgottenMessage: msg({ id: 'workflow.slots.removeForgottenMessage', defaultMessage: 'Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
   removeKept: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
   removeKeptTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
@@ -247,7 +248,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
                         <td>
-                          {s.keptFor !== undefined && !s.keptGone ? tr(T.keptState) : s.keptGone?.forgotten ? tr(T.forgottenState) : tr(T.state[s.state])}
+                          {s.keptFor !== undefined && !s.keptGone ? tr(T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : tr(T.state[s.state])}
                           {s.stale && (
                             <>
                               {' · '}
@@ -266,6 +267,11 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                           )}
                           {s.keptGone && s.keptFor !== undefined && (
                             <button className="btn subtle small" data-action="remove-kept" onClick={() => void removeKeptSlot(project.path, s, card, reload)}>
+                              {tr(T.removeKept)}
+                            </button>
+                          )}
+                          {s.forgotten && (
+                            <button className="btn subtle small" data-action="remove-forgotten" onClick={() => void removeForgottenSlot(project.path, s, reload)}>
                               {tr(T.removeKept)}
                             </button>
                           )}
@@ -464,6 +470,17 @@ async function recoverSlot(projectPath: string, s: SlotView, reload: () => void)
 }
 
 /** A slot kept for a card with its folder gone, removed (HI-3032, `slots:removeKept`): the user's action, after their confirmation. */
+/** A slot kept for no card whose workspace was forgotten, removed (HI-3103, `slots:removeForgotten`): the user's action, after their confirmation. */
+async function removeForgottenSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
+  const f = s.forgotten
+  if (!f) return
+  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeForgottenFree, { slot: s.name }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
+  const r = await call('slots:removeForgotten', projectPath, s.name, f.generation).catch(() => ({ ok: false as const, why: '' }))
+  reload()
+  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
+  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
+}
+
 async function removeKeptSlot(projectPath: string, s: SlotView, card: (n: number) => string, reload: () => void): Promise<void> {
   const kept = s.keptGone
   if (!kept || s.keptFor === undefined) return

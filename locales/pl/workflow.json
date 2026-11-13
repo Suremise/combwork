@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "Opcji „Nikt nie recenzuje własnej pracy” nie można wyłączyć, gdy pracę sprawdza agent recenzent.",
   "workflow.contradiction.subfolderTarget": "Ten projekt jest wewnątrz większego repozytorium: wskaż gałąź, do której scalana jest jego praca.",
   "workflow.contradiction.upToDateNeedsSlots": "Sloty są aktualizowane tylko wtedy, gdy każda karta ma własny folder.",
+  "workflow.earlierWork.message": "{read, select, yes {{n, plural, one {Jej wcześniejsza linia, {lines}, może zawierać pracę, której brakowało w jej celu:} few {Jej wcześniejsze linie, {lines}, mogą zawierać pracę, której brakowało w ich celu:} many {Jej wcześniejsze linie, {lines}, mogą zawierać pracę, której brakowało w ich celu:} other {Jej wcześniejsze linie, {lines}, mogą zawierać pracę, której brakowało w ich celu:}} Combwork zostawia tę pracę tam i jej nie przenosi.} other {Combwork nie mógł odczytać wcześniejszych startów karty, więc nie wie, czy praca sprzed zmiany została na osobnej linii.}} Sprawdź, co jest w folderze karty (jej cel może już zawierać tę pracę), i wprowadź, czego potrzebujesz, albo ją zostaw. Jej builder dostaje informację na karcie.",
+  "workflow.earlierWork.title": "{read, select, yes {Karta {card}: jej wcześniejsza praca jest na {line}} other {Karta {card}: nie udało się odczytać jej wcześniejszej pracy}}",
   "workflow.forYou.decidedAfterMerge": "Decyzja na karcie {card} zapadła po scaleniu: czy potrzebna jest dalsza praca?",
   "workflow.forYou.focusedSkip": "Testy ukierunkowane karty {card} zostały pominięte przy jej scaleniu: {tests}. Scalić ją z pominiętymi testami?",
   "workflow.forYou.lineAsk": "Gałąź {line} nadal zawiera pracę karty {card}, scaloną jako squash do {target}: zatwierdź, a Combwork raz zaktualizuje gałąź, albo odrzuć i zrób to samodzielnie przed startem karty {next}.",
@@ -368,6 +370,8 @@
   "workflow.refused.platform.targetGone.next": "Użytkownik lub Assistant może przenieść ją na inną gałąź, zachowując jej pracę: ustaw jej „Scalanie do” albo przestaw „Praca jest scalana do”.",
   "workflow.refused.platform.offLine.message": "Folder karty {card} nie jest na jej gałęzi {line}: {where, select, detached {jej HEAD jest odłączony na {head}} other {jest na {on}}}, więc praca w nim nie jest tym, co karta by scaliła.",
   "workflow.refused.platform.offLine.next": "{where, select, detached {Przenieś commity na gałąź karty: git switch -c {line}, jeśli jeszcze nie istnieje, w przeciwnym razie git switch {line} i git cherry-pick commitów zrobionych poza nią. Potem prześlij ponownie.} other {Wróć poleceniem git switch {line} i zrób tam git cherry-pick commitów karty zrobionych na {on}. Potem prześlij ponownie.}}",
+  "workflow.refused.platform.slotLeft.message": "{unknown, select, yes {Combwork nie mógł ustalić, czy slot {slot} ({folder}) nadal należy do karty {card}, więc jej nie zgłoszono.} other {Slot {slot} ({folder}) nie należy już do karty {card}: Combwork zakończył tam jej wypożyczenie, więc praca w tym folderze może teraz należeć do innej karty.}}",
+  "workflow.refused.platform.slotLeft.next": "{unknown, select, yes {Spróbuj ponownie za chwilę.} other {Odłóż kartę i uruchom ją ponownie: dostanie własny slot, ze swoją zatwierdzoną pracą, jeśli slot został dla niej zachowany.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {Repozytorium Git projektu zniknęło: przywróć je albo przełącz projekt na Brak w zakładce Kontrola wersji (od następnej karty).} other {Repozytorium Git projektu zniknęło: poproś użytkownika, by je przywrócił albo przełączył projekt na Brak w zakładce Kontrola wersji (od następnej karty).}}",
   "workflow.refused.queue.advancing.message": "Karta {card} jest teraz scalana z {target}: nie można jej już usunąć z kolejki scalania.",
   "workflow.refused.queue.advancing.next": "Poczekaj, aż scalanie się zakończy. Jeśli zmiana nie jest potrzebna, cofnij ją w gałęzi {target}.",
@@ -662,5 +666,6 @@
   "workflow.slots.notRemovedKept": "Slot {slot} nie został usunięty: {why, select, changed {zmienił się po wyświetleniu listy (jego folder wrócił albo został utworzony ponownie)} busy {coś w nim teraz pracuje} other {Combwork go zachował}}.",
   "workflow.slots.keptForgottenFor": "Zachowany dla karty {card}, ale jj nie wymienia już jego workspace’u",
   "workflow.slots.removeForgottenMessage": "Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim. Karta {card} zacznie wtedy od nowa od swojego celu, w innym slocie. Praca zatwierdzona tutaj zostaje w magazynie jj{commit, select, none {.} other {: jej ostatni commit to {commit}.}}",
-  "workflow.slots.state.forgotten": "Niewymieniony przez jj"
+  "workflow.slots.state.forgotten": "Niewymieniony przez jj",
+  "workflow.slots.removeForgottenFree": "jj nie wymienia już workspace’u {slot}. Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim."
 }

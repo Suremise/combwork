@@ -27,6 +27,7 @@ import { needsRepository, PLATFORMS, type PlatformId } from '../../shared/platfo
 import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { workspacePortOf } from '../platform/workspacePorts'
+import { earlierWork, UNREAD } from './earlierWork'
 import { withValues } from '../../shared/advanced'
 import type { ProjectConfig, ProjectWorkflow } from '../../shared/types'
 import { onAfterRefresh, openWorkspaces, type WorkspaceService } from '../workspace'
@@ -395,12 +396,38 @@ async function detachedMembers(members: readonly Member[], to: PlatformId): Prom
   return out
 }
 
+/**
+ * HI-3107: each member's cards not in flight (not started, or put back), code cards not archived, whose earlier lines
+ * hold work its target may lack (earlierWork: read through the version control that made them). Said under the warning,
+ * never a refusal: the work stays on its line, and the card starts from its target under `to`. What can't be read is said
+ * as such, never taken for no work (HR2): a card's starts unread, `line` null; a member's board unread, `card` null too.
+ */
+async function carriedWork(ws: WorkspaceService, members: readonly Member[], to: PlatformId): Promise<NonNullable<StoreSwitch['carried']>> {
+  const out: NonNullable<StoreSwitch['carried']> = []
+  for (const m of members) {
+    const wf = await workflowFor(ws, m.path).catch(() => null)
+    if (!wf) {
+      out.push({ project: m.name, card: null, line: null, state: 'unknown' })
+      continue
+    }
+    for (const c of wf.store.cards()) {
+      const s = wf.state(c)
+      if (c.kind === 'no-code' || (s.stage !== 'todo' && s.stage !== 'hold')) continue
+      const lines = await earlierWork({ facts: (id) => wf.store.facts(id), ruleset: (id) => wf.store.ruleset(id) }, c.id, to, m.path).catch(() => [UNREAD])
+      for (const e of lines) out.push({ project: m.name, card: c.id, line: e.line, state: e.state })
+    }
+  }
+  return out
+}
+
 /** A store-wide switch's warning and its refusal, read without changing anything (the dialog's, and the switch's own). */
 export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
   const g = await groupOf(ws, path)
   const none: StoreSwitch = { group: [], token: '', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
   if (!g) return { refused: { why: to === 'jj' ? 'noJj' : 'noGit' }, store: none } // i18n-ignore: a code or SQL, never shown as text
   const store: StoreSwitch = { group: g.members.map((m) => ({ path: m.path, name: m.name, from: m.from })), token: g.token, drain: await drainOf(ws, g.members, to, g.bystanders) }
+  const carried = await carriedWork(ws, g.members, to)
+  if (carried.length) store.carried = carried
   let refused: SwitchRefusal | null = null
   const other = await otherWorkspaceOn(ws, g.store)
   if (other) refused = { why: 'otherWorkspace', workspace: other } // i18n-ignore: a code or SQL, never shown as text

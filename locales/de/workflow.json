@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "„Niemand reviewt die eigene Arbeit“ kann nicht aus sein, während ein Reviewer-Agent die Arbeit prüft.",
   "workflow.contradiction.subfolderTarget": "Dieses Projekt liegt in einem größeren Repository: Nenne den Branch, in den seine Arbeit gemergt wird.",
   "workflow.contradiction.upToDateNeedsSlots": "Slots werden nur aktualisiert, wenn jede Karte ihren eigenen Ordner hat.",
+  "workflow.earlierWork.message": "{read, select, yes {{n, plural, one {Seine frühere Linie, {lines}, enthält vielleicht Arbeit, die seinem Ziel fehlte:} other {Seine früheren Linien, {lines}, enthalten vielleicht Arbeit, die ihrem Ziel fehlte:}} Combwork lässt diese Arbeit dort und übernimmt sie nicht.} other {Combwork konnte die früheren Starts der Karte nicht lesen und kann daher nicht sagen, ob Arbeit von vorher auf einer eigenen Linie zurückgeblieben ist.}} Sieh nach, was der Ordner der Karte enthält (ihr Ziel enthält diese Arbeit vielleicht inzwischen), und hol herein, was du brauchst, oder lass sie. Sein Builder wird auf der Karte informiert.",
+  "workflow.earlierWork.title": "{read, select, yes {{card}: Seine frühere Arbeit liegt auf {line}} other {{card}: Seine frühere Arbeit konnte nicht gelesen werden}}",
   "workflow.forYou.decidedAfterMerge": "Zu {card} gab es nach dem Merge eine Entscheidung: Ist eine Nacharbeit nötig?",
   "workflow.forYou.focusedSkip": "Die gezielten Tests von {card} wurden bei ihrem Merge übersprungen: {tests}. Mit den übersprungenen Tests mergen?",
   "workflow.forYou.lineAsk": "{line} enthält noch die Arbeit von {card}, per Squash in {target} gemergt: Stimme zu, und Combwork bringt den Branch einmal auf den neuesten Stand, oder lehne ab und erledige es selbst, bevor {next} startet.",
@@ -368,6 +370,8 @@
   "workflow.refused.platform.targetGone.next": "Du oder der Assistant könnt sie mit ihrer Arbeit auf einen anderen Branch verschieben: Setze ihr „Wird gemergt in“ oder stelle „Arbeit wird gemergt in“ um.",
   "workflow.refused.platform.offLine.message": "Der Ordner von {card} ist nicht auf ihrem Branch {line}: {where, select, detached {sein HEAD ist bei {head} abgekoppelt} other {er ist auf {on}}}, also ist die Arbeit dort nicht das, was die Karte mergen würde.",
   "workflow.refused.platform.offLine.next": "{where, select, detached {Bring die Commits auf den Branch der Karte: git switch -c {line}, falls es ihn noch nicht gibt, sonst git switch {line} und die außerhalb gemachten Commits per git cherry-pick übernehmen. Dann reiche erneut ein.} other {Wechsle mit git switch {line} zurück und übernimm dort per git cherry-pick alle Commits der Karte, die auf {on} gemacht wurden. Dann reiche erneut ein.}}",
+  "workflow.refused.platform.slotLeft.message": "{unknown, select, yes {Combwork konnte nicht feststellen, ob Slot {slot} ({folder}) noch {card} gehört, daher wurde sie nicht eingereicht.} other {Slot {slot} ({folder}) gehört nicht mehr zu {card}: Combwork hat ihre Ausleihe dort beendet, die Arbeit in diesem Ordner kann jetzt also zu einer anderen Karte gehören.}}",
+  "workflow.refused.platform.slotLeft.next": "{unknown, select, yes {Versuche es gleich noch einmal.} other {Lege die Karte zurück und starte sie neu: Sie bekommt einen eigenen Slot, mit ihrer committeten Arbeit, falls der Slot für sie aufbewahrt wurde.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {Das Git-Repository des Projekts ist weg: Stelle es wieder her oder stelle das Projekt in seinem Tab „Versionsverwaltung“ auf „Keine“ um (ab der nächsten Karte).} other {Das Git-Repository des Projekts ist weg: Bitte den Benutzer, es wiederherzustellen oder das Projekt in seinem Tab „Versionsverwaltung“ auf „Keine“ umzustellen (ab der nächsten Karte).}}",
   "workflow.refused.queue.advancing.message": "{card} wird gerade in {target} gemergt: Die Karte kann nicht mehr aus der Merge-Warteschlange entfernt werden.",
   "workflow.refused.queue.advancing.next": "Warte, bis der Merge fertig ist. Wenn die Änderung nicht gewollt ist, mache sie in {target} rückgängig.",
@@ -662,5 +666,6 @@
   "workflow.slots.notRemovedKept": "{slot} wurde nicht entfernt: {why, select, changed {er hat sich geändert, seit die Liste angezeigt wurde (sein Ordner ist zurück, oder er wurde neu angelegt)} busy {etwas arbeitet gerade darin} other {Combwork hat ihn behalten}}.",
   "workflow.slots.keptForgottenFor": "Für {card} aufbewahrt, aber jj führt seinen Workspace nicht mehr",
   "workflow.slots.removeForgottenMessage": "Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin. {card} beginnt dann neu von seinem Ziel aus, in einem anderen Slot. Die hier committete Arbeit bleibt in jjs Speicher{commit, select, none {.} other {: ihr letzter Commit ist {commit}.}}",
-  "workflow.slots.state.forgotten": "Nicht in jj geführt"
+  "workflow.slots.state.forgotten": "Nicht in jj geführt",
+  "workflow.slots.removeForgottenFree": "jj führt den Workspace von {slot} nicht mehr. Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin."
 }

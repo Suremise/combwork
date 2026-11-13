@@ -1965,6 +1965,8 @@ export interface SlotView {
    * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
    */
   keptGone?: { generation: string; commit: string | null; forgotten?: true }
+  /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
+  forgotten?: { generation: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -4406,6 +4408,11 @@ export interface LaneCard {
    * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
    */
   elsewhere?: string
+  /**
+   * HI-3118: held elsewhere because it is given to another agent than the lane's builder (not merely listed by a newer
+   * lane): the lane has given it up, so it doesn't keep the lane from ending (allDone).
+   */
+  givenAway?: true
 }
 
 export interface LaneInfo {

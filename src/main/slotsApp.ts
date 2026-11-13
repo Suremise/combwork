@@ -992,7 +992,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const record = jj && (s.state === 'dirty' || s.state === 'gone') ? pool.keptRecord(s.name) : null
       const keptFor = record?.card ?? null
       const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}) }
+      // HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove….
+      const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
     })
   )
 }
@@ -1006,6 +1008,18 @@ export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, 
   const r = await pool.removeKeptGone(name, { card, generation }, forgotten)
   if (r.ok) return r
   log.info(`Slot ${userText(name)}, kept for #${card}, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
+  return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
+}
+
+/**
+ * A slot kept for no card whose workspace the user forgot, removed by the user (HI-3103, Slots and copies' Remove…): only
+ * the one the window showed (`generation`), checked again under the removal (SlotPool.removeForgotten).
+ */
+export async function removeForgottenSlot(ws: WorkspaceService, projectPath: string, name: string, generation: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const pool = await poolFor(ws, projectPath)
+  const r = await pool.removeForgotten(name, generation)
+  if (r.ok) return r
+  log.info(`Slot ${userText(name)}, its workspace forgotten, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
   return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
 }
 

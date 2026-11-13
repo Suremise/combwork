@@ -15,6 +15,8 @@ interface CombworkMessageValues {
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
   'workflow.contradiction.upToDateNeedsSlots': undefined
+  'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
+  'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
@@ -380,6 +382,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
   'workflow.refused.platform.offLine.next': { where: string; line: string | number; on: string | number }
+  'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }
+  'workflow.refused.platform.slotLeft.next': { unknown: string }
   'workflow.refused.platform.switching.message': { card: string | number }
   'workflow.refused.platform.switching.next': undefined
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
@@ -533,6 +537,7 @@ interface CombworkMessageValues {
   'workflow.slots.recoveredPutBack': { n: number }
   'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
+  'workflow.slots.removeForgottenFree': { slot: string | number }
   'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
   'workflow.slots.removeKept': undefined
   'workflow.slots.removeKeptMessage': { card: string | number; commit: string }

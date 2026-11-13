@@ -416,3 +416,74 @@ describe.skipIf(!jjExe)('a kept jj slot gone stale (HI-3095)', { timeout: REAL_J
     expect(w.h.jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${ws}@-`, '-T', 'description.first_line()').trim()).toBe('card 1 work')
   })
 })
+
+/** A slot kept for no card (put back with no work: ready), its workspace then forgotten by the user (HI-3103). */
+async function forgottenFree(w: World): Promise<{ name: string; folder: string; workspace: string; generation: string }> {
+  const lent = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+  if (!lent.ok) throw new Error(`not lent: ${JSON.stringify(lent)}`)
+  const row = w.store.slot(lent.slot.name)!
+  await w.pool.release(lent.lease.id, 'putBack')
+  await w.pool.refresh()
+  expect(w.store.slot(row.name)?.state).toBe('ready')
+  expect(w.pool.keptCard(row.name)).toBeNull()
+  w.h.jj(w.repo, 'workspace', 'forget', row.identity!.workspace)
+  await w.pool.refresh()
+  // Left ready: nothing looks at a ready slot again until a lend tries it.
+  expect(w.store.slot(row.name)?.state).toBe('ready')
+  expect(existsSync(row.folder)).toBe(true)
+  expect(await w.pool.forgottenFree(w.store.slot(row.name)!)).toBe(true)
+  return { name: row.name, folder: row.folder, workspace: row.identity!.workspace, generation: row.identity!.generation }
+}
+
+describe.skipIf(!jjExe)('a slot kept for no card whose workspace the user forgot (HI-3103)', { timeout: REAL_JJ_MS }, () => {
+  it.each([true, false])('Remove… trashes its folder whole, an edit in it too (colocated: %s)', async (colocated) => {
+    const { w, trashed } = forgetting(colocated)
+    const a = await forgottenFree(w)
+    writeFileSync(join(a.folder, 'edit.txt'), 'not committed\n')
+    // The window's view of another generation: refused, nothing removed.
+    expect(await w.pool.removeForgotten(a.name, 'another')).toEqual({ ok: false, why: 'changed' })
+    expect(await w.pool.removeForgotten(a.name, a.generation)).toEqual({ ok: true })
+    expect(w.store.slot(a.name)).toBeNull()
+    expect(trashed.map((t) => t.from)).toEqual([a.folder])
+    expect(readFileSync(join(trashed[0].to, 'edit.txt'), 'utf8')).toBe('not committed\n')
+  })
+
+  it.each([true, false])('changed between the confirmation and the removal: its folder gone, or jj listing it again: refused, nothing trashed (colocated: %s)', async (colocated) => {
+    const { w, at, trashed } = forgetting(colocated)
+    const a = await forgottenFree(w)
+    // Its name registered again elsewhere after the pool found it eligible: the port's proof refuses it.
+    at.proof = () => void w.h.jj(w.repo, 'workspace', 'add', '--name', a.workspace, join(tempDir('keptforgot-again-'), 'again'))
+    expect(await w.pool.removeForgotten(a.name, a.generation)).toMatchObject({ ok: false, why: 'kept', kept: { why: 'gitRefused', detail: JJ_REFUSED.listed } })
+    expect(trashed).toEqual([])
+    expect(existsSync(a.folder)).toBe(true)
+    // Its folder moved away since the window showed it (re-listing undone first): `changed`, nothing removed.
+    at.proof = null
+    w.h.jj(w.repo, 'workspace', 'forget', a.workspace)
+    renameSync(a.folder, `${a.folder}-moved-away`)
+    expect(await w.pool.removeForgotten(a.name, a.generation)).toEqual({ ok: false, why: 'changed' })
+    expect(trashed).toEqual([])
+    expect(existsSync(`${a.folder}-moved-away`)).toBe(true)
+  })
+
+  it.each([true, false])('a slot kept for a card since is not removed by this way (colocated: %s)', async (colocated) => {
+    const { w, trashed } = forgetting(colocated)
+    const a = await forgotten(w)
+    // Kept for card 1 (HI-3097's slot): the free slot's Remove… refuses it; Remove… for a kept slot is its way.
+    expect(await w.pool.removeForgotten(a.name, a.generation)).toEqual({ ok: false, why: 'changed' })
+    expect(trashed).toEqual([])
+    expect(w.pool.keptCard(a.name)).toBe(1)
+  })
+})
+
+describe.skipIf(!jjExe)('a slot kept for no card whose workspace the user forgot, its setup failed since (HI-3103)', { timeout: REAL_JJ_MS }, () => {
+  it.each([true, false])('the next lend fails it (not listed); Remove… still trashes it (colocated: %s)', async (colocated) => {
+    const { w, trashed } = forgetting(colocated)
+    const a = await forgottenFree(w)
+    // The next card's lend tries it: jj doesn't list it, so its setup fails and it is left `creating` with its error.
+    await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })
+    expect(w.store.slot(a.name)).toMatchObject({ state: 'creating', warmError: expect.any(String) })
+    expect(await w.pool.forgottenFree(w.store.slot(a.name)!)).toBe(true)
+    expect(await w.pool.removeForgotten(a.name, a.generation)).toEqual({ ok: true })
+    expect(trashed.map((t) => t.from)).toEqual([a.folder])
+  })
+})

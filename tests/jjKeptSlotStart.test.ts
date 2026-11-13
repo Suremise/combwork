@@ -20,7 +20,8 @@ if (!jjExe) console.warn(`jjKeptSlotStart.test.ts skipped: jj ${TESTED_JJ.versio
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => true }))
 // The lanes as the test records them (their cards, for the lane's first card still to do).
 const { lanes, pools } = vi.hoisted(() => ({ lanes: new Map<string, number[]>(), pools: { now: null as unknown } }))
-vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [...lanes].map(([id, cards]) => ({ id, state: 'active', cards })) }))
+// Their builder is always b1 here (HI-3117: a lane card's start takes the lane's slot only for that lane's builder).
+vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [...lanes].map(([id, cards]) => ({ id, state: 'active', cards })), laneRunsWith: (_ws: unknown, id: string, role: string, agent: string) => lanes.has(id) && role === 'builder' && agent === 'b1' }))
 vi.mock('../src/main/slotsApp', async (orig) => {
   const real = await orig<typeof import('../src/main/slotsApp')>()
   return { ...real, poolFor: async (...a: Parameters<typeof real.poolFor>) => (pools.now as Awaited<ReturnType<typeof real.poolFor>> | null) ?? real.poolFor(...a) }
@@ -149,6 +150,7 @@ describe.skipIf(!jjExe)('a card with a kept jj slot, started (HI-3032)', { timeo
     const t = await setup('lane-card')
     const n = await t.card('kept')
     const k = await t.putBack(n)
+    lanes.set('lane-3', [n])
     expect(await t.start(n, 'lane-3', true)).toMatchObject({ slot: k.name, lease: '' })
     expect(t.store.openLease(k.name)).toBeNull()
     expect(await t.start(n, 'lane-3')).toMatchObject({ slot: k.name })

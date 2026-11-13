@@ -179,4 +179,6 @@ export interface StoreSwitch {
   fallback?: FallbackProblem[]
   /** HI-3104: to a platform whose folders check out a branch, each member whose folder is on none now (head detached). */
   detached?: { project: string; head: string }[]
+  /** HI-3107: cards not in flight whose earlier lines (another version control's branches) hold work their target may lack. */
+  carried?: { project: string; card: number | null; line: string | null; state: 'ahead' | 'unknown' }[]
 }

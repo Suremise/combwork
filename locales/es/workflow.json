@@ -11,6 +11,8 @@
   "workflow.contradiction.selfReview": "“Nadie revisa su propio trabajo” no puede estar desactivado mientras un agente revisor comprueba el trabajo.",
   "workflow.contradiction.subfolderTarget": "Este proyecto está dentro de un repositorio más grande: indica la rama en la que se fusiona su trabajo.",
   "workflow.contradiction.upToDateNeedsSlots": "Los slots solo se actualizan cuando cada tarjeta tiene su propia carpeta.",
+  "workflow.earlierWork.message": "{read, select, yes {{n, plural, one {Su línea anterior, {lines}, puede tener trabajo que le faltaba a su destino:} many {Sus líneas anteriores, {lines}, pueden tener trabajo que le faltaba a su destino:} other {Sus líneas anteriores, {lines}, pueden tener trabajo que le faltaba a su destino:}} Combwork deja ese trabajo allí y no lo trae.} other {Combwork no pudo leer los inicios anteriores de la tarjeta, así que no puede saber si quedó trabajo de antes en una línea propia.}} Revisa qué tiene la carpeta de la tarjeta (puede que su destino ya tenga ese trabajo) e incorpora lo que necesites, o déjalo. Su builder recibe el aviso en la tarjeta.",
+  "workflow.earlierWork.title": "{read, select, yes {{card}: su trabajo anterior está en {line}} other {{card}: no se pudo leer su trabajo anterior}}",
   "workflow.forYou.decidedAfterMerge": "La tarjeta {card} recibió una decisión después de fusionarse: ¿necesita un seguimiento?",
   "workflow.forYou.focusedSkip": "Las pruebas específicas de {card} se omitieron al fusionarla: {tests}. ¿Fusionarla con ellas omitidas?",
   "workflow.forYou.lineAsk": "{line} todavía tiene el trabajo de {card}, fusionado con squash en {target}: aprueba y Combwork actualiza la rama una vez, o rechaza y hazlo tú antes de que empiece {next}.",
@@ -368,6 +370,8 @@
   "workflow.refused.platform.targetGone.next": "Tú o el Assistant podéis moverla a otra rama con su trabajo: cambia su «Se fusiona en» o redirige El trabajo se fusiona en.",
   "workflow.refused.platform.offLine.message": "La carpeta de {card} no está en su rama {line}: {where, select, detached {su HEAD está separado en {head}} other {está en {on}}}, así que el trabajo allí no es lo que la tarjeta fusionaría.",
   "workflow.refused.platform.offLine.next": "{where, select, detached {Pon los commits en la rama de la tarjeta: git switch -c {line} si aún no existe; si no, git switch {line} y git cherry-pick de los commits hechos fuera de ella. Luego envíala de nuevo.} other {Vuelve con git switch {line} y haz allí git cherry-pick de los commits de la tarjeta hechos en {on}. Luego envíala de nuevo.}}",
+  "workflow.refused.platform.slotLeft.message": "{unknown, select, yes {Combwork no pudo saber si el slot {slot} ({folder}) sigue siendo de {card}, así que no se envió.} other {El slot {slot} ({folder}) ya no es de {card}: Combwork terminó su préstamo allí, así que el trabajo de esa carpeta puede ser ahora de otra tarjeta.}}",
+  "workflow.refused.platform.slotLeft.next": "{unknown, select, yes {Inténtalo de nuevo en un momento.} other {Devuelve la tarjeta y vuelve a empezarla: tendrá un slot propio, con su trabajo confirmado si el slot se reservó para ella.}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {El repositorio Git del proyecto ya no está: restáuralo o cambia el proyecto a Ninguno en su pestaña Control de versiones (a partir de la próxima tarjeta).} other {El repositorio Git del proyecto ya no está: pide al usuario que lo restaure o que cambie el proyecto a Ninguno en su pestaña Control de versiones (a partir de la próxima tarjeta).}}",
   "workflow.refused.queue.advancing.message": "La tarjeta {card} se está fusionando ahora en {target}: ya no se puede quitar de la cola de fusión.",
   "workflow.refused.queue.advancing.next": "Espera a que termine la fusión. Si el cambio no se quiere, reviértelo en {target}.",
@@ -662,5 +666,6 @@
   "workflow.slots.notRemovedKept": "{slot} no se quitó: {why, select, changed {cambió después de mostrarse la lista (su carpeta volvió, o se creó de nuevo)} busy {algo trabaja en él ahora} other {Combwork lo conservó}}.",
   "workflow.slots.keptForgottenFor": "Reservado para {card}, pero jj ya no lista su workspace",
   "workflow.slots.removeForgottenMessage": "Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga. {card} empieza entonces de nuevo desde su destino, en otro slot. El trabajo que confirmó aquí se queda en el almacén de jj{commit, select, none {.} other {: su último commit es {commit}.}}",
-  "workflow.slots.state.forgotten": "jj no lo lista"
+  "workflow.slots.state.forgotten": "jj no lo lista",
+  "workflow.slots.removeForgottenFree": "jj ya no lista el workspace de {slot}. Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga."
 }

@@ -15,7 +15,7 @@ import type { FileChange } from '../../shared/workflow/facts'
 import { gitlinkOf, parseRawRows, sideOf, type GitlinkSide } from '../../shared/gitlink'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
-import type { CommitInfo, WorktreeNow } from './history'
+import type { CommitInfo, SubmoduleChange, SubmoduleState, WorktreeNow } from './history'
 
 // A commit as attribution reads it, and a worktree as worktreeNow reads it: port 3's types (history.ts, HI-2787).
 export type { CommitInfo, WorktreeNow } from './history'
@@ -390,6 +390,20 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
  */
 export const insideOnly = (xy: string | undefined, sub: string | undefined): boolean => !!xy && !!sub && xy[0] === '.' && sub.length === 4 && sub[0] === 'S' && sub[1] === '.' && (sub[2] === 'M' || sub[3] === 'U')
 
+/** HI-3124: how a submodule's porcelain v2 row says it changed (its `XY` and `S<c><m><u>`): see SubmoduleState. */
+export function submoduleState(xy: string | undefined, sub: string | undefined): SubmoduleState {
+  const [x, y] = [xy?.[0], xy?.[1]]
+  if (x === 'A') return 'added'
+  if (x === 'D') return 'removed'
+  if (x === 'M') return 'staged'
+  if (x === '.' && y === 'D') return 'deleted'
+  if (x === '.' && sub?.[1] === 'C') return 'moved'
+  return 'other'
+}
+
+/** A submodule row's HEAD object (`hH`): null when HEAD has none (an added one: all zeros). */
+const recordedOf = (h: string | undefined): string | null => (h && /^[0-9a-f]{40,64}$/.test(h) && !/^0+$/.test(h) ? h : null)
+
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
 
@@ -417,7 +431,7 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   let oid: string | null = null
   const files: string[] = []
   const inside: string[] = []
-  const subs: string[] = []
+  const subs: SubmoduleChange[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i]
@@ -429,12 +443,14 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
       const path = f.slice(8).join(' ')
       files.push(path)
       if (insideOnly(f[1], f[2])) inside.push(path)
-      if (f[2]?.[0] === 'S') subs.push(path)
+      // `1 XY sub mH mI mW hH hI path`
+      if (f[2]?.[0] === 'S') subs.push({ path, state: submoduleState(f[1], f[2]), recorded: recordedOf(f[6]) })
     } else if (p.startsWith('2 ')) {
       const f = p.split(' ')
       const path = f.slice(9).join(' ')
       files.push(path)
-      if (f[2]?.[0] === 'S') subs.push(path)
+      // A rename (`2 XY sub mH mI mW hH hI Xscore path`): said as other.
+      if (f[2]?.[0] === 'S') subs.push({ path, state: 'other', recorded: recordedOf(f[6]) })
       i++ // the original path
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
     else if (p.startsWith('? ')) files.push(p.slice(2))
