@@ -4,8 +4,9 @@
 // it depends on), nothing changed; a card dropped from the board onto the lane; a Done card dropped from the board
 // refused; Add Card… taking a card given to another agent off that agent; a card on another lane refused with Move Here,
 // which moves it in one change, and the notification's Undo putting both lanes and its agent back; × taking a card off
-// and Ctrl+Z putting it back; Cancel Change; and Ended today listing a lane that ended, opening to its cards read only.
-// Screenshots of the editable queue with a refusal, and of Ended today, in both themes. Dev build, throwaway profile,
+// and Ctrl+Z putting it back; Cancel Change; and Ended today listing a lane that ended, opening to its cards read only,
+// and a long one scrolling to its last lane with compact rows at the panel's narrowest and widest (HI-3178).
+// Screenshots of the editable queue with a refusal, and of Ended today, in both themes (the long one dark, both widths). Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -99,7 +100,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('the panel opens', !!(await until(async () => (await panel.count()) === 1, HUNG_MS)))
   await panel.locator('.progress-tab[data-tab="lanes"]').click()
   const tab = panel.locator('.progress-tab-lanes')
-  const lane = (id) => tab.locator(`.progress-lanes-list .progress-lane[data-lane="${id}"]`)
+  const lane = (id) => tab.locator(`.progress-lanes-list > .progress-lane[data-lane="${id}"]`)
   const row = (id, n) => lane(id).locator(`.progress-lane-queue-row[data-card="${n}"]`)
   const rows = (id) => lane(id).locator('.progress-lane-queue-row').evaluateAll((els) => els.map((e) => Number(e.dataset.card)))
   await until(async () => (await lane(la).count()) === 1, HUNG_MS)
@@ -182,7 +183,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
 
   // --- Alt+Up and Alt+Down inside the opened cards (HI-2970): from a waiting card's link or × they move that card, and
   // from anything else there (the locked card's link, Add Card…) nothing; never the lane among the running lanes.
-  const laneOrder = () => tab.locator('.progress-lanes-list .progress-lane').evaluateAll((els) => els.map((e) => e.dataset.lane))
+  const laneOrder = () => tab.locator('.progress-lanes-list > .progress-lane').evaluateAll((els) => els.map((e) => e.dataset.lane))
   const order0 = (await laneOrder()).join()
   check('both lanes are listed', order0.split(',').includes(la) && order0.split(',').includes(lb), order0)
   await row(la, a2).locator('.progress-lane-queue-key').focus()
@@ -318,6 +319,55 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.screenshot({ path: path.join(shots, `ended-today-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
+
+  // --- A long Ended today (HI-3178): more ended lanes than the panel holds scroll with the list, to the last one, at the
+  // panel's narrowest and widest; each row's facts stay on one line (beside the name where they fit, else under it).
+  for (let i = 1; i <= 14; i++) {
+    const n = await make(`Ended lane card ${i}`, 'todo', b3.id)
+    const r = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B3', reviewer: 'R1', cards: [n], name: `1.5.0: an ended lane with a longer name ${i}` })
+    const gone = r.status === 200 && (await api('POST', `/v1/lanes/${r.body.lane.id}/end`, { abandoned: true })).status === 200
+    if (!gone) check(`ended lane ${i} is started and ended`, false, JSON.stringify(r))
+  }
+  check('Ended today lists 15 lanes, open', !!(await until(async () => /Ended today \(15\)/.test(await ended.locator('.progress-lanes-ended-bar').innerText()) && (await ended.locator('.progress-lane-ended').count()) === 15, HUNG_MS)), await ended.locator('.progress-lanes-ended-bar').innerText().catch(() => ''))
+  await lib.fitWindow(app, page, { width: 1500, height: 600 })
+  const resizer = panel.locator(':scope > .pane-resizer')
+  const panelAt = async (want) => {
+    const edge = await resizer.boundingBox()
+    const now = (await panel.boundingBox()).width
+    await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(edge.x + edge.width / 2 + (now - want), edge.y + edge.height / 2, { steps: 5 })
+    await page.mouse.up()
+    return !!(await until(async () => Math.abs((await panel.boundingBox()).width - want) <= 2, HUNG_MS))
+  }
+  const endedList = tab.locator('.progress-lanes-list')
+  const reach = () =>
+    endedList.evaluate((el, oldest) => {
+      el.scrollTop = el.scrollHeight
+      const frame = el.getBoundingClientRect()
+      const endRow = el.querySelector(`.progress-lane-ended[data-lane="${oldest}"]`)?.getBoundingClientRect()
+      return { scrolls: el.scrollHeight > el.clientHeight + 1, lastBottom: endRow ? Math.round(frame.bottom - endRow.bottom) : null }
+    }, lc)
+  const compact = () =>
+    ended.locator('.progress-lane-ended > .progress-lane-top').evaluateAll((tops) =>
+      tops.map((t) => {
+        const pair = t.querySelector('.progress-lane-pair').getBoundingClientRect()
+        const facts = t.querySelector('.progress-lane-ended-facts').getBoundingClientRect()
+        return { line: Math.round(pair.height), facts: Math.round(facts.height), top: Math.round(t.getBoundingClientRect().height), oneLine: Math.abs(facts.top - pair.top) < pair.height / 2 }
+      })
+    )
+  for (const [width, label] of [[220, 'narrowest'], [640, 'widest']]) {
+    check(`the panel at its ${label} (${width}px)`, await panelAt(width), String((await panel.boundingBox()).width))
+    check(`…the list scrolls to the last ended lane (${label})`, !!(await until(async () => {
+      const r = await reach()
+      return r.scrolls && r.lastBottom !== null && r.lastBottom >= -1
+    }, HUNG_MS)), JSON.stringify(await reach()))
+    const tops = await compact()
+    check(`…each row's facts on one line, the row at most two (${label})`, tops.length === 15 && tops.every((r) => r.facts <= r.line * 1.5 && r.top <= r.line * 2 + 8), JSON.stringify(tops.slice(0, 3)))
+    if (label === 'widest') check('…and at the widest, each row is one line', tops.every((r) => r.oneLine), JSON.stringify(tops.slice(0, 3)))
+    await painted()
+    await page.screenshot({ path: path.join(shots, `ended-today-long-${label}.png`) })
+  }
 
   await app.close().catch(() => undefined)
   console.log(failed ? `\n${failed} FAILED` : '\nAll passed')

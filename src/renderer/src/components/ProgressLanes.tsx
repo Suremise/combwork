@@ -354,10 +354,12 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
       <span id={legendId} className="visually-hidden">
         {legendText(legend)}
       </span>
-      {full && <EndedToday lanes={endedToday} badges={badges} />}
       {!folded && (
-        // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
+        // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit. In the
+        // Lanes tab, Ended today is the list's first part, so it scrolls with the lanes (HI-3178: outside, a long one ran
+        // past the panel's bottom, out of reach).
         <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
+          {full && <EndedToday lanes={endedToday} badges={badges} />}
           {lanes.map((l) => (
             <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} {...(full ? { expanded: expanded.has(l.id), onExpand: () => expand(l.id), all } : {})} />
           ))}
@@ -1311,7 +1313,8 @@ function RefusalLine({ refusal: r, onMoveHere, onDismiss }: { refusal: Refusal; 
 
 const ENDED = {
   title: msg({ id: 'board.lanes.endedToday', defaultMessage: 'Ended today ({n, number})', description: "HI-2898: a collapsed row at the top of Progress → Lanes: the lanes (a builder and a reviewer working through cards in turn) that ended today, local time ({n}: how many); it opens to them." }),
-  took: msg({ id: 'board.lanes.endedTook', defaultMessage: '{time} in all', description: "HI-2898: how long a lane that ended today ran, from its start to its end, in Ended today (Progress → Lanes). {time}: 4 min, 1 h 5 min." }),
+  ran: msg({ id: 'board.lanes.endedRan', defaultMessage: 'ran {time}', description: "HI-3178: how long a lane that ended today ran, from its start to its end (waits and pauses included), in Ended today (Progress → Lanes). Keep it short. {time}: 4 min, 1 h 5 min." }),
+  ranTip: msg({ id: 'board.lanes.endedRanTip', defaultMessage: 'Started {start}, ended {end}: {time} from its start to its end, waits and pauses included. A lane given new cards keeps its start.', description: "HI-3178: tooltip of how long a lane that ended today ran, in Ended today (Progress → Lanes). {start}, {end}: a date and time; {time}: 4 min, 1 h 5 min." }),
   cards: msg({ id: 'board.lanes.endedCards', defaultMessage: '{n, plural, one {# card} other {# cards}}', description: "HI-2898: how many cards a lane that ended today had, in Ended today (Progress → Lanes)." })
 }
 
@@ -1384,16 +1387,28 @@ function EndedToday({ lanes, badges }: { lanes: Lane[]; badges: Map<number, Work
                   onClick={() => toggle(l.id)}
                 />
                 <span className="progress-lane-pair">{pair}</span>
-                {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
-                <div className="grow" />
-                {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
-                <span className="faint">{tr(ENDED.cards, { n: l.cards.length })}</span>
-                {took !== null && took >= 0 && <span className="faint progress-lane-ended-took">{tr(ENDED.took, { time: durationText(took, tr) })}</span>}
-                {l.mergeCommit && (
-                  <button type="button" className="link progress-lane-queue-commit" title={tr(COPY_MERGE, { commit: l.mergeCommit })} onClick={() => copyCommit(l.mergeCommit!)}>
-                    {l.mergeCommit.slice(0, 7)}
-                  </button>
+                {l.name ? (
+                  <span className="progress-lane-name faint" title={l.name}>
+                    · {l.name}
+                  </span>
+                ) : (
+                  <span className="progress-lane-name" />
                 )}
+                {/* Its facts kept together, each whole (HI-3178): beside the name where they fit, else on a line of their own. */}
+                <span className="progress-lane-ended-facts">
+                  {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+                  <span className="faint">{tr(ENDED.cards, { n: l.cards.length })}</span>
+                  {took !== null && took >= 0 && (
+                    <span className="faint progress-lane-ended-took" title={tr(ENDED.ranTip, { start: formatDateTime(l.startedAt), end: formatDateTime(l.endedAt!), time: durationText(took, tr) })}>
+                      {tr(ENDED.ran, { time: durationText(took, tr) })}
+                    </span>
+                  )}
+                  {l.mergeCommit && (
+                    <button type="button" className="link progress-lane-queue-commit" title={tr(COPY_MERGE, { commit: l.mergeCommit })} onClick={() => copyCommit(l.mergeCommit!)}>
+                      {l.mergeCommit.slice(0, 7)}
+                    </button>
+                  )}
+                </span>
               </div>
               {shown.has(l.id) && <LaneQueue lane={l} badges={badges} />}
             </div>

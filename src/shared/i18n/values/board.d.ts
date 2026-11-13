@@ -532,8 +532,9 @@ interface CombworkMessageValues {
   'board.lanes.end': undefined
   'board.lanes.endFailed': { lane: string | number }
   'board.lanes.endedCards': { n: number }
+  'board.lanes.endedRan': { time: string | number }
+  'board.lanes.endedRanTip': { start: string | number; end: string | number; time: string | number }
   'board.lanes.endedToday': { n: number }
-  'board.lanes.endedTook': { time: string | number }
   'board.lanes.expand': { open: string; lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.freshBlocked': { agent: string | number; why: string; reason: string | number }

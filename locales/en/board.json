@@ -2123,13 +2123,17 @@
     "defaultMessage": "{n, plural, one {# card} other {# cards}}",
     "description": "HI-2898: how many cards a lane that ended today had, in Ended today (Progress → Lanes)."
   },
+  "board.lanes.endedRan": {
+    "defaultMessage": "ran {time}",
+    "description": "HI-3178: how long a lane that ended today ran, from its start to its end (waits and pauses included), in Ended today (Progress → Lanes). Keep it short. {time}: 4 min, 1 h 5 min."
+  },
+  "board.lanes.endedRanTip": {
+    "defaultMessage": "Started {start}, ended {end}: {time} from its start to its end, waits and pauses included. A lane given new cards keeps its start.",
+    "description": "HI-3178: tooltip of how long a lane that ended today ran, in Ended today (Progress → Lanes). {start}, {end}: a date and time; {time}: 4 min, 1 h 5 min."
+  },
   "board.lanes.endedToday": {
     "defaultMessage": "Ended today ({n, number})",
     "description": "HI-2898: a collapsed row at the top of Progress → Lanes: the lanes (a builder and a reviewer working through cards in turn) that ended today, local time ({n}: how many); it opens to them."
-  },
-  "board.lanes.endedTook": {
-    "defaultMessage": "{time} in all",
-    "description": "HI-2898: how long a lane that ended today ran, from its start to its end, in Ended today (Progress → Lanes). {time}: 4 min, 1 h 5 min."
   },
   "board.lanes.expand": {
     "defaultMessage": "{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}",

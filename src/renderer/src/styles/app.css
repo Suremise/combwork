@@ -13508,9 +13508,17 @@ button.progress-run-show:focus-visible {
 .progress-lane.card-over {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
-/* Ended today, collapsed at the top of the Lanes tab. */
+/* Ended today, collapsed at the top of the Lanes tab: the list's first part, scrolled with the lanes (HI-3178), never
+   squeezed by them; the lanes below it still stack from the bottom. */
 .progress-lanes-ended {
+  flex-shrink: 0;
   margin: 0 8px 6px;
+}
+.progress-lanes.full .progress-lanes-list > .progress-lanes-ended:first-child {
+  margin-top: 0;
+}
+.progress-lanes.full .progress-lanes-list > .progress-lanes-ended + * {
+  margin-top: auto;
 }
 .progress-lanes-ended-bar {
   display: flex;
@@ -13530,8 +13538,22 @@ button.progress-run-show:focus-visible {
 .progress-lanes-ended .progress-lane {
   margin: 0 0 6px;
 }
+/* A row on one line where it fits (HI-3178); in a narrow panel its facts go whole to a second line, right-aligned,
+   rather than each wrapping down the row. The name takes what is left and gives way first. */
 .progress-lane-ended .progress-lane-top {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.progress-lane-ended .progress-lane-name {
+  flex: 1 1 5em;
+}
+.progress-lane-ended-facts {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
   gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 .progress-lane-ended-took {
   font-variant-numeric: tabular-nums;
