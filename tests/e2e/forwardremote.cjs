@@ -96,12 +96,12 @@ const isIn = (repo, commit, ref) => {
     const reviewer = await q.agent(fx, h, 'R1')
     const builder = await q.agent(fx, h, 'B1')
     /** Someone else's commit of `file` on origin's `branch`, from their clone: its id. */
-    const pushOther = (branch, file, text, message) => {
+    const pushOther = (branch, file, text, message, as = []) => {
       lib.git(other, ['fetch', '-q', 'origin'])
       lib.git(other, ['checkout', '-q', '-B', branch, `origin/${branch}`])
       fs.writeFileSync(path.join(other, file), text)
       lib.git(other, ['add', '-A'])
-      lib.git(other, ['commit', '-qm', message])
+      lib.git(other, [...as, 'commit', '-qm', message])
       lib.git(other, ['push', '-q', 'origin', branch])
       return git(other, 'rev-parse', 'HEAD')
     }
@@ -136,7 +136,9 @@ const isIn = (repo, commit, ref) => {
 
     // --- HI-3127 (C): a forward's resolution. A 1.4.0 fix and a remote-only 1.5.0 commit change fwd.txt both: the
     // forward comes back; Resolve on a builder makes a card, started in a real slot from the remote's 1.5.0.
-    pushOther('1.4.0', 'fwd.txt', 'release\n', 'Fix on the release')
+    // The release's fix with the project's identity, as the release's own queue merges it (a source commit of someone
+    // else's is counted as the resolution's own by the identity check: HI-2959's, carded separately).
+    pushOther('1.4.0', 'fwd.txt', 'release\n', 'Fix on the release', ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`])
     const next = pushOther('1.5.0', 'fwd.txt', 'next\n', 'Next version, remote only')
     const fwdC = await h.inv('queue:forward', fx.alpha, '1.4.0', '1.5.0')
     check('C: the forward is queued', fwdC?.queued === true, JSON.stringify(fwdC))
