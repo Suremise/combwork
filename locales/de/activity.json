@@ -47,7 +47,7 @@
   "activity.map.partial": "Aus den zuletzt gelesenen Aufrufen: nicht der ganze Verlauf.",
   "activity.map.pct": "{pct, number} %",
   "activity.map.prompt": "Prompt",
-  "activity.map.ringTip": "{name}: {load, select, notLoaded {jenseits der acht Agenten, die die Karte liest, daher sind seine Aufrufe nicht zu sehen} loading {seine Aufrufe werden gelesen} other {{known, select, no {Kontext unbekannt} other {Kontext {pct, number} %}}}}. Klicken, um nur diesen Agenten zu zeigen.",
+  "activity.map.ringTipShown": "{name}: {load, select, notLoaded {jenseits der acht Agenten, die die Karte liest, daher sind seine Aufrufe nicht zu sehen} loading {seine Aufrufe werden gelesen} other {{known, select, no {Kontext unbekannt} other {Kontext {pct, number} %}}}}. {shown, select, yes {Auf der Karte gezeigt: klicken, um wieder alle Agenten zu zeigen (oder Esc drücken).} other {Klicken, um seine Karte zu zeigen; die anderen bleiben hier aufgelistet.}}",
   "activity.map.show": "Zeigen",
   "activity.map.state": "{state, select, working {Arbeitet} waiting {Wartet auf dich} failed {Fehlgeschlagen oder festgefahren} done {Fertig} other {Untätig}}",
   "activity.map.station": "{station, select, you {Du} read {Lesen} edit {Ändern} shell {Shell} agents {Agenten} other {Tools}}",

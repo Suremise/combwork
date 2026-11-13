@@ -47,7 +47,7 @@
   "activity.map.partial": "From the latest calls read: not the whole history.",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "Prompt",
-  "activity.map.ringTip": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. Click to show only this agent.",
+  "activity.map.ringTipShown": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. {shown, select, yes {Shown on the map: click to show every agent again (or press Escape).} other {Click to show its map; the others stay listed here.}}",
   "activity.map.show": "Show",
   "activity.map.state": "{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}",
   "activity.map.station": "{station, select, you {You} read {Read} edit {Edit} shell {Shell} agents {Agents} other {Tools}}",

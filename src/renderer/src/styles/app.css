@@ -8660,6 +8660,12 @@ button.agent-place:hover {
 .activity-map-ring:hover {
   background: var(--bg-hover);
 }
+/* The agent the map shows alone (HI-3180): marked in the strip, which still lists the selection. */
+.activity-map-ring.picked {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-weight: 600;
+}
 .activity-map-ring-mark path {
   fill: none;
   stroke-width: 3;
