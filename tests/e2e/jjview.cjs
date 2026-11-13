@@ -412,8 +412,9 @@ function jjRepo(dir, o = {}) {
     check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), HUNG_MS)) && fs.existsSync(path.join(shop, '.jj')))
 
     // --- HI-2974: shop's repository has been switched, so its switch to None waits for its work: refused while a card is
-    // in flight (the drain listed, Check Again), then the usual warning (cancelled here: shop goes on as Git below).
-    const card2 = await inv('tasks:create', { title: 'Still running', project: 'shop' })
+    // in flight (the drain listed, Check Again), then the usual warning (cancelled here: shop goes on as Git below). No-code,
+    // as the first: Git's head is still detached (HI-3166).
+    const card2 = await inv('tasks:create', { title: 'Still running', project: 'shop', kind: 'no-code' })
     await inv('tasks:move', card2.number, 'doing', { confirm: true, reason: 'jjview: a card in flight' })
     await head.locator('[data-platform="none"]').click()
     const memberDrained = dialog.filter({ has: page.locator('[data-vc-store-drain]') })
