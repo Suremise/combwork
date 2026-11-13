@@ -4,7 +4,7 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { spawn } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
@@ -1464,7 +1464,7 @@ describe('a submodule changed only inside it', () => {
       expect(now.submodules).toEqual([{ path: 'sub', state: staged ? 'staged' : 'moved', recorded: sh(proj, 'rev-parse', 'HEAD:sub') }])
       const before = [head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]
       // HI-3124: each said as it is.
-      const said = staged ? /^sub is a submodule whose new commit is staged, which Git can't set aside\. Commit it instead, or unstage it \(git restore --staged sub\)/ : /^sub is a submodule now at another commit, which Git can't set aside\. Commit it instead/
+      const said = staged ? /^sub is a submodule whose new commit is staged, which Git can't set aside\. Commit it instead, or unstage it \(git restore --staged -- sub\)/ : /^sub is a submodule now at another commit, which Git can't set aside\. Commit it instead/
       for (const shown of [['sub', 'a.txt'], ['sub']]) await expect(settle('setAside', shown)).rejects.toThrow(said)
       expect([head(), status(), sh(proj, 'stash', 'list'), sh(join(proj, 'sub'), 'rev-parse', 'HEAD')]).toEqual(before)
       // An ordinary edit alone is still set aside, the submodule left as it was.
@@ -1488,7 +1488,7 @@ describe('a submodule changed only inside it', () => {
     sh(join(proj, 'sub'), 'checkout', '-q', recorded)
     expect(status()).toBe('MM sub')
     const before = [head(), status(), sh(proj, 'stash', 'list')]
-    for (const action of ['commit', 'setAside'] as const) await expect(settle(action, ['sub'])).rejects.toThrow(/^sub is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside\. Unstage it with git restore --staged sub\.$/)
+    for (const action of ['commit', 'setAside'] as const) await expect(settle(action, ['sub'])).rejects.toThrow(/^sub is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside\. Unstage it with git restore --staged -- sub\.$/)
     expect([head(), status(), sh(proj, 'stash', 'list')]).toEqual(before)
     sh(proj, 'restore', '--staged', 'sub')
     expect(status()).toBe('')
@@ -1525,7 +1525,7 @@ describe('a submodule changed only inside it', () => {
       sh(proj, 'add', 'sub')
     }, /^sub is a submodule added here, which Git can't set aside\. Commit it instead\.$/, null],
     ['removed (git rm)', 'removed', () => void sh(proj, 'rm', '-q', 'sub'), /^sub is a submodule removed from Git here, which Git can't set aside\. Commit the removal instead\.$/, null],
-    ['deleted by hand', 'deleted', () => rmSync(join(proj, 'sub'), { recursive: true, force: true }), /^sub is a submodule whose folder was deleted, which Git can't set aside\. Commit its removal instead, or bring it back with git submodule update sub\.$/, () => void sh(proj, 'submodule', 'update', '-q', 'sub')]
+    ['deleted by hand', 'deleted', () => rmSync(join(proj, 'sub'), { recursive: true, force: true }), /^sub is a submodule whose folder was deleted, which Git can't set aside\. Commit its removal instead, or bring it back with git submodule update -- sub\.$/, () => void sh(proj, 'submodule', 'update', '-q', 'sub')]
   ] as const)
     it(`${name}: Set Aside refused saying so, nothing done${clear ? '; its remedy clears it' : ''}; Commit takes it`, async () => {
       make()
@@ -1543,6 +1543,75 @@ describe('a submodule changed only inside it', () => {
       await settle('commit', ['sub'])
       expect(committed()).toEqual(['sub'])
       expect(status()).not.toMatch(/ sub$/m)
+    })
+})
+
+// HR3's round 1 on HI-3124: the remedies' commands take the submodule's path as one argument, after --, whatever it is.
+describe('a submodule remedy\'s command', () => {
+  it('quotes the path only when it needs it, as one argument in PowerShell, cmd and Git Bash', () => {
+    expect(changes.commandPath('sub')).toBe('sub')
+    expect(changes.commandPath('libs/sub-1.2_x')).toBe('libs/sub-1.2_x')
+    expect(changes.commandPath('-lead')).toBe('-lead')
+    expect(changes.commandPath('libs/my sub')).toBe('"libs/my sub"')
+    expect(changes.commandPath('a$b sub')).toBe("'a$b sub'")
+    expect(changes.commandPath("it's $x")).toBe("'it''s $x'")
+  })
+
+  /** A submodule at `path` (one added beside sub), committed. */
+  const addSub = (path: string): void => {
+    const src = join(base, `sub-src${n}-${path.replace(/[^a-z]/gi, '')}`)
+    mkdirSync(src, { recursive: true })
+    gitRepo(src)
+    commit(src, { 's.txt': 's\n' }, 'sub')
+    // git's submodule add takes no path starting with `-` (even after --): added under another name, then moved there.
+    const at = path.startsWith('-') ? `x${path}` : path
+    sh(proj, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', '--', src.replace(/\\/g, '/'), at)
+    if (at !== path) sh(proj, 'mv', '--', at, path)
+    sh(proj, 'commit', '-q', '-m', `add ${path}`)
+  }
+  /** The command a refusal names, run as the user would, in Git Bash: what it leaves. */
+  const runIn = (cmd: string): void => {
+    const bin = msysBinFor({ env: process.env })
+    expect(bin).not.toBeNull()
+    execFileSync(join(bin!, 'sh.exe'), ['-c', cmd], { cwd: proj, env: baseEnv(), stdio: 'pipe' })
+  }
+
+  for (const path of ['libs/my sub', '-lead sub'])
+    it(`at ${JSON.stringify(path)}: each remedy's command, run as said, clears what it names`, async () => {
+      addSub(path)
+      const inside = join(proj, path)
+      const recorded = head(inside)
+      // Staged back at its recorded commit: refused by both, and the command said clears it.
+      writeFileSync(join(inside, 's.txt'), 'new submodule commit\n')
+      sh(inside, 'commit', '-q', '-am', 'inside')
+      sh(proj, 'add', '--', path)
+      sh(inside, 'checkout', '-q', recorded)
+      const back = await settle('commit', [path]).catch((e: Error) => e.message)
+      const unstage = /Unstage it with (git restore --staged -- .+)\.$/.exec(String(back))?.[1]
+      expect(unstage).toBe(`git restore --staged -- ${changes.commandPath(path)}`)
+      runIn(unstage!)
+      expect(status()).toBe('')
+      // Staged: Set Aside's command, then the recorded commit checked out inside.
+      sh(inside, 'checkout', '-q', '-')
+      sh(proj, 'add', '--', path)
+      const staged = await settle('setAside', [path]).catch((e: Error) => e.message)
+      const unstage2 = /\((git restore --staged -- .+)\) and check out/.exec(String(staged))?.[1]
+      expect(unstage2).toBe(unstage)
+      runIn(unstage2!)
+      sh(inside, 'checkout', '-q', recorded)
+      expect(status()).toBe('')
+      // Its folder deleted: Set Aside's command brings it back.
+      rmSync(inside, { recursive: true, force: true })
+      const deleted = await settle('setAside', [path]).catch((e: Error) => e.message)
+      const update = /bring it back with (git submodule update -- .+)\.$/.exec(String(deleted))?.[1]
+      expect(update).toBe(`git submodule update -- ${changes.commandPath(path)}`)
+      // git's submodule commands ignore a submodule whose path could be read as an option ("warning: ignoring
+      // 'submodule.….path' which may be interpreted as a command-line option", CVE-2018-17456), whatever the quoting:
+      // there, the command said is one argument after -- all the same, and nothing of git's brings it back.
+      if (path.startsWith('-')) return
+      runIn(update!)
+      expect(status()).toBe('')
+      expect(head(inside)).toBe(recorded)
     })
 })
 

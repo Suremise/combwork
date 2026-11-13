@@ -397,7 +397,8 @@
   },
   "service.folderChanges.submoduleDeleted": {
     "placeholders": {
-      "folder": "plain"
+      "folder": "plain",
+      "path": "plain"
     }
   },
   "service.folderChanges.submoduleInside": {
@@ -422,12 +423,14 @@
   },
   "service.folderChanges.submoduleStaged": {
     "placeholders": {
-      "folder": "plain"
+      "folder": "plain",
+      "path": "plain"
     }
   },
   "service.folderChanges.submoduleStagedBack": {
     "placeholders": {
-      "folder": "plain"
+      "folder": "plain",
+      "path": "plain"
     }
   },
   "service.folderChanges.tooManyToSetAside": {
