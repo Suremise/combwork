@@ -360,6 +360,7 @@
   "main.server.url.scheme": "The URL must start with https:// (or http:// for a server on this PC).",
   "main.server.url.userinfo": "The URL can't hold a user name or password: give the key in its own field.",
   "main.storage.claimed": "The folder belongs to a session again.",
+  "main.storage.launchInUse": "its agent is the project’s again, or is starting",
   "main.storage.noLonger": "{path}: no longer qualifies",
   "main.storage.purgeChanged": "It changed since the preview.",
   "main.storage.purgeClaimed": "It belongs to a session again.",

@@ -446,6 +446,8 @@ export const AREAS = [
   // Hook tokens per launch (#345): the hook server, and hook commands reading their header from the auth file.
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },
+  // HI-3144: removed agents' launch folders, swept as a workspace opens and listed by Clean Up (storage checks both).
+  { paths: ['src/main/launchFolders.ts', 'src/main/launchFolderNames.ts'], suites: ['storage'] },
   { paths: ['src/renderer/src/components/Purge.tsx'], suites: ['purge'] },
   { paths: ['src/main/antivirus.ts', 'src/shared/antivirus.ts', 'src/renderer/src/components/Antivirus.tsx'], suites: ['antivirus', 'performance', 'repairdefender'] },
   { paths: ['src/shared/tipPlacement.ts'], suites: ['tooltips'] },

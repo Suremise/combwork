@@ -8,6 +8,7 @@ import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
 import { initSkillCopies } from './skillCopies'
+import { initLaunchFolders } from './launchFolders'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
@@ -1178,6 +1179,7 @@ app.whenReady().then(async () => {
   initReviewsOnOpen()
   // Combwork's skill copies in folders no session of Combwork's works in (#1431), as each workspace opens.
   initSkillCopies((folder) => sessions.runningIn(folder))
+  initLaunchFolders((projectPath, agentId) => sessions.activeOrStarting(projectPath, agentId))
   initInboxNotices()
   // What agents' commands leave running while they run (HI-2111).
   startOrphanWatch()
