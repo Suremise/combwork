@@ -137,9 +137,9 @@ const isIn = (repo, commit, ref) => {
 
     // --- HI-3127 (C): a forward's resolution. A 1.4.0 fix and a remote-only 1.5.0 commit change fwd.txt both: the
     // forward comes back; Resolve on a builder makes a card, started in a real slot from the remote's 1.5.0.
-    // The release's fix with the project's identity, as the release's own queue merges it (a source commit of someone
-    // else's is counted as the resolution's own by the identity check: HI-2959's, carded separately).
-    pushOther('1.4.0', 'fwd.txt', 'release\n', 'Fix on the release', ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`])
+    // The release's fix by a teammate, not the project's identity (HI-3145: the source's commits aren't the resolution's
+    // own, so its identity check leaves them out).
+    pushOther('1.4.0', 'fwd.txt', 'release\n', 'Fix on the release')
     const next = pushOther('1.5.0', 'fwd.txt', 'next\n', 'Next version, remote only')
     const fwdC = await h.inv('queue:forward', fx.alpha, '1.4.0', '1.5.0')
     check('C: the forward is queued', fwdC?.queued === true, JSON.stringify(fwdC))
