@@ -431,7 +431,8 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check('…its ring read now, marked; the other rings still listed', (await lastRing.getAttribute('data-load')) === 'loaded' && (await lastRing.getAttribute('aria-current')) === 'true' && (await vRings.count()) >= 10)
       check('…the selection and the list\'s tab unchanged', (await vHead.locator('.activity-pick').first().innerText()) === vPick && (await page.locator(`${v.scope} .activity-agent-tab[aria-selected="true"]`).innerText().catch(() => '')) === vTab, `${await vHead.locator('.activity-pick').first().innerText()} / ${vTab}`)
       edits++
-      await turn(last.id, `tool Edit src/late/edit${edits}.ts`)
+      // Its context as before, so the next view reads the same 55 % (a turn without one reports none: 0 %).
+      await turn(last.id, `window 100000 then context 55000 then tool Edit src/late/edit${edits}.ts`)
       check('…and its new calls come in as it works', !!(await lib.until(async () => ((await vStation('edit').textContent().catch(() => '')) ?? '').includes(`late/edit${edits}.ts`), HUNG_MS, 250)), String(await vStation('edit').textContent().catch(() => '')))
       await shoot(`9-ninth-of-ten-${v.label === 'the workspace view' ? 'workspace' : 'project'}-light`)
       await page.keyboard.press('Escape')
