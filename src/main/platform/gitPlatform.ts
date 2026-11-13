@@ -469,7 +469,9 @@ export class GitPlatform implements PlatformAdapter {
       if (th === null && target) return { ok: false, refusal: { rule: 'platform.targetGone', values: { card: card.key, target } } }
       const mb = !isUnknown(th) && th ? (th === h ? h : await G.mergeBase(this.project, th, h)) : th
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
-      base = mb
+      const fb = await this.followedBase(s, o, h, mb)
+      if (isUnknown(fb)) return { ok: false, refusal: unknownRefusal(card, fb, 'submit') }
+      base = fb
     } else {
       // A shared folder: the card's change is its own attributed commits (§16.3.2), attributed by reconciling first; a
       // start not written yet (a drag planning, #1265) has none yet, and nothing is written for it.
@@ -529,6 +531,31 @@ export class GitPlatform implements PlatformAdapter {
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
     const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
+  }
+
+  /**
+   * HI-3127: under G21 the target is its remote's branch, which the local one may lag (it catches up only after a
+   * publication): a submission's base is read against what Combwork knows the remote had too, never only the local
+   * target. Those heads are the remote's head the card started from (`started.base`, fetched then) and the one its last
+   * return was tested on (`failure.onto`, pinned): the newest of them in the head's history, or its merge base with it,
+   * replaces `mb` when it comes after it, so the remote's commits the builder merged (as the return told it to) aren't
+   * counted as the card's own work (its files, its identity check). Off G21, or none newer: `mb`.
+   */
+  private async followedBase(s: CardState, o: WorkflowOptions, head: string, mb: string): Promise<Maybe<string>> {
+    if (o.finish !== 'combworkMerges' || this.wf.cfg.options().followRemote !== true) return mb
+    const known = [s.started?.base, ...s.entries.map((e) => e.failure?.onto)].filter((x): x is string => !!x && x !== mb)
+    let best = mb
+    for (const k of new Set(known)) {
+      const there = await G.isAncestor(this.project, k, head)
+      if (isUnknown(there)) return there
+      const c = there ? k : await G.mergeBase(this.project, k, head)
+      if (isUnknown(c)) return c
+      if (!c || c === best) continue
+      const after = await G.isAncestor(this.project, best, c)
+      if (isUnknown(after)) return after
+      if (after) best = c
+    }
+    return best
   }
 
   /** HI-3082: whether `revision` brings `source` into the history `base` lacks (merged since the card's base). */

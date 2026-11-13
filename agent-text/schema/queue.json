@@ -217,6 +217,13 @@
       "target": "plain"
     }
   },
+  "queue.next.conflictRemote": {
+    "placeholders": {
+      "target": "plain",
+      "remote": "plain",
+      "commit": "plain"
+    }
+  },
   "queue.next.direction": {
     "placeholders": {}
   },
@@ -228,6 +235,13 @@
   },
   "queue.next.fix": {
     "placeholders": {}
+  },
+  "queue.next.fixRemote": {
+    "placeholders": {
+      "commit": "plain",
+      "target": "plain",
+      "remote": "plain"
+    }
   },
   "queue.next.forward": {
     "placeholders": {

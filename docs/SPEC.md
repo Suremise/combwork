@@ -6822,6 +6822,22 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
 
+**Returns** (HI-3127; the design agreed with HR3 on the card, s7, s11 and s14). A card returned from a tested merge (a
+conflict, strict's update, red checks or a hook) whose attempt was tested on a remote head the local target hasn't got
+names it: `IntegrationFailed.onto` (that commit) and `remote` (`<remote>/<branch>`, a name, never an address), and its
+builder's next step says to merge that commit (`git merge <commit>`), which is kept in the repository at the card's
+tested pin `refs/cw/tested/<key>` (the latest attempt's; dropped with the card's pins once it is archived; never one of
+the card's own refs, `refs/cw/cards/<key>/`, which the own-work proof reads). The pin is written first: one that can't be
+written is a failed read (no return recorded, nobody told, the round tried again, then paused with git's words), so a
+return never names a commit that isn't kept. Nothing of the user's moves: the local target and its tracking ref stay
+behind until a publication catches the target up. A submission under G21 bases its change on the newest head Combwork
+knows the remote had and the card's head holds (the head it started from, or the one its last return was tested on),
+not only on the local target, so the remote's commits merged as told are never counted as the card's own (its files, its
+identity check). A forward's resolution starts in a slot like any card, from the remote's head; in a pre-P7 stand-in
+worktree (a 0.9 one carried across the upgrade), which keeps its own base, its first return names the remote's head the
+same way. Before, the builder was told to merge the target, which the local branch already had, and an unchanged
+submission was refused.
+
 **Forward merges** (§16.9's Bring Up to Date, HI-3126; the design agreed with HR2 on the card, s7 and s11). With G21 on,
 a forward request reads both branches' remotes, each fetched now in the sealed context (within 60 seconds, the window or
 the Assistant waiting on the reply; pinned at `refs/cw/forward/<branch>`; no checkout, the local branches never moved):

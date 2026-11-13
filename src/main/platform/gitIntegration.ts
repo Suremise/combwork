@@ -98,6 +98,9 @@ async function folderAt(h: CandidateHost, at: string, merging: string[] = []): P
   return add.ok ? null : again(add.err)
 }
 
+/** HI-3127: a card's tested pin: the remote's head its latest returned attempt was tested on (follow mode). */
+export const testedPin = (card: string): string => `refs/cw/tested/${card.toLowerCase().replace(/[^a-z0-9._-]/g, '-')}`
+
 /** A signing check that didn't finish within its bound (HI-1185): the pause's detail, never proof it asked. */
 const SIGN_UNFINISHED = agentMsg({ id: 'queue.signing.unfinished', text: "The signer didn't finish within a few seconds with nobody there.", note: "A merge queue pause's detail (HI-1185, signingWaits): the signing check's signer was still running at its bound." })
 
@@ -363,14 +366,25 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(project, ['update-ref', '-d', ref])
   },
 
-  // The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3), by card, as queueHost.ts's prunePins listed them.
+  // The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3), by card, as queueHost.ts's prunePins listed them; HI-3127:
+  // and each card's tested pin (`refs/cw/tested/<key>`), kept apart from its own refs (it holds the remote's commit, never
+  // the card's own work: retargetCard's own-work proof reads `refs/cw/cards/<key>/` as the card's).
   async cardPins(project) {
-    const r = await git(project, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
+    const r = await git(project, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/', 'refs/cw/tested/'])
     if (!r.ok) return null
-    const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
+    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const keyOf = (l: string): string | undefined => /^refs\/cw\/cards\/([^/]+)\//.exec(l)?.[1] ?? /^refs\/cw\/tested\/([^/]+)$/.exec(l)?.[1]
     const out = new Map<string, string[]>()
-    for (const key of keys) out.set(key, r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`)))
+    for (const l of refs) {
+      const key = keyOf(l)
+      if (key) out.set(key, [...(out.get(key) ?? []), l])
+    }
     return out
+  },
+
+  async keepTested(h, card, commit) {
+    const r = await h.run(h.project, ['update-ref', testedPin(card), commit])
+    return r.ok ? null : again(r.err.trim() || `git exited with code ${r.code}`) // i18n-ignore: git's side of a pause, in English as git's are
   },
 
   async dropPin(project, ref) {

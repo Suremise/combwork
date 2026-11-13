@@ -74,6 +74,8 @@ const Q = {
   nextRepick: agentMsg({ id: 'queue.next.repick', text: 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on cw_submit), for review.', note: "The next step when its focused tests couldn't be chosen (G20, HI-1367)." }),
   nextTransient: agentMsg({ id: 'queue.next.transient', text: 'Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.', note: 'The next step after a failure of the environment, not the work.' }),
   nextConflict: agentMsg({ id: 'queue.next.conflict', text: 'Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).', note: 'The next step after a conflict with {target}, the branch.' }),
+  nextConflictRemote: agentMsg({ id: 'queue.next.conflictRemote', text: '{target} on its remote ({remote}) is at {commit}, which the queue tested on and your local {target} doesn’t have yet: merge that commit into your worktree (git merge {commit}: it is in the repository already), resolve the conflict, commit and submit again (cw_submit).', note: 'HI-3127: the next step after a conflict with {target} under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>.' }),
+  nextFixRemote: agentMsg({ id: 'queue.next.fixRemote', text: 'Fix it in your worktree, commit and submit again (cw_submit). It was tested merged with {commit}, {target}’s head on its remote ({remote}), which your local {target} doesn’t have yet: merge that commit (git merge {commit}: it is in the repository already) to see what the queue saw.', note: 'HI-3127: the next step after a red check or a hook under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>.' }),
   nextForward: agentMsg({ id: 'queue.next.forward', text: 'A forward merge has no builder, and no agent works on it: the user or the Assistant decides. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} and resolve this there; Remove from queue ends it, nothing merged.', note: "HI-2959: the next step on a forward merge card (Combwork merging branch {from} into {to}) the merge queue returned: no agent may act on it. Retry merge, Resolve on a builder and Remove from queue are the window's commands." }),
   nextFix: agentMsg({ id: 'queue.next.fix', text: 'Fix it in your worktree, commit and submit again (cw_submit).', note: 'The next step after anything else that came back.' }),
   staleWake: agentMsg({ id: 'queue.wake.stale', text: '{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (cw_submit).', note: "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)." }),
@@ -432,8 +434,10 @@ function nextStep(f: FactData['IntegrationFailed'], forward?: ReturnedForward): 
   }
   if (f.reason === 'direction') return say(Q.nextDirection)
   if (f.transient) return say(Q.nextTransient)
-  if (f.reason === 'conflict') return say(Q.nextConflict, { target: f.target })
-  return say(Q.nextFix)
+  // HI-3127: under follow mode, the remote's head it was tested on, when the local target hasn't it: named, as it is kept.
+  const remote = f.onto && f.remote ? { target: f.target, remote: f.remote, commit: f.onto } : null
+  if (f.reason === 'conflict' || (f.reason === 'notUpToDate' && remote)) return remote ? say(Q.nextConflictRemote, remote) : say(Q.nextConflict, { target: f.target })
+  return remote ? say(Q.nextFixRemote, remote) : say(Q.nextFix)
 }
 
 /** The output's last `n` non-blank lines, on one line. */

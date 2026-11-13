@@ -176,6 +176,13 @@ export interface IntegrationPort {
   cardPins(project: string): Promise<Map<string, string[]> | null>
   /** Drops one pin. */
   dropPin(project: string, ref: string): Promise<void>
+  /**
+   * HI-3127: keeps `commit`, the remote's head a card's returned attempt was tested on (follow mode), in the project's
+   * repository for its builder to merge, at the card's own tested pin (one per card, the latest attempt's), in the queue's
+   * run. `again` with git's words when it can't be written: the return then isn't recorded (it promises the commit).
+   * Listed with the card's pins (`cardPins`), dropped once the card is archived. Absent: no remote to follow.
+   */
+  keepTested?(h: CandidateHost, card: string, commit: string): Promise<Again | null>
   /** The platform's own removal of one of the queue's workspaces (its guard is the runner's); whether it succeeded. */
   removeWorkspace(project: string, folder: string): Promise<boolean>
   /** The platform's record of workspaces gone from disk tidied (after a removal). */

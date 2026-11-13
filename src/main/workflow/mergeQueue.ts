@@ -331,6 +331,9 @@ export function catchUpOf(value: string | null): CatchUp | null {
 export const catchUpPaused = (catchUp: string | null, pause: { card: string } | null | undefined): boolean => !!pause?.card && catchUpOf(catchUp)?.card === pause.card
 
 /** The project's pin of an entry's fetched remote head (HI-1183): under its entry's queue pins, dropped with them. */
+/** HI-3127: under follow mode, the remote's head an attempt was tested on (pinned) and its branch as `<remote>/<branch>`. */
+type Tested = { onto: string; remote: string }
+
 export const fetchPin = (entry: string): string => `refs/cw/queue/${entry.replace(/[^A-Za-z0-9._-]/g, '-')}-fetch`
 /** HI-3041: an owed catch-up's look at the remote, one per target (never an entry's: those go with their card). */
 export const catchUpPin = (target: string): string => `refs/cw/catch-up/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`
@@ -1558,6 +1561,16 @@ export class MergeQueue {
           onto = f.onto
           snap = f.snap
         }
+        // HI-3127: this attempt's remote head, when the local target hasn't it: a return names it, pinned first (the
+        // builder's local target and tracking ref don't have it, and nothing of the user's is moved).
+        const tested: Tested | undefined = follow && snap && onto !== head ? { onto, remote: `${snap.remote}/${snap.ref.replace(/^refs\/heads\//, '')}` } : undefined
+        /** Pins what was tested before a tested merge's return is recorded: a pin that can't be made is a failed read. */
+        const pinned = async (): Promise<QueueOutcome | 'again' | null> => {
+          if (!tested) return null
+          const a = await this.integration(card, s).keepTested?.(this.host(reads), card.key, tested.onto)
+          if (!a) return null
+          return (await readFailed(a)) ?? 'again'
+        }
         // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read (the
         // remote's, following it). A forward merge (HI-2885) only when its source is in the target's history: one whose
         // files the target already has (main after a release, into the next version) still lands as a merge commit. So
@@ -1592,7 +1605,12 @@ export class MergeQueue {
             continue
           }
           if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
-          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts)
+          if ('fail' in up) {
+            const p = await pinned()
+            if (p === 'again') continue
+            if (p) return p
+            return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts, undefined, tested)
+          }
           updated = up.updated ?? undefined
         }
         const test = await this.testMerge(card, s, revision, onto, reads, updated, base)
@@ -1602,7 +1620,12 @@ export class MergeQueue {
           continue
         }
         if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
-        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log, undefined, undefined, test.conflicts)
+        if ('fail' in test) {
+          const p = await pinned()
+          if (p === 'again') continue
+          if (p) return p
+          return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log, undefined, undefined, test.conflicts, undefined, tested)
+        }
         result = test.result
         await this.cfg.hooks?.afterTest?.(entry.id)
 
@@ -1610,7 +1633,13 @@ export class MergeQueue {
         // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
         step('checks', onto)
         const checks = await this.mergeChecks(card, result, entry, onto)
-        if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
+        if (checks.kind === 'red') {
+          // A transient red (the environment's) names no commit: the same revision goes back.
+          const p = checks.transient ? null : await pinned()
+          if (p === 'again') continue
+          if (p) return p
+          return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) }, undefined, undefined, checks.transient ? undefined : tested)
+        }
         // Missing review proof or a missing runner isn't the work's fault: the same revision may go back (requeue.allowed).
         if (checks.kind === 'focused') return this.returnCard(card, entry, revision, target, 'focused', checks.focused.why === 'noProof' || checks.focused.why === 'noRunner', undefined, undefined, undefined, undefined, undefined, checks.focused)
         if (checks.kind === 'skip') return this.askSkip(target, card, entry, checks.skipped, { expected: checks.expected, tree: checks.tree })
@@ -2284,14 +2313,14 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord, focused?: FocusedReturn): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord, focused?: FocusedReturn, tested?: Tested): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {
       if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}), ...(focused ? { focused } : {}) }
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}), ...(focused ? { focused } : {}), ...(tested ? { onto: tested.onto, remote: tested.remote } : {}) }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded. A forward
