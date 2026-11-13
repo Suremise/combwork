@@ -352,7 +352,7 @@ export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string
     // them as uncommitted, so it is kept, never reused or removed with them in it.
     if (r.ok && r.leftOut.length) log.info(`Slot ${userText(s.name)} recovered with files jj leaves out for snapshot.max-new-file-size: ${userText(r.leftOut.slice(0, 10).join(', '))}`)
     // What it did, for the window (HI-2996): the copies it wrote beside, the deletions it kept, a divergent commit kept.
-    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, asides: r.asides, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why }
+    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, asides: r.asides, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why, ...(r.divergent ? { divergent: r.divergent } : {}) }
   }
   const held = pool.openLease(name)
   const out = held ? await (await import('./slotCards')).recoverHeldSlot(ws, projectPath, pool, name, held, run) : await pool.recoverStale(name, run)

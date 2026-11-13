@@ -82,9 +82,20 @@ export interface RecoveryRequest {
  */
 export type RecoveryResult =
   | { ok: true; restored: string[]; beside: string[]; late: string[]; deletedLocally: string[]; kept: string[]; xKept: boolean; copies: { path: string; copy: string }[]; asides: { path: string; copy: string }[]; x: string | null; leftOut: string[] }
-  | { ok: false; why: RecoveryRefusal; detail?: string }
+  | { ok: false; why: RecoveryRefusal; detail?: string; divergent?: RecoveryDivergent }
 
-export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence' | 'collision'
+export type RecoveryRefusal = 'notStale' | 'busy' | 'unreadable' | 'link' | 'bounds' | 'preserve' | 'changing' | 'identity' | 'provenance' | 'update' | 'restore' | 'fence' | 'collision' | 'divergent'
+
+/**
+ * HI-3134: why a recovery was refused `divergent`: the commit the folder's checkout is (WS, `folder`) is still visible at
+ * the head beside the commit the head gives the workspace now (HW, `head`); `same`: the same change (divergent), else
+ * another. Full commit ids.
+ */
+export interface RecoveryDivergent {
+  folder: string
+  head: string
+  same: boolean
+}
 
 interface Entry {
   path: string
@@ -369,6 +380,27 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     return (JSON.parse(text) as { entries: Entry[] }).entries
   }
 
+  /**
+   * HI-3134: the workspace's own recorded commit (WS, the folder's checkout) still visible at the head beside the commit
+   * the head gives the workspace (HW): a record that raced another write, reconciled with the same change divergent (or
+   * WS left beside another commit). `update-stale` would check HW out and take WS's files out of the folder, where only
+   * WS holds them: refused, naming both, nothing changed. Read pinned at the head; unreadable fails closed. Null: none.
+   */
+  const leftBeside = async (WS: string, workspace: string): Promise<RecoveryResult | null> => {
+    const head = await port.pinned(folder)
+    if (isUnknown(head)) return refuse('unreadable', head.detail ?? head.what)
+    const hw = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(workspace)}@`, '-T', 'commit_id ++ " " ++ change_id'], { op: head })
+    const [HW, hwChange] = hw.ok ? hw.out.trim().split(' ') : []
+    if (!HW || !/^[0-9a-f]{40}$/.test(HW) || !hwChange) return refuse('unreadable', hw.ok ? 'HW' : hw.err)
+    if (HW === WS) return null
+    // Visible at the head: an ancestor of a visible head (a hidden commit, abandoned or rewritten, isn't).
+    const ws = await port.jj(folder, ['log', '--no-graph', '-r', `${WS} & ::visible_heads()`, '-T', 'change_id'], { op: head })
+    if (!ws.ok) return refuse('unreadable', ws.err)
+    const wsChange = ws.out.trim()
+    if (!wsChange) return null
+    return { ok: false, why: 'divergent', divergent: { folder: WS, head: HW, same: wsChange === hwChange } }
+  }
+
   // 1. planned
   if (!j) {
     if (!(await fenced())) return refuse('busy')
@@ -384,6 +416,9 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     const conv = await port.jj(folder, ['config', 'get', 'working-copy.eol-conversion'], { op: co.op })
     const eol = conv.ok ? conv.out.trim() : ''
     if (eol !== 'none' && eol !== 'input' && eol !== 'input-output') return refuse('unreadable', conv.ok ? `eol-conversion ${eol}` : conv.err) // i18n-ignore: a protocol detail, never wording
+    // HI-3134: refused before anything is written (no journal, no preservation).
+    const beside = await leftBeside(ws.out.trim(), co.name)
+    if (beside) return beside
     await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, generation: req.identity.generation, folder: resolve(folder), S: co.op, WS: ws.out.trim(), ...(eol !== 'none' ? { eol } : {}) })
   }
   let cur = j as unknown as Journal
@@ -420,6 +455,9 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         cur = j as unknown as Journal
       }
       await deps.hooks?.beforeUpdate?.()
+      // HI-3134: again right before jj's update, whatever phase this recovery resumed from; the journal kept.
+      const beside = await leftBeside(cur.WS, cur.workspace)
+      if (beside) return beside
       if (!(await mine())) return refuse('fence')
       // The whole proof again under the file gate's admission, right before jj starts (HI-2918; with HI-2913's held path,
       // its held fence unsplit and in its own order).

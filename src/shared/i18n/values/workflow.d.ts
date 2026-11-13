@@ -510,6 +510,9 @@ interface CombworkMessageValues {
   'workflow.slots.copy': undefined
   'workflow.slots.copyDesc': undefined
   'workflow.slots.desc': undefined
+  'workflow.slots.divergent': { same: string; folder: string | number; head: string | number }
+  'workflow.slots.divergentNext': { folder: string | number; head: string | number }
+  'workflow.slots.divergentTitle': { slot: string | number }
   'workflow.slots.fromSetup': undefined
   'workflow.slots.gitFiles': undefined
   'workflow.slots.gitFilesDesc': undefined

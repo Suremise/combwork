@@ -307,3 +307,104 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
     mkdirSync(join(s.slot, 'unused'), { recursive: true })
   })
 })
+
+/**
+ * HI-3134: the slot's own record of an edit (`wip.txt`, its working copy E -> X) raced a write of the user's from the
+ * operation before it that rewrote E (E -> E'); after jj's reconcile the head names E' as the slot's working copy and X
+ * stays visible beside it, the same change, divergent. The folder still holds X's files, so the slot is stale with X at
+ * its operation.
+ */
+async function raced(colocated: boolean): Promise<Stale & { X: string; E2: string }> {
+  const h = harness()
+  const { repo, root } = h.repo('race', colocated)
+  const base = h.id(repo, '@-')
+  const slot = join(root, 'slot-a')
+  expect((await h.port.create(repo, slot, base)).ok).toBe(true)
+  const name = h.port.nameFor(repo, slot)
+  const op0 = h.jj(repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-n', '1', '-T', 'id').trim()
+  const E = h.jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${name}@`, '-T', 'commit_id').trim()
+  writeFileSync(join(slot, 'wip.txt'), 'wip\n')
+  h.jj(slot, 'status')
+  const X = h.jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${name}@`, '-T', 'commit_id').trim()
+  h.jj(repo, '--at-op', op0, '--ignore-working-copy', 'describe', '-r', E, '-m', 'user')
+  const E2 = h.jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'description(exact:"user\n")', '-T', 'commit_id').trim()
+  // The reconcile as the card saw it: the head's view of the slot is E', X its divergent sibling.
+  h.jj(slot, '--ignore-working-copy', 'edit', E2)
+  const id = (await h.port.identity!(slot))!
+  const git: GitRun = async (cwd, args) => {
+    try {
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      return { ok: true, out: buf.toString('utf8'), buf, err: '' }
+    } catch (e) {
+      const err = e as { stderr?: Buffer; stdout?: Buffer }
+      return { ok: false, out: err.stdout?.toString('utf8') ?? '', buf: err.stdout ?? Buffer.alloc(0), err: err.stderr?.toString('utf8') ?? String(e) }
+    }
+  }
+  const preserveRoot = join(tempDir('jj-preserve-'), '.cw-recovery')
+  return {
+    h,
+    repo,
+    slot,
+    name,
+    id,
+    X,
+    E2,
+    deps: (more = {}) => ({ port: h.port, git, preserveRoot, trash: async () => undefined, ...more }),
+    visible: () => h.jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'all()', '-T', 'change_id.short() ++ " " ++ commit_id.short() ++ " " ++ divergent ++ "\n"').trim().split(/\r?\n/)
+  }
+}
+
+describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj beside the one the head gives it', () => {
+  for (const colocated of [true, false]) {
+    const files = (slot: string): Record<string, string> => Object.fromEntries(readdirSync(slot).filter((f) => !f.startsWith('.')).map((f) => [f, readFileSync(join(slot, f), 'utf8')]))
+    const headOf = (s: Stale): string => s.h.jj(s.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `${s.name}@`, '-T', 'commit_id').trim()
+
+    it(`refused naming both commits, nothing changed: the recorded edit, later edits, both commits and the workspace as they were (colocated: ${colocated})`, async () => {
+      const s = await raced(colocated)
+      expect(await s.h.port.stale(s.slot)).toBe(true)
+      // More unrecorded work after the record: a new file, and the recorded one changed again.
+      writeFileSync(join(s.slot, 'later.txt'), 'later\n')
+      writeFileSync(join(s.slot, 'wip.txt'), 'wip, then more\n')
+      const before = files(s.slot)
+      const visible = s.visible()
+      const r = await run(s, s.deps())
+      expect(r).toEqual({ ok: false, why: 'divergent', divergent: { folder: s.X, head: s.E2, same: true } })
+      expect(files(s.slot)).toEqual(before)
+      expect(s.visible()).toEqual(visible)
+      expect(headOf(s)).toBe(s.E2)
+      expect(await s.h.port.stale(s.slot)).toBe(true)
+      // Refused before anything was written: no journal to resume.
+      expect(s.h.journals.of('rec').read()).toBeNull()
+    }, 120_000)
+
+    it(`a recovery resumed from its journal is refused the same right before jj's update, its journal kept (colocated: ${colocated})`, async () => {
+      // A stale slot (its commit rebased by the default workspace), its recovery stopped once its bytes were preserved.
+      const s = await stale(colocated)
+      await expect(run(s, s.deps({ hooks: { afterPreserve: () => { throw new Error('stopped') } } }))).rejects.toThrow('stopped')
+      expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
+      // Then the folder's commit (WS, hidden by the rebase) made visible again: a child of it, from the project folder.
+      const WS = (s.h.journals.of('rec').read() as { WS: string }).WS
+      s.h.jj(s.repo, '--ignore-working-copy', 'new', '--no-edit', WS, '-m', 'on the old version')
+      const before = files(s.slot)
+      const head = headOf(s)
+      const r = await run(s, s.deps())
+      expect(r).toEqual({ ok: false, why: 'divergent', divergent: { folder: WS, head, same: true } })
+      expect(files(s.slot)).toEqual(before)
+      expect(headOf(s)).toBe(head)
+      expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
+    }, 120_000)
+
+    it(`once the user gives the slot the folder's version again, it isn't stale and nothing is lost (colocated: ${colocated})`, async () => {
+      const s = await raced(colocated)
+      writeFileSync(join(s.slot, 'later.txt'), 'later\n')
+      const before = files(s.slot)
+      expect(await run(s, s.deps())).toMatchObject({ ok: false, why: 'divergent' })
+      // The user's choice, in the slot folder: its working copy the folder's commit again (no file changed by it).
+      s.h.jj(s.slot, '--ignore-working-copy', 'edit', s.X)
+      expect(await s.h.port.stale(s.slot)).toBe(false)
+      expect(files(s.slot)).toEqual(before)
+      expect(await run(s, s.deps())).toMatchObject({ ok: false, why: 'notStale' })
+      expect(files(s.slot)).toEqual(before)
+    }, 120_000)
+  }
+})

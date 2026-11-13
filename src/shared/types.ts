@@ -1927,6 +1927,16 @@ export interface ProjectConfig {
 }
 
 /**
+ * HI-3134: a stale jj slot's recovery refused `divergent`: the commit its folder holds (`folder`) is still in jj beside
+ * the commit jj's latest operation gives the slot (`head`); `same`: one change, divergent. Full commit ids.
+ */
+export interface SlotRecoverDivergent {
+  folder: string
+  head: string
+  same: boolean
+}
+
+/**
  * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
  * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
  * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.

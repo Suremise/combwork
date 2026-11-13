@@ -59,10 +59,10 @@ import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
-import type { AppSettings, ProjectConfig, SlotRecovery, WorkspaceConfig } from '../shared/types'
+import type { AppSettings, ProjectConfig, SlotRecoverDivergent, SlotRecovery, WorkspaceConfig } from '../shared/types'
 
 /** A stale jj slot's recovery (HI-2866): what it did (HI-2996), or why it was refused (a protocol code). */
-export type RecoverOutcome = { ok: true; recovered?: SlotRecovery } | { ok: false; why: string }
+export type RecoverOutcome = { ok: true; recovered?: SlotRecovery } | { ok: false; why: string; divergent?: SlotRecoverDivergent }
 import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
 import { COPY_PREFIX } from './providers/common'
 
