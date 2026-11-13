@@ -1273,6 +1273,26 @@
   "workflow.refused.verdict.reviewing.next": {
     "placeholders": {}
   },
+  "workflow.refused.why.passes": {
+    "placeholders": {
+      "n": "number",
+      "q": "plural"
+    }
+  },
+  "workflow.refused.why.requeueLimit": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "workflow.refused.why.requeueNotTransient": {
+    "placeholders": {}
+  },
+  "workflow.refused.why.stale": {
+    "placeholders": {}
+  },
+  "workflow.refused.why.userOk": {
+    "placeholders": {}
+  },
   "workflow.roundChoice": {
     "placeholders": {
       "choice": "select"
