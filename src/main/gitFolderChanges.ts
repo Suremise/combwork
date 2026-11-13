@@ -111,8 +111,8 @@ async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M
   try {
     // HI-3053: the real index's entries as the copy was taken (git writes an index whole, by its lock and a rename, so
     // the copy is one index git wrote): what they must still be when git's are taken in, or kept. Every entry (HI-3074:
-    // a commit's hook can change paths beyond `files`).
-    const was = await entriesIn(folder, null, copy)
+    // a commit's hook can change paths beyond `files`). With their flags (HI-3125), as takeEntries compares them.
+    const was = await entriesIn(folder, null, copy, true)
     if (!was.ok) throw failed(m, was.why)
     return await fn({ ...quietEnv(), GIT_INDEX_FILE: copy }, copy, (made) => takeEntries(folder, index, copy, made?.paths ?? files, was.entries, made?.entries))
   } finally {
@@ -211,7 +211,8 @@ async function takeEntries(folder: string, index: string, copy: string, files: s
 
   /** The new index made in the scratch (which holds the real index as it was read): which paths are kept, and whether anything is to be written. */
   const build = async (fresh: boolean): Promise<{ ok: true; kept: string[]; write: boolean } | { ok: false; why: string }> => {
-    const now = await entriesIn(folder, files, scratch)
+    // With their flags (HI-3125), as `was` is: a flag set on one meanwhile (skip-worktree, say) keeps it, as a re-stage does.
+    const now = await entriesIn(folder, files, scratch, true)
     if (!now.ok) return now
     const kept = changedPaths(files, was, now.entries)
     const keptSet = new Set(kept)
@@ -330,10 +331,15 @@ async function noHooks(folder: string, copy: string): Promise<{ ok: true; args: 
   return { ok: true, args: ['-c', `core.hooksPath=${copy}.no-hooks`, '-c', 'core.fsmonitor=false', ...[...names].flatMap((n) => ['-c', `hook.${n}.command=true`])] }
 }
 
-/** The entries the private index `copy` has for `files` (null: every one), as `ls-files -s` says them (mode, object, stage, path). */
-async function entriesIn(folder: string, files: string[] | null, copy: string): Promise<{ ok: true; entries: string[] } | { ok: false; why: string }> {
+/**
+ * The entries the private index `copy` has for `files` (null: every one), as `ls-files -s` says them (mode, object,
+ * stage, path). `flags`: each with its tag first, as `-v` gives it (`H`; `S` skip-worktree; lower case, assume
+ * unchanged), for comparing (HI-3125: a flag another git sets meanwhile is a change of that entry); never for
+ * `--index-info`, which takes the plain lines.
+ */
+async function entriesIn(folder: string, files: string[] | null, copy: string, flags = false): Promise<{ ok: true; entries: string[] } | { ok: false; why: string }> {
   // Every entry, those of `files` kept (ls-files takes no pathspecs on its input, and they can be many). No fsmonitor.
-  const ls = await git(folder, ['-c', 'core.fsmonitor=false', 'ls-files', '-s', '-z', '--full-name'], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: copy } })
+  const ls = await git(folder, ['-c', 'core.fsmonitor=false', 'ls-files', '-s', ...(flags ? ['-v'] : []), '-z', '--full-name'], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: copy } })
   if (!ls.ok) return { ok: false, why: gitErrorLine(ls.err) || ls.err.trim() }
   const wanted = files && new Set(files)
   return { ok: true, entries: ls.out.split('\0').filter((e) => e && (!wanted || wanted.has(e.slice(e.indexOf('\t') + 1)))) }
@@ -607,8 +613,14 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
       log.warn(`A commit in ${userText(folder)} was ended at its bound, HEAD moved meanwhile to ${now ?? '(unread)'}: not credited`)
       throw combworkError(M.commitTimedOutMoved, { seconds: boundSeconds(), head: typeof now === 'string' ? now.slice(0, 12) : 'none' })
     }
-    const made = r.ok ? await headOf(folder) : undefined
-    if (typeof made !== 'string') throw failed(M.commitFailed, r.ok ? "git couldn't read HEAD after the commit" : `${r.err}\n${r.out}`) // i18n-ignore: stands in for git's own (English) words
+    if (!r.ok) throw failed(M.commitFailed, `${r.err}\n${r.out}`)
+    // HI-3125: this commit, never whatever HEAD is now (another git can commit right after it).
+    const made = await ownCommit(folder, before, message)
+    if (made === undefined) throw failed(M.commitFailed, "git couldn't read the branch after the commit") // i18n-ignore: stands in for git's own (English) words
+    if (made === null) {
+      log.warn(`git committed in ${userText(folder)}, but no commit "${userText(message)}" is on the branch since ${before ?? '(none)'}: not credited`)
+      throw failed(M.commitFailed, "git said it committed, but the commit isn't on the branch now (another git moved it): check git log") // i18n-ignore: stands in for git's own (English) words
+    }
     // HI-3074: from the commit, never the private index: a pre-commit hook's `git add` (a formatter, a generated file)
     // goes into what git commits, not into the private index.
     const entries = await entriesOfCommit(folder, made, before, files)
@@ -616,6 +628,22 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
     const took = entries.ok ? await take(entries) : entries
     return { made, warning: indexWarning('commit', made, took) }
   })
+}
+
+/**
+ * HI-3125: the commit a commit of `message` made, git having said it did: on the branch since `before` (first parents,
+ * from HEAD back; the branch's whole history when it had none), the newest with that message. Never HEAD alone: another
+ * git (the user's terminal, an agent) can commit right after it, or just before it. Null: none there; undefined: the
+ * branch unreadable. Bounded to the branch's last 50 commits: no more land in a moment.
+ */
+async function ownCommit(folder: string, before: string | null, message: string): Promise<string | null | undefined> {
+  const r = await git(folder, ['log', '--first-parent', '-n', '50', '--format=%H%x00%s', before ? `${before}..HEAD` : 'HEAD', '--'])
+  if (!r.ok) return undefined
+  for (const line of r.out.split('\n')) {
+    const at = line.indexOf('\0')
+    if (at > 0 && line.slice(at + 1) === message) return line.slice(0, at).trim()
+  }
+  return null
 }
 
 /** The commit as git's own partial commit makes it, in the private index: untracked paths as intent-to-add first. */
@@ -724,10 +752,24 @@ async function leftUnchanged(folder: string, files: string[]): Promise<boolean> 
   return !!now && !files.some((p) => now.has(p))
 }
 
-/** The stash ref's object now (null: no stash). */
-async function stashTop(folder: string): Promise<string | null> {
-  const r = await git(folder, ['rev-parse', '-q', '--verify', 'refs/stash'])
-  return r.ok ? r.out.trim() || null : null
+/** The folder's stashes now, newest first: each one's object and subject (`On main: <message>`). Null: unreadable. */
+async function stashesNow(folder: string): Promise<{ oid: string; subject: string }[] | null> {
+  const r = await git(folder, ['stash', 'list', '--format=%H%x00%s'])
+  if (!r.ok) return null
+  return r.out
+    .split('\n')
+    .map((l) => ({ oid: l.slice(0, l.indexOf('\0')).trim(), subject: l.slice(l.indexOf('\0') + 1) }))
+    .filter((s) => s.oid)
+}
+
+/**
+ * HI-3125: the stash a `stash push -m <message>` made: one not among `before` (the objects there as it started) whose
+ * subject is that message (`On <branch>: <message>`), the newest. Never the stash ref having moved: another git's stash
+ * just before or after it (the user's own) moves it too, and a push that saved nothing moves it not at all.
+ */
+async function ownStash(folder: string, before: ReadonlySet<string>, message: string): Promise<string | null> {
+  const now = await stashesNow(folder)
+  return now?.find((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))?.oid ?? null
 }
 
 /**
@@ -740,7 +782,10 @@ async function stashTop(folder: string): Promise<string | null> {
 async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = []): Promise<MadeWith> {
   // HI-3081: git's stash on a branch with no commit yet fails, saying why only without --quiet: said here instead.
   if ((await headOf(folder)) === null) throw failed(M.stashFailed, "the branch has no commit yet, and git can't set changes aside before its first one") // i18n-ignore: stands in for git's own (English) words
-  const before = await stashTop(folder)
+  // HI-3125: the stashes there as it starts, so its own is told by its message among the new ones.
+  const was = await stashesNow(folder)
+  if (!was) throw failed(M.stashFailed, "git couldn't list the stashes") // i18n-ignore: stands in for git's own (English) words
+  const before = new Set(was.map((s) => s.oid))
   // HI-3022: a staged rename's old side is in neither the index nor the folder, and git's stash, given it, makes the
   // stash and then dies on it ("pathspec … did not match any files"), every try. Given the new side alone, it stashes
   // the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives the
@@ -759,8 +804,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
       if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
     }
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
-    const after = await stashTop(folder)
-    const stash = after && after !== before ? after : null
+    const stash = await ownStash(folder, before, message)
     if (stash && pushed.ok && renamedFrom.length) pushed = await restoreOldSides(folder, env, renamedFrom)
     // HI-3059: a stash made is said made, whatever its index step gives (logged there too, should git's own failure be
     // what is said below).
@@ -785,7 +829,12 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     }
     throw failed(M.stashFailed, r.err)
   }
-  if (!made) throw failed(M.stashFailed, r.err || r.out || 'no stash was made') // i18n-ignore: stands in for git's own (English) words
+  if (!made) {
+    // HI-3125: git's push saved nothing (it says so and exits 0): never done. The paths unchanged now (another git put
+    // them back, or set them aside itself, just before): the changes aren't the ones shown any more.
+    if (await leftUnchanged(folder, files)) throw combworkError(M.changed, { folder })
+    throw failed(M.stashFailed, r.err || r.out || 'no stash was made') // i18n-ignore: stands in for git's own (English) words
+  }
   return { made, warning }
 }
 
