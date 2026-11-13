@@ -537,6 +537,33 @@ const onDb = (fn) => {
     check('…recovered: not stale any more, its edit in the folder', !!recovered5 && fs.existsSync(path.join(w5.folder, 'wip.txt')) && fs.readFileSync(path.join(w5.folder, 'wip.txt'), 'utf8') === 'unrecorded before the abandon\n', JSON.stringify({ slots: await inv('slots:list', shop), toasts: await text(page.locator('.toasts')) }))
     check('…the project folder as the user left it, its bookmarks too, and jj works there', JSON.stringify(shopFiles()) === JSON.stringify(shopBefore) && jj(shop, '--ignore-working-copy', 'bookmark', 'list') === shopBookmarks && /Working copy/.test(jj(shop, 'status')), JSON.stringify({ before: shopBefore, now: shopFiles() }))
 
+    // HI-3132: card 2's work is kept in its slot (the recovered edit above), and that slot can't be lent now (a run still
+    // writing there: this suite's own process, recorded as its writer). The user drags card 2 to Doing; the board asks to
+    // start it across the slot's rule; Move Anyway is refused naming the slot: never started where B1 is (the project
+    // folder) without that work, which stays in the slot.
+    const kept7 = await until(async () => (await inv('slots:list', shop)).find((s) => s.keptFor === n2 && !s.lease) ?? null, HUNG_MS)
+    check('card 2: its work kept in its slot', !!kept7, JSON.stringify(await inv('slots:list', shop)))
+    const keptFiles7 = fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()
+    const held7 = await inv('slots:test', shop, { op: 'writer', slot: kept7.name, agent: b1.id, run: 'hi3132-probe', pid: process.pid, started: Math.round(Date.now() - process.uptime() * 1000) })
+    check('…that slot held: a run still writing in it', held7 === true, JSON.stringify(held7))
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    const tile7 = page.locator(`.task-card[data-task="${n2}"]`)
+    const doing7 = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Doing' }) })
+    check('…card 2 on the board, in To Do', !!(await until(async () => (await tile7.count()) === 1 && (await tile7.evaluate((e) => e.closest('.board-column')?.getAttribute('data-column')).catch(() => null)) === 'todo', HUNG_MS)))
+    await tile7.dragTo(doing7.locator('.board-column-body'))
+    const ask7 = page.locator('.dialog', { hasText: 'anyway?' })
+    check('…the board asks to start it across the slot rule', !!(await until(async () => (await ask7.count()) === 1, HUNG_MS)), await text(page.locator('body')))
+    await shoot(ask7, 'kept-elsewhere-ask')
+    await ask7.getByRole('button', { name: 'Move Anyway' }).click()
+    const refused7 = page.locator('.toast', { hasText: `kept in slot ${kept7.name}` })
+    check('…Move Anyway refused, naming the slot', !!(await until(async () => (await refused7.count()) > 0, HUNG_MS)), await text(page.locator('.toasts')))
+    await shoot(refused7.first(), 'kept-elsewhere-refused')
+    console.log(`INFO HI-3132 refusal shown: ${(await refused7.first().innerText().catch(() => '')).replace(/\s+/g, ' ')}`)
+    const facts7 = (await inv('tasks:facts', n2)).map((f) => f.kind)
+    const work7 = await inv('tasks:work', n2).catch(() => null)
+    check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
+    check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
+
   } finally {
     await app.close().catch(() => undefined)
   }
