@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "Ninguno",
   "workflow.form.notEnforced": "Las reglas del flujo de trabajo no se aplican (Configuración → Avanzado). Estas opciones se guardan y se aplicarán cuando las reglas vuelvan a aplicarse.",
   "workflow.form.off": "Desactivado",
+  "workflow.form.offerStale": "«El trabajo se fusiona en» u «Otras ramas en las que se puede fusionar el trabajo» cambió desde que se hizo la oferta de versión, así que no se rellenó. La oferta se vuelve a leer.",
+  "workflow.form.offerUnsaved": "El flujo de trabajo tiene cambios sin guardar, así que la oferta de versión no se rellenó. Guárdalos o descártalos y vuelve a elegir «Cambiar…».",
   "workflow.form.on": "Activado",
   "workflow.form.openAdvanced": "Abrir Avanzado",
   "workflow.form.otherTargets": "Ramas separadas por comas (como 1.2.0)",

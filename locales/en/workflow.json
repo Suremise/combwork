@@ -439,6 +439,14 @@
     "defaultMessage": "Off",
     "description": "A workflow option’s value: off."
   },
+  "workflow.form.offerStale": {
+    "defaultMessage": "Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.",
+    "description": "HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there."
+  },
+  "workflow.form.offerUnsaved": {
+    "defaultMessage": "Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.",
+    "description": "HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there."
+  },
   "workflow.form.on": {
     "defaultMessage": "On",
     "description": "A workflow option’s value: on."

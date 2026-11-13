@@ -396,6 +396,10 @@
   "api.change.deactivateProject": {
     "text": "deactivate the project {project}"
   },
+  "api.change.dismissOffer": {
+    "text": "put off the release offer of {project}",
+    "note": "HI-3155: cw_branch dismissOffer (the user’s Not now)."
+  },
   "api.change.endALane": {
     "text": "end a lane"
   },
@@ -758,6 +762,10 @@
   },
   "api.done.notRunning": {
     "text": "{agent} in {project} wasn't running"
+  },
+  "api.done.offerDismissed": {
+    "text": "Put off the release offer of {project} until it changes",
+    "note": "HI-3155: what the Assistant’s dismissOffer did (stored, said in the Default)."
   },
   "api.done.prompted": {
     "text": "Gave {agent} in {project} a task{given, select, yes { ({id})} other {}}"

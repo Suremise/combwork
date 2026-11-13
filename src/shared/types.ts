@@ -4383,6 +4383,8 @@ export type CombworkEvent =
   | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
   | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
+  /** HI-3155: a project's release offer appeared, changed, went or was put off: read them again (workflow:releaseOffers). */
+  | { type: 'release-offers'; workspacePath: string; projectPath: string }
   /** Busy agents whose tools a workflow change changes (HI-2694): the window asks whether to restart them when their turn is over. */
   | { type: 'tools-restart-asked'; workspacePath: string; projectPath: string; agents: { id: string; name: string }[] }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
@@ -4601,6 +4603,28 @@ export interface LaneStartRequest {
   target?: string | null
   /** HI-3148: the user's Start Anyway for a lane on a released line (a hotfix lane): the line as the window named it, and why. */
   released?: { target: string; reason: string }
+}
+
+/**
+ * HI-3155: a project's release offer (its For you item, not a card's). Either part may be absent, never both. `basis` is
+ * Work merges into and Other branches work can merge into as the offer read them: every action on it is checked against
+ * them, and refused once they moved.
+ */
+export interface ReleaseOffer {
+  id: string
+  project: string
+  projectPath: string
+  basis: { target: string; otherTargets: string[] }
+  move: ReleaseOfferPart['move']
+  cleanup: ReleaseOfferPart['cleanup']
+  since: string
+}
+
+export interface ReleaseOfferPart {
+  /** Work merges into is released: the tag, where it went, the tag's own date (annotated only), and where to go next. */
+  move: { target: string; tag: string; into: string; date: string | null; moveTo: string | null; startNext: string | null } | null
+  /** Other branches work can merge into that are released: those nothing uses (`drop`), and those still used (`kept`). */
+  cleanup: { drop: { branch: string; tag: string }[]; kept: { branch: string; tag: string; uses: string[] }[] } | null
 }
 
 /**

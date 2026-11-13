@@ -541,6 +541,11 @@
       "project": "plain"
     }
   },
+  "api.change.dismissOffer": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
   "api.change.endALane": {
     "placeholders": {}
   },
@@ -1133,6 +1138,11 @@
   "api.done.notRunning": {
     "placeholders": {
       "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.offerDismissed": {
+    "placeholders": {
       "project": "plain"
     }
   },

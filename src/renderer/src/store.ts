@@ -2,7 +2,7 @@ import { DEFAULT_PERF_FILTERS, type PerfFilters } from '@shared/metricsView'
 import { create } from 'zustand'
 import type { ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
-import type { McpCatalogRow } from '@shared/types'
+import type { McpCatalogRow, ReleaseOffer } from '@shared/types'
 import type { StartFailure } from '@shared/startFailure'
 import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
@@ -62,6 +62,9 @@ import { keepSame } from '@shared/keepSame'
 import { withAction } from '@shared/assistantChangeList'
 import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
+
+/** No release offers (HI-3155): a stable empty list for selectors (before the store, whose first state uses it). */
+export const NO_RELEASE_OFFERS: ReleaseOffer[] = []
 
 export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'dialects' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
@@ -479,7 +482,9 @@ interface State {
    * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
    * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
    */
-  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number } } | null
+  /** HI-3155: the workspace's release offers the user hasn't put off (Not now): projects' For you items. */
+  releaseOffers: ReleaseOffer[]
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number }; offer?: { id: string; basis: { target: string; otherTargets: string[] }; options: { target?: string; otherTargets: string[] } } } | null
   /**
    * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
    * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.
@@ -702,6 +707,7 @@ export const useStore = create<State>(() => ({
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
+  releaseOffers: NO_RELEASE_OFFERS,
   templatePending: null,
   vcGitPreview: null,
   presetStepShown: [],

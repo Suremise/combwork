@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "なし",
   "workflow.form.notEnforced": "ワークフローのルールは適用されていません（「設定」→「詳細」）。これらのオプションは保存され、ルールが再び適用されると有効になります。",
   "workflow.form.off": "オフ",
+  "workflow.form.offerStale": "リリースの提案が作られた後に「マージ先」または「その他のマージ先ブランチ」が変わったため、入力しませんでした。提案を読み直します。",
+  "workflow.form.offerUnsaved": "ワークフローに保存していない変更があるため、リリースの提案を入力しませんでした。保存するか破棄してから、もう一度「変更…」を選んでください。",
   "workflow.form.on": "オン",
   "workflow.form.openAdvanced": "詳細を開く",
   "workflow.form.otherTargets": "ブランチをカンマ区切りで（例：1.2.0）",

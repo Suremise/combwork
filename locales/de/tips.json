@@ -448,6 +448,8 @@
   "tips.quitWhenDone.title": "Beenden, wenn Agenten fertig sind",
   "tips.recentWorkspaces.text": "Entferne einen Arbeitsbereich aus Datei → Zuletzt geöffnet oder von der Startseite mit seinem ✕ oder per Rechtsklick. „Zuletzt geöffnete leeren“ vergisst alle; Ordner, die nicht mehr da sind, erscheinen als nicht gefunden.",
   "tips.recentWorkspaces.title": "Deine zuletzt geöffneten Arbeitsbereiche aufräumen",
+  "tips.releaseOffer.text": "Sobald „Arbeit wird gemergt in“ veröffentlicht ist (als v1.4.0 getaggt und in main gemergt), bietet „Für dich“ an, es auf 1.5.0 umzustellen oder 1.5.0 zu starten und veröffentlichte, ungenutzte Branches zu entfernen. „Umstellen…“ öffnet „Speichern…“ mit dem, was folgen kann; „Nicht jetzt“ blendet es aus, bis sich etwas ändert.",
+  "tips.releaseOffer.title": "Weitermachen, wenn ein Release erschienen ist",
   "tips.removeAll.text": "„Alle entfernen“ im Projektkopf entfernt nach einer Rückfrage alle Agenten eines Projekts. Worktrees bleiben erhalten, außer du hakst das Kästchen an; dann werden nur gemergte, saubere gelöscht.",
   "tips.removeAll.title": "Alle Agenten auf einmal entfernen",
   "tips.resolveOnBuilder.text": "„Auf den neuesten Stand bringen…“ kam mit einem Konflikt zurück? „Von einem Bearbeiter lösen lassen…“ auf seiner Karte erstellt eine normale Karte, auf der ein Bearbeiter von Hand mergt und den Konflikt löst; sie wird wie jede Karte geprüft und als Merge-Commit gemergt.",

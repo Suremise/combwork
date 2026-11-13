@@ -109,6 +109,8 @@
   "workflow.form.noneValue": "None",
   "workflow.form.notEnforced": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
   "workflow.form.off": "Off",
+  "workflow.form.offerStale": "Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.",
+  "workflow.form.offerUnsaved": "Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.",
   "workflow.form.on": "On",
   "workflow.form.openAdvanced": "Open Advanced",
   "workflow.form.otherTargets": "Branches, separated by commas (such as 1.2.0)",

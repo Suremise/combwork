@@ -58,6 +58,7 @@ import { applyProjectPref } from './projectPrefs'
 import { useLayoutRoom } from './layoutRoom'
 // The agent-state mark's test hook (the statemarks suite), until the session page shows the marks itself (#974).
 import './components/StateMark'
+import { loadReleaseOffers } from './releaseOffers'
 
 function applyTheme(): void {
   const s = get().settings
@@ -327,6 +328,9 @@ function handleEvent(e: CombworkEvent): void {
     case 'tools-restart-asked':
       // Busy agents whose tools a workflow change changed (HI-2694): asked whether to restart them.
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) void askWorkflowToolsRestart(e.projectPath, e.agents)
+      break
+    case 'release-offers':
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) void loadReleaseOffers()
       break
     case 'workflow-changed':
       if (e.workspacePath.toLowerCase() !== get().workspace?.path.toLowerCase()) break

@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "Keine",
   "workflow.form.notEnforced": "Workflow-Regeln werden nicht durchgesetzt (Einstellungen → Erweitert). Diese Optionen werden gespeichert und gelten, sobald die Regeln wieder durchgesetzt werden.",
   "workflow.form.off": "Aus",
+  "workflow.form.offerStale": "„Arbeit wird gemergt in“ oder „Weitere Branches, in die Arbeit gemergt werden kann“ hat sich geändert, seit das Release-Angebot erstellt wurde, daher wurde es nicht eingetragen. Das Angebot wird neu gelesen.",
+  "workflow.form.offerUnsaved": "Workflow hat Änderungen, die du nicht gespeichert hast, daher wurde das Release-Angebot nicht eingetragen. Speichere oder verwirf sie und wähle dann erneut „Umstellen…“.",
   "workflow.form.on": "An",
   "workflow.form.openAdvanced": "Erweitert öffnen",
   "workflow.form.otherTargets": "Branches, durch Kommas getrennt (etwa 1.2.0)",

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 135
+const FIXTURES_VERSION = 136
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -5017,6 +5017,35 @@ module.exports.SCENARIOS = [
       ]
     },
     fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
+  },
+  {
+    id: 'assistant-release-offer',
+    title: "The Assistant told alpha's release shipped, with Combwork's release offer waiting (HI-3155): moves Work merges into to the next version (naming the offer), never puts the offer off itself",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    async setup(c) {
+      // 1.4.0 released (tagged v1.4.0, its head in main), 1.5.0 made: the offer moves alpha to 1.5.0.
+      c.git('branch', '1.4.0')
+      c.git('-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'tag', '-a', 'v1.4.0', '-m', 'release 1.4.0', '1.4.0')
+      c.git('branch', '1.5.0')
+      await pairInProject(c, { target: '1.4.0', otherTargets: ['1.5.0'] })
+      // The offer read before the session starts (a condition, never a time); before HI-3155 there is none to wait for.
+      const end = Date.now() + 120_000
+      for (;;) {
+        const offers = await c.inv('workflow:releaseOffers').catch(() => null)
+        if (!offers || offers.some((o) => o.move?.moveTo === '1.5.0')) break
+        if (Date.now() > end) throw new Error('setup: no release offer for alpha')
+        await new Promise((r) => setTimeout(r, 200))
+      }
+    },
+    prompt: "alpha's 1.4.0 has shipped. Move its work on to the next version: I've checked, go ahead.",
+    fake: 'cw cw_project_status {"project":"alpha"} then cw cw_update_setting {"id":"project.workflow.target","value":"1.5.0","project":"alpha"}',
+    expect: (o) => [
+      ["moved alpha's Work merges into to 1.5.0 with cw_update_setting", ran(o, 'cw_update_setting').some((x) => /workflow\.target/.test(String(argsOf(x).id)) && argsOf(x).value === '1.5.0') && o.targets?.target === '1.5.0', JSON.stringify({ calls: o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`), targets: o.targets })],
+      ['didn’t put the offer off itself (no cw_branch dismissOffer)', !called(o, 'cw_branch').some((x) => argsOf(x).action === 'dismissOffer'), o.combworkCalls.map((x) => `${x.tool} ${x.args}`).join(' | ')]
+    ],
+    observe: (o) => [["answered naming Combwork's offer (cw_update_setting's offer)", ran(o, 'cw_update_setting').some((x) => typeof argsOf(x).offer === 'string' && argsOf(x).offer.startsWith('ro-')), ran(o, 'cw_update_setting').map((x) => x.args).join(' | ')]]
   },
   {
     id: 'assistant-next-version-ask',

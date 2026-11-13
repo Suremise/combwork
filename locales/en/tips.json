@@ -1875,6 +1875,14 @@
     "defaultMessage": "Tidy your recent workspaces",
     "description": "A tip's title."
   },
+  "tips.releaseOffer.text": {
+    "defaultMessage": "Once Work merges into is released (tagged v1.4.0 and merged into main), For you offers to move it to 1.5.0 or start 1.5.0, and to drop released branches nothing uses. Move… opens Save… with what can follow; Not now hides it until something changes.",
+    "description": "A tip (HI-3155). Work merges into, For you, Move…, Save… and Not now are names in Combwork's window: keep them as Combwork shows them. Keep v1.4.0, 1.4.0, 1.5.0 and main as they are."
+  },
+  "tips.releaseOffer.title": {
+    "defaultMessage": "Moving on once a release ships",
+    "description": "A tip's title (HI-3155): Combwork offers to move a project's Work merges into once that branch is released."
+  },
   "tips.removeAll.text": {
     "defaultMessage": "Remove All in the project header removes all of a project's agents after one question. Worktrees are kept unless you tick the box, which deletes only merged, clean ones.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

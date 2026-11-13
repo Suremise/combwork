@@ -31,6 +31,7 @@ import { providerService } from './providerService'
 import { emit } from './events'
 import { workspace } from './workspace'
 import { advanced, updateSettingsChecked } from './advanced'
+import { checkOffer } from './workflow/releaseOffer'
 
 /**
  * Combwork's settings for the Agent API and the Combwork Assistant's settings tools (#186): the catalog's entries with their
@@ -46,6 +47,7 @@ import { advanced, updateSettingsChecked } from './advanced'
 const T = {
   noSetting: agentMsg({ id: 'settings.agent.tool.noSetting', text: 'No setting "{id}": cw_list_settings lists them (query narrows it).', note: 'cw_read_setting or cw_update_setting naming no setting there is. {id} is the id as given.' }),
   projectSetting: agentMsg({ id: 'settings.agent.tool.projectSetting', text: "{id} is a project's setting: say which project.", note: "A project's setting read or changed without naming the project. {id} is the setting's id." }),
+  offerNotHere: agentMsg({ id: 'settings.agent.tool.offerNotHere', text: 'offer answers a release offer: only with project.workflow.target or project.workflow.otherTargets, not {path}.', note: 'HI-3155: cw_update_setting given a release offer’s id for another setting.' }),
   usersToChange: agentMsg({ id: 'settings.agent.tool.usersToChange', text: "{path} is the user's to change.", note: "A sensitive setting with no reason recorded (#186). {path} is where the user changes it." }),
   levelsRefused: agentMsg({ id: 'settings.agent.tool.levelsRefused', text: "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.", note: "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence." }),
   optionsRefused: agentMsg({ id: 'settings.agent.tool.optionsRefused', text: "These workflow options can't be saved: {problems} Change the other options first, or tell the user.", note: "A project's workflow option that contradicts the others (#1278). {problems} are the reasons, each a sentence." }),
@@ -279,7 +281,8 @@ export async function applySetting(
   raw: unknown,
   projectPath: string | null,
   guard?: (current: unknown) => void,
-  removed?: string[]
+  removed?: string[],
+  offer?: string
 ): Promise<{ old: unknown; new: unknown; removed?: { old: string[]; new: string[] }; note?: string }> {
   if (e.sensitive) throw new SettingRefused(403, settingReadOnly(e) ?? say(T.usersToChange, { path: settingPath(e) }))
   const value = await checkedValue(e, raw, e.scope === 'project' ? projectPath : null)
@@ -332,7 +335,20 @@ export async function applySetting(
       await missingFirst()
       return write()
     }) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
-    const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
+    // HI-3155: an answer to a release offer (`offer`): only on the options it was made on, checked under these locks (where
+    // they can't change), else refused with nothing written. Only for Work merges into and Other branches.
+    if (offer && e.workflow !== 'target' && e.workflow !== 'otherTargets') throw new SettingRefused(400, say(T.offerNotHere, { path: settingPath(e) }))
+    const offered = async (): ReturnType<typeof guarded> => {
+      if (offer) {
+        try {
+          await checkOffer(workspace, projectPath, offer)
+        } catch (err) {
+          throw new SettingRefused(409, agentError(err as CombworkError))
+        }
+      }
+      return guarded()
+    }
+    const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(offered), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     const now = settingValue(e, config.settings, next)
     const changed = e.workflow === 'target' && JSON.stringify(old) !== JSON.stringify(now)

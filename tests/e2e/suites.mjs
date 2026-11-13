@@ -321,6 +321,7 @@ export const SUITES = [
   { name: 'rail' },
   { name: 'recent' },
   { name: 'reconcile' },
+  { name: 'releaseoffer' },
   { name: 'removeall' },
   { name: 'removeprojectslots' },
   { name: 'rendercrash' },

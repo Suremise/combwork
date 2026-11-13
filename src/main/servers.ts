@@ -15,7 +15,9 @@ import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDesc
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
-import { branchChange, changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
+import { branchChange, changeGroups, noteAgent, noteChange, offerDismissChange, recordedHere, recordingChanges } from './assistantChanges'
+import { dismissOffer, releaseOffers } from './workflow/releaseOffer'
+import { releaseOfferSaid } from './workflow/releaseOfferText'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
@@ -949,7 +951,22 @@ route('GET', '/v1/projects', async ({ query }) => {
 route('GET', '/v1/projects/:name', async ({ params }) => {
   const p = projectByName(params[0])
   const unused = await unusedWorktreeCounts(p)
-  return { ...(await projectSummary(p)), ...(unused ? { unusedWorktrees: unused } : {}) }
+  // HI-3155: its release offer, the Assistant's alone (the user's and its decision, as Work merges into is), unless put off.
+  const offer = assistantCaller() ? releaseOffers(workspaceOf(p)).find((o) => o.projectPath.toLowerCase() === p.toLowerCase()) : undefined
+  return { ...(await projectSummary(p)), ...(unused ? { unusedWorktrees: unused } : {}), ...(offer ? { releaseOffer: { id: offer.id, said: releaseOfferSaid(offer, 'status') } } : {}) }
+})
+
+// HI-3155: the Assistant's Not now on a project's release offer (its current one, by id): Control's, recorded for undo.
+route('POST', '/v1/projects/:name/release-offer/dismiss', async ({ params, body }) => {
+  const p = projectByName(params[0])
+  if (!assistantCaller()) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.dismissOffer, { project: basename(p) }]) }))
+  const id = typeof body?.id === 'string' ? body.id.slice(0, 64) : ''
+  return assistantChange('agents', [API.change.dismissOffer, { project: basename(p) }], { kind: 'setting', project: basename(p) }, async (guard) => {
+    guard()
+    const was = await dismissOffer(workspaceOf(p), p, id)
+    await noteChange(requireWorkspace(), offerDismissChange(basename(p), was, id))
+    return { done: [API.done.offerDismissed, { project: basename(p) }], result: { ok: true, offer: id } }
+  })
 })
 
 // A project agent turns only its own project on or off (HI-2330: another project is its own agents', the Assistant's and the user's).
@@ -1169,7 +1186,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
     const e = entryOf(decodeURIComponent(params[0]))
     const p = settingsProject(body?.project)
     if (e.scope === 'project' && !p) throw new HttpError(400, apiSaid(API.settings.sayProject, { setting: e.id }))
-    return settingsChange(e, body?.value, e.scope === 'project' ? p : null)
+    return settingsChange(e, body?.value, e.scope === 'project' ? p : null, typeof body?.offer === 'string' && body.offer ? body.offer.slice(0, 64) : undefined)
   })
 )
 
@@ -1177,7 +1194,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
  * A setting the Combwork Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
-async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
+async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null, offer?: string) {
   // Where it is, as the caller reads it; and as records keep it, in the Default (dialects, HI-2441).
   const path = settingPath(e)
   const storedPath = inDefaultDialect(() => settingPath(e))
@@ -1209,7 +1226,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   }
   try {
     // The value as sent (applySetting checks it again): a provider's prices take null, Combwork's own, as more than {}.
-    const r = await applySetting(e, value, projectPath, stillAllowed)
+    const r = await applySetting(e, value, projectPath, stillAllowed, undefined, offer)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
     const stored = inDefaultDialect(() => settingChangeTexts(e, r.old, r.new, r.removed))
@@ -2766,7 +2783,7 @@ route('POST', '/v1/workflow/next-version', async ({ body }) => {
   return assistantChange('agents', [API.change.nextVersion, { project: basename(p) }], { kind: 'next-version', project: basename(p) }, async (guard) => {
     let r: NextVersionResult
     try {
-      r = await startNextVersion(ws, p, { name, from, check: guard, preview: true })
+      r = await startNextVersion(ws, p, { name, from, check: guard, preview: true, ...(typeof body?.offer === 'string' && body.offer ? { offer: body.offer.slice(0, 64) } : {}) })
     } catch (e) {
       // The branch kept after a refused save: recorded, so undo can still take it back.
       if (e instanceof NextVersionPartial) await noteChange(ws, branchChange(basename(p), e.branch.name, e.branch.commit))

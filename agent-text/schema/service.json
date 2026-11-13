@@ -1225,6 +1225,43 @@
   "service.queue.pauseNoFolder": {
     "placeholders": {}
   },
+  "service.releaseOffer.drop": {
+    "placeholders": {
+      "branches": "plain",
+      "id": "plain"
+    }
+  },
+  "service.releaseOffer.head": {
+    "placeholders": {
+      "id": "plain",
+      "project": "plain"
+    }
+  },
+  "service.releaseOffer.kept": {
+    "placeholders": {
+      "kept": "plain"
+    }
+  },
+  "service.releaseOffer.move": {
+    "placeholders": {
+      "target": "plain",
+      "tag": "plain",
+      "into": "plain",
+      "how": "select",
+      "next": "plain",
+      "id": "plain"
+    }
+  },
+  "service.releaseOffer.stale": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.releaseOffer.tail": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
   "service.repoOps.notOffered": {
     "placeholders": {
       "platform": "plain"

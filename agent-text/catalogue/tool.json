@@ -47,8 +47,8 @@
     "text": "The project's MCP servers it gets: [] none, [\"*\"] all (default). combwork is always given."
   },
   "tool.arg.override": {
-    "text": "Moves it past the rules the move skips: reason is the user's own why, never made up. released: the released branch its refusal named, once the user OKs work there.",
-    "note": "HI-3148: released added."
+    "text": "Past the rules the move skips: reason is the user's own why, never made up. released: the branch its refusal named.",
+    "note": "HI-3148: released added (HI-3155: within 120 characters)."
   },
   "tool.arg.project": {
     "text": "A project's name."
@@ -94,6 +94,10 @@
     "text": "create: where it starts: a branch, tag or commit. nextVersion: Work merges into as you read it (refused if it moved on).",
     "note": "HI-3114: required for nextVersion too."
   },
+  "tool.branch.arg.offer": {
+    "text": "A release offer’s id: nextVersion answers it; dismissOffer puts it off (Not now).",
+    "note": "HI-3155: cw_branch’s offer argument."
+  },
   "tool.branch.description": {
     "text": "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.",
     "note": "HI-2807. Work merges into and Other branches (work can merge into) are option names."
@@ -101,6 +105,10 @@
   "tool.branch.reply.created": {
     "text": "Created {name} from {from} ({commit}).",
     "note": "HI-2807: cw_branch create. {commit} is a short hash."
+  },
+  "tool.branch.reply.dismissed": {
+    "text": "Put off release offer {offer} until it changes.",
+    "note": "HI-3155: cw_branch dismissOffer’s reply."
   },
   "tool.branch.reply.nextVersion": {
     "text": "Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}",
@@ -332,7 +340,7 @@
     "text": "start: reviewed by the project's reviewer pool."
   },
   "tool.lane.arg.released": {
-    "text": "start: target and reason: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.",
+    "text": "start: target and reason: the released branch its refusal named, once the user OKs a hotfix there.",
     "note": "HI-3148: the Assistant’s override of a new lane on a released line."
   },
   "tool.lane.arg.reviewer": {
@@ -688,6 +696,10 @@
   },
   "tool.updateAgent.description": {
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."
+  },
+  "tool.updateSetting.arg.offer": {
+    "text": "A release offer’s id it answers.",
+    "note": "HI-3155: cw_update_setting’s offer argument (project.workflow.target or otherTargets)."
   },
   "tool.updateSetting.arg.value": {
     "text": "What cw_read_setting says it takes."

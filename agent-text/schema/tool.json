@@ -110,6 +110,9 @@
   "tool.branch.arg.from": {
     "placeholders": {}
   },
+  "tool.branch.arg.offer": {
+    "placeholders": {}
+  },
   "tool.branch.description": {
     "placeholders": {}
   },
@@ -118,6 +121,11 @@
       "name": "plain",
       "from": "plain",
       "commit": "plain"
+    }
+  },
+  "tool.branch.reply.dismissed": {
+    "placeholders": {
+      "offer": "plain"
     }
   },
   "tool.branch.reply.nextVersion": {
@@ -791,6 +799,9 @@
     "placeholders": {}
   },
   "tool.updateAgent.description": {
+    "placeholders": {}
+  },
+  "tool.updateSetting.arg.offer": {
     "placeholders": {}
   },
   "tool.updateSetting.arg.value": {

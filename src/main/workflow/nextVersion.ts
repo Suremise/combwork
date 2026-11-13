@@ -27,6 +27,7 @@ import { retargetPreview } from './retarget'
 import { projectTargets } from './targets'
 import { workflowWrite } from './writes'
 import { queueIntegration } from '../platform/integrationPorts'
+import { checkOffer } from './releaseOffer'
 
 const log = createLogger('nextVersion')
 
@@ -83,7 +84,7 @@ export async function previewFor(ws: WorkspaceService, projectPath: string, from
 export async function startNextVersion(
   ws: WorkspaceService,
   projectPath: string,
-  a: { name?: string; from?: BranchStart; base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }; check?: () => void; preview?: boolean }
+  a: { name?: string; from?: BranchStart; base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }; check?: () => void; preview?: boolean; offer?: string }
 ): Promise<NextVersionResult> {
   return withFolderRepoLocks([projectPath], () => workflowWrite(() => startLocked(ws, projectPath, a)), { quiet: true, project: projectPath })
 }
@@ -95,6 +96,8 @@ async function startLocked(ws: WorkspaceService, projectPath: string, a: Paramet
   const release = (await projectTargets(ws, projectPath))?.default ?? ''
   const from: BranchStart = a.from ?? { ref: release, commit: '' }
   if (from.ref !== release) throw combworkError(M.movedOn, { now: release, from: from.ref }, { kind: 'conflict' })
+  // HI-3155: started from a release offer's Start…: only while that offer is the project's, on the options it saw.
+  if (a.offer) await checkOffer(ws, projectPath, a.offer)
   const name = (a.name ?? '').trim() || nextVersionName(release) || ''
   if (!name) throw combworkError(M.noName, { from: release }, { kind: 'invalid' })
   if (name === release) throw combworkError(M.sameName, { from: release }, { kind: 'invalid' })

@@ -320,7 +320,8 @@ export const AREAS = [
   // A watch from a builder's previous conversation, and an agent's watch guards (HI-2197).
   { paths: ['tests/e2e/stalewatch.cjs', 'src/main/watchGuards.ts', 'src/main/watches.ts', 'src/main/cardIntents.ts'], suites: ['stalewatch'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
-  { paths: ['src/main/platform/releaseReads.ts', 'src/main/platform/gitReleaseReads.ts', 'src/main/platform/jjReleaseReads.ts', 'src/main/platform/releaseReadsPorts.ts'], suites: ['lanestart'] },
+  { paths: ['src/main/platform/releaseReads.ts', 'src/main/platform/gitReleaseReads.ts', 'src/main/platform/jjReleaseReads.ts', 'src/main/platform/releaseReadsPorts.ts'], suites: ['lanestart', 'releaseoffer'] },
+  { paths: ['src/main/workflow/releaseOffer.ts', 'src/main/workflow/releaseOfferText.ts', 'src/shared/releaseOffer.ts', 'src/renderer/src/releaseOffers.tsx', 'tests/e2e/releaseoffer.cjs'], suites: ['releaseoffer'] },
   // A lane's brief (HI-1795): given with its cards' placements in slots, delivered outside them.
   { paths: ['src/main/laneBriefs.ts', 'tests/e2e/lanebrief.cjs'], suites: ['lanebrief', 'slotrecovery'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).

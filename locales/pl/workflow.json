@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "Brak",
   "workflow.form.notEnforced": "Reguły przepływu pracy nie są egzekwowane (Ustawienia → Zaawansowane). Te opcje są zapisane i zaczną obowiązywać, gdy reguły znów będą egzekwowane.",
   "workflow.form.off": "Wyłączone",
+  "workflow.form.offerStale": "„Praca jest scalana do” lub „Inne gałęzie, do których można scalać pracę” zmieniło się od utworzenia propozycji wydania, więc jej nie wpisano. Propozycja jest odczytywana ponownie.",
+  "workflow.form.offerUnsaved": "Przepływ pracy ma niezapisane zmiany, więc propozycji wydania nie wpisano. Zapisz je lub odrzuć, a potem ponownie wybierz „Zmień…”.",
   "workflow.form.on": "Włączone",
   "workflow.form.openAdvanced": "Otwórz Zaawansowane",
   "workflow.form.otherTargets": "Gałęzie rozdzielone przecinkami (np. 1.2.0)",
