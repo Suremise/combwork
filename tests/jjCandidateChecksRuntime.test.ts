@@ -463,6 +463,28 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
         expect(x.runs.length - runs).toBe(2)
       })
     }
+
+    it('HI-3122: the stamp changed under a running check, its setup command the same: invalid, nothing published, then tried again by itself and passed', async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS })
+      // The retry's look comes soon; nothing else asks for one.
+      x.h.againMs = () => 50
+      let once = true
+      x.h.hook = async (p) => {
+        if (p === 'beforeCheck:lint' && once) {
+          once = false
+          // Its stamp moves on (as any change to what it reads would), the setup command itself unchanged: the key stays.
+          x.setSetup('')
+        }
+      }
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      const cycle = w.wf.state(card).cycle
+      await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
+      expect(x.leases.map((l) => l.given)).toContain('invalid')
+    })
   })
 
   describe.runIf(process.platform === 'win32')("HR1's round 1, in real jobs (colocated)", () => {

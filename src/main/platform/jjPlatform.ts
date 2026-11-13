@@ -863,6 +863,11 @@ export class JjPlatform implements PlatformAdapter {
         const retryMs = host.againMs?.(misses + 1) ?? Math.min(15 * 60_000, 30_000 * 2 ** misses)
         await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500), retryMs })
         later = Math.min(later ?? Infinity, retryMs)
+      } else if ('invalid' in out) {
+        // HI-3122: what the run was for changed under it (its setup command, its options, the candidate, the offer):
+        // nothing is published, and the next look, soon, decides again (anew under a new key, or not at all once the
+        // candidate has gone). Before, nothing asked again, and its checks stayed shown running.
+        later = Math.min(later ?? Infinity, host.againMs?.(0) ?? 30_000)
       }
     }
     if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
