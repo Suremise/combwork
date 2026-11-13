@@ -162,6 +162,25 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await reopenBranches()
   check('…an unlocked ssh key: signs without asking, with its format, key and scope', !!(await signingIs('unattended')) && /SSH/.test(await text(signingBox)) && (await text(signingBox)).includes(path.basename(signKey)) && /set in this repository/.test(await text(signingBox)), await text(signingBox))
   await shot(page, '3b-signing')
+  // HI-3110: a key with a passphrase needs someone: the SSH how-to shows, naming Windows' ssh-keygen as gpg.ssh.program
+  // (Git for Windows' own can't reach the Windows agent). Both themes; the unlocked key back after.
+  const lockedKey = path.join(lib.WORK, `gitview-signing-locked-${Date.now()}`).replace(/\\/g, '/')
+  execFileSync(path.join(gitRoot, 'usr', 'bin', 'ssh-keygen.exe'), ['-q', '-t', 'ed25519', '-N', 'secret', '-f', lockedKey])
+  g(alpha, 'config', 'user.signingkey', lockedKey)
+  await reopenBranches()
+  const how = signingBox.locator('.git-signing-how')
+  const howText = (await signingIs('needsSomeone')) ? await lib.until(async () => ((await how.count()) ? text(how) : null), HUNG_MS) : null
+  check('HI-3110: a key that needs someone shows the SSH how-to, naming gpg.ssh.program as Windows’ ssh-keygen', !!howText && howText.includes('set gpg.ssh.program to C:/Windows/System32/OpenSSH/ssh-keygen.exe (Git for Windows’ own ssh-keygen can’t reach that agent).'), (await text(signingBox)) || '')
+  await page.mouse.move(5, 5)
+  for (const t of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme: t } })
+    await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+    await signingBox.screenshot({ path: path.join(lib.WORK, `gitview-3c-signing-how-ssh-${t}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  g(alpha, 'config', 'user.signingkey', signKey)
+  await reopenBranches()
+  await signingIs('unattended')
   const marker = path.join(lib.WORK, `gitview-signer-ran-${Date.now()}.txt`)
   const customSigner = path.join(lib.WORK, 'gitview-custom-signer.cmd')
   fs.writeFileSync(customSigner, `@echo ran > "${marker}"\r\n`)
