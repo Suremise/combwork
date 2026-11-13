@@ -153,8 +153,10 @@ function jjRepo(dir, o = {}) {
     check('the jjFound offer: jj found at the root, Switch to jj…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'jjFound' && /jj found at/.test(await text(offer)), HUNG_MS)), await text(offer))
     await shoot(page.locator('.vc-view'), 'offer')
 
-    // --- The drain: a card in flight refuses the switch, listed; Check Again reads it again.
-    const card = await inv('tasks:create', { title: 'In flight', project: 'shop' })
+    // --- The drain: a card in flight refuses the switch, listed; Check Again reads it again. A no-code card (HI-3166):
+    // shop is colocated with jj, which leaves Git's head detached, so a code card's start in its folder is refused
+    // `platform.detachedFolder` (HI-3104); the drain counts any card started, whatever its kind.
+    const card = await inv('tasks:create', { title: 'In flight', project: 'shop', kind: 'no-code' })
     const moved = await inv('tasks:move', card.number, 'doing', { confirm: true, reason: 'jjview: a card in flight' })
     check('a card started in shop', !!moved && (await inv('tasks:list')).find((t) => t.number === card.number)?.column === 'doing', JSON.stringify(moved))
     await head.locator('[data-platform="jj"]').click()
@@ -410,8 +412,9 @@ function jjRepo(dir, o = {}) {
     check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), HUNG_MS)) && fs.existsSync(path.join(shop, '.jj')))
 
     // --- HI-2974: shop's repository has been switched, so its switch to None waits for its work: refused while a card is
-    // in flight (the drain listed, Check Again), then the usual warning (cancelled here: shop goes on as Git below).
-    const card2 = await inv('tasks:create', { title: 'Still running', project: 'shop' })
+    // in flight (the drain listed, Check Again), then the usual warning (cancelled here: shop goes on as Git below). No-code,
+    // as the first: Git's head is still detached (HI-3166).
+    const card2 = await inv('tasks:create', { title: 'Still running', project: 'shop', kind: 'no-code' })
     await inv('tasks:move', card2.number, 'doing', { confirm: true, reason: 'jjview: a card in flight' })
     await head.locator('[data-platform="none"]').click()
     const memberDrained = dialog.filter({ has: page.locator('[data-vc-store-drain]') })
