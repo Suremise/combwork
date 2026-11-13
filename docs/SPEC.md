@@ -2485,13 +2485,16 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
      complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
      (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
-     worktree; colocated (the pool adds it `--colocate`), jj registers it in `.git/worktrees` with a relative `gitdir`,
-     which the observer's `foldersOf` resolves against the wrong folder (HI-3160), so either way its own folder has no
-     write record today and the stat snapshot decides (once HI-3160 is fixed, the write record decides there). Both leave
+     worktree, and the stat snapshot decides; colocated (the pool adds it `--colocate`), jj registers it in
+     `.git/worktrees` with a relative `gitdir`, which the observer's `foldersOf` resolves against that entry, as Git does
+     (HI-3160), so the slot has a write record of its own and it decides. Both leave
      out what jj ignores (HI-3158, `jjIgnoredEntries.ts`), as jj's rules say (the tracked `.gitignore` files, its Git
      store's `info/exclude`, Git's global excludes), asked of Git with jj's Git-backed store as its folder
      (`check-ignore --no-index`), colocated or not. The write record: a path jj ignores doesn't count, the revision's own
-     files always do, and where Git can't say the record stands. The stat snapshot: a write inside a folder that is
+     files always do, and where Git can't say the record stands. A path is ignored only as every kind it may have had
+     (HI-3160), asked by kind as below: those the run's watch saw and the start's listing had, a folder where the record
+     has paths under it (a deleted `__pycache__/`), what is on disk now, and a file too where its folder wasn't both
+     listed and watched or nothing says; one it can't stat counts. The stat snapshot: a write inside a folder that is
      already there (an `out/` an earlier build made) changes none of its lines; a run that makes or removes an entry in the
      workspace's root or in a folder holding a tracked file changes that folder's line. So the run also watches each such
      folder (not its subfolders; at most 64, else none) from before t0 until it has settled after t1, and the start keeps

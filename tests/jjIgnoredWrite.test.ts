@@ -1,14 +1,15 @@
 // HI-3121, settled: whether a jj builder's own check (`cw-progress --check`, JjPlatform.checkRun's bracket) counts when its
 // command writes a file the repository ignores. The production bracket (jjCheckStart, jjCheckEnd, jjCredit) on real jj,
 // in a slot as the app makes one (a second jj workspace beside the project's), the production Observer following the
-// project as the app does. A slot is no Git worktree, so the Observer keeps no write record for it: the credit rests on
+// project as the app does. A slot not colocated is no Git worktree, so the Observer keeps no write record for it: the credit rests on
 // the stat snapshot of the revision's files and of their folders, the workspace's root included. What that does:
 // - a write inside a folder that is already there (an `out/` an earlier build made) changes none of those: credited;
 // - a run that makes (or removes) an entry in the root or in a folder holding a tracked file changes that folder's time.
 //   HI-3158: where every entry that came, went or was made again is one jj ignores (a first build's new `out/`, a
 //   `__pycache__/` beside a tracked `.py`, a build that deletes its output folder and makes it again each time), the run
 //   is credited; a new entry jj doesn't ignore still makes it `changed`.
-// Colocated and not, the same: the slot's own folder is never watched either way.
+// Colocated, the slot is also a Git worktree, whose write record the Observer keeps (HI-3160): that record, less what jj
+// ignores, decides instead of the stat snapshot, with the same outcomes.
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, resolve } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -52,28 +53,27 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       // As the pool's add (jjWorkspacePort.ts): colocation as the project's (HR1's round 1), full sparse patterns.
       h.jj(project, 'workspace', 'add', slot, '--name', 'slot-a', '-r', R, '--sparse-patterns', 'full', colocate ? '--colocate' : '--no-colocate')
       // HR1's round 1: what the slot is to Git. Colocated, jj gives it a .git of its own; the Observer's write records are
-      // the Git worktrees its repository lists (repoRefs' foldersOf: the main folder and .git/worktrees/*): never the slot.
+      // the Git worktrees its repository lists (repoRefs' foldersOf: the main folder and .git/worktrees/*).
       expect(existsSync(join(slot, '.git'))).toBe(colocate)
       if (colocate) {
         const listed = readRepoRefs(join(resolve(realpathSync.native(project)), '.git'), 100).folders.map((f) => resolve(f.folder).toLowerCase())
-        // jj registers it in .git/worktrees with a relative gitdir; foldersOf resolves that against the process's own
-        // folder, not the git dir, so the folder it watches isn't the slot (HI-3121's finding, carded): the slot's own
-        // folder has no write record, and the stat snapshot decides, as below.
+        // jj registers it in .git/worktrees with a relative gitdir, which foldersOf resolves against that entry, as Git
+        // does (HI-3160): the slot is listed.
         const common = join(resolve(realpathSync.native(project)), '.git')
         const gitdir = readFileSync(join(common, 'worktrees', 'slot-a', 'gitdir'), 'utf8').trim()
         console.log('slot .git is a', statSync(join(slot, '.git')).isDirectory() ? 'folder' : 'file', '; worktrees/slot-a/gitdir:', gitdir, '; the repository lists', listed)
         expect(isAbsolute(gitdir)).toBe(false)
         expect(listed).toContain(resolve(realpathSync.native(project)).toLowerCase())
-        expect(listed).not.toContain(resolve(realpathSync.native(slot)).toLowerCase())
+        expect(listed).toContain(resolve(realpathSync.native(slot)).toLowerCase())
       }
       const root = resolve(realpathSync.native(slot))
       const d = await jjContextOf(root, h.runner)
       if (!('jj' in d)) throw new Error(`not detected: ${JSON.stringify(d)}`)
       const view: ViewOf = { jjRepo: d.jj.jjRepo, workspace: d.jj.workspace, root: d.jj.root, store: d.jj.store, colocated: d.jj.colocated }
-      // The Observer follows the project as the app does; the slot has no write record of its own.
+      // The Observer follows the project as the app does; a slot not colocated has no write record of its own.
       const pr = resolve(realpathSync.native(project))
       o.follow([{ path: pr, platform: 'jj' as never, root: pr }])
-      expect(isUnknown(await o.changedBetween(root, Date.now(), Date.now(), jjCounts))).toBe(true)
+      if (!colocate) expect(isUnknown(await o.changedBetween(root, Date.now(), Date.now(), jjCounts))).toBe(true)
 
       // A builder's check: the repository's scope (no `scope`), as JjPlatform.checkRun brackets it.
       const run = async (write: ((start: JjCheckStart) => void | Promise<void>) | null) => {
@@ -83,6 +83,8 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
         return jjCredit(await jjCheckEnd(f, start, o, { runner: h.runner }))
       }
       const credited = (c: { whyNot?: string; tested: string }) => !c.whyNot && c.tested === R
+      // What decides a run that isn't credited: the slot's write record, colocated (HI-3160); else the stat snapshot.
+      const decides = colocate ? 'end:written' : 'end:stats'
       expect(credited(await run(null))).toBe(true)
       // A first build: out/ is new in the root, and ignored: credited, as the next one, writing into it, is.
       const first = await run(() => {
@@ -148,14 +150,14 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
           writeFileSync(join(root, 'stray.txt'), 'read by the check\n')
           rmSync(join(root, 'stray.txt'))
         })
-      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      ).toMatchObject({ whyNot: 'changed', why: decides })
       expect(
         await run(() => {
           pyc()
           writeFileSync(join(root, 'src', 'gen.py'), 'x\n')
           rmSync(join(root, 'src', 'gen.py'))
         })
-      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      ).toMatchObject({ whyNot: 'changed', why: decides })
       rmSync(join(root, 'src', '__pycache__'), { recursive: true })
       // HR2's round 2: a file named `out` (the rule is `out/`, folders only) made where out/ was, read as a file by the
       // watch before it's deleted and out/ made again. (Gone before it's read: the residual, Darren's r36.)
@@ -167,7 +169,7 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
           rmSync(join(root, 'out'))
           mkdirSync(join(root, 'out'))
         })
-      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      ).toMatchObject({ whyNot: 'changed', why: decides })
       expect(credited(await run(() => rmSync(join(root, 'out'), { recursive: true })))).toBe(true)
 
       // The same, asked directly, for a file jj doesn't track (`snapshot.auto-track` narrowed: HI-3096), which no end

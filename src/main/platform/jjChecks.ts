@@ -27,7 +27,7 @@
 // or another @, and a write to its files is in the record or the snapshot. The revision is a commit id: what was tested
 // can't change.
 
-import { stat } from 'original-fs/promises'
+import { lstat, stat } from 'original-fs/promises'
 import { join } from 'path'
 import type { CheckRanData } from '../../shared/workflow/facts'
 import type { FolderChanges, WriteLog } from './history'
@@ -37,7 +37,7 @@ import { isJjUnknown, JjReads, type JjCommit } from './jjReads'
 import { snapshotLine } from './snapshotLine'
 import { isAbsent, viewNow, type ViewNow, type ViewOf } from './jjView'
 import { isUnknown, type Maybe } from './types'
-import { foldersOf, ignoredOnly, jjEntries, jjIgnored, RunWatch, type EntriesOf } from './jjIgnoredEntries'
+import { foldersOf, ignoredByKind, ignoredOnly, jjEntries, RunWatch, type EntriesOf, type Kind, type WatchedNames } from './jjIgnoredEntries'
 
 /** What a jj check run is for. */
 export interface JjCheckFor {
@@ -188,11 +188,14 @@ export async function jjCheckEnd(r: JjCheckFor, start: JjCheckStart, log: WriteL
     // Combwork's writes in between: the end boundary comes after), so a write just before the command ended is in it.
     await log.settled(r.folder)
     t1 = now()
-    seen = await withoutIgnored(r.view.root, start.files, await log.changedBetween(r.folder, start.t0, t1, jjCounts))
+    // The run's watches settle before the end boundary, whose own writes (in `.jj`) they'd otherwise see; only when a
+    // filter below asks (a settle waits for quiet).
+    let settled: Promise<WatchedNames | null> | undefined
+    const watched = (): Promise<WatchedNames | null> => (settled ??= start.watch ? start.watch.settle() : Promise.resolve(null))
+    seen = await withoutIgnored(r.view.root, start.files, start.entries ?? null, await log.changedBetween(r.folder, start.t0, t1, jjCounts), watched)
     statsEnd = isUnknown(seen) ? await jjStats(r.view.root, start.files) : undefined
     const moved = statsEnd && start.files ? movedFolders(start, statsEnd) : []
-    // The run's watches settle before the end boundary, whose own writes (in `.jj`) they'd otherwise see.
-    if (moved.length && start.files) explained = await ignoredOnly(r.view.root, moved, { files: start.files, before: start.entries ?? null, watched: (await start.watch?.settle()) ?? null })
+    if (moved.length && start.files) explained = await ignoredOnly(r.view.root, moved, { files: start.files, before: start.entries ?? null, watched: await watched() })
   } finally {
     start.watch?.close()
   }
@@ -209,18 +212,55 @@ const slashes = (p: string): string => p.replace(/\\/g, '/')
 
 /**
  * HI-3158: a write record's paths less those jj ignores (Git's own record filters with check-ignore; jj's is narrowed by
- * jjCounts alone), the record's paths being the workspace's (a colocated slot's record is its own folder's). Where Git
- * can't say, the record stands as it is. The revision's own files are never asked: they count.
+ * jjCounts alone), the record's paths being the workspace's (a colocated slot's record is its own folder's, HI-3160).
+ * Where Git can't say, the record stands as it is. The revision's own files are never asked: they count.
+ *
+ * A path is ignored only as every kind it may have had during the run, asked by kind (ignoredByKind), never by what is
+ * on disk now: a folder-only rule (`out/`) mustn't cover a file `out` the run read and replaced with a folder (HR2's
+ * round 2 on HI-3158). Its kinds: those the run's watch saw in its folder and the start's listing of it had (as
+ * ignoredOnly reads them); a folder where the record has paths under it (a deleted `__pycache__/`); what it is on disk
+ * now; and a file too where its folder wasn't both listed and watched, or none of those says. Unreadable: it counts.
  */
-async function withoutIgnored(root: string, tracked: string[] | null, seen: Maybe<FolderChanges>): Promise<Maybe<FolderChanges>> {
+async function withoutIgnored(root: string, tracked: string[] | null, before: EntriesOf | null, seen: Maybe<FolderChanges>, settled: () => Promise<WatchedNames | null>): Promise<Maybe<FolderChanges>> {
   if (isUnknown(seen) || !seen.changed || !tracked) return seen
   // The revision's own files always count, whatever a rule says (a tracked file under an ignored folder).
   const mine = new Set(tracked)
-  const asked = new Set(seen.paths.filter((p) => !p.startsWith(':') && !mine.has(slashes(p))))
-  const ignored = await jjIgnored(root, [...asked].map(slashes))
+  const rels = new Set(seen.paths.filter((p) => !p.startsWith(':') && !mine.has(slashes(p))).map(slashes))
+  if (!rels.size) return seen
+  const watched = await settled()
+  const parents = new Set<string>()
+  for (const p of rels) for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) parents.add(p.slice(0, i))
+  const forms = new Map<string, string[]>()
+  for (const p of rels) {
+    const i = p.lastIndexOf('/')
+    const folder = i < 0 ? '.' : p.slice(0, i)
+    const name = p.slice(i + 1)
+    const inFolder = watched?.get(folder)
+    const listed = before?.get(folder)
+    const kinds = new Set<Kind>(inFolder?.get(name) ?? [])
+    const was = listed?.get(name)
+    if (was) kinds.add(was === '?' ? '?' : was.startsWith('d:') ? 'd' : 'f')
+    if (parents.has(p)) kinds.add('d')
+    const onDisk = await kindOnDisk(join(root, p))
+    if (onDisk) kinds.add(onDisk)
+    if (!inFolder || !listed || !kinds.size) kinds.add('f')
+    if (kinds.has('?')) continue
+    forms.set(p, [...(kinds.has('d') ? [`${p}/`] : []), ...(kinds.has('f') ? [p] : [])])
+  }
+  const ignored = await ignoredByKind(root, [...forms.values()].flat())
   if (!ignored) return seen
-  const paths = seen.paths.filter((p) => !asked.has(p) || !ignored.has(slashes(p)))
+  const isIgnored = (p: string): boolean => forms.get(p)?.every((f) => ignored.has(f)) ?? false
+  const paths = seen.paths.filter((p) => !rels.has(slashes(p)) || !isIgnored(slashes(p)))
   return { changed: paths.length > 0, paths }
+}
+
+/** What is at a path now: a folder, something else, nothing (null), or '?' when that can't be told. */
+async function kindOnDisk(path: string): Promise<Kind | null> {
+  try {
+    return (await lstat(path)).isDirectory() ? 'd' : 'f'
+  } catch (e) {
+    return isAbsent(e) ? null : '?'
+  }
 }
 
 /** The snapshot's lines, the revision's files' first, then their folders' (jjStats' order), each with its path and kind. */

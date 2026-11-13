@@ -285,20 +285,6 @@ export function entriesChanged(folder: string, before: FolderEntries | null, aft
   return [...out]
 }
 
-/**
- * Of these workspace-relative paths, those jj ignores (its Git store's rules, `check-ignore --no-index`, so a tracked
- * path is asked by its rules too). Null when Git can't say (no Git store, Git failing): nothing is taken as ignored.
- */
-export async function jjIgnored(root: string, rels: string[]): Promise<Set<string> | null> {
-  if (!rels.length) return new Set()
-  const gd = await jjGitStoreOf(root)
-  if (!gd) return null
-  const r = await git(root, [`--git-dir=${gd}`, `--work-tree=${root}`, 'check-ignore', '--no-index', '-z', '--stdin'], undefined, rels.join('\0'))
-  // Exit 1: none ignored. Anything else is Git failing.
-  if (!r.ok && r.code !== 1) return null
-  return new Set(r.out.split('\0').filter(Boolean))
-}
-
 /** What ignoredOnly needs: the revision's files, the start's listings and what the run's watches saw. */
 export interface IgnoredEvidence {
   files: string[]
@@ -348,7 +334,7 @@ export async function ignoredOnly(root: string, changed: string[], ev: IgnoredEv
  * only the `.gitignore` files on the paths' way (the root's and each folder's down to theirs), where nothing else is: a
  * path with a slash is a folder, one without a file. Null where it can't say (one of those unreadable, Git failing).
  */
-async function ignoredByKind(root: string, rels: string[]): Promise<Set<string> | null> {
+export async function ignoredByKind(root: string, rels: string[]): Promise<Set<string> | null> {
   if (!rels.length) return new Set()
   const gd = await jjGitStoreOf(root)
   if (!gd) return null
