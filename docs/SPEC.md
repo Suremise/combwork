@@ -3672,9 +3672,11 @@ and s11 (HR1's OK).
   starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
   project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running
   check as invalid.
-- **An invalid run is looked at again** (HI-3122): nothing is published for it, and the next look comes at the retry
-  time (`againMs(0)`, 30 s), which runs the checks anew under the key then, or not at all once the candidate has gone.
-  Before, nothing asked again, and the checks stayed shown running.
+- **Unsettled checks are always looked at again** (HI-3122): at the end of each pass, every candidate whose checks are
+  still shown running, waiting or failing gets its next look at its retry time, or at the bounded retry (`againMs(0)`,
+  30 s) when it has none ahead, whatever ended its turn (an invalid run, a restart refused for an unknown or changed setup,
+  any early exit): the look runs the checks anew under the key then, or not at all once the candidate has gone. Before,
+  nothing asked again, and the checks stayed shown running.
 - **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
   progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
   card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at

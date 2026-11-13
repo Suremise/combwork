@@ -868,12 +868,19 @@ export class JjPlatform implements PlatformAdapter {
         const retryMs = host.againMs?.(misses + 1) ?? Math.min(15 * 60_000, 30_000 * 2 ** misses)
         await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500), retryMs })
         later = Math.min(later ?? Infinity, retryMs)
-      } else if ('invalid' in out) {
-        // HI-3122: what the run was for changed under it (its setup command, its options, the candidate, the offer):
-        // nothing is published, and the next look, soon, decides again (anew under a new key, or not at all once the
-        // candidate has gone). Before, nothing asked again, and its checks stayed shown running.
-        later = Math.min(later ?? Infinity, host.againMs?.(0) ?? 30_000)
       }
+    }
+    // HI-3122 (the Assistant's note after HR3's round 3): whatever ended a card's turn in this pass (an invalid run, a
+    // restart refused for an unknown or changed setup, or any early exit to come), a card whose checks are still unsettled
+    // (shown running, waiting or failing) gets its next look at its retry time, or at the bounded retry (`againMs(0)`)
+    // when it has none ahead: never only when something else asks for one, which left its checks shown running.
+    for (const card0 of wf.store.cards()) {
+      if (host.signal?.aborted) return
+      if (card0.stage !== 'approved') continue
+      const c = candidateShown(wf, card0, wf.state(card0), project, undefined, true)?.checks
+      if (!c || (c.state !== 'running' && c.state !== 'waiting' && c.state !== 'failing')) continue
+      const ahead = c.state === 'running' ? undefined : c.retryAt
+      later = Math.min(later ?? Infinity, ahead !== undefined && ahead > Date.now() ? ahead - Date.now() : (host.againMs?.(0) ?? 30_000))
     }
     if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
       if (r.timer) clearTimeout(r.timer)
