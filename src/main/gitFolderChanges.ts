@@ -23,6 +23,7 @@ import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
 import { checkouts, worktreeNow } from './platform/git'
+import type { SubmoduleChange } from './platform/history'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { workspace } from './workspace'
@@ -55,7 +56,13 @@ const M = {
   unmerged: msg({ id: 'service.folderChanges.unmerged', defaultMessage: "{file} is in conflict in Git: resolve it there first (fix the file, then git add it). Combwork doesn't commit or set aside a file in conflict.", description: "HI-3025: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: the file ({file}, a path) has a conflict git hasn't had resolved (after a git stash pop that conflicted, say); committing it would put its conflict markers into the commit, so nothing was done. Keep git add as it is: a command." }),
   nestedRepo: msg({ id: 'service.folderChanges.nestedRepo', defaultMessage: '{folder} is a Git repository of its own inside this one, so Combwork doesn\'t commit it or set it aside. Add it to .gitignore, or as a submodule, yourself.', description: "HI-2983: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path ending in /) is an untracked folder that is a Git repository of its own; nothing was done. Keep .gitignore: a file name." }),
   submoduleInside: msg({ id: 'service.folderChanges.submoduleInside', defaultMessage: '{folder} is a submodule whose changes are inside it, so Combwork can\'t commit them or set them aside here. Commit them or set them aside inside {folder}, then commit its new commit here if you want it.', description: "HI-3023: an error from Commit or Set aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with edited or untracked files inside it and its recorded commit unchanged, which git can't commit or stash from this repository; nothing was done." }),
-  submoduleMoved: msg({ id: 'service.folderChanges.submoduleMoved', defaultMessage: "{folder} is a submodule now at another commit, which Git can't set aside. Commit it instead, or check out its recorded commit inside {folder} yourself.", description: "HI-3052: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say); git's stash can't put it back, so nothing was done. Commit works for it." }),
+  submoduleMoved: msg({ id: 'service.folderChanges.submoduleMoved', defaultMessage: "{folder} is a submodule now at another commit, which Git can't set aside. Commit it instead, or check out its recorded commit inside {folder} yourself.", description: "HI-3052, HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose checked-out commit differs from the one recorded (a new commit made inside it, say), not staged; git's stash can't put it back, so nothing was done. Commit works for it." }),
+  submoduleStaged: msg({ id: 'service.folderChanges.submoduleStaged', defaultMessage: "{folder} is a submodule whose new commit is staged, which Git can't set aside. Commit it instead, or unstage it (git restore --staged -- {path}) and check out its recorded commit inside {folder} yourself.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with a new commit staged (git add of the submodule); git's stash can't set it aside, so nothing was done. Commit works for it; unstaging it and checking out the recorded commit inside it clears it. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --." }),
+  submoduleStagedBack: msg({ id: 'service.folderChanges.submoduleStagedBack', defaultMessage: "{folder} is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside. Unstage it with git restore --staged -- {path}.", description: "HI-3124: an error from Commit or Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose new commit is staged while the commit already recorded is checked out inside it again; git has nothing to commit and can't stash it, so nothing was done. Unstaging it clears the change. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --." }),
+  submoduleAdded: msg({ id: 'service.folderChanges.submoduleAdded', defaultMessage: "{folder} is a submodule added here, which Git can't set aside. Commit it instead.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a newly added submodule; git's stash can't set it aside, so nothing was done. Commit works for it." }),
+  submoduleRemoved: msg({ id: 'service.folderChanges.submoduleRemoved', defaultMessage: "{folder} is a submodule removed from Git here, which Git can't set aside. Commit the removal instead.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose removal is staged (git rm); git's stash fails on it, so nothing was done. Commit works for it." }),
+  submoduleDeleted: msg({ id: 'service.folderChanges.submoduleDeleted', defaultMessage: "{folder} is a submodule whose folder was deleted, which Git can't set aside. Commit its removal instead, or bring it back with git submodule update -- {path}.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose folder was deleted (not through git); git's stash can't set that aside, so nothing was done. Committing records its removal; git submodule update checks it out again. Keep git submodule update as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --." }),
+  submoduleOther: msg({ id: 'service.folderChanges.submoduleOther', defaultMessage: "{folder} is a submodule, and Git can't set aside a submodule's change. Commit it instead.", description: "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule changed in another way (renamed, say); git's stash can't set a submodule's change aside, so nothing was done. Commit works for it." }),
   tooManyToSetAside: msg({ id: 'service.folderChanges.tooManyToSetAside', defaultMessage: "Git can't set aside this many files ({count, number}) at once in {folder}. Commit them, or set them aside with git stash yourself.", description: "HI-2983: an error from Set aside (a paused merge, a start's warning): too many files ({count}) for git stash to be given by name (Windows' command-line limit, inside git); nothing was done. Keep git stash as it is: a command." }),
   stashPartial: msg({ id: 'service.folderChanges.stashPartial', defaultMessage: 'Git reported a problem while setting the changes aside, after keeping them in a stash ({stash}). Check git stash list and the files before going on. Git said: {why}', description: "HI-2944: an error from Set aside: git stashed the changes (the stash's id, {stash}) but then failed; the user checks the stash and the files. {why} is git's own message (English). Keep git stash list as it is: a command." })
 }
@@ -496,6 +503,61 @@ function indexWarning(action: FolderChangeAction, made: string, took: Taken): Te
   return withValues(M.indexKept, { action, made: made.slice(0, 12), file: took.kept[0], others: took.kept.length - 1 })
 }
 
+/**
+ * HI-3124: the first of `subs` whose new commit is staged while its recorded commit (HEAD's) is checked out in it again
+ * (`MM`): git commits what the folder has, the recorded commit, so there's nothing to commit. Its commit read inside
+ * it; unreadable, it isn't named (the commit then says what git says).
+ */
+async function stagedBack(folder: string, subs: readonly SubmoduleChange[]): Promise<string | null> {
+  for (const s of subs) {
+    if (s.state !== 'staged' || !s.recorded) continue
+    const r = await git(join(folder, s.path), ['rev-parse', '-q', '--verify', 'HEAD'])
+    if (r.ok && r.out.trim() === s.recorded) return s.path
+  }
+  return null
+}
+
+/**
+ * HI-3124 (HR3's round 1): a path as one argument of a git command the user is told to run, after `--` (so a path
+ * starting with `-` isn't an option), in whichever terminal they use (PowerShell, cmd or Git Bash): as it is when
+ * nothing in it needs quoting; else in double quotes, which all three take as one argument with its spaces; else, a
+ * character double quotes don't keep literal in one of them being in it (`$`, a backtick, `"`, `!`, `%`), in single
+ * quotes, PowerShell's (and Git Bash's, but for a `'` in it, doubled for PowerShell).
+ */
+export function commandPath(path: string): string {
+  if (/^[\p{L}\p{N}._/@+,=:-]+$/u.test(path)) return path
+  if (!/[$`"!%]/.test(path)) return `"${path}"`
+  return `'${path.replace(/'/g, "''")}'`
+}
+
+/**
+ * HI-3124 (HR3's round 2): a path as a git command the user is told to run takes it, literal at both layers: to git, a
+ * path with a glob character in it (`*`, `?`, `[`, `\`) or starting with `:` (pathspec magic) as `:(literal)<path>`, or
+ * `libs/[ab]` would also match `libs/a` (`git restore --staged` then unstaging that too); to the shell, commandPath.
+ */
+export function gitPathArg(path: string): string {
+  return commandPath(/[*?[\\]|^:/.test(path) ? `:(literal)${path}` : path)
+}
+
+/** HI-3124: Set Aside's refusal of a submodule, saying how it changed and what clears it. */
+function submoduleRefusal(s: SubmoduleChange): Error {
+  const folder = s.path
+  switch (s.state) {
+    case 'moved':
+      return combworkError(M.submoduleMoved, { folder })
+    case 'staged':
+      return combworkError(M.submoduleStaged, { folder, path: gitPathArg(folder) })
+    case 'added':
+      return combworkError(M.submoduleAdded, { folder })
+    case 'removed':
+      return combworkError(M.submoduleRemoved, { folder })
+    case 'deleted':
+      return combworkError(M.submoduleDeleted, { folder, path: gitPathArg(folder) })
+    default:
+      return combworkError(M.submoduleOther, { folder })
+  }
+}
+
 const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
 /**
@@ -504,7 +566,7 @@ const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() ==
  * work in (the folder's own project's agents there, unless the caller names more). Throws the refusal, in the
  * window's words.
  */
-async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[]; submodules: string[] }> {
+async function assertQuiet(projectPath: string, folder: string, branch: string | null, agentsAt: readonly { project: string; folder: string }[] = [{ project: projectPath, folder }]): Promise<{ line: string; inside: string[]; submodules: SubmoduleChange[] }> {
   const now = await worktreeNow(folder)
   if (isUnknown(now)) throw failed(M.commitFailed, now.detail ?? now.what)
   // The operations under way, apart from the files (HI-2983: a changed file named `(MERGE_HEAD)` is a file). First
@@ -769,14 +831,19 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A submodule changed only inside it (HI-3023): its commit unchanged, git has nothing of it to commit or stash here.
         const sub = files.find((p) => inside.includes(p))
         if (sub) throw combworkError(M.submoduleInside, { folder: sub })
+        // HI-3124: a new commit staged for a submodule that has its recorded commit checked out again: git's commit (of
+        // what the folder has) finds nothing to commit, and its stash can't take it. Unstaging is the way out.
+        const back = await stagedBack(folder, submodules.filter((s) => files.includes(s.path)))
+        if (back) throw combworkError(M.submoduleStagedBack, { folder: back, path: gitPathArg(back) })
         const removed = await removedIn(folder, files, now)
         const kept = await keptDeleted(removed)
         if (kept) throw combworkError(M.deletedKept, { file: kept })
         if (action === 'setAside') {
-          // HI-3052: a submodule whose commit moved (or whose new commit is staged): git's stash saves its recorded commit
-          // but never checks the old one out again, so it would stay changed, reported set aside. Commit takes it.
-          const moved = files.find((p) => submodules.includes(p))
-          if (moved) throw combworkError(M.submoduleMoved, { folder: moved })
+          // HI-3052: git's stash sets no submodule aside (its checked-out commit, staged or not, added, or deleted, stays
+          // as it is, reported set aside; its staged removal fails the stash). Commit takes each. HI-3124: refused saying
+          // how it changed, with what clears it.
+          const changedSub = submodules.find((s) => files.includes(s.path))
+          if (changedSub) throw submoduleRefusal(changedSub)
           // HI-3024: git's stash can't set aside a case-only rename (it fails after making the stash, the old name
           // "already exists"), nor a removal whose path is now a folder without taking the folder's files, shown or not.
           const alias = [...removed].find(([, k]) => k === 'alias')?.[0]

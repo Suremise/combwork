@@ -6359,7 +6359,26 @@ touched:
   stash records the new commit but never checks the recorded one out again, so the submodule stayed changed while Set
   Aside said it was done (*… is a submodule now at another commit, which Git can't set aside. Commit it instead …*),
   whether its new commit is staged or not, alone or shown with other files, before anything runs.
-  `WorktreeNow.submodules` names every changed submodule (porcelain v2's `S…`). The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  `WorktreeNow.submodules` names every changed submodule (porcelain v2's `S…`), **each with how it changed**
+  (HI-3124), so the refusal says what is true and a remedy that clears it (each proved on real git; git's stash sets
+  none of them aside, and fails on a staged removal): another commit checked out, not staged (`.M`, its commit
+  changed: *… now at another commit … or check out its recorded commit inside …*); a new commit staged (`M?`: *…
+  whose new commit is staged … or unstage it (git restore --staged …) and check out its recorded commit inside …*);
+  added (`A?`: *… added here … Commit it instead.*); its removal staged (`D?`: *… removed from Git here … Commit the
+  removal instead.*); its folder deleted, nothing staged (`.D`: *… whose folder was deleted … Commit its removal
+  instead, or bring it back with git submodule update …*); anything else (a rename: *… Git can't set aside a
+  submodule's change. Commit it instead.*). Commit takes each, but one: a new commit staged while the recorded commit
+  (HEAD's, `hH`) is checked out in it again (`MM`, the moved remedy followed on a staged commit): `commit --only`
+  commits what the folder has, the recorded commit, so git has nothing to commit (*On branch main*). Read inside it
+  (its `HEAD`), both Commit and Set Aside refuse it by name before anything runs: *… with a new commit staged, but its
+  recorded commit is checked out in it again … Unstage it with git restore --staged …*, which leaves it clean. Staged
+  with a third commit checked out (`MM` too), Commit records that one. A command these name takes the path after `--`,
+  literal to git (HR3's round 2: `gitPathArg`; a path with a glob character, `*`, `?`, `[` or `\`, or starting with `:`
+  is written `:(literal)<path>`, or `git restore --staged -- "libs/[ab]"` would also unstage a staged `libs/a`), and
+  as one argument to the shell (HR3's round 1: `commandPath`): as it is when nothing in it needs quoting, else in double quotes
+  (one argument with its spaces in PowerShell, cmd and Git Bash alike), else, for a `$`, backtick, `"`, `!` or `%` in
+  it, in PowerShell's single quotes. A submodule path starting with `-` stays one argument there too, though git's
+  own submodule commands ignore such a submodule (CVE-2018-17456), so `git submodule update` can't bring it back. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
   file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
   before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
   own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
