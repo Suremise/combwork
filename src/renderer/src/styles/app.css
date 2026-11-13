@@ -7772,8 +7772,12 @@ button.agent-place:hover {
 .pane-footer-bar .pane-foot-item.warn {
   color: var(--warning);
 }
+/* On the footer's line (HI-3183): the footer's own font, so the label shares the text's baseline, and an odd height, so
+   in the footer's 23px below its top border the border box has as much room above it as below, on whole pixels. */
 .pane-footer-bar .mode-chip {
-  height: 18px;
+  height: 19px;
+  font-size: inherit;
+  line-height: inherit;
 }
 .pane-placeholder {
   position: absolute;
