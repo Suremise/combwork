@@ -2035,6 +2035,18 @@
     "defaultMessage": "These are saved as you change them, apart from the options above.",
     "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
   },
+  "workflow.slots.divergent": {
+    "defaultMessage": "{same, select, yes {The slot’s change is divergent in jj: its folder holds commit {folder}, and jj’s latest operation gives the slot commit {head}, another version of the same change.} other {The slot’s folder holds commit {folder}, which is still in jj, but jj’s latest operation gives the slot commit {head}.}} Recovering would take what only {folder} holds out of the folder, so nothing was changed.",
+    "description": "HI-3134: the text of the window after Recover… was refused (divergentTitle). {folder} and {head} are short jj commit ids: the one the slot’s folder holds, and the one jj now gives the slot. same: yes when both are versions of one change (jj calls that divergent). Keep the select keys."
+  },
+  "workflow.slots.divergentNext": {
+    "defaultMessage": "Look at both versions in jj (jj log -r \"{folder} | {head}\", and jj diff --from {head} --to {folder}), choose the one the slot should have, keeping anything in its folder you want, then choose Recover… again.",
+    "description": "HI-3134: the second paragraph of the window after Recover… was refused (divergentTitle): what to do next. {folder} and {head} are short jj commit ids; the jj commands are commands: keep them as they are."
+  },
+  "workflow.slots.divergentTitle": {
+    "defaultMessage": "{slot} wasn’t recovered",
+    "description": "HI-3134: the title of a window after Recover… of a stale jj slot was refused because the commit its folder holds is still in jj beside the one jj now gives the slot. {slot} is its name (slot-a)."
+  },
   "workflow.slots.fromSetup": {
     "defaultMessage": "From the project’s setup command before 1.0",
     "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before 1.0."

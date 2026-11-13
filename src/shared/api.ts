@@ -25,6 +25,7 @@ import type {
   SlotOptions,
   GitFilesStatus,
   SlotView,
+  SlotRecoverDivergent,
   SlotRecovery,
   HeldWriter,
   BoardState,
@@ -469,7 +470,7 @@ export interface CombworkRequests {
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** A stale jj slot recovered (HI-2866): the user's explicit action, with what it did (HI-2996); a protocol code when refused. */
-  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string }
+  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string; divergent?: SlotRecoverDivergent }
   /** HI-3032: a slot kept for a card with its folder gone, removed (Remove…): only that card's record at that generation. */
   /** `forgotten` (HI-3097): the mode the user confirmed, its folder there (true) or missing (false); another now: `changed`. */
   'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string, forgotten: boolean) => { ok: true } | { ok: false; why: string }

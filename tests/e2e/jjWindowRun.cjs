@@ -649,6 +649,38 @@ const onDb = (fn) => {
     const startedOn8 = ((await inv('tasks:facts', n2)) ?? []).filter((f) => f.kind === 'Started').pop()?.data?.target
     check('…card 2 started in its kept slot, on main (the bookmark its work is on), its work there', !!w8 && startedOn8 === 'main' && JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7), JSON.stringify({ started8, startedOn8, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
 
+    // HI-3134: card 2 put back, its slot settled; then the slot's own record of an edit (race.txt) races a write of the
+    // user's from the operation before it (a describe of the slot's older commit), and jj's head ends up giving the slot
+    // that older version, the folder's commit still beside it (the same change, divergent). Recover… changes nothing:
+    // a window names both commits and says what to do; race.txt stays in the folder.
+    const back9 = await inv('tasks:move', n2, 'todo', { confirm: true, reason: 'jjwindow: put back before a raced record' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    check('card 2 put back: its slot settled, nothing writing in it', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === kept7.name); return s && !s.lease && !s.writer && s.state === 'dirty' ? s : null }, HUNG_MS)), JSON.stringify({ back9, slots: await inv('slots:list', shop) }))
+    const op9 = jj(shop, '--ignore-working-copy', 'op', 'log', '--no-graph', '-n', '1', '-T', 'id').trim()
+    const E9 = id(kept7.folder, '@')
+    fs.writeFileSync(path.join(kept7.folder, 'race.txt'), 'recorded in the race\n')
+    jj(kept7.folder, 'status')
+    const X9 = id(kept7.folder, '@')
+    jj(shop, '--at-op', op9, '--ignore-working-copy', 'describe', '-r', E9, '-m', 'the user')
+    const E9b = id(shop, 'description(exact:"the user\n")')
+    jj(kept7.folder, '--ignore-working-copy', 'edit', E9b)
+    check('…the slot stale, its folder\'s commit beside the one jj gives it', X9 !== E9b && !!(await until(async () => (await inv('slots:list', shop)).find((x) => x.name === kept7.name)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    const row9 = page.locator(`[data-slot="${kept7.name}"]`)
+    check('…Slots and copies: Stale, with Recover…', !!(await until(async () => (await row9.locator('[data-action="recover"]').count()) === 1, HUNG_MS)), await text(row9))
+    await row9.locator('[data-action="recover"]').click()
+    const ask9 = page.locator('.dialog').filter({ hasText: `Recover ${kept7.name}?` })
+    check('…its confirmation', !!(await until(async () => (await ask9.count()) === 1, HUNG_MS)), await text(page.locator('.dialog')))
+    await ask9.getByRole('button', { name: 'Recover', exact: true }).click()
+    const refused9 = page.locator('.dialog').filter({ hasText: `${kept7.name} wasn’t recovered` })
+    check('…refused in a window naming both commits, with how to look at them', !!(await until(async () => (await refused9.count()) === 1 && /divergent in jj/.test(await text(refused9)) && (await text(refused9)).includes(X9.slice(0, 8)) && (await text(refused9)).includes(E9b.slice(0, 8)) && /jj diff --from/.test(await text(refused9)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(refused9, 'recover-divergent')
+    console.log(`INFO HI-3134 refusal shown: ${(await refused9.innerText().catch(() => '')).replace(/\s+/g, ' ')}`)
+    await refused9.getByRole('button', { name: 'OK', exact: true }).click()
+    check('…race.txt still in the folder, the slot still stale, both commits still in jj', fs.existsSync(path.join(kept7.folder, 'race.txt')) && (await inv('slots:list', shop)).find((x) => x.name === kept7.name)?.stale === true && id(shop, X9) === X9 && id(kept7.folder, '@') === E9b, JSON.stringify(await inv('slots:list', shop)))
+
   } finally {
     await app.close().catch(() => undefined)
   }

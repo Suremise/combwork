@@ -3882,6 +3882,18 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
 - **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
   Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
   card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
+- **The folder's commit still beside the head's** (HI-3134; HR1's design s7: a refusal). A record of the slot that
+  raced another write (the user's `jj op abandon`, say), reconciled by jj, can leave the head giving the workspace a commit
+  HW while the commit the folder's checkout is (WS) is still visible beside it: the same change, divergent, or another.
+  `update-stale` would check HW out and take what only WS holds out of the folder, which equals WS, so nothing is
+  preserved. `recoverStale` reads, pinned at the head, HW and whether WS is still visible (an ancestor of a visible head);
+  then it refuses `divergent` with both full commits and `same`, nothing changed. It does so when a fresh recovery
+  starts, before its journal or any copy is written, and again right before `update-stale` whatever phase a recovery
+  resumed from, its journal kept; there the head that decision was read at is compared again in `update-stale`'s recheck
+  under the file gate's admission (`headsNow`, no jj process: HR1's round 1), and moved, the decision is made again
+  (`divergent`, else `changing`), never jj's update on a head it wasn't made for. Unreadable, it refuses `unreadable`. A WS hidden (rewritten or abandoned: the usual
+  stale slot, HI-3099's) recovers as before. The window says it in a window of its own: both short ids, how to look at
+  them (`jj log`, `jj diff`), and to choose the slot's version keeping what its folder holds, then Recover… again.
 - **Stale after `jj op abandon`** (HI-3099): a folder whose checkout operation is no longer in the head's history (the
   user discarded old operations; jj then refuses to read or record it, "a sibling of the working copy's operation") is
   stale too (`staleAt`'s `inHistory`: the op log read pinned at the head, 200 ids then up to 20,000; only a completed
