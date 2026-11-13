@@ -13547,12 +13547,21 @@ button.progress-run-show:focus-visible {
 .progress-lane-ended .progress-lane-name {
   flex: 1 1 5em;
 }
+/* Wider than the row (a long time and a commit at the panel's narrowest, a long translation: HR1's HI-3178 round 1),
+   it wraps between its facts, each kept whole, never past the row's edge. */
 .progress-lane-ended-facts {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
+  min-width: 0;
+  max-width: 100%;
   margin-left: auto;
+}
+.progress-lane-ended-facts > * {
+  flex-shrink: 0;
   white-space: nowrap;
 }
 .progress-lane-ended-took {
