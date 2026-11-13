@@ -92,7 +92,7 @@ export interface CandidateHost {
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
-  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus> }
+  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus>; onTarget?: Promise<string[] | Again> }
   /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
   skipSmudge?: () => Promise<boolean>
 }

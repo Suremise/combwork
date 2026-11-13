@@ -115,15 +115,21 @@ describe('the target branch’s signing settings, read in the merge’s own work
 
   it('fails closed: a folder not detached at `at` is never touched; an unreadable include, a failed read or restore is unknown, HEAD put back', async () => {
     const { repo, folder, at } = repoWithDetached()
-    // Not detached at `at`: refused before anything changes.
+    // No onbranch condition anywhere: nothing to add, and nothing is touched (one git).
+    expect(await targetSigning(runner, folder, 'release', at)).toEqual({ args: [] })
+    writeFileSync(join(repo, '.git', 'rel.cfg'), '[commit]\n\tgpgsign = true\n')
+    run(repo, 'config', 'includeIf.onbranch:release.path', 'rel.cfg')
+    // Not detached at `at` (the project folder, on main): refused before anything changes.
     expect(await targetSigning(runner, repo, 'release', at)).toMatchObject({ failed: expect.stringMatching(/not detached/) })
     expect(run(repo, 'branch', '--show-current')).toBe('main')
-    // An include that is a directory: git can't read it.
+    // An include that is a directory: git can't read it on release (every git there fails, git's restore too); HEAD is
+    // written back detached all the same.
     mkdirSync(join(repo, '.git', 'dir.cfg'))
-    run(repo, 'config', 'includeIf.onbranch:release.path', 'dir.cfg')
+    run(repo, 'config', '--add', 'includeIf.onbranch:release.path', 'dir.cfg')
     expect(await targetSigning(runner, folder, 'release', at)).toMatchObject({ failed: expect.any(String) })
     expect(detachedAt(folder, at)).toBe(true)
-    run(repo, 'config', '--unset', 'includeIf.onbranch:release.path')
+    run(repo, 'config', '--unset-all', 'includeIf.onbranch:release.path')
+    run(repo, 'config', 'includeIf.onbranch:release.path', 'rel.cfg')
     // The read failing: unknown, HEAD restored.
     const readFails: BranchConfigRun = async (cwd, args) => (args[0] === 'config' ? { ok: false, code: 128, out: '', err: 'injected' } : runner(cwd, args))
     expect(await targetSigning(readFails, folder, 'release', at)).toEqual({ failed: 'injected' })

@@ -55,9 +55,9 @@ async function mergeBase(h: CandidateHost, a: string, b: string): Promise<string
  * the target for the read alone, detached at `at` again and read back so), first in every command that signs; a step
  * that failed is `again`, before anything is merged or committed (the next round's `folderAt` detaches the folder first).
  */
-async function onTarget(h: CandidateHost, f: string, target: string, at: string): Promise<string[] | Again> {
-  const r = await targetSigning(h.run, f, target, at)
-  return 'failed' in r ? again(r.failed) : r.args
+function onTarget(h: CandidateHost, f: string, target: string, at: string): Promise<string[] | Again> {
+  // Once a round (its target's), as `signs`: the round's update and test merge sign alike.
+  return (h.reads.onTarget ??= targetSigning(h.run, f, target, at).then((r) => ('failed' in r ? again(r.failed) : r.args)))
 }
 
 /**
