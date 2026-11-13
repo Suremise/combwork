@@ -152,6 +152,21 @@ export function liveIn<L>(hosts: readonly { path: string; agents: readonly { id:
  * The entries the map's context reads take (HI-2929): each with its live state as `liveOf` has it now, and their key,
  * which changes with what the ring depends on (mapContextKey), not only with the session id.
  */
+/**
+ * The order the map reads its agents in (HR1's HI-3180 round 1): turns and contexts are read for the first MAP_AGENTS
+ * only, so an agent shown alone from the strip (one past them, say the ninth of ten) goes first, and is read as a
+ * filter to it was. The rest keep their order; the strip's colours keep the selection's.
+ */
+export function mapReadOrder<E extends { key: string }>(entries: readonly E[], shown: string | null): readonly E[] {
+  const i = shown ? entries.findIndex((e) => e.key === shown) : -1
+  return i <= 0 ? entries : [entries[i], ...entries.slice(0, i), ...entries.slice(i + 1)]
+}
+
+/** The keys of the agents the map reads (HI-3180): the first MAP_AGENTS in its read order (`mapReadOrder`). */
+export function mapReadKeys(read: readonly { key: string }[]): ReadonlySet<string> {
+  return new Set(read.slice(0, MAP_AGENTS).map((e) => e.key))
+}
+
 export function mapContextEntries<L extends Parameters<typeof mapContextKey>[0], E extends { key: string; live: L }>(entries: readonly E[], liveOf: (e: E) => L): { key: string; entries: E[] } {
   const now = entries.map((e) => {
     const live = liveOf(e)

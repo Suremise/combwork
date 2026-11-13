@@ -12,7 +12,7 @@ import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '..
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
+import { mapContextEntries, mapMode, mapReadOrder, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -323,12 +323,6 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
-  // The context reads take each agent's live state as the project has it now (HI-2929: a setup ending, local limits set
-  // after the launch, under the same session id).
-  const forContexts = mapContextEntries(entries, (e) => project.agents.find((a) => a.id === e.agentId)?.live ?? null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
-  const mapOn = mapShow.map
   // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
   // the strip stay; a click on another switches, on that one (or Escape) shows them all again. Gone with the agent.
   const [shownAgent, setShownAgent] = useState<string | null>(null)
@@ -337,12 +331,21 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const alone = mode === 'shared' && shownAgent && entries.some((e) => e.key === shownAgent) ? shownAgent : null
   const drawnMode = alone ? 'single' : mode
   const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
+  // What the map reads turns and contexts for: the one shown alone first (HR1's round 1: the ninth of ten is read, as a
+  // filter to it was), then the rest of the selection.
+  const readEntries = useMemo(() => mapReadOrder(entries, alone), [entries, alone])
+  // The context reads take each agent's live state as the project has it now (HI-2929: a setup ending, local limits set
+  // after the launch, under the same session id).
+  const forContexts = mapContextEntries(readEntries, (e) => project.agents.find((a) => a.id === e.agentId)?.live ?? null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
+  const mapOn = mapShow.map
   // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
   // held ones (from those, what came while frozen was sent as a burst).
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
-  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts) : undefined), [alone, entries, drawn.contexts])
+  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
-  const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
+  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
   const pickMapAgent = useCallback((key: string) => setShownAgent(alone === key ? null : key), [alone])
 
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running

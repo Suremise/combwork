@@ -3,7 +3,7 @@
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, stationLastShown, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -268,13 +268,14 @@ export interface ActivityMapProps {
 export type MapStripAgent = Pick<MapModel['agents'][number], 'key' | 'name' | 'context' | 'load'>
 
 /**
- * The strip's agents for the selection (HI-3180) while one of them is shown alone, as the shared map would list them
- * (its first MAP_AGENTS read, the rest not shown; read or still loading): from the same entries and contexts.
+ * The strip's agents for the selection (HI-3180) while one of them is shown alone, in the selection's order: those the
+ * map reads (`read`, its read order: the one shown first, HR1's round 1) read or still loading, the rest not shown.
  */
-export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<string, MapContext | null>): MapStripAgent[] {
-  return entries.map((e, i) => {
+export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<string, MapContext | null>, read: readonly MapEntry[]): MapStripAgent[] {
+  const reads = mapReadKeys(read)
+  return entries.map((e) => {
     const sid = e.input.agents.find((x) => x.id === e.agentId)?.live?.sessionId ?? null
-    const load: MapStripAgent['load'] = i >= MAP_AGENTS ? 'notLoaded' : !sid || e.input.turns.get(sid) ? 'loaded' : 'loading'
+    const load: MapStripAgent['load'] = !reads.has(e.key) ? 'notLoaded' : !sid || e.input.turns.get(sid) ? 'loaded' : 'loading'
     return { key: e.key, name: e.name, context: contexts.get(e.key) ?? null, load }
   })
 }

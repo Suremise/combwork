@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -533,5 +533,24 @@ describe("a station's last call in its hex (HI-3179)", () => {
   })
   it('never shows more than its columns', () => {
     for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md', `${'日'.repeat(20)}.ps1`, `ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, `한국어파일이름입니다.ts`, `a${'日'.repeat(9)}b`, `${'🇬🇧'.repeat(20)}.ps1`, `${'é'.repeat(20)}.md`, `${'ﷺ'.repeat(10)}`]) for (const st of ['read', 'tools'] as const) expect(textColumns(stationLastShown(s, st)), s).toBeLessThanOrEqual(STATION_LAST_CHARS)
+  })
+})
+
+describe('an agent shown alone from the strip is read (HI-3180, HR1’s round 1)', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => ({ key: `a${i + 1}` }))
+  it('reads the first MAP_AGENTS of the selection while all are shown', () => {
+    expect(MAP_AGENTS).toBe(8)
+    expect(mapReadOrder(ten, null)).toBe(ten)
+    expect([...mapReadKeys(mapReadOrder(ten, null))]).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8'])
+  })
+  it('puts the one shown first, so the ninth or tenth of ten is read, the rest in their order', () => {
+    expect(mapReadOrder(ten, 'a9').map((e) => e.key)).toEqual(['a9', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a10'])
+    expect(mapReadKeys(mapReadOrder(ten, 'a9')).has('a9')).toBe(true)
+    expect(mapReadKeys(mapReadOrder(ten, 'a10')).has('a10')).toBe(true)
+    expect(mapReadKeys(mapReadOrder(ten, 'a10')).size).toBe(MAP_AGENTS)
+  })
+  it('changes nothing for the first, or for an agent no longer in the selection', () => {
+    expect(mapReadOrder(ten, 'a1')).toBe(ten)
+    expect(mapReadOrder(ten, 'gone')).toBe(ten)
   })
 })
