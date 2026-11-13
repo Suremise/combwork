@@ -321,8 +321,20 @@ export function platformIds(root, over = {}) {
   const name = readdirSync(join(root, dirname(DESCRIPTORS))).find((e) => e.startsWith(`${basename(DESCRIPTORS)}.`))
   const file = `${dirname(DESCRIPTORS)}/${name}`
   const text = over[file] ?? readFileSync(join(root, file), 'utf8')
-  const m = /export type PlatformId = ([^\n]+)/.exec(text)
-  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : []
+  return platformIdsIn(file, text)
+}
+
+/**
+ * The string literals of a source's `PlatformId` union, read by TypeScript's parser (any quotes, any line breaks; HR1's
+ * HI-3140 round 1). A declaration that can't be read throws: an audit that found no platform would enforce nothing.
+ */
+export function platformIdsIn(file, text) {
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const decl = sf.statements.find((st) => ts.isTypeAliasDeclaration(st) && st.name.text === 'PlatformId')
+  const members = !decl ? [] : ts.isUnionTypeNode(decl.type) ? decl.type.types : [decl.type]
+  const ids = members.map((t) => (ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal) ? t.literal.text : null))
+  if (!ids.length || ids.includes(null)) throw new Error(`${file}: its PlatformId isn't a union of string literals the audit can read`)
+  return ids
 }
 
 /**
@@ -368,9 +380,15 @@ export const JJ_HOMES = {
   'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
 }
 
+/** An expression without what never changes its value: parentheses, `!`, `as`, `satisfies`, `<T>x`. */
+function bare(n) {
+  while (n && (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isTypeAssertionExpression(n))) n = n.expression
+  return n
+}
+
 /** The name an operand reads as (`a.b?.platform!` → platform), or null for any other expression. */
 function nameOf(n) {
-  while (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n)) n = n.expression
+  n = bare(n)
   if (ts.isIdentifier(n)) return n.text
   if (ts.isPropertyAccessExpression(n)) return n.name.text
   return null
@@ -380,10 +398,13 @@ const COMPARE = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.Ex
 
 /** One file's switches: each `{ id, line }`; `exempt` collects the NOT_PLATFORM names it used. */
 export function fileSwitches(file, text, ids, exempt) {
-  const quoted = new RegExp(`['"\`](${ids.join('|')})['"\`]`)
-  if (!quoted.test(text)) return []
+  // Every file is parsed (no text prefilter: HR1's round 1 found one skipping `PLATFORMS.jj`); switchCounts keeps each
+  // file's answer by its text.
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const idOf = (n) => (n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && ids.includes(n.text) ? n.text : null)
+  const idOf = (n0) => {
+    const n = bare(n0)
+    return n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && ids.includes(n.text) ? n.text : null
+  }
   const out = []
   const add = (id, n) => out.push({ id, line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1 })
   const versus = (id, other, n) => {

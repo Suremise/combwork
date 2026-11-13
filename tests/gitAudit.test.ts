@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, JJ_EDGES, JJ_HOMES, NOT_PLATFORM, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, JJ_EDGES, JJ_HOMES, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
 type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
@@ -141,6 +141,30 @@ const r = (platform: string) => platform === 'none'
       "const q = (b: object) => 'none' in b"
     ])
       expect(added(code), code).toEqual([])
+  })
+
+  it("fails a switch in a new file with nothing else naming a platform, and one wrapped in parentheses or a cast (HR1's round 1)", () => {
+    const fresh = 'src/shared/newPlatformUse.ts'
+    const one = ["src/shared/newPlatformUse: 1 switches on a platform's id, listed 0"]
+    for (const code of ['export const x = PLATFORMS.jj.name', "export const y = (p: string) => p === ('jj')", "export const z = (p: string) => p === ('jj' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('jj') in d"])
+      expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual(one)
+    // Controls: a plain string and a parenthesized one compared to another enum, in a file of their own.
+    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'jj' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
+  })
+
+  it("reads every platform id from PlatformId's union however it is written, and fails when it can't (HR1's round 1)", () => {
+    const desc = 'src/shared/platform/descriptors.ts'
+    const t = text(desc)
+    const was = /export type PlatformId = [^\r\n]+/.exec(t)![0]
+    expect(platformIdsIn(desc, t)).toEqual(['none', 'git', 'jj'])
+    for (const union of ['export type PlatformId = "git" | "none" | "jj" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'jj'\n  | 'hg'"]) {
+      const four = t.replace(was, union)
+      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'jj', 'none'])
+      // The new id is scanned for at once: a switch on it in shared code fails.
+      expect(run({ [desc]: four, 'src/shared/hgUse.ts': "export const h = (p: string) => p === 'hg'\n" }).switches).toEqual(["src/shared/hgUse: 1 switches on a platform's id, listed 0"])
+    }
+    expect(() => platformIdsIn(desc, t.replace(was, 'export type PlatformId = string'))).toThrow(/PlatformId/)
+    expect(() => platformIdsIn(desc, t.replace(was, 'export type Platform = "git"'))).toThrow(/PlatformId/)
   })
 
   it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
