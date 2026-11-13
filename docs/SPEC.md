@@ -3790,6 +3790,18 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   (concurrent history) or with the root as its parent (history abandoned below it) can't be classified: kept, and the
   drop finishes (`keptSuccessors`, logged); a read that fails interrupts the drop with nothing adopted, read again on
   the next pass. Reads only until every group is decided; none at all without a hidden commit with a successor.
+- **Brought back** (HI-3150, design HI-3150/s7, s10, s13): the user's `jj op restore` to before a drop shows the
+  dropped attempt's commits again, without its pins (Git refs jj doesn't restore). A `dropped` entry with an owned commit
+  visible again is **revived** (`reviveDropped`, jjCandidateStep.ts): under the card's lock, its row's journal and its
+  commits' visibility read again there, and saved live (`state` removed) only while it is the entry read (the same
+  attempt and record, still `dropped`) and its owner holds; nothing pinned or abandoned in that pass before the save, so
+  any interruption after it is resumed by the ordinary drop paths. The drop (`dropJjAttempt`) pins again each owned
+  visible commit no pin holds (`<prefix>r<n>`, as adopted successors are) before its guarded abandon: what the target
+  reaches is kept (and settles `kept` for good: `JjDropped.dropped.reached`), as is anything the user built on it.
+  **Where it is noticed:** the live cycle's step, before its drops; ended cycles through the sweep, whose otherwise
+  settled rows (no live entry, candidate or checks rows) with dropped entries are nominated by one visibility read of
+  the owned commits of every such row the page already scanned, in chunks of 256 (`visibleCommits`), evidence only: a
+  read jj can't make admits none, read again next run. No new scan or timer; journals cleared since are out of reach.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
