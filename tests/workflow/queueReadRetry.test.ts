@@ -125,8 +125,9 @@ const failing = (match: string | RegExp, times = 1, more: { code?: number; err?:
   fail.rules.push({ match: (l) => (typeof match === 'string' ? l.includes(match) : match.test(l)), times, err: more.err ?? BUSY, code: more.code ?? 128, ...(more.native ? { native: more.native } : {}), ...(more.after ? { after: more.after } : {}) })
 }
 const callsOf = (match: string): number => fail.calls.filter((l) => l.includes(match)).length
-/** HI-2050: the one git that reads the commit identity (both keys). */
-const IDENTITY = 'config --null --get-regexp'
+/** HI-2050: the one git that reads the commit identity (both keys). Its pattern too (HI-3159): HI-3111's signing read
+ *  (branchConfig's `^includeif\.onbranch:`) is a `config --null --get-regexp` of its own. */
+const IDENTITY = String.raw`config --null --get-regexp ^user\.(name|email)$`
 const HEAD_READ = 'rev-parse --verify -q HEAD'
 
 let env: Env | null = null
