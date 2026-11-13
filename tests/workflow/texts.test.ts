@@ -105,6 +105,13 @@ const SAMPLE: RefusalValues = {
   publish: 'git push -u origin 1.5.0',
   track1: 'git fetch origin 1.5.0',
   track2: 'git branch -u origin/1.5.0 1.5.0',
+  // start.released (HI-3148): the release's tag, its date (as lanes.ts passes it, in ms) and the branch it was merged
+  // into; a branch to start on instead.
+  tag: 'v1.4.0',
+  dated: 'yes',
+  date: Date.UTC(2026, 10, 2),
+  into: 'main',
+  suggest: '1.5.0',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
