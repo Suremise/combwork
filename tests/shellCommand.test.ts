@@ -13,7 +13,7 @@ const { stopProcessesIn } = req('./e2e/folderProcesses.cjs') as { stopProcessesI
 // The run context's allowlisted environment, never the shell's (tests/README.md).
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
-vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined, onCombworkEvent: () => () => undefined }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined, onCombworkEvent: () => () => undefined, toast: () => undefined }))
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
 
 const { shellCommand } = await import('../src/main/sessions')

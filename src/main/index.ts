@@ -8,6 +8,7 @@ import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
 import { initSkillCopies } from './skillCopies'
+import { initLaunchFolders } from './launchFolders'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
@@ -32,7 +33,9 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkRepoTools } from './platform/repoPorts'
-import { handoverSession, combworkInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
+import { handoverSession, combworkInstructions, withLatestHandover, withPlatformRule, wrapsLongCommands } from '../shared/combworkGuidance'
+import { detect } from './platform/registry'
+import { ruleKeyOf } from '../shared/platform/descriptors'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -71,12 +74,15 @@ import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
+import { startReleaseOffers, stopReleaseOffers } from './workflow/releaseOffer'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
 import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { stopPublishWorker } from './jjPublish'
 import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
@@ -109,7 +115,8 @@ import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
 import { closedNotice, startNoticeResolver } from './notices'
 import { setNotifyHost, tell } from './notify'
-import { initUpdater, installNow, installsOnQuit, markInstalling } from './updater'
+import { acceptInstall, clearInstall, grantInstall, initUpdater, INSTALL_SECONDS, installConsent, installNow, installOffer, markInstalling } from './updater'
+import type { InstallOffer } from './updateConsent'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
@@ -134,7 +141,7 @@ import { checkInstallDir, setLanguageBeforeReady } from './installDir'
 import { exitBeforeProfile, exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
-import type { RestartReason } from '../shared/restartResume'
+import { closeReason, type RestartReason } from '../shared/restartResume'
 import { startOutageResume } from './outageResume'
 import { startRetryNotice } from './retryNotice'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
@@ -493,8 +500,6 @@ function windowsToRestore(): { workspacePath: string | null; bounds?: WindowStat
 // ---------------------------------------------------------------------------
 
 let pendingQuit = false
-/** Restart and Update was chosen: install the downloaded update instead of just quitting. */
-let installOnQuit = false
 /** Restart Combwork was chosen (#676: a value that applies when Combwork restarts): start again after quitting. */
 let relaunchOnQuit = false
 /** An installer asked Combwork to close for an install (HI-1707): the quit records its agents as an install's. */
@@ -541,14 +546,27 @@ const workingCount = (): number => sessions.liveStates().filter((s) => s.status 
 
 /** Shows the quit (or close) dialog in a window and waits for the answer. */
 function ask(e: CombworkWindow, req: { sessions: QuitSession[]; unsaved: string[]; scope: QuitScope }): Promise<QuitChoice> {
+  return askQuit(e, req).then((a) => a.choice)
+}
+
+/** What a quit dialog shows of the update it offers (HI-3167). */
+const shownUpdate = (o: InstallOffer | null) => (o ? { version: o.version, seconds: INSTALL_SECONDS } : undefined)
+
+/**
+ * The dialog, with the update a plain quit offers to install now (`update`, HI-3167): `install` is the version Install
+ * now was chosen for, only when this dialog offered that version (acceptInstall checks it against the one ready).
+ */
+function askQuit(e: CombworkWindow, req: { sessions: QuitSession[]; unsaved: string[]; scope: QuitScope; update?: InstallOffer | null }): Promise<{ choice: QuitChoice; install: string | null }> {
   showWindow(e.win)
-  return new Promise<QuitChoice>((answer) => {
+  const update = req.scope === 'app' ? (req.update ?? null) : null
+  return new Promise<{ choice: QuitChoice; install: string | null }>((done) => {
+    const answer = (choice: QuitChoice, install: string | null): void => done({ choice, install: update && install === update.version ? install : null })
     // Held at once, so a second request finds it; shown once the agents' cards are read (#572).
-    e.question = { request: req.sessions, unsaved: req.unsaved, scope: req.scope, answer }
+    e.question = { request: req.sessions, unsaved: req.unsaved, scope: req.scope, update, answer }
     void withCards(req.sessions).then((listed) => {
       if (e.question?.answer !== answer) return
       e.question.request = listed
-      emitTo(e.win, { type: 'quit-request', sessions: listed, unsaved: req.unsaved, scope: req.scope })
+      emitTo(e.win, { type: 'quit-request', sessions: listed, unsaved: req.unsaved, scope: req.scope, update: shownUpdate(update) })
     })
   }).finally(() => {
     e.question = null
@@ -556,16 +574,18 @@ function ask(e: CombworkWindow, req: { sessions: QuitSession[]; unsaved: string[
 }
 
 /**
- * Quitting, asking first as Confirm on quit and unsaved files say. `intent` is Restart and Update's ('update') or
- * Restart Combwork's ('restart'): it belongs to this request only (HI-2427), set for the quit once it goes ahead.
+ * Quitting, asking first as Confirm on quit and unsaved files say. `intent` is Restart and Update's ('update', for
+ * `version`) or Restart Combwork's ('restart'): it belongs to this request only (HI-2427), set for the quit once it goes
+ * ahead. A plain quit with an update ready to install (Install automatically) always asks, Install now or Next time
+ * (HI-3167): nothing installs without that answer or Restart and Update, for that version and this quit.
  */
-async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart' } = {}): Promise<void> {
-  const forUpdate = opts.intent === 'update'
+async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart'; version?: string } = {}): Promise<void> {
+  const forUpdate = opts.intent === 'update' && !!opts.version
   const forRelaunch = opts.intent === 'restart'
   // A quit under way, or waiting for its agents: it goes ahead with this request's install or restart too (cancelling
   // a waiting quit forgets it).
   if (quitting || pendingQuit) {
-    installOnQuit ||= forUpdate
+    if (forUpdate) grantInstall(opts.version!)
     relaunchOnQuit ||= forRelaunch
   }
   if (quitting) return
@@ -579,15 +599,19 @@ async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart
     showWindow(asking.win)
     return
   }
-  // Only a quit that goes ahead from here on installs the update, or restarts; a cancelled one forgets it.
-  installOnQuit = false
+  // Only a quit that goes ahead from here on installs the update, or restarts; a cancelled one forgets it. An earlier
+  // request's consent is never this one's (HI-3167).
+  clearInstall()
   relaunchOnQuit = false
   const live = sessions.liveStates()
   const mode = config.settings.general.confirmOnQuit
   const unsavedIn = combworkWindows().filter((e) => e.unsaved.length > 0)
   const askSessions = !opts.force && live.length > 0 && (mode === 'always' || (mode === 'working' && sessions.busyStates().length > 0))
   const target = unsavedIn.find((e) => e === lastFocused()) ?? unsavedIn[0] ?? lastFocused()
-  if ((askSessions || unsavedIn.length > 0) && target) {
+  // A plain quit (not Restart and Update, nor Restart Combwork) asks about an update ready to install, whatever Confirm
+  // on quit says (HI-3167).
+  const update = !opts.intent ? installOffer() : null
+  if ((askSessions || unsavedIn.length > 0 || update) && target) {
     // Unsaved edits live in each window's page: a window with some is asked about them first.
     for (const other of unsavedIn.filter((e) => e !== target)) {
       const first = await ask(other, { sessions: [], unsaved: other.unsaved, scope: 'app' })
@@ -595,16 +619,17 @@ async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart
       // Its files are dealt with, but its agents weren't listed: closing it asks about them as Close Window does.
       if (first === 'window') return closeWindowOnly(other, { unsaved: true })
     }
-    const choice = await ask(target, { sessions: askSessions ? quitSessions() : [], unsaved: target.unsaved, scope: 'app' })
+    const { choice, install } = await askQuit(target, { sessions: askSessions ? quitSessions() : [], unsaved: target.unsaved, scope: 'app', update })
     if (choice === 'cancel') return
     // Close this window only: the Close Window path, without asking again about what the dialog listed.
     if (choice === 'window') return closeWindowOnly(target, { sessions: askSessions, unsaved: true })
-    installOnQuit = forUpdate
+    if (forUpdate) grantInstall(opts.version!)
+    else if (update && install) acceptInstall(update)
     relaunchOnQuit = forRelaunch
     if (choice === 'wait') return startPendingQuit()
     return quitNow(!askSessions && live.length > 0)
   }
-  installOnQuit = forUpdate
+  if (forUpdate) grantInstall(opts.version!)
   relaunchOnQuit = forRelaunch
   return quitNow(live.length > 0)
 }
@@ -673,6 +698,9 @@ async function requestCloseWindow(e: CombworkWindow, done: AlreadyAsked = {}): P
  * it closes as the last window's X does: to the tray, or quitting.
  */
 function closeWindowOnly(e: CombworkWindow, done: AlreadyAsked): Promise<void> {
+  // Never an install from it (HI-3167, HR1's round 1): a pending quit's Install now included, which a later end of that
+  // quit would otherwise still carry out.
+  clearInstall()
   if (combworkWindows().length > 1) return requestCloseWindow(e, done)
   if (config.settings.general.closeToTray) {
     e.win.hide()
@@ -701,7 +729,7 @@ function startPendingQuit(): void {
 function cancelPendingQuit(): void {
   if (!pendingQuit) return
   pendingQuit = false
-  installOnQuit = false
+  clearInstall()
   relaunchOnQuit = false
   setTrayPendingQuit(false)
   emit({ type: 'quit-pending', pending: false, working: 0 })
@@ -752,7 +780,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
   saveWindows()
   quitting = true
   // Restart and Update's notice says Installing only now (HI-2425): a quit cancelled before this kept its button.
-  if (installOnQuit) markInstalling()
+  if (installConsent()) markInstalling()
   const stopped = sessions.liveCount()
   // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Combwork
   // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Combwork).
@@ -767,7 +795,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // restarting for an update, an install or a restart (an ordinary quit is offered back at the next start instead).
   stopRestartRecovery()
   stopWatchingRestartRequests()
-  const reason: RestartReason = quitReason ?? (installOnQuit || installsOnQuit() ? 'update' : relaunchOnQuit ? 'restart' : 'quit')
+  // A plain quit that installs on its way out is a quit (HI-3167): the user quit, and Combwork doesn't restart itself.
+  const reason: RestartReason = quitReason ?? closeReason(installConsent()?.kind ?? null, relaunchOnQuit)
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Combwork closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
@@ -775,6 +804,9 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await sessions.writersSettled(3000)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
+  // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
+  // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
+  await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
   // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
   // with its job (kill on close) as Combwork exits.
   await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
@@ -787,9 +819,10 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await config.flush()
   // Apps that find Combwork by its discovery file stop looking for this one (#620).
   await clearDiscovery()
-  // A downloaded update installs here, at the end of the quit, never for one cancelled (#1647: only over an older copy).
-  if (installOnQuit) installNow(true)
-  else if (installsOnQuit()) installNow(relaunchOnQuit)
+  // A downloaded update installs here, at the end of the quit, never for one cancelled (#1647: only over an older copy),
+  // and only with the user's say for this quit and this version, read again now (HI-3167: a session end since voids it).
+  const consent = installConsent()
+  if (consent) installNow(consent)
   else {
     if (relaunchOnQuit) relaunch()
     exitBy('app.quit', relaunchOnQuit ? 'quitting to restart' : 'quitting', () => app.quit())
@@ -837,7 +870,7 @@ async function quitLeftovers(): Promise<void> {
     let end = config.settings.agents.leftoverProcesses === 'end'
     // A quiet test copy asks only when its suite says so: a native dialog no suite answers would hold its quit.
     const shown = !testQuiet() || process.env.CW_TEST_ASK_LEFTOVERS === '1' ? combworkWindows().find((e) => e.win.isVisible()) : undefined
-    const asking = !end && !!shown && !installOnQuit
+    const asking = !end && !!shown && !installConsent()
     if (asking && shown) {
       const n = left.reduce((sum, l) => sum + l.processes.length + l.more, 0)
       const { response } = await dialog.showMessageBox(shown.win, {
@@ -1094,6 +1127,15 @@ app.whenReady().then(async () => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
+  // Agents' signer (HI-2867): cw-sign.exe, built with Combwork (resources\bin installed, out\bin in development), and
+  // cw-sign.js beside cw-progress.js. Without the launcher, sessions sign with git's own signer, as before.
+  const signLauncher = app.isPackaged ? join(process.resourcesPath, 'bin', 'cw-sign.exe') : join(__dirname, '..', 'bin', 'cw-sign.exe')
+  void stat(signLauncher).then(
+    (s) => {
+      if (s.isFile()) sessions.signer = { launcher: signLauncher, exec: process.execPath, script: unpackedScript('cw-sign.js') }
+    },
+    () => log.warn(`No signer launcher at ${userText(signLauncher)}: agents' signed commits use git's own signer`)
+  )
   /** Tests only (development builds): where the combwork MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
   sessions.combworkMcp = (projectPath, agentId): McpServerDef | null => {
@@ -1163,6 +1205,7 @@ app.whenReady().then(async () => {
   initReviewsOnOpen()
   // Combwork's skill copies in folders no session of Combwork's works in (#1431), as each workspace opens.
   initSkillCopies((folder) => sessions.runningIn(folder))
+  initLaunchFolders((projectPath, agentId) => sessions.activeOrStarting(projectPath, agentId))
   initInboxNotices()
   // What agents' commands leave running while they run (HI-2111).
   startOrphanWatch()
@@ -1184,8 +1227,12 @@ app.whenReady().then(async () => {
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
       // Naming only the skills its agents get (#1431).
-      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
-      return withLatestHandover(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
+      const pc = await workspace.projectConfig(projectPath)
+      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames(pc.skillDelivery)])
+      // A jj project's agents get the jj rule after the contract (HI-2800), as cw-mcp.ts gives Claude Code.
+      // A jj repository with no Git working copy gets its own variant (HI-2896). The platform's key (HI-3140).
+      const rule = ruleKeyOf(pc.platform, () => detect(projectPath))
+      return withLatestHandover(withPlatformRule(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), rule), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -1269,8 +1316,12 @@ app.whenReady().then(async () => {
   startObserving()
   // What it sees reconciled with the cards' facts: recorded (#1217), and acted on with the rules enforced (#1263).
   startReconciling()
+  // HI-3155: the projects' release offers, followed per open workspace.
+  startReleaseOffers()
   // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
+  // HI-1185: a signing check of one of its projects still running is ended.
+  WorkspaceService.closingTasks.add((path) => endOwnedWork((owner) => workspaceFor(owner)?.path?.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
@@ -1330,15 +1381,15 @@ app.whenReady().then(async () => {
   registerIpc(appInfo, {
     quit: () => void requestQuit(),
     restart: () => void requestQuit({ intent: 'restart' }),
-    decide: (from, choice, dontAskAgain) => {
+    decide: (from, choice, dontAskAgain, install) => {
       const e = combworkWindows().find((x) => x.win === from)
       if (dontAskAgain && (choice === 'now' || choice === 'wait') && e?.question?.scope === 'app') config.updateSettings({ general: { confirmOnQuit: 'never' } })
-      e?.question?.answer(choice)
+      e?.question?.answer(choice, install)
     },
     cancelPending: cancelPendingQuit,
     state: (from) => {
       const q = combworkWindows().find((x) => x.win === from)?.question
-      return { request: q?.request ?? null, unsaved: q?.unsaved ?? [], scope: q?.scope ?? 'app', pending: pendingQuit, working: pendingQuit ? workingCount() : 0 }
+      return { request: q?.request ?? null, unsaved: q?.unsaved ?? [], scope: q?.scope ?? 'app', update: shownUpdate(q?.update ?? null) ?? null, pending: pendingQuit, working: pendingQuit ? workingCount() : 0 }
     },
     setUnsaved: (from, paths) => {
       const e = combworkWindows().find((x) => x.win === from)
@@ -1413,7 +1464,7 @@ app.whenReady().then(async () => {
     if (e.type === 'session-exit') void endExitedReviews(e.projectPath, e.agentId)?.catch((err) => log.warn('ending the reviews of a session that ended', err))
   })
   initUpdater({
-    restart: () => void requestQuit({ intent: 'update' })
+    restart: (version) => void requestQuit({ intent: 'update', version })
   })
   void providerService.refresh()
   void checkRepoTools()
@@ -1440,12 +1491,16 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  // The fallback when the quit couldn't wait (an updater's install, a crash's quit): synchronous, best effort.
+  endOwnedWorkNow()
   stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()
   stopObserving()
   stopReconciling()
+  stopReleaseOffers()
+  void stopPublishWorker()
   stopQueueHosts()
   stopSlotCards()
   stopLaneBriefs()

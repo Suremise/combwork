@@ -2,8 +2,12 @@
 /* eslint-disable typescript/no-extraneous-class -- stand-ins for Electron's classes */
 import { tempRoot } from './tempDir'
 
-export const app = { getPath: () => tempRoot(), getVersion: () => '0.0.0-test', isPackaged: false }
-export class BrowserWindow {}
+export const app = { getPath: () => tempRoot(), getVersion: () => '0.0.0-test', isPackaged: false, on: (): unknown => app }
+export class BrowserWindow {
+  static getAllWindows(): BrowserWindow[] {
+    return []
+  }
+}
 export class Notification {
   // Tests that record notifications make it supported and spy on show().
   constructor(readonly options?: { title?: string; body?: string }) {}

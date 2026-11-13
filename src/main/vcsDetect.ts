@@ -43,3 +43,38 @@ export function otherVcsOf(folder: string): { name: string; root: string } | nul
     dir = up
   }
 }
+
+/**
+ * The Jujutsu repository holding a folder (HI-2799), read from its files only: the nearest `.jj` at or above it, and
+ * whether a `.git` sits beside it (colocated). A hint: jj itself confirms it before a switch (`jjContextOf`). Null when
+ * the nearest marker isn't jj's: another system's, or a `.git` nearer than any `.jj` (HI-2976: a Git repository inside a
+ * jj workspace is Git's, as its repository boundary says, `boundaryOf`).
+ */
+export function jjOf(folder: string): { root: string; colocated: boolean; inGit?: string } | null {
+  let dir = resolve(folder)
+  for (;;) {
+    if (existsSync(join(dir, '.jj'))) {
+      const colocated = existsSync(join(dir, '.git'))
+      const inGit = colocated ? null : gitAbove(dir)
+      return { root: dir, colocated, ...(inGit ? { inGit } : {}) }
+    }
+    if (existsSync(join(dir, '.git')) || OTHER_VCS.some(([marker]) => existsSync(join(dir, marker)))) return null
+    const up = dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
+}
+
+/**
+ * The nearest Git working tree above a folder (not the folder itself): the first `.git` met going up from its parent, or
+ * null (HI-2896: a non-colocated jj repository inside one, where a git command in the project would reach that tree).
+ */
+export function gitAbove(folder: string): string | null {
+  let dir = dirname(resolve(folder))
+  for (;;) {
+    if (existsSync(join(dir, '.git'))) return dir
+    const up = dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
+}

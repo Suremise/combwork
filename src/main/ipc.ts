@@ -10,7 +10,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { CombworkChannel, CombworkRequests } from '../shared/api'
 import * as updater from './updater'
-import type { LaneStartRequest, MergeResult, ProviderId, QuitChoice } from '../shared/types'
+import type { LaneStartRequest, MergeResult, ProviderId, QueuePauseRef, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
 import { extraArgsProblem, isKnownProvider, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
@@ -50,7 +50,8 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, listLanes, stampLaneProjects } from './lanes'
+import { endLane, laneReleaseCheck, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
@@ -136,20 +137,26 @@ import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
+import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
-import { rulesetsNow } from './workflow/rulesets'
-import { poolFor, slotTest, slotViews } from './slotsApp'
+import { rulesNow } from './workflow/rulesets'
+import { poolFor, recoverStaleSlot, removeForgottenSlot, removeKeptSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
+import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
+import { jjChecksAgain, jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
+import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
+import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
-import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, purgeTargetsOf, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -322,7 +329,7 @@ export interface QuitControl {
   quit: () => void
   /** Quits as quit does (asking about running agents), then starts Combwork again (#676). */
   restart: () => void
-  decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean) => void
+  decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean, install: string | null) => void
   cancelPending: () => void
   state: (from: BrowserWindow) => ReturnType<CombworkRequests['app:quitState']>
   setUnsaved: (from: BrowserWindow, paths: string[]) => void
@@ -515,7 +522,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
     'app:quit': () => quitControl.quit(),
     'app:restart': () => quitControl.restart(),
-    'app:quitDecision': (choice, dontAskAgain) => quitControl.decide(win(), choice, dontAskAgain),
+    'app:quitDecision': (choice, dontAskAgain, install) => quitControl.decide(win(), choice, dontAskAgain, typeof install === 'string' ? install : null),
     'app:cancelPendingQuit': () => quitControl.cancelPending(),
     'closeCommand:state': () => closeCommandState(win()),
     'closeCommand:dontWait': (id) => dontWait(win(), String(id)),
@@ -913,6 +920,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
     'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
+    'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const
@@ -975,9 +983,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       // A start that skips rules asks first (#1275), before any agent is added or anything launched.
       if (!opts?.confirm) {
         const ask = await tasks.startAsks(n, target.kind === 'agent' ? target.agentId : null)
-        if (ask.length) return { ask }
+        if (ask.rules.length) return { ask: ask.rules, ...(ask.released ? { released: ask.released } : {}) }
       }
-      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason)
+      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason, undefined, undefined, typeof opts?.released === 'string' ? opts.released : undefined)
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
     },
     'tasks:work': (n) => {
@@ -992,8 +1000,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const ws = currentWorkspace()
       if (!ws.path) return []
       // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
-      const now = await rulesetsNow(ws)
-      return ws.path ? workBadges(ws, now) : []
+      const now = await rulesNow(ws)
+      return ws.path ? workBadges(ws, now.ids, now.at) : []
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
@@ -1031,13 +1039,25 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
     'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
-    'workflow:startNextVersion': (p, a) => startNextVersion(workspace, workspace.assertProject(p), { name: String(a?.name ?? ''), ...(branchStartArg(a?.from) ? { from: branchStartArg(a?.from)! } : {}), ...(a?.base ? { base: a.base } : {}) }),
-    'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
+    'workflow:startNextVersion': (p, a) => startNextVersion(workspace, workspace.assertProject(p), { name: String(a?.name ?? ''), ...(branchStartArg(a?.from) ? { from: branchStartArg(a?.from)! } : {}), ...(a?.base ? { base: a.base } : {}), ...(typeof a?.offer === 'string' && a.offer ? { offer: a.offer.slice(0, 64) } : {}) }),
+    'workflow:releaseOffers': () => releaseOffers(currentWorkspace()),
+    'workflow:releaseOfferCurrent': (p, id) => checkOffer(currentWorkspace(), workspace.assertProject(p), String(id ?? '')).then(() => true, () => false),
+    'workflow:releaseOfferDismiss': async (p, id) => void (await dismissOffer(currentWorkspace(), workspace.assertProject(p), String(id ?? ''))),
+    'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [], ...(typeof opts?.offer === 'string' && opts.offer ? { offer: opts.offer.slice(0, 64) } : {}) }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
     'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
-    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
+    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }),
+    'workflow:switchPlatform': async (p, to, opts) => {
+      try {
+        return { switched: await setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }) }
+      } catch (e) {
+        // Only a repository switch's own refusal is data (HI-3105); anything else (a save that failed, say) still throws.
+        if (e instanceof SwitchRefusedError) return { refused: e.refusal }
+        throw e
+      }
+    },
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
@@ -1048,6 +1068,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    // Never asked of Git in a non-colocated jj project (HI-2896): git there finds no repository, or one above it.
+    'slots:gitFiles': async (p) => {
+      const at = workspace.assertProject(p)
+      return (await gitCantRead(at)) ? null : ((await slotWorkspaces().files?.status(at)) ?? null)
+    },
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
     'github:set': async (p, change) => {
@@ -1061,6 +1086,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return slotLevelForm(workspace, level)
     },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
+    // A stale jj slot recovered, the user's explicit action (HI-2866).
+    'slots:recoverStale': (p, slot) => recoverStaleSlot(workspace, workspace.assertProject(p), String(slot)),
+    'slots:removeKept': (p, slot, card, generation, forgotten) => removeKeptSlot(workspace, workspace.assertProject(p), String(slot), Number(card), String(generation), forgotten === true),
+    'slots:removeForgotten': (p, slot, generation) => removeForgottenSlot(workspace, workspace.assertProject(p), String(slot), String(generation)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
@@ -1071,13 +1100,19 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:purgeHistory': (p, targets) => purgeQueueHistory(workspace, workspace.assertProject(p), purgeTargetsOf(targets, queueTarget)),
     'queue:forward': async (p, from, to) => {
       const r = await forwardMerge(currentWorkspace(), workspace.assertProject(p), queueTarget(from), queueTarget(to), { kind: 'user' })
-      return 'upToDate' in r ? { upToDate: true, card: null, queued: false } : { upToDate: false, card: r.card.number, queued: r.queued }
+      const ahead = r.localAhead ? { localAhead: r.localAhead } : {}
+      return 'upToDate' in r ? { upToDate: true, card: null, queued: false, ...ahead } : { upToDate: false, card: r.card.number, queued: r.queued, ...ahead }
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
+    // HI-2944: the port refuses it first where the project's version control doesn't offer it.
+    'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
+    // HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder.
+    'queue:resolve': async (n, reason) => (await resolveForward(currentWorkspace(), n, { kind: 'user' }, typeof reason === 'string' ? reason : '')).card,
     'project:excludeCombwork': async (p) => {
       p = workspace.assertProject(p)
       const r = await ensureCombworkExcluded(p)
@@ -1589,6 +1624,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
     },
+    // The user's edit of a running lane's list (HI-2898): every field checked here, then by laneEdits as it saves.
+    'lanes:edit': (edit) => editLanes(currentWorkspace(), laneEditOf(edit)),
+    'lanes:endedSince': (since) => (workspace.path ? lanesEndedSince(currentWorkspace(), endedSinceOf(since)) : []),
     'lanes:retryFresh': (id) => {
       if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return retryFreshStart(currentWorkspace(), id)
@@ -1607,9 +1645,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}) })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}), ...(r.released && typeof r.released.target === 'string' && r.released.target && typeof r.released.reason === 'string' && r.released.reason.trim() ? { released: { target: r.released.target.slice(0, 250), reason: r.released.reason.trim().slice(0, 4000) } } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
+    'lanes:releaseCheck': (p, builder, target) => laneReleaseCheck(currentWorkspace(), basename(workspace.assertProject(p)), typeof builder === 'string' ? builder : '', typeof target === 'string' && target ? target.slice(0, 250) : null),
     'costs:cards': (q) => {
       if (!workspace.path) return []
       const numbers = Array.isArray(q?.numbers) ? q.numbers.filter((n) => Number.isInteger(n) && n > 0).slice(0, 1000) : undefined
@@ -1789,6 +1828,23 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
     // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
     'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
+    // A jj project's views (HI-2799): read-only, pinned, off main (jj's worker); only a project the window shows.
+    'jj:repo': (p) => jjRepoView(workspace.assertProject(p)),
+    'jj:history': (p) => jjHistory(workspace.assertProject(p)),
+    'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
+    'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
+    'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
+    'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
+    // The Operations section (HI-2800): read only; the preview's command is the user's to run.
+    'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
+    'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),
+    // The window for jj cards (HI-2869): reads, the user's acknowledgement, and what a set-up left.
+    'jj:waiting': (p) => jjWaiting(workspace, workspace.assertProject(p)),
+    'jj:candidateChecksAgain': (p, card) => jjChecksAgain(workspace, workspace.assertProject(p), Number(card)),
+    'jj:toCheck': (p, after) => jjToCheck(workspace, workspace.assertProject(p), after ?? null),
+    'jj:markChecked': (p, row) => jjMarkChecked(workspace, workspace.assertProject(p), row),
+    'jj:leftovers': (p) => jjLeftovers(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()
@@ -1926,6 +1982,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   const holding = (channel: string): boolean => !app.isPackaged && (process.env.CW_TEST_HOLD_IPC ?? '').split(',').some((x) => x.trim() === channel)
   const heldIpc: Record<string, number> = {}
   if (!app.isPackaged) (globalThis as { __cwHeldIpc?: Record<string, number> }).__cwHeldIpc = heldIpc
+  // And globalThis.__cwSettledIpc counts the calls answered (or failed), by channel, so a suite knows a slowed call's
+  // late answer has gone to the window (HI-2971) without waiting a time.
+  const settledIpc: Record<string, number> = {}
+  if (!app.isPackaged) (globalThis as { __cwSettledIpc?: Record<string, number> }).__cwSettledIpc = settledIpc
   const hold = async (channel: string): Promise<void> => {
     heldIpc[channel] = (heldIpc[channel] ?? 0) + 1
     try {
@@ -1961,9 +2021,18 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         throw windowError(err)
       } finally {
         done()
+        if (!app.isPackaged) settledIpc[channel] = (settledIpc[channel] ?? 0) + 1
       }
     })
   }
+}
+
+/** HI-2944: the pause a Commit or Set aside acts on, as the window showed it (null: from a start's warning). */
+function pauseRef(p: unknown): QueuePauseRef | null {
+  if (p === null || p === undefined) return null
+  const { card, reason, at } = (typeof p === 'object' ? p : {}) as Record<string, unknown>
+  if (typeof card === 'string' && typeof reason === 'string' && typeof at === 'string') return { card, reason, at }
+  throw new CombworkError({ lines: ["A paused merge is named by its card, reason and time"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
 }
 
 /** A merge queue's target as the window names it (a branch): refused when it isn't one. */

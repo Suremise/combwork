@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
-import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, RETURN_REASON_CODES, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copiesRunsKey, CW_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
@@ -89,6 +89,13 @@ describe('which merge queues show (#1356 item 0)', () => {
     expect(queueShown(view({ paused: { reason: 'user', card: null, files: [], by: 'user', at: iso(NOW) } }), NOW)).toBe(true)
     expect(queueShown(view({ runBy: 'Combwork-Dev' }), NOW)).toBe(true)
     expect(queueShown(view({ inFlight: [61] }), NOW)).toBe(true)
+  })
+
+  it("HI-2893: never a past branch's queue (not a target now, nothing in it), whatever else it has", () => {
+    const r = recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] })
+    const paused = { reason: 'user' as const, card: null, files: [], by: 'user' as const, at: iso(NOW) }
+    expect(queueShown(view({ past: true, combworkMerges: true, paused, runBy: 'Combwork-Dev', inFlight: [61], returns: [r] }), NOW)).toBe(false)
+    expect(shownQueues([view({ target: '1.0.0', past: true, returns: [r] }), view({ target: '1.5.0', combworkMerges: true })], NOW).map((v) => v.target)).toEqual(['1.5.0'])
   })
 
   it('an unseen return keeps an old queue shown; once seen, it goes a few seconds later', () => {
@@ -181,6 +188,25 @@ describe('returns on a queue card', () => {
     expect(nextFold(view({ returns: [seen(1, 1_000), seen(2, 4_000)], returnsMore: 3 }))).toBe(NOW - 4_000 + RETURN_SEEN_SHOWN_MS)
   })
 
+  it('says every reason the queue records in words, never its code, in every language (HI-3037)', () => {
+    const LOCALES = join(__dirname, '..', 'locales')
+    // Each with a file, so a conflict's words ("conflict in a.ts") aren't its code; the code alone is what shows unsaid.
+    const said = (code: string): string[] => RETURN_REASON_CODES.filter((reason) => returnWhy(recent({ outcome: 'returned', reason, files: ['a.ts'] }), null, '1.5.0', tr, list) === reason).map((reason) => `${code}: ${reason}`)
+    expect(RETURN_REASON_CODES).toContain('resolution')
+    expect(said('en')).toEqual([])
+    try {
+      for (const code of readdirSync(LOCALES, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'en' && !d.name.startsWith('.')).map((d) => d.name)) {
+        const dir = join(LOCALES, code)
+        setLanguage(code, Object.assign({}, ...readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))))
+        expect(said(code)).toEqual([])
+      }
+    } finally {
+      setLanguage('en', {})
+    }
+    // A reason Combwork doesn't know yet (a newer build's) is still shown as recorded.
+    expect(returnWhy(recent({ outcome: 'returned', reason: 'somethingNew' }), null, 'main', tr, list)).toBe('somethingNew')
+  })
+
   it('why, in a few words: a conflict with its files, a red check by name, a hook, a temporary failure', () => {
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] }), null, 'main', tr, list)).toBe('conflict in tasks.ts')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'] }), null, 'main', tr, list)).toBe('conflict in a.ts, b.ts, c.ts, and 2 more')
@@ -189,6 +215,7 @@ describe('returns on a queue card', () => {
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks' }), null, 'main', tr, list)).toBe('checks failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'hook' }), null, 'main', tr, list)).toBe('a hook failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks', transient: true }), 'unit', 'main', tr, list)).toBe('checks failed: unit (temporary)')
+    expect(returnWhy(recent({ outcome: 'returned', reason: 'resolution' }), null, '1.5.0', tr, list)).toBe('the commit it resolves was copied, not merged')
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict in tasks.ts', 'HB1', tr)).toBe('HI-108 returned to builder HB1: conflict in tasks.ts')
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict', null, tr)).toBe('HI-108 returned: conflict')
   })
@@ -241,10 +268,20 @@ describe('what a queue card says', () => {
   it("each pause in a sentence: the user's, the Assistant's, Combwork's own with the files and git's message, an unknown one", () => {
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'user', at: null }, 'main', tr, list)).toBe('Paused by you. The queue merges nothing until you resume it.')
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'assistant', at: null }, 'main', tr, list)).toMatch(/^Paused by the Assistant/)
-    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('a.ts and b.ts have changes in the folder main is checked out in. Commit or undo them, then resume.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('a.ts and b.ts have uncommitted changes in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     expect(pauseText({ reason: 'signing', card: 'HI-61', files: [], by: null, at: null, message: 'gpg: no secret key' }, 'main', tr, list)).toBe('Signing the merge commit failed.\ngpg: no secret key')
     expect(pauseText({ reason: 'approval', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toMatch(/^HI-61 is ready to merge into main/)
     expect(pauseText({ reason: 'somethingNew', card: null, files: [], by: null, at: null }, 'main', tr, list)).toBe('Paused (somethingNew).')
+    // HI-2944: a staged pause names its files (Commit and Set Aside act on them), or says changes when it has none.
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt and b.ts are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Changes are staged in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
+    // HI-2988: a catch-up's pause (the card merged and published): Set Aside alone, the card said merged.
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts'], by: null, at: null, catchUp: true }, 'main', tr, list)).toBe('HI-61 is merged and on main’s remote already, but a.ts has changes in the folder main is checked out in, so the local main isn’t up to date with it yet. Set them aside, and it catches up.')
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: [], by: null, at: null, catchUp: true }, 'main', tr, list)).toMatch(/^HI-61 is merged and on main’s remote already, but files it changes have changes in the folder/)
+    // HI-2951: one file agrees as one, staged or not; more than five named, the count is all of them.
+    expect(pauseText({ reason: 'staged', card: 'HI-61', files: ['keep.txt'], by: null, at: null }, 'main', tr, list)).toBe('keep.txt is staged in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['.gitignore'], by: null, at: null }, 'main', tr, list)).toBe('.gitignore has uncommitted changes in the folder main is checked out in. Commit it or set it aside, and the merge goes on.')
+    expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toBe('Files the merge changes have uncommitted changes in the folder main is checked out in. Commit them or set them aside, and the merge goes on.')
     for (const reason of ['targetMovesFast', 'folderBusy', 'wrongBranch', 'staged', 'identity', 'needsYou', 'uncounted', 'checkedOut', 'rulesOff', 'signingWaits', 'hookTimedOut']) expect(pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).not.toMatch(/^Paused \(/)
   })
 

@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
 }))
 
 const { config } = await import('../src/main/config')
-const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, usageLogin, warningKey } = await import('../src/main/planUsage')
+const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, readingAges, reportPlanUsage, usageLogin, warnedAfterDrop, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
 const { onCombworkEvent } = await import('../src/main/events')
@@ -377,6 +377,142 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
       off()
       update.mockRestore()
     }
+  })
+
+  describe('a usage reset that lowers the share mid-period (HI-3181)', () => {
+    /** Sessions reporting in turn, each with its readings' ages as reportPlanUsage works them out. */
+    const run = (kept: ReturnType<typeof mergePlanUsage> | undefined, steps: [string, number][], memo = new Map(), from = at, launched: Record<string, number> = {}) => {
+      steps.forEach(([who, used], i) => {
+        const t = from + (i + 1) * 60_000
+        const report = claude(used, t)
+        const launch = launched[who] === undefined ? undefined : new Date(launched[who]).toISOString()
+        kept = mergePlanUsage(kept, report, t, who, readingAges(who, report, memo, launch))
+      })
+      return kept!
+    }
+
+    it("is shown at the session's next report with the lower figure; an idle session's older, higher one can't raise it back", () => {
+      const memo = new Map()
+      // A worked up to 96% and went idle, repeating it; B read 96% too; then the reset, and B's next call reads 77%.
+      let kept = run(undefined, [['A', 95], ['A', 96], ['B', 96], ['A', 96], ['B', 96]], memo)
+      kept = run(kept, [['B', 77]], memo, at + 5 * 60_000)
+      expect(weekly(kept)).toBe(77)
+      expect(kept.limits.find((l) => l.id === 'seven_day')).toMatchObject({ reportedBy: 'B' })
+      // A still repeats its 96% from before the reset: older than B's 77%, it stays 77%.
+      kept = run(kept, [['A', 96], ['B', 77], ['A', 96]], memo, at + 6 * 60_000)
+      expect(weekly(kept)).toBe(77)
+      // Usage climbing again after the reset is shown as before, from either session.
+      kept = run(kept, [['B', 78], ['A', 79]], memo, at + 9 * 60_000)
+      expect(weekly(kept)).toBe(79)
+    })
+
+    it('a session changing its figure on the very next report is shown, with no repeat between (HR3, round 2)', () => {
+      for (const steps of [[['A', 96], ['A', 77]], [['A', 95], ['A', 96], ['A', 77]]] as [string, number][][]) {
+        const memo = new Map()
+        let kept = run(undefined, steps, memo)
+        expect(weekly(kept)).toBe(77)
+        kept = run(kept, [['A', 77], ['A', 77]], memo, at + steps.length * 60_000)
+        expect(weekly(kept)).toBe(77)
+      }
+    })
+
+    it('a figure kept before HI-3181, with no ages, gives way to a session reading lower since it was reported', () => {
+      const old = mergePlanUsage(undefined, claude(96), at, 'HB5')
+      expect(old.limits.find((l) => l.id === 'seven_day')!.firstSeenAt).toBeUndefined()
+      const memo = new Map()
+      // A session's first report can't be dated: the higher figure stays (#383) until that session's figure changes.
+      let kept = run(old, [['C', 77]], memo)
+      expect(weekly(kept)).toBe(96)
+      kept = run(kept, [['C', 78]], memo, at + 60_000)
+      expect(weekly(kept)).toBe(78)
+    })
+
+    it("after a drop, a session's first report or a forgotten session's repeat, higher, can't raise it back (HR1's round 1)", () => {
+      const memo = new Map()
+      let kept = run(undefined, [['A', 96], ['A', 96], ['A', 77]], memo)
+      expect(weekly(kept)).toBe(77)
+      // B, never seen (or forgotten: a restart, the memo's cap), reports its older 96% and repeats it; A repeats its 77%.
+      kept = run(kept, [['B', 96], ['A', 77], ['B', 96], ['A', 77]], memo, at + 3 * 60_000)
+      expect(weekly(kept)).toBe(77)
+      // B's figure changing shows it read since: its next call's reading counts.
+      kept = run(kept, [['B', 78]], memo, at + 7 * 60_000)
+      expect(weekly(kept)).toBe(78)
+    })
+
+    it("a session's first report, or an older one it repeats, still never lowers the figure (#383)", () => {
+      const memo = new Map()
+      // A reads 98% now; B, resumed, reports its older 96% and repeats it: kept at 98%.
+      expect(weekly(run(undefined, [['A', 98], ['B', 96], ['A', 98], ['B', 96]], memo))).toBe(98)
+    })
+
+    describe("dated by its run's launch, where every reading is the run's own (HI-3187: Claude Code's)", () => {
+      const min = 60_000
+
+      it('after a reset and a restart, the first report of a run launched since replaces the stale higher figure', () => {
+        // HB5's 96% (kept before HI-3181, or with its ages), its run gone; then the reset, the restart, and new runs.
+        const memo = new Map()
+        const dated = run(undefined, [['HB5', 95], ['HB5', 96]], memo, at, { HB5: at })
+        for (const old of [mergePlanUsage(undefined, claude(96, at + min), at + min, 'HB5'), dated]) {
+          const restart = at + 4 * 60 * min
+          let kept = run(old, [['C', 77]], new Map(), restart, { C: restart })
+          expect(weekly(kept)).toBe(77)
+          expect(kept.limits.find((l) => l.id === 'seven_day')).toMatchObject({ reportedBy: 'C', takenAfter: new Date(restart).toISOString() })
+          // Another run launched since, at its first report, and climbing again: as before.
+          kept = run(kept, [['D', 77], ['C', 77], ['D', 78]], new Map(), restart + min, { C: restart, D: restart })
+          expect(weekly(kept)).toBe(78)
+        }
+      })
+
+      it("keeps HI-3181's protections: a run launched before the drop or the kept reading neither raises nor lowers it", () => {
+        const memo = new Map()
+        // A and B launched together; A reads 96%, then 77% after the reset. B, never seen (forgotten), repeats its older 96%.
+        let kept = run(undefined, [['A', 96], ['A', 96], ['A', 77]], memo, at, { A: at, B: at })
+        expect(weekly(kept)).toBe(77)
+        kept = run(kept, [['B', 96], ['A', 77], ['B', 96]], memo, at + 3 * min, { A: at, B: at })
+        expect(weekly(kept)).toBe(77)
+        // A run launched after the drop reads 77% too; B's 96% still can't raise it.
+        kept = run(kept, [['C', 77], ['B', 96]], memo, at + 6 * min, { A: at, B: at, C: at + 6 * min })
+        expect(weekly(kept)).toBe(77)
+        // A reads 98% now; E, launched before that reading, reports its older 96% first: it never lowers it (#383).
+        expect(weekly(run(undefined, [['A', 98], ['E', 96], ['A', 98], ['E', 96]], new Map(), at, { A: at, E: at }))).toBe(98)
+      })
+
+      it("a run launched later but before the kept reading was taken can't raise it back with a reading from before the reset (HR1's round 1)", () => {
+        // Old 96%; A launches, then B, which calls before the reset (96%); the reset; A's first report, 77%, then B's, 96%.
+        const old = mergePlanUsage(undefined, claude(96, at), at, 'HB5')
+        const memo = new Map()
+        const launched = { A: at + min / 6, B: at + min / 3 }
+        let kept = run(old, [['A', 77]], memo, at + 5 * min, launched)
+        expect(weekly(kept)).toBe(77)
+        kept = run(kept, [['B', 96], ['A', 77], ['B', 96]], memo, at + 6 * min, launched)
+        expect(weekly(kept)).toBe(77)
+      })
+
+      it('two live sessions interleaving 95% and 96% within one period never take the figure down (#383)', () => {
+        // B launched with A, or after A's 95% but before its 96%: B, not calling since, keeps reporting 95%.
+        for (const bLaunch of [at, at + 1.5 * min]) {
+          const memo = new Map()
+          const launched = { A: at, B: bLaunch }
+          let kept = run(undefined, [['A', 95]], memo, at, launched)
+          const shown: number[] = []
+          for (const [i, step] of ([['A', 96], ['B', 95], ['A', 96], ['B', 95], ['B', 95], ['A', 96]] as [string, number][]).entries()) {
+            kept = run(kept, [step], memo, at + (i + 1) * min, launched)
+            shown.push(weekly(kept)!)
+          }
+          expect(shown).toEqual([96, 96, 96, 96, 96, 96])
+        }
+      })
+    })
+
+    it('lowers the warning level with the figure, so a climb back past a level warns again', () => {
+      const resetsAt = WEEK_RESETS
+      const warned = { resetsAt, level: 95 }
+      expect(warnedAfterDrop({ usedPercent: 77, resetsAt }, warned)).toBe(0)
+      expect(warnedAfterDrop({ usedPercent: 85, resetsAt }, warned)).toBe(80)
+      expect(warnedAfterDrop({ usedPercent: 96, resetsAt }, warned)).toBeNull()
+      expect(warnedAfterDrop({ usedPercent: 50, resetsAt: new Date(Date.parse(resetsAt) + 7 * 86400e3).toISOString() }, warned)).toBeNull()
+      expect(nextWarning({ usedPercent: 81, resetsAt }, { resetsAt, level: 0 })).toBe(80)
+    })
   })
 
   it('with no reset time to tell periods apart, the latest report, as before; a limit not reported stays until its reset', () => {

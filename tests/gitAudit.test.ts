@@ -4,14 +4,14 @@
 // call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
 // (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
 // scripts/gitInventory.mjs prints the audit.
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, JJ_EDGES, JJ_HOMES, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -111,6 +111,108 @@ const n = (platform: string) => platform !== 'none'
     expect(run({ [registry]: `${text(registry)}
 const r = (platform: string) => platform === 'none'
 ` }).switches).toEqual([])
+  })
+
+  it("fails every platform id's switch however it is written, and leaves descriptor, registration and presentation data alone (HI-3140)", () => {
+    const options = 'src/shared/workflow/options.ts'
+    const added = (code: string): string[] => run({ [options]: `${text(options)}\n${code}\n` }).switches
+    const one = ["src/shared/workflow/options: 1 switches on a platform's id, listed 0"]
+    for (const code of [
+      "const a = (p: { platform: string }) => p.platform === 'jj'",
+      "const b = (p: string) => 'git' !== p",
+      'const c = (to: string) => to === "none"',
+      "const d = (id: string) => id === 'none'",
+      'const e = (to: string) => to == `none`',
+      "const f = (p: string) => { switch (p) { case 'jj': return 1 } return 0 }",
+      "const g = (d: object) => 'jj' in d",
+      "const h = (x: string) => revisionShort('jj', x)",
+      "const i = PLATFORMS['git'].name",
+      'const j = PLATFORMS.jj.name'
+    ])
+      expect(added(code), code).toEqual(one)
+    // Allowed: another enum's `none` by its field's name, a comparison of two variables, prose and other strings, a
+    // registration by id (not a descriptor helper), and data keyed by the platform.
+    for (const code of [
+      "const k = (o: { review: string }) => o.review === 'none'",
+      'const l = (a: string, b: string) => a === b',
+      "// a comment saying platform === 'jj'\nconst m = 'jj is a platform'",
+      "const n = () => registerWorkspacePort('jj', port)",
+      'const o2: Record<string, number> = { jj: 1, git: 2, none: 3 }',
+      "const q = (b: object) => 'none' in b"
+    ])
+      expect(added(code), code).toEqual([])
+  })
+
+  it("fails a switch in a new file with nothing else naming a platform, and one wrapped in parentheses or a cast (HR1's round 1)", () => {
+    const fresh = 'src/shared/newPlatformUse.ts'
+    const one = ["src/shared/newPlatformUse: 1 switches on a platform's id, listed 0"]
+    for (const code of ['export const x = PLATFORMS.jj.name', "export const y = (p: string) => p === ('jj')", "export const z = (p: string) => p === ('jj' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('jj') in d"])
+      expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual(one)
+    // Controls: a plain string and a parenthesized one compared to another enum, in a file of their own.
+    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'jj' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
+  })
+
+  it("reads every platform id from PlatformId's union however it is written, and fails when it can't (HR1's round 1)", () => {
+    const desc = 'src/shared/platform/descriptors.ts'
+    const t = text(desc)
+    const was = /export type PlatformId = [^\r\n]+/.exec(t)![0]
+    expect(platformIdsIn(desc, t)).toEqual(['none', 'git', 'jj'])
+    for (const union of ['export type PlatformId = "git" | "none" | "jj" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'jj'\n  | 'hg'"]) {
+      const four = t.replace(was, union)
+      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'jj', 'none'])
+      // The new id is scanned for at once: a switch on it in shared code fails.
+      expect(run({ [desc]: four, 'src/shared/hgUse.ts': "export const h = (p: string) => p === 'hg'\n" }).switches).toEqual(["src/shared/hgUse: 1 switches on a platform's id, listed 0"])
+    }
+    expect(() => platformIdsIn(desc, t.replace(was, 'export type PlatformId = string'))).toThrow(/PlatformId/)
+    expect(() => platformIdsIn(desc, t.replace(was, 'export type Platform = "git"'))).toThrow(/PlatformId/)
+  })
+
+  it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
+    const app = 'src/main/slotsApp.ts'
+    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
+    const cards = 'src/main/jjCards.ts'
+    expect(run({ [cards]: `${text(cards)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
+    expect(run({ [cards]: `${text(cards)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/jjCards: 1 switches on a platform's id, listed 0"])
+  })
+
+  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a jj home, a listed switch (HI-3140)', () => {
+    const tiles = 'src/renderer/src/components/AgentTiles.tsx'
+    expect(run({ [tiles]: text(tiles).replace("x !== 'none'", "x !== 'auto'") }).switches).toEqual(["src/renderer/src/components/AgentTiles: 0 switches on a platform's id, listed 1"])
+    const scan = 'src/renderer/src/components/Antivirus.tsx'
+    const noScan = text(scan).replace(/status\.scan === 'none'/g, 'status.scan === null').replace(/case 'none':/g, "case 'off':")
+    expect(run({ [scan]: noScan }).switches).toEqual(['NOT_PLATFORM scan: no comparison uses it (stale)'])
+    expect(Object.keys(JJ_HOMES as Record<string, unknown>).every((f) => existsSync(join(root, `${f}.ts`)) || existsSync(join(root, `${f}.tsx`)))).toBe(true)
+    expect(Object.values(SWITCHES as Record<string, { class?: string }>).filter((s) => !['data', 'historic', 'gitUi', 'schema'].includes(s.class ?? '')).length).toBe(0)
+    expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
+  })
+
+  it("fails a production import of a path kept only for the tests (HI-3140: jj's candidate modules moved to the platform layer)", () => {
+    expect(run().compat).toEqual([])
+    const reconcile = 'src/main/workflow/reconcile.ts'
+    expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
+    const win = 'src/main/jjWindow.ts'
+    expect(run({ [win]: `${text(win)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjWindow -> src/main/workflow/jjCandidateReturn'])
+    const service = 'src/main/workflow/service.ts'
+    expect(run({ [service]: `${text(service)}\nconst words = require('./jjCandidateReturn')\n` }).compat).toEqual(['src/main/workflow/service -> src/main/workflow/jjCandidateReturn'])
+    // The moved modules themselves, by their new paths: not this check's (the jj edges' below).
+    expect(run({ [reconcile]: `import type { ChecksJournal } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual([])
+  })
+
+  it("lists each jj module reached from outside the platform layer, edge by edge and name by name (HI-3140)", () => {
+    expect(run().jj).toEqual([])
+    const edges = JJ_EDGES as Edge[]
+    expect(edges.filter((e) => !['impl', 'registry', 'jjUi', 'defect'].includes(e.class) || !e.why || !e.names?.length || (e.class === 'defect' && !e.card)).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
+    // A new edge from the workflow (the moved candidate modules, by their new path), a name beyond its list, one gone.
+    const reconcile = 'src/main/workflow/reconcile.ts'
+    expect(run({ [reconcile]: `import { checksKeyOf } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateChecks: unlisted'])
+    const t = text(reconcile)
+    expect(t).toContain('type JjCandidateStep } from')
+    expect(run({ [reconcile]: t.replace('type JjCandidateStep } from', 'type JjCandidateStep, candidateNow } from') }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateStep: candidateNow'])
+    const diag = 'src/main/diagnostics.ts'
+    expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
+    // jj's homes and the platform layer itself are not edges.
+    const cards = 'src/main/jjCards.ts'
+    expect(run({ [cards]: `import { checksKeyOf } from './platform/jjCandidateChecks'\n${text(cards)}` }).jj).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

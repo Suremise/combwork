@@ -164,6 +164,21 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const upd = await api(assistant, 'PATCH', `/v1/tasks/${await keyOf(nA)}`, { target: '1.2.0', column: 'todo', blocked: null })
     const cA = await card(nA)
     check("HI-2825: the Assistant changes a never-started held card's Merges into, with its column and blocked", upd.status === 200 && (await ownTarget(nA)) === '1.2.0' && cA?.column === 'todo' && !cA?.blocked, JSON.stringify({ status: upd.status, body: upd.body, column: cA?.column, blocked: cA?.blocked }))
+    // HI-3043: a card the Assistant makes with a target of its own says so, as an update does, naming the value that
+    // clears it (""); one made with the project's own says nothing. Both deleted after, so nothing later lists them.
+    const madeOwn = await api(assistant, 'POST', '/v1/tasks', { title: 'Made for 1.2.0', project: 'alpha', target: '1.2.0' })
+    const ownNote = String(madeOwn.body?.nudge ?? '')
+    check('HI-3043: a card made with a target of its own says so, and how to clear it ("")', madeOwn.status === 200 && /now has a target of its own, 1\.2\.0/.test(ownNote) && /target to "" \(its project's\)/.test(ownNote), JSON.stringify(madeOwn.body))
+    const madeDef = await api(assistant, 'POST', '/v1/tasks', { title: 'Made for integration', project: 'alpha', target: 'integration' })
+    check("…one made with the project's own says nothing of it", madeDef.status === 200 && !/target of its own/.test(String(madeDef.body?.nudge ?? '')), JSON.stringify(madeDef.body))
+    for (const m of [madeOwn, madeDef]) if (m.body?.number) await inv('tasks:delete', m.body.number)
+    // HI-3114: Start the next version names the release it starts from, as the Assistant read it: none is refused (400),
+    // one the project has moved on from (409, a retried request), each starting nothing.
+    const noFrom = await api(assistant, 'POST', '/v1/workflow/next-version', { project: 'alpha', name: '9.9.0' })
+    check('HI-3114: next-version without from is refused (400), saying from is required', noFrom.status === 400 && /from is required/.test(noFrom.body?.error ?? ''), JSON.stringify(noFrom.body))
+    const stale = await api(assistant, 'POST', '/v1/workflow/next-version', { project: 'alpha', from: '1.2.0', name: '9.9.0' })
+    check('…one from a release the project moved on from is refused (409)', stale.status === 409 && /integration now, not 1\.2\.0/.test(stale.body?.error ?? ''), JSON.stringify(stale.body))
+    check('…neither made a branch or moved Work merges into', !git(fx.alpha, 'branch', '--list', '9.9.0') && (await inv('workflow:form', fx.alpha)).options?.target === 'integration', JSON.stringify((await inv('workflow:form', fx.alpha)).options))
     await inv('session:stop', home, 'assistant')
 
     // --- HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration. Save…'s Retarget offers it, with its
@@ -259,6 +274,102 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('…its history says it moved with its branch and work kept', hist9.some((x) => /Moved from 1\.2\.0 to integration, its branch and work kept/.test(x)), JSON.stringify(hist9.slice(-3)))
     const sub9 = await q.act(fx, h, b9, n9, 'submit', { summary: 'In flight: ready' })
     check('…and it submits, merging into integration', sub9.status === 200, JSON.stringify(sub9.body))
+
+    // --- HI-3113: a lane started on the project's own, 1.3.0 (no branch of its own named), then Start the next version
+    // from the dialog: the lane stays on 1.3.0, its header says "into 1.3.0", and 1.3.0 can't be taken out of Other
+    // branches work can merge into while it uses it. Screenshots in both themes.
+    git(fx.alpha, 'branch', '1.3.0', 'integration')
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { target: '1.3.0', otherTargets: ['integration'] }) })
+    const [b11, r11] = [await q.agent(fx, h, 'B11'), await q.agent(fx, h, 'R11')]
+    const n11 = (await inv('tasks:create', { title: 'On the release', project: 'alpha' })).number
+    const lane11 = (await inv('lanes:start', fx.alpha, { builder: b11.id, reviewer: r11.id, cards: [n11] })).lane
+    check('HI-3113: a lane started on the project’s own 1.3.0 names no branch of its own', !!lane11?.id && !lane11.target, JSON.stringify(lane11?.target))
+    await waitHung(async () => (await page.locator('[data-action="next-version"]').count()) === 1 && !(await page.locator('[data-action="next-version"]').isDisabled()))
+    await page.locator('[data-action="next-version"]').click()
+    const nv = page.locator('.dialog', { hasText: 'Start the next version' })
+    await waitHung(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.4.0')
+    await nv.getByRole('button', { name: 'Start', exact: true }).click()
+    const started11 = await waitHung(async () => ((await inv('workflow:form', fx.alpha))?.options?.target === '1.4.0' ? true : null)).catch(() => null)
+    check('…Start the next version from the dialog: work merges into 1.4.0', !!started11, JSON.stringify((await inv('workflow:form', fx.alpha))?.options))
+    const panel = page.locator('.progress-panel')
+    if (!(await panel.count())) await page.locator('.progress-rail').click()
+    await panel.locator('.progress-tab[data-tab="lanes"]').click()
+    const top11 = panel.locator(`.progress-lane[data-lane="${lane11.id}"] .progress-lane-top`)
+    const into = await waitHung(async () => ((await top11.locator('[data-lane-target="1.3.0"]').count()) === 1 ? true : null)).catch(() => null)
+    check('…the lane stays on 1.3.0, and its header says "into 1.3.0"', !!into, await text(top11))
+    // HI-3142: its Merges into alone isn't old rules: no such mark.
+    check('…and no "old rules" mark for that alone (HI-3142)', (await top11.locator('[data-mark="old-rules"]').count()) === 0, await text(top11))
+    // Start's notification covers the panel's foot, where the lane is: closed first.
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await waitHung(async () => (await page.locator('.toast').count()) === 0)
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await panel.screenshot({ path: path.join(fx.shots, `retarget-lane-left-on-release-${t}.png`) }).catch(() => undefined)
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    // 1.3.0 taken out of Other branches in the tab: refused, naming the lane's builder; still listed.
+    const others = form.locator('.workflow-option[data-option="otherTargets"] input')
+    await others.fill('integration')
+    await others.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    const refusal = await waitHung(async () => {
+      if (await save.isVisible().catch(() => false)) await save.getByRole('button', { name: 'Save', exact: true }).click().catch(() => undefined)
+      const t = await text(page.locator('body'))
+      // Its card started on 1.3.0 and their slot are named too; the lane (B11) is what HI-3113 adds.
+      return /1\.3\.0 can’t be taken out of Other branches work can merge into while these use it: [^.]*\bB11\b/.test(t) ? t : null
+    }).catch(() => null)
+    await page.screenshot({ path: path.join(fx.shots, 'retarget-release-in-use.png') }).catch(() => undefined)
+    check('…taking 1.3.0 out of Other branches is refused while the lane uses it, naming B11', !!refusal, (await text(page.locator('body'))).slice(-600))
+    await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
+    check('…and 1.3.0 is still listed', ((await inv('workflow:form', fx.alpha))?.options?.otherTargets ?? []).includes('1.3.0'), JSON.stringify((await inv('workflow:form', fx.alpha))?.options?.otherTargets))
+
+    // --- HI-3112: a card started on 1.4.0 (Work merges into now), a commit on its line, put back. Work merges into set to
+    // integration in the tab: Save…'s Retarget lists it as staying, its branch made from 1.4.0. Screenshots in both themes.
+    const b12 = await q.agent(fx, h, 'B12')
+    const n12 = (await inv('tasks:create', { title: 'Put back with work', project: 'alpha' })).number
+    const st12 = await q.startCard(fx, h, b12, n12)
+    check('HI-3112: a card started on 1.4.0 in a slot of its own', st12.status === 200 && st12.body?.data?.target === '1.4.0' && !!b12.folder && b12.folder !== fx.alpha, JSON.stringify(st12.body))
+    fs.writeFileSync(path.join(b12.folder, 'kept.txt'), 'kept\n')
+    lib.git(b12.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(b12.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Kept'])
+    const back12 = await q.act(fx, h, b12, n12, 'put-back', { why: 'later' })
+    check('…a commit on its line, put back', back12.status === 200 && (await card(n12))?.column === 'todo', JSON.stringify(back12.body))
+    const key12 = await keyOf(n12)
+    await targetInput.waitFor({ timeout: HUNG_MS })
+    await targetInput.fill('integration')
+    await targetInput.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    await save.waitFor({ timeout: HUNG_MS })
+    const keptRow = save.locator(`[data-retarget-keep="${key12}"]`)
+    const keptText = await waitHung(async () => ((await keptRow.count()) ? text(keptRow) : null)).catch(() => null)
+    check("…Save…'s Retarget lists it as staying: its branch was made from 1.4.0", !!keptText && /its branch was made from 1\.4\.0, so it keeps merging there/.test(keptText), (await text(save)).slice(0, 600))
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await save.screenshot({ path: path.join(fx.shots, `retarget-kept-line-${t}.png`) }).catch(() => undefined)
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Discard Changes', exact: true }).click().catch(() => undefined)
+
+    // --- HI-3142: a real rule change since (the merge style) marks the lane left on 1.3.0 old rules, its Merges into kept.
+    const now = (await inv('workflow:form', fx.alpha)).options
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { target: now.target, otherTargets: now.otherTargets, style: now.style === 'squash' ? 'merge' : 'squash' }) })
+    if (!(await panel.isVisible().catch(() => false))) await page.locator('.progress-rail').click()
+    await panel.locator('.progress-tab[data-tab="lanes"]').click()
+    const marked = await waitHung(async () => ((await top11.locator('[data-mark="old-rules"]').count()) === 1 ? true : null)).catch(() => null)
+    check('HI-3142: a real rule change since marks it old rules, "into 1.3.0" kept', !!marked && (await top11.locator('[data-lane-target="1.3.0"]').count()) === 1, await text(top11))
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await waitHung(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t))
+      await panel.screenshot({ path: path.join(fx.shots, `retarget-lane-old-rules-${t}.png`) }).catch(() => undefined)
+    }
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

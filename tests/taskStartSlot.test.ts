@@ -10,11 +10,11 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 /** What the slot module answers and was given: a placement due or not, and the prompts handed to it. */
-const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string }, offered: [] as (string | null)[], asked: 0 }))
+const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string }, offered: [] as ({ text: string } | null)[], asked: 0 }))
 vi.mock('../src/main/slotCards', async (orig) => ({
   ...(await orig<object>()),
   placementDue: async () => (slot.asked++, slot.due),
-  expectStartPrompt: () => (prompt: string | null) => void slot.offered.push(prompt)
+  expectStartPrompt: () => (prompt: { text: string } | null) => void slot.offered.push(prompt)
 }))
 
 const base = tempDir('cw-startslot-')
@@ -97,7 +97,7 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect(r.card.column).toBe('doing')
     expect(launched).toEqual([])
     expect(slot.offered).toHaveLength(1)
-    expect(slot.offered[0]).toMatch(/Start with the parser\.$/)
+    expect(slot.offered[0]?.text).toMatch(/Start with the parser\.$/)
     // B1 is starting until the placement gives it the card (HI-1976): its card isn't stalled meanwhile.
     expect(startNow(p, 'b1')).toEqual({ starting: true, failed: null, waiting: null })
   })

@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
+import { allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -97,6 +97,10 @@ describe('a lane on slots (#1438)', () => {
     expect([held.state, held.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'session', agent: 'CB1' }])
     expect(laneLine(held)).toContain("waiting for slot-a: CB1's session is still in it")
     const process = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'process' } })
+    // HI-3168: its builder already builds in slot-a for another card (an ended lane's card in flight): which slot and card.
+    const byCard = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'card', agent: 'B1', card: 7 } })
+    expect([byCard.state, byCard.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'card', agent: 'B1', heldFor: 7 }])
+    expect(laneLine(byCard)).toContain('waiting for a slot: B1 still builds in slot-a for #7, which keeps it until that card is Done or put back')
     expect(laneLine(process)).toContain('waiting for slot-a: a process still has a file or folder in it open')
     // HI-2467: Windows Sandbox's broker seen working in it, idle, a Sandbox running, or that not known.
     const broker = (idle?: boolean) => laneLine(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', ...(idle !== undefined ? { idle } : {}) } }))
@@ -223,10 +227,15 @@ describe('a lane against the board', () => {
     expect([v.builder.name, v.reviewer?.name]).toEqual(['Builder One', 'R1'])
   })
 
-  it('all Done (gone cards aside) ends it; Passed is not merged', () => {
+  it('all Done (gone cards aside) ends it; Passed is not merged; every card gone or held elsewhere ends it too (HI-3117)', () => {
     expect(allDone(laneView(rec(), new Map([[1, card(1, 'done')], [2, null], [3, card(3, 'done')]])).cards)).toBe(true)
     expect(allDone(laneView(rec(), new Map([[1, card(1, 'done')], [2, card(2, 'passed')], [3, card(3, 'done')]])).cards)).toBe(false)
-    expect(allDone(laneView(rec(), new Map()).cards)).toBe(false)
+    // Every card gone (archived): nothing left to do, so it ends rather than holding its builder for good.
+    expect(allDone(laneView(rec(), new Map()).cards)).toBe(true)
+    // A card given to another agent (held elsewhere) is that agent's: the lane doesn't wait for it to end.
+    const of = { lane: 'lane-1', builder: 'b1' }
+    expect(allDone([laneCard(1, card(1, 'done'), of), laneCard(2, card(2, 'todo', { agent: 'b9' }), of)])).toBe(true)
+    expect(allDone([laneCard(1, card(1, 'done'), of), laneCard(2, card(2, 'todo', { agent: 'b1' }), of)])).toBe(false)
   })
 
   it('in a line: its pair, state, cards and id', () => {
@@ -287,6 +296,24 @@ describe('which lanes are listed and kept', () => {
     expect(laneNumber(99999, 'waitMinutes', 5)).toHaveProperty('said')
     expect(laneName('  lanes\nand   loops ')).toBe('lanes and loops')
     expect(laneName('')).toBeNull()
+  })
+
+  it('a lane name is cut to LANE_NAME_MAX UTF-16 units, never inside a character, and a lane is never dropped for its name (HI-3119)', () => {
+    const long = 'n'.repeat(103)
+    expect(laneName(long)).toBe(`${'n'.repeat(LANE_NAME_MAX - 1)}…`)
+    expect(laneName('n'.repeat(LANE_NAME_MAX))).toBe('n'.repeat(LANE_NAME_MAX))
+    // An emoji (two units) straddling the cut is left out whole, not split into a lone surrogate.
+    const emoji = laneName(`${'n'.repeat(LANE_NAME_MAX - 2)}😀${'n'.repeat(10)}`)!
+    expect(emoji).toBe(`${'n'.repeat(LANE_NAME_MAX - 2)}…`)
+    expect(emoji.length).toBeLessThanOrEqual(LANE_NAME_MAX)
+    const fits = laneName(`${'n'.repeat(LANE_NAME_MAX - 3)}😀${'n'.repeat(10)}`)!
+    expect(fits).toBe(`${'n'.repeat(LANE_NAME_MAX - 3)}😀…`)
+    expect(fits.length).toBe(LANE_NAME_MAX)
+    // Saved longer (by a build before this, or by hand): the lane reads, its name cut.
+    expect(readLane({ ...rec(), name: long })).toEqual({ ...rec(), name: laneName(long) })
+    expect(readLane({ ...rec(), name: '' })).toEqual({ ...rec(), name: null })
+    expect(readLane({ ...rec(), name: 42 })).toEqual({ ...rec(), name: null })
+    expect(readLanes({ lanes: [{ ...rec(), name: long }] })).toHaveLength(1)
   })
 })
 
@@ -394,6 +421,20 @@ describe('the lanes service', () => {
     await lanes.endLane(w, c.lane.id, { abandoned: true })
   })
 
+  it('a lane started with a name over LANE_NAME_MAX is saved with it cut, and stays listed; so does one renamed to one (HI-3119)', async () => {
+    await rulesOff()
+    const [c1, c2] = [await make('Long 1'), await make('Long 2')]
+    const long = 'Lane '.repeat(21).trim()
+    const a = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [c1.number], name: long, by: 'B1 (alpha)' })
+    expect(a.lane.name).toBe(laneName(long))
+    expect((await lanes.listLanes(w)).find((l) => l.id === a.lane.id)?.name).toBe(laneName(long))
+    const emoji = `${'n'.repeat(LANE_NAME_MAX - 2)}😀 more`
+    const b = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [c1.number, c2.number], name: emoji, by: 'B1 (alpha)' })
+    expect([b.did, b.lane.id, b.lane.name]).toEqual(['updated', a.lane.id, laneName(emoji)])
+    expect((await lanes.listLanes(w)).find((l) => l.id === a.lane.id)?.name).toBe(laneName(emoji))
+    await lanes.endLane(w, a.lane.id, { abandoned: true })
+  })
+
   it("a lane started without rounds or wait takes the project's workflow options as they resolve, else the workspace's; given ones win, and a lane keeps what it started with (#412, HI-1766)", async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()
@@ -464,7 +505,8 @@ describe('the lanes service', () => {
     const [c1] = [await make('N1')]
     const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
     await lanes.endLane(w, ended.id, {})
-    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.`)
+    // Ended by the user with its card still in Todo (HI-3118): said so, never "all its cards are Done".
+    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} was ended with #${c1.number} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with that card.`)
     const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
     await lanes.endLane(w, abandoned.id, { abandoned: true })
     await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)

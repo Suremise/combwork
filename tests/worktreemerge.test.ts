@@ -4,7 +4,7 @@
 // project folder hasn't checked out is merged without touching a folder.
 // HI-2422: the branch is merged by its full ref, never a same-named tag.
 import { execFileSync } from 'child_process'
-import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorktree, mergeWorktree } from '../src/main/worktrees'
@@ -83,6 +83,70 @@ describe('mergeWorktree (#1347)', () => {
       expect(run(project, 'status', '--porcelain')).toBe('')
     })
   }
+
+  // HI-3030 (Darren's decision): a merge into a branch checked out nowhere is made as every other merge is, by git merge
+  // in a temporary worktree: signed as the repository says or refused with git's reason (never made unsigned, as git
+  // commit-tree made it), and the repository's commit hooks run. The temporary folder goes either way.
+  const worktrees = (project: string): string[] => run(project, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree '))
+  for (const squash of [false, true]) {
+    it(`into a branch checked out nowhere with signing on and a signer that can't run: refused saying why, nothing moved (${squash ? 'squash' : 'merge commit'})`, async () => {
+      const { project, a } = await twoBranches()
+      run(project, 'branch', 'release')
+      const listed = worktrees(project)
+      // Repo-local: a signer that doesn't exist, so any commit git signs fails; nothing of the user's is touched.
+      run(project, 'config', 'commit.gpgsign', 'true')
+      run(project, 'config', 'gpg.program', join(root, 'no-such-signer.exe'))
+      const release = run(project, 'rev-parse', 'release')
+      const r = await mergeWorktree(project, a, { squash, message: 'into release', target: 'release' })
+      expect(r.ok).toBe(false)
+      expect(r.error).toMatch(/^Nothing was merged: /)
+      expect(r.error).toMatch(/sign|gpg/i)
+      expect(run(project, 'rev-parse', 'release')).toBe(release)
+      expect(worktrees(project)).toEqual(listed)
+    })
+
+    it(`into a branch checked out nowhere: the repository's commit hooks run, and one refusing keeps it as it was (${squash ? 'squash' : 'merge commit'})`, async () => {
+      const { project, a } = await twoBranches()
+      run(project, 'branch', 'release')
+      const listed = worktrees(project)
+      const hooks = join(root, 'hooks')
+      mkdirSync(hooks)
+      run(project, 'config', 'core.hooksPath', hooks.replace(/\\/g, '/'))
+      // commit-msg runs for a merge commit and a squash's commit alike: it marks the message.
+      writeFileSync(join(hooks, 'commit-msg'), '#!/bin/sh\necho "Hooked: yes" >> "$1"\n')
+      const r = await mergeWorktree(project, a, { squash, message: 'into release', target: 'release' })
+      const release = run(project, 'rev-parse', 'release').trim()
+      expect(r).toEqual({ ok: true, mergeCommit: release })
+      expect(run(project, 'log', '-1', '--format=%B', 'release')).toContain('Hooked: yes')
+      expect(run(project, 'log', '-1', '--format=%P', 'release').trim().split(' ')).toHaveLength(squash ? 1 : 2)
+      expect(worktrees(project)).toEqual(listed)
+      // A hook that refuses (pre-merge-commit for a merge, pre-commit for a squash's commit): refused with its words.
+      run(a.path, 'commit', '-q', '--allow-empty', '-m', 'more')
+      writeFileSync(join(a.path, 'more.txt'), 'more\n')
+      run(a.path, 'add', '-A')
+      run(a.path, 'commit', '-qm', 'more work')
+      writeFileSync(join(hooks, squash ? 'pre-commit' : 'pre-merge-commit'), '#!/bin/sh\necho "the hook says no" >&2\nexit 1\n')
+      const no = await mergeWorktree(project, a, { squash, message: 'again', target: 'release' })
+      expect(no.ok).toBe(false)
+      expect(no.error).toContain('the hook says no')
+      expect(run(project, 'rev-parse', 'release').trim()).toBe(release)
+      expect(worktrees(project)).toEqual(listed)
+    })
+  }
+
+  // HR1's round 1 on HI-3030: git merge answers "Already up to date" for a branch the target has (merged before):
+  // that is success with the target where it was, never "Nothing was merged".
+  it('merging again a branch a target checked out nowhere has already: done, the target unmoved, nothing left', async () => {
+    const { project, a } = await twoBranches()
+    run(project, 'branch', 'release')
+    const listed = worktrees(project)
+    const first = await mergeWorktree(project, a, { squash: false, message: 'into release', target: 'release' })
+    const release = run(project, 'rev-parse', 'release').trim()
+    expect(first).toEqual({ ok: true, mergeCommit: release })
+    expect(await mergeWorktree(project, a, { squash: false, message: 'again', target: 'release' })).toEqual({ ok: true, mergeCommit: release })
+    expect(run(project, 'rev-parse', 'release').trim()).toBe(release)
+    expect(worktrees(project)).toEqual(listed)
+  })
 
   it('refuses a target checked out in another folder, and a target that does not exist', async () => {
     const { project, a, b } = await twoBranches()

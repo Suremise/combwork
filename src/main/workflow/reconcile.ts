@@ -23,7 +23,12 @@ import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
+import { catchUpKey, catchUpOf } from './mergeQueue'
 import { inTargetNow } from '../../shared/workflow/workView'
+import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, type JjCandidateStep } from '../platform/jjCandidateStep'
+import type { WorkflowOptions } from '../../shared/workflow/options'
+import type { StoredText } from '../../shared/types'
+import { asCardCounts } from './containment'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -39,9 +44,16 @@ const UNFINISHED = ['active', 'review', 'approved', 'merging']
 /** A shared folder's new commits attributed in one transaction at most (HI-2379): main's thread given back between. */
 export const ATTRIBUTE_BATCH = 100
 
+/**
+ * Whether a card is built in the project folder beside others (§16.3.2). HI-3083: never a forward merge card (HI-2679):
+ * it records the project folder with no line, but no agent builds it and it has no commits of its own, so it takes no
+ * attribution and makes no other card's commits need a trailer.
+ */
+export const sharesFolder = (s: CardState): boolean => s.started?.folder === 'project' && !s.forward
+
 /** Cards working in the project folder that aren't finished (Active, Review, Approved). */
 function sharedFolderCards(wf: Workflow): CardRecord[] {
-  return wf.store.cards().filter((c) => UNFINISHED.includes(c.stage) && wf.state(c).started?.folder === 'project')
+  return wf.store.cards().filter((c) => UNFINISHED.includes(c.stage) && sharesFolder(wf.state(c)))
 }
 
 /**
@@ -85,7 +97,7 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks, H: HistoryPort
   if (isUnknown(list)) return 'done'
   await hooks.afterRead?.()
   const decided = list.map((c) => {
-    const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x)
+    const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x && !wf.state(x).forward)
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
     return { commit: c.commit, card, how: byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed' }
   })
@@ -327,7 +339,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const approved = { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key }
     // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
-      const c = await H.contains(project, target, approved)
+      const c = asCardCounts(s, await H.contains(project, target, approved))
       if (!isUnknown(c) && c) {
         await hooks.afterRead?.()
         return integratedOutside(wf, H, card, s, approved.revision, c.method, [])
@@ -390,7 +402,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     // submission, for the submission it was read for.
     if (inTargetNow(s)) return
     const sub = s.latest
-    const c = await H.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
+    const c = asCardCounts(s, await H.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key }))
     if (isUnknown(c) || !c) return
     await hooks.afterRead?.()
     await wf.write(card, null, 'outside', (w) => {
@@ -429,7 +441,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
     const from = s.latest?.base ?? base
     if (!revision || !from || revision === from) return
-    const c = await H.contains(project, target, { base: from, revision, key: s.latest?.key })
+    const c = asCardCounts(s, await H.contains(project, target, { base: from, revision, key: s.latest?.key }))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
     const th = await H.lineHead(project, target)
@@ -447,12 +459,55 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     // isn't is the change looked for, in the same head.
     const resultIn = await H.isAncestor(project, i.result, th)
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
-    if (resultIn) return
+    // In it again (HI-2988: caught up, or merged back): a mark it had cleared.
+    if (resultIn) {
+      if (s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
+      return
+    }
+    // HI-2988: published to its remote (follow mode, G21), the card's result is the remote's: a local target whose
+    // catch-up to it is still owed, or merely behind it, hasn't left it.
+    if (catchUpOf(wf.store.meta(catchUpKey(i.target)))?.card === card.key) return
+    if (published(wf, card, s)) {
+      const behind = await H.isAncestor(project, th, i.result)
+      if (isUnknown(behind)) return hooks.unknown?.(behind.what)
+      // HI-3041 (Darren's 2b): unless the remote no longer has the result either (undone there too): then it has left,
+      // as with a push after merging. The remote looked at only here, behind a published result (kept a minute).
+      // Already marked: nothing for the remote to decide.
+      if (behind && !s.marks.leftTarget) {
+        const there = H.remoteHas ? await H.remoteHas(project, i.target, i.result) : true
+        if (isUnknown(there)) return hooks.unknown?.(there.what)
+        if (there) return
+      }
+    }
     const sub = s.latest
-    const c = await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
+    const c = asCardCounts(s, await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    // HI-3041 (Darren's 3a): merged back by hand (the card's own change in its target again, by the test that marks it
+    // left), the mark cleared too, not only once the queue's result is back.
+    if (c && s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
+    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))
   }
+}
+
+/**
+ * HI-2988: a Done card's leaving its target and coming back, each observation keyed to the transition it follows (the
+ * latest fact of the opposite kind, read in its write): two Combworks observing one transition write one fact, and the
+ * same heads visited again (reset away and back, twice) make new ones. `LeftTarget` follows the integration or the last
+ * `BackInTarget`; `BackInTarget` follows the last `LeftTarget`.
+ */
+const LEFT: ReadonlySet<string> = new Set(['LeftTarget']) // i18n-ignore: fact kinds
+const BACK: ReadonlySet<string> = new Set(['Integrated', 'BackInTarget']) // i18n-ignore: fact kinds
+const lastSeq = (w: Write, card: number, kinds: ReadonlySet<string>): number => w.tx.facts(card).findLast((f) => kinds.has(f.kind))?.seq ?? 0
+
+/**
+ * HI-2988: whether a Done card's integration was published to its target's remote (follow mode): its advance's
+ * `IntegrationStarted` recorded the publication, or the queue found it published by someone else while following.
+ */
+function published(wf: Workflow, card: CardRecord, s: CardState): boolean {
+  const i = s.integrated
+  if (!i?.entry) return false
+  if (wf.store.facts(card.id).some((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === i.entry && !!(f.data as FactData['IntegrationStarted']).publish)) return true
+  return i.by === 'outside' && wf.cfg.options().followRemote === true
 }
 
 async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
@@ -474,6 +529,541 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
     if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
     w.move('done', 'derived')
   })
+}
+
+/**
+ * What jj's adapter answers for its reconciliation (HI-2882's J9b2): the card's head in its slot now (J2's head), whether
+ * a later head carries the approved pass (J3's `jjSameRevision`, with the merge base it found), and J5's proof for the
+ * approved submission (`jjContains`: its containment, its provenance and its retained bundle, or why not).
+ */
+/**
+ * HI-3140: a candidate's platform's own words and keys (jj's, platform/jjCandidateReturn.ts and jjCandidateChecks.ts),
+ * given by its reconcile port: the key its merge checks run under, the entry an IntegrationFailed names, and what a
+ * returned card's builder and card are told.
+ */
+export interface CandidateWords {
+  checksKey(options: WorkflowOptions, setup: string): string
+  entry(attempt: string): string
+  wake(key: string, f: FactData['IntegrationFailed']): string
+  comment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText }
+}
+
+export interface JjReconcilePorts {
+  /** HI-3140: the candidate's words and keys (CandidateWords). */
+  words: CandidateWords
+  headNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
+  /** Unknown (a read that couldn't be made, a view that moved): never taken for "not the same" (HR1's round 1). */
+  same(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }, head: string): Promise<{ same: boolean; base: string | null } | { unknown: string }>
+  prove(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved>
+  /** The rows an Integrated fact's transaction writes beside it (its obligation and retained bundle). */
+  record(w: Write, row: { card: string; cycle: number; bundle: string; target: string; result: string; since: number }): void
+  /** The project's canonical id: the containment record's scope (HI-2869). */
+  projectId(): string
+  /**
+   * HI-2871: J4's pre-integration candidate for the approval its fingerprint names (built, answered again, or why not);
+   * `still`: whether that fingerprint is the card's now, read from the board (the attempt's owner). Absent: none is built.
+   */
+  candidate?(card: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean): Promise<JjCandidateStep>
+  /** HI-2871: whether the target's head is still `expected`, read just before a candidate's answer is published. */
+  headIs?(target: string, expected: string): Promise<boolean>
+  /**
+   * HI-2871 (HR3's round 2): whether a published offer is still current: the target still at its head, and its candidate
+   * still the visible commit J4 recorded (`jjCandidateNow`: not superseded or gone). False when either can't be read.
+   */
+  offerCurrent?(target: string, offer: JjCandidateOffer): Promise<boolean>
+  /** HI-2871: the cycle integrated: its candidates dropped (the one the target reaches kept). */
+  candidatesDone?(card: CardRecord, cycle: number): Promise<void>
+  /** HI-2938: the project's merge checks for a candidate now: their names and key (checksKeyOf); none: none configured. */
+  checksNow?(card: CardRecord, s: CardState): Promise<{ key: string; names: string[] }>
+  /** HI-2938: a candidate waits for its checks: the project's checks runner asked to look. */
+  checksWanted?(): void
+}
+
+/**
+ * HI-2938: a candidate's merge checks as the window shows them, bound to the checks key they run under (s11 §2):
+ * running (`done` of `names`, `current` the one running), passed (adoptable), waiting for a check copy, stopped (Stop:
+ * waits for Run Checks Again), or failing transiently (`misses` in a row, `why`). HI-2991: `misses` is kept while they run
+ * again (only a pass or a restart under a new key clears it), and a waiting or failing set isn't run again before `retryAt`.
+ */
+export interface JjCandidateChecksShown {
+  key: string
+  names: string[]
+  state: 'running' | 'passed' | 'waiting' | 'stopped' | 'failing'
+  done?: number
+  current?: string
+  why?: string
+  misses?: number
+  /** HI-2991: waiting or failing, when the checks runner may run them again (ms since the epoch). */
+  retryAt?: number
+}
+
+/**
+ * The window's record of a jj card's candidate (HI-2871/s21), board_meta, by the project's canonical id: the fingerprint
+ * it was made for (shown only while that is the card's), and what it is: a candidate ready, none (the repository signs),
+ * or why it couldn't be built (`misses` in a row: shown from CANDIDATE_MISSES on).
+ */
+export interface JjCandidateShown {
+  gen: number
+  fp: JjCandidateFingerprint
+  state: 'ready' | 'signing' | 'unknown'
+  offer?: JjCandidateOffer
+  /** HI-2938: its merge checks (absent: none configured, so it is offered after its conflict check alone). */
+  checks?: JjCandidateChecksShown
+  why?: string
+  misses?: number
+  at: number
+}
+
+/** Unknown candidate steps in a row before the window says why (s13 §3). */
+export const CANDIDATE_MISSES = 3
+
+export const candidateKey = (project: string, card: string, cycle: number): string => `jj_candidate:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`
+
+/**
+ * A jj card's candidate fingerprint now (null: not an approval a candidate is built for): Approved, its pass holding (no
+ * Stale recorded, and its slot's observed head the approved revision: HR3's round 1). The one predicate for reuse, J4's
+ * owner, publication and display.
+ */
+export function candidateFingerprint(wf: Workflow, card: CardRecord, s: CardState): JjCandidateFingerprint | null {
+  const snap = approvalOf(card, s)
+  if (!snap || snap.stage !== 'approved' || !s.approved || !snap.target) return null
+  if (s.stale || (s.head && s.head !== snap.revision)) return null
+  // HI-2938/s11: the approval's own identity: the move into Approved it came from, in this cycle (the stage is Approved,
+  // so the latest such move is the one the card stands on), and the decision generation.
+  const approval = wf.store.facts(card.id).findLast((f) => f.kind === 'Moved' && f.seq > s.cycle && (f.data as FactData['Moved']).to === 'approved')?.seq
+  if (approval === undefined) return null
+  const r = wf.rulesetOf(card, s)
+  return { cycle: snap.cycle, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, ruleset: r.id, style: r.options.style, strict: r.options.strict, generation: s.generation, approval }
+}
+
+/**
+ * The card's candidate record, only while it was made for its fingerprint now (a stale row, a crash's, shows nothing);
+ * a ready one only while `headNow` (the target's head as just read; undefined: not read) is the head it was built on
+ * (HR3's round 1): a target that moved hides it at once, whatever its rebuild does, across restarts too.
+ */
+export function candidateShown(wf: Workflow, card: CardRecord, s: CardState, project: string, headNow?: string | null, anyHead = false): JjCandidateShown | null {
+  // The record first: a card with none (most) needs no fingerprint read.
+  const raw = wf.store.boardMeta(candidateKey(project, card.key, s.cycle))
+  const fp = raw ? candidateFingerprint(wf, card, s) : null
+  if (!fp || !raw) return null
+  try {
+    const rec = JSON.parse(raw) as JjCandidateShown
+    if (!sameFingerprint(rec.fp, fp)) return null
+    return rec.state !== 'ready' || anyHead || (!!headNow && rec.offer?.expected === headNow) ? rec : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether a card's cycle has ended without Integrated (HI-2950/s10): an earlier cycle than its current one (put back and
+ * restarted), or its current one while it is in Todo (put back) or Done with no Integrated fact (the user's own Done, or
+ * one while the rules were off). An Approved, Review or Active card's current cycle never has.
+ */
+export const cycleEnded = (card: Pick<CardRecord, 'stage'>, s: Pick<CardState, 'cycle' | 'integrated'>, cycle: number): boolean => cycle < s.cycle || (cycle === s.cycle && (card.stage === 'todo' || (card.stage === 'done' && !s.integrated)))
+
+/**
+ * Whether a card's cycle is over, so nothing of its candidates is wanted any more (HI-2990): ended (`cycleEnded`), or its
+ * current one with Integrated recorded, whatever the card's stage (Done, or still Approved when Integrated was recorded
+ * while the rules were off). Integrated is final for its cycle: a reopen is a new one. The sweep's predicate and its owner.
+ */
+export const cycleOver = (card: Pick<CardRecord, 'stage'>, s: Pick<CardState, 'cycle' | 'integrated'>, cycle: number): boolean => cycleEnded(card, s, cycle) || (cycle === s.cycle && !!s.integrated)
+
+/**
+ * An over cycle's rows for the window and its checks (HI-2950/s10, HI-2990) deleted, only in a write that finds the cycle
+ * still over in its own transaction (the card reopened or re-approved meanwhile: nothing deleted). `checks`: the checks
+ * journals' keys whose leases are freed. Whether it deleted.
+ */
+export async function clearEndedCycle(wf: Workflow, card: CardRecord, project: string, cycle: number, checks: readonly string[]): Promise<boolean> {
+  let done = false
+  await wf.write(card, null, 'combwork', (w) => {
+    if (!cycleOver(wf.store.card(card.id), w.state(), cycle)) return
+    w.tx.sql((db) => {
+      const del = db.prepare('DELETE FROM board_meta WHERE key = ?') // i18n-ignore: SQL
+      del.run(candidateKey(project, card.key, cycle))
+      for (const k of checks) del.run(k)
+    })
+    done = true
+  })
+  return done
+}
+
+/** What a candidate's checks run came to, as the runner publishes it (HI-2938). */
+export type JjChecksUpdate =
+  | { progress: { done: number; current?: string } }
+  /** The checks' key changed (other checks, commands, install or setup): they start anew under it (HR1's round 1 finding 3). */
+  | { restart: string[] }
+  | { passed: string[] }
+  /** HI-2991: `retryMs`, how long until the checks runner tries again. */
+  | { waiting: string; retryMs: number }
+  | { stopped: string }
+  | { failing: string; retryMs: number }
+  | { red: { check: string; output: string; logPath?: string; expected: string } }
+
+/**
+ * Publishes a candidate's checks' progress or outcome (HI-2938/s11 §2), only in a write that finds, in its own
+ * transaction, the card's fingerprint still `fp`, its record still this attempt's with checks under `key`, and `key` the
+ * one the card's options give now with the project's setup command (`setup`, read just before). `current`: the target
+ * still at the candidate's head and the candidate still its recorded commit (read just before; false fails closed).
+ * A red check returns the card to its builder (`IntegrationFailed`, as the queue's red check does). Whether it wrote.
+ */
+export async function publishCandidateChecks(wf: Workflow, card: CardRecord, project: string, at: { fp: JjCandidateFingerprint; attempt: string; key: string; setup: string; setupStill?: () => boolean }, u: JjChecksUpdate, current: boolean, words: CandidateWords): Promise<boolean> {
+  if (!current) return false
+  const key = candidateKey(project, card.key, at.fp.cycle)
+  let wrote = false
+  await wf.write(card, 'red' in u ? wf.rulesetOf(card) : null, 'outside', (w) => {
+    const now = wf.store.card(card.id)
+    const st = w.state()
+    if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
+    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    // The setup command still the one the key was made with (finding 3): project.json unchanged since it was read.
+    if (at.setupStill && !at.setupStill()) return
+    let rec: JjCandidateShown | null = null
+    w.tx.sql((db) => {
+      const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+      try {
+        rec = had ? (JSON.parse(had.value) as JjCandidateShown) : null
+      } catch {
+        rec = null
+      }
+    })
+    const r = rec as JjCandidateShown | null
+    if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || !r.checks || (!('restart' in u) && r.checks.key !== at.key)) return
+    if ('red' in u) {
+      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
+      w.fact('IntegrationFailed', failed)
+      w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
+      wrote = true
+      if (!wf.cfg.reconcileActs) return
+      w.move('active', 'derived')
+      wf.wake(w, st.started?.builder, words.wake(card.key, failed))
+      w.action('comment', { ...words.comment(card.key, failed) })
+      return
+    }
+    const c = r.checks!
+    const next: JjCandidateChecksShown =
+      'restart' in u
+        ? { key: at.key, names: u.restart, state: 'running', done: 0 }
+        : 'progress' in u
+        ? // HI-2991: the misses in a row kept while they run again, so a failing set counts up to the window's message.
+          { key: c.key, names: c.names, state: 'running', done: u.progress.done, ...(u.progress.current ? { current: u.progress.current } : {}), ...(c.misses ? { misses: c.misses } : {}) }
+        : 'passed' in u
+          ? { key: c.key, names: c.names, state: 'passed', done: c.names.length }
+          : 'waiting' in u
+            ? { key: c.key, names: c.names, state: 'waiting', why: u.waiting, ...(c.misses ? { misses: c.misses } : {}), retryAt: Date.now() + u.retryMs }
+            : 'stopped' in u
+              ? { ...c, state: 'stopped', why: u.stopped, retryAt: undefined }
+              : { key: c.key, names: c.names, state: 'failing', why: u.failing, misses: (c.misses ?? 0) + 1, retryAt: Date.now() + u.retryMs }
+    const row: JjCandidateShown = { ...r, checks: next, at: Date.now() }
+    w.tx.sql((db) => void db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify(row), key)) // i18n-ignore: SQL
+    wrote = true
+  })
+  return wrote
+}
+
+/** HI-2938's Run Checks Again: a stopped or failing candidate's checks running again, under the same validity (s11 §1). */
+export async function checksAgain(wf: Workflow, card: CardRecord, project: string, setup: string, current: boolean, words: CandidateWords): Promise<boolean> {
+  const s = wf.state(card)
+  const rec = candidateShown(wf, card, s, project, undefined, true)
+  if (!rec?.offer || !rec.checks || (rec.checks.state !== 'stopped' && rec.checks.state !== 'failing')) return false
+  const fp = candidateFingerprint(wf, card, s)
+  if (!fp) return false
+  return publishCandidateChecks(wf, card, project, { fp, attempt: rec.offer.attempt, key: rec.checks.key, setup }, { progress: { done: 0 } }, current, words)
+}
+
+/**
+ * HI-2871's step (design HI-2871/s21): J4's candidate for the card's exact approval, answered only while the card is
+ * still that approval under the same rules and its target still at the head it was built on, each checked in the write
+ * that publishes it. A candidate: its record for the window. A conflict or not up to date: the card back to its
+ * builder (`IntegrationFailed`, as the queue returns one). The repository signs: a record saying so. Unknown: nothing
+ * offered or returned; counted, and said once it has happened CANDIDATE_MISSES times in a row.
+ */
+async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports: JjReconcilePorts, hooks: ReconcileHooks): Promise<void> {
+  const fp = candidateFingerprint(wf, card, s)
+  if (!fp || !ports.candidate) return
+  const project = ports.projectId()
+  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp)
+  const still = (): boolean => {
+    const c = wf.store.card(card.id)
+    return stillIn(c, wf.state(c))
+  }
+  const key = candidateKey(project, card.key, fp.cycle)
+  const prior = (db: { prepare(sql: string): { get(...a: string[]): unknown } }): JjCandidateShown | null => {
+    const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+    try {
+      return had ? (JSON.parse(had.value) as JjCandidateShown) : null
+    } catch {
+      return null
+    }
+  }
+  // HR3's rounds 1 and 2: a ready offer that isn't current any more (its head not the target's, its candidate superseded
+  // or gone, or either unreadable) is withdrawn before anything is recovered, dropped or rebuilt, so an interrupted or
+  // failed rebuild never leaves it offered. Only that exact row.
+  const raw = wf.store.boardMeta(key)
+  let had: JjCandidateShown | null = null
+  try {
+    had = raw ? (JSON.parse(raw) as JjCandidateShown) : null
+  } catch {
+    had = null
+  }
+  if (had?.state === 'ready' && had.offer && !(ports.offerCurrent && (await ports.offerCurrent(fp.target, had.offer)))) {
+    const seen = had
+    await wf.write(card, null, 'outside', (w) => {
+      w.tx.sql((db) => {
+        const now = prior(db)
+        if (now && now.gen === seen.gen && now.offer?.attempt === seen.offer?.attempt) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // i18n-ignore: SQL
+      })
+    })
+  }
+  const gen = await reserveContained(wf, project)
+  const step = await ports.candidate(card, s, fp, still)
+  const put = (rec: Omit<JjCandidateShown, 'gen' | 'fp' | 'at'>) => async (): Promise<void> => {
+    await wf.write(card, null, 'outside', (w) => {
+      if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+      w.tx.sql((db) => {
+        const was = prior(db)
+        if (was && was.gen >= gen) return
+        const misses = rec.state === 'unknown' ? (was?.state === 'unknown' && sameFingerprint(was.fp, fp) ? (was.misses ?? 1) + 1 : 1) : undefined
+        const row: JjCandidateShown = { gen, fp, ...rec, ...(misses ? { misses } : {}), at: Date.now() }
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(row)) // i18n-ignore: SQL
+      })
+    })
+  }
+  if ('unknown' in step) {
+    await put({ state: 'unknown', why: step.unknown })()
+    return hooks.unknown?.(`candidate: ${step.unknown}`)
+  }
+  // HI-2989: the target already holds its candidate: nothing written (the offer stays as it was; the proof credits it).
+  if ('none' in step) return step.none === 'reached' ? undefined : put({ state: 'signing' })()
+  // A candidate or a return is published only while the target is still at the head it was built on.
+  const expected = 'offer' in step ? step.offer.expected : step.returned.expected
+  if (!ports.headIs || !(await ports.headIs(fp.target, expected))) return
+  await hooks.afterRead?.()
+  if ('offer' in step) {
+    // HI-2938: with merge checks configured, offered only once they pass: until then running, its progress kept for
+    // exactly this attempt and checks key (a new attempt or key starts them anew).
+    const cn = ports.checksNow ? await ports.checksNow(card, s) : { key: '', names: [] }
+    const offer = step.offer
+    await wf.write(card, null, 'outside', (w) => {
+      if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+      w.tx.sql((db) => {
+        const was = prior(db)
+        if (was && was.gen >= gen) return
+        const kept = was?.offer?.attempt === offer.attempt && was.checks?.key === cn.key ? was.checks : undefined
+        const checks: JjCandidateChecksShown | undefined = cn.names.length ? (kept ?? { key: cn.key, names: cn.names, state: 'running', done: 0 }) : undefined
+        const row: JjCandidateShown = { gen, fp, state: 'ready', offer, ...(checks ? { checks } : {}), at: Date.now() }
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(row)) // i18n-ignore: SQL
+      })
+    })
+    if (cn.names.length) ports.checksWanted?.()
+    return
+  }
+  const f = step.returned
+  await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
+    if (!sameCycle(w, s) || !stillIn(wf.store.card(card.id), w.state())) return
+    const failed: FactData['IntegrationFailed'] = { entry: ports.words.entry(f.attempt), revision: fp.revision, target: fp.target, reason: f.reason === 'conflict' ? 'conflict' : 'notUpToDate', transient: false, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log.slice(-4000) } : {}), ...(f.conflicts?.files.length ? { conflicts: f.conflicts } : {}) } // i18n-ignore: a failure's code, not text
+    w.fact('IntegrationFailed', failed)
+    w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
+    if (!wf.cfg.reconcileActs) return
+    w.move('active', 'derived')
+    wf.wake(w, w.state().started?.builder, ports.words.wake(card.key, failed))
+    w.action('comment', { ...ports.words.comment(card.key, failed) })
+  })
+}
+
+/** J5's answer for an approved submission: contained (with what to record), not contained, or why it couldn't say. */
+export type JjProved =
+  | { contained: true; method: 'merge' | 'fastForward' | 'squash' | 'sameTree'; result: string; bundle: string; platform: Record<string, unknown> }
+  | { contained: false }
+  | { unknown: string }
+
+/** The window's containment record of a jj card's cycle (HI-2869/s13, s16), board_meta, by the project's canonical id. */
+export const containedKey = (project: string, card: string, cycle: number): string => `jj_contained:${project.toLowerCase()}:${card.toLowerCase()}:${cycle}`
+const containedGenKey = (project: string): string => `jj_contained_gen:${project.toLowerCase()}`
+
+/** A containment record as the window reads it: the exact approval it was observed for, and what was observed. */
+export interface JjContained {
+  gen: number
+  submission: number
+  revision: string
+  base: string
+  key: string | null
+  commit: string | null
+  target: string
+  state: 'notYet' | 'unknown'
+  why?: string
+  at: number
+}
+
+/** A new observation's generation, from the project's counter, moved in its own board write (monotonic, never a clock). */
+async function reserveContained(wf: Workflow, project: string): Promise<number> {
+  let gen = 0
+  await wf.locked(async () =>
+    wf.store.tx((tx) =>
+      tx.sql((db) => {
+        db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(containedGenKey(project)) // i18n-ignore: SQL
+        gen = Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(containedGenKey(project)) as { value: string }).value) // i18n-ignore: SQL
+      })
+    )
+  )
+  return gen
+}
+
+/**
+ * The observation recorded for the window (HI-2869/s13, s16): only while the card is still exactly the approval observed
+ * (its cycle, stage, approved submission, endpoints, jj commit and target, checked in the write), and only over no record
+ * or a lower generation's (an older observation finishing later writes nothing).
+ */
+async function noteContained(wf: Workflow, card: CardRecord, s: CardState, snap: ApprovalSnapshot, project: string, gen: number, seen: { state: 'notYet' | 'unknown'; why?: string }): Promise<void> {
+  await wf.write(card, null, 'outside', (w) => {
+    if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(wf.store.card(card.id), w.state()))) return
+    w.tx.sql((db) => {
+      const k = containedKey(project, card.key, s.cycle)
+      const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string } | undefined // i18n-ignore: SQL
+      let stored = 0
+      try {
+        stored = had ? Number((JSON.parse(had.value) as { gen?: number }).gen ?? 0) : 0
+      } catch {
+        stored = 0
+      }
+      if (had && stored >= gen) return
+      const rec: JjContained = { gen, submission: snap.submission, revision: snap.revision, base: snap.base, key: snap.key, commit: snap.commit, target: snap.target, state: seen.state, ...(seen.why ? { why: seen.why } : {}), at: Date.now() }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(k, JSON.stringify(rec)) // i18n-ignore: SQL
+    })
+  })
+}
+
+/** What a jj proof was made for: the card's exact approval, rechecked in the Integrated write (HI-2882/s10 §2). */
+interface ApprovalSnapshot {
+  cycle: number
+  stage: StageId
+  submission: number
+  revision: string
+  base: string
+  key: string | null
+  /** The approved submission's jj commit id as recorded (its `platform.jj`), or null. */
+  commit: string | null
+  target: string
+}
+
+const jjCommitOf = (platform: unknown): string | null => {
+  const j = platform && typeof platform === 'object' ? (platform as { jj?: { commitId?: unknown } }).jj : null
+  return j && typeof j.commitId === 'string' ? j.commitId : null
+}
+
+function approvalOf(card: CardRecord, s: CardState): ApprovalSnapshot | null {
+  if (!s.approved?.revision || !s.approved.base || !s.latest) return null
+  return { cycle: s.cycle, stage: card.stage, submission: s.latest.id, revision: s.approved.revision, base: s.approved.base, key: s.latest.key ?? null, commit: jjCommitOf(s.latest.platform), target: s.started?.target ?? '' }
+}
+
+const sameApproval = (a: ApprovalSnapshot, b: ApprovalSnapshot | null): boolean => !!b && a.cycle === b.cycle && a.stage === b.stage && a.submission === b.submission && a.revision === b.revision && a.base === b.base && a.key === b.key && a.commit === b.commit && a.target === b.target
+
+/**
+ * A jj card's reconciliation (HI-2882's J9b2, design HI-2882/s7–s22; SPEC §16.4.4's table for a platform whose user
+ * integrates, option A): Gone for the repository or the slot folder; its head observed (HeadMoved); in Approved, J5's
+ * proof first (contained: `Integrated` by outside, recorded only while the card is still exactly the approval proved, its
+ * obligation and retained bundle in the same write, then Done), else Git's stale and carry-over rules on the jj head. A
+ * proof refused or unknown is told to `hooks.unknown` and writes nothing: never "not integrated". Not offered for jj in
+ * 1.5.0: InTarget, MergedInPart and LeftTarget (each would need a containment decision outside J5's proof).
+ */
+export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: ReconcileHooks, ports: JjReconcilePorts): Promise<void> {
+  let card = wf.store.card(card0.id)
+  let s = wf.state(card)
+  if (!s.started) return
+  const r = wf.rulesetOf(card, s)
+  const o = r.options
+  const project = wf.cfg.project
+  const s0 = s
+  if (presence(project) === 'gone') {
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } })) // i18n-ignore: a fact's kind and codes, not text
+    return
+  }
+  if (card.stage !== 'done' && wf.ownLine(s) && presence(s.started.folder) === 'gone') {
+    const folder = s.started.folder
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.state().started?.folder === folder && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
+    return
+  }
+  // Its head, once its slot is prepared (#1551: until then there is nothing of its to observe).
+  if (card.stage !== 'done' && s.started.line && !slotPreparationOwed(wf, card, s)) await observeHead(wf, card, () => ports.headNow(card, s), s.started.line, hooks)
+  card = wf.store.card(card.id)
+  s = wf.state(card)
+  if (card.stage !== 'approved') return
+  // Integrated already recorded this cycle (the rules off then, or another Combwork's): its effects applied once the rules
+  // act, with no new proof or rows (HR1's round 1), as Git's integration does.
+  if (s.integrated) {
+    if (wf.cfg.reconcileActs) await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && !!w.state().integrated && w.current !== 'done' && !wf.closeWaitsFor(w).length && void w.move('done', 'derived'))
+    return
+  }
+  const snap = approvalOf(card, s)
+  if (!snap) return
+  const approved = { base: snap.base, revision: snap.revision, key: snap.key }
+  if (approved.revision !== s.started!.base) {
+    // HI-2869: this observation's generation, reserved before anything is read (the window's containment record is
+    // ordered by it, never by a clock).
+    const gen = await reserveContained(wf, ports.projectId())
+    const p = await ports.prove(card, s, approved)
+    if ('unknown' in p) {
+      await noteContained(wf, card, s, snap, ports.projectId(), gen, { state: 'unknown', why: p.unknown })
+      return hooks.unknown?.(p.unknown)
+    }
+    if (!p.contained) await noteContained(wf, card, s, snap, ports.projectId(), gen, { state: 'notYet' })
+    // HI-2871: not in its target yet, its pass holding at its slot's head: J4's candidate before the user integrates it
+    // (with the rules enforced: a candidate may return the card).
+    if (!p.contained && wf.cfg.reconcileActs && !s.stale && (!s.head || s.head === approved.revision)) await candidateFor(wf, card, s, ports, hooks)
+    if (p.contained) {
+      await hooks.afterRead?.()
+      await wf.write(card, r, 'outside', (w) => {
+        // Only while the card is still exactly the approval proved (its cycle, stage, approved submission and its
+        // endpoints, its recorded jj ids and its target), and nothing it depends on is undone.
+        const now = wf.store.card(card.id)
+        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || wf.closeWaitsFor(w).length) return
+        const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision: snap.revision, target: snap.target, result: p.result, method: p.method, by: 'outside', platform: p.platform } }) // i18n-ignore: a fact's kind and codes, not text
+        if (!f) return
+        w.written.push(f as Fact)
+        ports.record(w, { card: card.key, cycle: s.cycle, bundle: p.bundle, target: snap.target, result: p.result, since: Date.now() })
+        // Integrated: its containment record goes with it (the card leaves "Waiting for you to integrate").
+        w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(containedKey(ports.projectId(), card.key, s.cycle))) // i18n-ignore: SQL
+        // HI-2871: and its candidate record: nothing waits to be integrated any more.
+        w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(candidateKey(ports.projectId(), card.key, s.cycle))) // i18n-ignore: SQL
+        if (wf.cfg.reconcileActs && w.current !== 'done') w.move('done', 'derived')
+      })
+      // HI-2871: integrated (by its candidate or the user's own way): the cycle's other candidates dropped from the
+      // user's log, the one the target reaches kept. What this can't finish (a copy still leased, a held drop, a crash
+      // before it) is the sweep's, which visits Integrated cycles too (HI-2990).
+      if (wf.state(wf.store.card(card.id)).integrated) await ports.candidatesDone?.(card, s.cycle)
+      return
+    }
+  }
+  // Not in its target: the pass follows the newest observed head, as under Git (#1623).
+  const back = 'approved'
+  const newest = (w: Write): boolean => sameCycle(w, s) && w.state().lastHeadFact === s.lastHeadFact && w.state().head === s.head
+  if (s.head === approved.revision && s.stale) {
+    const from = s.stale.current ?? approved.revision
+    await wf.write(card, r, 'combwork', (w) => {
+      if (!newest(w) || !w.state().stale) return
+      if (observed(w, 'CarriedOver', `back:${s.cycle}:${s.lastHeadFact}`, { from, to: approved.revision, toBase: approved.base, how: 'sameRevision' }) && wf.cfg.reconcileActs) holdsAgain(wf, w)
+    })
+    return
+  }
+  if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
+    await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, staleWake(card.key, approved.revision, s.stale?.current)))
+    return
+  }
+  if (s.head && s.head !== approved.revision && !s.stale) {
+    const head = s.head
+    const sm = o.sameness === 'change' ? await ports.same(card, s, approved, head) : { same: false, base: null }
+    if ('unknown' in sm) return hooks.unknown?.(sm.unknown)
+    const { same, base } = sm
+    await wf.write(card, r, 'combwork', (w) => {
+      if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
+      if (same && base) {
+        observed(w, 'CarriedOver', `carried:${s.cycle}:${s.lastHeadFact}`, { from: approved.revision, to: head, toBase: base, how: 'replay' })
+        return
+      }
+      observed(w, 'Stale', `stale:${s.cycle}:${s.lastHeadFact}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
+      if (wf.cfg.reconcileActs) staleEffects(w, back, staleWake(card.key, approved.revision, head))
+    })
+  }
 }
 
 /** None: an edit to a card's paths after a pass makes the pass stale (§16.3.3); files outside its paths never do. */

@@ -23,6 +23,7 @@ const { agentActor } = await import('../src/shared/workflow/facts')
 const { preset } = await import('../src/shared/workflow/options')
 const { compile, mustCompile, rulesBaseId, skipReviewOf, targetedOf, targetOfRulesetId, baseRulesetId } = await import('../src/shared/workflow/compile')
 const { cardTarget, workBadges } = await import('../src/main/workflow/cardWork')
+const { cardTargetSaid } = await import('../src/main/cardTargetReply')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -176,6 +177,39 @@ describe("a card's Merges into", () => {
     expect(cardTarget(w, later.number)).toBeNull()
     await expect(inWorkspace(w, () => tasks.setTarget(later.number, '1.2.0', agent))).rejects.toThrow(/Only the user or the Assistant/)
     expect((await inWorkspace(w, async () => workBadges(w))).find((b) => b.card === made.number)?.target).toBe('1.2.0')
+  })
+
+  it('says a target of its own stays when the project changes, and how to have it follow (HI-3017)', async () => {
+    const { w } = await project()
+    const c = await card(w, 'Set before the project')
+    await inWorkspace(w, () => tasks.setTarget(c.number, '1.2.0', assistant))
+    const own = await inWorkspace(w, () => cardTargetSaid(w, c.number, 'p'))
+    expect(own.own).toBe('1.2.0')
+    expect(own.note).toContain('now has a target of its own, 1.2.0')
+    expect(own.note).toContain('now main')
+    // HI-3043: the value cw_update_task's target takes ("", its schema a string), never null.
+    expect(own.note).toMatch(/change project\.workflow\.target first, then set the card's target to "" \(its project's\)/)
+    // The project's own, by name or none: it follows, nothing to say.
+    for (const raw of ['main', null]) {
+      await inWorkspace(w, () => tasks.setTarget(c.number, raw, assistant))
+      expect(await inWorkspace(w, () => cardTargetSaid(w, c.number, 'p'))).toEqual({ own: null, note: '' })
+    }
+  })
+
+  it('says the same of a card made with a target of its own; a resolution pinned to the project branch says that branch (HI-3043)', async () => {
+    const { w } = await project()
+    const made = await inWorkspace(w, () => tasks.createTask({ title: 'Made for the next version', project: 'p', target: '1.2.0' }, assistant))
+    const said = await inWorkspace(w, () => cardTargetSaid(w, made.number, 'p'))
+    expect(said.own).toBe('1.2.0')
+    expect(said.note).toContain('now has a target of its own, 1.2.0')
+    // Made with the project's own branch: follows, nothing said.
+    const plain = await inWorkspace(w, () => tasks.createTask({ title: 'Made on main', project: 'p', target: 'main' }, assistant))
+    expect(await inWorkspace(w, () => cardTargetSaid(w, plain.number, 'p'))).toEqual({ own: null, note: '' })
+    // A forward's resolution (HI-2985) is made pinned to its branch, the project's own here: stored as itself, and said
+    // as that branch (never "the project's branch", which it would not follow), with no note to unpin it.
+    const pinned = await inWorkspace(w, () => tasks.createTask({ title: 'Resolve 1.2.0 into main', project: 'p', target: 'main' }, assistant, { pinTarget: true }))
+    expect(cardTarget(w, pinned.number)).toBe('main')
+    expect(await inWorkspace(w, () => cardTargetSaid(w, pinned.number, 'p'))).toEqual({ own: 'main', note: '' })
   })
 
   it('changes only while its branch has no work: refused started, allowed put back with none of its own', async () => {

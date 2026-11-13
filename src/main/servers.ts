@@ -15,7 +15,9 @@ import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDesc
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
-import { branchChange, changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
+import { branchChange, changeGroups, noteAgent, noteChange, offerDismissChange, recordedHere, recordingChanges } from './assistantChanges'
+import { dismissOffer, releaseOffers } from './workflow/releaseOffer'
+import { releaseOfferSaid } from './workflow/releaseOfferText'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
@@ -35,6 +37,7 @@ import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
 import { API } from './apiText'
+import { FOUND } from './platform/agentPresentation'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
@@ -85,8 +88,10 @@ import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from '
 import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type StallAgent } from './cardStall'
+import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { giveUnseen } from './cardFreshness'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -95,13 +100,13 @@ import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
 import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
 import { NextVersionPartial, startNextVersion } from './workflow/nextVersion'
-import { projectTargets } from './workflow/targets'
+import { cardTargetSaid } from './cardTargetReply'
 import { withRepoLock } from './repoLock'
 import type { NextVersionResult } from '../shared/types'
 import { lineRepoOps } from './platform/repoOpsPorts'
 import { branchStartArg } from '../shared/nextVersion'
 import type { Value } from './assistantChanges'
-import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resolveForward, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
@@ -119,7 +124,7 @@ import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
-import { detect, platformIdOf } from './platform/registry'
+import { detect, initialOf, platformIdOf } from './platform/registry'
 import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
@@ -715,7 +720,8 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : 'none'
+  // HI-3140: what was found in the platform's own words (its row in agentPresentation.ts).
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : FOUND[d.platform](d)
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 
@@ -947,7 +953,22 @@ route('GET', '/v1/projects', async ({ query }) => {
 route('GET', '/v1/projects/:name', async ({ params }) => {
   const p = projectByName(params[0])
   const unused = await unusedWorktreeCounts(p)
-  return { ...(await projectSummary(p)), ...(unused ? { unusedWorktrees: unused } : {}) }
+  // HI-3155: its release offer, the Assistant's alone (the user's and its decision, as Work merges into is), unless put off.
+  const offer = assistantCaller() ? releaseOffers(workspaceOf(p)).find((o) => o.projectPath.toLowerCase() === p.toLowerCase()) : undefined
+  return { ...(await projectSummary(p)), ...(unused ? { unusedWorktrees: unused } : {}), ...(offer ? { releaseOffer: { id: offer.id, said: releaseOfferSaid(offer, 'status') } } : {}) }
+})
+
+// HI-3155: the Assistant's Not now on a project's release offer (its current one, by id): Control's, recorded for undo.
+route('POST', '/v1/projects/:name/release-offer/dismiss', async ({ params, body }) => {
+  const p = projectByName(params[0])
+  if (!assistantCaller()) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.dismissOffer, { project: basename(p) }]) }))
+  const id = typeof body?.id === 'string' ? body.id.slice(0, 64) : ''
+  return assistantChange('agents', [API.change.dismissOffer, { project: basename(p) }], { kind: 'setting', project: basename(p) }, async (guard) => {
+    guard()
+    const was = await dismissOffer(workspaceOf(p), p, id)
+    await noteChange(requireWorkspace(), offerDismissChange(basename(p), was, id))
+    return { done: [API.done.offerDismissed, { project: basename(p) }], result: { ok: true, offer: id } }
+  })
 })
 
 // A project agent turns only its own project on or off (HI-2330: another project is its own agents', the Assistant's and the user's).
@@ -1167,7 +1188,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
     const e = entryOf(decodeURIComponent(params[0]))
     const p = settingsProject(body?.project)
     if (e.scope === 'project' && !p) throw new HttpError(400, apiSaid(API.settings.sayProject, { setting: e.id }))
-    return settingsChange(e, body?.value, e.scope === 'project' ? p : null)
+    return settingsChange(e, body?.value, e.scope === 'project' ? p : null, typeof body?.offer === 'string' && body.offer ? body.offer.slice(0, 64) : undefined)
   })
 )
 
@@ -1175,7 +1196,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
  * A setting the Combwork Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
-async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
+async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null, offer?: string) {
   // Where it is, as the caller reads it; and as records keep it, in the Default (dialects, HI-2441).
   const path = settingPath(e)
   const storedPath = inDefaultDialect(() => settingPath(e))
@@ -1207,7 +1228,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   }
   try {
     // The value as sent (applySetting checks it again): a provider's prices take null, Combwork's own, as more than {}.
-    const r = await applySetting(e, value, projectPath, stillAllowed)
+    const r = await applySetting(e, value, projectPath, stillAllowed, undefined, offer)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
     const stored = inDefaultDialect(() => settingChangeTexts(e, r.old, r.new, r.removed))
@@ -2281,6 +2302,10 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (place) args.cards = [place.card]
   if (!args.cards) throw new HttpError(400, apiSaid(API.lane.cardsArg))
   const a = agentCaller()
+  // HI-3148: a hotfix lane's override of its released line, `released: { target, reason }`: the Assistant's alone (the
+  // user's is the window's); a project agent's or a script's is refused before anything.
+  const released = body?.released !== undefined && body.released !== null ? releasedLaneArg(body.released) : undefined
+  if (released && !assistantCaller()) throw new HttpError(403, apiSaid(API.lane.releasedNotYours))
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
   if (!builder) throw new HttpError(403, apiSaid(API.lane.agentStartsOwn))
@@ -2319,7 +2344,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2441,7 +2466,9 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
     if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
-  const views = await queueViews(ws, p)
+  // HI-2893: of the live queues only: a past branch's is named or never picked. HI-2994: of those that hold or held
+  // something (an entry, an outcome, a pause, a card in flight), not each of the project's targets the listing has.
+  const views = (await queueViews(ws, p)).filter((x) => !x.past && (!!x.testing || x.queued.length > 0 || x.recent.length > 0 || !!x.paused || !!x.runBy || x.inFlight.length > 0))
   if (views.length === 1) return views[0].target
   throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
@@ -2463,7 +2490,9 @@ route('GET', '/v1/queue', async ({ query }) => {
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
   if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, apiSaid(API.queue.targetArg))
-  return (await queueViews(ws, p, target)).map(publicQueue)
+  // HI-2893: the project's targets' queues and any holding an entry; past branches' only with past=true, or one named.
+  const past = query.get('past') === 'true'
+  return (await queueViews(ws, p, target)).filter((v) => !v.past || past || !!target).map(publicQueue)
 })
 
 route('POST', '/v1/queue/pause', async ({ body }) => {
@@ -2683,13 +2712,33 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
   const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
   const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
   if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
-  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
-    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+  // HI-2892: the user's explicit override of the release path's direction, only as the JSON boolean true.
+  if (body?.override !== undefined && body.override !== true && body.override !== false) throw new HttpError(400, say(API.queue.overrideArg))
+  const override = body?.override === true
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to, override: override ? 'yes' : 'no' }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard, { override }).catch((e: unknown) => {
       throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
     })
     const made = 'upToDate' in r ? null : r
-    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
-    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+    // HI-3126: under follow mode, the local source's commits its remote lacks, left out.
+    const ahead = r.localAhead ?? 0
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no', ahead, aheadTotal: String(ahead) }] : [API.done.forwardUpToDate, { from, to, ahead, aheadTotal: String(ahead) }]
+    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to, ...(made?.overridden ? { overridden: true } : {}), ...(ahead ? { localAhead: ahead } : {}) } }
+  })
+})
+// HI-2959: Resolve on a builder, on a forward merge the queue returned: the Assistant's (within Control agents, its
+// reason required) and the user's, never a project agent's or a script's.
+route('POST', '/v1/queue/resolve', async ({ body }) => {
+  notAgents([API.change.resolveForwardAny])
+  const ws = requireWorkspace()
+  const ref = intentRef(String(body?.card ?? ''))
+  const reason = textField(body, 'reason', true)
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', [API.change.resolveForward, { card: was?.key ?? `#${ref.n}` }], { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const r = await resolveForward(ws, ref.n, await taskActor(), reason, guard).catch((e: unknown) => {
+      throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
+    })
+    return { done: [API.done.forwardResolved, { card: cardName(r.card), forward: r.forward, from: r.from, to: r.to, source: r.source.slice(0, 12) }], act: { card: r.card.number, column: r.card.column, ...(was?.project ? { project: was.project } : {}) }, stays: UNDO_FINAL.forwardResolved, result: { card: r.card.number, key: r.card.key ?? null, forward: r.forward, from: r.from, to: r.to, source: r.source } }
   })
 })
 /** A git refusal as the Agent API answers it (HI-2807): its own status where it has a kind, else 409. */
@@ -2722,6 +2771,8 @@ route('POST', '/v1/git/branch', async ({ body }) => {
 })
 // HI-2807: Start the next version, as the window's dialog does it, in one hold: the branch made at the project's target's
 // head (pinned by `commit` when given), the target added to Other branches, Work merges into moved to the new branch.
+// `from` (required, HI-3114): Work merges into as the caller saw it, as the dialog sends it, so a retried or repeated
+// request is refused once the project has moved on rather than starting a second version from the first.
 // What can follow is offered as a retarget preview made before the branch existed, both going on (started cards and
 // running lanes stay), applied with /v1/workflow/retarget. Recorded for undo: the branch and the two options.
 route('POST', '/v1/workflow/next-version', async ({ body }) => {
@@ -2729,12 +2780,12 @@ route('POST', '/v1/workflow/next-version', async ({ body }) => {
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 250) : ''
-  const commit = typeof body?.commit === 'string' ? body.commit.trim().slice(0, 64) : ''
+  const from = branchStartArg({ ref: body?.from, commit: body?.commit })
+  if (!from) throw new HttpError(400, say(API.queue.nextVersionArgs))
   return assistantChange('agents', [API.change.nextVersion, { project: basename(p) }], { kind: 'next-version', project: basename(p) }, async (guard) => {
-    const from = commit ? { from: { ref: (await projectTargets(ws, p))?.default ?? '', commit } } : {}
     let r: NextVersionResult
     try {
-      r = await startNextVersion(ws, p, { name, ...from, check: guard, preview: true })
+      r = await startNextVersion(ws, p, { name, from, check: guard, preview: true, ...(typeof body?.offer === 'string' && body.offer ? { offer: body.offer.slice(0, 64) } : {}) })
     } catch (e) {
       // The branch kept after a refused save: recorded, so undo can still take it back.
       if (e instanceof NextVersionPartial) await noteChange(ws, branchChange(basename(p), e.branch.name, e.branch.commit))
@@ -3037,7 +3088,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c))
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c), c.column === 'doing' && !c.agent && c.project && workspace.path ? await forwardWaitOf(workspace, join(workspace.path, c.project), c.number) : null)
   }
   // A review whose reviewer has gone or isn't running (Combwork ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -3228,11 +3279,22 @@ function taskPatch(body: any): TaskPatch {
   return out
 }
 
-/** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
-export function overrideParam(v: unknown): { reason: string } {
+/** HI-3148: a lane start's `released`: the released line and the user's reason, both given. */
+function releasedLaneArg(v: unknown): { target: string; reason: string } {
+  const o = v && typeof v === 'object' ? (v as { target?: unknown; reason?: unknown }) : {}
+  if (typeof o.target !== 'string' || !o.target.trim() || typeof o.reason !== 'string' || !o.reason.trim()) throw new HttpError(400, apiSaid(API.lane.releasedArg))
+  return { target: o.target.trim().slice(0, 250), reason: o.reason.trim() }
+}
+
+/**
+ * A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules;
+ * `released` (HI-3148), the released line a start it makes may go onto, as the refusal named it (that line only).
+ */
+export function overrideParam(v: unknown): { reason: string; released?: string } {
   const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
   if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, apiSaid(API.card.overrideArg))
-  return { reason: reason.trim() }
+  const released = (v as { released?: unknown }).released
+  return { reason: reason.trim(), ...(typeof released === 'string' && released.trim() ? { released: released.trim().slice(0, 250) } : {}) }
 }
 
 route('GET', '/v1/tasks', async ({ query }) => {
@@ -3250,6 +3312,15 @@ route('GET', '/v1/tasks', async ({ query }) => {
   // HI-2568: whole cards without their history (historyEntries counts it), so the listing doesn't grow with every card's
   // changes; ?history=true keeps it.
   return query.get('history') === 'true' ? views : views.map(withoutHistory)
+})
+
+// HI-2854: a card's start task that carried the whole card, read with cw_inbox, is a full read of it as it was then: the
+// generations it was made at are received (never later ones), and the flag's baseline moves to when it was made.
+onCardTaskReceived((host, agentId, n, seen) => {
+  const agent = { projectPath: host, agentId }
+  if (lastCardRead(agent, n) < seen.at) noteCardRead(agent, n, seen.at)
+  const ws = workspaceFor(host)
+  if (ws) void recordDecisionsReceived(ws, agentId, n, seen.decisions, basename(host), seen.comments)
 })
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
@@ -3273,8 +3344,10 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     noteCardRead(me, view.number)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
+    // HI-2854: the user's comments too, only from a read that gave every comment it keeps in full (not comments=n or
+    // summary=true, which may leave one out).
     const ws = contextWorkspace()
-    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project)
+    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project, n === null && !summary ? seen.comments : undefined)
   }
   const lean = n === null ? view : newestComments(view, n)
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
@@ -3378,7 +3451,12 @@ route('POST', '/v1/tasks', async ({ body }) => {
   const create = (commit?: () => void) => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor, { commit }), commit))
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
-  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
+  // A target of its own given as it is made (HI-3043): said as cw_update_task says it (HI-3017), under the reply.
+  const reply = async (c: TaskCard) => {
+    const own = input.target ? (await cardTargetSaid(workspace, c.number, c.project)).note : ''
+    const notes = [nudge, own].filter(Boolean).join('\n')
+    return { ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+  }
   // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
   if (actor.kind !== 'assistant') return placing(await reply(await create()))
@@ -3414,6 +3492,15 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
   // Its Merges into (HI-2556): a branch, or null for the project's own; checked by tasks.setTarget.
   const target = body?.target === undefined ? undefined : targetArg(body.target)
+  // HI-3017: a target of its own (one of the project's other targets) is said under the change: it stays there when the
+  // project's target changes, even to it, so setting cards before the project pins them.
+  let ownTargetNote = ''
+  const setCardTarget = async (commit?: () => void): Promise<void> => {
+    const c = await tasks.setTarget(n, target, actor, { commit })
+    const { own, note } = await cardTargetSaid(workspace, n, c.project)
+    changes.push(sayStored([API.card.saidTarget, { own: own ? 'yes' : 'no', target: own ?? '' }]))
+    ownTargetNote = note
+  }
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
@@ -3427,10 +3514,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
       changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
-    if (target !== undefined && !moving) {
-      await tasks.setTarget(n, target, actor, { commit })
-      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
-    }
+    if (target !== undefined && !moving) await setCardTarget(commit)
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
@@ -3444,10 +3528,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const moving = target !== undefined && (await tasks.targetMovesInFlight(n).catch(() => false))
   const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || (target !== undefined && !moving) ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
-    if (moving) {
-      await tasks.setTarget(n, target, actor, { commit })
-      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
-    }
+    if (moving) await setCardTarget(commit)
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
     changes.push(...attachedLines(c))
@@ -3458,7 +3539,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   // order and takes it again in it, said as a put-back says it (HI-2267).
   const reply = async (c: TaskCard) => {
     const held = patch.column !== undefined ? await lanes.lanesHolding(requireWorkspace(), [c.number]).catch(() => []) : []
-    const notes = [nudge, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
+    const notes = [nudge, ownTargetNote, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
     return { ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
   }
   if (actor.kind !== 'assistant') {
@@ -3649,7 +3730,7 @@ async function platformOfCard(c: TaskCard): Promise<PlatformId> {
     const p = projectByName(c.project)
     return platformIdOf(p, (await workspace.projectConfig(p)).platform)
   } catch {
-    return detect(workspace.path!).platform
+    return initialOf(detect(workspace.path!))
   }
 }
 
@@ -3955,11 +4036,26 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   const ref = intentRef(param)
   const actor = await taskActor()
   if (actor.kind !== 'assistant') {
-    const { done: ran, card } = await runCardIntent(ref, actor, intent)
-    const done = await withLaneOrder(intent, card, ran)
+    const self = actor.kind === 'agent' ? actor.self : undefined
+    const { done: ran, card } = await runCardIntent(ref, actor, intent).catch(async (e: unknown) => {
+      // HI-2854: a submit refused for what its builder hasn't seen gives it those, in full, received with the refusal.
+      if (self && intent.kind === 'submit' && e instanceof tasks.WorkflowRefusedError && e.refusal.rule === 'submit.decisionsReceived') {
+        // The card, its facts and archive in one snapshot (HR2's round 1), still its own project's card (round 2: not one moved since).
+        const unread = await giveUnseen(requireWorkspace(), self.agentId, ref.n, self.project).catch((err) => (log.warn('giving a refused submit its unseen decisions', err), [] as string[]))
+        // Given in full: the reply flag's baseline moves too, so its next reply doesn't flag them again.
+        const me = agentCaller()
+        if (unread.length && me) noteCardRead(me, ref.n)
+        if (unread.length) throw new tasks.WorkflowRefusedError({ ...e.refusal, unread })
+      }
+      throw e
+    })
+    // HI-2854: the task Combwork started the card with is acked by its builder's start or submit of it (still recorded).
+    const me = agentCaller()
+    const acked = me && self && (intent.kind === 'start' || intent.kind === 'submit') ? await ackCardTask(me.projectPath, me.agentId, card).catch((err) => (log.warn('acking a card\'s task by its start or submit', err), [] as string[])) : []
+    // Said in the reply ("acked: m1"), so the agent doesn't call cw_inbox to ack it again.
+    const done = await withLaneOrder(intent, card, acked.length ? { ...ran, data: { ...ran.data, acked } } : ran)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
     // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
-    const self = actor.kind === 'agent' ? actor.self : undefined
     const watch = self ? await armIntentWatch(requireWorkspace(), self.agentId, card, { submit: intent.kind === 'submit', failed: intent.kind === 'verdict' && !intent.pass }) : null
     const out = watch ? { ...done, watch } : done
     // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.
@@ -4127,8 +4223,8 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   // An agent's plain number is refused, naming the card's key (S48), as for the intents.
   if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
   try {
-    const { card, id } = await askAssistant(ws, ref.n, actor, text)
-    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
+    const { card, id, waiting } = await askAssistant(ws, ref.n, actor, text)
+    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id, ...(waiting ? { waiting: true } : {}) }
   } catch (e) {
     if (e instanceof AskRefused) throw httpFrom(e.status, e)
     throw e
@@ -4158,7 +4254,10 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   return assistantChange('agents', [API.change.startTask, { card: cardRef(n), on, agent: named?.name ?? '', inProject: card.project ? 'yes' : 'no', project: card.project ?? '' }], { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async (guard) => {
     // Its guard checked again as the card is taken, and before the task is typed or its agent launched (HI-2420): a
     // revoked start is undone, the card back where it was and a new agent removed.
-    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, undefined, undefined, guard)
+    // HI-3148: the Assistant's override of a start onto a released line (`override: { reason, released }`, the line its
+    // refusal named): for that line only. An agent's start never gets here (its intent, above).
+    const o = body?.override !== undefined && body.override !== null ? overrideParam(body.override) : null
+    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, o?.reason, undefined, guard, o?.released)
     return {
       done: [API.done.cardStarted, { card: cardRef(n), added: r.added ? 'yes' : 'no', agent: r.agentName, project: card.project ?? '', title: clip(card.title, 80) }],
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },
@@ -4579,7 +4678,10 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (!hasCapability(platformIdOf(caller.projectPath, cfg?.platform), 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  const platform = platformIdOf(caller.projectPath, cfg?.platform)
+  if (!hasCapability(platform, 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
+  // jj has slots but no check copies yet (HI-2868): refused before any copy is leased, the check run in the card's slot.
+  if (!hasCapability(platform, 'checkCopies')) throw new HttpError(400, apiSaid(API.check.noCopies))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
@@ -4915,9 +5017,14 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
  * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
+  // A refusal's `error` is its `message`, word for word (HI-3136: the same sentence, filled as the reader's).
+  if (e instanceof tasks.WorkflowRefusedError) {
+    const refused = refusalBody(e.refusal)
+    return { status: errorStatus(e), body: { error: refused.message, ...refused } }
+  }
   // agent-protocol: a CombworkError's text, carried by httpFrom: its messages are found where it was thrown
   const error = e instanceof HttpError && e.text !== undefined ? agentText(e.text) : agentError(e)
-  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
+  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined) } }
 }
 
 /**

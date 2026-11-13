@@ -4,24 +4,30 @@
 // platform's reads (head, sameChange) are platform/git.ts's as before. The queue's worktree is made or reused (never
 // removed or pruned), a failure leaves it clean at the target's head, and a result is kept on `refs/cw/queue/*`.
 
+import { clearSubmoduleCheckouts, SKIP_SMUDGE } from './gitModules'
 import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
 import { git } from '../git'
 import { again, isAgain } from './again'
+import { targetSigning } from '../branchConfig'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
+import { CANDIDATE_TEXT, UPDATE_NOT_SAME } from './candidateText'
 import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, RecoveryFound } from './integration'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
+import { destinationOf, fetchHeadOf, prePushOf, projectHost, publishOf, redactTransport, upstreamRemedyOf } from './gitTransport'
+import { checkSigning } from './gitSigning'
+import type { SigningStatus } from '../../shared/gitSigning'
+import { boundedSpawn } from './boundedSpawn'
+import { gitExe } from '../gitTool'
+import { withLauncherEnv } from '../gitWorker'
 import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
-const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
-const NOT_ON_TOP = agentMsg({ id: 'queue.candidate.notOnTop', text: "{card}: {revision} rebased onto {expected} isn't on top of the target: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision doesn't sit on the target's head, so the card goes back. card: its key; revision and expected: short commit ids." })
-const MERGE_COMMIT = agentMsg({ id: 'queue.candidate.mergeCommit', text: '{card}: {revision} rebased onto {expected} would land a merge commit (Rebase and fast-forward lands a linear history): rebase it onto the target yourself and submit it again.', note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision would add a merge commit to the target, so the card goes back. card: its key; revision and expected: short commit ids." })
-const REBASED_NOT_SAME = agentMsg({ id: 'queue.candidate.rebasedNotSame', text: "{card}: {revision} rebased onto {expected} isn't the same change as reviewed: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids." })
-const CANDIDATE_LOGS = { notSame: NOT_SAME, notOnTop: NOT_ON_TOP, mergeCommit: MERGE_COMMIT, rebasedNotSame: REBASED_NOT_SAME }
+const NOT_SAME = UPDATE_NOT_SAME
+const CANDIDATE_LOGS = { notSame: NOT_SAME, ...CANDIDATE_TEXT }
 export type CandidateLogKind = keyof typeof CANDIDATE_LOGS
 
 /** The card's log when its candidate isn't what was reviewed, which says why (exported for the canary test, HI-2827). */
@@ -45,11 +51,21 @@ async function mergeBase(h: CandidateHost, a: string, b: string): Promise<string
 }
 
 /**
- * Whether the repository signs commits, as git reads it in the queue's folder. HI-2054: a read git couldn't make is
+ * HI-3111: the target's signing settings as `-c` arguments (`targetSigning`: read in the queue's folder with its HEAD on
+ * the target for the read alone, detached at `at` again and read back so), first in every command that signs; a step
+ * that failed is `again`, before anything is merged or committed (the next round's `folderAt` detaches the folder first).
+ */
+function onTarget(h: CandidateHost, f: string, target: string, at: string): Promise<string[] | Again> {
+  // Once a round (its target's), as `signs`: the round's update and test merge sign alike.
+  return (h.reads.onTarget ??= targetSigning(h.run, f, target, at).then((r) => ('failed' in r ? again(r.failed) : r.args)))
+}
+
+/**
+ * Whether the repository signs commits, as git reads it in the queue's folder, with the target's signing (`onTarget`). HI-2054: a read git couldn't make is
  * `again` with git's words (the round's reads are new each time round, so it is read again), never "unsigned".
  */
-function signs(h: CandidateHost, f: string): Promise<boolean | Again> {
-  return (h.reads.signs ??= h.run(f, ['config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
+function signs(h: CandidateHost, f: string, targetArgs: readonly string[]): Promise<boolean | Again> {
+  return (h.reads.signs ??= h.run(f, [...targetArgs, 'config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
     const v = configRead(r)
     return typeof v === 'string' ? v === 'true' : again(v.failed)
   }))
@@ -60,9 +76,11 @@ function signs(h: CandidateHost, f: string): Promise<boolean | Again> {
  * repository's worktree list names it (HI-2019: never because a folder is there); made when it is neither there nor
  * listed, or there and empty. A git that failed (the listing, the add, the checkout, which may have done part of its
  * work) is `again`: the next pass looks afresh. Nothing is ever removed or pruned: a folder there but not listed with
- * something in it, or listed but gone, is left as it is and pauses, named.
+ * something in it, or listed but gone, is left as it is and pauses, named. HI-3027: a reused folder's own submodule
+ * checkouts that `at` or a revision it will merge (`merging`) doesn't keep as a submodule are removed first, so their
+ * files never stand in the way of that revision's own (clearSubmoduleCheckouts).
  */
-async function folderAt(h: CandidateHost, at: string): Promise<Again | CandidatePause | null> {
+async function folderAt(h: CandidateHost, at: string, merging: string[] = []): Promise<Again | CandidatePause | null> {
   const f = h.folder
   const list = await h.run(h.project, ['worktree', 'list', '--porcelain'])
   if (!list.ok) return again(list.err)
@@ -70,6 +88,9 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
   const there = existsSync(f)
   if (listed && there) {
+    const runGit = { git: (cwd: string, args: string[], o?: { env?: Record<string, string> }) => h.run(cwd, args, o?.env ? { env: { ...process.env, ...o.env } } : undefined) }
+    const cleared = await clearSubmoduleCheckouts(runGit, f, [at, ...merging])
+    if (cleared) return again(cleared)
     const co = await h.run(f, ['checkout', '--detach', '-f', at])
     if (!co.ok) return again(co.err)
     await h.run(f, ['clean', '-fdq'])
@@ -86,6 +107,48 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
   const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at])
   return add.ok ? null : again(add.err)
+}
+
+/** HI-3127: a card's tested pin: the remote's head its latest returned attempt was tested on (follow mode). */
+export const testedPin = (card: string): string => `refs/cw/tested/${card.toLowerCase().replace(/[^a-z0-9._-]/g, '-')}`
+
+/** A signing check that didn't finish within its bound (HI-1185): the pause's detail, never proof it asked. */
+const SIGN_UNFINISHED = agentMsg({ id: 'queue.signing.unfinished', text: "The signer didn't finish within a few seconds with nobody there.", note: "A merge queue pause's detail (HI-1185, signingWaits): the signing check's signer was still running at its bound." })
+
+/**
+ * HI-1185 (SPEC §16.9.5): just before a step that signs, whether its signer could sign with nobody there, checked as
+ * that commit would sign (its folder, identity overrides and environment), once a round. One that needs someone, or
+ * didn't finish within the check's bound, pauses `signingWaits` before anything is committed or rewritten; one that
+ * can't sign pauses `signing`; a signer Combwork doesn't run by itself (`notChecked`) goes on to the bounded commit as before.
+ */
+async function preSign(h: CandidateHost, f: string, who: string[]): Promise<CandidatePause | Again | null> {
+  const use = gitExe()
+  const env = use.launcherEnv ? withLauncherEnv(commitEnv(), use.launcherEnv) : commitEnv()
+  const status = await (h.reads.signCheck ??= checkSigning({ git: (cwd, args) => h.run(cwd, args), spawn: h.spawn ?? ((file, args, o) => boundedSpawn(file, args, o)), cwd: f, who, env }).then((i) => i.status))
+  return signingPause(status)
+}
+
+/** What a signing check's status does to the step about to sign (exported for the canary dialect's cases, HI-2883). */
+export function signingPause(status: SigningStatus): CandidatePause | Again | null {
+  if (status.kind === 'needsSomeone') return { pause: 'signingWaits', message: status.detail }
+  if (status.kind === 'couldNotComplete') return { pause: 'signingWaits', message: say(SIGN_UNFINISHED) }
+  if (status.kind === 'cantSign') return { pause: 'signing', message: status.message }
+  if (status.kind === 'unreadable') return again(status.message)
+  return null
+}
+
+/**
+ * HI-1182 (HR2's round 2): with Set up submodules and LFS on, every git the queue runs that checks files out in its own
+ * folder (its worktree's add and checkouts, the merge, squash or rebase and their aborts and resets) leaves LFS files as
+ * pointers (GIT_LFS_SKIP_SMUDGE, over that command's own environment: Combwork's commit environment, hooks and signing
+ * kept), so the files step after the candidate fills them, bounded and attributed. Never a command in the project's own
+ * folder (an advance there checks out real files, as before); off, the host as it is.
+ */
+async function smudgeHost(h: CandidateHost): Promise<CandidateHost> {
+  if (!(await h.skipSmudge?.().catch(() => false))) return h
+  const queueFolder = (p: string): boolean => resolve(p).toLowerCase() === resolve(h.folder).toLowerCase()
+  const mine = (cwd: string, args: string[]): boolean => queueFolder(cwd) || (args[0] === 'worktree' && args[1] === 'add' && args.some(queueFolder))
+  return { ...h, run: (cwd, args, opts) => (mine(cwd, args) ? h.run(cwd, args, { ...opts, env: { ...(opts?.env ?? process.env), ...SKIP_SMUDGE } }) : h.run(cwd, args, opts)) }
 }
 
 /** Its commits' options: Combwork's environment, and the signing bound when the repository signs. */
@@ -293,8 +356,17 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
     if (r.ok) return 'pushed'
     const said = `${r.err}\n${r.out}`.trim()
+    // HI-1183: the remote's own refusal (a hook, a protected branch), its words kept as they are.
+    if (!r.timedOut && /\[remote rejected\]/i.test(said)) return { refused: said }
     return !r.timedOut && PUSH_REJECTED.test(said) ? { rejected: said } : { failed: said }
   },
+
+  // Follow mode (HI-1183): gitTransport.ts's sealed context.
+  destination: destinationOf,
+  fetchHead: fetchHeadOf,
+  prePush: prePushOf,
+  publish: publishOf,
+  redact: redactTransport,
 
   // A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome (queueHost.ts's, moved).
   async dropQueuePins(project, card) {
@@ -305,14 +377,27 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(project, ['update-ref', '-d', ref])
   },
 
-  // The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3), by card, as queueHost.ts's prunePins listed them.
+  // The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3), by card, as queueHost.ts's prunePins listed them; HI-3127:
+  // and each card's tested pin (`refs/cw/tested/<key>`), kept apart from its own refs (it holds the remote's commit, never
+  // the card's own work: retargetCard's own-work proof reads `refs/cw/cards/<key>/` as the card's).
   async cardPins(project) {
-    const r = await git(project, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
+    const r = await git(project, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/', 'refs/cw/tested/'])
     if (!r.ok) return null
-    const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
+    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const keyOf = (l: string): string | undefined => /^refs\/cw\/cards\/([^/]+)\//.exec(l)?.[1] ?? /^refs\/cw\/tested\/([^/]+)$/.exec(l)?.[1]
     const out = new Map<string, string[]>()
-    for (const key of keys) out.set(key, r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`)))
+    for (const l of refs) {
+      const key = keyOf(l)
+      if (key) out.set(key, [...(out.get(key) ?? []), l])
+    }
     return out
+  },
+
+  upstreamRemedy: (project, branch, from) => upstreamRemedyOf(projectHost(project), branch, from),
+
+  async keepTested(h, card, commit) {
+    const r = await h.run(h.project, ['update-ref', testedPin(card), commit])
+    return r.ok ? null : again(r.err.trim() || `git exited with code ${r.code}`) // i18n-ignore: git's side of a pause, in English as git's are
   },
 
   async dropPin(project, ref) {
@@ -335,11 +420,18 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     const folder = where[target]
     if (!folder) return null
     if (reason === 'wrongBranch') return (await G.branch(folder)) === target ? null : {}
-    if (reason === 'staged') return (await git(folder, ['diff', '--cached', '--quiet'])).code === 0 ? null : {}
+    // HI-2944: the files staged now, and the folder they were seen in (an older pause gets it here: Commit and Set aside
+    // act only where the changes were seen).
+    if (reason === 'staged') {
+      const staged = await git(folder, ['diff', '--cached', '--name-only', '-z'])
+      if (!staged.ok) return {}
+      const names = staged.out.split('\0').filter(Boolean)
+      return names.length ? { files: names, folder } : null
+    }
     if (!files?.length) return null
     const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
     const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-    return !st.ok || busy.length ? { files: busy.length ? busy : files } : null
+    return !st.ok || busy.length ? { files: busy.length ? busy : files, ...(st.ok ? { folder } : {}) } : null
   }
 }
 
@@ -357,7 +449,8 @@ export const gitIntegration: IntegrationPort = {
    * test merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a
    * retest after the target moved updates afresh, never on an earlier update.
    */
-  async update(h, c) {
+  async update(host, c) {
+    const h = await smudgeHost(host)
     const { revision, base, expected } = c
     const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
@@ -365,14 +458,18 @@ export const gitIntegration: IntegrationPort = {
     const id = await h.identity()
     if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [h.project] }
-    const at = await folderAt(h, revision)
+    const at = await folderAt(h, revision, [expected])
     if (at) return at
     const f = h.folder
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const onIt = await onTarget(h, f, c.target, revision)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const rebase = c.how === 'rebase'
-    const signed = await signs(h, f)
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     // Read now, as the options are just before the update (G19: the project's current Commit message, HR1's R7 round 1).
     const message = c.message()
@@ -413,25 +510,30 @@ export const gitIntegration: IntegrationPort = {
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
    */
-  async candidate(h, c) {
+  async candidate(host, c) {
+    const h = await smudgeHost(host)
     const id = await h.identity()
     if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [h.project] }
     if (c.style === 'rebase') return rebaseOnto(h, { ...c, base: c.base || (await mergeBase(h, c.revision, c.expected)) }, id)
     const { expected } = c
     const f = h.folder
-    const at = await folderAt(h, expected)
+    const revision = c.updated ?? c.revision
+    const at = await folderAt(h, expected, [revision])
     if (at) return at
     const message = await c.message()
     if (isAgain(message)) return message
-    const revision = c.updated ?? c.revision
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const onIt = await onTarget(h, f, c.target, expected)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = c.style === 'squash'
-    // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
-    // is ended with the rest of the commit's tree.
-    const signed = await signs(h, f)
+    // Signed as the repository says on the target (never overridden), within a bound when it signs: a signer waiting
+    // for a passphrase is ended with the rest of the commit's tree.
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     const clean = async (): Promise<void> => {
       await h.run(f, ['merge', '--abort'])
@@ -439,7 +541,9 @@ export const gitIntegration: IntegrationPort = {
       await h.run(f, ['clean', '-fdq'])
     }
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
-    const m = await h.run(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    // HI-3108: a squash says --ff, so the repository's merge.ff (false: "--squash and --no-ff"; only: refused once the
+    // target moved on) never decides it: a squash makes no merge commit, so the setting has nothing to say about it.
+    const m = await h.run(f, [...who, 'merge', ...(squash ? ['--squash', '--ff'] : ['--no-ff', '--no-edit', '-m', message]), revision], opts)
     // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from), or HI-2042 a signal ended it
     // (no answer of git's to tell them from): put back, and again.
     if (m.notRun || m.signal) {
@@ -479,7 +583,7 @@ export const gitIntegration: IntegrationPort = {
  * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
  * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
  */
-async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string; base: string; key?: string | null; expected: string }, id: { name: string; email: string }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
+async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string; base: string; key?: string | null; expected: string; target: string }, id: { name: string; email: string }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
   const { revision, base, expected } = c
   const f = h.folder
   const merges = await h.run(h.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
@@ -489,14 +593,19 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
   if (onTop.code !== 0 && onTop.code !== 1) return again(onTop.err)
   // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
   // lands as it is, and its merge checks still run there, on exactly that revision.
-  const at = await folderAt(h, revision)
+  const at = await folderAt(h, revision, [expected])
   if (at) return at
   let result = revision
   if (!linear || onTop.code !== 0) {
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
-    const signed = await signs(h, f)
+    const onIt = await onTarget(h, f, c.target, revision)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
+    // The rewritten commits are signed: checked first (an on-top linear suffix lands unchanged, signing nothing).
+    const pre = signed ? await preSign(h, f, who) : null
+    if (pre) return pre
     const opts = commitOpts(h, signed)
     const u = await h.run(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
     // HI-2020: git never started, or HI-2042 a signal ended it: put back, and again.

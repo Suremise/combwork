@@ -87,7 +87,6 @@ describe('a dialect over the settings', () => {
 describe('the canary dialect over the settings tools', async () => {
   const base = tempDir('cw-agenttext-settings-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-  afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
   const { settingDetail, settingRows } = await import('../src/main/settingsTools')
   const path = join(base, 'ws')
@@ -96,6 +95,11 @@ describe('the canary dialect over the settings tools', async () => {
   writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], workflow: { platform: 'git', preset: null, options: {} } }))
   const w = createWorkspaceService()
   await w.open(path)
+  // The open workspace holds files in its folder open (its databases): closed first, or the folder can't go (HI-2876).
+  afterAll(async () => {
+    await w.close()
+    rmSync(base, { recursive: true, force: true })
+  })
 
   it("finds every word of a setting's detail, its listing and its refusals in the catalogue", async () => {
     await inWorkspace(w, async () => {

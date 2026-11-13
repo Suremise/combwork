@@ -1,9 +1,10 @@
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import type { AgentDef, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
-import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
+import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, unpinAssistant, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
 import { CW_DIR, projectAgents } from '../shared/defaults'
+import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onCombworkEvent, toast } from './events'
@@ -78,6 +79,8 @@ async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<vo
   // A project without its project.json yet has nothing to migrate (its first write is a new one's).
   if (!assistant && !existsSync(join(projectPath, CW_DIR, 'project.json'))) return
   const read = await ws.projectConfig(projectPath)
+  // HI-2899: whether the Assistant ever ran (a session of its recorded); unknown counts as ran, so nothing is unpinned on doubt.
+  const ran = assistant ? await ws.sessionsOfAgent(projectPath, ASSISTANT_AGENT_ID).then((r) => r.length > 0, () => true) : true
   if (!read.migrations?.accounts1) {
     // Automatic's pick (an agent from before 0.2, the Assistant following Settings) is only known once detection answered.
     if (projectAgents(read).some((a) => !a.provider) && autoProviderPending(config.settings)) await providerService.settle()
@@ -87,7 +90,7 @@ async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<vo
       let next: ProjectConfig | null = null
       await ws.mutateProjectConfig(projectPath, (cfg) => {
         const saved = plan((store) => {
-          next = assistant ? migrateAssistant(cfg, inputsFor(ws), store, at) : migrateProject(cfg, inputsFor(ws), store, at)
+          next = assistant ? migrateAssistant(cfg, inputsFor(ws), store, at, { ran }) : migrateProject(cfg, inputsFor(ws), store, at)
         })
         // Connections made in this run: saved first, then the whole again.
         if (!saved || !next) return {}
@@ -99,6 +102,19 @@ async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<vo
       writes++
       log.info(`${userText(basename(projectPath))}: agents pointed at their connections (HI-2106)`)
     })
+  } else if (assistant && unpinAssistant(read, inputsFor(ws), ran)) {
+    // HI-2899: a home migrated before it, its Assistant pinned to Automatic's pick with nothing naming its CLI: decided
+    // again in the project's lock, against the file as it is then.
+    let unpinned = false
+    await ws.mutateProjectConfig(projectPath, (cfg) => {
+      const patch = unpinAssistant(cfg, inputsFor(ws), ran)
+      unpinned = !!patch
+      return patch ?? {}
+    })
+    if (unpinned) {
+      writes++
+      log.info("the Assistant names no CLI again: it runs the first usable account's (HI-2899)")
+    }
   }
   await placeLeft(ws, projectPath)
 }

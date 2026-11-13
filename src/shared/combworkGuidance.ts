@@ -14,7 +14,7 @@
  * code chooses which message; the words, and every variant a setting chooses, are the message's (an ICU select).
  */
 // With its extension: tests' scripts load this file in plain Node (replysize.cjs, scenarios.cjs), which needs it.
-import { agentList, agentMsg, say } from './agentText/index.ts'
+import { agentList, agentMsg, say, type AgentMsg } from './agentText/index.ts'
 
 /** Settings → Assistant → Control (AssistantControl). */
 type AssistantControlLevel = 'look' | 'agents' | 'projects'
@@ -49,8 +49,8 @@ const A = {
   }),
   stop: agentMsg({
     id: 'contract.agent.stop',
-    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`, and end anything you started that won't end by itself before your card ends, unless the user wants it running.",
-    note: '#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once.'
+    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`, and end anything you started that won't end by itself before your card ends, unless the user wants it running. End a process only by its handle or the identity you took (pid and start time, job), never by name or a `ps`/`grep` pattern: other lanes' runs (cw-progress, tests) share the machine.",
+    note: "#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once. HI-2865: an agent of another project ended every lane's cw-progress runs with `ps -ef | grep cw-progress | xargs kill` (Git Bash's ps lists all the user's processes); their tests ended with exit 143."
   }),
   inboxRule: agentMsg({
     id: 'contract.inbox.rule',
@@ -71,6 +71,16 @@ const A = {
     id: 'contract.agent.folder',
     text: "Combwork sets your folder (the project's, a card's or lane's slot, or the review copy a review names): make no git worktree to work in unless the user asks. Merge or remove a subagent's worktree before you finish.",
     note: "#476: Combwork tracks the folder it gave the session (locks, Changes, merging, card tools); a worktree made here isn't. One the user asks for is theirs (#482). #1444: a card's or lane's slot, or a review's copy; #1529: or the project folder, shared."
+  }),
+  jj: agentMsg({
+    id: 'contract.agent.jj',
+    text: "This project uses jj (Jujutsu) with Git beside it. Record your work with jj (`jj describe`, `jj commit`, `jj new`). Don't run git commands that change HEAD, the index, branches or refs (commit, add, reset, restore --staged, rebase, merge, cherry-pick, checkout, switch, stash, branch, tag, update-ref, worktree, pull), nor `jj git init`: `git status` and `git log` may show changes jj has already recorded. The user integrates finished work: nothing you do moves a bookmark or pushes.",
+    note: "HI-2800 (J7): only in a jj project's sessions (platformRule). HI-2781 probed plain git in a jj workspace: jj imports a git commit on detached HEAD, but reset, rebase, merge and the index aren't validated, and git status can look dirty after jj snapshotted. Decision A (HI-2794): the user integrates, and Combwork moves no bookmark. HI-2870 (J9d): its last sentence says that rather than 'no card starts', which J9e makes untrue; agents never move a bookmark or push (Combwork's own slot operations aren't theirs)."
+  }),
+  jjSeparate: agentMsg({
+    id: 'contract.agent.jjSeparate',
+    text: "This project uses jj (Jujutsu) with no Git working copy: Git's data is inside .jj, so git commands don't work here, and one could reach another repository above this folder. Use jj for everything: record your work with `jj describe`, `jj commit` and `jj new`, and read history with `jj log` and `jj diff --from <base> --to <revision>`. Don't run `jj git init` or `jj git colocation`. The user integrates finished work: nothing you do moves a bookmark or pushes.",
+    note: "HI-2896 (J9f): contract.agent.jj's variant for a jj repository not colocated with Git (platformRule's 'jj-separate'): there is no .git in the folder, so git commands fail or reach a Git repository above it, and a colocation change moves the store under Combwork's slots. Decision A (HI-2794): the user integrates, and Combwork moves no bookmark."
   }),
   scratch: agentMsg({
     id: 'contract.agent.scratch',
@@ -289,6 +299,26 @@ export function controlRules(control: AssistantControlLevel, changeSettings = fa
  */
 export function journalRule(scope: readonly string[]): string {
   return [say(A.journalRule), say(A.journalScope, { hasScope: scope.length ? 'yes' : 'no', scope: scope.join(', ') })].join('\n')
+}
+
+/**
+ * The project's version control rule (HI-2800, J7): given only to sessions whose project uses jj, after the contract
+ * (like the latest handover's pointer, it is the project's part of what a launch tells a session): in the project
+ * folder (the user's own jj workspace) and in a card's slot (HI-2870, J9d), a plain git command that moves HEAD, the
+ * index or a branch confuses jj (HI-2781's probes). Under decision A (HI-2794) the user integrates. How a jj card's work
+ * is committed, submitted and reviewed is the bundled skills' (work-on-card, card-loop, review-agent-work). A jj
+ * repository with no Git working copy (HI-2896) gets its own variant (`jj-separate`: platformRuleKey).
+ * Empty for every other key. The keys are the platforms' (HI-3140: a descriptor's `guidance`, `ruleKeyOf`); the texts are here.
+ */
+export const platformRule = (key: string | null | undefined): string => (key && Object.hasOwn(PLATFORM_RULES, key) ? say(PLATFORM_RULES[key]!) : '')
+
+/** Each platform rule key's text (HI-3140): the keys a descriptor's `guidance` gives (`jj`, and `jj-separate` for HI-2896). */
+const PLATFORM_RULES: Record<string, AgentMsg> = { jj: A.jj, 'jj-separate': A.jjSeparate }
+
+/** The instructions with the project's version control rule after them, when it has one (platformRule). */
+export function withPlatformRule(instructions: string, platform: string | null | undefined): string {
+  const rule = platformRule(platform)
+  return rule ? `${instructions}\n${rule}` : instructions
 }
 
 export function withLatestHandover(instructions: string, relPath: string | null | undefined): string {

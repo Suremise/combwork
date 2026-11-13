@@ -75,6 +75,12 @@ const prose = (seed, n) => {
 
   // Agents: two in alpha (one running a few turns), one in beta.
   const alpha = path.join(ws, 'alpha')
+  // The suite's own untracked files in alpha (attachments, a long doc) are left out of git from the start (HI-2960):
+  // untracked, they'd make every start and lane start warn that master's folder has uncommitted changes (HI-2944), and
+  // a card's clean check refuse.
+  const exclude = path.join(alpha, '.git', 'info', 'exclude')
+  fs.mkdirSync(path.dirname(exclude), { recursive: true })
+  fs.appendFileSync(exclude, '\nattach-src/\ndocs/\n')
   // Each builds and reviews the other's lanes (HI-2664: a lane part only for a role that does it).
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either' })
   await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
@@ -946,18 +952,22 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   }
   // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured. The card
   // is started first (HI-2082): a card in Doing is never a lane's to start, so Combwork's own look can't start it first.
-  const startedOwn = measure('cw_start_card', intent('cw_start_card', { card: `#${todo[40]}` }), 400)
-  const designStart = tool('cw_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }, 'own').text
+  // All of it as Coder, with its own token: the card's holder and its lane's builder one agent. (`intent` speaks with alpha's
+  // latest launch's token, Starter's since cw_start_task, which can't start a lane: a lane over a card another agent holds
+  // ends by itself, HI-3118, and its card then has no reviewer, HI-3163.)
+  const asOwn = (name, args) => tool(name, args, 'own')
+  const startedOwn = measure('cw_start_card', asOwn('cw_start_card', { card: `#${todo[40]}` }), 400)
+  const designStart = asOwn('cw_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }).text
   const designLane = designStart.match(/lane-[0-9a-f]+$/)?.[0]
   check('a lane for the design step, Tester reviewing', !!designLane, designStart)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
   // …and what can come next on it, as its rules have it (#1530).
   check('…and what comes next on it', startedOwn.split('\n')[0].endsWith(' Next on it: cw_submit or cw_put_back.'), startedOwn)
   // A card loop's design step (#1382): nothing moves, and the reply says how long to wait for the check.
-  const designed = measure('cw_loop_step', intent('cw_loop_step', { card: `#${todo[40]}`, step: 'design', text: 'Design: one line.' }), 160)
+  const designed = measure('cw_loop_step', asOwn('cw_loop_step', { card: `#${todo[40]}`, step: 'design', text: 'Design: one line.' }), 160)
   check('a design step says the card stays, names the design and when its check is due', /^[A-Z]+-\d+: still active\. design: [A-Z]+-\d+\/s\d+; until: \S+; waitMinutes: 30$/.test(designed), designed)
   check('…and its lane ends', !!designLane && tool('cw_lane', { action: 'end', lane: designLane, abandoned: true }).text.startsWith('Lane abandoned: '), designLane)
-  const putBack = measure('cw_put_back', intent('cw_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  const putBack = measure('cw_put_back', asOwn('cw_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
   check('put back names the start as next', putBack.endsWith(' Next on it: cw_start_card.'), putBack)
   // HI-2267: a card no running lane holds gets no lane line.
   check("…and a card on no lane: no lane line", !/keeps its own order/.test(putBack) && putBack.split('\n').length === 1, putBack)
@@ -1038,11 +1048,6 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
     lib.git(builtFolder, ['add', file])
     lib.git(builtFolder, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `${K(builtCard)}: ${file}`, '--trailer', `Combwork-Card: ${K(builtCard)}`])
   }
-  // The suite's own untracked files in alpha (attachments, a long doc) kept out of the card's clean check meanwhile.
-  const exclude = path.join(alpha, '.git', 'info', 'exclude')
-  const excluded = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : null
-  fs.mkdirSync(path.dirname(exclude), { recursive: true })
-  fs.writeFileSync(exclude, `${excluded ?? ''}\nattach-src/\ndocs/\n`)
   builtCommit('built.txt')
   const builtSubmitted = intent('cw_submit', { card: `#${builtCard}`, summary: 'Built.' }).text
   check('…submitted for review', / → review\b/.test(builtSubmitted), builtSubmitted)
@@ -1056,8 +1061,6 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('…and only its builder is told', /^Waiting for [A-Z]+-\d+\. End your turn now: /.test(otherWatch), otherWatch)
   tool('cw_wait_for_tasks', { cancel: true }, 'own')
   intent('cw_wait_for_tasks', { cancel: true })
-  if (excluded === null) fs.rmSync(exclude)
-  else fs.writeFileSync(exclude, excluded)
   const plainRefused = intent('cw_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card by its key", plainRefused.isError && plainRefused.text.includes(`Name the card by its key: ${K(todo[40])}.`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))

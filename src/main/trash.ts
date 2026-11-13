@@ -33,9 +33,16 @@ let moved = 0
 const HELD_RETRY_MS = [50, 100, 200, 400, 800]
 const HELD_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
 
-/** move(), tried again while held(error) says what stopped it may pass; then its last error stands. */
-async function whileHeld(path: string, move: () => Promise<void>, held: (e: unknown) => boolean): Promise<void> {
+/** A move `still` stopped before it tried: nothing was changed. */
+export class TrashNoLonger extends Error {}
+
+/**
+ * move(), tried again while held(error) says what stopped it may pass; then its last error stands. `still`, asked before
+ * each try (the first and every retry), stops the move when it says no (TrashNoLonger), nothing changed.
+ */
+async function whileHeld(path: string, move: () => Promise<void>, held: (e: unknown) => boolean, still?: () => Promise<boolean>): Promise<void> {
   for (let tried = 0; ; tried++) {
+    if (still && !(await still())) throw new TrashNoLonger(`${path}: no longer to be moved`)
     try {
       await move()
       if (tried) log.info(`Moved ${userText(path)} to the Recycle Bin on try ${tried + 1}: it was in use for a moment`)
@@ -57,16 +64,19 @@ async function whileHeld(path: string, move: () => Promise<void>, held: (e: unkn
  * (a copy and remove could fail halfway, leaving parts of it in both places). Noting the move in `trash.jsonl` comes
  * after it and is best effort: a note that can't be written is logged as a warning, and never turns the deletion,
  * which has happened, into a failure.
+ *
+ * `still` (HI-3144), when given, is asked before each try, the retries too, with nothing awaited between its answer and
+ * the move: a no stops it (TrashNoLonger), nothing changed.
  */
-export async function trash(path: string): Promise<void> {
+export async function trash(path: string, opts: { still?: () => Promise<boolean> } = {}): Promise<void> {
   const dir = testTrashDir()
   // The Recycle Bin's failures carry no code: tried again while the item is still there to move.
-  if (!dir) return whileHeld(path, () => shell.trashItem(path), () => existsSync(path))
+  if (!dir) return whileHeld(path, () => shell.trashItem(path), () => existsSync(path), opts.still)
   await mkdir(dir, { recursive: true })
   // A name of its own: the same name can be deleted twice in a run.
   const to = join(dir, `${Date.now()}-${process.pid}-${++moved}-${basename(path)}`)
   try {
-    await whileHeld(path, () => rename(path, to), (e) => HELD_CODES.has((e as NodeJS.ErrnoException).code ?? ''))
+    await whileHeld(path, () => rename(path, to), (e) => HELD_CODES.has((e as NodeJS.ErrnoException).code ?? ''), opts.still)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
     throw new Error(`${path} is on another drive than the test trash folder (${dir}): a test copy of Combwork only moves within a drive, so nothing is half deleted. Nothing was changed.`, { cause: e })

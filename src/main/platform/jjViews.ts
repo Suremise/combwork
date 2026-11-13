@@ -1,0 +1,346 @@
+// The Version Control tab's jj views (HI-2799, J6): read-only, every read pinned at the single operation head through J3's
+// JjReads (`--at-op` with J0's `--ignore-working-copy`: no snapshot, no merge of several heads, R5.3), answered only
+// while the heads are still that one, and only by the pinned jj. With none or several heads nothing is read (unknown).
+// Off main: each is jj processes in jj's worker. Nothing here writes, snapshots or changes a bookmark.
+
+import { join, resolve } from 'path'
+import { readFileSync, statSync } from 'original-fs'
+import { jjOf } from '../vcsDetect'
+import { PLATFORMS } from '../../shared/platform/descriptors'
+import { isJjViewUnknown, JJ_CONFLICTS_MAX, JJ_DIFF_MAX, JJ_HISTORY_MAX, jjRevisionInput, type JjBookmarkRow, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown, type JjWorkspaceRow } from '../../shared/jjViews'
+import { jjContextOf, type JjContext } from './jjDetect'
+import { jjRunner, type JjRunner } from './jjRunner'
+import { jjFileGate, pathKey, storeKey } from './jjFileGate'
+import { isJjUnknown, jjUnknown, JjReads, type JjMaybe } from './jjReads'
+import { CHANGE_ID, COMMIT_ID, readCheckout, readOpHeads } from './jjView'
+
+const SEP = '\x1f'
+
+/** One commit per line, fields apart by U+001F (descriptions and names as JSON strings, so no field holds the separator). */
+export const ROW_TEMPLATE = [
+  'commit_id',
+  'change_id',
+  'description.first_line().escape_json()',
+  'author.name().escape_json()',
+  'author.timestamp().utc().format("%Y-%m-%dT%H:%M:%SZ")',
+  '"[" ++ bookmarks.map(|b| b.name().escape_json()).join(",") ++ "]"',
+  'current_working_copy',
+  'empty',
+  'divergent',
+  'conflict'
+].join(` ++ "${SEP}" ++ `) + ' ++ "\\n"'
+
+const json = (s: string): unknown => {
+  try {
+    return JSON.parse(s) as unknown
+  } catch {
+    return undefined
+  }
+}
+const bool = (s: string): boolean | null => (s === 'true' ? true : s === 'false' ? false : null)
+
+/** Parses one ROW_TEMPLATE line, or null when any field isn't what it should be. */
+export function parseRow(line: string): JjRow | null {
+  const f = line.split(SEP)
+  if (f.length !== 10) return null
+  const [commit, change, desc, author, time, marks, wc, empty, divergent, conflict] = f
+  const d = json(desc)
+  const a = json(author)
+  const b = json(marks)
+  const flags = [wc, empty, divergent, conflict].map(bool)
+  if (!COMMIT_ID.test(commit) || !CHANGE_ID.test(change) || typeof d !== 'string' || typeof a !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time)) return null
+  if (!Array.isArray(b) || !b.every((x) => typeof x === 'string') || flags.some((x) => x === null)) return null
+  return { commit, change, description: d.slice(0, 500), author: a.slice(0, 200), time, bookmarks: b as string[], workingCopy: flags[0]!, empty: flags[1]!, divergent: flags[2]!, conflict: flags[3]! }
+}
+
+/** The root commit jj shows below everything (all zeros): never a row of its own. */
+const isRoot = (r: JjRow): boolean => /^0+$/.test(r.commit)
+
+export const unknownOf = (u: { jjUnknown: string; detail?: string }): JjViewUnknown => ({ jjUnknown: u.jjUnknown as JjViewUnknown['jjUnknown'], ...(u.detail ? { detail: u.detail.slice(0, 2000) } : {}) })
+
+/**
+ * The operation heads of the jj repository holding `folder`, from its files alone (no process): its shared repository
+ * found as J0's detection finds it (`.jj/repo`, or the file a linked workspace has naming it). Null when there's no
+ * readable `.jj` here (detection then says why).
+ */
+export function headsHere(folder: string): string[] | null {
+  const at = jjOf(folder)
+  if (!at) return null
+  const repoAt = join(at.root, '.jj', 'repo')
+  let jjRepo = repoAt
+  try {
+    if (statSync(repoAt).isFile()) {
+      const pointer = readFileSync(repoAt, 'utf8').trim()
+      if (!pointer || /[\r\n\0]/.test(pointer) || pointer.length > 4096) return null
+      jjRepo = resolve(join(at.root, '.jj'), pointer)
+    }
+  } catch {
+    return null
+  }
+  return readOpHeads(jjRepo)
+}
+
+/**
+ * A project folder's jj context, confirmed by jj (J0's detection), and the operation it was confirmed at: or why not.
+ * On jj 0.47.1 an unpinned command merges diverged heads, a write (R5.3, HR2's HI-2799 round 1: a head appearing between
+ * a check and the command). So the single head is read from the files first (none, several or unreadable: nothing
+ * runs), J0's confirmation pins its commands at the head it reads (HI-2831), and the heads are read again after:
+ * anything but that one head is `moved`.
+ */
+export async function pinnedContextOf(folder: string, runner: JjRunner = jjRunner): Promise<{ ctx: JjContext; op: string } | { none: true } | JjViewUnknown> {
+  if (!jjOf(folder)) return { none: true }
+  const heads = headsHere(folder)
+  if (!heads) return { jjUnknown: 'heads', detail: 'unreadable' } // i18n-ignore: a protocol code
+  if (heads.length !== 1) return { jjUnknown: 'heads', detail: String(heads.length) }
+  const op = heads[0]
+  const d = await jjContextOf(folder, runner)
+  const after = headsHere(folder)
+  if (!after || after.length !== 1 || after[0] !== op) return { jjUnknown: 'moved' }
+  if ('jj' in d) return { ctx: d.jj, op }
+  if ('none' in d) return { none: true }
+  if (d.unknown === 'opHeads') return { jjUnknown: 'heads', ...(d.detail ? { detail: d.detail.slice(0, 2000) } : {}) }
+  return { jjUnknown: d.unknown, ...(d.detail ? { detail: d.detail.slice(0, 2000) } : {}) }
+}
+
+/** A project folder's jj context for a view (pinnedContextOf's), or why not. */
+export async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
+  const c = await pinnedContextOf(folder, runner)
+  if ('ctx' in c) return c.ctx
+  return 'none' in c ? { jjUnknown: 'noRepo' } : c
+}
+
+/** Reads for a context, run in its workspace root. */
+export const readsOf = (c: JjContext, runner: JjRunner): JjReads => new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
+
+async function rowsAt(reads: JjReads, op: string, revset: string, max: number): Promise<JjMaybe<{ rows: JjRow[]; capped: boolean }>> {
+  const out = await reads.run(op, ['log', '--no-graph', '-r', revset, '-n', String(max + 1), '-T', ROW_TEMPLATE])
+  if (isJjUnknown(out)) return out
+  const lines = out.split('\n').filter(Boolean)
+  const rows = lines.map(parseRow)
+  if (!rows.every((r): r is JjRow => r !== null)) return { jjUnknown: 'malformed', detail: 'logRow' } // i18n-ignore: a protocol code
+  const shown = rows.filter((r) => !isRoot(r))
+  return { rows: shown.slice(0, max), capped: shown.length > max }
+}
+
+/** A workspace's working-copy commit at an operation, or why not. */
+async function wcAt(reads: JjReads, at: string, workspace: string): Promise<JjMaybe<string>> {
+  const out = await reads.run(at, ['log', '--no-graph', '-r', `present(${JSON.stringify(workspace)}@)`, '-n', '2', '-T', 'commit_id ++ "\\n"'])
+  if (isJjUnknown(out)) return out
+  const ids = out.split('\n').filter(Boolean)
+  return ids.length === 1 && COMMIT_ID.test(ids[0]) ? ids[0] : jjUnknown('malformed', 'workingCopy')
+}
+
+/**
+ * Whether the project folder's workspace is stale at `at` (J2's read: the operation its files were last updated at names
+ * another working-copy commit than `at` does); null when that can't be read (counted as stale: E7).
+ */
+export async function staleAt(reads: JjReads, root: string, at: string): Promise<boolean | null> {
+  const co = readCheckout(join(root, '.jj'))
+  if (!co) return null
+  if (co.op === at) return false
+  const then = await wcAt(reads, co.op, co.workspace)
+  const now = await wcAt(reads, at, co.workspace)
+  if (isJjUnknown(then) || isJjUnknown(now)) return null
+  return then !== now
+}
+
+/** The Repository section. */
+export async function jjRepoView(folder: string, runner: JjRunner = jjRunner): Promise<JjView<JjRepoView>> {
+  const c = await contextOf(folder, runner)
+  if (isJjViewUnknown(c)) return c
+  const heads = readOpHeads(c.jjRepo)
+  const base = { root: c.root, store: c.store, colocated: c.colocated, linked: c.linked, tool: c.tool, gates: PLATFORMS.jj.gates }
+  if (!heads || heads.length !== 1) return { ...base, op: null, heads: heads?.length ?? 0, workspaces: { jjUnknown: 'heads', detail: heads ? `${heads.length}` : 'unreadable' } } // i18n-ignore: a protocol code
+  const reads = readsOf(c, runner)
+  const ws = await reads.pinned(async (op): Promise<JjMaybe<JjWorkspaceRow[]>> => {
+    const out = await reads.run(op, ['workspace', 'list', '-T', `name.escape_json() ++ "${SEP}" ++ target.commit_id() ++ "${SEP}" ++ target.change_id() ++ "\\n"`])
+    if (isJjUnknown(out)) return out
+    const rows: JjWorkspaceRow[] = []
+    for (const l of out.split('\n').filter(Boolean)) {
+      const [n, commit, change] = l.split(SEP)
+      const name = json(n ?? '')
+      if (typeof name !== 'string' || !COMMIT_ID.test(commit ?? '') || !CHANGE_ID.test(change ?? '')) return { jjUnknown: 'malformed', detail: 'workspaceList' } // i18n-ignore: a protocol code
+      rows.push({ name, commit, change })
+    }
+    // The project folder's workspace, stale or not (HI-2800, J2's read): explained in the window, never recovered here.
+    const co = readCheckout(join(c.root, '.jj'))
+    const stale = co ? await staleAt(reads, c.root, op) : null
+    return rows.map((r) => (co && r.name === co.workspace ? { ...r, here: true, stale } : r))
+  })
+  return { ...base, op: isJjUnknown(ws) ? null : ws.op, heads: 1, workspaces: isJjUnknown(ws) ? unknownOf(ws) : ws.value }
+}
+
+/** The History section: every visible commit (every head's ancestry: a divergent change's variants all show), newest first, a page of JJ_HISTORY_MAX. */
+export async function jjHistory(folder: string, runner: JjRunner = jjRunner): Promise<JjView<JjHistoryView>> {
+  const c = await contextOf(folder, runner)
+  if (isJjViewUnknown(c)) return c
+  const reads = readsOf(c, runner)
+  const r = await reads.pinned((op) => rowsAt(reads, op, '::visible_heads()', JJ_HISTORY_MAX))
+  return isJjUnknown(r) ? unknownOf(r) : { op: r.op, ...r.value }
+}
+
+/** Parses `bookmark list -a` lines (BOOKMARK_TEMPLATE), or null when malformed. */
+export function parseBookmarkRows(out: string): JjBookmarkRow[] | null {
+  const rows: JjBookmarkRow[] = []
+  for (const l of out.split('\n')) {
+    if (!l) continue
+    const f = l.split(SEP)
+    if (f.length !== 6) return null
+    const [n, remote, conflict, commit, change, added] = f
+    const name = json(n)
+    const c = bool(conflict)
+    const sides = added ? added.split(',') : []
+    if (typeof name !== 'string' || c === null || (commit && !COMMIT_ID.test(commit)) || (change && !CHANGE_ID.test(change)) || !sides.every((s) => COMMIT_ID.test(s))) return null
+    rows.push({ name, remote: remote || null, conflict: c, commit: commit || null, change: change || null, sides: c ? sides : [] })
+  }
+  return rows
+}
+
+export const BOOKMARK_TEMPLATE = [
+  'name.escape_json()',
+  'if(remote, remote, "")',
+  'conflict',
+  'if(normal_target, normal_target.commit_id(), "")',
+  'if(normal_target, normal_target.change_id(), "")',
+  'added_targets.map(|c| c.commit_id()).join(",")'
+].join(` ++ "${SEP}" ++ `) + ' ++ "\\n"'
+
+/**
+ * Each local bookmark against Git (colocated only): its `@git` remote-tracking target as jj last saw it, and the branch Git
+ * has now (`refs/heads/<name>`, read from the files: loose or packed). A difference is shown, never resolved.
+ */
+async function markGit(c: JjContext, rows: JjBookmarkRow[]): Promise<void> {
+  // Not colocated (HI-2896): no Git working copy sees the store's refs, and nothing exports without colocation, so an
+  // unexported or stale `@git` is no difference anyone sees: nothing is marked (J5 decides by the local bookmark alone).
+  if (!c.colocated) return
+  const tracked = new Map(rows.filter((r) => r.remote === 'git').map((r) => [r.name, r.commit]))
+  const refs = c.colocated ? await gitBranches(c.store) : null
+  for (const r of rows) {
+    if (r.remote !== null || r.conflict) continue
+    const git = tracked.get(r.name)
+    const now = refs?.get(r.name)
+    if (git === undefined || git !== r.commit || (refs && now !== r.commit)) r.gitDiffers = true
+  }
+}
+
+/** Git's local branches, read from the store's files (no process): loose refs win over packed ones. Null if unreadable. */
+export async function gitBranches(store: string): Promise<Map<string, string> | null> {
+  // Under Combwork's file gate for the store (HI-2918): never while a jj write of Combwork's exports there.
+  const key = await pathKey(store)
+  if (!key) return null
+  return jjFileGate.read([storeKey(key)], () => gitBranchesNow(store))
+}
+
+async function gitBranchesNow(store: string): Promise<Map<string, string> | null> {
+  const { readFile, readdir } = await import('original-fs/promises')
+  const out = new Map<string, string>()
+  const packed = await readFile(join(store, 'packed-refs'), 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? '' : null))
+  if (packed === null) return null
+  for (const l of packed.split(/\r?\n/)) {
+    const m = /^([0-9a-f]{40}) refs\/heads\/(.+)$/.exec(l)
+    if (m) out.set(m[2], m[1])
+  }
+  const walk = async (dir: string, prefix: string): Promise<boolean> => {
+    const ents = await readdir(dir, { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? [] : null))
+    if (!ents) return false
+    for (const e of ents.slice(0, 4096)) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) {
+        if (!(await walk(p, `${prefix}${e.name}/`))) return false
+      } else if (e.isFile()) {
+        const v = (await readFile(p, 'utf8').catch(() => null))?.trim()
+        if (v && /^[0-9a-f]{40}$/.test(v)) out.set(`${prefix}${e.name}`, v)
+      }
+    }
+    return true
+  }
+  return (await walk(join(store, 'refs', 'heads'), '')) ? out : null
+}
+
+/** The Bookmarks section: every bookmark, local and remote-tracking; conflicted ones with their sides. */
+export async function jjBookmarks(folder: string, runner: JjRunner = jjRunner): Promise<JjView<JjBookmarksView>> {
+  const c = await contextOf(folder, runner)
+  if (isJjViewUnknown(c)) return c
+  const reads = readsOf(c, runner)
+  const r = await reads.pinned(async (op): Promise<JjMaybe<JjBookmarkRow[]>> => {
+    const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_TEMPLATE])
+    if (isJjUnknown(out)) return out
+    return parseBookmarkRows(out) ?? { jjUnknown: 'malformed', detail: 'bookmarkList' } // i18n-ignore: a protocol code
+  })
+  if (isJjUnknown(r)) return unknownOf(r)
+  await markGit(c, r.value)
+  return { op: r.op, rows: r.value }
+}
+
+/**
+ * A revision typed for Compare, resolved at `op` to exactly one commit. An id naming several (a divergent change id, an
+ * ambiguous prefix) lists them all, for the user to pick one by its commit id; nothing is picked for them.
+ */
+export async function resolveAt(reads: JjReads, op: string, input: string): Promise<JjMaybe<JjResolved>> {
+  const rev = input.trim()
+  if (!jjRevisionInput(rev)) return { jjUnknown: 'malformed', detail: 'revision' } // i18n-ignore: a protocol code
+  const one = await rowsAt(reads, op, rev, 16)
+  if (!isJjUnknown(one)) return one.rows.length === 1 && !one.capped ? { commit: one.rows[0] } : one.rows.length === 0 ? { none: true } : { ambiguous: one.rows }
+  const said = one.detail ?? ''
+  if (/doesn't exist|didn't resolve|no such|not found/i.test(said)) return { none: true }
+  // A conflicted bookmark names every commit it points at.
+  if (/is conflicted/i.test(said) && /^[A-Za-z0-9._\-/]+$/.test(rev)) {
+    const sides = await rowsAt(reads, op, `bookmarks(exact:${JSON.stringify(rev)})`, 16)
+    return isJjUnknown(sides) ? { jjUnknown: 'ambiguous', detail: said } : { ambiguous: sides.rows }
+  }
+  if (!/divergent|ambiguous/i.test(said)) return one
+  // Every commit the id could mean: a change id's (divergent) or a prefix's, change and commit ids alike.
+  const hex = /^[0-9a-f]+$/.test(rev)
+  const ch = /^[k-z]+$/.test(rev)
+  if (!hex && !ch) return { jjUnknown: 'ambiguous', detail: said }
+  const all = await rowsAt(reads, op, [ch ? `change_id(${rev})` : null, hex ? `commit_id(${rev})` : null].filter(Boolean).join(' | '), 16)
+  return isJjUnknown(all) ? { jjUnknown: 'ambiguous', detail: said } : { ambiguous: all.rows }
+}
+
+/** What a Compare reads: each side resolved, or why it couldn't be. */
+export type JjCompareAnswer = JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
+
+/** The Compare section: two revisions resolved to one commit each, then what changed between them (capped). */
+export async function jjCompare(folder: string, from: string, to: string, runner: JjRunner = jjRunner): Promise<JjCompareAnswer> {
+  const c = await contextOf(folder, runner)
+  if (isJjViewUnknown(c)) return c
+  const reads = readsOf(c, runner)
+  const r = await reads.pinned(async (op): Promise<JjMaybe<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>> => {
+    const a = await resolveAt(reads, op, from)
+    if (isJjUnknown(a)) return a
+    const b = await resolveAt(reads, op, to)
+    if (isJjUnknown(b)) return b
+    if (!('commit' in a) || !('commit' in b)) return { from: a, to: b, op }
+    const summary = await reads.run(op, ['diff', '--from', a.commit.commit, '--to', b.commit.commit, '--summary'])
+    if (isJjUnknown(summary)) return summary
+    const files = summary
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => /^([MADRC]) (.+)$/.exec(l))
+    if (!files.every((m) => m)) return { jjUnknown: 'malformed', detail: 'diffSummary' } // i18n-ignore: a protocol code
+    const diff = await reads.run(op, ['diff', '--from', a.commit.commit, '--to', b.commit.commit, '--git'])
+    if (isJjUnknown(diff)) return diff
+    return { op, from: a.commit, to: b.commit, files: files.map((m) => ({ status: m![1], path: m![2] })), diff: diff.slice(0, JJ_DIFF_MAX), capped: diff.length > JJ_DIFF_MAX }
+  })
+  if (isJjUnknown(r)) return unknownOf(r)
+  return 'files' in r.value ? r.value : { ...r.value, op: r.op }
+}
+
+/** The Conflicts section: the commits storing conflicts among the history's, each with its conflicted files. */
+export async function jjConflicts(folder: string, runner: JjRunner = jjRunner): Promise<JjView<JjConflictsView>> {
+  const c = await contextOf(folder, runner)
+  if (isJjViewUnknown(c)) return c
+  const reads = readsOf(c, runner)
+  const r = await reads.pinned(async (op): Promise<JjMaybe<Omit<JjConflictsView, 'op'>>> => {
+    const found = await rowsAt(reads, op, 'conflicts() & ::visible_heads()', JJ_CONFLICTS_MAX)
+    if (isJjUnknown(found)) return found
+    const rows: JjConflictsView['rows'] = []
+    for (const row of found.rows) {
+      const out = await reads.run(op, ['resolve', '--list', '-r', row.commit])
+      const files = isJjUnknown(out) ? unknownOf(out) : out.split('\n').filter(Boolean).map((l) => l.replace(/\s{2,}.*$/, '').trim())
+      rows.push({ row, files })
+    }
+    return { rows, capped: found.capped }
+  })
+  return isJjUnknown(r) ? unknownOf(r) : { op: r.op, ...r.value }
+}

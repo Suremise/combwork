@@ -1,0 +1,11 @@
+{
+  "folderChanges.commitFailed": "Nie udało się zrobić commita",
+  "folderChanges.committed": "{count, plural, one {Zrobiono commit # pliku} few {Zrobiono commit # plików} many {Zrobiono commit # plików} other {Zrobiono commit # pliku}} na gałęzi {branch}.",
+  "folderChanges.committedWarning": "{count, plural, one {Zrobiono commit # pliku} few {Zrobiono commit # plików} many {Zrobiono commit # plików} other {Zrobiono commit # pliku}} na gałęzi {branch}, z ostrzeżeniem",
+  "folderChanges.resumed": "Scalanie trwa dalej.",
+  "folderChanges.setAside": "{count, plural, one {Odłożono # plik} few {Odłożono # pliki} many {Odłożono # plików} other {Odłożono # pliku}} na gałęzi {branch}.",
+  "folderChanges.setAsideDetail": "Git przechowuje je w stashu o nazwie „{name}”: git stash pop je przywraca.",
+  "folderChanges.setAsideFailed": "Nie udało się odłożyć zmian",
+  "folderChanges.setAsideWarning": "{count, plural, one {Odłożono # plik} few {Odłożono # pliki} many {Odłożono # plików} other {Odłożono # pliku}} na gałęzi {branch}, z ostrzeżeniem",
+  "folderChanges.stillPaused": "Scalanie jest nadal wstrzymane: przyczynę widać przy nim."
+}

@@ -2,7 +2,8 @@ import { COMPARE_COMMITS, COMPARE_FILES, type CompareFile, type CompareLines, ty
 import type { GitDiff } from '../shared/types'
 import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
-import { failure as commandFailed, git, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
+import { failure as commandFailed, git, gitlinkChange, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
+import { subprojectLine, type GitlinkSide } from '../shared/gitlink'
 import { gitProblem } from './gitTool'
 import { combworkError } from './combworkError'
 import * as G from './platform/git'
@@ -166,9 +167,14 @@ export async function compareDiff(root: string, baseName: string, headName: stri
   const [pb, ph] = await Promise.all([pinnedCommit(root, pinned?.base), pinnedCommit(root, pinned?.head)])
   const [base, head] = pb && ph ? [pb, ph] : await Promise.all([branchTip(root, baseName), branchTip(root, headName)])
   const from = (await mergeBaseOf(root, base, head)) ?? base
-  const [original, modified] = await Promise.all([fileAt(root, from, path), fileAt(root, head, path)])
-  if ('size' in original) return tooLargeDiff(path, original.size)
-  if ('size' in modified) return tooLargeDiff(path, modified.size)
-  if (isBinary(original.buf) || isBinary(modified.buf)) return { path, original: '', modified: '', binary: true }
-  return { path, original: original.buf.toString('utf8'), modified: modified.buf.toString('utf8'), binary: false }
+  // HI-2864: a side that is a gitlink (by its mode, even when its commit is in this store) is git's own line, never read.
+  const link = await gitlinkChange(root, [from, head], path)
+  const side = (s: GitlinkSide | undefined, rev: string): Promise<{ buf: Buffer } | { size: number }> =>
+    s?.kind === 'gitlink' ? Promise.resolve({ buf: Buffer.from(subprojectLine(s.commit), 'utf8') }) : fileAt(root, rev, path)
+  const [original, modified] = await Promise.all([side(link?.from, from), side(link?.to, head)])
+  const gitlink = link ? { gitlink: link } : {}
+  if ('size' in original) return { ...tooLargeDiff(path, original.size), ...gitlink }
+  if ('size' in modified) return { ...tooLargeDiff(path, modified.size), ...gitlink }
+  if (isBinary(original.buf) || isBinary(modified.buf)) return { path, original: '', modified: '', binary: true, ...gitlink }
+  return { path, original: original.buf.toString('utf8'), modified: modified.buf.toString('utf8'), binary: false, ...gitlink }
 }

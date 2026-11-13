@@ -9,7 +9,10 @@ import { join } from 'path'
 import { setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { leftWake, queueLine, resubmittedText, returnedComment, returnedText, staleWake, type QueueState } from '../src/main/workflow/queueState'
-import { candidateLog } from '../src/main/platform/gitIntegration'
+import { candidateLog, signingPause } from '../src/main/platform/gitIntegration'
+import { checkSigning, signingTestHooks, type SignDeps } from '../src/main/platform/gitSigning'
+import type { QueueGitResult } from '../src/main/platform/integration'
+import { tempDir } from './tempDir'
 import { CAME_BACK } from '../src/shared/workflow/queue'
 import type { FactData } from '../src/shared/workflow/facts'
 // @ts-expect-error: a plain .mjs module without types
@@ -32,7 +35,8 @@ afterEach(() => {
 })
 
 type Failed = FactData['IntegrationFailed']
-const base: Failed = { entry: 'HI-7/e3', revision: 'abc1234', target: 'main', reason: 'conflict', transient: false }
+const REMOTE_HEAD = '0123456789abcdef0123456789abcdef01234567'
+const base: Failed ={ entry: 'HI-7/e3', revision: 'abc1234', target: 'main', reason: 'conflict', transient: false }
 /** Every kind of return, with what a test passes in it. */
 const FAILURES: Failed[] = [
   { ...base, files: ['src/a.ts', 'src/b.ts'], logPath: 'C:/logs/q.log', log: 'one\ntwo\nthree' },
@@ -48,6 +52,11 @@ const FAILURES: Failed[] = [
   { ...base, reason: 'checks', transient: true },
   { ...base, reason: 'hook' },
   { ...base, reason: 'targetMoved' },
+  // HI-1183's follow mode: the push of the merge refused, and an unknown publication the user said didn't happen.
+  { ...base, reason: 'pushRefused' },
+  { ...base, reason: 'notPublished' },
+  // HI-2892: a forward merge against the release path's direction, never merged.
+  { ...base, reason: 'direction' },
   { ...base, reason: 'folderBusy' },
   { ...base, reason: 'notUpToDate' },
   { ...base, reason: 'notUpToDate', files: ['src/a.ts'] },
@@ -56,7 +65,10 @@ const FAILURES: Failed[] = [
   { ...base, reason: 'focused', focused: { why: 'noProof', tests: ['e2e:real-chat'] } as never },
   { ...base, reason: 'focused', focused: { why: 'newProof', tests: ['e2e:packaged'] } as never },
   { ...base, reason: 'focused', focused: { why: 'noRunner' } as never },
-  { ...base, reason: 'focused' }
+  { ...base, reason: 'focused' },
+  // HI-3127 (HI-3151): under follow mode, tested on the remote's head the local target lacks: a conflict, and a red check.
+  { ...base, onto: REMOTE_HEAD, remote: 'origin/main' },
+  { ...base, reason: 'checks', check: 'quick', onto: REMOTE_HEAD, remote: 'origin/main' }
 ]
 const STATES: QueueState[] = [
   { state: 'queued', target: 'main', position: 2 },
@@ -65,8 +77,10 @@ const STATES: QueueState[] = [
   { state: 'testing', target: 'main', step: 'advance' },
   { state: 'testing', target: 'main', step: 'checks' },
   { state: 'testing', target: 'main', step: null },
-  ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
+  ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
   { state: 'paused', target: 'main', reason: 'needsYou', card: 'HI-6', stuck: true },
+  // HI-3091: an unknown publication the user has answered.
+  { state: 'paused', target: 'main', reason: 'publishUnknown', card: 'HI-6', answered: true },
   { state: 'returned', reason: 'conflict', transient: false, failure: FAILURES[0] },
   { state: 'left', why: 'stale' },
   { state: 'left', why: 'decision' },
@@ -75,7 +89,7 @@ const STATES: QueueState[] = [
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */
-const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
+const VALUES = ['no-such-signer', '128', 'HI-7','HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown', '—', 'line 3', 'lines 1, 2', REMOTE_HEAD, 'origin/main',...FAILURES.flatMap((f) => f.files ?? [])]
 
 function queueTexts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
@@ -86,6 +100,17 @@ function queueTexts(): { name: string; text: string }[] {
     out.push({ name: `returned ${i} short`, text: returnedText('HI-7', f, 160) })
     out.push({ name: `resubmitted ${i}`, text: resubmittedText('HI-7', f, 'Coder') })
   }
+  // HI-2959: a forward merge's return names the user's choices, not a builder's step.
+  out.push({ name: 'returned forward', text: returnedText('HI-7', FAILURES[0], undefined, undefined, { from: 'main', to: 'main' }) })
+  // HI-2998: a forward's resolution returned for its direction: its builder told to leave it to the user.
+  const dir = FAILURES.find((f) => f.reason === 'direction')!
+  out.push({ name: 'returned resolution', text: returnedText('HI-7', dir, undefined, undefined, { from: 'main', to: 'main', resolution: 'HI-6' }) })
+  out.push({ name: 'returned resolution short', text: returnedText('HI-7', dir, 160, undefined, { from: 'main', to: 'main', resolution: 'HI-6' }) })
+  out.push({ name: 'resubmitted resolution', text: resubmittedText('HI-7', dir, 'Coder', { from: 'main', to: 'main', resolution: 'HI-6' }) })
+  // HI-2999: a resolution returned without the commit it resolves.
+  const missing: Failed = { ...base, reason: 'resolution' }
+  out.push({ name: 'returned resolution source', text: returnedText('HI-7', missing, undefined, undefined, { from: 'main', to: 'main', resolution: 'HI-6', source: 'abc1234' }) })
+  out.push({ name: 'resubmitted resolution source', text: resubmittedText('HI-7', missing, 'Coder', { from: 'main', to: 'main', resolution: 'HI-6', source: 'abc1234' }) })
   out.push({ name: 'stale', text: staleWake('HI-7', 'abc1234', null) })
   for (const to of ['review', 'active'] as const) out.push({ name: `left decision ${to}`, text: leftWake('HI-7', 'decision', to) })
   out.push({ name: 'left stale', text: leftWake('HI-7', 'stale', 'review') })
@@ -94,11 +119,44 @@ function queueTexts(): { name: string; text: string }[] {
   return out
 }
 
-describe("the canary dialect over the merge queue lines (queueState.ts, and gitIntegration.ts's candidate logs)", () => {
-  it('finds every word in the catalogue, and every queue id in some case', () => {
+/** A git whose config reads answer `settings` (key → value; unset when absent), its other commands as `rest` says. */
+const configGit = (settings: Record<string, string>, rest: QueueGitResult = { ok: true, out: '', err: '', code: 0 }): SignDeps['git'] => async (_cwd, args) => {
+  if (args[0] !== 'config') return rest
+  const key = args.find((a) => settings[a] !== undefined)
+  return key ? { ok: true, out: `local\t${settings[key]}\n`, err: '', code: 0 } : { ok: false, out: '', err: '', code: 1 }
+}
+/** A pause's detail, or an again's message, as the queue gets it. */
+const pauseText = (p: ReturnType<typeof signingPause>): string => (p && 'pause' in p ? p.message : p && 'again' in p ? p.again.message : '') ?? ''
+
+/** HI-1185's signing check (gitSigning.ts) and the pause it gives (gitIntegration.ts), HI-2883: a case for each of its texts. */
+async function signingTexts(): Promise<{ name: string; text: string }[]> {
+  const cwd = tempDir('cw-agenttext-signing-')
+  const deps = (git: SignDeps['git']): SignDeps => ({ git, spawn: async () => ({ ok: true, out: '', err: '', code: 0 }), cwd, who: [], env: { PATH: '' } })
+  const ssh = { 'commit.gpgsign': 'true', 'gpg.format': 'ssh' }
+  const check = async (git: SignDeps['git']): Promise<string> => pauseText(signingPause((await checkSigning(deps(git))).status))
+  const out = [
+    // A config read that failed saying nothing: its exit code.
+    { name: 'signing exited', text: await check(async () => ({ ok: false, out: '', err: '', code: 128 })) },
+    // The signer named isn't on the commit's PATH.
+    { name: 'signing notFound', text: await check(configGit({ ...ssh, 'gpg.ssh.program': 'no-such-signer' })) },
+    { name: 'signing unfinished', text: pauseText(signingPause({ kind: 'couldNotComplete', format: 'ssh' })) }
+  ]
+  // ssh with no key and no key command: a signer that exists, taken as a known installation (the test-only seam).
+  signingTestHooks.eligible = () => true
+  try {
+    out.push({ name: 'signing noSshKey', text: await check(configGit({ ...ssh, 'gpg.ssh.program': process.execPath })) })
+  } finally {
+    signingTestHooks.eligible = undefined
+  }
+  return out
+}
+
+describe("the canary dialect over the merge queue lines (queueState.ts, and gitIntegration.ts's candidate logs and signing pauses)", () => {
+  it('finds every word in the catalogue, and every queue id in some case', async () => {
     canary()
     const seen = new Set<string>()
-    for (const { name, text } of queueTexts()) {
+    for (const { name, text } of [...queueTexts(), ...(await signingTexts())]) {
+      expect(text, name).not.toBe('')
       expect(canaryProblems(text, ids, VALUES), name).toEqual([])
       for (const m of text.matchAll(/⟦([^/⟧][^⟧]*)⟧/g)) seen.add(m[1])
     }

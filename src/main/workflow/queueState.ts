@@ -3,7 +3,7 @@
 // merges, what the queue is doing with it, worked out from the card's facts and the queue's order (queueOrder: its
 // entries in the order they were requested, and the one testing now). One order for every place that says it: a card
 // read, a lane's next, a refusal's next step, and the window's queue model (#1353, queueControls.ts's queueView).
-import { openEntry, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
+import { openEntry, QUEUE_PUBLISH_GATE, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
 import { CAME_BACK, type QueueQueued, type QueueStep, type QueueTesting } from '../../shared/workflow/queue'
 import type { CardRecord } from './factStore'
 import type { PauseReason, QueueStepInfo } from './mergeQueue'
@@ -30,6 +30,8 @@ const Q = {
   waitsApproval: agentMsg({ id: 'queue.paused.approval', text: 'it moves on once the user answers, in For you, whether to update {target} now', note: "What a queue paused for the user's answer waits for (#1406): whether to update a checked-out target now (Resume doesn't stand in for it). {target}: the branch." }),
   waitsMergeChoice: agentMsg({ id: 'queue.paused.mergeChoice', text: 'it moves on once the user chooses, in For you, how Combwork merges this project (merge style and commit message)', note: "What a queue paused for the project's merge style waits for (#1406)." }),
   waitsStuck: agentMsg({ id: 'queue.paused.stuck', text: 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)', note: 'What a queue paused on an interrupted advance waits for (#1406): Decide in For you, or Resume once settled.' }),
+  waitsPublish: agentMsg({ id: 'queue.paused.publish', text: 'it moves on once the user says whether its push reached the remote (their answer in For you), or Resume finds it there', note: 'What a queue paused on an unknown publication waits for (HI-1183, follow mode): Approve or Decline in For you; Resume looks at the remote again.' }),
+  waitsPublishAnswered: agentMsg({ id: 'queue.paused.publishAnswered', text: 'the user has answered whether its push reached the remote; it moves on as the queue takes up that answer', note: "HI-3091: a queue still paused on an unknown publication whose For you question the user has answered (nothing left to ask): the queue's next run settles it." }),
   waitsFix: agentMsg({ id: 'queue.paused.fix', text: 'it moves on once the user fixes what stopped it and resumes it', note: "What a queue paused on a step that needs the user waits for (#1406): git's error, a push (G18, #1179), then Resume." }),
   waitsFolder: agentMsg({ id: 'queue.paused.folder', text: 'it moves on once the user puts right the folder {target} is checked out in and resumes it', note: 'What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch.' }),
   waitsRules: agentMsg({ id: 'queue.paused.rules', text: 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)', note: "What a queue paused while workflow rules weren't enforced waits for (#1406): Combwork resumes it once they are." }),
@@ -51,6 +53,14 @@ const Q = {
   checkFailed: agentMsg({ id: 'queue.failure.check.failed', text: '{what} failed on the merged result', note: '{what}: the check (queue.failure.check.*): it failed on the work merged with its target.' }),
   hook: agentMsg({ id: 'queue.failure.hook', text: 'a git hook refused its merge commit', note: 'What came back: a git hook refused the merge commit.' }),
   targetMoved: agentMsg({ id: 'queue.failure.targetMoved', text: '{target} moved while it was being merged', note: 'What came back: its target branch moved during the merge.' }),
+  pushRefused: agentMsg({ id: 'queue.failure.pushRefused', text: 'publishing it to {target}’s remote was refused (a pre-push hook or the remote); it is tested again after Resume', note: 'What came back (HI-1183, follow mode): the project’s pre-push hook or the remote refused the push of the merge; nothing was published.' }),
+  direction: agentMsg({ id: 'queue.failure.direction', text: 'a forward merge into {target} against the release path’s direction (into an older version or the default branch, or two branches Combwork can’t order), its request with no override; nothing merged', note: 'What came back (HI-2892): a forward merge card the queue refused to merge, against the release path’s direction.' }),
+  nextDirection: agentMsg({ id: 'queue.next.direction', text: 'Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.', note: 'The next step after a forward merge came back against the release path’s direction (HI-2892).' }),
+  directionResolution: agentMsg({ id: 'queue.failure.directionResolution', text: 'the resolution of {forward}, bringing {to} up to date with {from}, is against the release path’s direction now (the default branch or the branches changed since Resolve), and {forward}’s request recorded no override; nothing merged', note: 'What came back (HI-2998): a card made by Resolve on a builder to merge branch {from} into branch {to} by hand, refused at its merge: that direction no longer reads forward. {forward}: the forward merge card it resolves (a key like HI-12).' }),
+  nextDirectionResolution: agentMsg({ id: 'queue.next.directionResolution', text: 'Don’t submit it again yet: it comes back the same way. Say so on the card and leave it to the user: only their explicit override (a forward request of {from} into {to} with the override, which records it on this card) lets it merge. Once it is recorded, you are told to submit the same revision again.', note: 'The next step, for its builder, after a resolution of a forward merge came back against the release path’s direction (HI-2998; HI-3040: the override request records it on the resolution).' }),
+  resolution: agentMsg({ id: 'queue.failure.resolution', text: 'the resolution of {forward} doesn’t contain {source}, the commit it resolves (cherry-picked or copied, not merged); nothing merged', note: 'What came back (HI-2999): a card made by Resolve on a builder whose revision lacks the commit it resolves. {forward}: the forward merge card (a key like HI-12); {source}: a commit id.' }),
+  nextResolution: agentMsg({ id: 'queue.next.resolution', text: 'In its branch, run git merge {source}, resolve the conflict, commit, and submit again.', note: 'The next step after a resolution came back without the commit it resolves (HI-2999). {source}: a full commit id.' }),
+  notPublished: agentMsg({ id: 'queue.failure.notPublished', text: 'the user said its publication to {target}’s remote didn’t happen; it is tested again', note: 'What came back (HI-1183, follow mode): an unknown publication the user said wasn’t published.' }),
   folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
   notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
   notUpToDateFiles: agentMsg({ id: 'queue.failure.notUpToDate.files', text: '{head}: a conflict in {files}', note: "HI-1181 round 1: Strict's update conflicted. {head}: queue.failure.notUpToDate. {files}: its files and where, as a conflict's are." }),
@@ -64,6 +74,9 @@ const Q = {
   nextRepick: agentMsg({ id: 'queue.next.repick', text: 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on cw_submit), for review.', note: "The next step when its focused tests couldn't be chosen (G20, HI-1367)." }),
   nextTransient: agentMsg({ id: 'queue.next.transient', text: 'Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.', note: 'The next step after a failure of the environment, not the work.' }),
   nextConflict: agentMsg({ id: 'queue.next.conflict', text: 'Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).', note: 'The next step after a conflict with {target}, the branch.' }),
+  nextConflictRemote: agentMsg({ id: 'queue.next.conflictRemote', text: '{target} on its remote ({remote}) is at {commit}, which the queue tested on and your local {target} doesn’t have yet: merge that commit into your worktree (git merge {commit}: it is in the repository already), resolve the conflict, commit and submit again (cw_submit).', note: 'HI-3127: the next step after a conflict with {target} under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>.' }),
+  nextFixRemote: agentMsg({ id: 'queue.next.fixRemote', text: 'Fix it in your worktree, commit and submit again (cw_submit). It was tested merged with {commit}, {target}’s head on its remote ({remote}), which your local {target} doesn’t have yet: merge that commit (git merge {commit}: it is in the repository already) to see what the queue saw.', note: 'HI-3127: the next step after a red check or a hook under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>.' }),
+  nextForward: agentMsg({ id: 'queue.next.forward', text: 'A forward merge has no builder, and no agent works on it: the user or the Assistant decides. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} and resolve this there; Remove from queue ends it, nothing merged.', note: "HI-2959: the next step on a forward merge card (Combwork merging branch {from} into {to}) the merge queue returned: no agent may act on it. Retry merge, Resolve on a builder and Remove from queue are the window's commands." }),
   nextFix: agentMsg({ id: 'queue.next.fix', text: 'Fix it in your worktree, commit and submit again (cw_submit).', note: 'The next step after anything else that came back.' }),
   staleWake: agentMsg({ id: 'queue.wake.stale', text: '{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (cw_submit).', note: "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)." }),
   resubmitted: agentMsg({ id: 'queue.wake.resubmitted', text: '{card} is back in Review after the merge queue returned it ({failure}); {builder} {conflict, select, yes {resolved it} other {changed it}} and submitted it again: review {conflict, select, yes {the resolution} other {what changed}}', note: "HI-2143: a card submitted again after the queue returned it, its reviewer's wake. {failure}: what came back (queue.failure.*). {conflict}: yes when it came back with a conflict." }),
@@ -79,9 +92,9 @@ export type QueueState =
   /** The queue's entry now, at its step (null: another Combwork runs the queue, or its advance is recovered, step unknown). */
   | { state: 'testing'; target: string; step: QueueStep | null }
   /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
-  | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true }
+  | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true; answered?: true }
   /** Back from the queue to its builder: a conflict, red checks, a hook (`failure`: what came back, as recorded). */
-  | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed'] }
+  | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed']; about?: ReturnedForward }
   /** Left the queue: it isn't approved any more (its pass stale, or a decision since). */
   | { state: 'left'; why: 'stale' | 'decision' }
   /** Approved, but its pass is stale (HI-1763): its line moved on since (`approved` what was passed, `current` its line). */
@@ -103,13 +116,16 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
     const on = open.state === 'open' ? wf.queueWaitingOn(card.id) : []
     if (on.length) return { state: 'waiting', target: open.target, on }
     const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string; stuck?: unknown } | null
-    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}) }
+    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}), ...(publishAnswered(wf, pause) ? { answered: true as const } : {}) }
     return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
   }
   // Approved with a stale pass, never queued (HI-1763: HI-1737 sat so, its lane paused, nobody told): said, with what to do.
   if (s.stage === 'approved' && s.stale) return { state: 'stale', approved: s.stale.approved, current: s.stale.current }
   const last = s.entries.at(-1)
-  if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure }
+  if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) {
+    const about = returnedAbout(s)
+    return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure, ...(about ? { about } : {}) }
+  }
   if (last?.state === 'cancelled' && (last.cancelled === 'stale' || last.cancelled === 'decision') && s.stage !== 'merging') return { state: 'left', why: last.cancelled }
   return { state: 'notYet' }
 }
@@ -138,13 +154,17 @@ export interface QueueOrder {
  * step; else an advance begun (its recovery finishes it), or, when another Combwork runs the queue, its first entry (its
  * step isn't known here).
  */
-export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target)): QueueOrder {
+export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target), openCards?: ReadonlyMap<number, CardRecord>): QueueOrder {
   const store = wf.store
+  // HI-3169: a Done card holds no open entry (merged, or moved there, which cancels it: queueStateOf), so only the cards
+  // not Done are read and folded, all in one read (`openCards`: a listing's, read once for all its targets): the target's
+  // history, all Done, costs nothing here.
+  const notDone = openCards ?? new Map(store.cardsOpen().map((c) => [c.id, c]))
   const states = new Map<number, { card: CardRecord; s: CardState }>()
   const of = (id: number): { card: CardRecord; s: CardState } => {
     let x = states.get(id)
     if (!x) {
-      const card = store.card(id)
+      const card = notDone.get(id) ?? store.card(id)
       states.set(id, (x = { card, s: wf.state(card) }))
     }
     return x
@@ -157,6 +177,7 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     if (d.target !== target) continue
     entries.add(d.entry)
     cards.add(f.card)
+    if (!notDone.has(f.card)) continue
     const { card, s } = of(f.card)
     const e = s.entries.find((x) => x.id === d.entry)
     if (e && (e.state === 'open' || e.state === 'started')) open.push({ f, card, state: e.state })
@@ -168,7 +189,10 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     testing = { ...named(store.card(n.number)), entry: n.entry, revision: n.revision, expected: n.expected, step: n.step, started: n.started, run: live.run }
   } else {
     // Another Combwork's run: its first entry that isn't waiting for a blocker (HI-2709: the queue goes on without those).
-    const begun = open.find((o) => o.state === 'started') ?? (store.queueLease(target) && !live.running ? open.find((o) => !wf.queueWaitingOn(o.card.id).length) : undefined)
+    // HI-3091: a begun entry the queue is paused on isn't being merged (an unknown publication waiting for the user's
+    // answer, an interrupted advance): it is shown with the pause, never as "moving the target to its merge now".
+    const pausedOn = store.queuePause(target)?.card ?? null
+    const begun = open.find((o) => o.state === 'started' && o.card.key !== pausedOn) ?? (store.queueLease(target) && !live.running ? open.find((o) => o.card.key !== pausedOn && !wf.queueWaitingOn(o.card.id).length) : undefined)
     if (begun) {
       const d = begun.f.data as FactData['IntegrationRequested']
       const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started
@@ -181,7 +205,8 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
       const d = o.f.data as FactData['IntegrationRequested']
       // HI-2709: what it waits for, as the board is now (a dependency's edit shows at once); still in the list, in its place.
       const on = o.state === 'open' ? wf.queueWaitingOn(o.card.id) : []
-      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at, ...(on.length ? { waitingOn: on } : {}) }
+      const fw = of(o.card.id).s.forward
+      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at, ...(on.length ? { waitingOn: on } : {}), ...(fw ? { forward: { from: fw.from, to: fw.to } } : {}) }
     })
   return { open, entries, cards, testing, queued }
 }
@@ -199,6 +224,8 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
   switch (reason) {
     case 'approval':
     case 'mergeChoice':
+    // G21 (HI-1183): an unknown publication waits for the user's answer (Resume only looks at the remote again).
+    case 'publishUnknown':
       return 'answer'
     case 'needsYou':
       return stuck ? 'answer' : 'fix'
@@ -208,6 +235,15 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
     case 'pushFailed':
     case 'pushNoRemote':
     case 'pushUnreadable':
+    // HI-1183: the remote's refusal, and follow mode's remote put right (what it tracks, its address, a sign-in, a pull).
+    case 'pushRefused':
+    case 'publishRefused':
+    case 'publishFailed':
+    case 'noUpstream':
+    case 'remoteAmbiguous':
+    case 'remoteUnsupported':
+    case 'fetchFailed':
+    case 'remoteDiverged':
       return 'fix'
     case 'wrongBranch':
     case 'staged':
@@ -221,11 +257,21 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
   }
 }
 
+/**
+ * HI-3091: a pause on an unknown publication whose For you question is closed (the user answered it): the card it paused
+ * on has no open publish question. Any other pause: false.
+ */
+function publishAnswered(wf: Workflow, pause: { reason: PauseReason; card: string }): boolean {
+  if (pause.reason !== 'publishUnknown') return false
+  const on = wf.store.cardByKey(pause.card)
+  return !!on && !wf.state(on).requests.some((r) => r.gate === QUEUE_PUBLISH_GATE)
+}
+
 /** A paused queue's "it moves on once …" for agents: what the pause waits for, never a step of the agent's own. */
 function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
   switch (pauseWait(q.reason, q.stuck)) {
     case 'answer':
-      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : say(Q.waitsStuck)
+      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : q.reason === 'publishUnknown' ? say(q.answered ? Q.waitsPublishAnswered : Q.waitsPublish) : say(Q.waitsStuck)
     case 'fix':
       return say(Q.waitsFix)
     case 'folder':
@@ -254,7 +300,7 @@ export function queueLine(q: QueueState, enforced = true): string {
     case 'paused':
       return say(Q.paused, { who, target: q.target, reason: q.reason, card: q.card, waits: pausedWaits(q) })
     case 'returned':
-      return say(Q.returned, { who, returned: returnedText(say(Q.subjectIt), q.failure, READ_MAX, READ_LINES) })
+      return say(Q.returned, { who, returned: returnedText(say(Q.subjectIt), q.failure, READ_MAX, READ_LINES, q.about) })
     case 'left':
       return say(Q.left, { who, why: q.why })
     case 'stale':
@@ -313,7 +359,7 @@ function placedFiles(f: FactData['IntegrationFailed'], room: number): string {
 }
 
 /** What came back, in a few words: the reason, and the files (in `room` characters) or the check. Names already clipped. */
-function failureText(f: FactData['IntegrationFailed'], room: number): string {
+function failureText(f: FactData['IntegrationFailed'], room: number, about?: ReturnedForward): string {
   switch (f.reason) {
     case 'conflict': {
       const head = say(Q.conflict, { target: f.target })
@@ -327,6 +373,15 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
       return say(Q.hook)
     case 'targetMoved':
       return say(Q.targetMoved, { target: f.target })
+    case 'pushRefused':
+      return say(Q.pushRefused, { target: f.target })
+    case 'notPublished':
+      return say(Q.notPublished, { target: f.target })
+    case 'direction':
+      if (about?.resolution) return say(Q.directionResolution, { forward: clip(about.resolution, NAME_MAX), from: clip(about.from, NAME_MAX), to: clip(about.to, NAME_MAX) })
+      return say(Q.direction, { target: f.target })
+    case 'resolution':
+      return say(Q.resolution, { forward: clip(about?.resolution ?? '?', NAME_MAX), source: about?.source ?? '?' })
     case 'folderBusy':
       return say(Q.folderBusy, { target: f.target })
     case 'notUpToDate': {
@@ -348,16 +403,46 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
   }
 }
 
+/**
+ * HI-2959: a forward merge's branches, for what its return says to do next. HI-2998: `resolution`, the forward's key when
+ * the card is its resolution (Resolve on a builder: its builder's card), not the forward itself.
+ */
+export interface ReturnedForward {
+  from: string
+  to: string
+  resolution?: string
+  /** HI-2999: with `resolution`, the commit it resolves. */
+  source?: string
+}
+
+/** What a card's return is about (HI-2959, HI-2998): its forward merge, or the forward it resolves; else none. */
+export function returnedAbout(s: CardState): ReturnedForward | undefined {
+  if (s.forward) return { from: s.forward.from, to: s.forward.to }
+  if (s.resolves) return { from: s.resolves.from, to: s.resolves.to, resolution: s.resolves.forward, source: s.resolves.source }
+  return undefined
+}
+
 /** What to do next: a transient failure is the same revision submitted again; anything else a fix. */
-function nextStep(f: FactData['IntegrationFailed']): string {
+function nextStep(f: FactData['IntegrationFailed'], forward?: ReturnedForward): string {
+  // HI-2998: a resolution returned for its direction: its builder can't change that, the user decides.
+  if (forward?.resolution) {
+    if (f.reason === 'direction') return say(Q.nextDirectionResolution, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
+    if (f.reason === 'resolution') return say(Q.nextResolution, { source: forward.source ?? '?' })
+    forward = undefined
+  }
+  // HI-2959: a forward merge's choices are the user's or the Assistant's, never a builder's (it has none).
+  if (forward && f.reason !== 'direction') return say(Q.nextForward, { from: clip(forward.from, NAME_MAX), to: clip(forward.to, NAME_MAX) })
   if (f.reason === 'focused') {
     if (f.focused?.why === 'noProof' || f.focused?.why === 'newProof') return say(Q.nextProof)
     if (f.focused?.why === 'noRunner') return say(Q.nextRunner)
     return say(Q.nextRepick)
   }
+  if (f.reason === 'direction') return say(Q.nextDirection)
   if (f.transient) return say(Q.nextTransient)
-  if (f.reason === 'conflict') return say(Q.nextConflict, { target: f.target })
-  return say(Q.nextFix)
+  // HI-3127: under follow mode, the remote's head it was tested on, when the local target hasn't it: named, as it is kept.
+  const remote = f.onto && f.remote ? { target: f.target, remote: f.remote, commit: f.onto } : null
+  if (f.reason === 'conflict' || (f.reason === 'notUpToDate' && remote)) return remote ? say(Q.nextConflictRemote, remote) : say(Q.nextConflict, { target: f.target })
+  return remote ? say(Q.nextFixRemote, remote) : say(Q.nextFix)
 }
 
 /** The output's last `n` non-blank lines, on one line. */
@@ -376,13 +461,13 @@ function lastLines(log: string, n: number): string {
  * fit, "and n more"), its log's path (whole, or a pointer to the card), and the output's last lines (cut from their
  * start so the end shows, "…").
  */
-export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES): string {
+export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES, forward?: ReturnedForward): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
   const lead = { subject: clip(subject, NAME_MAX), cameBack: CAME_BACK }
-  const next = ` ${nextStep(named)}`
+  const next = ` ${nextStep(named, forward)}`
   // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
   const fixed = frame(Q.lead, lead, 'failure') + next.length
-  const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN) })
+  const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN, forward) })
   let room = max - head.length - next.length
   let path = ''
   if (f.logPath) {
@@ -407,7 +492,7 @@ const shortRev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 
 export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string => say(Q.staleWake, { card: key, approved: shortRev(approved), current: shortRev(current) })
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
-export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)
+export const returnedWake = (key: string, f: FactData['IntegrationFailed'], forward?: ReturnedForward): string => returnedText(key, f, WAKE_NOTE_MAX, WAKE_LINES, forward)
 
 /** How many characters a resubmitted card's wake gives what came back (its files): see resubmittedText. */
 const RESUBMITTED_ROOM = 200
@@ -417,10 +502,10 @@ const RESUBMITTED_ROOM = 200
  * came back (the files of a conflict, in RESUBMITTED_ROOM characters: the wake line's bytes keep its end whole, in any
  * script), who submitted it again and what to review. One sentence (agent-facing, English).
  */
-export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string): string {
+export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string, about?: ReturnedForward): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
   const conflict = f.reason === 'conflict' || (f.reason === 'notUpToDate' && !!f.files?.length)
-  return say(Q.resubmitted, { card: clip(key, NAME_MAX), failure: failureText(named, RESUBMITTED_ROOM), builder: clip(builder, NAME_MAX), conflict: conflict ? 'yes' : 'no' })
+  return say(Q.resubmitted, { card: clip(key, NAME_MAX), failure: failureText(named, RESUBMITTED_ROOM, about), builder: clip(builder, NAME_MAX), conflict: conflict ? 'yes' : 'no' })
 }
 
 /** How long the queue's comment on a returned card is, and how many of its output's last lines it quotes (HI-2087). */
@@ -434,14 +519,14 @@ const COMMENT_FILES = 10
  * back and what to do next, as its wake says it, with more room), and as a message for the window (`shown`): why, and
  * the files.
  */
-export function returnedComment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText } {
+export function returnedComment(key: string, f: FactData['IntegrationFailed'], forward?: ReturnedForward): { text: string; shown: StoredText } {
   const reason = f.reason === 'checks' ? (f.check === 'install' ? 'install' : f.transient ? 'checksEnv' : f.check ? 'checks' : 'checksSome') : f.reason
   const files = f.files?.length ? `${f.files.slice(0, COMMENT_FILES).join(', ')}${f.files.length > COMMENT_FILES ? ', …' : ''}` : 'none'
   // Stored in the Default, for any reader; what it is said from is kept beside it, so a reader's dialect says it again
   // when it is read (storedForAgents, HI-2440).
   // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
   const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
-  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept } }
+  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}), ...(forward.source ? { source: forward.source } : {}) } } : {}) } }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
 }
 
@@ -450,10 +535,12 @@ export const RETURNED_COMMENT = 'queue.returned'
 
 /** A return comment's English from its stored data, in the current chain; null for data that isn't one. */
 export function returnedCommentFrom(data: unknown): string | null {
-  const d = data as { key?: unknown; failure?: unknown } | null
+  const d = data as { key?: unknown; failure?: unknown; forward?: unknown } | null
   if (!d || typeof d.key !== 'string' || !d.failure || typeof d.failure !== 'object') return null
+  const fw = d.forward as { from?: unknown; to?: unknown; resolution?: unknown; source?: unknown } | null | undefined
+  const forward = fw && typeof fw.from === 'string' && typeof fw.to === 'string' ? { from: fw.from, to: fw.to, ...(typeof fw.resolution === 'string' ? { resolution: fw.resolution } : {}), ...(typeof fw.source === 'string' ? { source: fw.source } : {}) } : undefined
   try {
-    return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES)
+    return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES, forward)
   } catch {
     return null
   }

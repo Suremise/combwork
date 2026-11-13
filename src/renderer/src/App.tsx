@@ -58,6 +58,7 @@ import { applyProjectPref } from './projectPrefs'
 import { useLayoutRoom } from './layoutRoom'
 // The agent-state mark's test hook (the statemarks suite), until the session page shows the marks itself (#974).
 import './components/StateMark'
+import { loadReleaseOffers } from './releaseOffers'
 
 function applyTheme(): void {
   const s = get().settings
@@ -96,6 +97,8 @@ let chimesPlayed = 0
 ;(window as unknown as { __cwChimes?: () => number }).__cwChimes = () => chimesPlayed
 // The bell's list as the tests read it (HI-2320): each entry, whether it was quiet (no pop-up), its buttons and what it says once resolved.
 ;(window as unknown as { __cwBell?: () => unknown[] }).__cwBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
+// How many usage changes the window has taken in (HI-3182): a test waits for one to land.
+;(window as unknown as { __cwUsageBumps?: () => number }).__cwUsageBumps = () => Object.values(get().usageVersion).reduce((a, b) => a + b, 0)
 
 function handleEvent(e: CombworkEvent): void {
   switch (e.type) {
@@ -240,7 +243,7 @@ function handleEvent(e: CombworkEvent): void {
       } else runCommand(e.command, ...(e.args ?? []))
       break
     case 'quit-request':
-      set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app' })
+      set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app', quitUpdate: e.update ?? null })
       break
     case 'quit-pending':
       set({ quitPending: e.pending ? { working: e.working } : null })
@@ -327,6 +330,9 @@ function handleEvent(e: CombworkEvent): void {
     case 'tools-restart-asked':
       // Busy agents whose tools a workflow change changed (HI-2694): asked whether to restart them.
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) void askWorkflowToolsRestart(e.projectPath, e.agents)
+      break
+    case 'release-offers':
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) void loadReleaseOffers()
       break
     case 'workflow-changed':
       if (e.workspacePath.toLowerCase() !== get().workspace?.path.toLowerCase()) break
@@ -463,7 +469,7 @@ export function App() {
       set(more)
       const q = await call('app:quitState')
       if (!early.active()) return
-      set({ quitRequest: q.request, quitUnsaved: q.unsaved, quitScope: q.scope, quitPending: q.pending ? { working: q.working } : null })
+      set({ quitRequest: q.request, quitUnsaved: q.unsaved, quitScope: q.scope, quitUpdate: q.update, quitPending: q.pending ? { working: q.working } : null })
       // And its close command's panel (HI-1368), when it reloaded while one ran.
       const closing = await call('closeCommand:state')
       if (!early.active()) return

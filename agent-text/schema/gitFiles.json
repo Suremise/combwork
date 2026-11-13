@@ -1,0 +1,94 @@
+{
+  "gitFiles.error.badPath": {
+    "placeholders": {
+      "name": "plain",
+      "path": "plain"
+    }
+  },
+  "gitFiles.error.clearStray": {
+    "placeholders": {
+      "name": "plain",
+      "path": "plain",
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.doubtfulLeft": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.error.foreign": {
+    "placeholders": {
+      "name": "plain",
+      "path": "plain"
+    }
+  },
+  "gitFiles.error.lfs": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.nested": {
+    "placeholders": {
+      "name": "plain",
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.noLfs": {
+    "placeholders": {}
+  },
+  "gitFiles.error.noLfsFilter": {
+    "placeholders": {}
+  },
+  "gitFiles.error.noUrl": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "gitFiles.error.removeLeft": {
+    "placeholders": {
+      "path": "plain",
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.stopped": {
+    "placeholders": {}
+  },
+  "gitFiles.error.unread": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.update": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "gitFiles.error.url": {
+    "placeholders": {
+      "name": "plain",
+      "url": "plain"
+    }
+  },
+  "gitFiles.remove.changed": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.odd": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.unpushed": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "gitFiles.remove.unread": {
+    "placeholders": {
+      "path": "plain",
+      "error": "plain"
+    }
+  }
+}

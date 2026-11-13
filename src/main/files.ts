@@ -9,6 +9,7 @@ import { attachmentsDir, movedAttachment } from './attachmentsFolder'
 import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
 import { fileListOf, ignoredIn, repoMetadataDirs } from './platform/repoPorts'
+import { inMetadataDir } from '../shared/platform/metadataDirs'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
@@ -315,7 +316,7 @@ export async function writeText(projectPath: string, rel: string, text: string, 
   })
 }
 
-const SKIP_WALK = new Set(['.git', 'node_modules'])
+const SKIP_WALK = new Set([...repoMetadataDirs(), 'node_modules'])
 
 /** Files whose path contains every word of the query. Uses git's file list (respects .gitignore) when it can. */
 export async function find(projectPath: string, query: string, limit = 500): Promise<FileEntry[]> {
@@ -377,7 +378,8 @@ export function watchProject(projectPath: string): void {
     entry.w = watch(projectPath, { recursive: true }, (_evt, file) => {
       if (!file) return
       const rel = String(file).split(sep).join('/')
-      if (rel === '.git' || rel.startsWith('.git/')) return
+      // A platform's own folder (`.git`, and jj's `.jj`, whose every command writes there: HI-2800).
+      if (inMetadataDir(rel)) return
       // An install writes thousands of files there; the tree shows the folder itself.
       if (rel.startsWith('node_modules/') || rel.includes('/node_modules/')) return
       entry.dirs.add(rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')

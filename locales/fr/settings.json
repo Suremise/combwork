@@ -558,7 +558,9 @@
   "settings.advanced.cw.prompt.clearDraft.desc": "Avant que Combwork tape un prompt ou Compacter dans la CLI d’un agent, il appuie sur Ctrl+U, qui efface ce qui se trouve dans la zone de saisie de la CLI, et il appuie de nouveau dessus pour retirer un prompt qu’il a interrompu en cours de route. Désactivé, Combwork n’appuie jamais dessus : le texte resté dans la zone de saisie de la CLI reste devant ce que Combwork tape et est envoyé avec, un prompt interrompu en cours de route reste dans la zone de saisie, et Compacter peut échouer à cause d’un brouillon. Changer le mode de Codex efface toujours d’abord sa zone de saisie, comme son menu l’exige.",
   "settings.advanced.cw.prompt.clearDraft.title": "Effacer le brouillon de la CLI avant que Combwork tape",
   "settings.advanced.cw.prompt.rawCardStart.desc": "Quand une carte est démarrée sur un agent, Combwork la lui donne enveloppée dans ses propres mots : quelle carte c’est sur le tableau, de quoi elle dépend et quels documents lire d’abord, et quelle compétence suivre. Activé, l’agent ne reçoit que le titre et la description de la carte, et ce que tu as écrit en la démarrant. Les autres prompts de Combwork (ses réveils et messages) restent tels quels : c’est ainsi que Combwork et ses agents se parlent.",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "Quand une carte est démarrée sur un agent, Combwork lui donne la carte entière, ses décisions et chaque commentaire compris, si tout tient dans ce nombre de caractères, pour que l’agent n’ait pas à la relire avant de commencer. Une carte plus longue reçoit son titre, sa description et le dernier retour, et l’agent lit le reste. 0 ne donne jamais la carte entière.",
   "settings.advanced.cw.prompt.rawCardStart.title": "Le démarrage d’une carte dans ses propres mots",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "Une carte entière à son démarrage, jusqu’à",
   "settings.advanced.cw.queue.checkMinutes.desc": "Combien de temps la file de fusion laisse tourner une vérification de fusion ou une installation avant de l’arrêter. Une vérification arrêtée ainsi est un échec de l’environnement, pas du travail : la carte revient marquée comme telle, et son auteur peut renvoyer la même révision dans la file. Augmente cette durée quand les vérifications d’un projet prennent vraiment plus longtemps ; trop longue, une vérification bloquée retient la file aussi longtemps.",
   "settings.advanced.cw.queue.checkMinutes.title": "File de fusion : durée maximale d’une vérification de fusion",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "Demander à chaque fois",
@@ -593,6 +595,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "Reprise après un redémarrage : prêt en",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "Combien de temps l’agent de code d’un agent peut attendre de relancer sa requête au modèle (limite de débit, ou service injoignable) dans un tour avant que Combwork prévienne l’Assistant, une fois par tour. 0 : jamais.",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "Attente de nouvel essai : prévenir l’Assistant après",
+  "settings.advanced.cw.sessions.signFailFast.desc": "Quand un dépôt signe ses commits, le commit d’un agent avec gpg ou ssh-keygen de Git for Windows, gpg de GnuPG ou ssh-keygen de Windows est signé sans personne, ou échoue aussitôt en disant pourquoi à l’agent, au lieu d’attendre une phrase secrète que personne ne peut saisir. La signature reste active, et tes réglages git et gpg ne sont jamais modifiés : les sessions reçoivent un signataire de Combwork dans leur environnement seulement. Les autres signataires fonctionnent comme avant. Désactivé, les sessions utilisent le signataire de git, comme avant.",
+  "settings.advanced.cw.sessions.signFailFast.title": "Les commits signés des agents n’attendent jamais de phrase secrète",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "Combien de temps le commit signé d’un agent laisse tourner gpg ou ssh-keygen avant que Combwork l’arrête et que le commit échoue. Assez pour une clé matérielle que tu touches ; un signataire qui tourne encore à ce moment attend quelqu’un.",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "Signataire des agents : abandonner après",
   "settings.advanced.cw.sessions.terminalType.desc": "Combwork démarre chaque session avec TERM=xterm-256color, comme son terminal l’est, et sans le WT_SESSION de Windows Terminal, pour que les CLI dessinent pareil que Combwork ait été ouvert depuis le menu Démarrer ou depuis un terminal (Claude Code dessine ❯ au lieu de >). Un TERM de ton propre environnement ou de celui de la session est gardé. Désactivé, les sessions reçoivent l’environnement avec lequel Combwork a été ouvert.",
   "settings.advanced.cw.sessions.terminalType.title": "Les sessions annoncent leur terminal comme xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "Afficher Aide → Console de développement (Ctrl+Alt+J) : ce que chaque CLI envoie à Combwork, à côté de ce que Combwork en a compris.",
@@ -1630,5 +1636,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Le temps dont dispose le serveur privé d’un agent OpenCode pour répondre avant que le lancement abandonne et l’arrête. Trop court, un agent sur un PC lent ne démarre pas.",
   "settings.advanced.opencode.server.readySeconds.title": "Serveur : délai de démarrage",
   "settings.advanced.opencode.version.desc": "Ce qu’affiche opencode --version : la version est son premier groupe. Combwork n’utilise qu’OpenCode 2 ou plus récent. Faux, OpenCode n’est pas trouvé.",
-  "settings.advanced.opencode.version.title": "La version dans opencode --version"
+  "settings.advanced.opencode.version.title": "La version dans opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "La carte d’activité envoie un point le long d’un rayon jusqu’à sa station pour chaque appel d’outil d’un agent, et le ramène quand il se termine. Comme Windows le dit suit le paramètre Windows Afficher les animations ; Activé les déplace toujours ; Désactivé allume seulement la station.",
+  "settings.advanced.cw.activity.mapMotion.off": "Désactivé",
+  "settings.advanced.cw.activity.mapMotion.on": "Activé",
+  "settings.advanced.cw.activity.mapMotion.system": "Comme Windows le dit",
+  "settings.advanced.cw.activity.mapMotion.title": "Impulsions animées de la carte d’activité"
 }

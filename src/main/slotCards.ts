@@ -24,7 +24,7 @@
 
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { projectAgents } from '../shared/defaults'
-import { taskPrompt } from '../shared/tasks'
+import { cardStartPrompt, type StartTaskMeta } from './cardStartPrompt'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import { SLOT_DIRTY_GATE, type Fact, type FactData, type StartedData, type StageId } from '../shared/workflow/facts'
@@ -45,32 +45,35 @@ import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
 import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
-import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
+import { laneRunsWith, lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
-import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
-import { slotWorkspaces } from './platform/workspacePorts'
+import type { HeldWork, WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
+import { shellLine } from '../shared/workflow/queue'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
-import { holder, poolFor, setSlotFreed } from './slotsApp'
+import { holder, laneEndHeldNow, poolFor, poolIfMade, setSlotFreed } from './slotsApp'
 import { brokerWorkingIn } from './agentProcesses'
-import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
+import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type LeaseRequest, type PrepareResult, type RecoverOutcome, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
-import { withoutWriteFence, type CardRecord } from './workflow/factStore'
+import { leaseHoldsIn, withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
-import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
+import { agentRunsGoing, setJjCards, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
+import { jjCardsFor } from './jjCards'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
 import { briefOf } from './laneBriefs'
+import { asCardCounts } from './workflow/containment'
 
 const log = createLogger('slots')
 
@@ -118,6 +121,8 @@ interface Cycle {
   seq: number
   started: StartedData & { lease: string; slot: string }
   prepared: FactData['SlotPrepared'] | null
+  /** Its preparation's failure under its lease (HI-2913), with no `SlotPrepared` after it; null otherwise. */
+  prepareFailed: FactData['SlotPrepareFailed'] | null
   claimed: (FactData['PlacementClaimed'] & { seq: number }) | null
   placed: boolean
   deleted: boolean
@@ -136,9 +141,12 @@ export function cycleIn(facts: readonly Fact[]): Cycle | null {
   if (at < 0) return null
   const started = facts[at].data as StartedData
   if (!started.lease || !started.slot) return null
-  const c: Cycle = { seq: facts[at].seq, started: started as Cycle['started'], prepared: null, claimed: null, placed: false, deleted: false, deleting: null }
+  const c: Cycle = { seq: facts[at].seq, started: started as Cycle['started'], prepared: null, prepareFailed: null, claimed: null, placed: false, deleted: false, deleting: null }
   for (const f of facts.slice(at + 1)) {
-    if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) c.prepared = f.data as FactData['SlotPrepared']
+    if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) {
+      c.prepared = f.data as FactData['SlotPrepared']
+      c.prepareFailed = null
+    } else if (f.kind === 'SlotPrepareFailed' && (f.data as FactData['SlotPrepareFailed']).lease === started.lease && !c.prepared) c.prepareFailed = f.data as FactData['SlotPrepareFailed']
     else if (f.kind === 'PlacementClaimed' && (f.data as FactData['PlacementClaimed']).lease === started.lease) c.claimed = { ...(f.data as FactData['PlacementClaimed']), seq: f.seq }
     else if (f.kind === 'BuilderPlaced' && (f.data as FactData['BuilderPlaced']).lease === started.lease) c.placed = true
     // Repair's move and a line's rename, as the card's state follows them (facts.ts, #1343, #1305; HI-1791: a preparation
@@ -205,9 +213,15 @@ function current(wf: Workflow, n: number, seq: number, lease: string): { card: C
  * the builder a reviewer (a carried slot, #1441, extends this). However it got its slot, a real start records its
  * target on it then, by the lease chosen (startServes).
  */
-export async function leaseForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
+export async function leaseForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }): Promise<SlotForStart> {
   const r = await slotForStart(ws, projectPath, card, builder, o)
   if (o.dry || !r || !('lease' in r)) return r
+  // HI-3129: a kept slot's target was resolved from its binding: read again before the target goes on its row. Changed
+  // or unreadable since: its lease given back as not started, its row as it was, and the start waits (it resolves again).
+  if (o.kept && r.slot === o.kept.slot && !(await (await poolFor(ws, projectPath)).keptBindingStill(o.kept.slot, card.id, o.kept.generation, o.kept.target))) {
+    await slotUnused(ws, projectPath, r.lease)
+    return { wait: say(T.keptMoved, { slot: o.kept.slot }) }
+  }
   const lost = await startServes(ws, projectPath, r.lease, builder, o.target)
   return lost ? { wait: lost } : r
 }
@@ -220,11 +234,13 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  */
 /** A card's slot's agent text (dialects, HI-2447): a start's waits, and why a builder isn't placed in its slot yet. */
 const T = {
+  keptMoved: agentMsg({ id: 'slot.start.keptMoved', text: "{slot}'s kept work changed while the start took it: the start tries again", note: "HI-3129: a start's wait: the kept slot's binding (the bookmark its work is on) changed, or couldn't be read, between the start resolving its target and recording it on the slot." }),
   leaseEnded: agentMsg({ id: 'slot.start.leaseEnded', text: "its slot's lease {lease} ended while the start took it: the start tries again", note: "A start's wait: the slot's lease ended between taking it and recording its target." }),
   ownSlotWaits: agentMsg({ id: 'slot.start.ownSlotWaits', text: "{agent}'s own slot {slot}, its run still there, {because}: this start waits for it rather than take a second slot", note: "A start's wait (HI-1762): the builder's own run still writes in a slot that can't be taken over now. {because} is one of slot.takeover.*." }),
   changed: agentMsg({ id: 'slot.takeover.changed', text: 'changed while it was taken over', note: 'As slot.takeover.gone: the slot changed while the start took it over, twice.' }),
   notReady: agentMsg({ id: 'slot.place.notReady', text: "Combwork couldn't get {slot} ready: {error}", note: "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default." }),
   notReadyFor: agentMsg({ id: 'slot.place.notReadyFor', text: "Combwork couldn't get {slot} ready for {card}: {error}", note: "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default." }),
+  held: agentMsg({ id: 'slot.place.held', text: "{card} waits for {slot}: {kind, select, notIntegrated {the last card's work isn't in {target} yet. Integrate it there; your own Done on exactly that card's cycle also counts.} cantInspect {Combwork can't read what it holds ({why}). It tries again; nothing there was changed.} other {it holds {hasCommits, select, yes {commits over the last card's work that are neither in {target} nor among the last card's own: {ids}{more, plural, =0 {} other { and # more (see them all with jj log -r {selectArg})}}{hasEdits, select, yes {, and edits in its working copy, recorded as {at}} other {}}} other {edits in its working copy over the last card's work, recorded as {at}}}. Set them aside so Combwork can prepare {slot}: jj new {base} keeps them where they are. Once {card} is prepared, bring what belongs to it under its working copy: jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes { (or squash the edits in: jj squash --from {at} --into ''@'')} other {}}; leave out what doesn't, or jj abandon it.}}{stopped, select, yes { {builder} was stopped so Combwork could read {slot}: resume it from its pane (Resume) to deal with this; {card} is prepared once {slot} is clear.} other {}}", note: "HI-3115: the builder's wake (and the card's notice, kept in the Default) when its jj slot can't be prepared yet for what it holds; service.slots.held's English, with the same values. Said once per cycle and reason." }),
   cantResume: agentMsg({ id: 'slot.place.cantResume', text: "Combwork can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).", note: "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default." }),
   resumeEnded: agentMsg({ id: 'slot.place.resumeEnded', text: "its conversation in {slot} didn't resume ({tries} tries): {why}", note: "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default." }),
   resumeFailed: agentMsg({ id: 'slot.place.resumeFailed', text: "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.", note: "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default." }),
@@ -254,28 +270,41 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   if (!agent || !takesCards(agentWorkflowRole(agent))) return null
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   const pool = await poolFor(ws, projectPath)
-  const lane = card.lane ?? null
+  // Its lane's slot only when that lane's builder starts it (HI-3117): a lane card given to another agent is that agent's
+  // work (HI-1821), started in a slot of its own, never refused for the lane's lease nor lent one on the lane's behalf.
+  const lane = card.lane && laneRunsWith(ws, card.lane, 'builder', builder) ? card.lane : null
+  // A slot kept for this card (HI-2995: put back with its committed work), read once to choose where it goes; each
+  // placement's own write is the authority (HI-3032): the card is placed only there, by any of the ways below.
+  const kept = pool.keptSlotFor(card.id)
+  const req = lane ? { lane, agent: builder, startsCard: card.id } : { card: card.id, agent: builder }
   const held = lane ? pool.leaseOf({ lane }) : pool.leaseOf({ card: card.id })
   if (held && held.agent === builder) {
+    // Its lane already works in another slot: the card isn't started there without its work.
+    if (kept && held.slot !== kept.name) return { wait: pool.keptElsewhere(kept.name, 'lane', held.slot) }
     const at = leaseAt(pool, held)
     if (at) return at
   }
   if (held) return { wait: refusalText({ why: 'inUse', slot: held.slot, agent: held.agent, card: held.card, lane: held.lane }, name) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
   // The builder's own slot (#1441: its carried lease, kept for nothing now) taken over when it can be; else the card gets
-  // another slot, and the carried one stays protected.
-  const own = await carriedToHand(ws, projectPath, pool, builder, o.target)
+  // another slot, and the carried one stays protected. Never for a card with a kept slot (never the carried one).
+  const own = kept ? null : await carriedToHand(ws, projectPath, pool, builder, o.target)
   if (own) {
     if (o.dry) return { slot: own.slot.name, folder: own.slot.folder, lease: '', fresh: false }
-    const handed = await handOffCarried(ws, projectPath, pool, own, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder))
+    const handed = await handOffCarried(ws, projectPath, pool, own, req, name(builder))
     if (handed) return leaseAt(pool, handed)
   }
   // The slot its own run still writes in, its lease ended (HI-1762): taken over too, or waited for, never a second slot.
-  const written = await startOnWritten(ws, projectPath, pool, builder, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder), o.dry)
+  // With a kept slot elsewhere: waited for, then the kept slot lent.
+  const written = await startOnWritten(ws, projectPath, pool, builder, req, name(builder), o.dry, kept?.name)
   if ('wait' in written) return { wait: written.wait }
   if ('dry' in written) return { slot: written.dry.name, folder: written.dry.folder, lease: '', fresh: false }
   if ('lease' in written) return leaseAt(pool, written.lease)
-  if (o.dry) return couldLend(pool, projectPath, builder)
-  const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
+  if (o.dry) {
+    const preview = await pool.keptPreview(card.id)
+    if (preview) return 'wait' in preview ? preview : { slot: preview.slot.name, folder: preview.slot.folder, lease: '', fresh: false }
+    return couldLend(pool, projectPath, builder)
+  }
+  const r = await pool.lend(req, { ...(o.target ? { target: o.target } : {}), install: false })
   // A lane's start refused for its slot held (HI-2468): what holds it kept for the lane's status; any other end forgets it.
   if (lane) {
     const busy = !r.ok && r.refusal.why === 'busy' ? r.refusal : null
@@ -476,7 +505,7 @@ function pruneLaneHolds(): void {
 /** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
 export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
   const h = laneHolds.get(laneHoldKey(wsPath, lane))
-  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
+  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.card !== undefined ? { card: h.card } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
 }
 
 /**
@@ -605,6 +634,8 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
  * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
  */
 async function leavable(projectPath: string, folder: string, target: string | null): Promise<Checkout | null> {
+  // A non-colocated jj slot (HI-2896): Git can't read it: kept.
+  if (await gitCantRead(folder)) return null
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return null
   const checkout = port().checkout(folder)
@@ -625,7 +656,7 @@ function sameCheckout(folder: string, was: Checkout): boolean {
  * conversation goes on there. Null when it couldn't be (the slot or lease changed meanwhile): the caller lends another.
  * In the write, the slot is still the one decided on (its folder and making) with the same checkout (HI-1741).
  */
-async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string): Promise<SlotLease | null> {
   const host = (await ws.sessionScope(projectPath)).scope
   const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   const still = (s: Slot): boolean => samePlace(s.folder, own.slot.folder) && s.createdAt === own.slot.createdAt && (!own.checkout || sameCheckout(s.folder, own.checkout))
@@ -665,11 +696,13 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
  * it changed while it was taken; looked at again once): the start waits for it, never lent a second slot meanwhile. A
  * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
-async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
+async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string, dry = false, kept?: string): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
   const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: say(T.ownSlotWaits, { agent: agentName, slot: s.name, because }) })
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
     if (!slot) return { none: true }
+    // The card has a slot kept for it (HI-3032): its builder's run elsewhere is waited for, never taken over for it.
+    if (kept && slot.name !== kept) return { wait: pool.keptElsewhere(kept, 'written', slot.name, agentName) }
     // The takeover's own conditions, read (HI-1787): a dry start never advertises what the real one would refuse.
     const busy = await pool.writtenNotTakeable(slot.name, builder, slot.writer!.run)
     if (busy) return waitFor(slot, busy)
@@ -681,7 +714,7 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
   return still ? waitFor(still, say(T.changed)) : { none: true }
 }
 
-async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, agentName: string): Promise<SlotLease | null> {
   const slot = writtenSlotOf(projectPath, pool, builder)
   const run = slot?.writer?.run
   if (!slot || !run) return null
@@ -699,6 +732,8 @@ async function takeWritten(ws: WorkspaceService, projectPath: string, pool: Slot
 
 /** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
 async function cleanAndContained(projectPath: string, folder: string, target: string | null): Promise<boolean> {
+  // A non-colocated jj slot (HI-2896): Git can't read it (none there, or a repository above it): not taken over.
+  if (await gitCantRead(folder)) return false
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return false
   const head = await port().head(folder)
@@ -749,10 +784,59 @@ function uses(wf: Workflow, l: SlotLease): boolean {
   return s.started?.lease === l.id && KEEPS.has(s.stage)
 }
 
+/**
+ * HI-3118: whether a card's started lease still holds its slot for it (factStore's leaseHoldsIn, on the board's database
+ * the pool's leases are in); null when it can't be read. The submit's own question, through SlotStarts.held.
+ */
+function slotHeldFor(ws: WorkspaceService, _project: string, lease: string, slot: string, folder: string, card: number): boolean | null {
+  try {
+    return boardRead(ws, (db) => leaseHoldsIn(db, lease, slot, folder, card))
+  } catch {
+    return null
+  }
+}
+
+/** Lane leases whose ambiguous end (HI-3118) was logged once already. */
+const ambiguousSaid = new Set<string>()
+
+/**
+ * Whether a lane is over, and its cards whose current cycle runs on its lease (HI-3118), read in the lease's release
+ * write: the lane's row (none: gone, so over), and every card started on that lease whose cycle keeps it now (its Started
+ * cycle's lease that one, its stage one that keeps a slot), whoever it is given to now. Null when it can't be read.
+ */
+export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: string): { over: boolean; cards: number[] } | null {
+  try {
+    const row = db.prepare('SELECT state FROM lanes WHERE id = ?').get(lane) as { state: string } | undefined // i18n-ignore: SQL
+    if (row?.state === 'active') return { over: false, cards: [] }
+    const kind = 'Started' as const // i18n-ignore: a fact kind, not text
+    const started = new Set(wf.store.factsOfKind(kind).filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
+    const cards: number[] = []
+    for (const n of started) {
+      // Read for real, never cardOf (which takes any failure for "no card"): a card that can't be read keeps the lease
+      // (HR2's round 1: an unreadable live card released its slot). Only a card the board has no row of is absent.
+      let card: ReturnType<Workflow['store']['card']>
+      try {
+        card = wf.store.card(n)
+      } catch (e) {
+        if (!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n)) continue // i18n-ignore: SQL
+        throw e
+      }
+      const s = wf.state(card)
+      if (s.started?.lease === lease && KEEPS.has(s.stage)) cards.push(n)
+    }
+    return { over: true, cards }
+  } catch (e) {
+    log.warn(`lane ${lane}'s end couldn't read its cards on ${lease}: ${userText(e instanceof Error ? e.message : String(e))}`)
+    return null
+  }
+}
+
 // --- The window's Start hands its prompt to the placement.
 
 /** Window Starts handing their card's prompt to the slot's placement (startTask), by project and card. */
-const offered = new Map<string, { prompt: string | null; ready: Promise<void> }>()
+const offered = new Map<string, { prompt: StartPrompt | null; ready: Promise<void> }>()
+/** A Start's prompt and what its delivery records (HI-2854: cardStartPrompt's meta). */
+type StartPrompt = { text: string; meta: StartTaskMeta }
 const offerKey = (projectPath: string, n: number): string => `${projectPath.toLowerCase()}#${n}`
 
 /**
@@ -760,11 +844,11 @@ const offerKey = (projectPath: string, n: number): string => `${projectPath.toLo
  * Read first) is given to the slot's placement rather than typed where the agent is now. Call before the card moves;
  * the returned function gives the prompt, or null when the Start didn't go through (the card's own prompt is used then).
  */
-export function expectStartPrompt(projectPath: string, n: number): (prompt: string | null) => void {
+export function expectStartPrompt(projectPath: string, n: number): (prompt: StartPrompt | null) => void {
   const key = offerKey(projectPath, n)
   let given = false
   let res!: () => void
-  const entry = { prompt: null as string | null, ready: new Promise<void>((r) => (res = r)) }
+  const entry = { prompt: null as StartPrompt | null, ready: new Promise<void>((r) => (res = r)) }
   offered.set(key, entry)
   return (p) => {
     if (given) return
@@ -953,7 +1037,7 @@ export async function finishedSlots(ws: WorkspaceService, projectPath: string, w
     }
     for (const n of cards) {
       if (ended(ws)) return detached
-      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane, () => !ended(ws))) || detached
+      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane, () => !ended(ws), (line) => pool.lineIsKey(line))) || detached
     }
     // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
     const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
@@ -1008,12 +1092,16 @@ export interface FinishedSlotView {
  * lease's now, or on another line, its question closes; dirty, asked once; clean, an open lease's slot detached at the
  * card's target's head (a released one is the pool's), its question closed.
  */
-export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true): Promise<boolean> {
+export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true, keyed: (line: string) => boolean = () => false): Promise<boolean> {
   const card = cardOf(wf, n)
   const s = card ? wf.state(card) : null
   if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
   const finish = s.finished.seq
   const line = s.started.line
+  // A jj card's slot (HI-2866) is put back on its target by the pool's own settle, an owned write under the slot's
+  // operation (SlotPool.detach); this path holds no such operation, so it never asks Git about a jj slot or acts on one.
+  // `keyed`: whether the line is the pool's port's preparation key (HI-3165, SlotPool.lineIsKey).
+  if (keyed(line)) return false
   // The finish this was for, still the card's: Done in that finish, on that lease and line.
   const own = (): boolean => {
     if (!alive()) return false
@@ -1128,12 +1216,17 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
       if (await pool.release(l.id, stage === 'done' ? 'done' : 'putBack', () => !uses(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${stage ?? 'gone'})`)
     } else if (l.kind === 'lane' && l.lane) {
       const lane = lanes.get(l.lane)
-      const over = (): boolean => {
-        const now = lanes.get(l.lane!)
-        return !now || now.state !== 'active'
+      if (lane && lane.state === 'active') continue
+      // HI-3118: decided in the release's own write, from the lane's row and the cards' cycles there: a card of it still
+      // in flight on this lease keeps the slot (the lease becomes its own), else the lease ends.
+      const r = await pool.releaseLane(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', (db, id) => laneOverIn(db, wf, id, l.id))
+      if (!r) continue
+      if ('ended' in r) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
+      else if ('card' in r) log.info(`Lane ${l.lane} ended with #${r.card.card} in flight: its lease ${l.id} on ${userText(l.slot)} is that card's now`)
+      else if (!ambiguousSaid.has(l.id)) {
+        ambiguousSaid.add(l.id)
+        log.warn(`Lane ${l.lane} ended with ${r.ambiguous.map((n) => `#${n}`).join(', ')} all started on its lease ${l.id} on ${userText(l.slot)}: the slot stays protected until one of them leaves it`)
       }
-      if (!over()) continue
-      if (await pool.release(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', over)) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
     } else if (l.kind === 'carried') {
       // An adopted worktree (#1441) kept for the lane or card in flight at the upgrade: released once that has ended (its
       // lane over, its card Done or put back). One kept for nothing stays (a handoff, or the user, ends it).
@@ -1211,7 +1304,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
 
 /** A cycle's preparation and placement, one at a time each. */
 async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
-  const key = `${projectPath.toLowerCase()}#${n}#${cycle.seq}`
+  const key = cycleKey(projectPath, n, cycle.seq)
   if (ensuring.has(key) || failed.has(key)) return
   ensuring.add(key)
   // Its builder is starting while the cycle is prepared and placed (HI-1976): its Start's hold taken over, so the card
@@ -1247,6 +1340,136 @@ async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, p
   }
 }
 
+/** The key a cycle's preparation and placement go by here (`ensuring`, `failed`). */
+const cycleKey = (projectPath: string, n: number, seq: number): string => `${projectPath.toLowerCase()}#${n}#${seq}`
+
+/**
+ * The card whose current cycle in lease `l` failed its preparation (HI-2913): its number and cycle, while the rules are
+ * on, the card active, its cycle started under `l`, with a `SlotPrepareFailed` for `l` and no `SlotPrepared` after it.
+ * Null otherwise (none, a preparation still owed, or one made).
+ */
+function failedCycleOf(wf: Workflow, l: SlotLease, laneCards: readonly number[]): { n: number; seq: number } | null {
+  if (!workflowEnforced()) return null
+  const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' ? laneCards : []
+  for (const n of cards) {
+    const card = cardOf(wf, n)
+    const c = card ? cycleIn(wf.store.facts(n)) : null
+    if (card && c && c.started.lease === l.id && wf.state(card).stage === 'active' && c.prepareFailed && !c.prepared) return { n, seq: c.seq }
+  }
+  return null
+}
+
+/**
+ * The user's Recover… of a stale jj slot a lease still holds (HI-2913, SPEC §16.10.1): let through only while that
+ * lease's card's cycle there failed its preparation (`failedCycleOf`), checked again after the pool's claim and before each
+ * of the recovery's writes (the same card, cycle and lease, still failed and not prepared). `preparing` when its cycle's
+ * preparation is still owed, `busy` when it was made or nothing failed there. After a recovery only, that cycle's failed
+ * try is forgotten here and a pass prepares it again; a refused or cut-short recovery leaves both as they were.
+ */
+export async function recoverHeldSlot(ws: WorkspaceService, projectPath: string, pool: SlotPool, name: string, l: SlotLease, run: Parameters<SlotPool['recoverStale']>[1]): Promise<RecoverOutcome> {
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+  const laneCards = async (): Promise<number[]> => (l.kind === 'lane' && l.lane ? ((await rawLanes(ws)).find((x) => x.id === l.lane)?.cards ?? []) : [])
+  const admitted = failedCycleOf(wf, l, await laneCards())
+  if (!admitted) {
+    const owed = (await laneCards()).concat(l.kind === 'card' && l.card !== null ? [l.card] : []).some((n) => {
+      const c = cardOf(wf, n) ? cycleIn(wf.store.facts(n)) : null
+      return !!c && c.started.lease === l.id && !c.prepared
+    })
+    return { ok: false, why: owed ? 'preparing' : 'busy' } // i18n-ignore: protocol codes
+  }
+  // Read afresh (the workspace's runtime, the lane's cards), slowly; then answered from them synchronously, from the
+  // card's stored facts as they are at that moment (the pool asks it inside its final proof's transaction).
+  let latest = { wf, cards: await laneCards() }
+  const now = (): boolean => {
+    const again = failedCycleOf(latest.wf, l, latest.cards)
+    return !!again && again.n === admitted.n && again.seq === admitted.seq
+  }
+  const refresh = async (): Promise<boolean> => {
+    latest = { wf: (await workflowFor(ws, projectPath).catch(() => null)) ?? latest.wf, cards: await laneCards() }
+    return now()
+  }
+  const r = await pool.recoverStale(name, run, { lease: l.id, refresh, now })
+  if (r.ok) {
+    failed.delete(cycleKey(projectPath, admitted.n, admitted.seq))
+    attempts.delete(cycleKey(projectPath, admitted.n, admitted.seq))
+    log.info(`Slot ${userText(name)} recovered for #${admitted.n}: its preparation is tried again`)
+    void settleSlotCards(ws, projectPath)
+  }
+  return r
+}
+
+/**
+ * A jj lane's builder out of its slot before the slot is prepared for its next card (HI-2913, SPEC §16.10.1): jj's record
+ * needs no session in the folder (J9a), and a lane's builder stays there between cards. Run under the folder's fence
+ * (`changingFolder`: nothing typed into it and nothing started there meanwhile). Only the builder's own run, in the slot,
+ * quiet, not resuming, with no input held and nothing owed to it (laneEndHeldNow), is ended with its CLI's exit command,
+ * fenced to that run in that folder and to the cycle at every key (sessions.quit, never a Stop of the user's: its
+ * conversation is resumed with the card by placement); then its run's end is waited for. 'free': no run of the builder's in
+ * the slot (another session there makes the record wait); 'wait': not now; 'gone': the cycle moved on.
+ */
+export async function freeSlotOfBuilder(projectPath: string, builder: string, folder: string, gone: () => boolean): Promise<'free' | 'wait' | 'gone'> {
+  if (gone()) return 'gone'
+  const now = sessions.runNow(projectPath, builder)
+  const st = sessions.liveFor(projectPath, builder)
+  if (!now) return 'free'
+  if (now.starting || !st) return 'wait'
+  if (!st.cwd || !containsPlace(folder, st.cwd)) return 'free'
+  if (!quiet(projectPath, builder) || isResuming(projectPath, builder) || now.run !== st.runId) return 'wait'
+  const run = now.run
+  const fenced = (): boolean => {
+    if (gone() || isResuming(projectPath, builder)) return false
+    const r = sessions.runNow(projectPath, builder)
+    const cwd = sessions.liveFor(projectPath, builder)?.cwd
+    return !!r && !r.starting && r.run === run && !!cwd && containsPlace(folder, cwd)
+  }
+  const out = await sessions.quit(projectPath, builder, run, { fenced, why: 'its slot is prepared for the next jj card of its lane', ready: () => (quiet(projectPath, builder) ? laneEndHeldNow(projectPath, builder, run) : 'it is busy'), cause: 'lane' }) // i18n-ignore: why, for the log
+  if (out !== 'sent') return gone() ? 'gone' : 'wait'
+  log.info(`${userText(builder)} ended in ${userText(folder)} so its slot can be prepared for the next jj card; placement resumes its conversation`)
+  return (await until(projectPath, builder, () => sessions.runNow(projectPath, builder)?.run !== run, gone)) ? 'free' : 'gone'
+}
+
+
+/** HI-3115: ids a hold notice lists, at most; the rest counted, and all of them selectable with its frozen revset. */
+const HELD_IDS = 20
+
+/**
+ * HI-3115 (decision B, design s42): a jj slot's hold, said on the card (the window's words) and to its builder (English):
+ * what holds it, from the port's frozen evidence (full ids, never `@` or a bookmark but as a destination), how to set it
+ * aside and bring what belongs to the card back once prepared; whether its builder was stopped to read it (resume it).
+ */
+export function heldTold(work: HeldWork | null, reason: string, slot: string, card: string, builder: string, stopped: boolean): { english: string; shown: ReturnType<typeof workflowText> } {
+  const kind = work?.why ?? 'cantInspect'
+  const commits = work?.commits ?? []
+  const edits = work?.edits ?? null
+  // The selection: under HELD_IDS ids, the ids themselves; else the frozen revset, which selects the same.
+  const all = [...commits, ...(edits ? [edits] : [])]
+  const select = all.length && all.length < HELD_IDS ? all.join('|') : (work?.select ?? '')
+  const values = {
+    card,
+    slot,
+    kind,
+    target: work?.target ?? '',
+    why: reason,
+    hasCommits: commits.length ? 'yes' : 'no',
+    ids: commits.slice(0, HELD_IDS).join(' '),
+    more: Math.max(0, commits.length - HELD_IDS),
+    hasEdits: edits ? 'yes' : 'no',
+    at: edits ?? '',
+    base: work?.base ?? '',
+    selectArg: shellLine([select]),
+    stopped: stopped ? 'yes' : 'no',
+    builder
+  }
+  return { english: inDefaultDialect(() => say(T.held, values)), shown: workflowText(SLOT_NOTICES.held, values) }
+}
+
+/** An agent's name in its project now (null: not there). */
+async function agentNameOf(ws: WorkspaceService, projectPath: string, id: string): Promise<string | null> {
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  return cfg ? (projectAgents(cfg).find((a) => a.id === id)?.name ?? null) : null
+}
+
 /** Failed tries of a cycle's preparation or placement before its card is stalled with the failure (HI-1976). */
 const START_FAIL_TRIES = 3
 
@@ -1257,28 +1480,52 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
   const st = cycle.started
   const builder = l.agent
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id) || !!pool.lease(l.id)?.to
+  // HI-3010: the card's line first made in place, whatever its builder is doing, where that changes no file (a Git slot
+  // detached at the card's base, as a lane's slot waits between cards): a builder told of the card another way (a wake,
+  // a message) and already at work commits on its line, never on a detached head this preparation would leave behind
+  // once the card moved on. Its answer is taken as any other's; a retry (what is left: files, install, a switch) waits
+  // for its builder below, as before.
+  const keyed = pool.lineIsKey(st.line)
+  let inPlace = !keyed
   for (;;) {
-    if (!(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
+    if (!inPlace && !(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
+    const tried = inPlace
+    inPlace = false
     wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
     const card = current(wf, n, cycle.seq, l.id)
     if (!card) return null
     const install = wf.rulesetOf(card.card, wf.state(card.card)).options.slotsUpToDate
-    const r = await changingFolder(st.folder, 'preparing a slot', () => // i18n-ignore: what fences the folder, for the log
-      pool.prepare(l.id, {
+    const r = await changingFolder(st.folder, 'preparing a slot', async (): Promise<PrepareResult> => { // i18n-ignore: what fences the folder, for the log
+      // A jj card's (HI-2913): its builder's idle run out of the slot first, under this same fence, so jj's record finds
+      // the folder quiet; not now, the fence lifted and looked at again.
+      if (keyed) {
+        // HI-3115 (decision B): committed work over the last card's there, read without recording the folder: held with its
+        // builder still running, so the wake reaches it; edits are found by the preparation's own record, after its run ends.
+        const early = await pool.heldEarly(l.id, st.line!, st.base!)
+        if (early) return { retry: 'its slot holds work over the last card', held: early.code, heldWork: early.work } // i18n-ignore: why a preparation waits, for the log
+        const free = await freeSlotOfBuilder(projectPath, builder, st.folder, gone)
+        if (free !== 'free') return { retry: free === 'gone' ? 'the card moved on' : 'its builder is still in the slot' } // i18n-ignore: why a preparation waits, for the log
+      }
+      return pool.prepare(l.id, {
         line: st.line!,
         base: st.base!,
         install,
-        // At the boundary: the card still this cycle's, the rules on, its builder quiet.
+        ...(st.target ? { target: st.target } : {}),
+        // At the boundary: the card still this cycle's, the rules on, its builder quiet (in place: the first two only).
         ready: async () => (gone() ? 'the card moved on, or the rules are off' : quiet(projectPath, builder) ? null : 'its builder is busy'), // i18n-ignore: why a preparation waits, for the log
-        around: (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
+        ...(tried ? { inPlace: async () => (gone() ? 'the card moved on, or the rules are off' : null) } : {}), // i18n-ignore: why a preparation waits, for the log
+        // A jj card's preparation takes its store's lock itself, rechecking its fence and the folder's quiet inside it
+        // (HI-2866: the lock isn't re-entrant, and a non-colocated project folder has no Git of its own to lock).
+        around: pool.preparesUnderOwnLock(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
       })
-    )
+    })
     if ('ok' in r) {
       await crashAt('inPrepare')
       const fact: FactData['SlotPrepared'] = { lease: l.id, line: st.line!, revision: r.revision }
       await wf.write(card.card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
-        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
+        if (!(now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared)) return
+        w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
       })
       // A line the slot was on before (the lane's last card's) may go now that nothing has it out.
       void settleSlotCards(ws, projectPath)
@@ -1290,6 +1537,10 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       startEnded(projectPath, builder, `#${n}`, { failed: inDefaultDialect(() => say(T.notReady, { slot: st.slot, error: r.error })) })
       await wf.write(card.card, null, 'combwork', (w) => {
         const english = inDefaultDialect(() => say(T.notReadyFor, { slot: st.slot, card: card.card.key, error: r.error }))
+        // Recorded (HI-2913) only while this very cycle and lease are current and not prepared: the window then shows the
+        // card not ready there, and the user's Recover… of a stale slot is let through for it.
+        const now = cycleIn(w.tx.facts(n))
+        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepareFailed', { lease: l.id, slot: st.slot, why: r.error, stale: !!r.stale }) // i18n-ignore: a fact's kind, not text
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
@@ -1297,6 +1548,26 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       // now, as the step-by-step start would have, so it reads the wake and learns why.
       void import('./laneStart').then((m) => m.briefAfterFailedPrepare(ws, projectPath, n, builder)).catch((e) => log.warn(`#${n}'s lane brief after its slot failed`, e))
       return null
+    }
+    // Not in place: on at once to the wait for its builder.
+    if (tried) continue
+    // HI-3115 (decision B, design s42): a jj slot that can't be prepared yet for what it holds: the cycle waits (never
+    // SlotPrepareFailed), said on the card and to its builder once per cycle and reason (a SlotPrepareHeld fact, which a
+    // submit's advice reads), then looked at again: corrected, the next pass prepares, with no put-back.
+    if (r.held) {
+      const what = r.heldWork?.why ?? 'cantInspect'
+      const reason = `${what}:${r.held}`
+      const name = (await agentNameOf(ws, projectPath, st.builder)) ?? st.builder
+      const told = heldTold(r.heldWork ?? null, r.held, st.slot ?? '', card.card.key, name, !sessions.runNow(projectPath, st.builder))
+      await wf.write(card.card, null, 'combwork', (w) => {
+        const facts = w.tx.facts(n)
+        const now = cycleIn(facts)
+        if (!(now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared)) return
+        if (facts.some((f) => f.kind === 'SlotPrepareHeld' && f.seq > cycle.seq && (f.data as FactData['SlotPrepareHeld']).lease === l.id && (f.data as FactData['SlotPrepareHeld']).why === reason)) return
+        w.fact('SlotPrepareHeld', { lease: l.id, slot: st.slot ?? '', why: reason, told: told.english }) // i18n-ignore: a fact's kind, not text
+        w.action('notify', { text: told.english, shown: told.shown })
+        wf.wake(w, st.builder, told.english)
+      })
     }
     // Not now (busy, not quiet at the boundary): looked at again at the next change.
     log.info(`Slot ${userText(st.slot)} for #${n}: not yet (${userText(r.retry)})`)
@@ -1575,7 +1846,9 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         if (isPlacedHow(was)) how = was
       }
     } else {
-      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
+      // HI-2854: with the whole card when it fits, and what its delivery records (the receipt the Start's prompt was made at).
+      const start = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? (await cardStartPrompt(ws, card, agentId, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane }))
+      const cardPrompt = start.text
       // Its lane's brief as it is now (HI-1795), after the card's own prompt (the window's or offered one kept whole): in
       // every placement of the lane's cards, whatever conversation works the card. Fixed with the delivery once made.
       // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
@@ -1583,7 +1856,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
       // agent-protocol: the sender is the product's name, Combwork
-      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { ...start.meta, how } } // i18n-ignore: who a delivery is from, as agents read it
       // Its builder can't take a line now (HI-2191: its input blocked, a line of Combwork's being typed, watching, working):
       // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
       // pass wrote the lane each time, which ran the next pass: HB3's every second. Said once for each reason.
@@ -1687,7 +1960,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       if (!allowed()) return false
       const head = await port().lineHead(projectPath, line)
       if (isUnknown(head) || !head) return false
-      const inTarget = await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null })
+      const inTarget = asCardCounts(s, await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null }))
       if (isUnknown(inTarget) || !inTarget) return false
       const before = await port().list(projectPath).catch(() => null)
       if (!before || before.some((w) => w.line === line) || !allowed()) return false
@@ -1782,6 +2055,17 @@ export async function settleRenames(pool: SlotPool): Promise<void> {
 
 // --- Lanes.
 
+/** A lane's first card still to do (HI-3032: open, not archived), in its list's order; null with none. */
+function laneFirstCard(ws: WorkspaceService, cards: readonly number[]): number | null {
+  if (!cards.length) return null
+  try {
+    const open = boardRead(ws, (db) => new Set((db.prepare(`SELECT number FROM cards WHERE number IN (${cards.map(() => '?').join(', ')}) AND col <> 'done' AND archived = 0`).all(...cards) as { number: number }[]).map((r) => r.number))) // i18n-ignore: SQL
+    return cards.find((n) => open.has(n)) ?? null
+  } catch {
+    return null
+  }
+}
+
 /** A slot's folder, by its name (HI-2558: whether a lane's idle builder already works in its slot). */
 export async function slotFolderOf(ws: WorkspaceService, projectPath: string, slot: string): Promise<string> {
   return (await poolFor(ws, projectPath)).folderFor(slot)
@@ -1803,16 +2087,22 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
   const pool = await poolFor(ws, projectPath)
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
+  // Its first card still to do (HI-3032): a slot kept for it is the lane's, by the same ways a card's start places it
+  // (slotForStart), never another. The card goes with every placement's request, whatever this read found: each write
+  // decides by the kept record as it is then (one a refresh writes meanwhile included).
+  const first = laneFirstCard(ws, (await rawLanes(ws)).find((l) => l.id === lane)?.cards ?? [])
+  const kept = first !== null ? pool.keptSlotFor(first) : null
+  const req = { lane, agent: builder, ...(first !== null ? { startsCard: first } : {}) }
   // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
-  const own = await carriedToHand(ws, projectPath, pool, builder, target)
-  const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
+  const own = kept ? null : await carriedToHand(ws, projectPath, pool, builder, target)
+  const handed = own ? await handOffCarried(ws, projectPath, pool, own, req, name(builder)) : null
   if (handed) return { slot: handed.slot, lease: handed.id }
   // The slot its own run still writes in, its last lease ended (HI-1762), as a card's start does: taken, or waited for.
-  const written = await startOnWritten(ws, projectPath, pool, builder, { lane, agent: builder }, name(builder))
+  const written = await startOnWritten(ws, projectPath, pool, builder, req, name(builder), false, kept?.name)
   if ('wait' in written) return { waiting: written.wait }
   if ('lease' in written) return { slot: written.lease.slot, lease: written.lease.id }
   // Lent with the lane's target (#1627), so the slot records where its lines merge.
-  const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
+  const r = await pool.lend(req, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
@@ -1844,7 +2134,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
     if (stopped()) return
     const key = laneHoldKey(wsPath, lane)
     const was = laneHolds.get(key)
-    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.broker === h.broker && was.idle === h.idle : !was) return
+    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.card === h.card && was.broker === h.broker && was.idle === h.idle : !was) return
     if (h) {
       ownLaneHolds(ws, life)
       laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane, life })
@@ -1854,10 +2144,13 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
   const ids = new Set(waiting.map((l) => l.id))
   for (const h of [...laneHolds.values()]) if (h.ws === wsPath.toLowerCase() && h.project === project && !ids.has(h.lane)) setHold(h.lane, null)
   let held = false
+  const builderOf = new Map(waiting.map((l) => [l.id, l.builder.name]))
   try {
     await lendWaiting(ws, projectPath, pool, waiting, stopped, (lane, r) => {
       if (r?.why === 'busy') held = true
-      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : null)
+      // Its builder already building in a slot for a card (HI-3168: one agent, one slot; that card's end is a board
+      // change, which passes again): which slot and card, for its status. No retry needed.
+      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : r?.why === 'agentLeased' && r.card !== null ? { slot: r.slot, held: 'card', agent: builderOf.get(lane) ?? '', card: r.card } : null)
     })
   } finally {
     // A held slot looked at again after a pause, until it is lent or held no more; otherwise its tries forgotten.
@@ -1875,6 +2168,8 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
   for (const lane of waiting) {
     if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
+    let kept: Slot | null = null
+    let req: LeaseRequest = { lane: lane.id, agent: lane.builder.id }
     if (!lease) {
       // Its cards still to do all no-code by now (HI-2338): it takes no slot, and its agents start where they are.
       const { noCodeOnly, startWaitingLane } = await import('./laneStart')
@@ -1886,14 +2181,18 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
       }
       if (stopped()) return
       if (full) continue
+      // Its first card still to do, with a slot kept for it (HI-3032): that slot is the lane's, as in lendLaneSlot.
+      const first = laneFirstCard(ws, lane.cards)
+      kept = first !== null ? pool.keptSlotFor(first) : null
+      req = { lane: lane.id, agent: lane.builder.id, ...(first !== null ? { startsCard: first } : {}) }
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
-      const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
+      const own = kept ? null : await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return
-      lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
+      lease = own ? await handOffCarried(ws, projectPath, pool, own, req, lane.builder.name) : null
       if (stopped()) return
       // The slot its own run still writes in (HI-1762): taken, or this lane goes on waiting (never a second slot).
       if (!lease) {
-        const written = await startOnWritten(ws, projectPath, pool, lane.builder.id, { lane: lane.id, agent: lane.builder.id }, lane.builder.name)
+        const written = await startOnWritten(ws, projectPath, pool, lane.builder.id, req, lane.builder.name, false, kept?.name)
         if ('wait' in written) continue
         if ('lease' in written) lease = written.lease
       }
@@ -1910,7 +2209,7 @@ async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: Slot
         full = true
         continue
       }
-      const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
+      const r = await pool.lend(req, { install: false })
       if (!r.ok) {
         tried(lane.id, r.refusal)
         full = true
@@ -2015,7 +2314,9 @@ export function startSlotCards(): void {
   }
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
-  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn })
+  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card), keptHere: async (ws, project, card) => (await poolFor(ws, project)).keptHere(card), held: (ws, project, lease, slot, folder, card) => slotHeldFor(ws, project, lease, slot, folder, card) })
+  // jj's card work's dependencies (HI-2868), for each project's workflow.
+  setJjCards(jjCardsFor)
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
     const ws = workspaceFor(projectPath)
@@ -2030,6 +2331,10 @@ export function startSlotCards(): void {
     if (!where) return
     const ws = workspaceFor(where)
     if (ws?.path && heldRetries.has(retireKey(ws, where))) void settleSlotCards(ws, where)
+    // A session ending or going quiet may be what a slot owing a settle waited for (HI-2906): its pool's owed pass now
+    // (coalesced with one running). Only a pool already made: nothing owed is in one that isn't.
+    const made = ws?.path ? poolIfMade(ws, where) : null
+    if (made) void made.then((p) => p.owedPass()).catch((x) => log.warn(`looking at the slots that owe a settle in ${userText(where)}`, x))
   })
   setSlotFreed((ws, project) => {
     for (const l of slotFreed) l(project)
@@ -2079,6 +2384,7 @@ export function startSlotCards(): void {
     setLaneSlots(null)
     setSlotFreed(null)
     setSlotStarts(null)
+    setJjCards(null)
     setBuilderCount(null)
   }
 }

@@ -111,6 +111,10 @@
     "defaultMessage": "The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.",
     "description": "Why nothing was merged: the project folder has no branch checked out. detached HEAD is git's term."
   },
+  "worktrees.merge.hooksElsewhere": {
+    "defaultMessage": "If one of the repository's hooks refused it: they ran in a temporary checkout of {branch}, which has none of the project folder's untracked files (node_modules, say). Check out {branch} in the project folder and merge there to run them with everything in place.",
+    "description": "HI-3109 (Darren's decision A): a line after a refused merge into a branch checked out nowhere ({branch}). Combwork makes that merge in a temporary checkout, where the repository's git hooks (commit-msg, pre-commit…) run without the project folder's untracked files; a hook needing them (node_modules) fails there. Keep node_modules as it is."
+  },
   "worktrees.merge.intoItself": {
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "Why nothing was merged: the branch to merge into is the worktree's own branch {branch}."
@@ -142,6 +146,10 @@
   "worktrees.merge.targetMoved": {
     "defaultMessage": "{branch} changed while Combwork was merging into it. Nothing was merged: merge again.",
     "description": "Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit)."
+  },
+  "worktrees.merge.temporaryLeft": {
+    "defaultMessage": "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "description": "HI-3030: a second line after a merge into a branch checked out nowhere: the temporary folder Combwork made to merge there ({folder}: its path) could not be removed."
   },
   "worktrees.merge.uncommitted": {
     "defaultMessage": "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",

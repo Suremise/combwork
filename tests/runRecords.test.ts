@@ -7,7 +7,7 @@ import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 /**
  * The job host as a stand-in (HR2's round 2): its helper (`instance`) and what each request answers. `onList` runs as
  * a job is listed, before its answer: a test loses the helper there (`lose`), as one ending mid-request does, and the

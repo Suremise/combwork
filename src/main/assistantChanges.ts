@@ -64,6 +64,9 @@ const recording = new AsyncLocalStorage<Recording | null>()
  * workspace read too. Undo takes it back as a branch (assistantUndo.ts `undoBranch`), never as a setting.
  */
 export const BRANCH_TARGET = 'branch:'
+/** HI-3155: the Assistant's Not now on a project's release offer: the offer id dismissed, and the one it replaced. */
+export const RELEASE_OFFER_TARGET = 'release-offer'
+export const offerDismissChange = (project: string, was: string | null, id: string): { kind: 'setting'; project: string; target: string; fields: { field: string; old: string | null; new: string }[] } => ({ kind: 'setting', project, target: RELEASE_OFFER_TARGET, fields: [{ field: 'dismissed', old: was, new: id }] })
 export const branchChange = (project: string, name: string, commit: string): { kind: 'setting'; project: string; target: string; fields: { field: string; old: null; new: string }[] } => ({ kind: 'setting', project, target: `${BRANCH_TARGET}${name}`, fields: [{ field: 'branch', old: null, new: commit }] })
 
 export function recordingChanges<T>(workspacePath: string, act: ActivityKind, what: string, fn: () => Promise<T>): Promise<T> {
@@ -102,9 +105,10 @@ export function cardValue(card: TaskCard, field: CardField): Value {
       return card.agent ?? null
     case 'blocked':
       return card.blocked ?? null
-    // Waiting on purpose (HI-2618), whole: why, who marked it and when, so undo puts back the mark as it was.
+    // Waiting on purpose (HI-2618), whole: why, who marked it and when, so undo puts back the mark as it was; with the ref
+    // of the request it waits on (HI-2931), so a request's mark put back still goes when that request ends.
     case 'waitingFor':
-      return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at } : null
+      return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at, ...(card.waitingFor.ask ? { ask: card.waitingFor.ask } : {}) } : null
     default:
       return card[field]
   }

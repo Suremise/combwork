@@ -9,7 +9,8 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
-import { resolve as resolvePath } from 'path'
+import type { JjCardDeps } from '../platform/jjPlatform'
+import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -20,7 +21,7 @@ import { combworkError } from '../combworkError'
 import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
-import { msg } from '../../shared/i18n'
+import { fmt, msg, tr } from '../../shared/i18n'
 import { declaresPaths, type PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
@@ -29,10 +30,16 @@ import { locksSettled } from './lockRecord'
 import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { Workflow, type SlotForStart } from './runtime'
+import { earlierWorkText, Workflow, type KeptAcross, type SlotForStart } from './runtime'
+import type { EarlierLine } from './earlierWork'
+import { tell } from '../notify'
+import { commentAsCombwork } from '../tasks'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
+import { noticeTargetChanges } from '../targetChangesNotice'
+import { readTable } from '../storeTables'
+import { readLanes } from '../../shared/lanes'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = WORKFLOW_ENFORCE
@@ -75,17 +82,50 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
  * written (slotCards.ts's). Given by the app as it starts (none in unit tests: no slots, a card starts where its agent is).
  */
 export interface SlotStarts {
-  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
+  /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross), else null. */
+  keptAcross?: (ws: WorkspaceService, project: string, card: number) => Promise<KeptAcross | null>
+  /** HI-3132: a card's kept slot of the project's own version control (SlotPool.keptHere), else null. */
+  keptHere?: (ws: WorkspaceService, project: string, card: number) => Promise<{ slot: string; folder: string } | null>
   /**
    * After #1441's migration: an agent's adopted worktree (its carried slot) while what it is kept for (the lane running at
    * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
    */
   standIn?: (ws: WorkspaceService, project: string, agent: string) => Promise<{ path: string; base: string | null } | null>
+  /**
+   * HI-3118: whether the lease a card's cycle started on still holds its slot for it, from the same pool `leaseFor` lends
+   * from (null: can't be read). Left out, a submit doesn't ask.
+   */
+  held?: (ws: WorkspaceService, project: string, lease: string, slot: string, folder: string, card: number) => boolean | null
 }
 let slotStarts: SlotStarts | null = null
+const EARLIER = {
+  title: msg({ id: 'workflow.earlierWork.title', defaultMessage: '{read, select, yes {{card}: its earlier work is on {line}} other {{card}: its earlier work couldn’t be read}}', description: 'HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then may still have work (yes); or its earlier starts couldn’t be read, so that can’t be told (other). Keep the select keys. {card} is a card key; {line} a branch or bookmark name.' }),
+  message: msg({ id: 'workflow.earlierWork.message', defaultMessage: '{read, select, yes {{n, plural, one {Its earlier line, {lines}, may hold work its target lacked:} other {Its earlier lines, {lines}, may hold work their target lacked:}} Combwork leaves that work there and doesn’t carry it in.} other {Combwork couldn’t read the card’s earlier starts, so it can’t tell whether work from before was left on a line of its own.}} Check what the card’s folder has (its target may hold that work by now), then bring in what you need, or leave it. Its builder is told on the card.', description: 'HI-3107: the notice’s text. yes: {lines} lists branch or bookmark names, {n} how many; other: the card’s starts couldn’t be read. Keep the select keys. Never says the folder lacks the work: its target may hold it. The builder gets the same as a comment on the card.' })
+}
+
+/**
+ * HI-3107: a start written with earlier work on another version control's lines: a comment on the card from Combwork
+ * (which its builder's start task carries, and the user sees on the card), once per start, and a notice to the user.
+ */
+async function sayEarlierWork(ws: WorkspaceService, projectPath: string, card: CardRecord, lines: EarlierLine[], now: PlatformId): Promise<void> {
+  const text = lines.map((e) => earlierWorkText(card.key, e, now)).join('\n\n')
+  const named = lines.flatMap((e) => (e.line === null ? [] : [e.line]))
+  const starts = (await workflowFor(ws, projectPath).catch(() => null))?.store.facts(card.id).filter((f) => f.kind === 'Started').length ?? 0
+  await commentAsCombwork(card.id, text, ws, () => true, `earlier-work:${card.id}:${starts}`)
+  tell({ kind: 'warning', level: 'warning', title: tr(EARLIER.title, { read: named.length ? 'yes' : 'no', card: card.key, line: named[0] ?? '' }), message: tr(EARLIER.message, { read: named.length ? 'yes' : 'no', n: named.length, lines: fmt.list(named) }), apiTitle: EARLIER.title.defaultMessage, projectPath })
+}
+
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
+}
+
+/** jj's card work's dependencies for a project (HI-2868: the app's jjCards.ts, set while slots run); none: jj answers nothing. */
+type JjCards = (ws: WorkspaceService, projectPath: string, projectId: () => string) => JjCardDeps
+let jjCards: JjCards | null = null
+export function setJjCards(f: JjCards | null): void {
+  jjCards = f
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -189,11 +229,13 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
 function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
+  let jjDeps: JjCardDeps | undefined
   return new Workflow({
     // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
+    projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path),
     get projectKey() {
       return store.projectKey()
     },
@@ -201,8 +243,35 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    // HI-3118: a submit from a slot asks whether its lease still holds it for the card, of the pool that lent it.
+    slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
+    keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
+    keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
+    // HI-3148: a running lane's grant to start on a released line (its record's, given with its start), for its cards' starts.
+    // Read from the lanes as stored, synchronously (inside the start's write too): an ended or replaced lane grants nothing.
+    releaseGrant: (lane) => {
+      if (!ws.path) return null
+      const l = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((x) => x.id === lane && x.state === 'active')
+      return l?.releasedOverride?.target ?? null
+    },
+    earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),
+    // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
+    targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
+    // jj's card work (HI-2868), composed once for the project while slots run.
+    get jj() {
+      jjDeps ??= jjCards?.(ws, project.path, () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path))
+      return jjDeps
+    },
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
+    // HI-2938: a card that passed is reconciled soon (a jj card's candidate is built then; its pass changes no jj
+    // operation or ref that would schedule it otherwise).
+    moved: (card, _from, to) => {
+      // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
+      // never a window's proxy of it, which this workflow may have been made from.
+      // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+    },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
     reviewersPresent: async () => {

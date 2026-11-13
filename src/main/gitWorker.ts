@@ -1,8 +1,10 @@
 import { execFile, type ChildProcess } from 'child_process'
+import { randomBytes } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
-import { delimiter, join } from 'path'
+import { delimiter, dirname, isAbsolute, join } from 'path'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import { RUN_MARK_VAR, treeEnding, type MsysMark } from './processTree'
 
 /**
  * Git's worker (HI-1783): a thread of its own that starts Combwork's git processes, so their starts (CreateProcess blocks the
@@ -49,6 +51,43 @@ export interface GitOutcome {
   cwdExists: boolean
   /** Its output stayed open after git exited, held by another process, and was closed (HI-1854: see runGit). */
   held?: boolean
+  /** Ended at its time limit, but its Git Bash programs couldn't be looked for, and why (HI-3047): its process tree alone was ended. */
+  msysIncomplete?: string
+}
+
+const msysBins = new Map<string, string | null>()
+
+/**
+ * HI-3047: the MSYS folder (`<root>\usr\bin`, with its sh.exe and msys-2.0.dll) of the Git for Windows that `m` starts, or
+ * null (not Git for Windows, or not found): its launcher's folders (launcherEnv), else its exe's root, else that of the
+ * first git on PATH, its root two to four folders above it. Kept per git.
+ */
+export function msysBinFor(m: Pick<GitRequest, 'exe' | 'launcherEnv' | 'env'>, exists: (p: string) => boolean = existsSync): string | null {
+  const path = (m.env ?? process.env).PATH ?? (m.env ?? process.env).Path ?? ''
+  const key = `${m.exe ?? ''}|${m.launcherEnv?.pathFirst ?? ''}|${m.exe ? '' : path}`
+  const known = exists === existsSync ? msysBins.get(key) : undefined
+  if (known !== undefined) return known
+  const isMsys = (bin: string): boolean => exists(join(bin, 'msys-2.0.dll')) && exists(join(bin, 'sh.exe'))
+  const fromExe = (exe: string): string | null => {
+    if (!isAbsolute(exe)) return null
+    // `<root>\cmd\git.exe`, `<root>\<mingw>\bin\git.exe`, `<root>\<mingw>\libexec\git-core\git.exe`.
+    for (let root = dirname(dirname(exe)), up = 0; up < 3; root = dirname(root), up++) if (isMsys(join(root, 'usr', 'bin'))) return join(root, 'usr', 'bin')
+    return null
+  }
+  const onPath = (): string | null => {
+    for (const d of path.split(delimiter)) {
+      const f = d && ['git.exe', 'git.com'].map((x) => join(d.replace(/^"|"$/g, ''), x)).find(exists)
+      if (f) return f
+    }
+    return null
+  }
+  const launcher = m.launcherEnv?.pathFirst.split(delimiter).find((d) => /[\\/]usr[\\/]bin[\\/]?$/i.test(d) && isMsys(d))
+  const exe = m.exe ?? onPath()
+  const bin = launcher ?? (exe ? fromExe(exe) : null)
+  if (exists !== existsSync) return bin
+  if (msysBins.size > 32) msysBins.clear()
+  msysBins.set(key, bin)
+  return bin
 }
 
 /**
@@ -79,19 +118,43 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     let held = false
     let exited = false
     let quiet: ReturnType<typeof setTimeout> | undefined
-    const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
-    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
+    // HI-3021: the time limit ends git's whole tree (a hook, a signer, git's own children), not git.exe alone as
+    // execFile's own would: those ran on, and on Windows a git ended alone never removes the index.lock it holds. The
+    // outcome comes once the tree has gone, so what the caller does next (a lock removed, the index put back) meets
+    // none of it. A program of Git Bash's own a hook starts (its `sleep`) is outside Windows' process tree (MSYS's exec
+    // leaves no parent behind), so no tree walk finds it; native ones (node, npm, python, gpg) are in it. HI-3047: those
+    // are found by a marker in the timed git's environment, which they inherit (processTree's MsysMark).
+    let timedOut = false
+    let bound: ReturnType<typeof setTimeout> | undefined
+    let msysIncomplete: string | undefined
+    const bin = m.timeout && process.platform === 'win32' ? msysBinFor(m) : null
+    const msys: MsysMark | undefined = bin ? { mark: randomBytes(16).toString('hex'), bin, onIncomplete: (why) => (msysIncomplete = why) } : undefined
+    const ending = treeEnding(process.platform, msys)
+    const given = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
+    const env = msys ? { ...(given ?? process.env), [RUN_MARK_VAR]: msys.mark } : given
+    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
+      clearTimeout(bound)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
-      res({
-        stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
-        stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
-        error: e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
-        // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
-        cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
-        ...(held ? { held } : {})
-      })
+      ending.after(() =>
+        res({
+          stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
+          stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
+          // Ended at its limit: said as execFile's own time limit says it (killed, SIGTERM), whatever exit the end gave.
+          error: timedOut ? { code: null, killed: true, signal: 'SIGTERM' } : e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
+          // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
+          cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
+          ...(held ? { held } : {}),
+          ...(msysIncomplete ? { msysIncomplete } : {})
+        })
+      )
     })
+    if (m.timeout)
+      bound = setTimeout(() => {
+        if (child.exitCode !== null || child.signalCode !== null) return
+        timedOut = true
+        ending.end(child)
+      }, m.timeout)
     // Closing them ends the call as their closing would have: execFile answers with what was read.
     const waitQuiet = (): void => {
       if (!exited) return

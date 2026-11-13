@@ -22,11 +22,41 @@ export interface CommitInfo {
 }
 
 /** A working folder as it is now (workspaceNow): its line (null: detached), head and uncommitted state (dirty's list). */
+/**
+ * HI-3124: how a submodule changed, from porcelain v2's row: `moved`, another commit checked out, not staged (`.M`, its
+ * commit changed); `staged`, a new commit staged (`M?`); `added` (`A?`); `removed`, its removal staged (`D?`, `git rm`);
+ * `deleted`, its folder gone, nothing staged (`.D`); `other`, anything else (a rename, only changes inside it).
+ */
+export type SubmoduleState = 'moved' | 'staged' | 'added' | 'removed' | 'deleted' | 'other'
+
+/** HI-3124: a submodule among a folder's changes: its path, how it changed, and HEAD's commit for it (null: none). */
+export interface SubmoduleChange {
+  path: string
+  state: SubmoduleState
+  recorded: string | null
+}
+
 export interface WorktreeNow {
   line: string | null
   /** Null: no commit yet. */
   head: string | null
   dirty: string[]
+  /**
+   * HI-2983: the operations under way among `dirty` (Git: its markers, `(MERGE_HEAD)`…, listed last), apart from the
+   * files, so a changed file of the same name is a file. Absent: the platform lists none.
+   */
+  operations?: string[]
+  /**
+   * HI-3023: the submodules among `dirty` whose only changes are inside them (edited or untracked files there, the
+   * recorded commit unchanged): work held there, but nothing the folder itself can commit or set aside. Absent: none.
+   */
+  insideOnly?: string[]
+  /**
+   * HI-3052: every submodule among `dirty` (porcelain v2's `S…`): its commit moved, staged, or changed inside. Git's stash
+   * can't set aside a submodule's checked-out commit. HI-3124: each with how it changed, so a refusal says what to do
+   * for it. Absent: none.
+   */
+  submodules?: SubmoduleChange[]
   /** The line asked for's head (null: no such line), when one was. */
   target?: string | null
   /** The platform's metadata paths asked for, absolute, in their order. */
@@ -107,6 +137,11 @@ export interface HistoryPort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: its default branch). */
   defaultTarget(repo: string): Promise<Maybe<string>>
+  /**
+   * The repository's own main line (Git: `main` or `master`), null when it has none: then `defaultTarget` is only the
+   * line the folder has checked out (HI-3049).
+   */
+  mainLine(repo: string): Promise<Maybe<string | null>>
   /** The repository's store (Git: the common git dir), read by the tool. */
   store(repo: string): Promise<Maybe<string>>
   /** `store`, read from the folder's metadata files with no process where they say, else by the tool. */
@@ -129,6 +164,18 @@ export interface HistoryPort {
   sameChange(repo: string, a: ChangeAt, b: ChangeAt): Promise<boolean>
   /** How `target` holds a change (at `at`, its head as read, when given), or null when it doesn't. */
   contains(repo: string, target: string, c: ChangeAt, at?: string): Promise<Maybe<Containment | null>>
+  /**
+   * HI-3041: whether the remote `target` follows (G21) has `revision` now, from a fetch of its branch (the remote's head
+   * kept a minute per repository and target). Unknown when it can't be read. Absent: a platform with no remote to look at.
+   */
+  remoteHas?(repo: string, target: string, revision: string): Promise<Maybe<boolean>>
+  /**
+   * HI-3126: the head of the remote branch `line` tracks, fetched now (sealed, within `timeoutMs`) and pinned at `pin`;
+   * `untracked` only when it tracks none at all (neither its remote nor its merge setting set). Tracking set up any other
+   * way (half of it, another local branch, a remote that isn't there), a read or a fetch that fails: unknown, saying why.
+   * Absent: a platform with no remote to look at.
+   */
+  trackedHead?(repo: string, line: string, pin: string, timeoutMs: number): Promise<Maybe<string | 'untracked'>>
   /** A line's own revisions since a base, newest first (its first parents). */
   firstParents(repo: string, base: string, head: string): Promise<Maybe<readonly string[]>>
   /** A range's commits, oldest first, with their authors and card trailers (attribution's read). */
@@ -160,6 +207,8 @@ export type ObserveEvent =
   | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
   | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
   | { kind: 'written'; project: string; folder: string; paths: string[] }
+  /** HI-2882: something a platform keeps (jj's retained bundles) may have changed, or its minute's tick: its adapter decides. */
+  | { kind: 'invalidated'; project: string; what: string }
 
 export interface Disposable {
   dispose(): void

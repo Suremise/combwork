@@ -8,8 +8,34 @@ import { git, gitReading } from '../git'
 import * as G from './git'
 import type { HistoryPort } from './history'
 import { gitOwnWork } from './gitOwnWork'
-import { unknown } from './types'
+import { isUnknown, unknown, withDetail, type Maybe } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
+import { isAgain } from './again'
+import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
+import { configRead } from './gitCommits'
+
+/** HI-3041: how long a target's remote head, fetched for the reconciler, stands for it (a pass over many cards fetches once). */
+const REMOTE_HEAD_MS = 60_000
+const REMOTE_HEADS_MAX = 64
+const remoteHeads = new Map<string, { at: number; head: Promise<Maybe<string>> }>()
+
+/** The head of the remote branch `target` follows, fetched (sealed, as slots' start) into its own pin, or kept a minute. */
+function remoteHeadOf(repo: string, target: string): Promise<Maybe<string>> {
+  const k = `${repo}\0${target}`
+  const kept = remoteHeads.get(k)
+  if (kept && Date.now() - kept.at < REMOTE_HEAD_MS) return kept.head
+  const head = (async (): Promise<Maybe<string>> => {
+    const h = projectHost(repo)
+    const d = await destinationOf(h, target)
+    if (isAgain(d) || 'pause' in d) return unknown(U.remoteSetup, { target })
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/reconcile/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`)
+    return 'failed' in f ? unknown(U.remoteHead, { branch: d.snapshot.ref.replace(/^refs\/heads\//, ''), endpoint: d.snapshot.display, target }) : f.head
+  })()
+  remoteHeads.delete(k)
+  remoteHeads.set(k, { at: Date.now(), head })
+  while (remoteHeads.size > REMOTE_HEADS_MAX) remoteHeads.delete(remoteHeads.keys().next().value!)
+  return head
+}
 
 export const gitHistory: HistoryPort = {
   step: (fn) => G.gitStep(fn),
@@ -31,6 +57,7 @@ export const gitHistory: HistoryPort = {
   line: (folder) => G.branch(folder),
   lineHead: (repo, line) => G.lineHead(repo, line),
   defaultTarget: (repo) => G.defaultBranch(repo),
+  mainLine: (repo) => G.mainBranch(repo),
   store: (repo) => G.commonDir(repo),
   storeFast: (repo) => G.commonDirFast(repo),
   refSync: (store, ref) => G.refSync(store, ref),
@@ -42,6 +69,34 @@ export const gitHistory: HistoryPort = {
   candidateKey: (repo, base, head) => G.candidateKey(repo, base, head),
   sameChange: (repo, a, b) => G.sameChange(repo, a, b),
   contains: (repo, target, c, at) => G.contains(repo, target, c, at),
+  // HI-3041 (Darren's 2b): follow mode's reconciler, telling a local target merely behind a published result from one
+  // whose result the remote no longer has either.
+  async remoteHas(repo, target, revision) {
+    const head = await remoteHeadOf(repo, target)
+    return isUnknown(head) ? head : G.isAncestor(repo, revision, head)
+  },
+  async trackedHead(repo, line, pin, timeoutMs) {
+    const h = projectHost(repo)
+    // A setting's value, or null only for git's own "not set" (exit 1, answered): a key set to nothing is set (HR2's round 1).
+    const get = async (key: string): Promise<string | null | { failed: string }> => {
+      const r = await h.run(repo, ['config', '--get', key])
+      if (!r.timedOut && !r.notRun && !r.signal && r.code === 1 && !r.out.trim()) return null
+      return configRead(r)
+    }
+    const remote = await get(`branch.${line}.remote`)
+    if (remote !== null && typeof remote !== 'string') return withDetail(unknown(U.tracking, { branch: line }), remote.failed)
+    const merge = await get(`branch.${line}.merge`)
+    if (merge !== null && typeof merge !== 'string') return withDetail(unknown(U.tracking, { branch: line }), merge.failed)
+    if (remote === null && merge === null) return 'untracked'
+    // Half set, set to nothing, another local branch ('.'), or not a branch: never taken for "tracks none".
+    if (!remote || !merge || remote === '.' || !merge.startsWith('refs/heads/')) return unknown(U.tracking, { branch: line })
+    const d = await destinationOf(h, line)
+    if (isAgain(d)) return withDetail(unknown(U.tracking, { branch: line }), d.again.message)
+    // A remote git doesn't know is its tracking's; several push addresses or a shallow repository, the remote's setup.
+    if ('pause' in d) return withDetail(d.pause === 'noUpstream' ? unknown(U.tracking, { branch: line }) : unknown(U.remoteSetup, { target: line }), d.files?.join(', '))
+    const f = await fetchHeadOf(h, d.snapshot, pin, timeoutMs)
+    return 'failed' in f ? withDetail(unknown(U.remoteHead, { branch: d.snapshot.ref.replace(/^refs\/heads\//, ''), endpoint: d.snapshot.display, target: line }), f.failed) : f.head
+  },
   firstParents: (repo, base, head) => G.firstParents(repo, base, head),
   commits: (repo, range, opts) => G.commits(repo, range, opts),
   workspaceNow: (folder, o) => G.worktreeNow(folder, o),

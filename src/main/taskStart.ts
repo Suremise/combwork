@@ -4,7 +4,8 @@ import type { DeliverySender } from '../shared/deliveries'
 import { projectAgents } from '../shared/defaults'
 import { deliverNow, launchWith, NotGiven } from './deliveries'
 import { msg } from '../shared/i18n'
-import { rawTaskPrompt, taskPrompt } from '../shared/tasks'
+import { rawTaskPrompt } from '../shared/tasks'
+import { cardStartPrompt } from './cardStartPrompt'
 import type { TaskCard, TaskStartTarget } from '../shared/types'
 import { emit } from './events'
 import { addAgent, removeAgent } from './projectAgents'
@@ -87,13 +88,13 @@ export const START_NOTE_MAX = MAX_NOTE
  * checked again where the card is taken (as it is saved), and before the task is typed in or its agent launched: once
  * it no longer holds, the start is undone as one that fails (the card back where it was, a new agent removed).
  */
-export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string, guard?: StartGuard, commit?: () => void): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string, guard?: StartGuard, commit?: () => void, released?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   if (note && note.length > MAX_NOTE) throw combworkError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
   if (starting.has(key)) throw combworkError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '{card} is already being started.', description: 'An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.' }), { card: cardRef(n) }, { kind: 'conflict' })
   starting.add(key)
   try {
-    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined, guard, commit)
+    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined, guard, commit, released?.trim() || undefined)
   } finally {
     starting.delete(key)
   }
@@ -123,7 +124,7 @@ function startable(card: TaskCard): void {
   if (!card.project) throw combworkError(msg({ id: 'tasks.start.noProject', defaultMessage: '{card} has no project. Give it one first: the agent works in that project.', description: 'An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first.' }), { card: cardRef(card.number) }, { kind: 'invalid' })
 }
 
-async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined, guard?: StartGuard, commit?: () => void): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined, guard?: StartGuard, commit?: () => void, released?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   const before = await getTask(n)
   startable(before)
   const p = workspace.assertProject(join(workspace.path!, before.project))
@@ -156,7 +157,7 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
   let typed = false
   let slotted = false
   try {
-    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason, guard, commit)
+    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason, guard, commit, released)
     typed = t
     slotted = s
     return result
@@ -183,7 +184,8 @@ async function giveCard(
   note: string | undefined,
   reason?: string,
   guard?: StartGuard,
-  commit?: () => void
+  commit?: () => void,
+  released?: string
 ): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean; slotted: boolean }> {
   const undoAgent = async (): Promise<void> => {
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
@@ -196,8 +198,11 @@ async function giveCard(
   // this Start read. Anything else is a newer decision (moved, reassigned, put in Done) and stays.
   let card: TaskCard
   try {
-    // The user's reason for a start that skips rules (#1275: the window asked first), kept with its Override.
-    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...(reason && actor.kind === 'user' ? { override: { reason } } : {}) }, actor, {
+    // The user's reason for a start that skips rules (#1275: the window asked first), kept with its Override. HI-3148: the
+    // released line confirmed, the user's or the Assistant's (with its reason), for that line only.
+    const overrides = actor.kind === 'user' || actor.kind === 'assistant'
+    const override = overrides && (reason || released) ? { override: { reason: reason ?? '', ...(released ? { released } : {}) } } : {}
+    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...override }, actor, {
       check: (now) => {
         startable(now)
         // What the start's caller said must still hold, where the start is written (HI-1990: Combwork's start of a lane's next card).
@@ -251,7 +256,9 @@ async function giveCard(
     // Already Active with no slot (HR2's round 1: a start from before this fix, given again) is refused the same way.
     if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw combworkError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
     const inLane = laneBuilds(await rawLanes(workspaceOf(p)), basename(p), agentId, n)
-    const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.combworkMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
+    // HI-2854: with the whole card when it fits, and what its delivery records (the card's start task, in this cycle).
+    const start = advanced.get<boolean>(RAW_CARD_START) ? { text: rawTaskPrompt(card, note), meta: {} } : await cardStartPrompt(workspaceOf(p), card, agentId, !!sessions.combworkMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
+    const prompt = start.text
     // Started in a slot (#1438): Combwork gives it to the agent there once the slot is ready (a new conversation where the
     // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
     // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).
@@ -259,7 +266,7 @@ async function giveCard(
       // The caller's authority, after the last await before the card is handed to its slot (HI-2420).
       commit?.()
       slotted = true
-      toSlot(prompt)
+      toSlot(start)
       if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
       return { card, agentId, agentName, added, typed: false, slotted: true }
     }
@@ -269,7 +276,7 @@ async function giveCard(
     commit?.()
     // A task delivery (#649), given now or not at all: typed into a running agent (and while it is typed, an agent that
     // starts work or that the user types in meanwhile doesn't get the rest), or the prompt it is started with.
-    const nd = { agentId, agentName, kind: 'task' as const, from: senderOf(actor), card: n, body: prompt, need: 'free' as const }
+    const nd = { agentId, agentName, kind: 'task' as const, from: senderOf(actor), card: n, body: prompt, need: 'free' as const, meta: start.meta }
     const holds = (): boolean => {
       try {
         commit?.()

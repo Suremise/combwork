@@ -34,7 +34,7 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
+import { catchUpKey, catchUpOf, MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
 import { changingFolder, inFolder } from '../folderFence'
 import { sessions } from '../sessions'
 import { progress } from '../progressService'
@@ -47,6 +47,7 @@ import { openEntry, type FactData } from '../../shared/workflow/facts'
 import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { pausedFor } from '../teamPause'
+import { queueTransportStore } from '../queueTransportStore'
 
 const log = createLogger('queue')
 
@@ -263,6 +264,8 @@ async function runHost(h: Host): Promise<void> {
         continue
       }
       await prunePins(wf, h.projectPath)
+      // G21 (HI-1183): snapshots no begun publication of the project needs (crash leftovers) dropped.
+      await new MergeQueue(wf, queueConfig(h, r)).pruneSnapshots(h.target).catch((e) => log.warn('dropping unused transport snapshots', e))
     } while (h.again && alive(h))
   } finally {
     // The queue is empty, paused or its workspace is going: the lease goes (its folder kept while the queue needs it).
@@ -331,6 +334,9 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     },
     holds: () => runner.holds(),
     git: (cwd, args, opts) => runner.git(cwd, args, 'testMerge', opts),
+    // HI-1185: the signing check's signer, in the lease's job as the test merge's commands are.
+    // HI-2947: as git starts it (the check quotes its words), its first word given. HI-3208: with no console of its own.
+    spawn: (file, args, o) => runner.run('testMerge', file, args, { cwd: o.cwd, env: o.env, timeoutMs: o.timeoutMs, ...(o.input !== undefined ? { input: o.input } : {}), ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(o.noConsole ? { noConsole: true } : {}) }),
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
@@ -343,6 +349,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
+    gitFiles: checks.gitFiles,
+    gitFilesOn: checks.gitFilesOn,
     // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),
@@ -355,13 +363,20 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
       h.now = step
       queueChanged(h.ws, h.projectPath, h.target)
     },
+    // G21 (HI-1183): follow mode's transport snapshots, encrypted in Combwork's profile.
+    transport: queueTransportStore,
     ...(app.isPackaged ? {} : { hooks: testHooks(h.projectPath, h.target) })
   }
   return cfg
 }
 
-/** The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
-const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
+/**
+ * The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d); and,
+ * following the remote, `beforePublish`: in phase push with nothing sent, so the restart finds an unknown publication
+ * the remote lacks and asks For you (HI-3088's window check); `beforeCatchUpRef`: a published merge's local catch-up
+ * with its files moved and its ref not (HI-3089's window check: taken up as Combwork starts again).
+ */
+const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback', 'beforePublish', 'beforeCatchUpRef']
 let raced = false
 
 /**
@@ -393,7 +408,7 @@ function testHooks(projectPath: string, target: string): QueueHooks {
  * going there (an agent's, the Assistant's or a script's; not Combwork's own). Null when there are none: an idle agent, or one
  * whose session lives there but works in a review copy, holds no lock and runs nothing there.
  */
-function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
+export function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
   const locked = sessions.locksIn(folder)
   const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'combwork' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
   const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]
@@ -438,8 +453,10 @@ function openTargets(wf: Workflow): string[] {
     const e = openEntry(wf.state(f.card))
     if (e && e.id === d.entry) out.add(d.target)
   }
-  // A target whose push an earlier merge still owes (G18, #1179: Combwork stopped before it, or it was refused) runs too.
-  for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t)))) out.add(t)
+  // A target whose push an earlier merge still owes (G18, #1179: Combwork stopped before it, or it was refused) runs too;
+  // so does one whose local catch-up a published merge still owes (HI-3089: one stopped part way, its files moved and its
+  // ref not, was left staged in the user's folder with nothing said until another card came).
+  for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t))) || catchUpOf(wf.store.meta(catchUpKey(t)))) out.add(t)
   return [...out]
 }
 

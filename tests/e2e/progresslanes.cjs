@@ -787,7 +787,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await panel2.locator('.progress-tab[data-tab="lanes"]').click()
   const queuedLine = panel2.locator(`.progress-tab-lanes .progress-lane[data-lane="${l9}"] .progress-lane-queued`)
   const wantLine = `Next, once ${K(q1)} is Done: ${K(q4)} added, new order: ${K(q1)}, ${K(q4)}, ${K(q3)}, ${K(q2)}`
-  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedLine.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedLine.innerText().catch(() => null), want: wantLine }))
+  // Its text (HI-2898 puts Cancel Change after it).
+  const queuedText = queuedLine.locator('.progress-lane-queued-text')
+  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedText.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedText.innerText().catch(() => null), want: wantLine }))
+  check('…with Cancel Change after it', (await queuedLine.locator('[data-action="lane-cancel-change"]').count()) === 1)
   check('…its whole text in its title', (await queuedLine.getAttribute('title')) === wantLine)
   check('…and no other lane shows one', (await panel2.locator('.progress-lane-queued').count()) === 1)
   await queuedLine.scrollIntoViewIfNeeded()

@@ -289,6 +289,10 @@
   "api.card.overrideArg": {
     "text": "override is '{' \"reason\": \"<why>\" '}', the reason not empty."
   },
+  "api.card.ownTarget": {
+    "text": "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to \"\" (its project's).",
+    "note": "HI-3017: below a card update (HI-3043: or a new card) that gave the card a target other than its project's ({default}). Setting cards before the project pinned them, unnoticed (HI-3004's trials of assistant-retarget-release)."
+  },
   "api.card.recordedDecision": {
     "text": "recorded a decision"
   },
@@ -331,6 +335,10 @@
   },
   "api.card.stayInProject": {
     "text": "Cards stay in your project ({project})."
+  },
+  "api.card.targetReleased": {
+    "text": "{target} is released ({tag}, merged into {into}): {card}'s start there is refused unless the user OKs work on {target} (a hotfix), given as override.released {target}.{has, select, yes { Did you mean {suggest}?} other {}}",
+    "note": "HI-3148: below a card update or new card whose Merges into ({target}) is already released: tagged ({tag}) and merged into the default branch ({into}). {suggest}: a branch that exists and isn’t released."
   },
   "api.card.titleRequired": {
     "text": "title is required"
@@ -388,6 +396,10 @@
   "api.change.deactivateProject": {
     "text": "deactivate the project {project}"
   },
+  "api.change.dismissOffer": {
+    "text": "put off the release offer of {project}",
+    "note": "HI-3155: cw_branch dismissOffer (the user’s Not now)."
+  },
   "api.change.endALane": {
     "text": "end a lane"
   },
@@ -395,7 +407,8 @@
     "text": "end lane {lane}"
   },
   "api.change.forward": {
-    "text": "bring {to} up to date with {from} in {project}"
+    "text": "bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}",
+    "note": "HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice)."
   },
   "api.change.forwardAny": {
     "text": "bring a branch up to date with another"
@@ -462,6 +475,13 @@
     "text": "put {total} {count, plural, one {card} other {cards}} in order in {column}",
     "note": "count: the number, for its plural; total: the same number as written."
   },
+  "api.change.resolveForward": {
+    "text": "hand {card} to a builder to resolve",
+    "note": "HI-2959: Resolve on a builder on a forward merge card the queue returned."
+  },
+  "api.change.resolveForwardAny": {
+    "text": "hand a returned forward merge to a builder"
+  },
   "api.change.resumeAQueue": {
     "text": "resume a merge queue"
   },
@@ -527,6 +547,10 @@
   },
   "api.check.leaseArgs": {
     "text": "lease, pid, after and before are required"
+  },
+  "api.check.noCopies": {
+    "text": "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot",
+    "note": "HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0)."
   },
   "api.check.noVcs": {
     "text": "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files"
@@ -696,10 +720,16 @@
     "text": "Created the project {name}"
   },
   "api.done.forwardQueued": {
-    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{override, select, yes {Recorded the user’s override on {card}, the resolution bringing {to} up to date with {from}: its builder is told to submit it again} other {{card} is bringing {to} up to date with {from} already}}}}{ahead, plural, =0 {} one {. {aheadTotal} commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. {aheadTotal} commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}",
+    "note": "HI-3126: ahead, under follow mode, the commits of the local branch {from} its remote lacks, left out (0: none), for its plural; aheadTotal: the same number as written (HI-3151). HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card. HI-3040: queued no with override yes: the override was recorded on the resolution the queue returned for its direction."
+  },
+  "api.done.forwardResolved": {
+    "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged",
+    "note": "HI-2959: Resolve on a builder’s reply. {card}: the new card; {forward}: the forward merge card it ended; {source}: a short commit id."
   },
   "api.done.forwardUpToDate": {
-    "text": "{to} has everything of {from} already: nothing queued"
+    "text": "{to} has everything of {from} already: nothing queued{ahead, plural, =0 {} one {. {aheadTotal} commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. {aheadTotal} commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}",
+    "note": "HI-3126: ahead, under follow mode, the commits of the local branch its remote lacks (0: none), for its plural; aheadTotal: the same number as written (HI-3151)."
   },
   "api.done.freshRetried": {
     "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"
@@ -732,6 +762,10 @@
   },
   "api.done.notRunning": {
     "text": "{agent} in {project} wasn't running"
+  },
+  "api.done.offerDismissed": {
+    "text": "Put off the release offer of {project} until it changes",
+    "note": "HI-3155: what the Assistant’s dismissOffer did (stored, said in the Default)."
   },
   "api.done.prompted": {
     "text": "Gave {agent} in {project} a task{given, select, yes { ({id})} other {}}"
@@ -958,6 +992,14 @@
   "api.lane.projectRequired": {
     "text": "project is required"
   },
+  "api.lane.releasedArg": {
+    "text": "released takes target and reason: the released branch the lane starts on, as its refusal named it, and the user’s reason",
+    "note": "HI-3148: POST /v1/lanes with a released that isn’t one."
+  },
+  "api.lane.releasedNotYours": {
+    "text": "Only the user or the Assistant starts work on a released branch: ask the user",
+    "note": "HI-3148: a project agent or a script passing released."
+  },
   "api.lane.targetText": {
     "text": "target must be a branch name, or null for the project's own"
   },
@@ -1084,6 +1126,10 @@
     "text": "git at {root}{subfolder, select, yes { (a subfolder of that repository)} other {}}",
     "note": "The version control found in a project folder."
   },
+  "api.project.vcsJj": {
+    "text": "jj at {root}{colocated, select, yes { (colocated with git)} other { (not colocated: no git working copy)}}",
+    "note": "HI-2799: a jj repository found in a project folder."
+  },
   "api.project.vcsUnsupported": {
     "text": "{name} (not supported: None)"
   },
@@ -1097,8 +1143,16 @@
   "api.queue.forwardArgs": {
     "text": "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)"
   },
+  "api.queue.nextVersionArgs": {
+    "text": "from is required: the project's Work merges into as you read it, the release the next version starts from (refused if it moved on)",
+    "note": "HI-3114: cw_branch nextVersion without from."
+  },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
+  },
+  "api.queue.overrideArg": {
+    "text": "override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction",
+    "note": "HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true."
   },
   "api.queue.projectRequired": {
     "text": "project is required"

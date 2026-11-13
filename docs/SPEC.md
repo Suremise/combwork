@@ -158,7 +158,7 @@ Darren, 5 Nov: a complete, **one-way** conversion to Combwork's names. What 1.0 
     attachments/cards/<card number>/<time>_<name>  # files kept with a card (HI-1700); never a session's: Clean Up and Purge pass them by
     removed/              # only after Remove from Combwork (§6.7): manifest.json, cards.json, handovers/
     project.json.bak      # last good copy (see §2)
-    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit
+    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit; a removed agent's goes (HI-3144, §4.2.1)
       plugin/.claude-plugin/plugin.json
       plugin/skills/<skill>/...     # copies of enabled Combwork skills
       mcp.json
@@ -177,7 +177,8 @@ Worktrees Combwork creates for agents live **next to the workspace**, in `<Works
 
 - **Project Settings → Storage** (also for the Assistant's home, from Settings → Workspace) shows the sizes of `.combwork/sessions`, `.combwork/archive`, `.combwork/attachments` and each agent's worktree, and their total; under the backups' and the archive's sizes, what they hold before compression (#1110: `sessionsRaw`, `archiveRaw`, each `.gz` counted by the size its gzip trailer records), when that is more. The CLIs' own transcripts aren't counted. Main measures in the background (`storage.ts`): a directory at a time, links and junctions not followed, yielding to the event loop every few hundred entries; one measurement per project at a time, and the last result comes back at once until **Refresh**. Attachment and worktree folders are cached per folder by modified time (a folder that hasn't changed counts its files as before; its subfolders are still checked); backups and the archive are measured afresh. The Storage pages pass a request with each call and abandon it when they close or measure again (`storage:abandon`, after the new call is sent): the abandoned call fails, and a measurement no call waits for any more stops between entries, leaving no result (the folders it finished stay cached). A request is its window's (by its web contents): only that window abandons it, and closing the window or reloading its page, which run none of the page's clean-up, abandons all of its requests (#260). Calls that reuse a request id while one under it still runs share it: abandoning it stops every one of their waits, and it goes with the last of them (#299). A call without a request (none in the UI today) can't be abandoned and keeps its measurement going. An `.asar` file counts as a file of its size.
 - **Settings → Workspace → Storage**: the workspace's total and every project, the Assistant included, biggest first, ten to a page (a data table, #250), each opening its Storage page (the Assistant's opens in place).
-- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has. Age is the session's last activity.
+- **Clean Up…** runs per project, only when asked; nothing is automatic. Options: attachments of archived sessions last active more than N days ago (on, 90); attachments of deleted sessions and of `run-<runId>` folders of launches that never got a session (never a running launch's); Combwork's backups of archived sessions older than N days, **only where the CLI still has the transcript**; and, apart from that, with a warning, backups of archived sessions the CLI no longer has; launch folders of removed agents (on: HI-3144, below). Age is the session's last activity.
+- **Launch folders of removed agents** (HI-3144, Darren 13 Nov; `launchFolders.ts`): a `.combwork/launch-<agent id>` is only what launches generated for that agent, so it goes when the agent no longer is the project's: with **Remove Agent**, in a sweep as each workspace opens (folders from before HI-3144, or left by a crash; and any set aside by a removal that stopped part way), and from Clean Up, listed with its size (to the Recycle Bin there; otherwise deleted). Only a real folder named exactly `launch-<id>` is touched, never a link, a file or anything else in `.combwork`; never a current agent's (its project.json read just before, and none when that file is missing or unreadable) nor one whose agent is starting or running. Launch and removal share one guard (`whileRemovingLaunchFolder`): once a removal qualifies, a launch of that agent waits for it to end before writing its folder (`launchFolderFree`, the Claude adapter's `prepareLaunch`), and each move qualifies again, the Recycle Bin's retries of a held folder included (`trash`'s `still`), so an agent added back or started meanwhile stops it with nothing changed (HR2's round 1). Deleted, it is renamed aside (`.removing-<hex>`) and removed under that name; to the Recycle Bin (Clean Up) it goes under its own name. Only Claude Code keeps such a folder: Codex and Copilot's skill copies have their own clean-up (§16.10.7), OpenCode's launch config is private and removed as its launch ends, and Antigravity's profile goes with Remove Agent (`agentRemoved`, HI-2731).
 - A preview lists every file and its size and the total before anything is removed (`storage:cleanupPreview`). Applying it (`storage:cleanup`, with the listed paths) plans again and removes only listed items that still qualify (a session resumed or unarchived meanwhile is skipped and reported); a session's backups go only if every copy of it was listed. Each session is reserved while its files go (a resume of it is refused until then: "Clean Up is removing files of this session") and checked with both of its backups locked, again right before they go (still archived, not running or starting, its copies exactly the ones listed); an image folder is checked the same way just before it goes. Anything else is skipped. A backup goes only after what its session used has been read and saved on its record (`keptUsage`; a session whose only copy it was then moves it to `deletedUsage` as it is deleted), so its totals survive a failure partway; if that can't be read or saved, the backup stays and is reported. Everything goes to the Recycle Bin. Running sessions and sessions that aren't archived are never touched, nor `~/.claude` or `~/.codex`.
 - Usage totals don't change: what a session used is recorded in the usage history (§9) before any of its copies goes, and stays there once the copies and the record are gone; a session whose usage can't be recorded keeps its copies. Removing the last copy deletes the session as Delete does (§6.2).
 - **Purge…** (#1138, decision 7 of #1106; scope confirmed by Darren, 20 Oct) removes **everything Combwork keeps per session**, only when asked, for one session (the Sessions tab's **Purge Combwork's Files…**, on Combwork's own sessions that aren't running), a project or the Assistant (**Project Settings → Storage**, beside Clean Up…) or the workspace (**Settings → Workspace → Storage**: every project's and the Assistant's). What it covers (`planPurge`, `shared/storage.ts`): each session's backups (active and archived, compressed or not); what is left of them (`.spare`, a half-made `.<pid>-<time>.tmp`, an archive's `.archiving`/`.previous`/`.archived`: the files of `.combwork/sessions` and `.combwork/archive` named for a session, nothing else there); each of its attachments (the plain files of its folder in `.combwork/attachments`); the old usage on its record (`keptUsage`); and what is left of sessions Combwork no longer has: their files, their attachments (`run-<runId>` folders too) and their kept usage (`deletedUsage`). A leftover that may be a session's **only copy** is kept and counted ("1 leftover file is kept…"): one of a session the CLI no longer has, with no backup of it in that folder, which is what Combwork stopping in the middle of a delete or a move leaves (a `.spare`, a set-aside `.previous`); nothing restores it by itself, and it stays until the session is deleted. **There is no option to clear the usage history: it always stays, so totals never change.** Never the CLIs' files (`~/.claude`, `~/.codex`, `~/.copilot`), the session records themselves (but see last copies), the `deleted` list that keeps the CLIs' sessions hidden, worktrees, or anything of a running or starting session (the preview says how many it left alone).
@@ -209,7 +210,7 @@ Windows only, behind a platform-neutral status (`shared/antivirus.ts`, `main/ant
 - `usage-cache.json` — retired (#1106): an older version kept each transcript's usage here; it is removed once a workspace's usage history has imported its sessions (§9).
 - `merge-slots/<hash of the workspace path>.json` — which agents held a merge slot (§6.2), with the folder each holder works in (`cwd`: its worktree or the main checkout, #984), so a hold Combwork closed under is reported when the workspace opens again, naming that folder; after an unexpected close it is a line of that notice (below) instead of a notice of its own.
 - `running.json` — **Combwork closing unexpectedly** (#984, `lastRun.ts`, `shared/unexpectedClose.ts`): written by the running Combwork (the copy holding the single-instance lock) once it is ready, every minute (`HEARTBEAT_MS`), 2 s after agents start or stop, and 2 s after a process joins a running launch's job (#1134: the job host tells main with a line `new` from its completion port, `onLaunchProcessJoined`, once per launch until main lists that launch's job again or it starts (a listing never takes back a notice due for another launch), so a build starting hundreds of processes asks for one write; one write at a time, the asks in between coalesced): `{ version, pid, startedAt, lastSeen, app, workspaces, agents: [{ workspace, projectPath, project, agentId, agentName, provider, sessionId, sessionName }], processes: [{ projectPath, agentId, agentName, runId, processes: [{ pid, name, label, created }] }] }` (the Assistant's own session isn't an agent), written beside it (compact, and asynchronously since #1111: it was a synchronous write on every status change) and renamed into place, checked just before the rename with nothing awaited between, so a marker removed as Combwork quits is never put back. `processes` (#987, `runningProcesses()` in `agentProcesses.ts`) is what each running launch's process job holds then (§ leftover processes, #507): its CLI and all it started, each by id and start time (one without a start time isn't kept), at most 100 launches and 50 processes each (as `leftovers.json`), listed from the jobs before each write, one write at a time. HI-2263: a launch whose job can't be listed then (the tracker ending as it lists), or that was running when the tracker was lost, is written with its processes as last listed, until that launch ends; the next start keeps only those still running as the same processes, as for any other. Removed on `will-quit` (every quit: the quit flow, Restart Combwork, an update's install, a crashed window's Quit Combwork) and on a window's `session-end` (Windows ending the session), and not written again. Found at the next start, the last run ended without quitting: Combwork logs it, Copy Diagnostics says so (last seen, started, agents, a crash dump, merges), and once the first window has loaded a warning notice, **Combwork closed unexpectedly**, says **Combwork was last seen on <date> at <time>**, how many agents were running in which projects, **Nothing was resumed** (or how many were, below), that a crash dump of that run was kept (#985: one made since it started), and each merge slot hold it closed under with its folder. #987: of the marker's `processes`, those still running as the same processes (id and start time, checked by the tracker's helper: never by name, a pid alone never counts) and not already listed as left running (`leftovers.json`, #614, offered on their own) are told in a line, **<n> processes the agents started are still running: <labels>.**, with a **Stop Them** button (`session.stopLeftAfterClose` → `app:stopLeftAfterClose`: ends each only while it is still the same process; those that still run after it stay, and the call fails saying how many). #1008: each kept process also has its `parent` (pid) and, on a cw-progress process (Combwork's executable running `cw-progress.js`), `run`: its `--title`, else its command. A cw-progress run is one item of the line, **<title> (<n> processes)**, with every kept process below it (by parent, each started after its parent) and the shell above it that ran the `cw-progress` command; Stop Them ends that whole tree as it is then, what it started since the marker was written too (`endtree`, `PickTree`: from the run's top and each of its processes still running, each only while it is still that process; below them by the parent ids of a snapshot, each child only if it still runs, started after its parent and not after the snapshot; each checked through a handle held until it is ended, so its id can't name another process meanwhile; a root gone or that can't be opened isn't followed). What it couldn't end stays listed with the rest: Stop Them then fails saying how many still run, and tries them again. #1028: a child that runs and Windows lets Combwork neither end nor check (PickTree's `unverified`, its pid in `endtree`'s reply) can't be tried again (with its parent ended, nothing tells it from a process that later gets the id, and Combwork never stops by pid alone or by name), so it is kept apart (`Leftovers.unverified`, `stopLeftovers`, in `LeftoverStops`, whose clicks take turns so one that overlaps another, twice quickly or from two windows, works on what the one before it left and can't drop its ids): every click after fails while any is kept, saying it may still run with its process IDs to look for in Task Manager (`main.unexpectedClose.notChecked`, or `notStoppedNorChecked` beside ones Stop Them does try again), never a quiet success; the roots are still ended (Stop Them ends the run, not keeping it alive for a child it may never reach), and Copy Diagnostics says how many with their ids; nothing is stopped on its own, whatever `agents.leftoverProcesses` says (that is for what agents leave as they stop while Combwork runs). Its buttons are also **Resume All** (`session.resumeAfterClose` → `app:resumeAfterClose`: those agents, once, one at a time, each into the conversation it was in, skipping one running again or with none; the result is a notice) and **Show Overview**. Nothing resumes on its own unless **Settings → Sessions → Resume agents after an unexpected close** (`sessions.resumeAfterUnexpectedClose`, **off**; Darren's 17 Oct decision) is on: then they are resumed first and the notice says how many (and which couldn't, with why). Each workspace of that run whose Assistant is set up (`.combwork/assistant/project.json`) gets a `control` delivery from Combwork for its next start: when Combwork was last seen, the agents, whether anything was resumed, how many processes the agents started still run (#987), and to check for stalled card loops and tell the user without restarting or stopping anything. A marker that can't be read is an unexpected close at its file's time, with no agents known. This machine's state: never in the workspace's `.combwork`.
-- `restart.json` — **Restarts announced and resumed** (HI-1707, `restartResume.ts`, `shared/restartResume.ts`). **As Combwork closes** (`quitNow`, before the sessions stop): the agents that are working, waiting, `background` or `watching`, or the builder or reviewer of a running lane (`laneOf`), each with its session, card (the lane's current one, else the one it works on or reviews in Doing or Review: its key, else #n) and round (`roundOf`) and lane, are recorded (`recordClosing`): first every running conversation, from the live states alone with nothing read (`baseEntries`), written at once; then, within 2 s, narrowed to those working, waiting, in the background, watching or in a running lane, with their cards and lanes (`enrich`); also kept, idle or not (HI-2909: rc.1's install after a team pause left the project's reviewer pool HR1–HR3, parked `finished`, stopped, and a pool lane waited for a reviewer), every agent whose workflow role reviews in a project with a running pool lane, and any agent reviewing a card in Review (`review.agent`); the rest, idle with nothing a running lane needs, are written `skipped: idle` (not for a quit, whose start offers rather than reports), not told they will be resumed, and named in the next start's report with any `skipped: expired` once their workspace is ready and has nothing left pending, queued or starting, alone too when every agent was idle; such a skip keeps the record open until a report has named it (`reported`, `unreported()`), but a later close replaces an earlier record's unreported skips (`mergeSnapshot` drops every final entry: the notice accounts for the agents of the latest close; the Assistant's scope for 1.4.0), once (a window's reload adds nothing), so the report accounts for every agent that ran; a read that takes longer keeps every conversation (an idle agent resumed is a lesser harm than a working one lost). The record is **who** and **how** (the Assistant's design call, 26 Oct): its entries are who is resumed, and carry no reason of their own; `reason` is how, one for the whole record, and every close overwrites it, so the latest close decides. An entry leaves only once its agent is ready (`resumed`); one not yet resumed at a close (queued, starting or offered) is `pending` again as it was, with its conversation, card, round and lane: one being resumed is never replaced by its launch, still starting and in no lane. The record: `{ version: 1, reason, entries: [{ workspace, projectPath, project, agentId, agentName, provider, sessionId, sessionName?, status, card?: { label, round }, lane?: { id, name, role }, from, at, state, why?, changedAt }] }` (a record with no `reason` it knows is a quit's). `reason` is `install` (an installer's request, below), `update` (Restart to Update, or Install automatically), `restart` (Restart Combwork) or `quit`; for all but `quit` each is told, best effort within 1.5 s, by a `control` delivery from Combwork: *Combwork is restarting for an update. Your work is saved; you'll be resumed.* A new snapshot merges into the record (`mergeSnapshot`): an agent in it replaces its earlier entry, every other open entry is kept (an offer not answered isn't lost); entries this run had queued, starting or offered go back to `pending`. The Assistant's own session isn't an agent here. **At the next start** (`loadRestartRecord` before the unexpected-close check, `startRestartRecovery` once the first window has loaded): entries the last run left `queued` or `starting` are `pending` again, and one over a day old is `skipped` (`atStart`); `held` ones are offered again. A `pending` entry is decided once **its workspace is ready**: open, read (`info()`: a window sets its path before its workspace is read) and its merge slots recovered (`workspaceRecovering`, from ipc.ts' `onOpened`, as the unexpected-close notice waits for them). It is queued when the record's `reason` isn't `quit` and **Settings → Advanced → Resume agents after an update** (`cw.restart.resumeAfterUpdate`, **on**; a workspace can set its own, as can *Resuming after a restart: ready within*) is on for its workspace, else `offered`: one notice, **Resume the <n> agents that were working?**, naming them, with **Resume** (`session.resumeRestart` → `app:resumeRestart`: queues them) and **Don't Resume** (`session.dismissRestart` → `app:dismissRestart`: `dismissed`, not offered again; the notice's × only closes it, and an `offered` entry is offered again at the next start). **One offer at a time** (HI-2356): a workspace ready later (its slots recovered after another's offer was shown) gives a new notice listing every entry `offered` now, and the earlier notice, its buttons not used, resolves as *Replaced by a newer offer*, so no notice's buttons act on agents it didn't name (both act on every `offered` entry). Resume takes its notice's buttons away at once (*Resuming, one at a time*) and the queue's report then says in it how it went; an offer still open at the report keeps its buttons. **The queue** (one owner of these resumes: `lastRun.ts` leaves out the agents with an open entry, `ownsResume`) takes one entry at a time whose workspace is open (Darren, 26 Oct: one at a time, each after the last is ready; no load check), checks it again just before it starts (the agent still there, `skipped: removed`; not running, `skipped: running`; its conversation still its last, `skipped: movedOn`; no slot hold, `held`, as `resumeAgents`), starts it in its conversation (`--resume`, `auto`) with its note as its first prompt (`resumeNote`: why, from which version to which and when, its card, round and lane, and to re-arm its watch if it was watching or in a lane), and waits until it has taken it: seen `working`, `finished`, `waiting` or `background` in a status change of this launch, within **Settings → Advanced → Resuming after a restart: ready within** (`cw.restart.resumeReadySeconds`, 90 s; not `ready`, which a resumed conversation's transcript gives before its CLI runs, nor `watching`, which a watch it had gives). Not in time: that launch (by its `runId`, never another) is stopped and ended (`stopWhereAndWait`, 10 s) and confirmed gone before the next starts, `failed: notReady`; one still running after that is `failed: notStopped`, and nothing more is admitted until it has ended (a `session-exit` goes on). Its launch ending meanwhile (stopped, or its CLI exited) is `failed: stopped`. **Combwork closing** (`stopRestartRecovery`, `recordClosing`: a generation bumped) cancels the attempt under way: it is checked after every await and just before the start (its workspace still ready, the agent still there and not running, its conversation still its last), starts nothing and changes nothing after (the closing snapshot has put it back to `pending`); its workspace closing puts it back to `pending`. A call for the queue while it works is never lost: it goes round again. Every state change is written at once; the record is removed once every entry is `resumed`, `failed`, `dismissed` or `skipped`. Once the queue is empty, one notice says who was resumed and who wasn't and why, and each workspace's Assistant (set up) gets a `control` delivery saying the same. **Lanes:** while an entry is queued or starting, or `pending` to resume by itself (from when the record was read), at most 10 min, the card stall "isn't running" (`cardStall`, the Agent API's `stalled` and `reviewStalled`) and the merge stall of a builder that isn't running aren't reported for that agent. **The installer's request** (`build/askToClose.ps1`, run by `installer.nsh`'s `customInit` in the outer instance, before the template's check ends a running Combwork): it finds the main Combwork process of `$INSTDIR` only (its exact executable, no `--type=`), opens a handle on it, writes `%APPDATA%\Combwork\restart-request.json` (1.0's profile folder when that is the only profile: a 1.0 being replaced, §4.3) (beside, then renamed: `{ v: 1, nonce: <GUID>, pid, pidCreated, exe, reason: 'install', at }`), waits up to 3 s for `restart-ack-<nonce>.json`, then up to 30 s for that process to exit; no acknowledgement, it removes its request; either way the template's check then runs as before. Combwork (`watchRestartRequests`: the profile watched, and checked at start) takes a request only when it is at most 4 KB, whole, with a GUID nonce, for its own `pid` and start (within 5 s of `Date.now() - uptime`), its own executable (real paths) and at most 60 s old, and its nonce not handled before; it renames it to `restart-request.<nonce>.taken`, writes the acknowledgement (beside, then renamed) and quits as for an update with no dialog (`quitReason = 'install'`). Any other request is removed with a log line saying why, never acted on; what earlier requests left is removed at start. **An older installer** (or one whose wait ran out) ends Combwork without asking: its running marker remains, and when it names another version than the one starting now its agents are added to the record as an install's (`adoptInstalledRun`: no card or lane known), resumed as above; the unexpected-close notice still says Combwork closed unexpectedly, without offering those.
+- `restart.json` — **Restarts announced and resumed** (HI-1707, `restartResume.ts`, `shared/restartResume.ts`). **As Combwork closes** (`quitNow`, before the sessions stop): the agents that are working, waiting, `background` or `watching`, or the builder or reviewer of a running lane (`laneOf`), each with its session, card (the lane's current one, else the one it works on or reviews in Doing or Review: its key, else #n) and round (`roundOf`) and lane, are recorded (`recordClosing`): first every running conversation, from the live states alone with nothing read (`baseEntries`), written at once; then, within 2 s, narrowed to those working, waiting, in the background, watching or in a running lane, with their cards and lanes (`enrich`); also kept, idle or not (HI-2909: rc.1's install after a team pause left the project's reviewer pool HR1–HR3, parked `finished`, stopped, and a pool lane waited for a reviewer), every agent whose workflow role reviews in a project with a running pool lane, and any agent reviewing a card in Review (`review.agent`); the rest, idle with nothing a running lane needs, are written `skipped: idle` (not for a quit, whose start offers rather than reports), not told they will be resumed, and named in the next start's report with any `skipped: expired` once their workspace is ready and has nothing left pending, queued or starting, alone too when every agent was idle; such a skip keeps the record open until a report has named it (`reported`, `unreported()`), but a later close replaces an earlier record's unreported skips (`mergeSnapshot` drops every final entry: the notice accounts for the agents of the latest close; the Assistant's scope for 1.4.0), once (a window's reload adds nothing), so the report accounts for every agent that ran; a read that takes longer keeps every conversation (an idle agent resumed is a lesser harm than a working one lost). The record is **who** and **how** (the Assistant's design call, 26 Oct): its entries are who is resumed, and carry no reason of their own; `reason` is how, one for the whole record, and every close overwrites it, so the latest close decides. An entry leaves only once its agent is ready (`resumed`); one not yet resumed at a close (queued, starting or offered) is `pending` again as it was, with its conversation, card, round and lane: one being resumed is never replaced by its launch, still starting and in no lane. The record: `{ version: 1, reason, entries: [{ workspace, projectPath, project, agentId, agentName, provider, sessionId, sessionName?, status, card?: { label, round }, lane?: { id, name, role }, from, at, state, why?, changedAt }] }` (a record with no `reason` it knows is a quit's). `reason` is `install` (an installer's request, below), `update` (Restart to Update; a plain quit that installs with Install now is a `quit`, HI-3167), `restart` (Restart Combwork) or `quit`; for all but `quit` each is told, best effort within 1.5 s, by a `control` delivery from Combwork: *Combwork is restarting for an update. Your work is saved; you'll be resumed.* A new snapshot merges into the record (`mergeSnapshot`): an agent in it replaces its earlier entry, every other open entry is kept (an offer not answered isn't lost); entries this run had queued, starting or offered go back to `pending`. The Assistant's own session isn't an agent here. **At the next start** (`loadRestartRecord` before the unexpected-close check, `startRestartRecovery` once the first window has loaded): entries the last run left `queued` or `starting` are `pending` again, and one over a day old is `skipped` (`atStart`); `held` ones are offered again. A `pending` entry is decided once **its workspace is ready**: open, read (`info()`: a window sets its path before its workspace is read) and its merge slots recovered (`workspaceRecovering`, from ipc.ts' `onOpened`, as the unexpected-close notice waits for them). It is queued when the record's `reason` isn't `quit` and **Settings → Advanced → Resume agents after an update** (`cw.restart.resumeAfterUpdate`, **on**; a workspace can set its own, as can *Resuming after a restart: ready within*) is on for its workspace, else `offered`: one notice, **Resume the <n> agents that were working?**, naming them, with **Resume** (`session.resumeRestart` → `app:resumeRestart`: queues them) and **Don't Resume** (`session.dismissRestart` → `app:dismissRestart`: `dismissed`, not offered again; the notice's × only closes it, and an `offered` entry is offered again at the next start). **One offer at a time** (HI-2356): a workspace ready later (its slots recovered after another's offer was shown) gives a new notice listing every entry `offered` now, and the earlier notice, its buttons not used, resolves as *Replaced by a newer offer*, so no notice's buttons act on agents it didn't name (both act on every `offered` entry). Resume takes its notice's buttons away at once (*Resuming, one at a time*) and the queue's report then says in it how it went; an offer still open at the report keeps its buttons. **The queue** (one owner of these resumes: `lastRun.ts` leaves out the agents with an open entry, `ownsResume`) takes one entry at a time whose workspace is open (Darren, 26 Oct: one at a time, each after the last is ready; no load check), checks it again just before it starts (the agent still there, `skipped: removed`; not running, `skipped: running`; its conversation still its last, `skipped: movedOn`; no slot hold, `held`, as `resumeAgents`), starts it in its conversation (`--resume`, `auto`) with its note as its first prompt (`resumeNote`: why, from which version to which and when, its card, round and lane, and to re-arm its watch if it was watching or in a lane), and waits until it has taken it: seen `working`, `finished`, `waiting` or `background` in a status change of this launch, within **Settings → Advanced → Resuming after a restart: ready within** (`cw.restart.resumeReadySeconds`, 90 s; not `ready`, which a resumed conversation's transcript gives before its CLI runs, nor `watching`, which a watch it had gives). Not in time: that launch (by its `runId`, never another) is stopped and ended (`stopWhereAndWait`, 10 s) and confirmed gone before the next starts, `failed: notReady`; one still running after that is `failed: notStopped`, and nothing more is admitted until it has ended (a `session-exit` goes on). Its launch ending meanwhile (stopped, or its CLI exited) is `failed: stopped`. **Combwork closing** (`stopRestartRecovery`, `recordClosing`: a generation bumped) cancels the attempt under way: it is checked after every await and just before the start (its workspace still ready, the agent still there and not running, its conversation still its last), starts nothing and changes nothing after (the closing snapshot has put it back to `pending`); its workspace closing puts it back to `pending`. A call for the queue while it works is never lost: it goes round again. Every state change is written at once; the record is removed once every entry is `resumed`, `failed`, `dismissed` or `skipped`. Once the queue is empty, one notice says who was resumed and who wasn't and why, and each workspace's Assistant (set up) gets a `control` delivery saying the same. **Lanes:** while an entry is queued or starting, or `pending` to resume by itself (from when the record was read), at most 10 min, the card stall "isn't running" (`cardStall`, the Agent API's `stalled` and `reviewStalled`) and the merge stall of a builder that isn't running aren't reported for that agent. **The installer's request** (`build/askToClose.ps1`, run by `installer.nsh`'s `customInit` in the outer instance, before the template's check ends a running Combwork): it finds the main Combwork process of `$INSTDIR` only (its exact executable, no `--type=`), opens a handle on it, writes `%APPDATA%\Combwork\restart-request.json` (1.0's profile folder when that is the only profile: a 1.0 being replaced, §4.3) (beside, then renamed: `{ v: 1, nonce: <GUID>, pid, pidCreated, exe, reason: 'install', at }`), waits up to 3 s for `restart-ack-<nonce>.json`, then up to 30 s for that process to exit; no acknowledgement, it removes its request; either way the template's check then runs as before. Combwork (`watchRestartRequests`: the profile watched, and checked at start) takes a request only when it is at most 4 KB, whole, with a GUID nonce, for its own `pid` and start (within 5 s of `Date.now() - uptime`), its own executable (real paths) and at most 60 s old, and its nonce not handled before; it renames it to `restart-request.<nonce>.taken`, writes the acknowledgement (beside, then renamed) and quits as for an update with no dialog (`quitReason = 'install'`). Any other request is removed with a log line saying why, never acted on; what earlier requests left is removed at start. **An older installer** (or one whose wait ran out) ends Combwork without asking: its running marker remains, and when it names another version than the one starting now its agents are added to the record as an install's (`adoptInstalledRun`: no card or lane known), resumed as above; the unexpected-close notice still says Combwork closed unexpectedly, without offering those.
 - **A window's page that crashes or hangs** (`main/rendererWatch.ts`, per window): agents run in main, so they are never affected. On `render-process-gone` (except a clean exit) Combwork logs the reason and reloads the page; terminals reattach to their running sessions as after View → Reload, the window keeps its workspace, and a toast says "Combwork's window stopped and was reloaded. Your agents kept running." with how many files' unsaved edits were lost (the window's last report; hot exit would keep them). A second crash within a minute doesn't reload again: a native dialog says "Combwork's window stopped working. Your agents are still running…" with **Reload**, **Open Logs** (then asks again) and **Quit Combwork**. On `unresponsive`, after 4 seconds a native dialog offers **Wait** / **Reload**; `responsive` closes it. Reload ends the hung page (`forcefullyCrashRenderer`) and loads it again, without the crash note.
 - `logs/combwork.log` — **Help → Copy Diagnostics…** puts its last 50 lines in a bug report, with Combwork's version and update channel (stable/beta), installed or development build, Windows version, display scaling and locale; each coding agent (on/off, version and path, signed in, update available, anything its adapter adds (`diagnostics()`: Codex's Windows sandbox, default/non-admin/not set up), and its readiness issues); counts (windows, active and total projects, agents, running agents, agents in worktrees, whether the Assistant runs); how each worker thread runs (HI-1880: its own thread, started and not running yet, on main's thread and why, ended and why, or not started yet); and the settings that change behaviour (file locks, merge style, quitting, tray, backups, cache TTL, Agent API, Assistant control, notifications, theme), never free text. A dialog shows exactly what will be copied; **Copy** copies it. It is built and redacted in main (`diagnostics.ts`, `shared/redact.ts`). Combwork marks the user's own text as it logs it (`userText()` in `logger.ts`: card titles, Assistant activity, session, project, agent and branch names, paths; of the arguments an agent is started with, everything but flags and the values of known flags such as `--model` and `--session-id`, whether separate or written as `--flag=value` (`argsForLog()`)), and the report replaces each marked span with `<text>` or `<path>`. Its start line says so (`your text marked`); lines from a run whose start line doesn't (an older version), or from before the first start line in view, keep only their time, level and scope. For older lines and anything unmarked: the home folder becomes `~`, workspace and worktree folders `<workspace>`, including the workspaces in the recent list; workspace, project, agent and branch names, and the project folders of recent workspaces, are taken out of the log lines (not the summary, which has none, so a project called "Combwork" doesn't take Combwork's name with it; each line's time, level and `[scope]` stay); any other absolute path becomes `<path>` unless it is under AppData, a dot folder in the home folder, Program Files or Windows; tokens, keys, everything after a credential's name in a line (`Authorization:`, `token=`, `--api-key`, `password:`, and the lines a continuation carries it onto; a quoted JSON key too), OAuth codes in URLs, sign-in and device codes (`maskText`, #699), well-known key formats, JWTs, long hex or base64 runs and email addresses are masked.
 - `Crashpad/` — crash dumps (#985, `exitLog.ts`): Electron's `crashReporter` is started before the app is ready (in the copy that holds the single-instance lock), with `crashDumps` set to the profile's `Crashpad` folder and **`uploadToServer: false`**: a crash of the main process, a window's page or a helper process leaves a minidump in `Crashpad\reports`, and nothing is ever sent. At start Combwork keeps the newest three dumps and removes the rest (#1111: one was 73 MB), as old heap snapshots are, not to the Recycle Bin; the start line is followed by how many were removed, how many dumps the profile has and the newest's time; Copy Diagnostics has a **Crash dumps** section naming how many, the newest by file name, time and size (never the dump itself), and that they are never sent: the user attaches one to an issue themselves.
@@ -363,7 +364,7 @@ Rebuilding `launch/` on every launch means a restarted agent has exactly the wor
 | New session | New UUID. A live session is stopped first (with confirmation). In a project without agents, New Session (and Resume) first adds one with the quick add, then starts it. |
 | Resume | `--resume <uuid>`, in an agent that works in the folder the session ran in (sessions record their agent, folder and branch). Shows the re-cache estimate (§9) first. A conversation that can't continue (HI-2463's rename, HI-2462's move: `shared/sessionFresh.ts`, the one rule the start and the window's lists read) starts a new conversation instead, carrying the agent's work; its Resume says so in its tooltip and session pickers, and pressing it asks **Start a new conversation?** instead of the re-cache question (HI-2540). A start no one was asked about (a restart's, Resume All, a lane's) gets the notice afterwards instead, and the Agent API's reply to a resume says it started fresh and why. If the session has no transcript yet (nothing was typed before it stopped or was restarted), it is started fresh with `--session-id <uuid>` instead. **One conversation runs in one agent at a time**: the main process refuses to resume a session that is open in another agent (two terminals would both append to its transcript), for the UI and the Agent API alike; the UI shows that agent instead. A paused session can move between agents that share its folder (never across worktrees); the record then names the new agent, and any other agent whose *last session* it was forgets it. |
 | Stop | Ends the pty. Session stays resumable. |
-| Leftover processes (#507) | Ending the pty ends what is attached to its console (node-pty asks the console for its processes), not what the agent started detached or hidden (a preview server, a `tail -f`, a Claude Code background shell, a Codex background terminal), which then outlive it and hold the project's folder and ports. Claude Code's own stop of a background command or Monitor on Windows leaves the commands of its Git Bash pipeline running too (HI-2570: `tail` and `grep` of `tail -F | grep`, the shell ended). Their Windows parents exited when they were exec'd, so they aren't in the shell's process tree, but they are in the job: listed or ended when the launch ends, not at the stop. Recorded as Claude Code's; Combwork doesn't match them to the stopped command. So each launch's CLI (and its worktree's setup command) runs in a **Windows job object** of its own from its first instruction, and everything it starts joins the job by itself, however it is started and through whatever exits since (`agentProcesses.ts`). node-pty can't start a process suspended and knows its pid only once it runs, so the terminal first runs a **gate** (`launchGate.ts`): a hidden PowerShell with no cmdlets (a console program, so it shares the pseudoconsole; Electron's own executable run as Node doesn't), given the command and its arguments in its environment (removed before the command starts). It connects to a pipe made for the launch and waits; Combwork puts the gate in the job (`ptyHost` `track`, which checks the process is still running), then answers `go`, and the gate starts the command with the command line node-pty would have built (`commandLineOf`, tested against node-pty's), on the same console, and exits with its code. The gate starts the command **only on `go`**, however long that takes: `stop <why>`, a failed connection or the pipe closing without a word (Combwork gone, or the terminal stopped) end it with `Error: Combwork didn't start <exe>: <why>` (a failed start), never running the command. A launch stopped while its gate was being tracked is told `stop`, and its job let go even if the assignment lands after (nothing is assigned to a dead or reused pid). **A terminal killed before its gate's word** (HI-1819: Combwork quitting just after a launch) tells the gate `stop` first (`its terminal was closed before it started`), whatever tracking answers after: a command started as its console closes misses the close and runs on with no console. The gate waits for its command, so a gated launch's CLI still running once the gate has exited lost its terminal the same way (`go` said just before the kill): two seconds after, it is ended by identity, not listed as a leftover to keep (it would hold its slot's run, #1434). The CLI is the gate's child and, through `cmd.exe` wrapping it (a `.cmd` launcher, a setup command), the command each wrapper runs, each started after its parent (`orphanedCli`); what the CLI itself started stays a leftover like any other. **When tracking can't work** (Darren's decision B, 10 Oct): a launch first waits until the job host is running (it starts it; `trackingReady`). #1155: the host also starts in the background (`warmProcessTracking`) as Combwork starts with a workspace to reopen (beside its windows' loading), and when a workspace opens later with agents (its `workspace-changed`: a project with an agent, or the Assistant with a session to resume), so the first launch after Combwork starts doesn't wait the 0.35–0.6 s its PowerShell takes (Resume All paid it first in line; measured on a dev build: 0 ms instead of ~340 ms, a Resume as soon as the window showed the workspace); it shows nothing, and a host that can't start is said by the first launch, as before. If it can't run (PowerShell blocked, Constrained Language Mode refusing Add-Type) or doesn't say it is ready within 60 s (it is then killed and given up on for the run), the CLI starts directly, untracked; if a launch's assignment then fails, the gate is told `go` all the same. Once the host runs, every reply is bounded too (60 s): one that doesn't come means the host is stuck, and it is killed, so no launch, End or quit waits on it longer. **A host that ends after starting** (a crash, or killed as stuck) closes its jobs: running agents' launches are no longer tracked (they keep running, nothing is ended); the leftovers listed stay listed by identity, as after a restart (#614, below), and those whose start time isn't known go. A host that held nothing (no running launch, nothing listed but what was restored) loses nothing: only the log says it ended. Otherwise Combwork says so at once through the same once-a-run notice (what was listed and what running agents start are no longer tracked), and Diagnostics keeps it (`; earlier, the process tracker stopped at <time> (<why>): …`) even once a new host, started by the next request, tracks later launches. Either way Combwork never refuses to start an agent over it, and says so once a run: a notification ("Combwork can't keep track of agents' processes": why, and that what agents leave running isn't listed) and a Diagnostics line (`Agents' processes: tracked` or `not tracked: <why>`). Test copies (unpackaged): `CW_TEST_PROCESS_TRACKER=fail` acts out a host that can't run, `=silent` one that starts but never says it is ready, `=mute` one that is ready but never answers (each request it reads noted in the file `CW_TEST_TRACKER_HEARD` names), and `CW_TEST_TRACKER_WAIT_MS` shortens the 60 s waits. One hidden PowerShell per Combwork holds the jobs (C# through `Add-Type`, no files; one line per request); without it (PowerShell blocked) nothing is tracked and agents stop as before. The jobs never end anything themselves (no kill-on-close). Two seconds after the CLI exits, what is still in its job is what it left (consoles' hosts not listed): logged, kept per agent (the newest 5 launches each, 100 in all; older ones forgotten, never ended), looked at again every 10 s while any are listed (those that ended go), and sent to the agent's window (`agent-leftovers`). **Settings → Agents → Processes left running** (`agents.leftoverProcesses`): **Ask** (default) shows a notification listing them with End Them / Keep Running and an **⚠ n left running** chip in the agent's pane header (hover: the list; click: end or keep); **End them** ends them as the agent stops. End terminates the launch's job, so only processes its CLI started are ended, never one started outside it (a process started outside it isn't tracked either, except what escapes it from inside, below; a launch whose job couldn't be ended stays listed and the End fails with a message (the header's End shows it; with End them set, the notification is shown instead, saying Combwork couldn't end them), so it can be tried again or kept; only what was ended is counted. Keep Running stops listing them and leaves them running. Offers whose agent has nothing listed any more are dismissed. Quitting Combwork with some listed asks once in a native dialog (End Them / Leave Running) while a window is shown; a quit with none shown, or to install an update, leaves them running and still listed. **Across a restart** (#614: a dev copy of Combwork a suite started under an agent outlived it and two of Combwork's restarts; that Combwork predated #507, and a later quit to install an update would have forgotten it): what is listed is also kept in the profile (`leftovers.json`, written on every change once within the bounds, so a crash keeps it too), each launch apart and within the same bounds when written and when read (the newest 5 launches an agent, 100 in all, 50 processes a launch), each process by its pid and start time (a Windows FILETIME the host reads with `GetProcessTimes`, `created` in the listing; a process whose start time couldn't be read isn't kept). The next start, once the first window has loaded, lists again those still running as the same processes, each launch on its own (the host's `identify`, which answers with pid and start time pairs, matched as pairs: a record whose pid names another process by then is dropped, also beside another record of that pid that does match) and offers them as when an agent stops ("<agent> left n processes running", End Them / Keep Running; with End them set, ends them). Their jobs are gone by then, so End ends exactly the listed processes, each only while it is still the same process (the host's `endexact`: opened by pid, its start time checked, ended through that handle; one gone counts as ended), not what they started since; they're looked at again every 10 s like the rest. Without the job host, nothing is restored and the list stays for the next start. Test copies of Combwork name their profile on their own command line (`--combwork-test-profile=…`, which Combwork ignores; `tests/e2e/lib.cjs`), so the e2e runner's clean-up of what names a suite's folder also stops a test Combwork whose suite died before closing it, as the one in #614 did. Renderer IPC: `session:leftovers` (the window's workspace), `session:settleLeftovers` (the session host is checked; only that agent's). Windows only. **The real CLIs** (#515, real-tier suites `leftovers-claude` and `leftovers-codex`): a Claude Code background Bash (`run_in_background`) outlives Combwork's stop (its terminal ended) and is listed, and End ends it; `/exit` ends it with Claude Code (2.1.296). Codex ends its background terminals itself as it exits, stopped by Combwork or `/exit` (0.162.1), so they're never left, except that Codex runs commands in PowerShell 7 where there is one, and doesn't end what runs through the Microsoft Store's: that is listed and ended as below (#543). **What escapes the job** (#543): the Store's PowerShell 7 (`WindowsApps\pwsh.exe`) is a packaged app, so Windows starts it in its package's job and its children in none: neither would be listed or ended. The job host takes them in: a live process whose parent is in a launch's job, and that isn't in that job itself, joins it if it is in no job (its later children with it); one already in another job (the Store's PowerShell, in its package's) is followed instead: held open, listed, and ended with the job. Never assigned (#659): Windows would nest the jobs, and the package's job, which every Store PowerShell joins, when it had no parent became the launch's, so every Store PowerShell started after it (any agent's or app's) was listed and ended with that launch. Nor is a packaged app's process, even in no job (#678): Windows puts the Store's PowerShell in its package's job only once it has started (4 to 160 ms after it shows in a snapshot, measured; more under load), and a sweep that caught it before then and assigned it nested the package's job in the launch's just the same (about 1 in 50 loaded test runs). A process with a package identity (`GetPackageFullName`) is followed whatever job it is in; its children (not packaged) still join the launch's job when they are in none. Ids are checked against what they named when seen (#543 round 2): a candidate, or a parent looked up by id and not held, created after the sweep's snapshot is refused (the id names another process by now; Windows stamps creation in ticks of about 15.6 ms, so one created within the snapshot's own tick still passes: a documented limit), the parent must have started before the child, and a process the port reports as joining is held only if it is in that job (a notification read late may carry a reused id). End ends the job and each followed process; one Windows won't end that still runs makes End fail (listed, to try again), and one already gone counts as ended. The host sweeps for them as processes of a job exit (the job's completion port reports each joining and leaving process; the host holds each open until the sweep after its exit, so the exited parent's id and start time stay known; exits are gathered for up to 250 ms and swept for together, since a sweep's snapshot of every process costs a few ms and a build ends hundreds), before listing or ending a job, and every second. Still missed: an escaped process that starts something and exits within a second, before any sweep saw it (a `Start-Process` from the Store's PowerShell that returns at once). The host's C# goes to its PowerShell as the first line of its input, base64 (a command line holds at most 32,767 characters). The log says how many processes of a launch were taken in this way. Unit tests stand in for the escape on any PC (a child started before its CLI joins the job) and use the Store's PowerShell where it is installed; `leftovers-codex` keeps it on PATH. **Agents stop what they start** (#613: one agent's own `tail -f | grep` log watchers, 16 of them, outlived the runs they watched until Combwork quit): the agents' session contract says to watch a run with something that ends with it (`cw-progress`, the CLI's notice that a background command ended), never `tail -f`, and to end what they started that won't end by itself before their card ends, unless the user wants it running; work-on-card (a Finish step, before Review), card-loop (a loop's turns end on a watch, never a watcher) and merge-ready (finishing loose work) say how. The `watcher-stopped` scenario checks it: Combwork lists nothing the agent left once its card is in Review and it is stopped (`session:leftovers` with `settled`, which answers once every exited launch has been looked at). |
+| Leftover processes (#507) | Ending the pty ends what is attached to its console (node-pty asks the console for its processes), not what the agent started detached or hidden (a preview server, a `tail -f`, a Claude Code background shell, a Codex background terminal), which then outlive it and hold the project's folder and ports. Claude Code's own stop of a background command or Monitor on Windows leaves the commands of its Git Bash pipeline running too (HI-2570: `tail` and `grep` of `tail -F | grep`, the shell ended). Their Windows parents exited when they were exec'd, so they aren't in the shell's process tree, but they are in the job: listed or ended when the launch ends, not at the stop. Recorded as Claude Code's; Combwork doesn't match them to the stopped command. So each launch's CLI (and its worktree's setup command) runs in a **Windows job object** of its own from its first instruction, and everything it starts joins the job by itself, however it is started and through whatever exits since (`agentProcesses.ts`). node-pty can't start a process suspended and knows its pid only once it runs, so the terminal first runs a **gate** (`launchGate.ts`): a hidden PowerShell with no cmdlets (a console program, so it shares the pseudoconsole; Electron's own executable run as Node doesn't), given the command and its arguments in its environment (removed before the command starts). It connects to a pipe made for the launch and waits; Combwork puts the gate in the job (`ptyHost` `track`, which checks the process is still running), then answers `go`, and the gate starts the command with the command line node-pty would have built (`commandLineOf`, tested against node-pty's), on the same console, and exits with its code. The gate starts the command **only on `go`**, however long that takes: `stop <why>`, a failed connection or the pipe closing without a word (Combwork gone, or the terminal stopped) end it with `Error: Combwork didn't start <exe>: <why>` (a failed start), never running the command. A launch stopped while its gate was being tracked is told `stop`, and its job let go even if the assignment lands after (nothing is assigned to a dead or reused pid). **A terminal killed before its gate's word** (HI-1819: Combwork quitting just after a launch) tells the gate `stop` first (`its terminal was closed before it started`), whatever tracking answers after: a command started as its console closes misses the close and runs on with no console. The gate waits for its command, so a gated launch's CLI still running once the gate has exited lost its terminal the same way (`go` said just before the kill): two seconds after, it is ended by identity, not listed as a leftover to keep (it would hold its slot's run, #1434). The CLI is the gate's child and, through `cmd.exe` wrapping it (a `.cmd` launcher, a setup command), the command each wrapper runs, each started after its parent (`orphanedCli`); what the CLI itself started stays a leftover like any other. **When tracking can't work** (Darren's decision B, 10 Oct): a launch first waits until the job host is running (it starts it; `trackingReady`). #1155: the host also starts in the background (`warmProcessTracking`) as Combwork starts with a workspace to reopen (beside its windows' loading), and when a workspace opens later with agents (its `workspace-changed`: a project with an agent, or the Assistant with a session to resume), so the first launch after Combwork starts doesn't wait the 0.35–0.6 s its PowerShell takes (Resume All paid it first in line; measured on a dev build: 0 ms instead of ~340 ms, a Resume as soon as the window showed the workspace); it shows nothing, and a host that can't start is said by the first launch, as before. If it can't run (PowerShell blocked, Constrained Language Mode refusing Add-Type) or doesn't say it is ready within 60 s (it is then killed and given up on for the run), the CLI starts directly, untracked; if a launch's assignment then fails, the gate is told `go` all the same. Once the host runs, every reply is bounded too (60 s): one that doesn't come means the host is stuck, and it is killed, so no launch, End or quit waits on it longer. **A host that ends after starting** (a crash, or killed as stuck) closes its jobs: running agents' launches are no longer tracked (they keep running, nothing is ended); the leftovers listed stay listed by identity, as after a restart (#614, below), and those whose start time isn't known go. A host that held nothing (no running launch, nothing listed but what was restored) loses nothing: only the log says it ended. Otherwise Combwork says so at once through the same once-a-run notice (what was listed and what running agents start are no longer tracked), and Diagnostics keeps it (`; earlier, the process tracker stopped at <time> (<why>): …`) even once a new host, started by the next request, tracks later launches. Either way Combwork never refuses to start an agent over it, and says so once a run: a notification ("Combwork can't keep track of agents' processes": why, and that what agents leave running isn't listed) and a Diagnostics line (`Agents' processes: tracked` or `not tracked: <why>`). Test copies (unpackaged): `CW_TEST_PROCESS_TRACKER=fail` acts out a host that can't run, `=silent` one that starts but never says it is ready, `=mute` one that is ready but never answers (each request it reads noted in the file `CW_TEST_TRACKER_HEARD` names), and `CW_TEST_TRACKER_WAIT_MS` shortens the 60 s waits. One hidden PowerShell per Combwork holds the jobs (C# through `Add-Type`, no files; one line per request); without it (PowerShell blocked) nothing is tracked and agents stop as before. The jobs never end anything themselves (no kill-on-close). Two seconds after the CLI exits, what is still in its job is what it left (consoles' hosts not listed): logged, kept per agent (the newest 5 launches each, 100 in all; older ones forgotten, never ended), looked at again every 10 s while any are listed (those that ended go), and sent to the agent's window (`agent-leftovers`). **Settings → Agents → Processes left running** (`agents.leftoverProcesses`): **Ask** (default) shows a notification listing them with End Them / Keep Running and an **⚠ n left running** chip in the agent's pane header (hover: the list; click: end or keep); **End them** ends them as the agent stops. End terminates the launch's job, so only processes its CLI started are ended, never one started outside it (a process started outside it isn't tracked either, except what escapes it from inside, below; a launch whose job couldn't be ended stays listed and the End fails with a message (the header's End shows it; with End them set, the notification is shown instead, saying Combwork couldn't end them), so it can be tried again or kept; only what was ended is counted. Keep Running stops listing them and leaves them running. Offers whose agent has nothing listed any more are dismissed. Quitting Combwork with some listed asks once in a native dialog (End Them / Leave Running) while a window is shown; a quit with none shown, or to install an update, leaves them running and still listed. **Across a restart** (#614: a dev copy of Combwork a suite started under an agent outlived it and two of Combwork's restarts; that Combwork predated #507, and a later quit to install an update would have forgotten it): what is listed is also kept in the profile (`leftovers.json`, written on every change once within the bounds, so a crash keeps it too), each launch apart and within the same bounds when written and when read (the newest 5 launches an agent, 100 in all, 50 processes a launch), each process by its pid and start time (a Windows FILETIME the host reads with `GetProcessTimes`, `created` in the listing; a process whose start time couldn't be read isn't kept). The next start, once the first window has loaded, lists again those still running as the same processes, each launch on its own (the host's `identify`, which answers with pid and start time pairs, matched as pairs: a record whose pid names another process by then is dropped, also beside another record of that pid that does match) and offers them as when an agent stops ("<agent> left n processes running", End Them / Keep Running; with End them set, ends them). Their jobs are gone by then, so End ends exactly the listed processes, each only while it is still the same process (the host's `endexact`: opened by pid, its start time checked, ended through that handle; one gone counts as ended), not what they started since; they're looked at again every 10 s like the rest. Without the job host, nothing is restored and the list stays for the next start. Test copies of Combwork name their profile on their own command line (`--combwork-test-profile=…`, which Combwork ignores; `tests/e2e/lib.cjs`), so the e2e runner's clean-up of what names a suite's folder also stops a test Combwork whose suite died before closing it, as the one in #614 did. Renderer IPC: `session:leftovers` (the window's workspace), `session:settleLeftovers` (the session host is checked; only that agent's). Windows only. **The real CLIs** (#515, real-tier suites `leftovers-claude` and `leftovers-codex`): a Claude Code background Bash (`run_in_background`) outlives Combwork's stop (its terminal ended) and is listed, and End ends it; `/exit` ends it with Claude Code (2.1.296). Codex ends its background terminals itself as it exits, stopped by Combwork or `/exit` (0.162.1), so they're never left, except that Codex runs commands in PowerShell 7 where there is one, and doesn't end what runs through the Microsoft Store's: that is listed and ended as below (#543). **What escapes the job** (#543): the Store's PowerShell 7 (`WindowsApps\pwsh.exe`) is a packaged app, so Windows starts it in its package's job and its children in none: neither would be listed or ended. The job host takes them in: a live process whose parent is in a launch's job, and that isn't in that job itself, joins it if it is in no job (its later children with it); one already in another job (the Store's PowerShell, in its package's) is followed instead: held open, listed, and ended with the job. Never assigned (#659): Windows would nest the jobs, and the package's job, which every Store PowerShell joins, when it had no parent became the launch's, so every Store PowerShell started after it (any agent's or app's) was listed and ended with that launch. Nor is a packaged app's process, even in no job (#678): Windows puts the Store's PowerShell in its package's job only once it has started (4 to 160 ms after it shows in a snapshot, measured; more under load), and a sweep that caught it before then and assigned it nested the package's job in the launch's just the same (about 1 in 50 loaded test runs). A process with a package identity (`GetPackageFullName`) is followed whatever job it is in; its children (not packaged) still join the launch's job when they are in none. Ids are checked against what they named when seen (#543 round 2): a candidate, or a parent looked up by id and not held, created after the sweep's snapshot is refused (the id names another process by now; Windows stamps creation in ticks of about 15.6 ms, so one created within the snapshot's own tick still passes: a documented limit), the parent must have started before the child, and a process the port reports as joining is held only if it is in that job (a notification read late may carry a reused id). End ends the job and each followed process; one Windows won't end that still runs makes End fail (listed, to try again), and one already gone counts as ended. The host sweeps for them as processes of a job exit (the job's completion port reports each joining and leaving process; the host holds each open until the sweep after its exit, so the exited parent's id and start time stay known; exits are gathered for up to 250 ms and swept for together, since a sweep's snapshot of every process costs a few ms and a build ends hundreds), before listing or ending a job, and every second. Still missed: an escaped process that starts something and exits within a second, before any sweep saw it (a `Start-Process` from the Store's PowerShell that returns at once). The host's C# goes to its PowerShell as the first line of its input, base64 (a command line holds at most 32,767 characters). The log says how many processes of a launch were taken in this way. Unit tests stand in for the escape on any PC (a child started before its CLI joins the job) and use the Store's PowerShell where it is installed; `leftovers-codex` keeps it on PATH. **Agents stop what they start** (#613: one agent's own `tail -f | grep` log watchers, 16 of them, outlived the runs they watched until Combwork quit): the agents' session contract says to watch a run with something that ends with it (`cw-progress`, the CLI's notice that a background command ended), never `tail -f`, and to end what they started that won't end by itself before their card ends, unless the user wants it running, and to end a process only by its handle or the identity they took (pid and start time, job), never by name or a `ps`/`grep` pattern (HI-2865: one project's agent ended every lane's `cw-progress` runs with `ps -ef | grep cw-progress | xargs kill`, Git Bash's `ps` listing all the user's processes); work-on-card (a Finish step, before Review), card-loop (a loop's turns end on a watch, never a watcher) and merge-ready (finishing loose work) say how. The `watcher-stopped` scenario checks it: Combwork lists nothing the agent left once its card is in Review and it is stopped (`session:leftovers` with `settled`, which answers once every exited launch has been looked at). |
 | Failed start | The CLI exits while the session is still **starting** (before its first hook, or for Codex before its prompt shows), and Combwork didn't stop it: a missing or broken CLI, an argument or config it refuses. Main reads the CLI's last error lines from the terminal output (`shared/startFailure.ts`: escapes removed, from the first line naming an error among the last 12, at most three lines and 300 characters) and asks the adapter for a hint (`startHint()`: what is wrong and where to fix it: Agent Settings, Provider Setup, or the terminal), and sends them with `session-exit` (`failure`). The pane shows them in place of "Session ended", in red: **Couldn't start:** the reason, the hint, **Retry** (the same launch again: a resume resumes the conversation), **Agent Settings…** (or **Provider Setup…** when that's where the fix is) and ✕; the agent's tab dot and header turn red ("Failed to start"); a toast with **Show** comes only when its pane isn't on screen, and the window's attention inbox lists it under *needs you* ("Couldn't start: …"; the tray's list, built in main, doesn't know it). It lasts until the agent's next launch or ✕, and isn't kept across restarts. The terminal keeps the full output. Not covered: errors the CLI shows without exiting (Claude Code's sign-in screen, an unknown model or expired sign-in on the first prompt). |
 | Compact | The agent's ⋯ (#977; a header button next to Stop before), Session menu, command palette. Enabled only while the agent is idle (Ready/Finished) and the conversation has content. A dialog shows the context size and cache state and takes an optional **focus**; empty lets the agent decide what to keep. Combwork sends Ctrl+U (clears half-typed input; Claude Code's Ctrl+Y restores it), then `/compact [focus]`. Status shows "Compacting…" until `PostCompact`, a new compaction in the transcript, a refusal in the output ("Not enough messages to compact"), no `PreCompact` within 20 s, or 10 minutes. A compaction the CLI begins by itself while the agent is idle shows "Compacting…" the same way, from its `PreCompact` until `PostCompact`, a prompt, a new compaction in the transcript, or 10 minutes (#1115: Claude Code precomputes a compaction in the background, idle too, and sends `PostCompact` only if and when it uses it). An agent's footer context turns amber above *Suggest compacting above* (the Assistant's Compact button too) (global, default 200,000 tokens; per-project override; **Never** turns it off). The Assistant has its own threshold, **Settings → Assistant → Highlight Compact over** (`settings.assistant.compactSuggestTokens`, default 500,000, **Never** = 0; it usually runs a bigger context): `assistantProjectConfig()` overlays it as its host's `compactSuggestTokens`, so its header's Compact (highlighted, with the same "Recommended…" tooltip) and its footer's context (amber, "— consider compacting", the `compact-suggested` tip) resolve it through the same `compactThreshold()` as agents' (#290). Until then its footer used the agents' 200,000 and its Compact button was never highlighted. The full pre-compaction history stays in the transcript and Combwork's backup. |
 | Archive | Copies the current transcript to `.combwork/archive/` (or moves the backup there if Claude Code no longer has it), removes the active backup and marks the session archived; the archived copy is then compressed (`<id>.jsonl.gz`, #1110). Can be unarchived. Only Combwork's sessions (adopt an external one first), and only when it isn't in use (as Delete). |
@@ -546,7 +547,7 @@ codex [resume <id>] --no-daemon          # options must follow "resume <id>"
 - **Control** (Settings → Assistant → Control, for every workspace; default **Control agents and create projects**): **Look and advise** (it reads and suggests; you act; it lists lanes too, #500: `cw_lane` is trusted at every level, its description says that only `list` works there, and the Agent API refuses starting, joining and ending one below Control agents), **Control agents** (also adds agents, changes their settings, starts and stops them, gives idle ones tasks, turns projects on, and releases a slot once the user agrees: #1561's `cw_release_slot`, whose `list` works at every level), **Control agents and create projects**. It never removes agents, discards worktrees or deletes projects. Changing it marks a running Assistant for restart.
 - **Combwork's settings** (#186). Every setting is described once, in the **settings catalog** (`src/shared/settingsCatalog.ts`): its id (`<section>.<key>`, `<provider>.<key>`, `project.<key>`), scope (app, provider, workspace, project), control and values, default, description, tip, "when it helps", place in Settings, user guide heading, whether a change waits for a restart (agents' sessions, or the Assistant), and whether it is **sensitive**. Settings and Project Settings draw their rows from it (the views add only the custom controls, by id), and the Assistant's tools read it, so the two never drift; a unit test fails when Combwork's settings or a project's config gain a field it doesn't describe. The Assistant reads and explains settings at every Control level (`cw_list_settings`, `cw_read_setting`; `GET /v1/settings`). It changes one (`cw_update_setting`; `PATCH /v1/settings/{id}`) only with **Settings → Assistant → Control → Change settings** on (`assistant.changeSettings`, off by default, independent of the level; the tool is offered only then, and turning it on marks a running Assistant for restart, while turning it off refuses at once), when the user asked or agreed (its rules and the `tune-settings` skill: suggest first, one line). The value is checked as Settings checks it and set as Settings sets it (`config.updateSettings`, or the project's config under its lock). **Sensitive settings are read-only to it**, enforced in the API: permission modes and the dangerous-mode switch, the Agent API, what Combwork runs (CLI paths, extra arguments, a project's setup command, background sessions, pre-release updates), where agents and it may attach card files from (Card attachments: more folders, Combwork's and a workspace's, HI-2480), where agents and it write their temporary files (Agents' temp folder, Combwork's and a workspace's, HI-2496) and its own Settings → Assistant (Control, Change settings, the typing pause, its provider, working mode and launch settings); the Assistant's own provider settings are an entry each (`assistant.<provider>.model`, `.effort`, `.permissionMode`, `.extraArgs`, `.use200kContext`, drawn together as "With <provider>"), readable like the rest. Tables are set whole as JSON: the board's column colours (an object of column → colour, merged), a provider's prices and its fallback model and effort lists (replaced through the same setters as Settings; null puts back Combwork's, for prices the shipped models removed from the table too, as Reset to defaults does). An effort level must be one the effort picker offers for the model that would run (or the default). Keybindings are read-only for now; agent settings stay with `cw_update_agent`. The permission and the value it replaces are checked again at the moment of the change, under the project's lock for a project's setting: a change waiting behind the user's own write is refused if Change settings was turned off meanwhile, or if the Assistant session that asked for it has ended (its launch's token isn't the current one: a restart doesn't carry out the old session's changes). A table's change is listed and answered by the entries that changed ("doing: #3b82f6 → doing: #ff0000"). Each change is listed with old → new and an **Undo** button (§16.14), through `assistant:undo`. Undo checks the value again at the write, under the project's lock for a project's setting; it skips a value changed since and preserves the newer edit. A price table's removed models are checked separately: those changed since are kept while unchanged price overrides can still go back.
 - **Messages for a busy agent** (#530). `cw_prompt_agent` refuses an agent that is working, starting, waiting on background tasks or for the user, or watching, which in a running card loop is nearly always: on 10 Oct the user pasted about ten of the Assistant's messages into agents' panes, and cards waited hours for them (#521). `cw_message_agent` (`POST …/agents/{agent}/message`, Control agents) leaves the agent a message instead (`main/agentMessages.ts`), a **delivery** (#647, below) of kind `rebrief`, which the agent reads with `cw_inbox` (#650: never typed in). Its **doorbell** is typed at once when the agent is idle or **watching** (a watching agent is idle, so it is woken by it; its watch carries on, since typing never ends one, and the line says so: `[CW] New in your inbox: 1 message (m4). Call cw_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #506 → Review: do what this asks, then end your turn, and Combwork wakes you when it changes.)`). A busy agent is told at its next tool call or before its turn ends (Notices and the doorbell, below); else it waits for its next line, whichever comes first: **a line with a wake** (#649: a watch's or a loop's wake is a delivery too, and the delivery service names whatever waits for the agent in one doorbell, `[CW] New in your inbox: 1 message and 1 card event (#2) (m5, m6). …`, whose inbox lists the message first, so the agent has it before it acts on the wake; a delivery cancelled, refused or added while that line is typed stops it, and it is offered again with what waits then), or a line of its own, as a wake is: only while it is idle, nobody types there (Pause after you type) and no earlier line waits to be taken. Tried on its status changes and every 5 s. Several waiting go in one line (`[CW] New in your inbox: 2 messages (m4, m5). …`). One the agent reads first (`cw_inbox`, mid-turn) is received and never offered after. **Each keeps its sender's permission**: the Assistant's `assistantChange` guard (its Control level, its session) is asked before its doorbell is typed, before each piece and Enter, and again as the agent reads its inbox: one whose sender may no longer send it (Control turned down, its session ended) is refused, never given, however long it waited. **A doorbell is never taken back** (#652): once typed it names ids, never what they say, so #376's Enter again (`confirmTaken`) submits it even when what it names has ended meanwhile, and the agent's `cw_inbox` gives nothing of that. (Before #650 a line carried the message's text, and Combwork cleared such a line with Ctrl+U, `clearTyped`, and typed nothing more until a draft typed over it was submitted; #652 retired that.) **Tied to a card round** (#652, from #699's history: the Assistant's re-brief for a round's finding reached its builder a second after the card passed, and the builder reopened the passed card to apply it). `card` ties a message to that card's round under way (its failed reviews plus one: the fix after a failed review is the next round; refused unless the card is in Doing or Review). Once the card has moved on (passed, done or archived, out of Doing and Review, or another review failed) the message is **stale**: ended with why (`#699 passed review`, `#699 is in round 7 now`), never offered, and not given by `cw_inbox` even when its doorbell has already rung, checked under the delivery lock as it is offered or read (judged against the board right before the plan, and read again if the board changed meanwhile; if it keeps changing, the message is held back unread, never judged on an outdated read), and as the board changes; the Assistant's activity list records it. The reply names the round (`Gave HB6 a message (m12) for #699 round 6`). At most 5 waiting per agent (`MAX_QUEUED`, counted as one is made) of at most 4000 characters (`MESSAGE_MAX_CHARS`); saved, so they survive the agent's stops and Combwork's restarts (the Assistant's are then refused, since the launch that left them has ended). The call's reply says what became of that message by the time it returns, with its id: told (its doorbell typed), queued, or (a `409`) cancelled meanwhile, refused, expired or stale, never told when it wasn't. The agent shows them (`inbox`): its pane header has **✉ n unread** (each one's id, who from, its state and the start of it in the tooltip; a click offers **Cancel the Message(s)** for those not read yet (#650: until the agent reads one, it can still be taken back), `session:cancelMessages`), and `cw_agent_activity` has `inbox` (unread, overdue, and the latest deliveries with their states and times), so the Assistant sees whether it was received and acked. `cancel: true` cancels them. `cw_prompt_agent`'s refusals name the tool. A message is for what the agent already works on (a re-brief, the user's answer, a lane addition); a new task is still `cw_prompt_agent` or `cw_start_task`.
-- **Deliveries and the inbox** (#647, the messaging redesign's first card: `plans/2026-10-12-messaging-redesign.md` §3.1, decisions on #645 and #649). Everything Combwork has for an agent to read is a **delivery**: a record (`shared/deliveries.ts`) with a short id unique in its project (`m12`), its target (agent and conversation), kind (task, re-brief, card event, the user's answer, handover, control), sender, card, created and expiry times, body and state, saved in the workspace's database (`.combwork/combwork.db`, #1018: a row each, under its project's id, or `assistant` for the Assistant's; a project's `.combwork/deliveries.json` from before is moved in the first time and kept as `deliveries.json.imported-<time>`), each change one transaction, and restored when Combwork starts (`main/deliveries.ts`). **States**: queued → offered → received → acked, or cancelled (by whom), refused (its sender may no longer send it), expired (not received within 24 hours, `DELIVERY_EXPIRY_HOURS`, or its agent is in another conversation now, or the launch it was for has ended), stale (#652: tied to a card round, and that card has moved on) and uncertain. **Received is automatic, acked is explicit** (#645): received means **read through `cw_inbox`**, the only receipt (#650: the line typed is the doorbell, which names it by id, never its text, so its CLI taking that line is no receipt; #649's `receivedVia: 'typed'`, when the line carried the whole text, is still read back from saved records). A card event or a control notice is done once received; a message, a task, a handover or the user's answer waits for the agent's ack (`cw_inbox` with `ack`), once it has read it: an id alone, as a doorbell names it, acks nothing (it is `unread` in the ack's reply, unchanged, and its source isn't told it was received). One of those not acked 30 minutes after it was made (`OVERDUE_MINUTES`) is **overdue**: shown in the agent's pane (**✉ 1 overdue**, in the warning colour) and in its activity, so a message that went nowhere is a named state, not a mystery. **One scheduler offers them**: the delivery service alone, which types the doorbell for an idle agent (#650, Notices and the doorbell, below), saved as offered before the first key. A doorbell its CLI took whose agent is idle again without having read it (the Stop drain asked it first) **rings once more**, never a third time; it then stays offered, unread in the pane. **Uncertain** (#649): one offered when Combwork stopped, or when its agent's launch ended (or another began) before it was read, may not have reached the agent: it is offered once more, its doorbell saying so (`[CW] New in your inbox: 1 card event (#7) (m2). Call cw_inbox to read it. (m2 again: Combwork restarted while offering it, so it may repeat.)`), and stays uncertain (shown, cancellable, fetchable) if that one isn't received either; agents tell a repeat by its ids. **One transaction at a time, saved before anyone sees it**: each host's changes are checked and planned on a copy, saved by one atomic write (a temp file, then a rename), and only then published (`transact`, under the host's lock), so a read or the pane never sees a change that isn't on disk, and a save that fails changes nothing, on disk or in memory, and fails the call (`NotSaved`); a delivery made, offered, fetched or acked is on disk before the call says so or the line's first key is typed. **An operation takes effect at its save**: its checks (its sender's permission, its expiry, the agent's conversation) are made inside the lock as it is planned, with no check after the save: a permission change that lands while it is saved applies to the next operation, not this one (the fetch was decided before it). **A typed line is checked at each write**: the writer checks its offer (`offerHolds`: still offered by it, its sender's permission, its expiry, the agent's launch and conversation, and whether its producer still wants it) before each piece and Enter; one that no longer holds gets no Enter, and each delivery in it is recorded as what is true (refused, expired, cancelled, stale, or put back to wait and offered again). Once typed, the doorbell isn't checked again before its Enter again (#652): what it names is checked as the agent reads it, and one that ended meanwhile is recorded so when Combwork next looks (its status, the 5 s tick, the read). One can be **cancelled** until the agent reads it (#650): while it waits, while its doorbell is typed (which then gets no Enter), and after; read, it is the agent's. Taken is counted from the CLI's prompts just before the line's own Enter (the writer's last check, after its offer was saved), so a prompt of the user's submitted while that save was slow is never taken for the line. **Permission is worked out again at every step** from the sender saved with it and the settings now (never a token or a closure): the Assistant's needs Control agents and the launch that sent it still running, so **a waiting message (or task) from an Assistant launch that has ended is refused, and shown** (#645) in the agent's activity and the Assistant's activity list (`A message for B1 (m3) was refused`). A delivery for a known conversation goes to that conversation only. Waiting ones survive the agent's stops and Combwork's restarts; a card's events coalesce into one inbox item (`#607: 3 changes, read the card`). **`cw_inbox`** (agents and the Assistant; `POST /v1/inbox`): lists the caller's unread deliveries, oldest first, each with its ids, sender and card, marking them received, and the ids received before and not acked; `ack` takes ids, and one that isn't the caller's is unknown, like one that doesn't exist; `ack` with `read: true` (#1531, opt-in, for an agent with more in its inbox as it acks) acks, then reads, in one call, what it reads received, never acked: nothing is acked by being read. Both check what is unread as an offer would, as they plan (its sender's permission, its expiry, the agent's conversation, and its source's say, #649: made again from things as they are now; an offered one keeps the version it was offered as while that still holds, and one that no longer does is made again rather than never given, since its doorbell carried no text (#650; a receipt covers exactly the version read), so a wake telling a reply the user no longer lets be told, a watch that has ended, a loop wake or a decision line that is no longer that agent's is cancelled, and a delivery its producer no longer holds is neither listed nor acked): one that may no longer be delivered is refused, expired or cancelled, never listed or acked; one already received can still be acked. The Agent API gives each delivery's state and times (`GET …/agents/{agent}/deliveries`, and the activity's `inbox`). Bounded: 500 live per project, ended ones (and card events and control notices once received) kept 50 per agent for a week, received ones never acked expire after a week; the file within a 4 MB budget (counted as written, UTF-8, with room for each live one to reach its end), while Combwork reads back up to 8 MB, so a file it wrote is never set aside as too big: a delivery that doesn't fit after the oldest ended ones make room is refused when made. A damaged file is set aside, never overwritten; saved entries that aren't deliveries are kept aside in the file (or moved to a file of their own when they don't fit).
+- **Deliveries and the inbox** (#647, the messaging redesign's first card: `plans/2026-10-12-messaging-redesign.md` §3.1, decisions on #645 and #649). Everything Combwork has for an agent to read is a **delivery**: a record (`shared/deliveries.ts`) with a short id unique in its project (`m12`), its target (agent and conversation), kind (task, re-brief, card event, the user's answer, handover, control), sender, card, created and expiry times, body and state, saved in the workspace's database (`.combwork/combwork.db`, #1018: a row each, under its project's id, or `assistant` for the Assistant's; a project's `.combwork/deliveries.json` from before is moved in the first time and kept as `deliveries.json.imported-<time>`), each change one transaction, and restored when Combwork starts (`main/deliveries.ts`). **States**: queued → offered → received → acked, or cancelled (by whom), refused (its sender may no longer send it), expired (not received within 24 hours, `DELIVERY_EXPIRY_HOURS`, or its agent is in another conversation now, or the launch it was for has ended), stale (#652: tied to a card round, and that card has moved on) and uncertain. **Received is automatic, acked is explicit** (#645): received means **read through `cw_inbox`**, the only receipt (#650: the line typed is the doorbell, which names it by id, never its text, so its CLI taking that line is no receipt; #649's `receivedVia: 'typed'`, when the line carried the whole text, is still read back from saved records). A card event or a control notice is done once received; a message, a task, a handover or the user's answer waits for the agent's ack (`cw_inbox` with `ack`), once it has read it: an id alone, as a doorbell names it, acks nothing (it is `unread` in the ack's reply, unchanged, and its source isn't told it was received). One of those not acked 30 minutes after it was made (`OVERDUE_MINUTES`) is **overdue**: shown in the agent's pane (**✉ 1 overdue**, in the warning colour) and in its activity, so a message that went nowhere is a named state, not a mystery. **One scheduler offers them**: the delivery service alone, which types the doorbell for an idle agent (#650, Notices and the doorbell, below), saved as offered before the first key. A doorbell its CLI took whose agent is idle again without having read it (the Stop drain asked it first) **rings once more**, never a third time; it then stays offered, unread in the pane. **Uncertain** (#649): one offered when Combwork stopped, or when its agent's launch ended (or another began) before it was read, may not have reached the agent: it is offered once more, its doorbell saying so (`[CW] New in your inbox: 1 card event (#7) (m2). Call cw_inbox to read it. (m2 again: Combwork restarted while offering it, so it may repeat.)`), and stays uncertain (shown, cancellable, fetchable) if that one isn't received either; agents tell a repeat by its ids. **One transaction at a time, saved before anyone sees it**: each host's changes are checked and planned on a copy, saved by one atomic write (a temp file, then a rename), and only then published (`transact`, under the host's lock), so a read or the pane never sees a change that isn't on disk, and a save that fails changes nothing, on disk or in memory, and fails the call (`NotSaved`); a delivery made, offered, fetched or acked is on disk before the call says so or the line's first key is typed. **An operation takes effect at its save**: its checks (its sender's permission, its expiry, the agent's conversation) are made inside the lock as it is planned, with no check after the save: a permission change that lands while it is saved applies to the next operation, not this one (the fetch was decided before it). **A typed line is checked at each write**: the writer checks its offer (`offerHolds`: still offered by it, its sender's permission, its expiry, the agent's launch and conversation, and whether its producer still wants it) before each piece and Enter; one that no longer holds gets no Enter, and each delivery in it is recorded as what is true (refused, expired, cancelled, stale, or put back to wait and offered again). Once typed, the doorbell isn't checked again before its Enter again (#652): what it names is checked as the agent reads it, and one that ended meanwhile is recorded so when Combwork next looks (its status, the 5 s tick, the read). One can be **cancelled** until the agent reads it (#650): while it waits, while its doorbell is typed (which then gets no Enter), and after; read, it is the agent's. Taken is counted from the CLI's prompts just before the line's own Enter (the writer's last check, after its offer was saved), so a prompt of the user's submitted while that save was slow is never taken for the line. **Permission is worked out again at every step** from the sender saved with it and the settings now (never a token or a closure): the Assistant's needs Control agents and the launch that sent it still running, so **a waiting message (or task) from an Assistant launch that has ended is refused, and shown** (#645) in the agent's activity and the Assistant's activity list (`A message for B1 (m3) was refused`). A delivery for a known conversation goes to that conversation only. Waiting ones survive the agent's stops and Combwork's restarts; a card's events coalesce into one inbox item (`#607: 3 changes, read the card`). **`cw_inbox`** (agents and the Assistant; `POST /v1/inbox`): lists the caller's unread deliveries, oldest first, each with its ids, sender and card, marking them received, and the ids received before and not acked; `ack` takes ids, and one that isn't the caller's is unknown, like one that doesn't exist; `ack` with `read: true` (#1531, opt-in, for an agent with more in its inbox as it acks) acks, then reads, in one call, what it reads received, never acked: nothing is acked by being read. Both check what is unread as an offer would, as they plan (its sender's permission, its expiry, the agent's conversation, and its source's say, #649: made again from things as they are now; an offered one keeps the version it was offered as while that still holds, and one that no longer does is made again rather than never given, since its doorbell carried no text (#650; a receipt covers exactly the version read), so a wake telling a reply the user no longer lets be told, a watch that has ended, a loop wake or a decision line that is no longer that agent's is cancelled, and a delivery its producer no longer holds is neither listed nor acked): one that may no longer be delivered is refused, expired or cancelled, never listed or acked; one already received can still be acked. **A card's start task is acked by its start or submit** (HI-2854): the task a card was started on its builder with (taskStart, a slot's placement; `meta.cardTask` with its work cycle, `meta.cycle`) is acked when that agent's `cw_start_card` or `cw_submit` of that card succeeds, in that cycle, once it was received; a refused or failed call acks nothing, and every other delivery (a later task about the same card included) stays as it was. It is recorded as acked like any other, "by its start or submit of the card". The Agent API gives each delivery's state and times (`GET …/agents/{agent}/deliveries`, and the activity's `inbox`). Bounded: 500 live per project, ended ones (and card events and control notices once received) kept 50 per agent for a week, received ones never acked expire after a week; the file within a 4 MB budget (counted as written, UTF-8, with room for each live one to reach its end), while Combwork reads back up to 8 MB, so a file it wrote is never set aside as too big: a delivery that doesn't fit after the oldest ended ones make room is refused when made. A damaged file is set aside, never overwritten; saved entries that aren't deliveries are kept aside in the file (or moved to a file of their own when they don't fit).
 - **Every way into an agent is a delivery** (#649, Messaging 3). Each producer makes a delivery and neither types nor keeps a cursor of its own; the delivery service alone offers them, in one doorbell per offer (#650: the counts by kind, cards and ids; the agent reads each in its inbox, a message first, then each other as its producer made it, a wake's words as they were); a task or a handover in a line of its own. A producer registers itself as the delivery's **source**: it makes the line again just before each offer from things as they are then (none left to tell: cancelled), says whether it still holds before each key (a board or lane change since: made again at the next try), and is told when the delivery is received, which is when its cursor moves on, never on "typed". What an agent must be doing to be offered each is one check (`readiness.ts`), read from the turn ledger's facts (#648): its CLI running (or, for the carry-on after a sign-in, stopped by the refused sign-in), no turn running and none whose state is unknown (unknown is never idle), no compaction, nobody asked, and, for new work, no background tasks that will start it again (#726: an agent whose turn has ended while its own background tasks run, a sleep or a timer, takes a message or a card event as an idle one does: HB6 slept 40 minutes to renew a merge slot and heard of neither #720's comment nor a message until it woke; its CLI takes the line as a new turn, Claude Code's; Codex and Copilot, whose tasks start no turn, were idle then already; card-loop, work-on-card and merge-ready have agents wait with a watch's `limitMinutes`, never a timer); a watch is Combwork's policy on top: a watching agent takes a message or a wake (its watch carries on), not new work (a task, a handover, the user's answer, a lock's go-ahead). A line put off part-way (the user began typing, what it was made from changed), or held back by the typing pause, is tried again in a moment, and on every status change and a 5 s tick. **The producers**: `cw_message_agent` (re-briefs, above); **`cw_prompt_agent`** and **Start** on a running agent (`cw_start_task`, the board): a task, given now or not at all (refused as before for an agent that is busy, waiting or watching; never queued; a Start whose task isn't given puts the card back), its doorbell typed and the task read from the inbox; **an agent started with a task** (`cw_start_agent` or Add Agent with a prompt, Start on a stopped agent, `cw_prompt_agent` with `newConversation`): a task its launch carries, its doorbell as the launch's prompt, offered into that launch and received once the agent reads it (`cw_agent_activity` shows that task as the agent's current one, not the doorbell); **card, lane and agent watches**: a fired watch's line is handed over as a card event once its agent can take a line (made from the cards as they are then), and the watch stays (the agent shows watching) until that delivery is received, then ends, and what its line told is where the agent's next watch starts (`watches.json` keeps the delivery's id: read back, a watch follows it, ending if it was received, firing again if it ended without that); **loop wakes** (card events, the latest per agent and card, noted on the card once received); **decision wakes** (the user's answer, acked; told once received); **Assistant mode notices** (control, for that launch; the conversation records its mode once received); **a lock's go-ahead** (control, for that launch, once its turn has ended); **the carry-on after a sign-in** (control, given now); **handovers and Continue with** (the source's request to write one and the target's to read it, handover deliveries given now). **Outside the service**: the user's own typing and attachments, and the Agent API's explicit raw session input (privileged, as before); the CLI controls (Compact, the mode menu and Shift+Tab, the Plan toggle, exit keys) stay separate but take the same composer reservation as Combwork's lines: none goes in while a line is typed, nor a line while one runs.
 - **Notices and the doorbell** (#650, the messaging redesign's channels: `plans/2026-10-12-messaging-redesign.md` §3.2, §3.4, §3.5; the spikes in `notes/2026-10-12-messaging-spike-*.md`). Combwork tells an agent it has something to read without typing into a busy one. **A checkpoint**: when one of the agent's own tool calls ends (PostToolUse, never a sub-agent's), the hook's reply carries a notice of what arrived since it was last told in that launch (`[CW] New in your inbox: 1 message and 1 card event (#607) (m4, m7). Call cw_inbox now to read them; act on them and ack them, then carry on.`). **The drain**: when its turn would end with something unread, the Stop hook's reply carries the turn on with a notice of everything unread that `cw_inbox` would give then (HI-1687: a notice, at a checkpoint or the drain, names only what passes the read's own gate as it stands, made again of nothing, so it creates or replaces no delivery; a loop wake nothing has made yet, or whose own card, lanes or project settings changed since it was made, isn't named, and the doorbell offers it once the agent is idle. A read hands a loop wake out unless its own card, lanes or project settings changed between its making and the hand-out, then makes it again, a few times at most; another card's change doesn't hold it back. A builder's step for a card that is Done with no lane running it any more is no longer due, and dropped) (`[CW] Before you finish: your inbox has 1 message (m4) you haven't read. Call cw_inbox, act on it and ack it before you end your turn.`), at most once a turn: not at a Stop after a continuation (`stop_hook_active`), nor in a turn Combwork carried on already. **Lanes unwatched (HI-2069)**: the Assistant's drain, with lanes running in the workspace that no watch of its covers (a lane watch on `all`, or on each by id), also carries the turn on with one line naming those lanes' builders (`[CW] Lanes are running (HB1, HB2) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.`), after its inbox's notice when it has one: the same drain, so once a turn and for every CLI the Assistant runs on. Only when its control level lets it control agents (HI-2187): at **Look and advise** the lanes are the user's to run, so no line is sent (a watch the Assistant starts on its own is still its choice). None with no lane running, for a project agent, with the stop continuation off, or with Settings → Advanced → *Lanes: remind the Assistant to watch them* (`cw.lanes.unwatchedNotice`) off. Builders' names are kept to letters, digits, spaces, `.`, `_` and `-`, at most 10; a name with nothing left (an emoji's) is counted among the rest (`HB2 and 2 more`, or `1 lane`), so no lane goes unsaid for its name. Whose turn a hook is, and whether it is stale, is the turn ledger's word: a hook that may carry a notice is answered in the launch's hook order, after the hooks before it, so a late hook of an earlier turn gets nothing and a prompt sent meanwhile waits behind it; the turn ledger counts that Stop as a continuation (#648), so the turn ends at the next one. **The doorbell**: for an idle agent, one short line of the same kind typed into it (`[CW] New in your inbox: 1 task (#12) (m9). Call cw_inbox to read it, act on it, then ack it.`): every line Combwork types for a delivery is one (a task, a handover, a wake, the user's decisions, a notice), with Enter again once if its CLI doesn't take it, never a third; taken but not read by the time the agent is idle again, it rings once more. **Not before its Combwork tools are there** (#865): a resumed Claude Code is ready at its SessionStart before its combwork server has connected, and a doorbell then was a turn that couldn't call `cw_inbox` (and said so in the conversation). A launch given Combwork's tools takes no line of Combwork's until its combwork server says the CLI has connected it (on `notifications/initialized`, or its first `tools/list`: `POST /v1/launch/connected` with the launch's own token), at most Settings → Advanced → *Combwork tools: wait to connect* (30 s) from when it first became ready, for a CLI whose server never starts; a message waits, and a task given meanwhile (given now or not at all) is held until then too (`deliverNow`'s `heldByTools`, `sessions.combworkToolsSettled`), not refused (round 3: refusing it failed the Assistant's task to an agent in the second after it became ready). Codex (0.163.0) and Copilot (1.0.98) connect their MCP servers as they start, before any prompt (Copilot even before its folder-trust question is answered; checked with a probe server whose initialize was held 8 s), and send `notifications/initialized`, so the same gate holds for them. **`cw_inbox` is the only receipt** (Deliveries, above). **No inbox** (Darren's decision on #650): an agent that can't read an inbox (a project agent while the Agent API or the built-in combwork server is off: `agentReadsInbox`; the Assistant always has its own) is given no delivery, and its bodies are never typed instead. Every automated or Assistant-originated delivery (messages, wakes, the user's decisions relayed, notices, a handover's steps, the carry-on) is refused with the reason its sender sees ("B1 has no inbox: turn on the Agent API"): when it is made, or, one already waiting when the Agent API was turned off, when it is next looked at. Only the user's own action from Combwork, a task they Start, is typed as their input, as their typing in its pane is: no delivery and no receipt. No new typed receipts; historical ones (`receivedVia: 'typed'`) still read back. It gets no notices. Each is **Combwork's own fixed wording** with counts by kind, card numbers and delivery ids (`shared/doorbell.ts`), **never a delivery's body, a sender's name or anything a person or an agent wrote**: bodies come only from `cw_inbox`, labelled with their sender, so a "the user says" quoted in a card or a message is data (#643). **Per CLI** (the adapter's `noticeReply`, beside `lockReply`; PreToolUse stays for locks, since its context reaches the model only after the tool ran, as PostToolUse's does): Claude Code (2.1.296) gets context at PostToolUse and Stop (a user-role reminder; Stop with context, not a block, which the user would see as "Stop hook error"); Codex (0.162.1) context at PostToolUse (a developer message, which is why the text is fixed) and a block at Stop (the reason goes on in the same turn as a user-role hook prompt); Copilot (1.0.95, checked offline against a stand-in model) top-level `additionalContext` at PostToolUse (added to the tool's result; the `hookSpecificOutput` form doesn't reach its model) and a block at Stop, whose reason comes back as a new prompt hook: Combwork takes that prompt as its own in the running turn (`drainIsPrompt`, the turn ledger's injected prompts), never a new prompt or turn. A notice is answered in the hook's reply, so a working agent is never typed into; a CLI that can't carry one on an event is never asked about it.
 - **How it acts.** Through the Agent API with **its own token**: a new one each time it starts, in a per-workspace file under the profile (`assistant-api/`) that its combwork MCP server reads, so its launch settings don't change. When it stops, its token stops working and any question it was asking is answered no. Its session doesn't get the Agent API's token, and its Combwork tools ignore one inherited from the CLI. Asking to stop a busy agent stops only the run it asked about, and only if Control still allows it when the user answers. Busy is starting, working, waiting for the user or on background tasks; one only watching cards or agents is idle and stopped without asking (HI-1994). The question is closed whatever ends the wait: the user's answer, 270 s without one (`STOP_ASK_MS`, under the Combwork tools' 300 s reply limit; the reply says it timed out and was withdrawn, `408`), or the call going away (withdrawn); an answer after that is nothing. The API applies Control (not Settings → Agent API) to its calls and confines them to its workspace; with the Agent API off, the server still runs for it alone, and its combwork MCP server is always there. Its tools: `cw_list_providers`, `cw_agent_activity` (status, the task it was last given, its latest reply, this turn's tool calls, locked files, when the user last typed there), `cw_wait_for_agents` (which project agents have too: #416), and as Control allows `cw_activate_project`, `cw_add_agent`, `cw_update_agent`, `cw_start_agent`, `cw_stop_agent`, `cw_prompt_agent` (with `newConversation`, #437: the agent's conversation ends, kept in the Sessions tab, and it starts in a new one on the task, as Hand Over to… itself does but with no handover, through `sessions.newConversation` and the provider's adapter; the same refusals, and also while Combwork is typing into it; the Assistant's Control and session are checked again after the stop and just before the new launch spawns, so a request whose permission ended meanwhile starts nothing), `cw_hand_over` (Hand Over to…: the first agent writes a handover, Combwork waits until it exists, then starts the second on it; refused at once when project agents lack Combwork's tools or the user just typed in either), `cw_create_project`. Project agents don't get these (AGENT_API.md lists them). Adding an agent, changing its settings, starting and stopping it run `assistantChange`'s guard (Control and the Assistant's launch) at their boundary, not only on arrival (HI-2328): `addAgent`'s and `updateAgent`'s `check` with the write under project.json's lock, `sessions.start`'s `allowed` just before the spawn, and just before `sessions.stop`; turned down or ended meanwhile, nothing changes.
@@ -594,7 +595,7 @@ codex [resume <id>] --no-daemon          # options must follow "resume <id>"
   - **The `card-loop` skill** (agents) runs a builder and a reviewer through a list of cards in turn with these watches: the builder sends a card to Review and watches for a verdict or a move into Passed; the reviewer watches for a card arriving in Review and, after failing it, for its return, and moves a card that passes to Passed with its verdict (#170; once the builder has merged its work, it moves its Passed cards to Done); the builder moves a failed card to Doing while it fixes it, then back to Review (a move to Review without leaving it returns it too, #214). Each starts its watch *before* the step that lets the other act, so a fast reply isn't missed. It counts rounds, a round being one build and its review (round 1 is the first build and review), and asks the user when the last round's review fails (5 rounds by default), and tells the user when a wait limit passes. A finding that comes back is marked recurring in the failed verdict and is another round, not a reason to stop early; one the builder disputes is a design question and stops the loop to ask (#163). **Asking the user** is the same for either side, and for any agent with a question only the user can answer (card-loop, review-agent-work, work-on-card; #840): it sets the card's `blocked` to the question and tells the user (`cw_notify`), never only a comment, since a lane watch wakes on a card becoming blocked and never on a comment (a reviewer's question left as a comment on #805 sat unseen for over an hour); once Combwork tells it of the user's decision, it clears `blocked` and carries on. A builder's merge step at the lane's end that needs the user (a commit or merge its CLI or a permission check refuses, a conflict it can't settle) is asked the same way, on the last card (#869): with every card passed nothing else shows the lane waiting.
   - **Card-loop defaults** (#412, Darren's decision: Rounds 10 and Wait 6h, set per workspace, a project can override, a prompt's own values win). Since HI-1766 they are workflow options, resolved Combwork → workspace → project (§16.6.7); what follows is the 0.9 to pre-1.0 design they replaced. **Settings → Workspace → Card loop rounds** and **Card loop wait** (`workspace.loopRounds`, `workspace.loopWaitHours`: whole numbers, 1–50 and 1–24 hours) are the workspace's own, kept in its `workspace.json` (`loops: { rounds, waitHours }`, absent: 10 and 6). They are the first settings with a value per workspace: the catalog's `settingValue`/`settingDefault`/`settingPatch` take the workspace's config for scope `workspace` (`{ workspace: { … } }`, saved by `WorkspaceService.setLoops`, which checks the range; the window through `workspace:setLoops`, the settings tools through `applySetting`, so the Assistant reads and, with Change settings, changes them). **Project Settings → Card loops → Rounds** and **Wait (hours)** (`project.loopRounds`, `project.loopWaitHours`, null inherits) override them for a project. `loopDefaults(ws, project)` (`shared/lanes.ts`) resolves them; a lane started without rounds or a wait (`startLane`) takes them, so the card-loop skill gives `cw_lane start` only the values its request named and uses the lane's from the reply (10 and 6 hours with no lane); the reviewer's `join` reply has the lane's too. coordinate-agents briefs a lane with rounds and a wait only when the user gave them. A prompt's values always win; a change applies to lanes started afterwards.
   - **Loop wakes** (#405, Darren's decision: on by default for cards with a reviewer, with a per-project opt-out). The loop only worked if every agent remembered its card watch; Combwork knows each card's agent and reviewer, so it delivers the two routine handoffs itself (`main/loopWakes.ts`). Each **handoff** is a durable `wake` action (§16.4.5) written with the fact that causes it, in the change's transaction (#1266: the recorder for the board's changes, the runtime for its own), and run by the actions worker once the change commits; there is no other path, so nothing wakes twice: the card moved or returned into Review (`review`, the reviewer's), a review's verdict (`verdict`), the card moved into Passed or Done not by a verdict (`approved`, `done`), a reviewer's request mid-review (`request`, #912: at once, its text in the line, which no card watch stands in for; a plain comment, no move or verdict, by a running lane's reviewer on its card in Review that it hasn't started reviewing counts as one too, #1410: "waiting for #12 first", with the same history line, and a comment once its review has started stays a comment), and the runtime's own notes (`note`: a pass gone stale, the user's answer), the builder's. **The builder's reply** (`reply`, HI-2302) is its reviewer's: a plain comment (no move or verdict) by the card's agent on its card in Review, after the card's loop reviewer commented on it in that round (since its latest arrival in Review, return for review or follow-up), writes the history line *Replied to the reviewer: "…"* and wakes that reviewer with its text, the mirror of #1410; a watch that counts loop steps tells it instead, it is due until the reviewer acts on the card or the card leaves Review, and it is off with the project's loop wakes. Before, a builder's answer to its reviewer's question reached nobody (PE-39). Both the request and the reply are read from a comment however it is written (HI-2428): a change with a comment, or a comment alone (`cw_update_task` with only a comment, the window's comment box), so a builder's later plain comment wakes its pool or lane reviewer too, watch or not; on HI-2410 a comment alone was written past both and a pool reviewer slept for seven hours after its builder's two answers. Only a card in a loop (a running lane with a reviewer, or an agent has reviewed it) gets the actions at all. A **decision** recorded on a card in a loop wakes its builder, and its reviewer while it is in Review or Passed (`wakeOnDecision`, one action per agent; S5, closing #587's manual step): the decision line (below), now also to an agent that is watching rather than waiting for the user. Each wake's delivery carries its action's id, so an action run again (a restart, another Combwork) makes none. A card's **reviewer** is the reviewer of a running lane (active or paused) with the card, else the project agent that last started reviewing it (its board name in the history); a card with neither has no wakes, so a solo user never sees one. A `review` handoff wakes the reviewer, a `verdict` the card's agent (its builder); never the agent that made the change, nor a builder reviewing its own card; never an agent whose own card watch tells it of that change (`watchCovers`, with the card's column: a watch on the card counting a move into Review; one counting a verdict, or a move into the column the verdict left the card in, so a watch for Passed alone stands in for a passing verdict that moved the card there but not for a failed one, which leaves it in Review; or one that has fired with it), checked when queued, again before typing and before each piece. **Whose wake it is is worked out again as it is delivered** (`targetOf`, from the lane and the card then): a lane whose reviewer changed while the wake waited gives it to the new reviewer, and one left with no reviewer drops it; a change to its own card, the lanes holding it or its project's settings while it is checked or typed stops it, and it is worked out again on the next try. Unrelated board traffic does not interrupt its doorbell (HI-2486): offers and inbox hand-outs use the same per-card state key; only when that key cannot be read does the strict board-change counter stand in. Off when the project's workflow option **Wake reviewers and builders** (Card loops, `loopWakes`) is off: inherited Combwork → workspace → project since HI-1766 (§16.6.7; before it, `project.json`'s own `loopWakes: false`, not inherited). The line is a card watch's, with its own tail (`loopWakeLine`: `[CW] #12 (B1's card) is in Review. You review this card in its loop: carry on with it (cw_read_task with latestComment for the comment in full).`; the builder's: `… is in Review: R1 (web) failed it; latest comment by …. This is your card in its loop: carry on (…)`), made from the card as it is when it is offered or read. It is a delivery (#649: a card event), made at once (#652: no settle of its own; what lands with the handoff is in it, since it is made again from the card just before it is offered or read) and given as a wake is (its doorbell only while the agent is idle, the user not typing, no line of Combwork's waiting there, no fired watch of the agent's going first, one line at a time per agent, checked as taken, #376; a busy agent told at its next tool call, #650); until then it waits, saved, the latest per agent and card (made again from a newer handoff; a day each), tried on the agent's next idle status and every 5 s, and made again from the card just before each offer. It is dropped once it has nothing to tell, judged by what the card's history has since the handoff's entry (`historySince`): a reviewer's when the card has left Review or that round has been reviewed (a review started or a verdict given since, also one that has ended: a round reviewed and failed while the reviewer was busy is the builder's now); a builder's when the card is another agent's, the builder has acted on it since the verdict, or another round has started; the user's answer only once it is read, or its card is Done with no lane running (HI-1721: HB2 submitted its next round on HI-1694 before reading Darren's answer, which was dropped as acted on). A later arrival queues a wake of its own. A watch's line telling the handoff's own entry stands in for its wake (#578), never for a `note` or the user's answer (HI-1721): no watch's line says what they say, and their anchor is only the card's latest entry when they were made (the merge queue's return writes none of its own), which a watch begun after them has read; on 26 Oct HB2's return from the queue on HI-1694 was dropped as "told", and HB2 watched for Done for three hours while the card waited for it in Doing. **A watch for another column on one's own returned card** (HI-1721, `tellReturned`): when a builder begins a card watch on its own card in Doing that the merge queue returned to it (`queueReturnOf`: the last entry failed and nothing submitted since), for any column but Doing, it is told of the return at once, from the card's state as it is (the return's own text, a `note` loop wake, the latest per card), its watch carrying on. Each received (read with `cw_inbox`) is noted in the card's history as Combwork (`Woke R1 (web) to review it (a loop wake)`, `Woke B1 (web) with its verdict (a loop wake)`). The card-loop skill says Combwork may wake the agent itself, and that watches stay how it waits.
-  - **Lanes** (#483). A loop is registered as a **lane**, so Combwork knows the loops it runs: `cw_lane` / `/v1/lanes` (Agent API §12), kept in the workspace's database (`.combwork/combwork.db`, a row each, #1018; moved in from `lanes.json` the first time) (`main/lanes.ts`, logic in `shared/lanes.ts`; read and written whole under the lanes' lock). The builder's card-loop starts it (`start`: the cards in order, the reviewer, rounds, wait in minutes, an optional name), the reviewer's joins it by the builder's name (`join`: with its cards, only a running lane sharing one; with none such it starts one from its cards as the builder's start would, which that start then updates), and the Assistant (Control agents, through `assistantChange`) or a script can start one for any builder. **One running lane per builder:** a start sharing a card with its running lane updates it in place (resumed, a card added, the order changed; a reviewer given replaces the old one), one sharing none ends it (ended when it has no card left to do, every one Passed, Done or gone, since it only waits for its merge; else abandoned). **Lifecycle:** `active`; `paused` while it waits for the user, read from the board, not kept: its first card not in Passed or Done is blocked and no other is in Doing or Review (#512: a builder that moved on to the next card while one waits for the user is working). Its current card is the one being worked: the first in Doing that isn't blocked, else the first in Review, else the first unfinished (`currentCard` in `shared/laneBar.ts`); `ended` once every card is Done (Combwork notices on the board's next change) or when ended after the merge (with its merge commit); `abandoned` when its builder or reviewer is removed from the project (`removeAgent`, and found on the next look if removed while Combwork was closed), or when ended unmerged. An ended or abandoned lane keeps its cards as they were when it ended (`frozen` in the file, #512) and reads them from there, never from the board: a card another lane has taken on shows only in that one. Without that record (a lane ended before #512, or one that doesn't read back) its cards are `unrecorded`: not known, with no current card, and never read from the board. A stopped agent doesn't abandon its lane: quitting, restarts and setting changes stop agents too. Ended lanes are listed until their builder starts another or for an hour, and kept a day (at most 200). **Lean replies:** a line per lane (`B1 / R1 (web) lanes and loops: active, on #405; #483 Passed, #405 Review r2, #412 Todo; rounds 10, wait 6 h. lane-3fa2c1`). **Scale-down:** a lane is bookkeeping, never a gate. Nothing refuses or waits on one; a solo agent on a card (work-on-card) makes none; the skill carries on if the tool is missing or a call fails; an unknown reviewer leaves the lane without one rather than refusing. The window gets `lanes:list` and `lanes-changed` (the listed lanes with each card's column, blocked reason, round and review, sent when a lane or one of its cards changes); the Agent API's stream sends `lanes-changed` with the workspace only.
+  - **Lanes** (#483). A loop is registered as a **lane**, so Combwork knows the loops it runs: `cw_lane` / `/v1/lanes` (Agent API §12), kept in the workspace's database (`.combwork/combwork.db`, a row each, #1018; moved in from `lanes.json` the first time) (`main/lanes.ts`, logic in `shared/lanes.ts`; read and written whole under the lanes' lock). The builder's card-loop starts it (`start`: the cards in order, the reviewer, rounds, wait in minutes, an optional name), the reviewer's joins it by the builder's name (`join`: with its cards, only a running lane sharing one; with none such it starts one from its cards as the builder's start would, which that start then updates), and the Assistant (Control agents, through `assistantChange`) or a script can start one for any builder. **One running lane per builder:** a start sharing a card with its running lane updates it in place (resumed, a card added, the order changed; a reviewer given replaces the old one), one sharing none ends it (ended when it has no card left to do, every one Passed, Done or gone, since it only waits for its merge; else abandoned). **Lifecycle:** `active`; `paused` while it waits for the user, read from the board, not kept: its first card not in Passed or Done is blocked and no other is in Doing or Review (#512: a builder that moved on to the next card while one waits for the user is working). Its current card is the one being worked: the first in Doing that isn't blocked, else the first in Review, else the first unfinished (`currentCard` in `shared/laneBar.ts`); `ended` once every card is Done (Combwork notices on the board's next change; HI-3117: a card archived or gone, or one given to another agent, counts as nothing left for it, so a lane whose cards are all such ends too; HI-3118: a card given to none that a newer lane lists still keeps it running, so starting a lane never ends another; and a lane card given to another agent is started in that agent's own slot, never refused for the lane's) or when ended after the merge (with its merge commit); `abandoned` when its builder or reviewer is removed from the project (`removeAgent`, and found on the next look if removed while Combwork was closed), or when ended unmerged. An ended or abandoned lane keeps its cards as they were when it ended (`frozen` in the file, #512) and reads them from there, never from the board: a card another lane has taken on shows only in that one. Without that record (a lane ended before #512, or one that doesn't read back) its cards are `unrecorded`: not known, with no current card, and never read from the board. A stopped agent doesn't abandon its lane: quitting, restarts and setting changes stop agents too. Ended lanes are listed until their builder starts another or for an hour, and kept a day (at most 200). **Lean replies:** a line per lane (`B1 / R1 (web) lanes and loops: active, on #405; #483 Passed, #405 Review r2, #412 Todo; rounds 10, wait 6 h. lane-3fa2c1`). **Scale-down:** a lane is bookkeeping, never a gate. Nothing refuses or waits on one; a solo agent on a card (work-on-card) makes none; the skill carries on if the tool is missing or a call fails; an unknown reviewer leaves the lane without one rather than refusing. The window gets `lanes:list` and `lanes-changed` (the listed lanes with each card's column, blocked reason, round and review, sent when a lane or one of its cards changes); the Agent API's stream sends `lanes-changed` with the workspace only.
 - **Waiting on lanes** (#531). A coordinator follows card loops, not cards: on 10 Oct the Assistant, with seven lanes and about 25 open cards, swapped cards in and out of its 20-card watch on every wake, missed one (#390 sat in Review unreviewed), and was woken by every column move, most of which needed nothing. `cw_wait_for_tasks` / `POST /v1/tasks/wait` with `lanes` (lane ids, or `["all"]`) and `wake: true` (an agent or the Assistant) starts a **lane watch** instead of a card watch (`shared/laneWatch.ts`, `registerLaneWatch` and `evaluateLanes` in `main/watches.ts`): the agent's one watch, kept in `watches.json` like the others (`lanes`, and `laneMarks`: each lane as last measured, its state, whether its merge is due, and each card's column, blocked, stalled, and latest failed and passed verdict times), with no cards and no card limit. `"all"` follows every running lane in the watcher's view (a project agent: its project's; the Assistant: all), lanes started later too, and each lane's cards as the lane goes on (cards added included). It counts only **events**, `events` narrowing or widening them: `failed` (a review failed), `blocked` (a card became blocked: a question for the user), `stalled` (a card became stalled, by the board's own reasons, `cardStall` in `main/cardStall.ts`, shared with the Agent API's `stalled`: nobody on a Doing card (its agent removed or not running; one whose start is under way, HI-1976, a Start giving it the card, its slot being prepared and its builder placed there or its session spawning, is starting, not stalled, for at most 10 minutes (`agentStarts.ts`); one whose start failed is stalled with why, "HB5's start failed: Combwork couldn't get slot-g ready: …", from a slot not prepared, a placement that failed three tries or the CLI exiting before its session started; the window's board reads the same start state, HI-1977: each agent of a ProjectInfo carries `start`, `{ starting: true }` or `{ failed }` (`withAgentStarts`), told to the window at once with each change (`agent-start`) and read again, a change counted (`startSeq`) so a read made before it and arriving after doesn't undo it, and its Stalled mark says the failure in the window's language, *HB5's start failed: …*, the reason as given), a loop agent with no watch, #376, a reviewer watching but not reviewing, #521; a card the merge queue returned, in Doing and unchanged for 15 minutes since, its builder idle or only watching it, HI-1721, `returnedWaitReason`: "HI-1694 came back from the merge queue 16 min ago; HB2 is only watching it, not fixing it."; a running lane's next card not started, HI-1741, `laneNextWaitReason`: in Todo, not blocked, every card before it in the lane Done, the last of them for 15 minutes, its builder idle, only watching or not running (one queued to resume isn't), never in a paused lane: "HI-1735 is the lane's next card: HI-1727 went Done 23 min ago, and HB3 is idle without starting it." (HB3 read HI-1727's Done and ended its turn, and its lane sat for two hours); or a lane's merge, #869: every card passed and none blocked, its builder not running or idle with no background task and no place at the merge slot for 10 minutes since the later of its cards' last change and its own, `mergeStallReason`, told once as "its merge is stalled" with why: on 14 Oct lane G's builder had its commit refused, told the user and stopped, and nothing woke the Assistant for two hours), `merge-due` (every card passed or done, one not yet merged), `unblocked` (a card's block lifted, #922, #1272: the user OK'd what it waited for in the agent's pane), `reblocked` (#1475, default: a card blocked when last measured and still blocked, whose blocked reason changed (a new "Blocked:" history entry) or whose agent commented since, `blockNewsAt` as the card mark's `r`, told as "#1432 is still blocked, with news" with its reason: on 22 and 23 Oct a builder re-shot for the Assistant's OK, commented and changed the reason, and the Assistant's lane watch stayed asleep for up to 2 h; a mark saved before has no `r` and never fires it, and a fresh block is told as `blocked`), `ended` (with the lane's merge commit when its end names one, #1270), `abandoned` (the default), `paused-user` (HI-1991: always counted, whatever `events` says, `readLaneCondition` and `registerLaneWatch` adding it: a new request for the user on a running lane's card, an agent's `cw_ask_user` question or Combwork's own, the card mark's `q` the newest open request's time from For you's items (`forYouOfCards`), told as "HI-12 waits for the user (HB6 asks): …" with its first line, and the tail saying to tell the user; twice a builder's question sat under For you about 20 minutes, its builder not waiting at a prompt so `waiting` never fired, and the Assistant having dropped `paused`, which also fired on every merge; a mark saved before has no `q` and never fires it), and `passed`, `moved` (any column change), `paused-merge` (a lane paused for a card passed but not merged, or merging; `paused`, its name before HI-1991, is read as it) when asked. The user's prompt to a lane's agent from its pane (with Settings → Assistant → Tell the Assistant when I reply to an agent on) reaches the Assistant as a line of its own with its first line, the lane watch going on (#1099, #922). Plain moves stay quiet. While nothing that counts happens each lane's mark moves on to now, so a card blocked again after an unblock counts; a lane that starts after an `"all"` watch began, and a card added to a lane it follows, start from an empty mark (a block or stall they come with is told once, and verdicts since the watch began). A watch on `"all"` keeps a lane it follows in view until that lane's end has been told, also across a wake: a lane that ends or is abandoned between a wake and the watch after it is told by that watch. Once a watch fires, its marks stay where they were until its line is handed over, and the line is worked out again then (`laneRound`), so events that land meanwhile are told in the same line; the marks become what that line told once the agent has read it (#649). One line tells every lane's events (`laneWakeLine`, within the wake size: `[CW] Lane B1 / R1 (greetings): #12 failed review (R1 (alpha)) | Lane B2 / R2: #15 is blocked: "Which icon?". Your lane watch has ended: …`; reasons, then labels, then all but each lane's events give way). A watch after a wake starts each lane from what that wake told (`wokeLanes`: its marks, and when its line was made), so an event in between fires it at once; and what is new is measured from when that line was made (`laneSince`), not from the new watch: a card added to a lane or a lane started in between (also one already ended or abandoned) starts from an empty mark, so its verdicts, block, stall or end are told once. Checked on board changes, `lanes-changed`, agents' status changes (debounced) and every 30 s (a stall that comes with time). Its label is "Waiting on all running lanes" / "Waiting on 3 lanes" / one lane by its **name** (HI-2522: Darren read WR1's "Waiting on lane lane-1d1c05" as a commit id): "Waiting on lane combwork screenshots", with its builder when another lane in the watcher's view has the same name ("Waiting on WB1's lane combwork screenshots"), and as "Waiting on WB1's lane" when it has none; the watch keeps each named lane's name and builder as they were when it began (`laneTitles`); one saved before HI-2522 takes them from the lanes as they are when it is read back (and keeps them), and a lane no longer listed is "a lane": never its id. A wake line too long to tell in full shortens each lane to its name ("B1 / R1" for one with none), never its id; its limit line says to check them (`cw_lane list`). `cw_lane start` from the Assistant nudges it to watch the lanes unless a lane watch on `"all"` (or that lane) runs, and its card wakes while lanes run end with the lanes-running tail, now pointing at a lane watch; run-lanes and coordinate-agents use one. **An ended lane is the answer at once** (HI-2521: WR1 watched its lane 2 s after it ended, merged, and sat watching it for its 6 h limit): a watch naming a lane that has ended or been abandoned starts none, ends the caller's watch before it, and replies with each such lane's end (`lanesAlready`: "Lane WB1 / WR1 (screenshots): ended: merged at 47a3d54c0ffe"). A watch naming lanes always counts their end, whatever its `events`, and one ending while the watch is being set up is told by the check the watch makes once in place.
 - **Lanes, the cards beside them and agents waiting, in one watch** (#726). On 13 Oct the release card #720 was in no lane, so HB6 waited about 45 minutes for Darren's push before the Assistant noticed, and only because another lane's merge came due: a session has one watch, and a lane watch saw only lane cards. A lane watch now takes `cards` too (up to 20, each in the caller's view, else `404`): cards beside its lanes, kept in the same record's `cond` with their `marks` and `seen` and checked as a card watch checks its cards (`check`, from what a wake told about them, `changes` defaulting to comment, column and verdict), a card becoming blocked counting too (`blocked` on the condition: a `Blocked:` entry in its history since, and still blocked). One line tells each lane's events, then each card that changed (as a card wake tells it, with why it is blocked) and each agent waiting (`laneWakeLine`). A later lane watch keeps the last lane watch's cards (the one it replaces, or the one whose wake was read: `wokeLanes`), less those since done or gone, unless it names its own (`[]` for none); its reply says which (`cards`: `now`, `kept`, `replaced`, `dropped`), and its label names them ("Waiting on all running lanes and #720"). A new default event, `waiting`: an agent of the projects it follows (the watcher's view; named lanes: their projects; never itself) starting to wait for the user, the status Combwork shows as waiting (a permission prompt or a question in its pane). Each start is recorded as it happens (`waitStarts`, numbered on the events' clock, in memory); a watch counts those after its `waitSeq` whose agent still waits in the same launch (a wait answered at once has nothing to tell), so a wait is told once, not on every refresh. The line names the agent, its card (its Doing card, else the one it reviews) and what it asks when Combwork knows (the status message), and its tail says to tell the user and never answer for them. Like the lanes' marks, `waitSeq` moves on while nothing counts, stays put once the watch fires, and becomes what the line told once it is read; a watch after a wake starts from there. A fired lane watch whose line has nothing left to tell when it is handed over (the wait answered, the block lifted) isn't given, and waits on. Opt out with `events`. coordinate-agents and run-lanes put a release or one-off card in the lane watch as `cards`, and say the `waiting` event means telling the user; the lanes-running tail on the Assistant's card wakes says so too.
 - **Agents beside the lanes, and what a swapped watch drops** (HI-1987). On 28 Oct the Tools Assistant, following LB2's build (on no card), replaced its lane watch with an agent watch (taking it that it could have one watch at a time), and nothing would have told it of LB1's lane meanwhile. A lane watch now takes `agents` too (`{ project, agent }`, as `cw_wait_for_agents` names them; never itself), followed as an agent watch follows them, in the same record (`agents`, `agentMarks`): a wake when one finishes its turn (through its background tasks), waits for the user or stops, told in the lane watch's line after its lanes, cards and waits (`[CW] Lane B1 / R1: #12 failed review (R1 (alpha)) | LB2 (tools) finished: "…". Your lane watch has ended: …`). The user's replies to them reach the Assistant on their own (#1099), as for a lane's agents. One not working when the watch starts isn't followed: the reply gives its state (`agents.already`). Each is one-off work, followed until a wake tells it: a later lane watch keeps the last one's agents (the one it replaces, or those its wake didn't tell: `wokeLanes`) unless it names its own (`[]` for none), the reply saying so (`agents`: `now`, `kept`, `already`), and the label names them ("Waiting on all running lanes and #720, LB2"). `agents` without `lanes` is `400` (an agent watch is `cw_wait_for_agents`). And a card or agent watch that replaces a lane watch, or follows a lane wake with no lane watch since, while lanes it followed still run, says so in its reply (`lanesLeft`, the lanes' builders: "This replaces your lane watch: 2 running lanes (LB1, LB2) are no longer followed. To follow them as well, watch them with this instead: cw_wait_for_tasks with lanes, and agents or cards."); with no such lane running, nothing is added. The descriptions and skills add no rule for it: the watch takes the work, and the reply is where the mistake is made.
@@ -603,7 +604,7 @@ codex [resume <id>] --no-daemon          # options must follow "resume <id>"
   - **What counts as working**: `working`, `starting`, `background` (unless `ignoreBackground`), or a prompt Combwork typed in the last 30 s that its CLI hasn't taken yet (`SessionManager.agentNow`: the agent was just given a task), also for the bounded wait, so a wait right after `cw_prompt_agent` waits for that task. A launch given its task on its command line (`cw_start_agent` or `cw_add_agent` with a prompt, `cw_prompt_agent` with `newConversation`, a card's Start) counts the same until its CLI takes that task (#712): the CLI is ready at its SessionStart and submits the task only after, and a wait in between was answered "ready" before the task began; at most 30 s after it became ready. Nor does Combwork type a line of its own (a doorbell, a wake) into it in that gap (#721): typed there, the line went first and the task's prompt was taken for the line's (the fake Claude Code merged them into one prompt), so the message waits until the task is taken. That gap is timed from when the launch first became ready (`launchReadyAt`), and also counts while a watch that outlived the agent's last launch shows that ready as watching, or as finished once the watch ends. An agent not working when the watch is asked for is the answer at once (`Already: B6 (web) is idle: "…"`) and no watch starts, as for a card already in the column; a prompt that was pending and is never taken is told as such ("its CLI hasn't taken the prompt it was given"). Without `agents`, every agent working now (the caller excepted); never the caller itself (400), at most 32 (a project's most, 24, and more, #562).
   - **The user's replies** (#418). The Assistant's watches (never an agent's) are also told when the user sends an agent a prompt from its pane: an agent watch on that agent, a card watch on a card that agent has or reviews (`card.agent`, `card.review.agent`), in the same line as other changes (`User replied to B1 on #399: "C, the honeycomb cell"`, `… to B1 (web): …`; the user is named by **Settings → General → Your name** (#426: `general.userName`, "User" by default and when empty, made one line of at most 40 characters by `userNameOf`), which goes into the Assistant's context, so it is the user's to set). It is the user's when the CLI reports the prompt taken (UserPromptSubmit, with its text: `HookEvent` prompt `text`; Codex's answers to its questions without their tag) within 15 s of the user's own Enter in that pane, and later than any line Combwork typed there (`SessionManager.noteUserReply`); slash commands and the Assistant's own pane aren't, nor is a turn the CLI starts by itself (HI-2410: Claude Code's wake when a background task ends sends a prompt hook with the same fields as the user's, only its text, `<task-notification>…`, tells it apart, so the adapter marks a prompt whose text matches the advanced pattern `claude-code.prompt.cliTurn` as the CLI's own, `HookEvent` prompt `cli`: still a turn, never a reply, whatever Enter the user pressed before it, such as one answering a permission dialog; Codex and Copilot start no turn by themselves). Kept on the events' clock (`noteUserReply` in watches.ts, the last 200, first line to 120 characters), and counted from what the watcher's last wake told (`replySeq`, `wokeReplies`), so one is told once. **When no watch of its own tells it now** (#1099: a reply waited for the Assistant's next watch, often turns later, since its watch ends at each wake and an agent watch on an idle agent is answered at once with none started; a lane watch tells no replies): a reply to an agent the Assistant follows is given to it at once, as a wake of its own (`[CW] Darren replied to HB2 (web): "go ahead.".`, a `card-event` delivery from Combwork, source `reply`), and no watch tells it again. It follows an agent that a watch of its own covers now, or its last wakes told it about: an agent watch on it (`wokeAgents`, also an answer at once), a card watch on a card it has or reviews (`woke`), a lane watch with a running lane it builds or reviews. The watches are checked first: one that tells it picks it for its line, as before; what none picked (none covers it, or the one that does had made its line already) is given on its own. Each reply has one owner, claimed at once by whichever picks it first (`Reply.owner`: a watch's `replyTo`, or the direct path after its lookup; rolled back if its delivery can't be saved, and left to the watches then), so it is told once. Turned off, such a wake not read yet is cancelled too. In a card watch's line each reply is told once (with the watched cards its agent has or reviews), first, and fitted with the card changes within the line's size (`cardWakeLine`: what was said gives way first, then whose and the verdicts; the end always stays), and only a reply the line names counts as told. An agent watch's line too long for each in full says whom the user replied to and which agents changed, by name, else by count (`Darren replied to 12 watched agents; 3 watched agents changed`): the user's replies are always told as theirs (`agentWakeLine`). **Settings → Assistant → Tell the Assistant when I reply to an agent** (`assistant.tellReplies`, default on) off: none is kept or told, also a reply already waiting to be typed in a wake (`revokeReplies`, and the setting is checked again whenever a reply is picked, and before every piece of a wake that tells one is typed and before its Enter: also when it was turned off and on again in between (each revocation raises a generation the wake was made under: `replyGeneration`), what was typed is cleared, the wake is dropped without counting anything as told, and the watch fires again on whatever else changed, without the reply, or waits on); turned on again, none comes back. The Assistant may read it, not change it (its own permissions). The coordinate-agents skill: a reply that decides something is recorded on the card as a decision, not asked again.
   - **Who may watch whom.** Any agent of the workspace's projects (never the Assistant), as the bounded wait has always allowed: agents' status is open to every caller. Project agents now have `cw_wait_for_agents` too (it left the Assistant-only tools), but a project agent's line leaves out the reply of another project's agent (`shownTo`), whose conversation holds that project's cards, as its activity is closed to it. The `coordinate-agents` skill prefers an agent watch to polling for card-less waits.
-- **Who may do what.** The user does everything from Combwork. Agents (through their Combwork tools or the Agent API) and the Assistant create cards, change them, give them to agents, comment, block them and move them between the columns, Done included; putting a card On Hold is the user's and the Assistant's (a project agent is refused, 403). **A project agent works on its own project's cards only**: known by its own Agent API token (never by what a request says), it lists, reads, comments on, moves, creates and orders only its project's cards; another project's card, or one with no project, is to it as if it didn't exist (404, the same as a missing number), a card it creates is its project's and can't move to another, a linked or blocking card from another project shows only as its number (listed in `elsewhere`) and stays when it edits the list, and its top, bottom and reorders work among its project's cards in the column without moving other projects' cards. Since a card started on an agent is that agent's prompt, it also can't read another project's agents' activity or session list, or type into them (403), and its event stream (`/v1/events`) has only its own project's session events; their status stays open to it. The Assistant, the user's board and scripts with the workspace token see the whole board. An agent runs as the user and could read the workspace token from disk, so this keeps agents in their lane rather than containing a hostile one. **An agent that moves a card into Doing takes it**: through its Combwork tools, moving a card into Doing from another column without naming an agent gives the card to it (if it is an agent of the card's project), also when another agent had it (out of Doing, nobody was working on it; the history says "Given to …"), and so is a card it creates in Doing; naming an agent (or none, with empty) wins, a card already in Doing keeps its agent, a card's reviewer moving it back from Review or Passed (the one reviewing it, or its running lane's reviewer) leaves it its builder's (HI-1832: on HI-1772 such a move gave the card to the reviewer and ended its builder's watch), and the Assistant, the user and other Agent API callers give it to nobody. **Review is the default for finished work**: the agents' session contract and the work-on-card skill (which a card's prompt points to) tell agents to move a card to Review when its work is done, also one that was in Passed or Done before (more work on a finished card is Done → Doing → Review); a reviewer moves a card that passes to Passed; Done means merged, so an agent moves a card there once its work is merged, or when the user asks; and On Hold is the user's, so agents don't move cards in or out of it unasked. Those are conventions, not permission checks (Combwork doesn't read prompts to decide), apart from parking a card On Hold. **Another agent's card in Doing is its work in progress**: a project agent can't move a card that is in Doing with a different agent to Review, Passed or Done (`409`, saying newer work is in progress, the card unchanged), checked under the board's lock against the card as it is before the rest of the change, so giving it to itself in the same change doesn't get round it. This covers a reviewer whose review ended because the card came back for more work: its verdict is refused, and so is a plain move. Its own agent may, and so may the user, the Assistant and scripts with the workspace token; a card in Doing with no agent, and other changes to the card (comments, labels, moving it back to Todo), aren't restricted. Every move is in the card's history with who made it ("Claudette (web): Moved to Done"), and any move is undone the same way, from the board or the tools, with no approval step. What stays the user's: creating a card straight in Done, putting Done in order, archiving, deleting and bringing archived cards back. Archived cards change only once the user brings them back. **Changing a card's project** (the user, the Assistant, scripts; never a project agent) always takes it from its agent, recorded in its history ("Moved to beta", "Taken from Agent 1 of alpha") so it can be put back; an agent named in the same change is refused (give it to one of the new project's agents afterwards; the card dialog does that as a second change). Every change to a card, including each card of a reorder, is checked against the card as it is when its change is made (under the board's lock): a card moved to another project while a project agent's change waited is unknown to it then, and is left as it is. **Decisions** (#357): a card's `decisions` (`{ id, text, decidedBy: "user", recordedBy, at, editedAt? }`, oldest first, in its file, absent when none) are what the user decided about it: the card is the record, not an agent's terminal. Anyone who can change the card records one (`cw_update_task` / `PATCH` `decision`, up to 4,000 characters and 100 a card), always as the user's decision with who wrote it down ("Recorded a decision: …" in the history, under the board's lock); only the user changes or removes one (`tasks:editDecision`, "Changed a decision to …" / "Removed a decision: …"). The card dialog pins them above the comments (newest last, who recorded each, **new since start** when recorded after the card last moved into Doing; add, change, remove; a decision being written or changed counts as unsaved when the card closes, and the card waits for one being saved), a tile counts them (its tooltip lists them) and an agent's card chip says how many. `cw_read_task` / `GET /v1/tasks/{n}` give them first, without ids. Agents pick them up at fixed checkpoints, never by text typed into their session while they work: work-on-card reads them when starting and again before moving the card to Review, and follows them over the description; review-agent-work checks the work against each (a mismatch is blocking); card-loop has a reviewer whose card is back in Review read it with `comments: 1` (decisions first) rather than only its latest comment, and anyone re-check when flagged; coordinate-agents has the Assistant record the user's decisions as decisions (moving old "Decisions (…)" comments of open cards only when asked). The nudge while it works is a flag: a project agent's reply to any Agent API call (the `X-Combwork-Notice` header, which the Combwork tools add as a last line) says "#12 has 1 new decision since you last read it…" for a card it works on (Doing, its agent), asked the user about out of Doing (blocked, its agent: a builder's question at its lane's end on its card in Passed or Review, #877), reviews, or reviewed before and is back in Review, or that was so when the call began (unless the call read it: the move to Review still hears of an unread one), when a decision was recorded by someone else (one the agent recorded itself isn't news to it) or changed by the user since it last read the card in full, else since its work began, it blocked the card, or its last verdict on it (starting another review round doesn't count as reading it; `decisionNotices.ts`; reads kept in memory, verdicts from the card's history). **An agent waiting for the user** (#401) makes no tool calls, so the flag never comes: when such decisions are new to a running project agent whose turn has ended (ready or finished; never `waiting`, a question or permission prompt it shows, nor while it works or runs background tasks, which aren't ready), Combwork gives it one line, a delivery of the user's answer (#649, with its id to ack): `[CW] #392 has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked. (Its id: m7. …)` (`decisionLine`, every such card of its in one line). It is checked after a settle (15 s) from the last board change of the workspace, or from the agent's turn ending (decisions recorded while it worked), the settle never more than 60 s past the first change it waits on, so decisions recorded together give one line. It goes as a wake does: only while the user isn't typing in that terminal (**Pause after you type**) and no line of Combwork's waits there (`sessions.lineWaiting`), and guarded again before each piece and before Enter, also against any change on the board and the agent reading a card since the line was worked out (then it is made again at the next try). One refused or stopped waits as its delivery and is tried again in a moment, on the agent's status changes and every 5 s, however long the user types or a line waits, until it is told, nothing is new to it any more (cancelled then), its session ends or its workspace closes; each try is made afresh from the decisions new to it then, so a card reassigned or a decision read meanwhile isn't told to the old agent; nothing counts as told until the agent has read its line with `cw_inbox` (received, #650); the doorbell that rings for it is checked as taken (#376, #430: `confirmTaken`). An agent watching cards hears of them from the flag in its wake's tool calls: its watch isn't `ready` (not typed into). Each decision is told once per run of Combwork (`decisionWakes.ts`: per agent and card, the newest decision a line covered, in memory), counted from the same baseline as the flag, and the card's history says whom Combwork told ("Told B6 (web) of 2 new decisions", by Combwork). The work-on-card skill: that line is the user's answer; read the decisions, then carry on from where it asked. Since a card counts as an agent's only once it is in Doing with it, work-on-card has an agent take the card (move it to Doing, which gives it to itself) before asking the user a question about it, also one it reads in Todo (#438): asked with the card still in Todo, the decision was nobody's and no one was told. **The latest comment**: `GET /v1/tasks/{n}/comments/latest` (`cw_read_task` with `latestComment`) gives only the newest comment, so an agent asked to check it doesn't read the whole card. **Summary lines** (#532: round reports and reviews ran to 3–6k characters, each read in full by the builder, the reviewer and the Assistant every round): work-on-card has a report to Review start with a one-sentence summary ("Round 2 ready: …") and review-agent-work a verdict with it in one line ("Round 1: FAILED: 2 findings: <titles>"), the evidence below; `?summary=true` on both reads (`cw_read_task` with `summary`) gives each comment as its first line that isn't blank (cut at 300 characters, `commentSummary` in `shared/tasks.ts`), with `length`, the whole comment's, when there is more. card-loop and run-lanes read wakes that way when the gist is enough; a wake line's comment is already its first line. **Stalled cards**: a Doing card that nobody is working on (no agent, its agent removed, or its agent not running; an agent that finished its turn is waiting for the user, not stalled) gets an amber edge and "Stalled: <why>", the board's sidebar lists them under **Stalled**, and the Agent API's card has `stalled` (the reason). **A card loop left with no watch** (#376) stalls too, in Doing or Review: "<agent> isn't watching #n: its turn ended with no card watch." Only for a card whose next move is its own, or that no loop wake would bring it (HI-1693, `loopCheck.owedCards`). While the project's loop wakes are on and the agent can read its inbox, a loop wake stands in for its watch where the other side moves next: a builder's card in Review (not failed since it arrived), or in Doing with its design or follow-up waiting for the answer (`pendingStep`); and its loop reviewer's card in Doing with no step for it to answer. A card with an open For you request the agent itself asked (`cw_ask_user`, `cw_cannot_within_rules`; HI-2080) is the user's move, whatever its column or reviewer: the user's answer is the agent's loop wake, so it isn't flagged as not watching (it shows as waiting for the user, and its lane as `paused-user`); once the request is answered or closed, the card is owed as before. Such an agent isn't flagged however its watch ended (a notice, its limit). A change of the board, the lanes, the settings or the project works its cards out again, so an idle agent whose move it is again (a failed verdict, a step to answer, its loop wakes or inbox gone) is flagged after the grace without a new turn. (`notWatchingReason`, from the agent's `notWatching`; its tooltip says to show the agent and ask it to carry on). **One that did watch, whose wake waits untaken in its prompt** (#777: a watch whose wake its CLI never took isn't a live one, `watchFor`, so its loop is checked as one with no watch) is stalled for that instead: "<agent> hasn't taken the wake Combwork typed for #n: it waits in its prompt." (`notWatchingReason` with the agent's `untakenLine`; its tooltip says to click its terminal and press Enter), and the user isn't told "isn't watching" again (the untaken line's own notice told them). On 14 Oct every "isn't watching" of the Ambrosia Codex reviewers was this: their wakes typed and not taken (#600), never a turn ended without a watch. An agent is in a loop once it has started a card watch in this run of Combwork (`loopCheck.ts`, `noteLoopWatch`; not the Assistant). When it is idle (ready or finished) with no watch for 45 s (`GRACE_MS`), and no background tasks that will wake it (#521, `tasksWillWake`: some, and its CLI's descriptor says they start a turn, `backgroundWakes`; so a Claude Code builder that ended its turn on an e2e run isn't flagged, and a Codex agent, which they don't wake, still is), its cards in play are marked on it (`notWatching`) and the user is told once per idle spell (a `waiting` notice, "<agent> isn't watching #n"). Its cards in play are the ones its latest watch named, in Doing or Review, and those in Review it is the agent or reviewer of; not its own Doing cards, since it may be asking the user. A **pool lane's card** (HI-2321) is in play only for its builder and the reviewer the pool has for it now (`loopReviewerOf`: its open design's, else its latest submission's), loop wakes or not: a reviewer the pool gave an earlier design step or round to is out of its loop once the next goes to another (on 2 Nov HR1 checked HI-2320's design s10, still watching the card, so the pool gave its revision s19 to HR2; HR1's turn then ended with no watch and the card showed as stalled on it). **Another agent's card** (HI-2381) isn't in play for the watcher either: a card's stall is its own builder's and reviewer's (on 2 Nov CB2, whose next card CL-10 depends on CB1's CL-8, watched both; its watch over, its turn ended with no watch, and CL-8 showed as stalled on CB2 while CB1 and CR1 were on it). A watched card in Doing or Review is owed only by its builder (its agent) and its current reviewer (the review on it, else `loopReviewerOf`); any other watcher's is dropped (`othersCards`), whatever else the watch names, with no exception for dependencies or a missing reviewer (the Assistant's scope call after HR1's round 2: a lane whose reviewer was removed left CB2 flagged again). What that gives up: a reviewer outside any lane waiting for a card's first round, with no review of it started yet, isn't owed its watch either, so it isn't flagged for ending its turn without one. The watched cards not its own are read in full for their loop reviewers, only when there are any. The mark clears as soon as it works or watches again, or has background tasks; a card that moves on (Passed, Done) drops out. A compaction the CLI does while the agent waits on background tasks leaves it **background** again, not ready (#521: that "ready" was what flagged HB3 on 10 Oct). **A card waiting on its reviewer** (#521) stalls too: in Review, not blocked, nobody reviewing it for 15 min (`REVIEW_WAIT_STALL_MS`, from its latest move or return into Review, with no review started or verdict given since: a failed round waiting in Review for its builder's fixes isn't) while the agent that owes its review has a card watch on it: "<agent> is watching #n but hasn't started reviewing it: in Review for 40 min." (`reviewWaitReason`; its tooltip says its reviewer's watch didn't wake it). Only the agent owing the review counts (HI-2636: on 6 Nov a builder only watching a pool card for Done was named, while the pool's reviewer given it sat idle): its lane's reviewer; for a card the pool gave out, the reviewer given its latest submission, stalled 15 min after it was given whether it watches or not, and said so ("#n was given to <agent> to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.", main's check: `reviewDueOf`); a card the pool gives out that nobody was given yet (a pool lane's, or one in no lane while workflow rules are on), none. The board's own mark knows the pool's choice only for a pool lane's current card (its lane's `poolReview`): there it counts that reviewer when it watches, and nobody else; for a card in no lane it names nobody while the rules are on (`laneReviewOwed`). Only with workflow rules off does any watcher count, and then only when its workflow role reviews, never the card's own agent. **A review started with no verdict** (#843, the safety net behind #840) stalls likewise: in Review, not blocked, its review started, and its reviewer's own session `watching` with a card watch on it for 15 min (`REVIEW_WAIT_STALL_MS`, from the later of the review's start and that watch's; any turn the reviewer takes, a comment included, ends its watch and so restarts it), with no verdict given: "<agent> started reviewing #n but has given no verdict, and has only been watching it for 40 min." (`reviewVerdictWaitReason`; its tooltip says to read the reviewer's latest comment, which may hold a question for the user, then ask it to finish its review). A reviewer working, or whose state is unknown, isn't, nor one with an open For you request of its own on the card (HI-2080: it waits for the user's answer; main's `cardStall` and the window's read the board's For you) (on 14 Oct a reviewer asked the user in a comment, set no block and went back to watching; nothing flagged it for 75 minutes). Nor is one waiting on its card's builder's job for the card (HI-1993: on 28 Oct LE-191's reviewer waited on an agreed 50-run stress proof the builder ran in the background, and showed stalled): the builder's open Progress run for the card (`card`; running, or quiet with its process still there) or its CLI's background tasks (a builder's tasks while its card is in Review count as that card's) count as progress, each for at most the background task limit from its start (Settings → Agents); once it ends, the 15 minutes count again from its end (a run's `finishedAt`, the tasks' `backgroundEndedAt`, the limit for a run that never ends): `builderJobOf`, read by main's `cardStall` (the runs given by `setStallRuns`) and the board alike. **A builder's reply waiting on an idle reviewer** (HI-2428) stalls too, watch or not: in Review, not blocked, its review started, its builder's *Replied to the reviewer* line with nothing of the reviewer's on the card since, and for 15 min (`REVIEW_WAIT_STALL_MS`, from the later of the reply and the end of the builder's job for the card, HI-1993) neither the reviewer nor the builder in a turn and no such job running: "<card>'s builder replied to <agent> 40 min ago; <agent> is idle, with no verdict or answer since." (`replyWaitReason`, agent-facing). A reply such as "running it now" while the builder works on what was asked is no stall; once both are idle it is, before the lane's own wait: on HI-2410 the Assistant's lane watch ran out after 6 h with nothing to tell. **A lane's deadlock** (#1410) stalls likewise: a card of a running lane (X) in Review, unreviewed and not blocked; the lane's builder (by agent id, in the lane's project) only `watching`, its live watch holding X; the lane's reviewer only `watching`, its live watch leaving X out and holding a card (Y) that comes **before X in the lane's order** and is still to come (Todo or Doing); and all of that unchanged for 15 min (`REVIEW_WAIT_STALL_MS`), counted from the latest of X's arrival in Review (or return for review), Y's last move into its column and both watches' starts, so a replaced watch or a moved card starts it again, and a time not known never makes it look old (not flagged): "<reviewer> is waiting for #m, before #n in the lane, while <builder> waits on the review of #n: each has waited on the other for 40 min." (`laneOrderWaitReason`; a later card, a card outside the lane, or either agent at work is no deadlock; its tooltip says to ask the builder to send the card the reviewer waits for, or the reviewer to review this one). On 22 Oct a builder sent a lane's later card to Review while its reviewer kept the lane's order and waited for the earlier one in Todo; each waited on the other for five hours, and no other stall rule caught it. On the board, through the Agent API and the Combwork tools (`stalled`, so the Assistant sees it), and in the Progress panel's lane row (a **stalled** marker in the header, the card and reason in its tooltip, for any stalled card of a running lane); the window re-reads it each minute. Combwork learns of a loop only from a watch, so an agent's first turn without one isn't caught; the card-loop skill has the agent check the watch's reply ("Waiting for #n…") before it ends its turn, start it again once, then tell the user. The Assistant's `coordinate-agents` skill tells it to report stalled cards when it looks at the board and suggest who could take each; its rules say it reassigns or restarts one only when the user agrees. **Removing an agent** (Remove Agent…, Discard) with open cards (not done or archived) asks: **Move them back** (nobody has them; Doing ones go to Todo) or **Leave them** (they show the agent as removed, Doing ones as stalled); Cancel keeps the agent. Removing an agent after a merge with clean-up leaves its cards as they are. **Archiving and deleting** (to the Recycle Bin; other cards' references to it are dropped) are the user's. **Archiving in bulk** (#351), the user's too (no tool or Agent API call does it; `PATCH /v1/tasks/{n}` with `archived` is refused, 403): each column's **⋯** (also right-click on its header) has **Archive All in <Column> (n)…**, and the toolbar's **⋯** **Archive All Cards (n)…**, off at 0. They take the cards the board shows: while a search, or the Board view's project filter, hides some of the column's (the board's) cards, the item and its dialog say **Archive the 5 Shown (of 23)…** and only those go (in a project's Tasks tab the project is the board, not a filter). The dialog says how many (Archive All Cards counts per column and has a danger button), and cards an agent is on are skipped and listed ("#305 Title · B4 is working on it · skipped"): a Doing card whose agent is running, a card with a reviewer, and a card an agent or the Assistant watches, unless it is in Done (HI-2153: a watch on a Done card waits for nothing, and Combwork ends it); **Also archive cards agents are working on** takes them too, warning that their agents lose the card. Main checks each card again as it archives it, under the board's lock (`tasks:archiveBatch` takes the column, project and search shown and whether busy cards are included; `cardBusy()` asks the sessions and watches as they are then): a card that has left the column, project or search, or that an agent took, began reviewing or watching while the dialog was open or the call waited, stays on the board, and the toast says which and why ("#12 moved to Doing"). Each is one **batch**: recorded in the board's database (the newest 50: id, time, by, what, its cards and each column it left as it was) in the same transaction as its cards, so two windows' batches run one after the other; each card is archived with the batch's id (`archivedBatch`) and a history line ("Archived in a batch of 23 (All in Done)"), and the board is told once. A toast, **Archived 23 cards**, has **Undo** for 10 seconds; **Archived** has **Batch** (each kept batch that still has archived cards: when, what, how many), and **Unarchive this batch** brings it back too (`tasks:unarchiveBatch`): each of its cards still archived with it goes back to its column just after the nearest card that was above it then and is there now, else just before the nearest that was below it, else at the top (`restoreOrders()`), "Brought back with its batch (…)" in its history, and the batch is forgotten once every card came back: a card that can't be read or saved stays archived with it, the error names it, and the batch stays in **Batch** to try again. A card unarchived on its own leaves its batch. A card watch on an archived card wakes its agent with "#12 was archived (off the board: only the user brings it back)", and a bounded wait reports "was archived". A reference (blocked by, link) to a card that is gone, left by a card linked to one at the moment it was deleted, is left out whenever cards are read and leaves the file when that card is next saved; numbers are never reused, so it can't come to mean another card. Nothing moves by itself: an agent finishing doesn't move its card; it moves to Review when someone moves it, which the card's prompt asks the agent to do.
+- **Who may do what.** The user does everything from Combwork. Agents (through their Combwork tools or the Agent API) and the Assistant create cards, change them, give them to agents, comment, block them and move them between the columns, Done included; putting a card On Hold is the user's and the Assistant's (a project agent is refused, 403). **A project agent works on its own project's cards only**: known by its own Agent API token (never by what a request says), it lists, reads, comments on, moves, creates and orders only its project's cards; another project's card, or one with no project, is to it as if it didn't exist (404, the same as a missing number), a card it creates is its project's and can't move to another, a linked or blocking card from another project shows only as its number (listed in `elsewhere`) and stays when it edits the list, and its top, bottom and reorders work among its project's cards in the column without moving other projects' cards. Since a card started on an agent is that agent's prompt, it also can't read another project's agents' activity or session list, or type into them (403), and its event stream (`/v1/events`) has only its own project's session events; their status stays open to it. The Assistant, the user's board and scripts with the workspace token see the whole board. An agent runs as the user and could read the workspace token from disk, so this keeps agents in their lane rather than containing a hostile one. **An agent that moves a card into Doing takes it**: through its Combwork tools, moving a card into Doing from another column without naming an agent gives the card to it (if it is an agent of the card's project), also when another agent had it (out of Doing, nobody was working on it; the history says "Given to …"), and so is a card it creates in Doing; naming an agent (or none, with empty) wins, a card already in Doing keeps its agent, a card's reviewer moving it back from Review or Passed (the one reviewing it, or its running lane's reviewer) leaves it its builder's (HI-1832: on HI-1772 such a move gave the card to the reviewer and ended its builder's watch), and the Assistant, the user and other Agent API callers give it to nobody. **Review is the default for finished work**: the agents' session contract and the work-on-card skill (which a card's prompt points to) tell agents to move a card to Review when its work is done, also one that was in Passed or Done before (more work on a finished card is Done → Doing → Review); a reviewer moves a card that passes to Passed; Done means merged, so an agent moves a card there once its work is merged, or when the user asks; and On Hold is the user's, so agents don't move cards in or out of it unasked. Those are conventions, not permission checks (Combwork doesn't read prompts to decide), apart from parking a card On Hold. **Another agent's card in Doing is its work in progress**: a project agent can't move a card that is in Doing with a different agent to Review, Passed or Done (`409`, saying newer work is in progress, the card unchanged), checked under the board's lock against the card as it is before the rest of the change, so giving it to itself in the same change doesn't get round it. This covers a reviewer whose review ended because the card came back for more work: its verdict is refused, and so is a plain move. Its own agent may, and so may the user, the Assistant and scripts with the workspace token; a card in Doing with no agent, and other changes to the card (comments, labels, moving it back to Todo), aren't restricted. Every move is in the card's history with who made it ("Claudette (web): Moved to Done"), and any move is undone the same way, from the board or the tools, with no approval step. What stays the user's: creating a card straight in Done, putting Done in order, archiving, deleting and bringing archived cards back. Archived cards change only once the user brings them back. **Changing a card's project** (the user, the Assistant, scripts; never a project agent) always takes it from its agent, recorded in its history ("Moved to beta", "Taken from Agent 1 of alpha") so it can be put back; an agent named in the same change is refused (give it to one of the new project's agents afterwards; the card dialog does that as a second change). Every change to a card, including each card of a reorder, is checked against the card as it is when its change is made (under the board's lock): a card moved to another project while a project agent's change waited is unknown to it then, and is left as it is. **Decisions** (#357): a card's `decisions` (`{ id, text, decidedBy: "user", recordedBy, at, editedAt? }`, oldest first, in its file, absent when none) are what the user decided about it: the card is the record, not an agent's terminal. Anyone who can change the card records one (`cw_update_task` / `PATCH` `decision`, up to 4,000 characters and 100 a card), always as the user's decision with who wrote it down ("Recorded a decision: …" in the history, under the board's lock); only the user changes or removes one (`tasks:editDecision`, "Changed a decision to …" / "Removed a decision: …"). The card dialog pins them above the comments (newest last, who recorded each, **new since start** when recorded after the card last moved into Doing; add, change, remove; a decision being written or changed counts as unsaved when the card closes, and the card waits for one being saved), a tile counts them (its tooltip lists them) and an agent's card chip says how many. `cw_read_task` / `GET /v1/tasks/{n}` give them first, without ids. Agents pick them up at fixed checkpoints, never by text typed into their session while they work: work-on-card reads them when starting (from its start task when that carries the whole card, HI-2854), and `cw_submit` refuses a builder that hasn't seen one (§16.4.6), giving it them, and follows them over the description; review-agent-work checks the work against each (a mismatch is blocking); card-loop has a reviewer whose card is back in Review read it with `comments: 1` (decisions first) rather than only its latest comment, and anyone re-check when flagged; coordinate-agents has the Assistant record the user's decisions as decisions (moving old "Decisions (…)" comments of open cards only when asked). The nudge while it works is a flag: a project agent's reply to any Agent API call (the `X-Combwork-Notice` header, which the Combwork tools add as a last line) says "#12 has 1 new decision since you last read it…" for a card it works on (Doing, its agent), asked the user about out of Doing (blocked, its agent: a builder's question at its lane's end on its card in Passed or Review, #877), reviews, or reviewed before and is back in Review, or that was so when the call began (unless the call read it: the move to Review still hears of an unread one), when a decision was recorded by someone else (one the agent recorded itself isn't news to it) or changed by the user since it last read the card in full, else since its work began, it blocked the card, or its last verdict on it (starting another review round doesn't count as reading it; `decisionNotices.ts`; reads kept in memory, verdicts from the card's history). **An agent waiting for the user** (#401) makes no tool calls, so the flag never comes: when such decisions are new to a running project agent whose turn has ended (ready or finished; never `waiting`, a question or permission prompt it shows, nor while it works or runs background tasks, which aren't ready), Combwork gives it one line, a delivery of the user's answer (#649, with its id to ack): `[CW] #392 has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked. (Its id: m7. …)` (`decisionLine`, every such card of its in one line). It is checked after a settle (15 s) from the last board change of the workspace, or from the agent's turn ending (decisions recorded while it worked), the settle never more than 60 s past the first change it waits on, so decisions recorded together give one line. It goes as a wake does: only while the user isn't typing in that terminal (**Pause after you type**) and no line of Combwork's waits there (`sessions.lineWaiting`), and guarded again before each piece and before Enter, also against any change on the board and the agent reading a card since the line was worked out (then it is made again at the next try). One refused or stopped waits as its delivery and is tried again in a moment, on the agent's status changes and every 5 s, however long the user types or a line waits, until it is told, nothing is new to it any more (cancelled then), its session ends or its workspace closes; each try is made afresh from the decisions new to it then, so a card reassigned or a decision read meanwhile isn't told to the old agent; nothing counts as told until the agent has read its line with `cw_inbox` (received, #650); the doorbell that rings for it is checked as taken (#376, #430: `confirmTaken`). An agent watching cards hears of them from the flag in its wake's tool calls: its watch isn't `ready` (not typed into). Each decision is told once per run of Combwork (`decisionWakes.ts`: per agent and card, the newest decision a line covered, in memory), counted from the same baseline as the flag, and the card's history says whom Combwork told ("Told B6 (web) of 2 new decisions", by Combwork). The work-on-card skill: that line is the user's answer; read the decisions, then carry on from where it asked. Since a card counts as an agent's only once it is in Doing with it, work-on-card has an agent take the card (move it to Doing, which gives it to itself) before asking the user a question about it, also one it reads in Todo (#438): asked with the card still in Todo, the decision was nobody's and no one was told. **The latest comment**: `GET /v1/tasks/{n}/comments/latest` (`cw_read_task` with `latestComment`) gives only the newest comment, so an agent asked to check it doesn't read the whole card. **Summary lines** (#532: round reports and reviews ran to 3–6k characters, each read in full by the builder, the reviewer and the Assistant every round): work-on-card has a report to Review start with a one-sentence summary ("Round 2 ready: …") and review-agent-work a verdict with it in one line ("Round 1: FAILED: 2 findings: <titles>"), the evidence below; `?summary=true` on both reads (`cw_read_task` with `summary`) gives each comment as its first line that isn't blank (cut at 300 characters, `commentSummary` in `shared/tasks.ts`), with `length`, the whole comment's, when there is more. card-loop and run-lanes read wakes that way when the gist is enough; a wake line's comment is already its first line. **Stalled cards**: a Doing card that nobody is working on (no agent, its agent removed, or its agent not running; an agent that finished its turn is waiting for the user, not stalled) gets an amber edge and "Stalled: <why>", the board's sidebar lists them under **Stalled**, and the Agent API's card has `stalled` (the reason). **A card loop left with no watch** (#376) stalls too, in Doing or Review: "<agent> isn't watching #n: its turn ended with no card watch." Only for a card whose next move is its own, or that no loop wake would bring it (HI-1693, `loopCheck.owedCards`). While the project's loop wakes are on and the agent can read its inbox, a loop wake stands in for its watch where the other side moves next: a builder's card in Review (not failed since it arrived), or in Doing with its design or follow-up waiting for the answer (`pendingStep`); and its loop reviewer's card in Doing with no step for it to answer. A card with an open For you request the agent itself asked (`cw_ask_user`, `cw_cannot_within_rules`; HI-2080) is the user's move, whatever its column or reviewer: the user's answer is the agent's loop wake, so it isn't flagged as not watching (it shows as waiting for the user, and its lane as `paused-user`); once the request is answered or closed, the card is owed as before. Such an agent isn't flagged however its watch ended (a notice, its limit). A change of the board, the lanes, the settings or the project works its cards out again, so an idle agent whose move it is again (a failed verdict, a step to answer, its loop wakes or inbox gone) is flagged after the grace without a new turn. (`notWatchingReason`, from the agent's `notWatching`; its tooltip says to show the agent and ask it to carry on). **One that did watch, whose wake waits untaken in its prompt** (#777: a watch whose wake its CLI never took isn't a live one, `watchFor`, so its loop is checked as one with no watch) is stalled for that instead: "<agent> hasn't taken the wake Combwork typed for #n: it waits in its prompt." (`notWatchingReason` with the agent's `untakenLine`; its tooltip says to click its terminal and press Enter), and the user isn't told "isn't watching" again (the untaken line's own notice told them). On 14 Oct every "isn't watching" of the Ambrosia Codex reviewers was this: their wakes typed and not taken (#600), never a turn ended without a watch. An agent is in a loop once it has started a card watch in this run of Combwork (`loopCheck.ts`, `noteLoopWatch`; not the Assistant). When it is idle (ready or finished) with no watch for 45 s (`GRACE_MS`), and no background tasks that will wake it (#521, `tasksWillWake`: some, and its CLI's descriptor says they start a turn, `backgroundWakes`; so a Claude Code builder that ended its turn on an e2e run isn't flagged, and a Codex agent, which they don't wake, still is), its cards in play are marked on it (`notWatching`) and the user is told once per idle spell (a `waiting` notice, "<agent> isn't watching #n"). Its cards in play are the ones its latest watch named, in Doing or Review, and those in Review it is the agent or reviewer of; not its own Doing cards, since it may be asking the user. A **pool lane's card** (HI-2321) is in play only for its builder and the reviewer the pool has for it now (`loopReviewerOf`: its open design's, else its latest submission's), loop wakes or not: a reviewer the pool gave an earlier design step or round to is out of its loop once the next goes to another (on 2 Nov HR1 checked HI-2320's design s10, still watching the card, so the pool gave its revision s19 to HR2; HR1's turn then ended with no watch and the card showed as stalled on it). **Another agent's card** (HI-2381) isn't in play for the watcher either: a card's stall is its own builder's and reviewer's (on 2 Nov CB2, whose next card CL-10 depends on CB1's CL-8, watched both; its watch over, its turn ended with no watch, and CL-8 showed as stalled on CB2 while CB1 and CR1 were on it). A watched card in Doing or Review is owed only by its builder (its agent) and its current reviewer (the review on it, else `loopReviewerOf`); any other watcher's is dropped (`othersCards`), whatever else the watch names, with no exception for dependencies or a missing reviewer (the Assistant's scope call after HR1's round 2: a lane whose reviewer was removed left CB2 flagged again). What that gives up: a reviewer outside any lane waiting for a card's first round, with no review of it started yet, isn't owed its watch either, so it isn't flagged for ending its turn without one. The watched cards not its own are read in full for their loop reviewers, only when there are any. The mark clears as soon as it works or watches again, or has background tasks; a card that moves on (Passed, Done) drops out. A compaction the CLI does while the agent waits on background tasks leaves it **background** again, not ready (#521: that "ready" was what flagged HB3 on 10 Oct). **A card waiting on its reviewer** (#521) stalls too: in Review, not blocked, nobody reviewing it for 15 min (`REVIEW_WAIT_STALL_MS`, from its latest move or return into Review, with no review started or verdict given since: a failed round waiting in Review for its builder's fixes isn't) while the agent that owes its review has a card watch on it: "<agent> is watching #n but hasn't started reviewing it: in Review for 40 min." (`reviewWaitReason`; its tooltip says its reviewer's watch didn't wake it). Only the agent owing the review counts (HI-2636: on 6 Nov a builder only watching a pool card for Done was named, while the pool's reviewer given it sat idle): its lane's reviewer; for a card the pool gave out, the reviewer given its latest submission, stalled 15 min after it was given whether it watches or not, and said so ("#n was given to <agent> to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.", main's check: `reviewDueOf`); a card the pool gives out that nobody was given yet (a pool lane's, or one in no lane while workflow rules are on), none. The board's own mark knows the pool's choice only for a pool lane's current card (its lane's `poolReview`): there it counts that reviewer when it watches, and nobody else; for a card in no lane it names nobody while the rules are on (`laneReviewOwed`). Only with workflow rules off does any watcher count, and then only when its workflow role reviews, never the card's own agent. **A review started with no verdict** (#843, the safety net behind #840) stalls likewise: in Review, not blocked, its review started, and its reviewer's own session `watching` with a card watch on it for 15 min (`REVIEW_WAIT_STALL_MS`, from the later of the review's start and that watch's; any turn the reviewer takes, a comment included, ends its watch and so restarts it), with no verdict given: "<agent> started reviewing #n but has given no verdict, and has only been watching it for 40 min." (`reviewVerdictWaitReason`; its tooltip says to read the reviewer's latest comment, which may hold a question for the user, then ask it to finish its review). A reviewer working, or whose state is unknown, isn't, nor one with an open For you request of its own on the card (HI-2080: it waits for the user's answer; main's `cardStall` and the window's read the board's For you) (on 14 Oct a reviewer asked the user in a comment, set no block and went back to watching; nothing flagged it for 75 minutes). Nor is one waiting on its card's builder's job for the card (HI-1993: on 28 Oct LE-191's reviewer waited on an agreed 50-run stress proof the builder ran in the background, and showed stalled): the builder's open Progress run for the card (`card`; running, or quiet with its process still there) or its CLI's background tasks (a builder's tasks while its card is in Review count as that card's) count as progress, each for at most the background task limit from its start (Settings → Agents); once it ends, the 15 minutes count again from its end (a run's `finishedAt`, the tasks' `backgroundEndedAt`, the limit for a run that never ends): `builderJobOf`, read by main's `cardStall` (the runs given by `setStallRuns`) and the board alike. **A builder's reply waiting on an idle reviewer** (HI-2428) stalls too, watch or not: in Review, not blocked, its review started, its builder's *Replied to the reviewer* line with nothing of the reviewer's on the card since, and for 15 min (`REVIEW_WAIT_STALL_MS`, from the later of the reply and the end of the builder's job for the card, HI-1993) neither the reviewer nor the builder in a turn and no such job running: "<card>'s builder replied to <agent> 40 min ago; <agent> is idle, with no verdict or answer since." (`replyWaitReason`, agent-facing). A reply such as "running it now" while the builder works on what was asked is no stall; once both are idle it is, before the lane's own wait: on HI-2410 the Assistant's lane watch ran out after 6 h with nothing to tell. **A lane's deadlock** (#1410) stalls likewise: a card of a running lane (X) in Review, unreviewed and not blocked; the lane's builder (by agent id, in the lane's project) only `watching`, its live watch holding X; the lane's reviewer only `watching`, its live watch leaving X out and holding a card (Y) that comes **before X in the lane's order** and is still to come (Todo or Doing); and all of that unchanged for 15 min (`REVIEW_WAIT_STALL_MS`), counted from the latest of X's arrival in Review (or return for review), Y's last move into its column and both watches' starts, so a replaced watch or a moved card starts it again, and a time not known never makes it look old (not flagged): "<reviewer> is waiting for #m, before #n in the lane, while <builder> waits on the review of #n: each has waited on the other for 40 min." (`laneOrderWaitReason`; a later card, a card outside the lane, or either agent at work is no deadlock; its tooltip says to ask the builder to send the card the reviewer waits for, or the reviewer to review this one). On 22 Oct a builder sent a lane's later card to Review while its reviewer kept the lane's order and waited for the earlier one in Todo; each waited on the other for five hours, and no other stall rule caught it. On the board, through the Agent API and the Combwork tools (`stalled`, so the Assistant sees it), and in the Progress panel's lane row (a **stalled** marker in the header, the card and reason in its tooltip, for any stalled card of a running lane); the window re-reads it each minute. Combwork learns of a loop only from a watch, so an agent's first turn without one isn't caught; the card-loop skill has the agent check the watch's reply ("Waiting for #n…") before it ends its turn, start it again once, then tell the user. The Assistant's `coordinate-agents` skill tells it to report stalled cards when it looks at the board and suggest who could take each; its rules say it reassigns or restarts one only when the user agrees. **Removing an agent** (Remove Agent…, Discard) with open cards (not done or archived) asks: **Move them back** (nobody has them; Doing ones go to Todo) or **Leave them** (they show the agent as removed, Doing ones as stalled); Cancel keeps the agent. Removing an agent after a merge with clean-up leaves its cards as they are. **Archiving and deleting** (to the Recycle Bin; other cards' references to it are dropped) are the user's. **Archiving in bulk** (#351), the user's too (no tool or Agent API call does it; `PATCH /v1/tasks/{n}` with `archived` is refused, 403): each column's **⋯** (also right-click on its header) has **Archive All in <Column> (n)…**, and the toolbar's **⋯** **Archive All Cards (n)…**, off at 0. They take the cards the board shows: while a search, or the Board view's project filter, hides some of the column's (the board's) cards, the item and its dialog say **Archive the 5 Shown (of 23)…** and only those go (in a project's Tasks tab the project is the board, not a filter). The dialog says how many (Archive All Cards counts per column and has a danger button), and cards an agent is on are skipped and listed ("#305 Title · B4 is working on it · skipped"): a Doing card whose agent is running, a card with a reviewer, and a card an agent or the Assistant watches, unless it is in Done (HI-2153: a watch on a Done card waits for nothing, and Combwork ends it); **Also archive cards agents are working on** takes them too, warning that their agents lose the card. Main checks each card again as it archives it, under the board's lock (`tasks:archiveBatch` takes the column, project and search shown and whether busy cards are included; `cardBusy()` asks the sessions and watches as they are then): a card that has left the column, project or search, or that an agent took, began reviewing or watching while the dialog was open or the call waited, stays on the board, and the toast says which and why ("#12 moved to Doing"). Each is one **batch**: recorded in the board's database (the newest 50: id, time, by, what, its cards and each column it left as it was) in the same transaction as its cards, so two windows' batches run one after the other; each card is archived with the batch's id (`archivedBatch`) and a history line ("Archived in a batch of 23 (All in Done)"), and the board is told once. A toast, **Archived 23 cards**, has **Undo** for 10 seconds; **Archived** has **Batch** (each kept batch that still has archived cards: when, what, how many), and **Unarchive this batch** brings it back too (`tasks:unarchiveBatch`): each of its cards still archived with it goes back to its column just after the nearest card that was above it then and is there now, else just before the nearest that was below it, else at the top (`restoreOrders()`), "Brought back with its batch (…)" in its history, and the batch is forgotten once every card came back: a card that can't be read or saved stays archived with it, the error names it, and the batch stays in **Batch** to try again. A card unarchived on its own leaves its batch. A card watch on an archived card wakes its agent with "#12 was archived (off the board: only the user brings it back)", and a bounded wait reports "was archived". A reference (blocked by, link) to a card that is gone, left by a card linked to one at the moment it was deleted, is left out whenever cards are read and leaves the file when that card is next saved; numbers are never reused, so it can't come to mean another card. Nothing moves by itself: an agent finishing doesn't move its card; it moves to Review when someone moves it, which the card's prompt asks the agent to do.
 - **Order is priority.** A column's order (top first) is its priority; `cw_list_tasks` and `GET /v1/tasks` return cards in board order. Placing a card (creating one, a move, a batch, archiving or bringing one back, importing) works out its order from every card's place under the board's lock, without reading the board (#458): `boardPlaces` reads each card's column, order, archived and project from the board's index (#1017), parsing no card, so a card changed by another process is placed by what the board says now. The user drags cards within a column. While a card is dragged, holding it near the top or bottom of a column's cards (or over its heading) scrolls that column, and near the board's sides scrolls the board, faster nearer the edge (`edgeScroll.ts`, in pixels a second, every frame so it goes on with the pointer still); the drop marker is worked out again from what scrolling brings under the pointer. It stops on drop, drag end or cancel, and when the pointer leaves the board. Agents and the Assistant put cards in order too, on any project's cards: `cw_update_task` / `PATCH /v1/tasks/{n}` take `position` (`top` or `bottom`) or `before` (a card that has to be in the column the card ends up in; anything else is refused with 400, as is giving both), with or without a column change; `cw_reorder_tasks` / `POST /v1/tasks/reorder` `{ column, cards }` puts the listed cards at the top of the column in that order in one call (the rest keep their order below them), and refuses the whole list (changing nothing) if a card isn't already in that column or is listed twice: it never moves cards between columns. **The order of Done is the user's**: placing a card in Done or putting Done in order is refused (403) for agents and the Assistant, before the Assistant would ask about a move to Done. A placement by an agent or the Assistant that moves the card adds a line to its history ("Moved to the top of Todo", "Moved before #12 in Todo", "Moved to Review, before #12", "Placed 3rd in Todo" for a list; a card left where it was gets none); the user's drags are saved without one. For the Assistant (Control agents) each call is one change in *Done by the Assistant* ("Put #4, #2 at the top of Todo") and counts once towards its limit per message. The agents' session contract and the work-on-card skill say a column's order is its priority, and to put the cards in order on the board when asked to prioritise rather than only list an order.
 - **Lean tool replies.** The Combwork tools answer in as few characters as do the job, since agents pay for every reply on each later turn: `cw_list_tasks` gives a line per card (number, title, project, agent and what it is doing, labels, blocked, depends on, stalled, reviewer, comment count; at most 200 lines a reply, saying how many more and the `offset` that carries on), `cw_read_task` the card without its history (`history: true` for it; `comments: n` for only its newest n comments, with `commentsOmitted`, and `comments: 0` for none of them, HI-2412; a card's comments past the 500 it keeps are archived, never dropped, counted in `commentsArchived` and read with `archived: <offset>`, a card that held 500 before the archive existed says its older comments may have been lost, and past 100 comments in all a read suggests splitting the card, HI-2641; a read narrowed so, or with `latestComment` or `summary`, lists only the attachments of the comments it gives in full and counts the rest in `attachmentsOmitted`, HI-2402, `attachments: true` for them all), and `cw_create_task`, `cw_update_task` and `cw_reorder_tasks` confirm what changed and where the card is now ("#12 Fix the redirect: Moved to Review; Commented. Now in Review (1st of 4), web."). `details: true` lists whole cards. Other tools follow the same rule: projects a line each, shared notes as a list of paths and read as text, agents and projects confirmed in a line. The Agent API keeps its full replies unless asked for the short ones (AGENT_API.md).
 - **Move to Doing asks.** When the user moves a card into Doing from another column (dragging it, the card menu's **Move to → Doing**, or the card dialog's **Column** set to Doing and Save), the **Move to Doing** dialog asks: **Nobody yet** (column doing, agent cleared: also takes it from an agent it had), **Assign an agent** (a list of every agent of the card's project with its status, busy ones included; only the assignment changes, nothing is sent or started) or **Assign and start** (Start's choices, below: busy agents (working, starting, waiting for input, waiting on background tasks) can't be chosen, stopped ones can; Start checks again when confirmed, and an agent that gets busy while the dialog is open can no longer be chosen). The default is the card's agent, assigned (Nobody yet when it has none). **Cancel** changes nothing: a dropped card stays where it was, and the card dialog stays open with its edits unsaved. Confirming saves the card dialog's other edits first, then sets column and agent (the drop position is kept). Reordering within Doing, a new card, a card with no project in the workspace (it moves as it is), **Save and Start…**, agents' and the Assistant's tool calls don't show the dialog. The Assistant's `cw_update_task` description and its `coordinate-agents` skill say to ask the user which of the three they mean when asked only to move a card to Doing, and not when they've said ("have Claude start this" starts it; "assign it to Claude without starting" assigns only). Agents moving a card they were given into Doing take it as before.
@@ -720,7 +721,7 @@ Agent text (HI-2065; `shared:plans/2026-11-03-dialects-design.md`, Darren's deci
 - **Combwork's git commands never write the index as a side effect** (#212): they run beside the user's and agents' own git commands, and `git status` (and `git diff` against the working tree) otherwise refresh the index, taking `index.lock` for a moment, so a `git add` or `commit` at that moment failed with "index.lock: File exists". Every git command Combwork runs (`git()`, `GIT_PREFIX` in `src/main/git.ts`) passes `--no-optional-locks` and `-c diff.autoRefreshIndex=false`; locks a command needs (commit, merge, reset, worktree add) are still taken. Status compares content in memory, so a file touched but unchanged still isn't listed; a worktree branch's changes since it left base (`diff --name-status <merge-base>`, which without a refresh lists stat-only files as modified) drop such a file only when git says exactly that it isn't changed: its working copy matches the index (status) and the index matches the merge base (`diff --cached`, mode included). A working copy that differs from an index that differs from base is kept (shown even if it was changed back by hand), never hidden.
 - **Git itself** (#346, `gitTool.ts` in main and shared): whether git runs is kept apart from whether a folder is a repository. `git --version` on Combwork's own PATH (a Start-menu launch can have another PATH than a terminal), with a 10 s timeout, at start and with Provider Setup's **Check again**, cached: `ok`, `missing`, `old` (older than **2.38**, `GIT_MIN`: `merge-tree --write-tree`, which checks a merge for conflicts first, recognises squash-merged branches and is what the merge-ready skill runs) or `unknown`, with the version and the executable (git.com or git.exe on PATH, as Windows starts it). **The git Combwork starts** (HI-2137, `gitExe()`): where that executable is exactly Git for Windows' launcher (`<root>\cmd\git.exe`), which starts the real git as a second process, the check also finds the real one (`git --exec-path` is `<root>/mingw64/libexec/git-core`, or `clangarm64`, `mingw32`, under the same root; its `git.exe` is there and gives the same `--version`), and every git Combwork starts (git's worker, the merge queue's git host and launcher) starts it directly, in the environment the launcher gives it (`withLauncherEnv`, as Git for Windows' `git-wrapper.c` sets it up: its own `MSYSTEM` whatever was set, `PLINK_PROTOCOL=ssh` unless set, `HOME` unless set from `%HOMEDRIVE%%HOMEPATH%` when that is a folder other than System32, else `%USERPROFILE%`, then `<root>\<mingw>\bin`, `<root>\usr\bin` and `%HOME%\bin` before PATH), so hooks and aliases see what they see through the launcher. Anything else (another git, a wrapper, git.com, a different version) is started from PATH as before. The check itself always runs PATH's git, and finds the git to start again each time; a command that can't start the real git (uninstalled, moved) runs once more with PATH's git, whichever command found it gone first, and git is checked again. Below **2.17** (`GIT_REQUIRED`: `--no-optional-locks` needs 2.15, `git worktree remove` 2.17) nothing of Combwork's git runs, which counts as missing. `git()` reports a call that couldn't start git (ENOENT and the like, when its working folder exists: Node says ENOENT for a missing folder too) as `missing` with exit code -1, never 1, so no caller takes it for git's "no" (`check-ignore`'s "not ignored"); such a call marks git missing at once, and a call that runs while it is marked missing clears it and checks again (`git-tool` event, every window's store). **Provider Setup** shows a Git row under every provider's tab: the version and path; or **Git not found** / **Git x is older than 2.38**, what doesn't work and the fix (install or update Git for Windows, or add git.exe's folder to PATH, then Check again: no restart, as Check again reads the fresh PATH, #472), with **Git for Windows** (git-scm.com). No setting for git's path. The status bar shows **Git** (warning) when git is missing or unusable, **Git x** (caution) when old; either opens Provider Setup. Copy Diagnostics lists it. **Every git-dependent screen says "git missing" instead of "not a repository"** (`gitProblem`): Add Agent's New worktree ("Git isn't installed (or isn't on Combwork's PATH)", `ProjectGitInfo.gitProblem`), the Board's Start in a worktree, adding a worktree agent (Agent API and cards too), the Changes tab (`GitStatus.gitProblem`: the problem, the fix, Provider Setup and Retry), the Merge dialog (the error in place of the merge, which can't be started), Remove All and template loads (the reason a worktree is kept, or the load refused), Remove Project. **Fail safe**: a git call that can't run, or fails, never counts as merged, clean or nothing to lose. `branchStatus` throws whenever git can't read the project folder's branch (`checkedOutBranch`: a failed read is not a detached HEAD, which counts against the base), count the branch or read the worktree's status (no more "nothing to merge" on a failure: the unmerged badges show nothing, the Merge dialog the error; merging refuses too), `worktreeCheck` is never removable then, and `removeCheckedWorktree` deletes nothing git can't run for. The Changes tab's status is "not a git repository" only when git says so: any other failed `git status` (a damaged index, a dubious owner), merge base or diff against an agent's base is an error the tab shows with Retry, never an empty list. A read that fails only because another git command is rewriting the index (`INDEX_BUSY`, "index file open failed" on Windows while a user's `git add` runs) is tried again briefly first (`gitReading`: 4 tries, 50 ms apart; the Changes tab's status and diff, worktrees' uncommitted counts, the Files tab's ignored entries). `.combwork`'s exclude line is still written without git (file work), reported `unconfirmed` and logged, and stays excluded. Bundled skills keep to git that Provider Setup's row covers: merge-ready's `merge-tree --write-tree` needs 2.38, which the row names.
 - **Ignored entries in the Files tab** (#222): `git check-ignore` exits 0 or 1; any other exit (128, "index file open failed" while another git command rewrites the index on Windows) is a failure, not "nothing ignored". A busy index is tried again (4 tries, 50 ms apart); outside a repository nothing is ignored. If git still can't say, the folder keeps its last known ignored entries (a memory of the 500 folders listed last) and is listed again 500 ms later (`files-changed`; at most 3 times in a row while it keeps failing). The failure is logged once per project.
-- **The Files tab's Git menu** (HI-2743; `filesGit.ts`, `shared/gitIgnoreRules.ts`, `FilesGitMenu.ts`; Darren, 9 Nov 2026): a Git section in a row's right-click menu, a short menu rather than a git client (no discard, stage, commit, blame or history: Discard stays in Version Control with its confirmation, since in a multi-agent project it can wipe an agent's work). It acts on the project folder only (`workspace.assertProject`, never `assertRoot`): with an agent's slot or worktree shown, the menu has no Git section. Opening the menu asks main for the selection's state (`files:gitInfo`: `git ls-files` for tracked, a folder by any file in it; `git check-ignore -v` for the rule; the branch from `symbolic-ref`), so it opens once git has answered, or without the section if it fails. **Exclude from Git** ▸ *This file* / *This folder* / *These n items* (each its exact path from the repository's top, anchored with `/`, a folder with a trailing `/`, `\ * ? [` and trailing spaces escaped) or *All \*.ext files* (one file with an extension; not a dotfile), under *Shared with everyone* (the repository's top `.gitignore`) or *Only on this PC* (`.git/info/exclude`, by `rev-parse --git-path`), each choice's second line showing the line and its file; offered while something selected isn't ignored. The write appends a line not already there (equal, trailing spaces aside), in the file's own line ending (CRLF if its first break is), after a break when the last line has none, keeping a BOM; a file that isn't UTF-8 is refused, and so is an ignore file that is a link or whose folders lead outside where it belongs (the repository's top, or its git folder: `insideReal`, checked under the file's lock), as the Files tab refuses paths through a link (HR1 on HI-2743). Selected paths reach `ls-files` and `rm` as literal pathspecs (`:(literal)`), so `src/[ab].txt` never matches `src/a.txt`. **Stop Tracking, Keep the File…** for tracked items: a confirmation naming the branch (the file stays on disk; Version Control shows a deletion), then `git rm --cached --quiet` (`-r` with a folder). **Include Again** only when the rule is a plain line in the top `.gitignore` or `.git/info/exclude` equal to the item's exact line or, for a file, its `*.ext` line (`removableRule`); main finds the rule again and checks the line at that number is still it before removing that line and its break. **Why Is This Ignored?** for an ignored item with a rule: a rule file in the project folder (outside `.git`) opens in the Files tab at its line; another (`.git/info/exclude`, the global excludes file, a `.gitignore` above the project folder) opens read-only in Combwork's viewer (Monaco) at the rule's line, its text from `files:gitRuleText`, where main finds the rule again (the window can't name a file; UTF-8, 1 MB at most). A dimmed row's tooltip names the rule ("Ignored by .gitignore:12 `*.log`"): the listing reads `check-ignore -v`, leaving out paths only a negation matched. **Show Changes** for a changed or new file opens Version Control → Changes on the project folder at that file (`changesJump`). Several items: Exclude (exact paths) and Stop tracking only. Outside a repository: **Initialise Repository…** (#701's dialog, in Version Control). Notifications name the file written and the branch changed (not for `.git/info/exclude`). Git runs on git's worker and files are read and written asynchronously; git's errors are shown in plain words (a busy index: try again).
+- **The Files tab's Git menu** (HI-2743; `filesGit.ts`, `shared/gitIgnoreRules.ts`, `FilesGitMenu.ts`; Darren, 9 Nov 2026): a Git section in a row's right-click menu, a short menu rather than a git client (no discard, stage, commit, blame or history: Discard stays in Version Control with its confirmation, since in a multi-agent project it can wipe an agent's work). It acts on the project folder only (`workspace.assertProject`, never `assertRoot`): with an agent's slot or worktree shown, the menu has no Git section. Opening the menu asks main for the selection's state (`files:gitInfo`: `git ls-files` for tracked, a folder by any file in it; `git check-ignore -v` for the rule; the branch from `symbolic-ref`), so it opens once git has answered, or without the section if it fails. **Exclude from Git** ▸ *This file* / *This folder* / *These n items* (each its exact path from the repository's top, anchored with `/`, a folder with a trailing `/`, `\ * ? [` and trailing spaces escaped) or *All \*.ext files* (one file with an extension; not a dotfile), under *Shared with the repository (a commit)* (the repository's top `.gitignore`) or *Only on this PC (nothing to commit)* (`.git/info/exclude`, by `rev-parse --git-path`), each choice's second line showing the line and its file (HI-2944: the shared exclude's notification offers **Commit It**, which commits the top `.gitignore` alone, as it is now with any earlier edits, on the project folder's branch, refused as §16.9.2's Commit is: an agent working there, an operation under way, a detached HEAD; no general commit in Files. HI-2962: the commit moves the whole working tree's HEAD, so a project folder inside a larger repository has the tree's top locked, fenced and checked: a run anywhere in the tree, or a busy agent of any workspace project in that same tree (not one that is a repository of its own; a project in the tree git can't place refuses it too, never skipped), refuses it); offered while something selected isn't ignored. The write appends a line not already there (equal, trailing spaces aside), in the file's own line ending (CRLF if its first break is), after a break when the last line has none, keeping a BOM; a file that isn't UTF-8 is refused, and so is an ignore file that is a link or whose folders lead outside where it belongs (the repository's top, or its git folder: `insideReal`, checked under the file's lock), as the Files tab refuses paths through a link (HR1 on HI-2743). Selected paths reach `ls-files` and `rm` as literal pathspecs (`:(literal)`), so `src/[ab].txt` never matches `src/a.txt`. **Stop Tracking, Keep the File…** for tracked items: a confirmation naming the branch (the file stays on disk; Version Control shows a deletion), then `git rm --cached --quiet` (`-r` with a folder). **Include Again** only when the rule is a plain line in the top `.gitignore` or `.git/info/exclude` equal to the item's exact line or, for a file, its `*.ext` line (`removableRule`); main finds the rule again and checks the line at that number is still it before removing that line and its break. **Why Is This Ignored?** for an ignored item with a rule: a rule file in the project folder (outside `.git`) opens in the Files tab at its line; another (`.git/info/exclude`, the global excludes file, a `.gitignore` above the project folder) opens read-only in Combwork's viewer (Monaco) at the rule's line, its text from `files:gitRuleText`, where main finds the rule again (the window can't name a file; UTF-8, 1 MB at most). A dimmed row's tooltip names the rule ("Ignored by .gitignore:12 `*.log`"): the listing reads `check-ignore -v`, leaving out paths only a negation matched. **Show Changes** for a changed or new file opens Version Control → Changes on the project folder at that file (`changesJump`). Several items: Exclude (exact paths) and Stop tracking only. Outside a repository: **Initialise Repository…** (#701's dialog, in Version Control). Notifications name the file written and the branch changed (not for `.git/info/exclude`). Git runs on git's worker and files are read and written asynchronously; git's errors are shown in plain words (a busy index: try again).
 
 ---
 
@@ -968,7 +969,24 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
 
 - **electron-updater** against GitHub Releases of `Suremise/combwork` (`publish:` in `electron-builder.yml`). It reads `latest.yml`, downloads the NSIS installer (differentially when a `.blockmap` is available) and checks its SHA-512 before installing. Only published releases of a public repository are seen (drafts are not); no token ships with the app. With no published release, checks report "No release of Combwork has been published yet". 0.1.0 (29 Sep 2026) was the first published release.
 - **Settings → Updates**: *Check for updates automatically* (on: 30 s after start, then every 6 hours), *Download updates automatically* (on), *Install updates* — **Automatically, when Combwork quits** (default) or **Manually, with Restart and Update** — and *Include pre-releases* (off). With it on, a pre-release install (`-beta.n`, `-rc.n`) is offered the newest published version newer by semver, whichever of beta, RC or release it is (HI-2311: Combwork's own GitHub provider picks the tag from the releases feed, `src/main/updateFeed.ts`; electron-updater alone offers a running RC only a later RC, and a running beta no RC); a release install takes electron-updater's choice, the feed's newest entry. Combwork never installs while it is running: sessions are never cut off by an update.
-- **Restart and Update** goes through the normal quit flow (the quit dialog when agents are working, including *wait for them*), then installs silently and reopens Combwork. Cancelling the quit cancels the update. The install (and Restart Combwork's restart) belongs to its own quit request (HI-2427): chosen while a quit or close question is already open, it only brings that question forward and is dropped, so cancelling it leaves nothing for a later quit; a quit already going ahead, or waiting for agents, takes it. Only over an older installed copy (#1647, below).
+- **Restart and Update** goes through the normal quit flow (the quit dialog when agents are working, including *wait for them*), then installs with the installer shown (below). Cancelling the quit cancels the update. The install (and Restart Combwork's restart) belongs to its own quit request (HI-2427): chosen while a quit or close question is already open, it only brings that question forward and is dropped, so cancelling it leaves nothing for a later quit; a quit already going ahead, or waiting for agents, takes it. Only over an older installed copy (#1647, below).
+- **Installing as Combwork quits is asked, and seen** (HI-3167, Darren's decision of 13 Nov: both). On 13 Nov 1.3.0 had 1.4.0 ready (Install automatically); the user chose File → Exit and restarted Windows straight away, and afterwards no Combwork was installed: the quit had run the installer silently (`/S`), with nothing on screen, and an update's install removes the old copy before it puts the new one in place, so a shutdown in those seconds leaves neither (likely; nothing logs the installer's end). So:
+  - **A plain quit asks** (File → Exit, the tray's Quit, the last window's X) when an update is ready and *Install updates* is Automatically (`installsOnQuit`, the copy on disk read now): the quit dialog shows, whatever *Confirm on quit* says and alone when nothing else is asked, a section *Combwork X is ready to install.* with **Install now** (chosen to begin with: its installer opens as Combwork quits and takes about N seconds; don't shut down or restart the PC until the installer says it has finished, its Finish button opening Combwork again) or **Next time** (it stays downloaded, and the next quit asks again). Restart and Update and Restart Combwork don't ask; *Install updates* Manually never offers it.
+  - **Only an explicit choice installs, for that quit and that version** (`updateConsent.ts`): Install now in that dialog (the version it showed, sent back with `app:quitDecision` and checked in main against the one ready, for a quit scope only), or Restart and Update (its notice's version). Every new quit request starts with none (an earlier one's never carries over); Cancel, Next time, Close this window only and cancelling a pending quit clear it; a quit waiting for its agents keeps it. The end of the quit installs only with a consent for the version ready then, `mayInstall` read again: an update downloaded while a quit waits, or one the dialog never showed, isn't installed, and a newer download never inherits one.
+  - **Windows ending the session voids it**: each `query-session-end` or `session-end` moves a session generation on (a counter, never a clock) and clears the consent; a dialog's answer or a consent from before counts for nothing. A shutdown another app cancels leaves Combwork running, and a later Install now or Restart and Update holds.
+  - **The installer is shown**: `quitAndInstall(false, true)`. electron-updater runs it with `--updated` and without `/S`: the assisted installer skips its welcome and folder pages for an update, shows its progress, then its finish page (*Combwork has been installed*), whose **Run Combwork** (ticked) reopens Combwork on Finish. That page, not the estimate, says it is safe to shut down. N (`INSTALL_SECONDS`, 45) is approximate: measured in Windows Sandbox (13 Nov, 1.2.0-beta.1 updated to a 1.4.0 build), 29 s and 49 s from the installer's start to its finish page, the old `Combwork.exe` gone for 3 to 4 s of it. **An update keeps its scope** (`customInstallMode` in `build/installer.nsh`): with exactly one copy installed, per-user or per-machine, the update skips the assisted installer's *Choose Installation Options* page, which otherwise stopped it half way (seen in the Sandbox).
+  - **A plain quit that installs is a quit** (`closeReason`): its agents are recorded as a quit's, offered back at the next start (*Combwork was quit and started again (1.4.0 → 1.5.0)*), never told Combwork is restarting for an update; Restart and Update's stays an update's.
+  - Not changed: the installer's own order (the old copy removed, then the new one extracted) is electron-builder's. What follows when it is interrupted is HI-3172's, below.
+- **An interrupted update is finished at the next sign-in** (HI-3172, a follow-up of HI-3167; design agreed with HR1, s7 to s18). electron-builder's install section runs the old copy's uninstaller (which deletes it, its files gone once it exits), then extracts the new copy, with no hook between them; an interruption there (shutdown, restart, power cut, the installer ended) left nothing in the install folder. Forking the template's install section (extract beside, then swap) was weighed and rejected: a hand merge at every electron-builder upgrade, and it bypasses the old uninstaller. Instead `build/installer.nsh` makes sure the update can be finished, with the template's own hooks only:
+  - **Armed before anything is removed**, when there is something to lose: a copy installed in this scope (its uninstall entry, or the exe in the folder), a recovery armed already, or this run being a resumed one. A shown install arms it in a hidden page after every page that can be cancelled (`customPageAfterChangeDir`); a silent one at the end of `customInit`, in the instance that installs (a per-machine update's elevated one).
+  - **Arming**: under the recovery lock (below), `build/recovery.ps1` stages a copy of this installer as `Combwork-Setup.new.exe` in the recovery folder and checks it (size and SHA-256); `MoveFileExW` (replace, write-through) swaps it onto `Combwork-Setup.exe`; then the **Run** value `CombworkFinishUpdate` is written and read back: `"<folder>\Combwork-Setup.exe" --cw-resume [--updated] [--force-run] /currentuser|/allusers /D=<install folder>` (the scope and folder explicit, so the old uninstaller removing the registry's InstallLocation loses neither). A Run value, not RunOnce: Windows runs it at each sign-in and never deletes it, so any number of interruptions are retried; only a finished install (`customInstall`) removes it.
+  - **Armed, or nothing removed**: any step failing (the lock, the folder, the copy, the swap, the value, a command over 259 characters) refuses before the uninstall: a message naming the step, exit 7. A refusal deletes nothing (HR1's round 1): it can come before the lock is held, when a `Combwork-Setup.new.exe` there may be another installer's, or after `recovery.ps1` found a junction, when a delete would act outside the folder. Only `recovery.ps1` removes a copy it staged itself, and a failed swap the copy just staged, under the lock, in a folder checked; an earlier interruption's recovery (its `Combwork-Setup.exe` and Run value) is never deleted by a refusal.
+  - **Scope and lock**: per-user, `%LOCALAPPDATA%\combwork-resume` and HKCU, locked by `Global\CombworkRecovery-<APP_GUID>-<the user's SID>` (the same user's other sessions share both); per-machine, the elevated instance, `%ProgramData%\Combwork\resume` (from the shell, not the environment) and HKLM, locked by `Global\CombworkRecovery-<APP_GUID>-machine`. electron-builder's own installer mutex is session-local, hence these. Each is owned until the installer exits (through the install and its clean-up), waited for at most 10 minutes (`CW_RECOVERY_WAIT_MS`; 20 s in a build with `CW_TEST_SHORT_RECOVERY_WAIT=1`), WAIT_ABANDONED counting as taken; any failing call, or the wait running out, refuses. Their default security (the creator's token) keeps other users out; one squatted forever refuses after the wait, and one this installer may not open (another user's, or SYSTEM's) refuses at once.
+  - **The per-machine folder is trusted, never repaired**: what doesn't exist is created by `recovery.ps1` and given, on that folder alone, a protected ACL (Administrators and SYSTEM full control, Users read and execute), then checked; what exists is checked and never changed: no reparse point, owned by Administrators or SYSTEM, no allow entry (inherit-only ones too) giving anyone but Administrators, SYSTEM or TrustedInstaller write, append, delete, delete-child, WRITE_DAC or WRITE_OWNER. The recovery folder may hold only the two files, each a plain file passing the same check. Anything else refuses: a standard user who made the folder first blocks per-machine updates (visibly, the folder named) until an administrator removes it. Nothing is recursive and nothing is followed. Per-user, the folder is the user's own: entries are checked for names and reparse points only.
+  - **Resumed at a sign-in** (`--cw-resume`), the installer first asks (*Combwork's last update was interrupted before it finished, so Combwork may not start. Finish installing it now?*): Yes carries on as an update; No quits (exit 8), the recovery kept, saying it asks again at the next sign-in, naming the installer to run by hand, and how to stop it (Task Manager's Startup apps).
+  - **Clean-up**: a finished install deletes the Run value and the copy, but a resumed run can't delete itself: its copy stays, inert (about 120 MB, nothing names it), until the next install replaces or removes it. Combwork itself never removes recovery files (it could race an installer arming one).
+  - **Retries where nothing was lost**: the template's own exits after arming (the old uninstaller failing and putting the old copy back, Cancel on *cannot be closed* or on an extraction retry) leave the recovery armed, so the next sign-in asks to finish the update; the old copy works meanwhile.
+  - Checked: `tests/installerRecovery.test.ts` (the staging, refusals and trust check against temp folders and descriptors; the installer's order in its text) and `tests/installer/interrupted.ps1` with real installers in Windows Sandbox. There the sign-in is the Run value's command run by hand (Run values aren't consumed); no case signs out. The lock's wait and its timeout are shown with a holder in the same session and the short-wait build, which alone writes `C:\out\recovery-wait.txt` as it starts waiting (`CW_RECOVERY_WAIT_SIGNAL`): the check lets the holder go once it sees it; one held from session 0 by SYSTEM shows the name is shared across sessions (the installer is denied that object rather than making its own) and that an installer which can't open it refuses at once. A shown resumed run of a custom folder whose name lacks *Combwork* installs into `<folder>\Combwork`: electron-builder's `instFilesPre` does that on every shown install, an update's too, not the recovery. Not covered: the upgrade from 1.0 (the 1.0 app removed in `customInit`, before any page).
 - **Where it shows**: the status bar's version item becomes *Combwork X available*, *Downloading Combwork X… N%* or *Restart to update to X* (click: update dialog); a notification when a download is ready; the update dialog (version, date, size, progress, release notes from the GitHub release, **Download**, **Skip This Version**, **Later**, **Restart and Update**, **On GitHub**); **Help → Check for Updates…** (always shows the result: up to date, available, or the error); the About panel and Settings → Updates (status and **Check Now**); the tray menu (*Restart to Update*). After an update, a notification links to the release notes.
 - **Skip This Version** stops automatic checks offering that version; a manual check still shows it.
 - **Local builds and what an install replaces** (#1647). On 23 Oct a running 0.9.2, which had downloaded the published 0.9.3, ran its installer when it quit (electron-updater's install on quit), and the user's local build of 0.9.3, with fixes the release lacked, didn't end up installed: most likely its installer, started after that quit, found the release's installer running and quit (the log shows the old version and the install on quit; which installer quit is inferred). So:
@@ -1158,6 +1176,13 @@ The design across every surface is HI-1755's design note and addendum. The decis
       - Exactly one eligible: *{name}, your {cli} account, is off in this workspace, so … can't start*, with **Turn On Here**. That is `connections:setOn` for this window's workspace only; another workspace's choice and the order are untouched.
       - Several: they are named, with **Choose in Settings** (Accounts & Connections).
       - None at all: as before, with **Add an Account**.
+    - **A new workspace's Assistant names no CLI** (HI-2899). The home's accounts migration (`migrateAssistant`) pinned Automatic's pick (Claude Code on a fresh install) as its agent's `provider` though nothing had chosen it, so its launch never followed the accounts added later. Now an Assistant that never ran (no session of its recorded; unknown counts as ran), whose CLI nothing named (`assistantNamedCli`: its own agent, Settings → Assistant's provider or the default provider, neither Automatic, or a setup of its for any CLI) and with no account to place it on, is left with none: its launch takes the first usable account's (decision A), by one rule (`launchCli`, accounts.ts) for its start's CLI, its launch settings and the accounts it uses, and the window's start check (`ensureAgent`) and panel (`assistantCli`) read it the same way. One that ran keeps the CLI it ran on (HI-2139). A home migrated before this, so pinned (no connection, its values still waiting to be placed), is unpinned once at its next migration check (`unpinAssistant`, in the project's lock against the file as it is then), unless it ran or its settings name a CLI.
+    - **The Assistant panel** (HI-2899, `assistantNeed` in shared/connectionLabel.ts, `AssistantAccountBanner`, `data-assistant-need`) names only the CLI the Assistant would really start on (`assistantCli`: running, its CLI; one that names a CLI or a connection, its own; one that names neither, a new workspace's, the CLI of the first usable connection here, as its launch picks it in sessions.ts, decision A; Automatic's pick only where none is). Never "Claude Code" by default:
+      - its connection resolves but its account is signed out (`accountState`, a sign-in account): *{name}, the Assistant's {cli} account, is signed out…*, with **Open Accounts & Connections**;
+      - none resolves and accounts that would do are off here: the banner above (`off`), any CLI's for an Assistant that names none, its own CLI's otherwise;
+      - for an Assistant that names no CLI, nothing while Combwork still looks for the CLIs or while an account is on here whose CLI isn't installed (no account is missing: the missing CLI is the CLI warnings' to say);
+      - none added, for an Assistant that names no CLI (`noneAny`): provider-neutral, *No account is on in this workspace… Add one for any coding agent Combwork supports…*, with **Add an Account**;
+      - none of its own CLI's, for one that names its CLI (`noneFor`): *The Assistant runs on {cli}, and no {cli} account is on…*, with **Add an Account**, and **Assistant Settings…** (its connection, any CLI's) when another CLI's account is on here.
     - **The other texts:**
       - An agent's refused start (`main.connections.launch.offHere`, the Agent API's too) says the CLI's accounts are off here and to turn one on with On here.
       - The choice of connection's line (`connections.choice.offHereAll`, also Add Agent's Start-a-session-now reason) names those off here.
@@ -1385,6 +1410,7 @@ Not yet: the terminal screen route and jumping to an agent's pane (with Apiary v
   - **Clean Up Old Sessions…** (#895; the header's clean-up button, beside Refresh; *Conversations* in the Assistant's view): one dialog picks an age, last active more than **24 hours**, **7 days** (the default) or **30 days** ago, and **Archive** (the default) or **Delete**, says what goes ("2 sessions older than 7 days.", "3 of them are archived." for Delete, "Nothing older than 30 days to delete." with its button off) and what it leaves alone ("Left alone: 1 running."), then sends the ids through `session:bulk`, the branch actions' path, which checks each again. *Last active* is the session's last transcript entry (`lastActivity`), else its record's `lastActiveAt`, else `createdAt`; a session with none, or last active exactly at the cut-off, stays (`shared/sessionCleanup.ts`). Its scope is the sessions the tab lists for the project, whether or not Archived is ticked or a search narrows the tree; each session is judged by its own activity, sub-sessions too. Archive takes Combwork's own sessions not yet archived; Delete takes all, archived and external ones too. Always left alone: running sessions, the one whose transcript the tab shows (not closed first, unlike a branch action), the Assistant's current conversation (the one it resumes) and, in main, anything else in use. The result is the branch actions' toast, with the dialog's own skips ("open here", "the Assistant's current conversation") alongside main's. **Progress** (#1659): `session:bulk` reads the host's records once, works on 4 sessions at a time (each still all or nothing, under its own reservation and locks), and sends `session-bulk` events to the window showing the host (at the start, at most every 250 ms, and once it ends), each listing every run on the host with its own id, so one ending leaves another shown (a branch's action started while Clean Up runs); the tab, and the dialog while it waits, show a line for each, "Archiving 120 of 300 sessions…" (Unarchiving, Deleting; *conversations* for the Assistant). Not in the Agent API's event stream.
   - **Can't resume**: a session that can't be resumed has a muted **can't resume** marker (a sub-session: its kind's badge) in the tree and over its transcript, and its Resume buttons and menu item are disabled with the reason as their tooltip (`shared/sessionResume.ts`): a sub-session; its provider turned off or not installed; no transcript left anywhere (neither the CLI's nor Combwork's backup); for the Assistant, a conversation from another provider than it runs now; no agent can run it (a worktree no agent of its provider uses, or no room for another agent). A running one shows **Show** instead. A removed agent's session that another agent can resume says so ("Its agent Coder was removed: it resumes in Helper."). Where a session ran is separate from who resumes it now: **Resume in …** names that agent, and its menu gives each agent's location (project folder, or worktree and branch), with "running, its current session stops first" where it applies. The transcript is read from Claude Code's file or Combwork's backup. Your messages and Claude's replies (Markdown) are shown in full; thinking and each tool call (one-line summary: the command's description, the file, the pattern…) collapse, with input and result on expand. Tool input/output over 4,000 characters is shortened, with **Show all**. Subagent work appears as its Agent tool call with the final report. Each compaction is an inline divider with trigger, size before and after, the first request's real size after it (including instructions and tools) and the collapsible summary. Slash commands and `!` commands show with their output. Pasted images show as thumbnails (the base64 stored in the transcript, loaded lazily) and open in a viewer that also shows where the image came from. The view opens at the latest message and loads the latest 200 items; earlier ones load as you scroll up (or click), keeping your place, and a search hit further back loads from just before it. A running session is followed (2-second poll of the appended bytes, while you are at the bottom) only with **Follow** switched on (off by default: Settings → Sessions → Follow running sessions); otherwise **Refresh** loads what is new. Search (Ctrl+F) looks through every session: names, dates, providers, agents and transcript text. It filters the tree to the sessions that match (and the sessions of matching sub-sessions), opens their branches, and lists each session's transcript matches under it; the line under the box counts sessions and matches. Clicking a match opens that transcript, expands the item and highlights the matches. Per-message Copy, **Export as Markdown** (tool calls, thinking and summaries as `<details>`), **Resume** for sessions that are not running — **Resume in ▾** to choose the agent when several work in the session's folder (by default the agent that last ran it, or another one that isn't running) — and **Show** for a running one, which opens that agent's terminal; plus Rename (a tag icon: the pencil means editing contents), Archive, Delete and Adopt. Each session row shows Rename, Delete and ⋯ on hover. Parsing is incremental and cached per transcript in main (`transcripts.ts`, `agents/conversation.ts`); blocks off screen use `content-visibility: auto`.
 - **Activity tab** (#1254; HI-1743, Darren's decisions of 26 Oct 2026 and the Assistant's round 1 notes; `shared/activity.ts`, `views/ActivityTab.tsx`): **what runs now**, nothing else ("the card is the history": past work is read from the card, its comments, history and rounds, never here). Last of the strip's main tabs (Alt+9). **A tab per agent** across the top, in pane order, scrolling sideways when they don't fit (no "All" tab), each with its state mark (a pulsing dot working, a diamond waiting for you, a square stalled, a ring idle) and the key of its current card. **Hide finished** (on by default) leaves out the agents with nothing running: not running, or idle with no process of its own besides its plumbing and no background task (`activityTabs()`); the tab shown keeps its tab. **Agents ▾** and **Cards ▾** narrow the tabs (several can be ticked; an agent by its current card, the cards offered those in progress). **Each tab is a list** read top to bottom (`buildActivityView()`), nothing off to the side: a **header line**, its current card (`currentCard()`: one it builds in Doing, else one it reviews in Review, else one of its in Review) as its key (a link to the card), title and column on one line (HI-1884: the key and the column never wrap or shrink; the title is cut with "…", whole in its tooltip), else its session's name; then the agent's work in groups: **Now**, its running session's latest turn (the prompt and how long ago it came) and what it does in it, the tool call under way with how long it has run, else **Thinking…** (nothing yet since the prompt or the last tool call) or **Writing…** (after a reply), from what came last in the transcript (`ActivityTurn.lastKind`), else its state (*Not running*); **Subagents and background tasks**, its sub-sessions active since that prompt (each with its tool call under way, else thinking or writing, while it can run: while the agent works or a background subagent of its runs, when its transcript is read again with the agent's; else *Done*) and its background tasks (a plain icon with the task's name); **Processes**, those of its launch (Stop's tracking), each by what it runs (`commandText()`: a `cmd /d /s /c "<x>"` wrapper as `<x>`, anything else by its label, whose switches keep their slash) and how long it has run. The agent's **own plumbing** (its CLI and the terminal hosting it, Combwork's tool server `cw-mcp.js`: `ownProcess()`) is left out unless **Show the agent's own processes (n)** beside the heading is ticked (kept with the view). A card's builder and reviewer work as a pair: on a card both are on, the other's work follows under its name and role, only while it runs on this card (a builder gone on to its next card while this one is reviewed isn't). Groups with nothing are left out (Now always shows). Nothing from earlier sessions or cards, no time ranges, no diagram (HI-1678's zoom, levels and jump went with it). **Frozen when opened**: each opening of the tab (shown again after another view or the window restored, or opened from an agent or a card) takes a snapshot once what runs is read, and the tab is drawn from it; each newer read counts in the pill, **12 updates · Refresh**; **Refresh** (or the pill) takes a new snapshot; **Play** goes live, **Pause** freezes again. Live mode is a choice, never the default, and never kept. Live, nothing shown moves: what is shown stays where it is and new rows come at the end of their group, and what ended (a process, a subagent) fades out where it was over 1.5 s, then leaves (`keepGoneList()`); another tab, a filter or a new snapshot draws it afresh. **No spinners**: working is the state mark's pulse, nothing that looks like loading. **Entries**: **Activity** in an agent's ⋯ menu opens its tab, filtered to it, frozen; a card's **Activity** opens the workspace level (below). The filters, Hide finished, the tab and the own processes are kept per project in the window's storage (`activityView.ts`). **Where each part comes from**, nothing collected anew: the board (cards, builder, reviewer), the session records (`activity:sessions`, for a running session's name and its subagents), the agents' live state, a session's transcript parse (`activity:turns`: masked like the log, cut short; read for each session shown, and again while it runs, or a subagent can, only when its transcript changed, a few at a time) and Stop's process tracking (`activity:now`: each running launch's job and its background tasks, masked). **Details** (click a row): its status, its input exactly as written (a prompt or a tool call's whole input and result, a process's whole command line), masked like the log, its last action, and **Open in Sessions Tab** for a subagent's session. **End Process…**: one process at a time, after a confirmation, only the agent's own: main ends it only while it is in that agent's running launch's job as the process listed (pid and start time), never the agent's CLI or its terminal (Stop does), never by name (`endAgentProcess`; `notOwn`, `cli` or `failed` are said). **Cost**: nothing read or drawn while the tab or the window is hidden; what runs now read once a second, the session list every 5 s and when an agent starts or stops, the tab drawn again only when something changed (the renders' times stay readable for a test copy). **The workspace level** (HI-1664, Darren's rescope of 26 Oct 2026: added on top of the project's tab, which stays as it is; `views/WorkspaceActivity.tsx`): the activity bar's **Activity** (`view.activity`), the same view across every session host of the window's workspace with an agent running, the Assistant's home among them; its tabs **grouped by project** (each group after its name, the Assistant's last), every agent named by its host and id together (`activityAgentKey`: two projects' agents or sessions with one id are never one). Its sidebar: **Whole workspace**, then a row per project with its running agents' count, opening that project's own tab. Its view (filters, tab, own processes) is the workspace's own, kept per workspace (`workspaceActivityKey`), never a project's or another workspace's. Frozen when opened, Play, Refresh, Hide finished, Agents ▾ (each agent with its project) and Cards ▾ as in a project's tab; nothing past. **Entries**: a card in progress (Doing or Review), a project's or the workspace's own, has **Activity** in its dialog and its right-click menu, opening the workspace level on **the agents working on it now** (`cardActivityAgents()`: its builder and its reviewer while each runs with this card as its current one, `currentCard()`, and every agent whose *running* session's record has it, found by main through the cards' index, `sessionsOfCard()`, one query per host with an agent running, only as it opens and again as an agent starts, stops or begins another session, never for a status change; a session the agent ran before doesn't count, nor, for a project card, an agent whose current card is another, though its session's record keeps this one, as a card loop's does). Found before it opens: if the window went elsewhere meanwhile (another view, another workspace, another opening), it doesn't open, with **Card HI-12** above, naming the filter (its × shows every agent), else *Nobody is working on HI-12 now. The card has its history.* (a workspace card has no builder or reviewer: its agents are the running sessions whose records have it). The Progress panel: a run's details have **Show in Activity** (its agent, the Assistant's for its runs), and a lane's menu **Show in Activity** (its builder and reviewer). **Cost** (HI-1887, HI-1909: no per-agent reads on main): nothing read or drawn while the view or the window is hidden, late results dropped; a tick reads what runs now in every host shown in **one call** (`activity:nowAll`: each a host of the calling window's workspace, any other refusing the whole call, each once), never overlapping the last; the session lists (`activity:sessions`) only of the hosts shown, every 5 s and when an agent starts, stops or begins another session (never for a status change: what is drawn follows the agents' status once a tick, what is read their sessions), two at a time; turns only for the tab shown, as a project's tab reads them. `activity:now`, `activity:sessions` and **End Process…** take the Assistant's home as a host too. **Lock blocks** (HI-982): under Now, an agent's edit Combwork's file lock blocked (or asked the user about) while that decision stands (`activity:now`'s `blocks`, `sessions.hookBlocks()`): the latest per launch, by its launch, tool call, file and the holder's launch, so a restarted agent or a lock passed on inherits none; gone once the holder no longer holds the file in that launch (its turn's end, the lock's TTL), the blocked launch makes another tool call, the blocked call ends, its turn ends (a new prompt, a stop, an interrupt, the session's end), or the user allows it; scoped like the rest of `activity:now` (the project's agents), the holder named only when it is in the same project. Live only: no history here.
+- **The Activity map** (HI-2903; Darren's decisions of 10 Nov 2026: no pane flip, only Activity's project tab and workspace view; presenting what Activity already has, no new collection; the honeycomb look approved from the mocks; HR2's design checks s11 and s16; `shared/activityMap.ts`, `views/ActivityMap.tsx`): Activity's reads drawn as a honeycomb above the list, beside it from 900 px of the tab's width. **Layout** (HI-3179, Darren's decisions of 13 Nov): the feed (*Last actions*) always under the graph and its agents' strip, at the map's full width, never beside the graph; beside the list the map's width is a split (`PaneResizer`, `ui.panes.activityMap`, 560 px by default, the list keeping 280), and the graph fills the height the feed leaves. **A station's last call** in its hex (`stationLastShown()`): a path's file name alone (Read, Edit; "+n" kept), anything wider than the hex (its drawn width, measured in the station's own font against the hex's inner width at that line less a margin, 78 of its 90 units: `lastFits` in ActivityMap; HR1's rounds 1 and 2, as counting characters missed glyphs a fallback font draws wider; where nothing can measure, at most `STATION_LAST_CHARS` columns, `textColumns()` counting any character but a single Latin, Greek, Cyrillic or punctuation one as two) cut in its middle between characters (graphemes), keeping its start and end (a file's extension); the whole in the station's hover. **Stations**, clockwise from the top: You (each turn's prompt, named only as *Prompt*, Question/AskUserQuestion; *Needs you* while the agent waits), Read (Read, Grep, Glob, view, read_file…), Edit (Edit, Write, a patch, edit_file…; red while a lock block stands), Shell (Bash, PowerShell, Shell, run_command…; the newest running process's executable name), Agents (Agent/Task calls, subagent sessions, background tasks), Tools (the rest, grouped: web, skills, Combwork's tools, other MCP). `stationOf()` maps the tool names each provider's parser gives (tested on each provider's recorded fixtures); a Codex or OpenCode script counts by its calls (`ActivityTool.calls`, names only). **Per station**: the calls of each agent's latest turn, the last one's label, heat (the spoke's width: the calls of the last 10 minutes in the turns read, a sample), red for a failed call. **Three states, never confused**: *not reported* (no shown agent's provider reports it: the descriptor's `activityStations`, set only from fixture evidence; none today), *loading…* (no turns read yet), and an observed 0. **Names, never content** (`mapLabel()`, fail-closed): a path tool's summary only when it is wholly one path (its last two segments; Codex's list: the first and "+n"), a web fetch's host (http(s) only; a masked address isn't one), else the tool's name: never other summary text, in labels, titles, accessibility names or the feed. **One agent** in the Agents filter: its map, with its context as a ring around the centre (`contextShown()`, the pane footer's own resolution, local launches' declared window included; unknown shown as —, never 0), amber from 70 %, red from 90 %. **Otherwise** a shared map of the agents the list's tabs show (the same filters: Agents, Cards, Hide finished; HR2's round 1: with nothing shown, no map), each in its colour (eight, in pane order), a station marking the agents with a call open there, and a strip of the agents' rings (HI-3180, Darren's decision of 13 Nov: a click shows that agent's map alone, the filter and the list unchanged, and reads it first (`mapReadOrder`: its turns and context, as a filter to it was, so the ninth of ten is read; HR1's round 1); the strip keeps listing the selection, the one shown marked (`aria-current`), so a click switches; that ring again, Escape, or the selection set again in Agents ▾ shows them all; it was a filter to that agent before, which lost the selection). **One shown agent** (HI-3186): the agent shown alone is always the current tab's (`shownAlone`), never a choice of its own, so the tab row and the strip can't mark two agents: a ring's click makes its agent the tab (kept under Hide finished, as a tab chosen is) and shows it alone; a tab's click while one is shown alone shows that one; that ring again or Escape shows them all and leaves the tab. The agent shown stays when it stops. One agent's map of an agent with no running session (never started, or stopped) shows *{name} isn't running, so there's nothing to show on the map.* in the graph's place, never another agent's graph; the strip below still lists the selection, its working agents one click away. **Bounded cost** (s16): the shared map reads turns for at most eight agents' running sessions (`MAP_AGENTS`), through the tab's own turns queue (four at once, versioned, dropped while hidden), each working one every tick, others once; the rest are *not shown*. At most 400 calls of an agent count (`MAP_CALLS`), the latest, read from the newest back and stopped there (nothing earlier visited or labelled), and the counts say they're partial (*From the latest calls read*); main keeps a script's latest 400 call names (`SCRIPT_CALLS`, `callsMore` the rest). A turns read is started and taken in only while the list or the map shows its session (checked at both ends), and turns read only for the map are dropped when neither shows it, so a read the map no longer wants (a filter changed, the map off) neither runs nor fills the cache again. Contexts come from `session:usage` again on the project's usage changes, two at a time, only with the map's context shown. **Frozen and live**: the map, feed, rings and counts draw from the same snapshot as the list (contexts held in it too); pulses only while shown, live and on. Each scope (an opening, Refresh, a filter change, going live, shown again) starts with a baseline that sends none, and a session whose turns weren't in the last read is a baseline of its own (`diffPulses()`): only a call new since the last read goes out, and a call seen running that is now done comes back, once; at most 24 in flight. Hidden, the map's model is held and nothing is built, drawn or read. **Show** (Map, Feed, Context) is kept once for every Activity view (`combwork.activity.map`); with the map off it reads and draws nothing. **Motion**: a dot travelling its spoke (a CSS animation, removed at its end); with Windows' reduced motion, or the advanced `cw.activity.mapMotion` (system, on, off), the station flashes instead. Usage beyond context stays out.
 - **Processes left running while the agent runs** (HI-2111, the Assistant's card after HB2's stray `grep -rh … /` ran orphaned for five hours; `main/orphanProcesses.ts`): one rule, nothing classified (HI-2081 dropped classifying the CLI's children). An **orphan** is a process in a running launch's job whose parent has exited, by the parent's id and start time: the job host's `lineage` gives each member's parent id (a snapshot), and the start time of the process running by that id now (`0`: none; a later start than the child's: the id was given again; `?`, access denied: not counted), with its CPU time. The CLI and what it runs directly (its MCP servers, a command under way) have a live parent, so never count; a server started with `&` from a shell that has ended does. Running launches are looked at every 30 s (never starting the host); an orphan seen at two looks that has run **ten minutes** (from its start) is **shown**: Activity marks its row *Left running · process 4120 · running 12 min · CPU 3 min* (a warning mark), its details say why and its CPU time, with **End It…** behind End Process's question (`endAgentProcess`, pid and start time); **one notice** per process (*HB2 left grep -rh … running for 12 min*, clicking to the agent: a toast's agent target); and the **agent is told once** in a hook notice at its next tool call or turn's end (`inboxNotices.ts`, English, its pid and command: *End it if not needed; Combwork won't*). Combwork never ends it. **Pause the Team** names every orphan at once (not only shown ones) as a busy process, with End It. **Settings → Advanced → Processes left running: tell me and the agent** (`cw.processes.orphanNotice`, on) turns off the notice and the agent's line; Activity still marks it. Test copies shorten the bound and the look (`CW_TEST_ORPHAN_MS`, `CW_TEST_ORPHAN_POLL_MS`).
 - **An agent's Hooks dialog** (HI-982, Darren's decision of 28 Oct 2026; `shared/hooks.ts`, `main/hookListing.ts`, `components/HooksDialog.tsx`): **⋯ → Hooks…** and the command **Agent Hooks…**, while the agent runs; read-only, never a hook or a CLI's config changed. **What's loaded**: from each provider's adapter (`launchHooks`, never a switch on the provider), each row with how sure Combwork is: Combwork's own as passed for the launch (**Passed by Combwork**); Codex's others from its own hooks/list, asked when the dialog opens in the launch's environment and folder with the launch's config overrides only (`hookQueryArgs`: never -s, -a or resume), through Combwork's owned app-server request (its request and timeout the advanced settings codex.hooks.listMethod and codex.hooks.listSeconds, which the launch's hook-hash check uses too), with Codex's trust (Combwork's are those of the session flags running exactly Combwork's command; Codex unable to answer: Combwork's as passed, a note, the rest unknown); Claude Code's from its settings scopes as read at launch (**Configured · loading unverified**; **Turned off** where the deciding `disableAllHooks` is on; **Not loaded** outside managed settings with `allowManagedHooksOnly`; a form Combwork doesn't know listed as such), and a file whose hooks changed since then noted as changed (the list stays the launch's); Copilot's Combwork's alone, with a note that it may load others. A file Combwork couldn't read or that isn't JSON is a note, never "no hooks". Bounded: a settings file read only within its size limit (a bounded read, as for auto-compaction), at most 100 hooks a source (the rest counted), a command 4 KB and a reason or event 300 characters, marked when cut; Combwork's authentication (the token, the run id in its URL, the auth file's path) left out of what is shown. Every hook not Combwork's is **not observed by Combwork**. **What fired**: the launch's last 50 hooks Combwork received on its authenticated route (`observeHook` in the hook server, recorded once handled, `hookHandled`; apart from `recentHooks`, whose log lines are unchanged), each with the event as sent, Combwork's hook it came through, **Combwork's reply** (`none`, `context`, `allowed` (Combwork didn't deny: no claim about other hooks), `warned`, `asked`, `blocked` with the reason, `error` with its step: reading the body, the reply, handling) apart from **the turn ledger's verdict** (applied, carried on, ignored with why, not reached), and Combwork's handling time (not any hook's runtime); in memory only, grouped when alike, never logged. A hook of no running launch is recorded nowhere. **Refresh** reads again; an answer for a launch that has since restarted says so (`runId`) rather than showing it as current. IPC `session:hooks` returns the rows and history only, never the launch's arguments, environment or token.
 - **Attachments** (#387, Darren's decisions of 7 Oct 2026): any file can be attached to an agent's or the Assistant's prompt, by a paste (a clipboard image), a drop on its terminal, or Insert into Session. Every attachment reaches the CLI the same way, **as its path in the prompt** (a type the CLI doesn't read itself is not refused). Main decides per file (`session:planAttach`, then `session:attach`, `shared/attachments.ts`): a file from **outside the session's folder** (`state.cwd`: the project or worktree; the Assistant's is the workspace) is copied into the host's `.combwork/attachments/<session id>/` (`run-<runId>` until the provider names the session, moved when it does), named `<time>_<its name>`, and the copy's path pasted; so is every **image**, from anywhere, so the Attachments tab keeps what was shown; a file **inside** the session's folder, one already in the attachments folder, and a folder are pasted as they are. Files over **20 MB** (`LARGE_ATTACHMENT_BYTES`) are confirmed first (one dialog for all of a drop's large files; cancelled, nothing is pasted or copied). Nothing attached is ever run: Combwork copies it and pastes its path, and the Attachments tab opens in its program only images and PDFs. **Kinds** by extension: image, PDF, text (text, logs, data, code) and file (anything else). Each provider's descriptor lists the kinds its CLI reads **itself** (`capabilities.attachments`), checked against the installed CLIs in test homes (`tests/fixtures/attachments/matrix.json`, a unit test holds the descriptors to it): Claude Code images, PDFs and text (2.1.296: its Read tool returns a PDF as a document); Codex images and text (0.162.1: a PDF only as raw bytes through a shell); Copilot images and text (1.0.95: its view tool returns a PDF's raw bytes). **Chips** (`AttachmentChips`): while the prompt is written, a chip per attachment over the terminal's top right, its kind's icon, name and label ("PDF", or "PDF · by path" where the CLI doesn't read that kind itself; the tooltip says which and the path); × dismisses one (the path stays), and Enter in that terminal clears them. **Old folder** (`attachmentsFolder.ts`): a host's `.combwork/images` is moved to `.combwork/attachments` the first time anything uses the folder in a run (renamed whole, else file by file into the same session folders, a taken name getting " (moved)", recorded in `.combwork/attachments/.moved.json` before the file moves (if the record can't be written, or is there but can't be read, which is never overwritten, the file stays at its old path, where old links find it first); only real files move, between real folders of the host's own; what can't move stays for the next run), and paths into the old folder still lead to the moved files in Combwork: the `combwork-img:` protocol and file links (`files:linkFiles`) resolve a gone old path through `movedAttachment()` (the renamed file when the move renamed it, else the same name under `attachments`). **Containment** (decision 4): every write and move into the attachments folder goes through `ownAttachmentsFolder()`, which checks that `.combwork`, `attachments` and the session folder are real folders of the host's own (no junction or symbolic link, really inside the host) and refuses otherwise; new files are created exclusively (never over a file, or a link left in its place).
@@ -1404,7 +1430,7 @@ Not yet: the terminal screen route and jumping to an agent's pane (with Apiary v
 - **Keyboard shortcuts** are configurable. Settings → Keyboard Shortcuts lists every command with its shortcut, its category, where it comes from (default, changed, removed), as a data table on one page (#250: sort by a header; filter by where it is set, in a strip above the table that wraps and never scrolls sideways with it, DataTable's opt-in `filtersAbove`, HI-1878, whose review dropped the Category filter as the tabs already choose the category; the search box narrows it too), on tabs since HI-1838 (the shared `Tabs`): **All**, then one per category in the commands' order, each with its count; a category's tab has no Category column; the tab is remembered (`ui.tabs`: `shortcuts`, Project Settings' `shortcuts.project`, which offers All, Project and Session); a search shows All with each tab's count its matches, a tab clicked meanwhile narrows that query only (kept with the trimmed, lower-cased query it was clicked for; a changed query shows All again, and going back to the first doesn't bring the click back, HI-1885, as Advanced's HI-1839) without being remembered, and clearing it brings back the tab remembered before. Conflicts are found across every category (a warning naming the other commands with their categories, *Session: Compact Conversation*, and a question before saving one) and keys that go to Claude Code while the terminal has focus. A shortcut is recorded by pressing it; a second combination within 1.2 s makes a chord. Refused: keys without Ctrl or Alt (except F-keys), Ctrl+C/V/X/A/Z/Y and Shift+Tab. Overrides are stored in `settings.keybindings` (`null` removes a default). **Project Settings → Keyboard Shortcuts** overrides the Project and Session commands for that project only, in `.combwork/project.json` (`keybindings`), over the global ones. Keys are matched by physical key (`KeyboardEvent.code`), so Shift and AltGr don't change a combination's name. Defaults besides the existing ones: Ctrl+P Go to Project, Ctrl+Tab / Ctrl+Shift+Tab next/previous project tab, Ctrl+1…9 focus agent N, Ctrl+Alt+1…5 layouts (of the page on screen), Ctrl+Alt+PageDown / PageUp next/previous agent page, Ctrl+Alt+M permission mode, Ctrl+Alt+C Compact, Ctrl+Alt+Shift+N Add Agent, Ctrl+` focus the session terminal, Ctrl+Shift+` external terminal, Ctrl+Alt+U notifications, Ctrl+Alt+P Progress panel, Ctrl+Shift+J Task Board, Ctrl+Shift+O Workspace Overview, Ctrl+Alt+T New Card; the project tabs Alt+1…9 in the strip's order (Activity, #1254, the 9th) and Alt+0 Project Settings (#1043). Help → Keyboard Shortcuts shows the current ones and links to the editor.
 - **Providers**: Settings → Providers enables and disables each provider (disabling one with running agents asks whether to stop them now or let them run). **There is no default provider** (decision A, HI-2106; its last readers went with HI-2132): a new agent's CLI is its connection's, the first usable connection in the one order of accounts (on here, its CLI on and installed: main's `firstUsableAccount`, the window's `firstReadyConnection`), for Add Agent, the quick add, New Session, the Agent API, a new template agent's suggested CLI, the Board's Start, the Skills tab and a new workspace's Assistant alike. A 0.9 `settings.defaultProvider` (or a project's own, or `settings.assistant.provider`) is read only by the migration (`connectionDefaults.ts`), which keeps each agent on the CLI it ran. **Automatic** (`autoProvider`) survives only as the last resort: an agent with no CLI of its own and no usable account (a test copy on its CLI test home) gets the first provider in the order that is turned on and installed, else the first turned on, else Claude Code (each process tells `shared/providers.ts` what it found, `setInstalledCheck`: main's providerService, the window's store). **The order** is Combwork's (`PROVIDERS`: Claude Code, Codex, GitHub Copilot), with no order of the user's: 0.9's `settings.providerOrder` (HI-1965) went with decision A (its reorder with HI-2107, `settings:moveProvider` and its revision with HI-2113, the setting itself with HI-2139: nothing in the window or at launch reads it, and a `settings:update` sending it changes nothing). A 0.9 user who reordered sees Combwork's order again. One saved by 0.9 stays in `config.json`, read-only, as the migration's input: what 0.9's Automatic picked followed it, so the migration reads an agent or Assistant that followed Automatic with its own resolver in that order (`legacyAutoProvider`), never today's `autoProvider`. Everything in the window that lists providers is in it: Add Agent's provider choice, Provider Setup's tabs, Settings' and Project Settings' provider pages, Settings → Advanced's CLI tabs (Combwork's first), the project's provider lists, the workspace overview, the Sessions tab's provider groups and Keyboard Shortcuts' reserved keys, as are Automatic's fallback (`enabledProviders`) and a Combwork template's stand-in provider (`templates.ts`). The one order the user sets is the accounts' (decision A). Config version 8 turned a saved Claude Code default into Automatic: it was the default saved into every config up to 0.4.x, so it can't be told from a choice, and Automatic still picks Claude Code wherever it is turned on and installed; Codex and Copilot defaults stayed. A project with no agents names the CLI a new agent gets (its first usable connection's) and warns only when no account is on here (*No account is on in this workspace*), or when accounts are on but none of their CLIs is installed (*No account on here has its coding agent CLI installed*); a CLI no connection leads to is never named, and nothing is said while Combwork is still looking. The same rule holds for the providers banner, the status bar and Provider Setup opening by itself (`providerWarnings` with `providersInUse`): they are about providers turned on **and in use** (the first usable connection's CLI, what a new agent gets, and any agent's own provider in the window's workspace, the Assistant's included). When none of those turned on is installed, one banner says so instead (Provider Setup at the first one). A provider only turned on that isn't installed shows plainly in the status bar ("not installed", no warning). Nothing is decided while Combwork is still looking for a provider it hasn't found (at start), since Automatic's pick isn't known yet. **Automatic never resolves from partial detection** (#506): detection answers per CLI and in any order, so Automatic is only decided once **every turned-on provider has answered**, found or missing (`autoProviderPending`). Until then `autoProvider` is a guess for display only (the first turned-on provider not known to be missing: never a later one because it answered first). A CLI counts as found as soon as it is located, before its version, models and sign-in are read. What commits to a pick waits for it: main's `providerService.settle()` (at most 20 s) before a new conversation of an agent with no CLI of its own, an agent added without a provider or connection (the first usable account may be on a CLI not answered yet) (Add Agent, the Agent API) and any launch whose CLI hasn't answered (a launch of a known provider waits only for that CLI, never for another); if Combwork is still looking after that, it is **refused** ("Combwork is still looking for … Try again in a moment."), never decided from the guess, and nothing is saved or started. In the window, the quick add, New Session and Resume wait the same way before deciding (rather than opening Provider Setup for a CLI not answered yet) and, still looking, say so and do nothing; Add Agent shows *Checking which coding agents are installed…* and holds Add until it is known, unless the user picks a provider. Tests only (unpackaged builds): `CW_TEST_SLOW_DETECT="<provider>=<ms>"` holds one provider's detection and `CW_TEST_DETECT_WAIT_MS` shortens the wait (`providerdetect`).
 - **A resume runs its conversation's own provider** (#506, Darren's decision). Resuming a conversation reopens it in the provider that recorded it (one Combwork has no record of, started outside Combwork: the provider whose CLI has its transcript), in whichever agent works in the folder it ran in, even if that agent's provider (its own, or a default it follows: the Assistant's, from Settings → Assistant or Assistant Settings) has changed since; new conversations use the agent's provider now. A conversation of another provider than the agent's runs with the project's settings for its provider (the agent's own model, effort, mode and context are its current provider's). If that CLI is turned off or not installed, the refusal names it. While it runs, a change of the agent's provider or a default asks for no restart: it is for the next new conversation. Resume (the agent's last conversation) is still its current provider's last: changing an agent's provider clears it. A conversation still never changes provider (§15, 22): Hand Over to… moves work between providers. `cw_list_providers`' `isDefault` is what new agents use now. Each provider has its own settings page (path, default model, effort and permission mode, dangerous-mode option, extra arguments, update checks, price table). **Allow background sessions** (providers with `capabilities.backgroundSessions`: Claude Code) is off by default: Combwork starts Claude Code with `CLAUDE_CODE_DISABLE_AGENT_VIEW=1`, because ← on an empty prompt opens its agent view and moves the session into Claude Code's background service, where Combwork can't see or stop it (Stop only closes the terminal, and resuming fails until `claude stop`). The user's own Claude Code settings are not changed. If a resume exits because the CLI holds the conversation in a background job (it names the job: `claude attach <id>`), Combwork shows a notification with **Stop It and Resume**, which runs `claude stop <id>` and resumes the conversation in the agent (`backgroundJobIn()`/`stopBackgroundJob()` on the adapter; nothing else is listed or stopped). Provider icons show on agent tabs, pane headers, the Sessions list, pickers, settings, Provider Setup, About and the status bar. They are **Combwork's own badges, never a provider's logo** (#470: the logo owners' terms need their permission): an outline, a glyph and a colour per provider (Claude Code a coral circle with a tilde, Codex a teal rounded square with braces, GitHub Copilot a violet diamond with a double chevron), always with the provider's name or as its tooltip. The status bar draws them in its text colour with the glyph cut out, so the outline tells them apart (`ProviderIcon.tsx`). A banner shows while no provider is enabled, none enabled is installed, or one in use needs setup (#474, above).
-- **Status bar**: workspace, branch, session counts, the attention inbox's **n need you** (§14), plan usage per provider (one item each: Claude Code's 5-hour and weekly %, Codex's windows; reset times and the agent that reported each on hover; darker at 80%, red at 95%; a limit whose reset has passed with no new report is left out). **Which reading is kept** (#383, from what the CLIs were recorded sending through the developer console, `tests/fixtures/planusage-2026-10-19.json`): each session relays the reading of its own latest API call (Claude Code 2.1.303 only with its turns, none while idle, none before its first call when resumed), and a resumed Codex session reports the last reading in its rollout, however old. So per provider and limit (`mergePlanUsage`, `main/planUsage.ts`), compared as reported: a reading of a period already over is ignored; the later period wins; within a period (resets under 30 min apart) the **higher** reading is kept, with the later reset time; with no reset time, the latest report. A limit is its window: Codex's `limit_id` was only ever `codex` (Darren's decision on #383: limits per `limit_id` wait for a recorded second id). The windows are told of any change to a kept value as reported, unrounded. Warnings run on what is kept. The status bar also shows each enabled provider's CLI version. Only app-wide items: an agent's model, effort, permission mode and context are in its pane footer (effort as the running session reports it, else the configured one; model shown as what actually runs (#248): the running session's reported model (Claude Code's status line, else its transcript; Codex's rollout), else what the choice resolves to (an alias by the model the CLI says it stands for: "Opus" shows as "Opus 5.5", the choice in the tooltip, "Opus 5.5 · chosen as Opus"), named as the CLI lists that id, else as the provider formats it; never guessed: an alias the CLI doesn't list shows as named. A project or agent choice shows plainly, an inherited one with "(default)"; Claude Code's own default is named from its settings' `model` (an alias there resolved the same way) or the model last seen in a session started without `--model`, else "Claude Code default"), Agent API state, Combwork's own version (opens About; dev builds show "Combwork Dev"), notifications.
+- **Status bar**: workspace, branch, session counts, the attention inbox's **n need you** (§14), plan usage per provider (one item each: Claude Code's 5-hour and weekly %, Codex's windows; reset times and the agent that reported each on hover; darker at 80%, red at 95%; a limit whose reset has passed with no new report is left out). **Which reading is kept** (#383, from what the CLIs were recorded sending through the developer console, `tests/fixtures/planusage-2026-10-19.json`): each session relays the reading of its own latest API call (Claude Code 2.1.303 only with its turns, none while idle, none before its first call when resumed), and a resumed Codex session reports the last reading in its rollout, however old. So per provider and limit (`mergePlanUsage`, `main/planUsage.ts`), compared as reported: a reading of a period already over is ignored; the later period wins; within a period (resets under 30 min apart) the **newer** reading where their sessions' reports tell, else the **higher**, with the later reset time; with no reset time, the latest report. Newer (HI-3181: a usage reset lowers the share mid-period, which "the higher" kept out until the week ended): the status line carries no reading time and a session repeats its latest call's reading, so a figure a session reports for the first time was taken after its report before, and one it repeats is as old as its first report of it (`readingAges`, per launch, in memory); a reading taken after the other was already reported is the newer, even lower. A run's launch dates its readings too (HI-3187), where they are all its own API calls' (`capabilities.planUsageSinceLaunch`: Claude Code, whose status line has no rate limits until its process calls the API, fresh or resumed; not Codex, whose resumed rollout can be days old): a run launched after the other reading was taken reads newer from its first report, so after a usage reset and a restart the first agents to work replace the stale higher figure without waiting for one's figure to change. Where two can't be ordered, the higher, as before, except that a reading that can't be dated (a session's first report, one forgotten by a restart, or one kept from before) never replaces a dated one: it may be from before the drop the dated one shows; a launch orders a reading only when it came after the other was taken, and otherwise leaves it undated (two runs' launches and calls interleave, so a run launched later can still relay a reading from before the drop). When the kept figure goes down, its warnings come down to the highest level still crossed, so a climb back past 80% or 95% warns again. A limit is its window: Codex's `limit_id` was only ever `codex` (Darren's decision on #383: limits per `limit_id` wait for a recorded second id). The windows are told of any change to a kept value as reported, unrounded. Warnings run on what is kept. The status bar also shows each enabled provider's CLI version. Only app-wide items: an agent's model, effort, permission mode and context are in its pane footer (effort as the running session reports it, else the configured one; model shown as what actually runs (#248): the running session's reported model (Claude Code's status line, else its transcript; Codex's rollout), else what the choice resolves to (an alias by the model the CLI says it stands for: "Opus" shows as "Opus 5.5", the choice in the tooltip, "Opus 5.5 · chosen as Opus"), named as the CLI lists that id, else as the provider formats it; never guessed: an alias the CLI doesn't list shows as named. A project or agent choice shows plainly, an inherited one with "(default)"; Claude Code's own default is named from its settings' `model` (an alias there resolved the same way) or the model last seen in a session started without `--model`, else "Claude Code default"), Agent API state, Combwork's own version (opens About; dev builds show "Combwork Dev"), notifications.
 - **About** dialog (versions, data folder, update status with Check Now, licence links: Combwork's MIT License and the third-party notices open in the Docs view, the Chromium licences file opens from the install folder), **Docs** view (user guide, Agent API reference, release notes, licence, third-party notices, shortcuts), first-run Claude Code setup. **The user guide's headings have stable ids** (#1535): each ends with an empty anchor, `## Card loops <a id="card-loops"></a>` (hidden on GitHub, which still scrolls to `#card-loops`; `{#id}` would show there as text), its slug when the ids were added, kept when the heading is renamed. The Docs view gives the heading that id and drops the anchor; `cw_doc_outline` lists it as the heading's slug. Every link into the guide goes by id: tips' Learn more, the window's other Learn more links (`openGuideAt(id)`), the settings catalogue's `docs`, the guide's own `#links` and the README's; the Assistant's settings tools give that heading's text as it is now. `tests/userGuide.test.ts` fails on a heading without an id and on a link to an id the guide lacks. A new heading gets its slug as its id; a renamed one keeps its id.
 
 ### 13.1 Colour scheme
@@ -1595,6 +1621,7 @@ offered, and its row says why [#1112 plan, note "Core model v2"].
 |---|---|---|---|
 | **revisions** | Name an exact state of the work; read the current one; say whether it is **ready** (no unresolved conflicts stored in it, nothing pending to snapshot). | A commit id (`rev-parse HEAD` in the card's folder); always ready (git can't commit unresolved conflicts). | A content hash of the card's deliverables (§16.3.3); ready unless a deliverable has conflict markers the check option names. |
 | **isolation** | Parallel working folders for cards. | Worktrees: slots (§16.10). | Not in 1.0 (OP-16): everyone works in the project folder. |
+| **checkCopies** | A check run in a copy of its own at the card's revision (§16.13's `--isolated`; HI-2868: apart from isolation, since jj has slots but no check copies in 1.5.0). | Check copies (#1435). | None (OP-16). |
 | **integration** | Combine an approved change into the target, and **advance the target atomically**: move it from an expected revision to the result, or fail without changing it. | Merge (merge commit or squash) by Combwork's merge queue (§16.9) or the agent; the target is a branch, advanced with compare-and-swap (§16.9.2). | **Acceptance**: an approved revision is recorded as accepted; nothing is copied (OP-16). |
 | **containment** | Is revision R (or its change) in target T? | Ancestor of the target, or a target commit with the same change (a squash) (§16.3.4). | R has an Accepted fact. |
 | **sameness** | Is R2 the same change as R1? | Replay equivalence: replaying the reviewed change onto the new base gives exactly the new tree (§16.3.2; patch-id as a first test, OP-33). | Same hash (any edit is a new revision) [#1112 B]. |
@@ -1608,8 +1635,8 @@ fix (Provider Setup, Retry).
 The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
 
 ```ts
-interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string
-  integration: 'merge' | 'accept'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
+interface PlatformDescriptor { id: 'none' | 'git' | 'jj'; capabilities: Capability[]; revisionShort(id: string): string
+  integration: 'merge' | 'accept' | 'user'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
 interface PlatformAdapter {
   detect(folder): Detection                               // §16.3.5
   head(where: Folder): Revision | Unknown                 // revisions: reads without side effects (no snapshot)
@@ -1700,6 +1727,9 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
     card's trailer (`Combwork-Card: AM-12`, §16.12, OP-14) is that card's; otherwise, if exactly one card of the folder is
     **unfinished** (Active, Review or Approved: not just Active) it is that card's (`how: only card`); otherwise it
     belongs to no card (`how: unattributed`) and is listed in the Version Control tab for the user to assign or leave.
+    A forward merge card (HI-2679), though started in the project folder, is never one of the folder's cards (HI-3083,
+    `sharesFolder`): no agent builds it, so it takes no commit (not even one naming it), and the trailer guard
+    (`submit.trailer`) doesn't count it as another card working there.
     Combwork keeps the last head it attributed up to per folder line; the first look starts from the oldest `Started.base`
     of the folder's unfinished cards, so commits from before any card started are nobody's [P2].
     The folder's line is its first-parent history (HI-2382, Darren's decision): a branch merged into it (another line,
@@ -1872,7 +1902,8 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 | Upgrading to 1.0 | Git projects get Git and None projects None, with options matching how they work today (§16.17); a one-time notice offers the presets. |
 | A None project gets `git init` (by the user or an agent) | Combwork notices (the refresh that ensures `.combwork`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
 | The repository disappears (`.git` removed or moved) | Combwork says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
-| Mercurial, Jujutsu or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." A colocated jj+git repository (`.jj` beside `.git`) is Jujutsu too, so None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts; `otherVcsOf` already treats it so for Initialise repository (§8) [P1, answering HB3's round 1 finding 16]. |
+| Mercurial or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." |
+| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker; a `.git` nearer than any `.jj`, a Git repository inside a jj workspace, makes the folder Git's, as its repository boundary says, with no jj offer: HI-2976) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`), colocated or not (HI-2896); a non-colocated one inside a Git working tree (`Detection.jj.inGit`) is shown and refused (`jjInGit`). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`); the switch back to Git then needs no jj (HI-2975: nothing for the fallback check to read). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
 | A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Combwork's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
@@ -2133,13 +2164,24 @@ The **integration** capability's mechanics. The queue's state machine, its facts
 - `advance(ctx, target, expected, result, journal)` → `Advanced` · `Moved { actual }` · `Paused { condition, files }`
   (`folderBusy`, `wrongBranch`, `staged`, `unstagedChanges`) · `Terminal { state }` (§16.9.2's needs-you record) ·
   `Unknown`. Git: `update-ref <result> <expected>` for a target checked out nowhere, and the journaled `read-tree` /
-  `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2.
+  `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2. A branch a rebase is under way
+  for counts as checked out in that folder (HI-3081: `git worktree list` says `detached` then, but git writes the
+  branch back when the rebase ends and refuses if it moved, so an `update-ref` meanwhile left the user's rebase unable
+  to finish): its `rebase-merge` or `rebase-apply` `head-name` names it, so the queue pauses on that folder
+  (`wrongBranch`) rather than moving the branch.
 - `recover(ctx, journal)` → the same outcomes, classified from the journal's last phase **and** the state read now
   (§16.9.2's table); never assumed from the journal alone.
 - `publish(ctx, target, owed)` → `Published { pushed }` · `UpToDate { pushed }` · `NotHeld` (the target no longer
   contains the owed result: reset since) · `Rejected` · `Failed { why }` · `NoRemote` · `Unknown` (Git: G18's settle,
   `MergeQueue.settlePush`, §16.9.1 step 7: the target's head read once, proved to contain the owed result, and that
-  **captured commit id** pushed to the destination ref, never the moving line; `pushed` is that id).
+  **captured commit id** pushed to the destination ref, never the moving line; `pushed` is that id). A remote's own
+  refusal (`[remote rejected]`: a hook, a protected branch) is `Refused { why }` (HI-1183), its words kept.
+- Follow mode (G21, HI-1183, §16.9.4), optional (a platform without them has no follow mode, and the option isn't
+  shown): `destination(target)` → the one publication endpoint and its transport snapshot · `noUpstream` ·
+  `remoteAmbiguous` · `remoteUnsupported`; `fetchHead(snapshot, pin)` → that fetch's own head, pinned; `prePush(snapshot,
+  lease, result)` → `ok` · `refused` · `timedOut`; `publish(snapshot, lease, result)` → `pushed` · `atResult` · `stale` ·
+  `refused` · `unknown`; `redact(text, snapshot)`. Git's are `platform/gitTransport.ts`; jj has no integration port, so
+  none (HB3, 10 Nov).
 - Further outcomes a later platform reports (the type carries them from R7/R8 so the queue handles them before jj
   exists, each a pause naming it, never success): `divergentChange`, `conflictedTarget`, `staleWorkspace`,
   `partialExport`.
@@ -2233,15 +2275,15 @@ operation withdrawn (refused, nothing run or changed), and `tests/repoOpsImports
 | **None** (no version control) | Supported, unchanged (§16.3.3). | Unchanged. |
 | **Git**, the project's own repository | Supported, unchanged: slots as worktrees, or the project folder shared (G11). | Unchanged. |
 | **Git**, a subfolder of a larger repository | Supported, unchanged (OP-29: Combwork merges only into a target the project names). | Unchanged. |
-| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform: jj workspaces as slots (made by jj, colocated as jj makes them), the gates below. |
-| **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter, once its tool, trust-root and file-list paths pass (J7). |
+| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform (J6, HI-2799: chosen, never taken by itself): read-only views, cards refused until jj's card work is enabled, the gates below. |
+| **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter (J9f, HI-2896: switched, slots and review copies, a jj card to Integrated, as colocated), unless inside a Git working tree. |
 | jj with another storage backend | None. | **Not supported** (untested, not proposed). |
 | Mercurial, other systems | None, as today. | None. |
 
 Switching between Git and jj (1.5.0) is stricter than §16.6.5's "from the next card": it drains the repository's lanes,
 queue, leases and review copies first, keeps historic facts under the platform that wrote them, and makes new slots
-(HI-2781 part 2 §7; J6 builds it). No mode is changed by detection alone, and Combwork never initialises jj or
-converts a repository's colocation.
+(HI-2781 part 2 §7; J6 built it: below, *jj in the window and the switch*). No mode is changed by detection alone,
+and Combwork never initialises jj or converts a repository's colocation.
 
 ##### Compatibility matrix and gates
 
@@ -2258,10 +2300,10 @@ works.
 | Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
-| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
-| **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
-| Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
-| Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`), built for an approved card by J9b2's reconciliation since HI-2871 | J4, HI-2871 |
+| **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
+| Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
+| Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
 | **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
 | **LFS** | As git does | — | **Not supported** | **gate: lfs** |
@@ -2270,8 +2312,1767 @@ works.
 | **Relocation** (moved workspace or project, the name upgrade's repair) | Supported (`workspaceMove.ts`, `combworkMove.ts`) | Supported | **Not supported**: no jj workspace move was validated | **gate: relocation**: a jj project's workspace or slots aren't moved; the move refuses with the reason |
 | Plain `git` run by an agent in a jj workspace | — | — | Add and commit seen through import (HI-2781); reset, rebase, merge and index-conflict states unvalidated | **gate: plainGit** (J7): guidance and detection before it's allowed |
 
-The gates' ids are the descriptor's (J0 adds them); their detection (which file or config makes a repository use
-attributes, hooks, LFS or submodules) is J0's and J7's to specify, failing closed: unreadable is "uses it".
+The gates' ids are the descriptor's (J0 added them: `Gate`, `GATES` in `shared/platform/descriptors.ts`; jj's descriptor,
+J6's, lists those closed). J0 specifies their detection; the compatibility assessment that runs it is J6's (shown
+before a switch), completed by J7. It reads what Git and jj would actually apply, never one source of it: the
+**effective** Git config of the store, every level and include Git reads (system, global, `XDG_CONFIG_HOME`, the
+store's, a worktree's, `include` and `includeIf`, as `git config --show-origin --show-scope` lists them, run with
+the store's environment), jj's effective config (`jj config list`: user, repository and workspace levels), and every
+attribute source Git applies. Anything it can't read, list or resolve (an unreadable file, an include it can't follow,
+a configured path outside what it can read, a tool that doesn't answer) is "uses it": the gate stays closed.
+- **attributes:** any of Git's attribute sources (the system `gitattributes`, the file `core.attributesFile` names or
+  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, every untracked one Git sees in a
+  colocated working tree, and any on disk in the root or a folder holding a tracked file, ignored or not (HI-2978), the store's `info/attributes`) setting
+  `text`, `eol`, `crlf` (`text`'s legacy spelling, which Git still converts by, HI-2978), `filter`, `diff`, `merge`,
+  `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
+  `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
+- **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
+  `.lfsconfig`.
+- **Git for Windows' stock settings** (HI-2872, Darren's (b) on HI-2799) aren't a use: the `filter.lfs.*` and
+  `diff.astextplain.textconv` values its installer writes, each at system scope from its own `<install>/etc/gitconfig`
+  (Git's `--show-origin`; the install from `git --exec-path`) with exactly the stock value, and the stock
+  `*.<ext> diff=astextplain` lines of its `<install>/etc/gitattributes` while no other level or value sets that driver.
+  The same keys at global or local scope, another value, another system file, any other line, and any use in the
+  repository still count. Its `core.autocrlf true` still counts (Git converts every text file's line endings, which
+  jj doesn't): the dialog says to turn it off for that repository alone (`git config core.autocrlf false` in it).
+- **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
+- **hooks:** a hook in the folder Git runs hooks from, as Git itself names it (`git rev-parse --git-path hooks`, HI-2941:
+  `core.hooksPath` at any level with Git's own expansion, `~/` and `%(prefix)/` included, a relative one from the working
+  tree's top; else the store's `hooks/`), never a `*.sample`. Git unable to name it is unknown, never clear.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` on at any level, read as Git reads a boolean (HI-2942: any nonzero
+  number too, `2`, `0x10` or `1k`; a value Git refuses counts, failing closed), or jj's `signing.behavior` set to `own`
+  or `force`.
+
+##### jj's runner and detection (1.5.0's J0, HI-2793)
+
+J0 built jj's execution and read-only detection, and enables nothing: `PlatformId` stays `'none' | 'git'`, jj isn't in
+`repoPorts.ts`' ports, and a `.jj` is still None (§16.3.5), so no project, folder, lock, file list or trust root
+changes. Git's runner and worker are untouched.
+- **The pinned version:** `resources/tested-vcs.json` (beside `tested-clis.json`, which the real tier's CLI records
+  write) names the jj Combwork is tested with (0.47.1, HI-2781's) and the official Windows build it was tested on (its
+  URL and SHA-256). `shared/jjTool.ts` reads it. Only that version is **supported** (`ok`): jj's command line and files
+  change between 0.x releases, so a newer one is `untested` (the runner starts it, for a report, but nothing trusts
+  what it says: detection is unknown with it, and every J card's reads ask `jjSupported`) and an older one `old` (not
+  run). Supporting another version is a change of the pin, with its real-jj run.
+- **The runner** (`platform/jjRunner.ts`, `jjProcess.ts`, its own worker `jjWorker.ts`, built as `jj-worker`): the
+  standalone `jj.exe` on Combwork's PATH (R1.5), checked lazily (`jj --version`, one check at a time: when something
+  asks, so nothing runs at startup for users without jj).
+  - **Every command** is non-interactive whatever the user's, repository's or workspace's config says: `--no-pager`,
+    `--color=never`, and `--config` overrides (they win over every config level, jj 0.47.1's config.md) giving
+    `ui.editor`, `ui.diff-editor` and `ui.merge-editor` a program that isn't there (an editor fails at once rather than
+    waits) and `fsmonitor.backend="none"`; `JJ_EDITOR` the same program; no credential prompts
+    (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`); its standard input closed after
+    what it is given. Combwork never edits jj's config files.
+  - **A read** (every command unless the caller asks to write; J0 has no writer) adds `--ignore-working-copy` (R5.3:
+    no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
+    reads are `jj --version`, `jj root` and `jj git root` (pinned, below); colocation is read from the files (below), not from
+    `jj git colocation status`.
+  - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
+    `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
+    its command's the same way: listed with start times, children first, each ended only while its pid still names
+    the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
+    that teardown. The teardown is awaited (`endTreeAsync`, never `spawnSync`, HI-2997): a write runs on main's thread,
+    where a synchronous listing and ending held it about 2.4 s; the result still waits for it to finish. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
+  - **Shutdown** (`shutdown(ms)`): ends every command under way, each one's tree, then jj's worker, within its bound;
+    a command asked after it starts nothing. The J card that first runs jj for a project calls it as Combwork quits.
+  - The bounds become Advanced settings with that card too.
+- **Detection** (`platform/jjDetect.ts`, `jjContextOf(folder)`): the nearest `.jj` at or above the folder (at most
+  256 levels); its shared repository (`.jj/repo`, or the file a `jj workspace add` workspace has naming it: `linked`); a
+  Git-backed store only (`store/type` is `git`; another backend is unknown and gets no store identity); and its Git
+  store, named as Git's context and repository lock name a store (`repoLock.ts` `commonGitDir`): the common git dir
+  `store/git_target` leads to (a worktree's administrative folder followed to its `commondir`, never a store of its
+  own), real (links, junctions and drive aliases resolved), compared case-insensitively (`sameStore`), and a Git folder
+  (it has a HEAD). So a colocated pair, its jj-made workspaces and Git's context of the same folders are one store
+  with one lock (R1.1). `colocated`: the workspace's root has a `.git` whose common dir is that store (a jj-made
+  workspace of a colocated repository has a Git worktree). `nestedGit`: a Git root nearer the folder than the
+  workspace's. Marker files are read bounded (one line, at most 4 KB, no NUL): anything else is malformed, unknown,
+  never followed. jj's files are hints (their format is no API), so the supported jj confirms them, reading only:
+  `jj root` and `jj git root` must name the same root and store. Both are pinned to the repository's one operation
+  head (`--at-op <H>`, H read from `.jj/repo/op_heads/heads` as J3's reads take it, `jjView.ts` `readOpHeads`;
+  HI-2831): with two heads (two commands that started from one operation: two agents, an external jj), any jj command
+  that loads the repository, `--ignore-working-copy` reads included, writes a merge operation to reconcile them, and a
+  pinned read never does. So with several heads, or none readable, detection is unknown (`opHeads`, its detail the
+  count or the folder) and asks jj nothing; it never merges them (a later jj write does, and the next detection
+  answers). A head that lands after H was read isn't merged by the pinned read either. The answer is a `JjContext`,
+  `none` (no `.jj`, no process run), or unknown with a code (`noRepo`, `emptyPointer`, `repoGone`, `storeType`,
+  `backend`, `gitStore`, `tool`, `opHeads`, `notRun`, `disagrees`) and its data (a path, jj's words, the command and
+  what was expected; never prose), never facts from the files alone. It never runs `jj git init`, changes colocation or snapshots.
+- **Copy Diagnostics** names jj's state (its version and path, the tested version, old or untested), checking it
+  when asked (no process when jj isn't on PATH).
+- **Tests:**
+  - `tests/jjRunner.test.ts` (a fake jj): the version's states, the prefix and environment, the cap, the time limit,
+    cancellation and shutdown, each ending the fake's whole tree and nothing else (a process of the test's own
+    started first survives), in this thread and through the built worker, and a missing tool.
+  - `tests/jjDetect.test.ts` (hand-made layouts, a stub jj): each unknown, an untested jj never asked, reads pinned to
+    the one head and nothing asked with several or none, malformed markers, a worktree's administrative folder as `git_target` resolving to its common dir.
+  - `tests/jjReal.test.ts` on the real pinned jj, fetched and checked by `npm run jj:fetch` into the test area's
+    `tools` folder (never system-wide), every repository a `tempDir()` with jj's and git's config isolated: the version,
+    a missing tool, colocated and non-colocated repositories, linked workspaces, nested roots, a damaged `.jj`, the cap
+    and cancellation on real jj, store identity against Git's own context (`sameStore`), and that detection writes
+    nothing: `.jj`, the whole `.git` (refs, config, index) and the operation log as they were, in a colocated
+    repository with plain-Git commits and branches jj hasn't imported, and in a stale linked workspace with a local
+    edit (not updated, not snapshotted, the edit still there), and with two operation heads (`opHeads`: `.jj`, the heads
+    and `.git` exactly as they were, where an unpinned `jj git root` merges them). Without the fetched jj it is skipped, saying so;
+    `CW_JJ_REAL=1` makes its absence fail: a card's acceptance is its run with `CW_JJ_REAL=1` at the submitted
+    revision, never a skipped run.
+- **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
+  seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
+  `slotRelocation()` J2's port, routed by the project's platform once jj is one (J6: J2 reaches jj's port by injection
+  only, below), `queueIntegration()` J4's and J5's, `lineRepoReads()` and `lineRepoOps()` J6's, as is jj's
+  descriptor (its capabilities, operations and closed gates, with HI-2822's workflow facts: integration `user`, the user
+  integrating under option A; deliverables `commits`; a repository needed). `lineHistory()`: J3 supplies jj's history and evidence (below) unregistered; J6 composes them into jj's
+  adapter and routes `lineHistory()` before it enables jj.
+- **Several operation heads** (found by J3, HI-2831): detection's `jj git root` loads the repository, and with two
+  operation heads any command that does, `--ignore-working-copy` included, writes a merge operation. HI-2831 fixes
+  detection; J3's reads never load the repository unpinned.
+
+##### jj's history, attribution and evidence (1.5.0's J3, HI-2796)
+
+J3 built jj's side of port 3, unregistered as J0's runner is (jj isn't a `PlatformId`; J6 composes it): which commit a
+card's work is, whether a check or a pass earns credit, which card a commit belongs to, and the watcher. The rule it
+holds everywhere: **the change id and the immutable commit id are kept apart.** A change id follows rewrites (an
+association, a hint), but it can be divergent, split, squashed with another card's or made fresh for a commit Git made,
+so credit is only ever on the exact commit id and its content (R3.1, R3.2), and attribution only on recorded provenance
+(R3.5). Everything was established on the pinned 0.47.1 (HI-2796's probes) and is held by its real-jj tests.
+
+- **Reads never write** (R3.4): every read through jj is pinned, `--at-op <H>` (J0's `--ignore-working-copy` with
+  it), where H is the **single** operation head read from `.jj/repo/op_heads/heads` (a file per head). With two heads
+  any read that loads the repository writes a merge operation; `--at-op` never does. So with none or several heads
+  nothing is read through jj (unknown), and a pinned answer (`Pinned`, its op beside its value) is used only after the
+  head files still say exactly H. Answers are a value or a typed unknown (`heads`, `tool`, `failed`, `malformed`,
+  `ambiguous`, `none`, `moved`: protocol codes, as J0's), and only the pinned jj's are trusted (`jjSupported`).
+  `platform/jjReads.ts`: a commit (`commitAt`: its commit id, change id, parents, empty, divergent, conflict; named by
+  its full id or a revset giving exactly one, so a divergent change id is `ambiguous`, never one picked), a change id's
+  commits, a revision's files, a config value, and a commit's evolution (below).
+- **The view** (`platform/jjView.ts`), read synchronously on main with no process and bounded: the heads (at most 64,
+  each a 128-hex name), a workspace's checkout record (`working_copy/checkout`, at most 4 KB: protobuf field 2, the
+  64-byte operation id, and field 3, the workspace's name; any other field or wire type, a duplicate, a truncation or
+  a missing field is malformed) and, colocated, Git's state beside it (HEAD's content, the index, the workspace's and
+  the store's HEAD reflogs, packed refs, every ref and ref log under `refs/heads`, at most 1,024 entries, and an
+  operation under way). Its parts are read as one moment: the heads are read again after the rest, and a moved head
+  is unknown. Unreadable or malformed is null, never an empty token: only "not there" (a fresh repository's missing
+  packed refs or reflogs) is an absence; any other failure to stat or list (access, I/O) is unknown, never "gone".
+  An intent's fingerprint (`jjFingerprint`) is
+  exactly these parts: it never walks the working tree (rule 5); the tree's content is the boundary's.
+- **The snapshot boundary** (`platform/jjBoundary.ts`): the only place Combwork records a jj working copy, a separate
+  operation its caller authorises (a check's start and end; a submission, once J6 wires it), never something an
+  observer, reader or credit decision does. Under the store's repository lock (its caller's, port 1's `withRepoLock`
+  for the workspace's context once J6 composes jj: J3 imports no lock of Git's) it checks its owner (the lease lending
+  the workspace to the card) before the snapshot and after every await; takes the single head H0 (with `expect`, a
+  check's end, H0 must be exactly that, else `moved`); runs `jj util snapshot` (written, `auto-update-stale=false`:
+  a stale workspace refuses, `stale`; its recovery is J2's explicit operation); reads the moment the snapshot left
+  (head H1, the checkout record, which must be at H1 and name the workspace, and Git's state); reads, pinned at H1,
+  the workspace's @ and `snapshot.auto-track` (anything but `all()` refuses: an untracked file would escape it); then
+  checks the moment is still the same before answering `{ before: H0, op: H1, recorded: H1 ≠ H0, at, view }`. It never
+  retries onto a newer operation. Only the pinned jj writes. Refusals: `owner`, `heads`, `moved`, `stale`,
+  `cancelled`, `autoTrack`, `tooLarge`, `unknown`.
+- **jj's size limit for new files** (HI-2973). jj leaves a new file past `snapshot.max-new-file-size` (1 MiB by default)
+  out of every snapshot, saying so only in a warning (exit 0, repeated on each snapshot while the file is there). Such a
+  file is on disk and in no commit, so Combwork reads the warning wherever it snapshots (`platform/jjSnapshotRefused.ts`)
+  and never takes it for recorded or clean: the boundary refuses `tooLarge`, naming the files and the limit; a
+  submission is then refused (`platform.jjRefused`, `tooLarge`), naming them; a check's start is `dirty`, its end
+  `changed`; the pool's record lists them as uncommitted, so a slot isn't settled ready, lent, reset or removed with
+  them in it, and a check copy with one isn't intact (a reset refuses it); a recovery puts them back on disk as any
+  other edit, ignores them when deciding whether X is exactly the preserved delta, and names them. Combwork never raises
+  the limit itself: the agent or user commits the file with the limit raised (`jj config set --repo
+  snapshot.max-new-file-size <bytes>`) or leaves it out with `.gitignore`.
+- **Files jj doesn't track** (HI-3096; Darren's decision, 12 Nov, option (a)). With the user's `snapshot.auto-track`
+  narrowed (`none()`: jj's own setting for adding files by hand) a new file is on disk, in no commit, and the snapshot
+  says nothing of it. It is a slot's uncommitted work all the same: the pool's record also lists `jj status`'s
+  "Untracked paths" (`platform/jjUntracked.ts`; a block of an unknown form is still not clean), so a slot holding one
+  is never settled ready, lent to the next card or removed with it. A submission under such a setting is refused as
+  `platform.jjRefused` `autoTrack` naming the setting (the boundary's `autoTrack`, no longer `platform.unknown`), the
+  way out being the setting back to `all()` for the repository (`jj config set --repo snapshot.auto-track 'all()'`).
+- **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
+  (`jjCredit`) from the captures, in order:
+  1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
+  2. tested: B1's @ is the revision, or an empty @ whose one parent is (jj's state after `jj commit`), else
+     `notContained`, as is a divergent or conflicted revision or @. Equal change ids count for nothing;
+  3. the start evidence E1 at H1: the revision's files (jj's list at H1), their and their folders' stat snapshot (off
+     main, `snapshotLine`'s: a deleted file is a "gone" line, one it can't stat makes the snapshot unknown), and the
+     moment still B1's;
+  4. t0 once the write record has settled; the command; t1 once it has settled again;
+  5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
+     complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
+     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
+     worktree, and the stat snapshot decides; colocated (the pool adds it `--colocate`), jj registers it in
+     `.git/worktrees` with a relative `gitdir`, which the observer's `foldersOf` resolves against that entry, as Git does
+     (HI-3160), so the slot has a write record of its own and it decides. Both leave
+     out what jj ignores (HI-3158, `jjIgnoredEntries.ts`), as jj's rules say (the tracked `.gitignore` files, its Git
+     store's `info/exclude`, Git's global excludes), asked of Git with jj's Git-backed store as its folder
+     (`check-ignore --no-index`), colocated or not. The write record: a path jj ignores doesn't count, the revision's own
+     files always do, and where Git can't say the record stands. A path is ignored only as every kind it may have had
+     (HI-3160), asked by kind as below: those the run's watch saw and the start's listing had, a folder where the record
+     has paths under it (a deleted `__pycache__/`), what is on disk now, and a file too where its folder wasn't both
+     listed and watched or nothing says; one it can't stat counts. The stat snapshot: a write inside a folder that is
+     already there (an `out/` an earlier build made) changes none of its lines; a run that makes or removes an entry in the
+     workspace's root or in a folder holding a tracked file changes that folder's line. So the run also watches each such
+     folder (not its subfolders; at most 64, else none) from before t0 until it has settled after t1, and the start keeps
+     each one's entries (name and file id). Where only folders' lines moved, a moved folder doesn't count when its watch
+     was there throughout and lost nothing, every entry that came, went or was made again between the two listings (a new
+     id under its name) is among the names the watch saw, and every name it saw (less jj's and Git's own folders, the
+     revision's files and the snapshot's folders, whose own lines decide) is one jj ignores, as every kind its entry had:
+     each event's entry is stat'ed as it arrives (a watch gives names only; eight at a time, a name once however many its
+     events, at most 256 waiting and 4096 names a folder, past which that folder's watch is incomplete), and a folder is asked about with its slash,
+     a file without, in a work tree holding only the `.gitignore` files on its way (Git otherwise takes a path that is a
+     folder on disk as that folder). So a build's first run that makes its output folder, or one that deletes it and
+     makes it again each run, is credited, and a file not ignored made and deleted during the run (no listing has it:
+     HR1's round 1) still counts, as does a file made where a folder-only rule's folder was (`out` for `out/`: HR2's round
+     2). A folder unwatched, a name not ignored, an unreadable listing or entry, Git failing, or a folder whose time moved
+     with no name to explain it is still `changed`. **The residual** (Darren's decision on HI-3158, 13 Nov, r36): a file
+     named as a folder-only rule's folder, made and deleted while that folder is remade and gone before its event is read
+     (milliseconds), passes as the folder; telling kinds for certain needs the change journal, which needs admin rights.
+     A candidate's merge check in a check copy is decided the same way;
+  6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
+     operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
+     state);
+  7. the end boundary B2, strict at H1: anything since H1 is `moved`; anything it records (a raw write, an add, a
+     delete or a rename the watcher missed) is `changed`, as is another @;
+  8. the final moment after B2, still B2's and E1's, read with nothing awaited before the decision.
+  Unknown at any step fails closed.
+- **A pass carrying over** (`jjSameRevision`): the same commit id, or the same change by content (Git's own replay on
+  the Git-backed store, §16.3.2's), never equal change ids; a divergent or conflicted side never carries, the same
+  commit id included (a reviewed commit can become one variant of a divergent change keeping its exact id).
+- **Attribution** (`platform/jjAttribution.ts`): a commit is a card's only on positive provenance: its commit id, or one
+  in its **complete** evolution (`jj evolog`, pinned, at most 100 entries: a 101st means capped; each line validated;
+  the first the commit itself; the heads unchanged after), recorded for that card and no other. A squash's evolution
+  holds both sides (probed), so a squash across two cards is `several`; a change id in its evolution recorded for
+  another card is `changeId`; a divergent commit is `divergent`; an incomplete evolution is `history`. All ambiguous,
+  refused or left to the user. Nothing recorded (a Git commit imported, another workspace's commit) is none: the lease
+  only scopes which workspace's history is read, and never assigns a commit by itself.
+- **Facts' optional ids** (`platform/jjFacts.ts`, rule 4): `data.platform.jj = { changeId, commitId, operation?,
+  workspace? }`, in the field §16.4.1 keeps for one platform's own data (Started, Adopted and Submitted have it), each
+  field validated or the whole record ignored; old facts are read as written. A submission's ids count only when their
+  commit id is the fact's own revision (an adoption's, its head; never a start's base, the target's). No shared schema
+  changes.
+- **The watcher** (`platform/jjObserve.ts`): the heads' folder watched as a hint and a rescan (the minute's) for missed
+  events. On a new single head it reads the view pinned there (each local bookmark's commit, the workspace's @) and
+  reports `lineMoved` and `folderMoved` only while the heads are still that one. With several heads, or a conflicted
+  bookmark, it reads or reports nothing and its token (`refsNow`) is null. Disposing closes the watch, clears the
+  timer and aborts reads under way. Unsnapshotted edits never reach the operation log: the write record's file watch
+  (the common observer) covers them (R3.3).
+- **Tests:** `tests/jjHistory.test.ts` (hand-made `.jj` files and a simulated jj): the bounded readers and their
+  malformed inputs, the parsers and evolution's completeness (capped, malformed, truncated, not the commit), the facts'
+  readers, attribution's rules, the boundary's refusals, and the bracket with races at each barrier (an owner lost at an
+  await; an operation, a bookmark-only one included, during the run, before and inside the end boundary and before the
+  final read; a colocated Git change at the same points). `tests/jjHistoryReal.test.ts` on the pinned jj, the
+  acceptance (`CW_JJ_REAL=1`), feeding real operations through the production capture and decision functions: a
+  clean run, a raw write, an edit and its undo, a missed event, a plain Git commit and its import, a bookmark set during
+  the run and racing the end boundary, a Git ref racing it, a stable change id rewritten with new content (and a
+  description-only rewrite carrying by content), a divergent change, a split, a squash across two cards, a stale
+  workspace and the observer with two heads, which nothing merged.
+
+##### jj's workspaces: slots and copies (1.5.0's J2, HI-2795)
+
+J2 built jj's workspace lifecycle port (`platform/jjWorkspacePort.ts`), a stale workspace's recovery
+(`platform/jjRecovery.ts`) and the pools' platform identity, and enables nothing: jj's port isn't in `workspacePorts.ts`'
+`PORTS` and `PlatformId` stays `'none' | 'git'` (agreed with J1, HI-2794: `JjPlatform` and `WorkspacePlatform =
+PlatformId | JjPlatform` are `workspacePort.ts`' types, so a jj in `project.json` stays J6's switch). A slot pool or copy
+pool gets jj's port only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`): the tests do; Combwork doesn't
+yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings); the evidence is jj 0.47.1's.
+- **Workspaces are made by `jj workspace add` only** (R2.6): never `jj git init`, never a Git worktree command on them.
+  A colocated workspace's Git worktree entry (`<store>/worktrees/<n>`) outlives `jj workspace forget` when its folder
+  is gone (0.47.1), and Git then refuses an add at that path (HI-3046, design HI-3046/s7–s14). `create` makes a
+  **receipt** of its slot's entry (board_meta `jj_gitlink:<folder>`: the entry's path, file id and birth time, its
+  `gitdir` and `commondir` bytes, the slot's store, folder, workspace and generation), and before the next add at that
+  folder clears an entry there only when the receipt proves it: under the store's lock and the file gate's write
+  admission for the folder and the store, with no workspace listed at the folder or under its name at the single head,
+  the entry is checked synchronously (folder absent, not `locked`, its identity and bytes the receipt's, its real path
+  the store's real path with `worktrees/<n>` below it and `worktrees` the receipt's real folder: no junction), moved aside
+  out of `worktrees` (`<store>/.cw-gitlink-<token>`, the intent journalled first), proved again on what was moved, and
+  only then removed asynchronously. A mismatch puts it back (or lists it as a residue), never deletes it; a restart's
+  resume proves it all again. An entry with no receipt or another identity (a user's worktree at that path) refuses
+  the add before jj runs, naming the entry: the user's to remove or keep. No other entry is touched and no command
+  prunes.
+  **A failed add's folder** (HI-3050, design HI-3050/s10): jj adds into an existing empty folder and keeps it, and a
+  failed add leaves it (probed). So under the store's lock `create` makes the slot's folder itself, exclusively (anything
+  there already refuses the add before jj runs), its file id and birth time read in the same synchronous step. After any
+  failure from then on, the folder is removed only when jj's outcome is settled (it never started, or ran to its own
+  exit: a timeout, a cancellation or a lost worker keeps it), no workspace is listed at the folder at the single head,
+  and, colocated, no Git worktree entry points at it; then, with the file gate's write admission for the folder and the
+  store and nothing awaited, the head still that one and the folder still that id and empty, it is moved aside
+  (`.cw-add-<token>` beside it), proved again on what was moved, and only then `rmdir`ed. A mismatch puts it back under
+  its name (or leaves it aside); a kept folder is named, with why, on the setup error's line. A later make that finds a
+  folder there says only what it read (empty or not, a workspace jj lists there) and never removes it.
+  `add` and `forget` snapshot the workspace they run from and refuse `--ignore-working-copy` (probed), so they run from
+  a **control workspace** of Combwork's per project (`<worktrees>/<project>/.cw-jj-control`, named `cw-<project
+  hash>-control`, sparse and empty: its snapshot is always empty), never lent, sized or tidied as a slot, its record
+  (board_meta `jj_control:…`: phase, store, name, folder, generation) checked before each use (its generation, no file
+  in it). Making it is the one command run from the project folder, which snapshots the project folder's working copy:
+  only under the store's repository lock, with the project folder quiet (no session, no process: jj's sharedFolder gate
+  is closed), as an explicit owned record; refused otherwise. A slot or copy is added with `--sparse-patterns full`,
+  `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
+  name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
+  child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
+  repository or workspace, is refused. A prune forgets only this project's workspaces whose folders are gone, each
+  proved again under the store's lock (HI-2946): still registered under that name at that root, read afresh at an
+  operation; then, with the control's proof at the forget's admission right before jj starts, that operation still the
+  single head (any registration changed since, such as the name forgotten and added again at another root, waits for
+  the next prune) and its folder still absent. A folder back by then (restored or replaced while the prune waited)
+  keeps its registration and everything in it.
+- **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
+  operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
+  jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
+  were last updated at (`.jj/working_copy/checkout`, confirmed by reading at it) names another working-copy commit than
+  the head: stale, so unknown to every read, never clean, lent, reset or removed.
+- **No checked-out line** (jj 0.47.1 has no current bookmark): `line`, `shownLine`, `currentLine` and `heads().line`
+  answer none; `prepare`, `attach`, `createOnNewLine`, `detach`, `dropLine` and `restoreLine` are refused until J3/J4
+  freeze a card's line under jj, so no card starts in a jj slot. `checkout` (synchronous, no process) answers null.
+  `head`: `@`'s parent when `@` is empty with one parent, else `@`; unknown when stale, divergent or merge-parented.
+- **`dirty` is unknown** (a read can't see edits jj hasn't recorded: `--ignore-working-copy status` in a stale
+  workspace says "no changes"). The port's new optional **`record(folder, fence)`** is the explicit snapshot, a write,
+  only for the holder of the folder's operation: the pool calls it instead of `dirty` where it holds the slot (a warm,
+  a settle, a removal's guards); Git has none, so its git commands are unchanged (`tests/slotTraces.test.ts`). A
+  listing's read (`check`) and the card hooks' reads get unknown for jj: "can't check", or refused.
+- **Identity** (schema step 28, `workspace identity`): `slots` and `copies` gained `platform` (`'git'` for every row
+  before), `store`, `workspace` and `generation` (the folder's and its `.jj`'s file ids and birth time at creation), and
+  `copy_leases.intact`. A jj row is `jj` from the write that reserves it; its identity is recorded once made, and
+  checked against the folder before every change: a folder replaced at the same path (even a same-named workspace of
+  the same store) has another generation and is never changed or trashed. Unreadable file ids refuse.
+- **Every write is owned** (HR1's HI-2795 round 1): right before each jj write (a record, a reset's snapshot, `new` and
+  `abandon`, a forget, a recovery's update and each restored path) the writer's operation still holds the folder and the
+  folder is still the recorded workspace (`owns`: its generation, its checkout's name and its store, read with no jj
+  process), else nothing is written. A removal's intent and its forget are inside the store's lock, after both are
+  checked again there. The pool records a jj slot only once no writer, job, session or process is in it (the rename
+  probe), checked again right before the snapshot; a busy one is left as it is, not ready. Recovery checks the
+  folder's generation at entry (fresh or resumed) and before every step, and its bounds apply to every entry and to a
+  file's size before it is read; every live file is read from its opened handle in bounded chunks, never past the
+  size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
+- **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
+  released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
+  with no port there is kept (`cantCheck`), its refresh, settle and owed pass leaving it as it is. HI-2936: after a
+  switch, the old platform's slots and copies are never lent again: they don't count toward the pool's size, and the
+  idle tidy removes each once unused for a day (its own port, the removal's guards: unmerged or uncommitted work keeps
+  it); the app registers jj's port while a project's board still holds a jj slot or copy, so a project switched back
+  to Git settles, keeps or removes them by jj.
+- **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
+  forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
+  worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
+  before `trash()` (never the project, its store or above them), the journal cleared. A removal cut short keeps the
+  slot out of the pool (dirty; a copy with an error) and the next removal, or a takeover of its operation, resumes it
+  from its phase. A stale slot isn't removed.
+- **Copies**: a warming reservation (the lease and its `lease` operation in one write) is the only time Combwork writes
+  in a copy: made, or reset (`record` into the copy's own change, `jj new <revision>`, the old change abandoned only as
+  the copy's own: no descendant, bookmark or other workspace's), and checked **before the run** (exactly the revision:
+  `@-` is it, `@` empty after a record, not stale, not divergent, read at one operation) right before the handing
+  write. A stale or divergent copy is disposed of (forget, then the Recycle Bin: no snapshot, nothing abandoned; probed:
+  forget hides the copy's empty working-copy commit itself) and made again, never reset. While handed out nothing in
+  Combwork writes in it. **Credit** is taken after the quiescence barrier: a `recover`-kind verification operation
+  records the copy, checks the same invariant against its files, and stores `intact` (1 or 0) on the lease in the write
+  that frees the copy, so nothing reuses it or reads a result before. jj's check and review credit (J3's) requires
+  `intact = 1`; Git leases keep null.
+- **Stale recovery** (`recoverStale`): explicit only, never the pool's clean-up (under decision A, J7 wires no UI for it: it recovers Combwork-owned slots, none of which exist until jj cards start; HI-2840); its journal resumes it
+  after any stop. Phases: planned (the stale operation S and the workspace's commit then, WS, read pinned), preserved
+  (the files that differ from WS: WS's tracked files plus what git lists as not ignored by jj's rules, with no
+  repository of the workspace's own; their bytes copied outside every workspace, each fsynced, a manifest fsynced last,
+  read back; refused with nothing changed past 2,000 files or 512 MB, or on a link, a junction or another kind of file),
+  updated (a rescan right before `update-stale`, preserving again if anything changed; P1, its snapshot, found only by
+  its exact shape: parents `[S]`, a snapshot, this workspace; what P1 recorded, X, that the manifest doesn't is written
+  beside its path as `.cw-recovered-<token>-late` and X kept), restoring (path by path, journalled before each step:
+  the current file moved aside atomically, put back as preserved only when the updated version and the moved-aside one
+  both equal WS's; otherwise the current file stays and the preserved version goes beside it; nothing overwritten, a
+  name taken meanwhile skipped), restored (an owned record, X abandoned only when it is exactly the preserved delta and
+  nobody else's, the preserved copy to the Recycle Bin).
+- **Tests** (`CW_JJ_REAL=1` runs them on the pinned jj; without the fetched jj they're skipped): `tests/jjWorkspaces.test.ts`
+  (the port, colocated and not: made from the control without snapshotting the project folder, two agents, stale with
+  a local edit, divergence, removal with ignored files, a crash between forget and the trash, a same-store same-name
+  same-root replacement, an immutable copy under a source rewrite, an unsnapshotted edit in a copy, the control refused
+  when the project folder isn't quiet), `tests/jjSlotPool.test.ts` (the pools with jj's port injected: lend, release
+  and look by the holder's record, leases and a takeover across a restart, a removal cut short and resumed, a Git slot
+  finishing under Git, a copy's verification after its barrier, a source rewritten during a live run) and
+  `tests/jjRecovery.test.ts` (HI-2781's case, overlaps, a local deletion against an upstream edit, every stop resumed,
+  a write at the seam, writes after preservation and after the rescan, an unrelated divergent change, a junction,
+  diverged operation heads refused with nothing written).
+
+##### jj in the window and the switch (1.5.0's J6, HI-2799)
+
+J6 made jj a platform: `PlatformId` is `'none' | 'git' | 'jj'` (J2's `JjPlatform` and `WorkspacePlatform` are its own),
+and its design is HI-2799/s11 to s26. Under Darren's option A (HI-2794) the window offers no jj mutation and Combwork never
+merges under jj.
+- **The descriptor** (`PLATFORMS.jj`): capabilities `revisions, isolation, containment, sameness, authorship, observe` (no `checkCopies`: HI-2868);
+  never `integration` (gate advance, J4 and J5 included); `operations: []`; commit and change ids shown at 12
+  (`revisionShort`, `changeShort`); `gates` every gate still closed (all ten in J6), which the window shows as "Not
+  supported with jj" (`shared/platform/gateTexts.ts`). Git's and None's `gates` are empty.
+- **Workflow options for jj**: Git's rows without a merge step or a shared folder (`FORM_GROUPS.jj`); finish
+  `userIntegrates` ("You integrate it yourself", jj's only finish: `jjYouIntegrate` otherwise) in slots only
+  (`jjNeedsSlots`); presets Solo, Pair, Team; workspace and Combwork defaults for jj as for the others. Until J9e (HI-2874)
+  every jj ruleset carried `start.platformReady`, refusing every jj start before the adapter was asked anything; J9e
+  retired it (below, "jj card starts on"), and jj cards run in slots under J9a–J9f.
+- **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
+  window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
+  colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
+  and the commands to start from (HI-2913: `jj duplicate -r <base>..<commit> --onto <target>`, every commit of the card
+  (HI-3094: `JjWaitingCard.base`, the approved base), then `jj bookmark set <target> -r <copy of the reviewed commit>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
+  slot stale and its lane's next card unprepared), and its last containment observation for exactly that
+  approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
+  conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
+  a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
+  `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
+  (`--all-remotes`; a conflicted one with its sides; a local one whose `@git` or Git branch, read from the store's files,
+  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **jj is confirmed pinned**
+  (`pinnedContextOf`): J0's detection would run `jj root` and `jj git root` unpinned, and on 0.47.1 an unpinned command
+  merges diverged heads (a write, R5.3), even when a second head appears between a check and the command (HR2's round 1).
+  So the single head is read from the files first (none, several or an unreadable `.jj`: `heads`, nothing run), J0's
+  confirmation pins its commands at the head it reads (`--at-op`, HI-2831), and the heads are read again after (anything else: `moved`). Every view, the switch's jj check and the fallback go through it.
+- **The switch** (`workflow/storeSwitch.ts`, through `setPlatform` when `storeWide`: to jj, jj → Git, or to Git where jj
+  is colocated). Its **group** is every project of this workspace on the repository (its Git store: `commonGitDir`, or
+  for a non-colocated jj repository the store its `.jj` names, HI-2896)
+  whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
+  of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
+  `groupChanged`. Refused, each with its list and Check Again reading it afresh (HI-3105: also when refused only as Switch
+  is pressed, the warning having been read clear: the check is read again and the refused dialog shows its lists, never
+  a refusal pointing at a list the dialog doesn't have; and back to Git, a fallback read that only raced jj's operation
+  head moving, `unknown` `moved`, is made again up to three times before it is shown): `drain` (active or paused lanes, cards
+  in flight, a member's merge queue with work, open slot leases, unfreed copy leases, and (HI-3069) each slot kept for
+  a card, `drain.kept`, that isn't of the platform switched to: it could never be lent back after the switch, so its
+  card is started and finished first; one already of that platform, left by a switch made before this, never refuses
+  the switch back to it; a member's switch to None counts every kept slot; and (HI-3070) the repository's other
+  projects whose choice is None, never switched with it, through their work still under Git or jj only: cards in
+  flight started under a repository's rules, their merge queue's work, open slot leases, unfreed copies and kept
+  slots, and their running lanes whose recorded ruleset needs a repository (one before its first card starts holds Git's
+  rules for it; a ruleset that can't be read counts), never their None cards or a lane recorded under None; such a
+  project stays None and outside the group), `otherWorkspace` (the store is a
+  project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
+  the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896), every other member a jj workspace (`memberNoJj`, naming it, HI-3034: a `git worktree` of the repository, or one nested in its jj workspace, would be a jj project with no jj repository; None for it, or removing it, is the way on; HI-3072: such a project, None while the repository runs jj, is refused its own switch back to Git, `storeRuns` naming jj, until the repository is switched back to Git from its other projects, since the fence would refuse its every admission) and the **compatibility assessment**
+  (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
+  -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
+  `.gitattributes` (one not on disk, deleted or skip-worktree, read from its index copy, named `:<path>`, HI-3035), untracked ones (colocated: `ls-files -o --exclude-standard`, and the ignored ones `ls-files -o -i --exclude-standard --directory` lists, an ignored folder not looked into since jj ignores its files too, HI-3035; in either mode, the one on disk in the root and in each
+  folder holding a tracked file, ignored or not, past 100,000 such folders unknown),
+  `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
+  without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
+  hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
+  Windows' stock system settings (`filter.lfs.*`, `diff=astextplain`) don't count (HI-2872: `GFW_STOCK_CONFIG`,
+  `gfwSystemFiles`); its `core.autocrlf true` does, and the finding carries `autocrlf` for the dialog's hint to turn it
+  off for the repository. Back to Git (`fallback`): one head, no conflicted
+  local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
+  `.jj` stays. It is read in the repository's jj workspace whichever member asks (HI-3034): the asked project's, else a member's that is one, else the working tree beside the repository's Git folder when it has a `.jj`. With no `.jj` there any more (the `jjGone` offer, HI-2975) nothing is checked: nothing can be unexported or
+  conflicted, so it goes through, fenced and drained as any. jj missing or not the tested version refuses it as
+  `jjToolBack`, saying the way out (install the tested jj, or remove `.jj` once done with jj), not as the list's unknown. jj → None (and Git → None) of a member is its own switch, drained through the fence as a group of one (HI-2974,
+  §16.6.5), so no jj card can be in flight once it is None.
+- **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
+  `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
+  and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
+  `platformFound` and `workflow`, refused past 64 KB; a former member outside a later switch keeps its current choice,
+  its old attempt dropped), `platform_member:<project id>`, `platform_store:<project id>` (each refresh's detection, written when it
+  changed) and `platform_switching`. Every admission checks it **in its own write transaction**, so the database
+  serializes it with the switch's writes and no new lock is taken: a lane's start (its save's `also`), a card's start
+  (the runtime's start write: `platform.switching` or `platform.changed`, refusals with their next step), a slot's lease
+  (`SlotStore.take`) and a copy's (`CopyStore.take`). A queue entry needs none: only a card in flight is enqueued, and
+  no member has one once A is written. Membership is looked up first, by the project's id: a participant of the switch under
+  way (its attempt the fence's generation) is refused whatever it compiled; a former member outside it, one that left
+  for None, is held to its own `current` as a settled fence holds every member (HR2's round 1); of a settled one, held to
+  its `current` (a stale start is re-resolved by the caller's
+  next attempt, a runtime made afresh for the project's new platform). Not a member: the store map; absent or
+  unreadable is refused while any store switches; an unchanged None project outside a group is the only exemption; a
+  Git or jj one on a switched store must match its members. Malformed rows fail closed.
+- **The switch's steps**, in lock order (the store's repository lock, the workflow writes, each project.json's lock):
+  A writes the fence `switching` with each member's before and after; **then** the drain is read again (nothing can be
+  admitted after A, so what it reads is final: anything running rolls the fence back and refuses); each member's
+  project.json is written; B settles the fence, each member's `current` its after. A failure between A and B is settled
+  in the switch's own `finally`, still under the lock, from each member's disk (`readKeptJson`): forward when every
+  member shows its after, else those showing after written back to their before (read back), the rest untouched, and
+  **stuck** (left switching, its admissions refused, said in the log) when a member shows neither or can't be read.
+  Only the participants are reconciled and take a new `current`. A member read on another repository, or no longer a
+  project of the workspace, leaves its fence at the next refresh (`dropMember`), never while it takes part in a
+  switch under way. HI-3071: a member whose repository can't be read at that refresh (git failing, jj's files
+  unreadable, or a store that isn't a git folder, as a `.git` file naming a missing one: `storeRead`'s `unknown`) or
+  reads as none (its `.git` moved away a moment) stays a member, its mapping unchanged too; and a switch's group keeps
+  such a member, unknown or none, while it is this store's member (HR1's round 1), so it is drained and switched with
+  the rest rather than left outside; its membership itself unreadable refuses the switch (`switching`).
+  **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
+  (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
+  HI-3073: the owner records its process's start time beside its pid (as slots record their holders, the same probe),
+  so a pid the system has since given another program isn't taken for it: alive only while a process with that id
+  started then runs; a probe that can't tell counts as alive (fail closed); a fence recorded without a start time (an
+  older one) by its pid alone, as before. A switch left **stuck** (by recovery or by a failed switch's own settle) is
+  said in a notice as well as the log, once per switch, naming its projects and those changed or unreadable.
+  The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
+  isn't fenced, as the queue isn't beyond the repository lock.
+- **Tests**: `tests/platformFence.test.ts` (the rules on a map), `tests/storeSwitch.test.ts` (two projects on one store,
+  the switch paused after A and after its drain read while the other starts a card, a lane, a slot and a copy lease;
+  the drain; a group changed; a failed save rolled back per member and fresh admissions after it; a save persisted
+  though its call failed; recovery during a live switch; a dead owner's recovered; a member edited by hand left stuck),
+  `tests/platformRegistry.test.ts` (detection, offers), `tests/jjViewsReal.test.ts` on the pinned jj (`CW_JJ_REAL=1`:
+  the views writing nothing, two heads read as such, a divergent change and a conflicted bookmark in Compare, a
+  conflicted commit, the fallback's refusals, the assessment's gates), and the e2e suite `jjview` (the real app).
+
+##### jj's merge-queue candidates (1.5.0's J4, HI-2797)
+
+J4 built the candidate a jj card's integration is made of (`platform/jjCandidates.ts`), and enables nothing: jj has no
+`integration` capability, `integrationOf('jj')` stays null and the queue offers no Combwork merging for jj (decision A:
+the user integrates, J1's gate stays closed). The composition that offers a candidate to the user (J5's containment
+record, J6's view) injects what it needs: the runner, the store's paths, the folder its writes run from (J2's control
+workspace), the store's lock, the owner (the queue's lease), a durable journal and Git's replay on the store. Its design
+is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a conflicted `jj duplicate` or `jj new` **exits 0**.
+- **Private commits, never a rewrite.** Rebase: `jj duplicate -r 'base..revision' --onto <target's head>`, new change
+  ids, so the builder's later amend never rebases the candidate, and always a copy, even for a card already on the
+  target (the user is never handed the builder's own change, which a bookmark would follow through the builder's
+  amends). A merge in the suffix returns the card (Rebase and fast-forward's linear policy). Squash: a scratch merge,
+  then a fresh child of the target given the merge's tree (`jj restore --from <scratch> --into <it>`), the scratch
+  abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
+  later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
+  never moves. Strict's update (G8) came with HI-2853 (`prepareJjUpdate`); HI-2871 runs both for approved cards.
+- **Never from a commit the user hid** (HI-3100). The reviewed revision is read visible at the base operation
+  (`R & ::visible_heads()`; hidden, a user's rewrite since: refused unwritten, `moved`), for a candidate of any style and
+  strict's update; and every write names the reviewed commit and the target's head so (`jj new`'s parents, and
+  `jj duplicate -r '<base>..(exactly(<id> & ::visible_heads(), 1))' --onto exactly(…)` for a rebase and squash's update,
+  HR1's round 1): `exactly(<id> & ::visible_heads(), 1)`, which jj resolves at the
+  operation it loads, so a rewrite that lands after the checks and before jj runs makes the write fail having made
+  nothing ("fewer than the expected 1 revisions", probed on 0.47.1; without `exactly`, `jj new` drops an empty argument
+  and builds on the target alone), never the hidden commit brought back as a parent beside its rewritten self. A write
+  jj refused while another's operation moved the head is one that made nothing when no operation between its parent and
+  the head carries the attempt's marker (`opsSince`, 50 back): its step cleared, not left uncertain and kept.
+  Tests: `tests/jjCandidateHidden.test.ts`.
+- **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
+  under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
+  operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
+  (read pinned, never from jj's output) what this step should make; bookmarks, tags and every workspace's @ unchanged;
+  Git's refs unchanged but for jj's own `refs/jj/keep/<id>` of exactly the commits it added or removed. Anything else is
+  `raced` and nothing more is written. What each step may make is data (`JjStep`: a duplicate's count and root, a new
+  commit's parents, a restore's commit and change, an abandon's set), journalled with the head it starts from before its
+  command runs, and checked by the same function (`shapeProblem`) here and in recovery. Visibility is
+  `::visible_heads()`, never `all()`: on 0.47.1 a revset naming a hidden commit makes it part of `all()` there (probed).
+- **Conflicts read, never assumed** (R4.8): every commit the attempt made is read pinned (a middle duplicate's conflict
+  counts), its conflicted files listed with their sides (`file list -T`, `conflict_side_count`) and their hunks read in
+  git's marker style (`ui.conflict-marker-style=git`), bounded by the conflict record's limits and parsed by its parser,
+  the target's side first. A conflict of more than two sides can't be written in git's style: listed, its text not read.
+- **Phases journalled before their step:** planned, writing, written, pinning, pinned, abandoning, abandoned, done. Every
+  commit the attempt made is **pinned before any is abandoned**, so evidence is never unreachable: a Git ref in the
+  backing store under the attempt's own prefix `refs/cw/jj/<card>/<attempt>/` (`c<n>` for each commit, `candidate` for
+  the result), never an exportable bookmark. A create is create-only (`update-ref <ref> <oid> 0…0`) and read back; a pin
+  is **owned only when the journal records its own create succeeding**. A ref found there first is a collision: never
+  owned, never touched again, and the attempt answers `raced`. A prefix is a namespace, never provenance.
+- **Abandons guarded by their revset**, evaluated by jj at the operation the command loads: of the set S, every commit
+  with no descendant outside S and no bookmark, remote bookmark, tag or working copy on it or above it in S, so what is
+  abandoned is closed under descendants and no surviving commit is rebased. A commit kept back stays visible and pinned,
+  and the attempt is `interrupted` (never a candidate or a clean failure). The squash's scratch, and on a failure (a
+  conflict, not on top, not the same change) every commit of the attempt, go this way. The pins are **read at the
+  abandon's boundary** (after its last await, never the journal's word): an owned pin moved or gone stops it
+  (`interrupted`, the evidence left visible), and they are read again after the abandon and before any outcome, so a pin
+  lost meanwhile is never reported as retained evidence (HR2's round 1).
+- **Outcomes** (the record's `outcome`, written with its `done`, says which; only `candidate` can credit J5's proof): a
+  candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
+  (`conflict` with its files, hunks and pinned evidence; `notUpToDate` in the queue's existing words, sameness being
+  §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
+  signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
+  a cancel, a race, a pin refused, a commit kept back), with the record for recovery.
+- **Strict's update** (G8, `prepareJjUpdate`, HI-2853; its design HI-2853/s7 and s10): the reviewed revision R brought
+  up to date with the target's head E on the same machinery, as private commits: already up to date (E an ancestor of
+  R) is `updated: null`, nothing written; `merge` makes a fresh commit with parents R then E (so a conflict's hunks show
+  the card's side first, `oursIs: 'card'`, as Git's merge of the target into the card), `rebase` duplicates R's suffix
+  onto E (a merge in it returns the card). Conflicts are read from every commit made, then §16.3.2's replay
+  (`jjSameRevision`), else `notSame` in Git's words. Its record is `kind: 'update'`, `outcome: 'updated'`, a **leaf**
+  (never carrying an update of its own), never a candidate by itself. A merge or squash candidate built on it records
+  `updated: { attempt, result }` and is built from U; a rebase candidate ignores an update and records none.
+  **`validUpdate`** decides whether an update may be built on or credited: done, `updated`, no step or uncertain
+  commits, a leaf, the same card, attempt, reviewed R and base, **the same target head as the candidate's**, and its
+  result pin read now. It runs before any write of a candidate (invalid: refused unwritten) and again in J5's credit; J5
+  reads every pin the credit rests on once more, synchronously, at its answer. A drop of an update under a live merge
+  candidate keeps U and its pins (the guard).
+- **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
+  operations carrying its marker walking back from the single head to its planned operation, never by
+  description or change id. Since HI-2992 (the Assistant's decision on the card): only a write under way (its step
+  journalled) needs the walk, since every write journals its step before jj runs and clears it only once its operation
+  is validated (or provably made nothing); with no step the attempt is settled from its journal alone, however far the
+  operation log has moved on (a walk of at most 200 left such an attempt unrecoverable for the rest of its cycle: every
+  step `recover:malformed`, its commits in the user's log, the sweep asking every minute). The walk pages back 1,000
+  operations at a time (`--at-op` each page's oldest's parent), at most 10,000 (`OPS_WALK_MAX`); a base past that, out
+  of the history, or past a page holding a merged operation gives the step up (`givenUp`, journalled): whatever that
+  write may have made isn't the attempt's (never owned or touched; it stays in the user's log), and the rest is recovered
+  and dropped as ever. The candidate step leaves an attempt it can't recover or drop now for later (only its owner gone
+  or a cancel ends the step), so it never stops a new candidate. A marked operation's commits are owned only when it was validated in the attempt (the
+  journal's), or is its journalled step validated now as the attempt would have (the step's parent, its view's
+  bookmarks, tags and workspaces unchanged, the step's shape). Any other marked operation's additions are **uncertain**:
+  kept apart, never owned, pinned or abandoned (a restore that raced an outside descendant rebases it: that rebased
+  commit is never adopted, HR2's round 1). Each journalled pin reconciled with the ref now: its own create
+  read back is owned; an intent with no outcome whose ref holds the intended commit is **ambiguous** (kept, never owned,
+  never deleted); anything else a collision. What isn't held is pinned now, create-only. It never abandons or deletes,
+  and never answers a success.
+- **Drop** (`dropJjAttempt`): the attempt's visible commits abandoned (guarded), then only its owned refs deleted with
+  exact-old deletes (a moved ref is `raced`, preserved). Refused for any commit the target reaches (an ancestor of the
+  target bookmark, local or remote, or of its Git branch or a remote's: a Git move jj hasn't imported) and when the target
+  can't be read or is conflicted: those commits and pins stay. What the target reaches is **read again under the lock
+  right before each delete** (an exact-old delete guards the pin's value, not containment): a target moved onto a pinned
+  commit meanwhile stops the drop there with every remaining pin kept. A record with uncertain commits, or an
+  unvalidated step, is refused whole (recovery first).
+- **Residual race:** an operation started from the same base operation as one of the attempt's own. jj 0.47.1 has no
+  conditional operation (J1's finding (a)), so only a later command reconciling the two heads would act on it; it shows
+  as `raced` (two heads, or a parent other than the head read), is reported, and nothing more is written or cleaned up.
+- **Check materialisation:** a candidate is an immutable commit, so the merge checks' copy is J2's copy pool leased at
+  its commit (exactly it, credited only with `intact = 1`).
+- **Tests:** `tests/jjCandidates.test.ts` (the delta validator, the guard's revset, the parsers) and
+  `tests/jjCandidatesReal.test.ts` on the pinned jj (`CW_JJ_REAL=1`), both Git-backed modes: each style clean and
+  conflicted with the builder's change, workspace (an unrecorded edit), bookmarks and Git refs intact; a conflicted
+  middle commit; a card already on top; a merge in the suffix; a racing operation; two heads; an owner lost and a cancel
+  at every boundary; an outside descendant before the scratch's and the conflict's abandon; a ref created by someone
+  else first (an unrelated commit, and the very commit), then recovery and drop leaving it; crashes after written,
+  during pinning and after pinned, and between a create and its journal; a drop refused for the candidate and for a
+  descendant of it as the target; a drop's delete racing a moved ref; a stale attempt's drop beside a newer one; a
+  superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
+  before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
+  abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
+  Git branch); HI-2990: a squash onto a head that already holds the change, its restore making no operation, its step
+  cleared, then recovered and dropped with nothing left; HI-2992: a crash between writes, then more operations than
+  the walk reads, settled from the journal and dropped; a crash inside a write, its base past the walk, the step given up
+  and the rest dropped; the walk paging back to the base.
+
+##### jj's integration evidence (1.5.0's J5, HI-2798)
+
+Under decision A, J5 is the evidence side of the user's own integration (`platform/jjIntegration.ts`), and enables
+nothing: jj still has no `integration` capability. **It writes no jj operation**, so there is no `jj undo`, no
+`op restore` and no bookmark reset anywhere in it; the user moves the bookmark (by hand, or onto J4's candidate) and
+pushes. The reconciler's existing "integrated outside" path records the result once J6 composes jj's HistoryPort
+(`contains`, `lineHead`) from these functions. Its design is HI-2798/s11, s14, s17 and s20 (HR2's).
+- **The target's head as evidence** (`jjTargetHead`), read at the single operation head: the local bookmark, not
+  conflicted (`conflictedTarget`), its commit neither divergent (`divergentChange`) nor conflicted (`conflictedTarget`:
+  a conflicted result is never integrated); the export matrix holding (`partialExport` otherwise); and the heads and
+  Git's ref the same after the reads. **The export matrix** (probed on 0.47.1: a non-colocated store has no
+  `refs/heads` and no `@git` row until `jj git export`): colocated, the `T@git` row and the store's `refs/heads/T`
+  must both equal T (a missing row disagrees); non-colocated (HI-2896, HR1's s10 answer), the local bookmark alone is
+  the target: nothing imports or exports without colocation (probed: after one manual `jj git export`, a later
+  `bookmark set` and even `jj git push` leave `T@git` and the ref behind), so a past export never disagrees; the row and
+  ref stay in the moment's print and its final fence (a change between the reads is `moved`), and a raw Git write to the
+  store is E8's. A plain Git move jj hasn't imported shows as a disagreement (colocated), never as the target.
+- **The proof** (`jjContains`): the head (equal to the caller's `at`, else `moved`); then a **J4 candidate bound to
+  exactly the reviewed input** (a done record with `outcome: 'candidate'`, no step or uncertain commits, its reviewed
+  revision and base equal to the change's, its owned `candidate` pin reading back its result now) that the head reaches
+  by exact commit id; else §16.3.2's test unchanged on the backing store (Git's `contains` at that head: ancestry,
+  a replaying commit, the whole target holding it). A divergent reviewed revision, or a divergent or conflicted proof
+  commit, is refused; change ids never count, not even as a hint. Every answer, a null included, is **fenced after its
+  last awaited read**: the target's head, the operation, Git's ref and the export matrix read again and compared (after
+  the proof, and again after retention's pin writes), so a plain Git move during the read is a refusal or unknown
+  (HR1's round 1). A refusal or unknown is never "not contained": LeftTarget is written only on a proved null.
+- **Retained bundles:** before it answers proved, every object the proof names (the reviewed revision, its base, the head,
+  and a separate proof commit) is pinned in a bundle with an immutable identity, `refs/cw/jj-integrated/<card>/<cycle>/
+  <bundle>/`, under J4's ownership rules (intent journalled, create-only, read back, owned only on its own create; a ref
+  there first is a race, never touched), and every pin read back held. A retry of the same integration reuses its
+  bundle only for exactly the same endpoints; a new integration (another head, or after a recorded fact, LeftTarget and
+  reintegration, even with identical endpoints) gets a new bundle; earlier bundles are never replaced. The bundle is
+  checked held at the fact's boundary, before and after its write, and on later passes `ensureRetained` creates a
+  missing pin again while its object resolves; an object gone makes that card's containment unknown. A proof survives
+  the original line abandoned, the target reset and both GCs (tested).
+- **Provenance:** `Integrated.data.platform.jj = { op, head, gitRef, via, bundle, candidate?, commit? }` (an optional
+  field like Started's and Submitted's; read whole or not at all, `jjFacts.ts`).
+- **Publish is observed, never done** (gate: publish stays closed for pushing). The remote: the bookmark's one tracked
+  remote; several tracked, or none tracked with several configured and no `origin`, is `ambiguousRemote`; its URL from
+  jj and from the store's config must agree. What the remote has is read from the remote (`ls-remote --refs`, no
+  prompt, exactly `refs/heads/T`), then the operation, the target's head and its export, the remote and both URLs are
+  read again, across the network read and **again after every awaited decision read, right before the settles** (which
+  are synchronous): any change writes nothing (HR1's round 1). The effective URL is Git's and jj's own answer, never
+  parsed by Combwork: exactly one value at every level, the same from the store's own config alone (`--local`), and
+  jj's. That last check **fingerprints, never interprets** (the Assistant's note after HR1's rounds 1–2 and HR2's round
+  3): before its awaited reads it takes a print of every source the decision rests on, the raw bytes of jj's operation
+  heads, the store's HEAD (an `onbranch` condition), the target's loose ref, the packed refs, Git's config environment,
+  and every config file Git reads, **found by Git, never parsed by Combwork** (the Assistant's note on HR1's round 4:
+  `git config --show-scope --show-origin -z --includes --list` gives every file a value comes from at every scope and
+  each include and includeIf target as Git decodes it, comments, quotes and continuations included; each scope's own
+  file is covered whether or not it exists yet). An include it can't resolve to a concrete file (a `~` path, a
+  condition it doesn't know) or an origin that isn't a file is unknown. The set is a **verified capture** (HR2's round
+  5): discover, print, discover again, print again; the second discovery ran wholly while the files it found held the
+  first print's bytes, so the set describes exactly them, and an include added during either discovery shows as a
+  different set or different bytes (unknown). Its end is a synchronous validator the caller runs **in its own
+  continuation** straight before the synchronous settles (HR2's round 6: an awaited helper's return is a microtask in
+  which a queued change could land): it takes the print again and checks the operation heads and the target's ref
+  against the moment. Any difference, whether or not it would matter (a mixed-case
+  `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
+  stays owed. A pushed commit the store lacks is `notFetched`.
+- **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
+  exists in any state, so a settled one (`published`, with the pushed id, or `notHeld`) is a tombstone that never comes
+  back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on
+  its own with a compare-and-set on its key, result and `owed` state: a late answer for one integration never settles
+  another; the network read is shared, the bookkeeping never coalesced.
+- **A settled record keeps its evidence and is re-checked** (HI-2873, Darren's decision B on HI-2798's question, 10
+  Nov; design HI-2873/s7, s11, s14): a wrong permanent record can't be repaired, so a settle is a claim that is checked
+  again, as a safety net beside the verified capture and the synchronous boundary above (both unchanged). Each settle
+  keeps `seen`: the remote, its URL, what the remote had (`pushed`, null when absent), the target's head and the jj
+  operation, the sources print the final validator checked, and when. Every observation also re-checks settled rows
+  against what it sees now, through the same capture and in the same synchronous step as its settles, never writing a
+  jj operation or pushing: a remote or URL that differs (a verified change of destination, even with the result still
+  there) flags with no further read; a `published` row stays while its result is in what the remote has (the same
+  pushed id with no read; the remote advancing past it), and is flagged when the remote moved back past it or lost the
+  ref; a `notHeld` row is flagged once its result is in the remote or held by the target again. The print is kept for
+  diagnosis, never a reason to flag (an unrelated edit to a global config would flag every row). A flagged row becomes
+  **`checkThis`** with what differs (`remote`, `url`, `pushed`, `inRemote`, `held`: as recorded, and now), its `seen`
+  kept as it was; it is the user's to resolve (J9c, HI-2869's UI): nothing automatic moves it again, and reconstruction
+  never brings it back. No remote at all is a **verified absence** through the same capture: no owed row is settled
+  then, and the settled rows that named a remote are flagged; an ambiguous, unreadable or changing observation writes
+  nothing, as before. **The compare-and-sets** (s20's, extended): per key the only moves are owed → `published` |
+  `notHeld` (`settle`, which writes `seen` and the store's `seq`) and settled → `checkThis` (`flag`, on its key,
+  result, settled state and settle time); `seen` and the settle time never change once written. If J9c ever replaces
+  a row at the same key, the flag's compare-and-set needs a monotonic generation then. **Bounded and fair**: `seq` is
+  per target and strictly increasing, assigned only by a successful settle (so clock skew and tied times don't
+  matter); a sweep covers the rows settled up to its end, fixed when it starts (rows settled during it wait for the
+  next one); a pass reads one page of at most 64 rows from the store by `seq` (an index read for a durable store, never
+  every row) and spends at most 16 ancestry reads (a row needs at most two), carrying on after the last row it decided;
+  the sweep's position is separate scheduling state (an unchanged row is never written) with a **generation** that every
+  applied pass advances (a sweep completed or its position unchanged included), moved by its own compare-and-set on
+  that generation in the final synchronous step before any flag: a pass planned before another one applied writes no
+  flag, whatever values the schedule passed through meanwhile (HR2's round 1: no ABA), and a pass that writes nothing
+  leaves it unchanged. A row the sweep passed before it went stale is reached in the next sweep, however many rows keep
+  arriving. The observation's store reads are bounded too: its owed rows by an owed-only query (an index on target and
+  state), its settled history only through the page; never the target's whole history.
+- **Recovery** reads and never rewinds: a crash between proof, pins, fact and obligation is met by proving again
+  (reusing an unconsumed bundle with the same endpoints), by the pins' journal, and by reconstructing obligations
+  idempotently. J4's attempts recover with J4's own functions.
+- **Tests:** `tests/jjIntegration.test.ts` (the export matrix, the remote's choice, the parsers, the obligations'
+  compare-and-set and reconstruction, the provenance reader) and `tests/jjIntegrationReal.test.ts` on the pinned jj
+  (`CW_JJ_REAL=1`), both Git-backed modes and a local bare remote: main set to each J4 candidate; a cherry-picked copy,
+  a merge and a copy with more in it by hand; a conflicted bookmark from two racing sets and a target at a conflicted
+  commit; a divergent reviewed revision; an export disagreement in each mode; two operation heads; candidate credit
+  refused for an older submission's candidate, failed, unfinished and interrupted records, and a moved candidate pin;
+  a manual squash surviving the original line abandoned, the target reset and both GCs; bundles across a target move,
+  a retry and a consumed bundle; a pin taken first, lost at the fact boundary and re-pinned; and publish: owed until
+  pushed, the exact pushed id, the remote advancing, `notHeld` after a reset, `notFetched`, two tracked remotes and
+  several untracked without origin, the remote URL and the target moving during `ls-remote`, two cards settled by one
+  push without coming back, and a reintegration's own obligation with a late answer for the earlier one. The re-check
+  (HI-2873): `tests/jjPublishRecheck.test.ts` (the flag's compare-and-set, `seq`, what flags, and the sweep's fairness:
+  a row going stale after the sweep passed it while more rows arrive each pass than it can take, an empty page
+  completing a sweep, a delayed concurrent pass within a sweep, after a completed one and after a full cycle back to
+  the same position, and the store's reads with 5,000 settled rows); on the real jj, the remote moved back past a published result, an
+  unchanged and an advanced remote, a changed URL, `notHeld` then pushed beside an owed row settled in the same pass,
+  the only remote removed (an owed row left owed), a removal at the final fence, and a change queued 1–3 microtasks
+  deep at the final fence before a flag.
+
+##### jj's recovery, agents and compatibility (1.5.0's J7, HI-2800)
+
+J7 finishes jj's user and agent flows under decision A (HI-2794). Its design is HI-2800/s12, s16 and s19 (HR2's).
+**Reconciled with A** (the Assistant's OK on HI-2800; the items dropped are recorded on HI-2840, option B): Combwork runs
+no jj write, so "a previewed undo" is a read-only preview of the user's own `jj op revert`; no jj card starts, so agents
+get no jj slot, and their guidance is for the sessions the user opens in the project folder. **Not built here**: a
+Combwork-run undo, a UI for J2's `recoverStale` (it recovers Combwork-owned slots, and none exist until jj cards
+start), and the skills' jj-slot workflow.
+- **Operations** (`platform/jjOperations.ts`, `platform/jjOpView.ts`; IPC `jj:operations`, `jj:operationPreview`; the
+  window's Operations section): jj's operation log, 50 a page (an older page read `--at-op` its first operation), each
+  operation by jj's own description, its user, workspace, time and snapshot flag. Every read is pinned at the single
+  head H (J3's `JjReads.pinned`: `op log`, `debug object operation` and `debug object view` pinned write nothing, probed
+  on 0.47.1), and the answer stands only while H is still the head.
+- **The preview reads the whole view.** For an operation O with parent P, jj 0.47.1's `debug object view` of P, O and H
+  (the Rust Debug form of its `View`) is read by a strict parser (`viewEntries`): exactly the fields `head_ids`,
+  `local_bookmarks`, `local_tags`, `remote_views` (each remote's bookmarks and tags, every ref's target **and** tracking
+  state), `git_refs`, `git_heads` and `wc_commit_ids`, each nested shape checked (a target `Resolved(Some|None)` or
+  `Conflicted([…])`), flattened to keyed entries (`bookmark:main`, `remote:origin:bookmark:main`, `gitref:…`,
+  `githead:<ws>`, `wc:<ws>`, `head:<commit>`). An unknown, missing or reordered field, text that doesn't parse, a
+  duplicate key, over 4 MB of text, over 5,000 entries in a dimension or over 200 commits in a list is no preview at
+  all, never a partial one. jj is pinned (J0), so this shape is the contract; another version's is never read. The parse
+  and comparison run on jj's worker (`runner.preview`).
+- **What O did**: every entry whose value differs between P and O, and the commits it made visible or hid
+  (`at_operation(O, ::visible_heads()) ~ at_operation(P, ::visible_heads())` and the reverse, read at H; never `all()`,
+  which on 0.47.1 also takes in commits a revset names, so a hidden one would count as visible). **Later overlap**: an
+  entry O changed whose value at H isn't O's; descendants at H of what O made visible; what O made that is gone at H;
+  what O hid that is back.
+- **The command** (`jj op revert <full id>`, never with `--at-op`, which could make divergent operations) is offered
+  only when E1–E8 all hold, else the preview says which failed: **E1** the tested jj, one operation head, the H shown;
+  **E2** O has one parent (not the root, not a merge of operations); **E3** the three views whole within the bounds;
+  **E4** O changed no `wc:` entry (the user's command would update files there, which a pinned read can't see: commit,
+  describe or edit of `@`, a snapshot, a workspace added or forgotten); **E5** each `gitref:` O changed is jj's export
+  of the jj ref it changed to the same value (`refs/heads/<b>` with `bookmark:<b>`, `refs/tags/<t>` with `tag:<t>`),
+  O changed no `githead:`, and O isn't jj's import or fetch (its description `import git refs`, `import git head` or
+  `fetch from git remote…`, 0.47.1's words: an import changes both sides alike); **E6** no later overlap; **E7** the
+  project folder's workspace not stale at H (J2's read; unknown counts as stale); **E8** (HR2's round 1) Git's actual
+  state is what jj recorded at H: every ref jj imports (`refs/heads`, `refs/tags`, `refs/remotes` but a remote's
+  `HEAD`), read with read-only git (`for-each-ref` on the store, never an import), at the commit its `gitref:` names (an
+  annotated tag's peeled commit counts), none recorded that Git lacks, nothing conflicted, and, colocated, the project
+  workspace's HEAD at its `githead:` (`unimported` otherwise: a plain Git move leaves jj's operation heads as they were,
+  and the user's command would import it first). A clean metadata-only operation (a bookmark created or deleted, a
+  remote bookmark tracked or untracked) is eligible.
+- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command. E8's Git
+  reads sit inside **J5's verified capture** (HR2's round 2; the Assistant's call to reuse it): `rawSourcesPrint`
+  (`platform/jjSourcesPrint.ts`, extracted from J5's `sourcesPrint`, whose own sources are unchanged) prints the raw
+  bytes of every source they rest on, in both Git-backed modes: jj's operation heads, the store's HEAD (and a colocated
+  workspace's own HEAD), the packed refs, every loose ref under `refs/heads`, `refs/tags` and `refs/remotes`, a reftable,
+  and the store's config. Print, read, print again (equal: the answers belong to those bytes), and the same print
+  checked once more at the answer, after the last awaited read: any change is no answer (`moved`). The `moment` hashes
+  H, the print and Git's answers.
+- **Off main's thread** (HR2's round 3: a print walks and hashes every loose ref, 4,000 tags about 260 ms): the prints
+  run on jj's worker (`runner.print`), and the final answer is one synchronous task there (`platform/jjPreviewTask.ts`):
+  the preview worked out, then the print taken again and compared, nothing awaited between the check and the answer it
+  carries; main only relays it and reads nothing after. That is enough here because the preview writes nothing and the
+  user acts later, if at all: no write follows the check, as one did J5's compare-and-set (the Assistant's note). The
+  Operations print is bounded (`OPERATIONS_PRINT_BOUNDS`: 20,000 files and 2,000 folders in its trees, 16 MB read in
+  all): past any, no command (`bounds`). The byte bound limits what is read, not only what is accepted (HR2's round 4):
+  each file's size is checked on its opened handle against what is left of the budget, one past it refused unread, and
+  read up to one byte past that size, its bytes taken only when exactly that size was read (grown or shrunk meanwhile:
+  unknown). J5's few small sources are read whole as before. Measured on 4,000 loose tags (`tests/jjOperationsReal.test.ts`): the longest
+  stall of the event loop during a preview, 221.6 ms with the prints and answer on that thread, 20.2 ms with them on jj's
+  worker. **Copy** asks main again with that moment
+  (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the
+  window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
+  first records any unrecorded edits, as its own snapshot operation S, before reverting.
+- **The proof** (`tests/jjOperationsReal.test.ts`, the pinned jj): each preview writes nothing (the operation heads, the
+  project's checkout record and its files the same before and after). Where a command is offered the test runs exactly
+  it from the project folder and checks the revert R against the operation it applied to, B: every entry outside "what O
+  did" equal at R and B, and O's own back to P's. B is H, or S when jj recorded edits first, found by its provenance
+  (its parent H, a snapshot in the project's workspace) and its exact delta (only that workspace's `wc:`, its Git HEAD
+  and `head:` entries); the edit's bytes are in S's working-copy commit and still on disk. Cases: a bookmark created
+  with an unrelated one after (with and without an unrecorded edit), a bookmark deleted, tracking only (eligible, then
+  overlap once tracked again), the same bookmark moved since, a commit made on what O rewrote, a merge of operations, a
+  racing set, a commit and a workspace added, an import of a plain Git branch move, a stale project workspace, two heads
+  (nothing read), the head moving between the preview and Copy, and a plain Git move jj hasn't imported (of the very
+  branch, between the preview and Copy and before a preview; a Git-only branch; HEAD), each with the operation heads
+  unchanged. The parser and the rules on recorded and built
+  views: `tests/jjOpView.test.ts`.
+- **Stale workspaces** are explained, never recovered: the preview's refusal and the guide say what `jj workspace
+  update-stale` can do to unrecorded edits (HI-2781: they can end up in a separate divergent revision).
+- **Agents** (agent text, `contract.agent.jj`): a session whose project's platform is jj gets one more line after the
+  contract (`platformRule`, like the latest handover's pointer: the project's part of a launch): record work with jj,
+  run no git command that changes HEAD, the index, branches or refs, nor `jj git init`; `git status` may show what jj
+  already recorded; the user integrates finished work, and nothing an agent does moves a bookmark or pushes (J9d's
+  wording; it said no card starts before). Claude Code gets it in the combwork server's instructions
+  (`CW_PLATFORM`, set at launch from the project's config, part of the tools' signature), the others in the launch's
+  guidance (`sessions.combworkGuidance`). The gate plainGit stays closed; its reason now says agents are told. The
+  scenario `jj-plain-git` (a colocated project switched to jj through Combwork, asked to commit a fix) checks the line
+  was given, the fix recorded in a described jj commit, no git command that moves HEAD, the index, a branch or a ref
+  (`tests/scenarios/gitMutations.cjs`, unit-tested), no `jj git init`, and jj left consistent.
+- **Compatibility**:
+  - **Files**: `.jj` is a platform's own folder whatever the project's platform (`shared/platform/metadataDirs.ts`):
+    hidden in the Files tab (`repoMetadataDirs`), skipped by search's walk and the files watcher, refused by the
+    document tools, never a None project's deliverable (a non-colocated jj repository a None project is in), and never a project
+    write in the workflow's write log.
+  - **Moves** (gate relocation): Repair of a moved `.combwork` folder's projects (`combworkMove.repairWorktrees`)
+    leaves a worktree that is a jj workspace (a `.jj` in it) as it is: git's repair would make only git's half right.
+    Combwork's own slots and agents' worktrees (`workspaceMove`) are Git's, and no jj slot exists.
+  - **Non-colocated**: `.combwork` is kept out in the `info/exclude` of jj's own Git store (`platform/jjKeepOut.ts`,
+    `.jj/repo/store/git_target`; probed: jj 0.47.1 honours it in every workspace), at each refresh and before each
+    launch, from the repository's own workspace or a linked one (its `.jj/repo` pointer followed as J0's detection does,
+    HR2's round 1), each project's line anchored at its workspace root; what jj recorded before stays tracked. Trust: its root is the folder itself (`git: false`); a colocated project's is Git's main
+    working tree, the jj root. A git-based build finds no repository there: a documented limit, no promise.
+  - **The Changes tab's status** already runs with `--no-optional-locks` (`GIT_PREFIX`), so it takes no index lock while
+    jj writes: no change (the audit's result, HR2's correction).
+  - **Tools**: jj's readiness stays lazy (no startup check) and shows in Copy Diagnostics and the Version Control tab.
+- **Documented limits match the gates**: the user guide's *What jj doesn't support in Combwork* has exactly one item per
+  closed gate, each tagged with its gate (`tests/jjLimits.test.ts` holds it to `PLATFORMS.jj.gates` and to each gate's
+  name in `GATE_TEXT`).
+
+##### jj's slots for cards (1.5.0's J9a, HI-2866)
+
+Darren chose (b) on HI-2801 (10 Nov): jj cards run in 1.5.0, still under decision A. J9 is split: J9a (this) the slots and
+copies, J9b (HI-2868) the runtime, J9c (HI-2869) the window, J9d (HI-2870) the guidance, and J9e (HI-2874) the only
+activation point, after them; until J9e, `start.platformReady` still refuses every jj start, so nothing here runs for a
+real card. Its design is HI-2866/s7, s10 and s13 (HR1's). **Nothing in Combwork makes or moves a bookmark** (A): a
+jj card's line is a key, Combwork's jj writes are owned writes in its own workspaces.
+- **A card's line under jj** is `jj:<workspace>/<card>.<cycle>` (`platform/jjSlotPrep.ts`): a locator of one card
+  cycle's preparation of one slot, never a ref (the port refuses it as one; `lineHead` answers none; `deleteMergedLine`
+  skips it). A lane keeps one lease for all its cards, so the lease identifies nothing: two cards in one lane's lease,
+  or two cycles of one card, have different keys. Every identity check compares the whole key, the lease, the card, the
+  cycle and the folder's generation now.
+- **The completed binding** of each slot is its pointer, board_meta `slot_jjcur:<store>:<workspace>` = `{ prep, key,
+  card, cycle, lease, target, base, generation, submitted }`, the only thing `line()`/`heads().line` answer from, and
+  only while the folder's generation is the binding's and its working copy descends from the binding's base (read
+  pinned); unreadable or mismatched is unknown, a detached binding (`key` null) and no binding are none, and an
+  unfinished preparation is never shown. `submitted` (J9b records it at a submission, by compare and swap while the slot
+  is still bound to that key and generation) is what a reuse of the slot allows over the base.
+- **What is kept by a workspace's name goes with it** (HI-2979). A workspace's name is the slot's
+  (`cw-<project hash>-<folder>`), so a slot removed and made again under the same name gets the same name with a new
+  generation, and an older generation's pointer would make every read of it unknown for good. The pool deletes the
+  pointer, every `slot_jjprep` journal of that workspace and the slot's `slot_jjrecover` journal in the same write
+  that deletes its row (a removal, or a removal resumed), through the port's `forgetIn`; and again in the write that
+  records a newly made workspace's identity (its folder made, or made again where it was gone), which also clears
+  rows left by a removal before this. Publishing a binding prunes the workspace's other preparations' journals that
+  are done, so they don't grow with each card cycle.
+- **`prepare` and `detach` are owned, journalled writes** (`WorkspacePort`'s new optional `OwnedWrite`: the row's
+  identity, the holder's fence, the lease, a detach's `settles` and `target`; Git ignores them, its git commands
+  unchanged). Each preparation has its own journal, `slot_jjprep:<store>:<workspace>:<prep>`, planned with a copy of the
+  pointer (`prev`); the pointer moves only when it finishes. Under the store's repository lock: the folder recorded (J2's
+  owned snapshot); at the single head H, the chain over `prev`'s base (with no binding, an empty working copy) exactly
+  `prev`'s submitted commits, those contained in `prev`'s target (§16.3.2's test on the backing store), the new base a
+  visible commit, and for a detach the target still at its head. **Done by you, integration not proved** (HI-2924,
+  Darren's decision, 11 Nov): a hand-resolved integration changes the change's diff, so no containment proof holds; the
+  user's own move into Done of exactly `prev`'s card cycle (its key: the user's actor, cause `user` or `override`, no
+  `Integrated` or `Accepted` that cycle; `workView.ts`'s `doneUnproved`) stands in for containment, nothing else does.
+  The chain must still be one of the shapes below. The card's Work section says so; no button, no bookmark
+  moved (A). **The chain's shapes:** exactly `prev`'s submitted commits; HI-2913's, the working copy empty directly on
+  `prev`'s base; or (HI-2980, Darren's decision A, 11 Nov, with HR1's full-ancestry proof) **nothing left behind**: the
+  card's commits rewritten as the user integrated them (described, rebased onto a moved target, squashed), so the chain
+  isn't the submitted ids, but the working copy is empty, `prev` has a target that is one known commit T at H, and
+  `::(<ws>@-) ~ ::T` is empty, read pinned at H (all the working copy's ancestry, not only the range over the old base,
+  so unrelated work below it refuses). Unknown or conflicted fails closed. The integration proof (containment, or the
+  user's Done) is still required, separately: neither stands in for the other. The guard (the fence: the pool's operation, the folder
+  quiet; the folder's identity; the pointer still exactly `prev`; the head still H) runs after every journal write and
+  right before each jj write (HR1, round 1: an await can outlive the holder). The write is marked, `jj
+  --config=cw.prep=<mark> new <base>`, its mark journalled with `writing` before it runs, and jj's operation log decides
+  what happened: exactly one marked operation after H, H its parent, its working copy empty on the base, is the
+  preparation's own write (its operation and commit journalled with `written`); no marked operation means it never ran;
+  anything else is uncertain and stays so, never retried blind. The old empty working copy is abandoned only as the
+  slot's own, with the head still the write's. Before publishing, the folder is recorded again and its working copy must
+  still be the very commit the marked write made, empty on the base (an unrecorded edit or someone else's write since
+  leaves it uncertain), then the guard once more; the binding is published by compare and swap against `prev` whole (its
+  submitted endpoints included) and only while the journal is still this attempt's (each attempt takes the journal up
+  with a fresh `run`), inside the pool's own fenced transaction (the fence's `commit`: the row still this operation's
+  token, its lease open, no writer or job, checked in the same commit; HR1's round 2), so an owner cancelled or replaced
+  while the publication waited for the database publishes nothing. Anything else refuses before the write and keeps the slot as it is: a read failure, extra or
+  unintegrated work, a lost fence, a replaced folder, a binding changed meanwhile (`superseded`), the head or target
+  moved. A fence lost after the write keeps the journal at `written`, for the holder's next attempt to confirm and
+  publish. A crash resumes from the journal's phase by the same reading; a retry after publication recognises its own
+  binding and writes nothing. **Work found there early** (HI-3115; Darren's decision B of 13 Nov, design HI-3115/s42 agreed
+  with HR1): the protection of extra work stands (HI-2913, HI-2923, HI-2924, HI-2980 A, HI-2981): a slot holding more
+  than the previous binding is never prepared over. Its refusal (`unintegrated`, `notIntegrated`, `divergent`, `notEmpty`,
+  `journal`) is the pending cycle's wait, never `SlotPrepareFailed`: nothing there is changed, and once the slot is clear
+  the next pass prepares the same cycle, with no put-back. With it comes the evidence, frozen at the inspected operation
+  (`HeldWork`): the commits over the previous binding's base up to the working copy that are neither in its target (its
+  commit there) nor any of its submitted commits, and the working copy's own commit when it holds edits; `select` the
+  same set as a revset of full ids only, never `@` or a bookmark. A builder idle in the slot is checked first without
+  recording the folder (`heldEarly`: committed work only), so a hold for it doesn't end its run; edits are found by the
+  preparation's own record, after its run is ended. The hold is said once per cycle and reason (a `SlotPrepareHeld`
+  fact, with the sentence said), on the card and in the builder's wake: what is there, `jj new <base>` to set it aside
+  where it is, and once prepared `jj rebase -r <frozen selection> -B '@'` (or `jj squash --from <edits> --into '@'`) to
+  bring back what belongs to the card, its arguments as typed in PowerShell; more than 20 commits are counted and
+  selectable with `jj log -r <frozen selection>`. Not integrated: integrate it, or the user's own Done on exactly that
+  cycle (HI-2924). Unreadable: no ids or commands. A builder stopped for the record is named, with how to resume it. A
+  submit before the slot is prepared is told to end its turn (`unbound`, `pending`), or, held, the hold's own sentence
+  (`held`); one bound to another card since keeps today's refusal.
+- **Composition:** jj's port is registered by the app with its dependencies (`slotsApp.ts`: the control workspace's
+  record and the bindings in the workspace database, the store's repository lock, re-entrant within one async context so
+  a jj write inside a held lock runs straight through, the Recycle Bin, the project folder's quiet, containment on the
+  store). The slot and copy pools make new slots and copies with their project's platform's port, read again before
+  each lending (`workspacesFor`, `refreshPorts`), so a project switched between Git and jj lends the new platform's;
+  existing rows keep their own (J2's per-row platform: a Git slot finishes under Git). `slotWorkspaces()` is now Git's
+  explicitly, for the callers not yet asking by platform.
+- **The pool:** a jj slot's preparation reads it through `record` (its holder's snapshot) and passes the owned options;
+  its settle passes its operation's token as the detach's fence; the removal guard asks §16.3.2's test of a jj slot's
+  Git store. A lane-held jj slot isn't settled by the post-Done path (it holds no slot operation): the pool's settle does
+  it once the lease is released.
+- **A settle that couldn't run yet is owed** (HI-2906, design HI-2906/s101, the Assistant's note on it): the pool's settle
+  right after a lease ends can find its builder's session or a process still leaving the slot. jj's record and owned
+  detach are fenced by quiet, so the look or the detach is refused; before, a jj slot then stayed `lent` until the next
+  refresh (up to an hour). Each attempt carries a latch its fences set when they find the folder no longer quiet (never
+  reconstructed from a later check). An attempt that ends busy (a busy look, never `dirty` for that; or a detach refused
+  with the latch set) records the slot as **owing a settle** (`slot_settle_owed:<project>:<slot>` in board_meta) in its
+  own fenced end write, with its row; one that decides (ready, dirty, gone, or a refusal with the latch clear: the
+  binding not settled, the target moved) clears it there; one that lost its operation writes neither. Attempts on a slot
+  never overlap (its operation), so the record is always the latest attempt's. **The owed pass** (`SlotPool.owedPass`)
+  settles each owed slot of the project in turn, one pass at a time (asked for while one runs, it runs again after);
+  records of slots no longer in the pool go. It is woken by the attempt that set a record (unless a pass runs, whose end
+  asks), by its own end while any slot is still owed (1 s, doubling, at most 30 s; from 1 s again once none is), by a
+  session ending or going quiet in the project (slotCards' session listener, only for a pool already made), by the
+  pool's start and by `refresh()`. A wake owns nothing: cancelled, or finding a slot taken, it loses nothing. The pool's
+  close cancels the wake and awaits the running pass and settles. A refusal for good and known dirty files aren't owed:
+  the next refresh or event looks again, with no periodic jj loop. Git's detach takes no fence, so Git is unchanged.
+- **The slot listing doesn't compete with the pool** (HI-2912): quiet is a rename probe, and Windows refuses to rename a
+  folder that is a process's working folder or has a file open in it. The listing's staleness (`slotViews`) runs jj in
+  the slot and reads its `.jj/working_copy/checkout`. Polled (jjwindow's waits, the window's Slots and copies while
+  shown), it kept the probe failing, so an owed settle found the slot busy for minutes after its builder had gone (a
+  real Claude Code session leaves nothing there: no process names the folder, no leftovers). Now, while the slot has an
+  operation or a job, or owes a settle, the listing reads nothing of the folder and shows the answer it last read for
+  that path (`SlotStaleView`, slotStaleView.ts). The decision is made from the slot's state right before the read would
+  start, nothing awaited between. Each read checks the folder's creation generation first, so another folder's answer
+  is never shown once the slot can be read again. At most one read runs per folder. An answer that couldn't be read
+  never replaces a known one, so a stale slot keeps its Stale and Recover…. One entry per slot, per pool lifetime. **Not
+  an ordering of Combwork's reads against its writes:** the probe samples quiet and another reader can start after it.
+  That ordering is the file gate's (next).
+- **Combwork's file gate** (HI-2918, design HI-2918/s14, `platform/jjFileGate.ts`): jj replaces a file by renaming a
+  temporary one over it, which Windows refuses while any process has the file open, whatever its share mode.
+  - **Two failures:** a workspace's `.jj/working_copy/checkout` open meanwhile makes the write fail after its
+    operation is committed, so the workspace is left stale. A Git store's ref or `HEAD` open meanwhile makes jj's export
+    fail with only a warning (exit 0), so Git's refs stay behind jj's until its next command there.
+  - **Who takes the gate:** every jj write of Combwork's takes it exclusively for its workspace root, its Git store and
+    any workspace it makes (`workspace add`'s destination, keyed before it exists), for its process's whole life. Writes
+    run on main's thread, so the admission ends exactly when the process tree has. Combwork's readers of those files
+    take it shared for the life of their read: the working copy's `checkoutOf` and the control's bytes (async),
+    `readCheckout` (sync); the store's `gitBranches` (async), `gitState`, `refFromFiles` and the publish print (sync),
+    the worker's print and preview requests (held until the worker answers or has exited), and git run on a jj store
+    (`storeGitGated`, and Git's history port as jj code asks it, `storeGatedHistory`). A sync reader never waits: while a
+    write holds or waits on its key it gets nothing, read as unreadable.
+  - **Keys:** a path's key is its nearest existing ancestor's real path with the rest appended, lower-cased, so
+    aliases meet and a folder not made yet has the key it will have. A key that can't be read refuses rather than
+    running ungated.
+  - **Admission:** all of a request's keys at once or none, so overlapping writes can't deadlock. Writers come first;
+    a queued request leaves when its signal aborts or the runner shuts down. A key with no holder and no waiter is
+    forgotten.
+  - **Recheck:** a write's pre-write proof runs again after its admission and before jj starts (`recheck`):
+    ownedMove's guard, the record's fence and ownership, recovery's `mine()` (HI-2913's held fence unsplit), the
+    controls' sync checks before `workspace add` and `forget`, the boundary's and candidates' owner. It runs with a
+    ticket for exactly its keys: a reader in its own call tree reads without waiting behind it, every such read is
+    awaited before jj starts, and the ticket is revoked after.
+  - **Not covered:** jj's own reads (`--at-op --ignore-working-copy` open neither kind of file) need no gate.
+    Processes that aren't Combwork's (agents, the user's tools, a scanner) can still fail a jj write.
+  - **Tests:** `jjFileGate.test.ts` (ordering, atomic grants, abort, release, tickets, keys), `jjRunner.test.ts` (a
+    write's admission, recheck and cancellation), `jjFileGateReal.test.ts` (each reader class against 27 writes, both
+    modes; with the gate passed through, the working copy's readers failed up to 14 of 27 writes and left the slot
+    stale), `jjSlotPrepReal.test.ts` (a real guard under its admission, ownership lost while queued, a held recovery's
+    shape, `workspace add`'s destination), `jjFileGateInventory.test.ts` (every jj file that reads these files is
+    gated or says where).
+- **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
+  settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
+  **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
+- **A held slot's recovery** (HI-2913): a slot a card's or lane's lease still holds is let through only while that
+  lease's card's current cycle has a `SlotPrepareFailed` for it and no `SlotPrepared` after (a preparation still owed is
+  refused `preparing`; a made one, or none failed, `busy`). slotCards' `recoverHeldSlot` admits that card and cycle;
+  `SlotStore.beginRecover` claims the slot in one write only while it is lent under exactly that open lease at its folder
+  with no operation, job or writer (a free slot's `beginSettle` is unchanged); the fence before each of J2's writes is the
+  folder's quiescence (no session, no process: a builder running there is `busy`), the lease still open and still the
+  operation's, and the same cycle still failed and unprepared. A preparation can't start under the claim, and one that
+  claimed first makes it `busy`. Only a recovery that succeeded forgets that cycle's failed try and asks for a pass,
+  which prepares the card and places its builder; a refused or cut-short one leaves both (its journal resumes it).
+- **A failed preparation** (HI-2913) is recorded as `SlotPrepareFailed { lease, slot, why, stale }`, written only while
+  the same cycle and lease are current and unprepared; the card's Work section then says it hasn't started in that slot
+  yet and why (a stale jj workspace: with Recover…), until a `SlotPrepared` for the lease. A stale jj workspace's refusal
+  is worded as such (`slot.prepare.stale`), never as Git's files being unreadable. **Every failure in jj's words**
+  (HI-3003): the pool's failures that name Git's tool or terms (a branch or files unreadable, a line or target unread,
+  `git switch`, `git worktree add`, a folder git doesn't list, `git worktree remove`, no target branch) are each a
+  `SlotWord`, said in the port's own message where it gives one (`WorkspacePort.says`), else in the pool's (Git's,
+  unchanged). jj's port gives all of them (`JJ_SAYS`, `slot.jj.*`: "jj couldn't prepare slot-a for the card: …", "jj
+  workspace add: …", "no target bookmark"), so a jj slot's agent is never told of git, branches or switch, nor led to
+  run git there. No code compares the platform's id for it.
+- **A jj lane's builder between cards** (HI-2913): jj's record needs no session in the slot and the folder's rename
+  probe quiet, and a lane's builder stays in its slot. Before a jj card's preparation, under the folder's fence
+  (`changingFolder`: nothing typed or started there), slotCards' `freeSlotOfBuilder` ends only the builder's own run in
+  that slot, quiet, not resuming, nothing owed to it, with no input held, with its CLI's exit command (`sessions.quit`,
+  cause `lane`: not a Stop of the user's, so a lane's start isn't refused), fenced to that run in that folder and to the
+  cycle at each key, and waits for the run to end; placement then resumes its conversation bound to the lease with the
+  card. Anything else (busy, held, a run replaced or moved, starting) lifts the fence and looks again. A busy or fenced
+  record, a lost fence or an uncertain write in the preparation is a retry, never a failure. Git is unchanged.
+- **The shape a rebase leaves** (HI-2913, HR1's s18 answer): jj's preparation also accepts a slot whose working copy is
+  empty, neither conflicted nor divergent, with exactly one parent that is the previous binding's base (a rebase of the
+  card's commit moved it off), besides exactly the binding's submitted commits (`chainIsBinding`, unchanged). An empty
+  range alone never authorizes it (a working copy on unrelated history has none); the previous card's work must still
+  be in its target (§16.3.2).
+- **A lane's later card whose slot couldn't be prepared** (HI-2923): its builder (stopped before a jj preparation) is
+  not started with the lane's brief, which only the lane's first card's start carries (`briefAfterFailedPrepare`); the
+  card waits, not started in that slot, with the failure in its Work section and its builder's wake. Work committed in
+  the slot before its preparation (on the last card's original commit, its copy in the target) is that slot's own
+  unintegrated work: refused and kept, never moved.
+- **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
+  again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
+  matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
+  published meanwhile; a detach with the target moving first; crashes before the write and after it before
+  publication, resumed without a second write) and `tests/jjSlotPoolPrep.test.ts` (the pool's own prepare, settle after
+  integration, kept when not integrated, and the recovery action).
+
+##### jj's control workspace (HI-2887)
+
+Every jj slot and copy is added and forgotten from a control workspace of Combwork's own (J2's, s21 §4: sparse and empty,
+so its own snapshot records nothing). jj can only add that first workspace from the project folder (`workspace add`
+refuses `--ignore-working-copy`, probed on 0.47.1), which snapshots the user's working copy. **Darren's decision (r9 on
+HI-2887, 10 Nov): it's made automatically**, the first time a jj slot is needed, provided no Combwork agent works in the
+project folder. J2's rename probe of the project folder (which an editor or terminal open in it always fails) is replaced
+by a **launch hold** (`launchHolds.ts`): under the store's lock the making holds the project folder, refused while any
+session is admitted or live in it; a session's start is admitted where its folder becomes known (sessions.ts' `start`,
+before anything is launched), waiting while a hold covers it; each side one synchronous step; released however the
+making ends. Logged, and the user guide's jj section says it.
+- **Each making is its own attempt**, its record journalled before each step and decided again inside the store's lock:
+  `intent` (a fresh token), `folder` (a token folder Combwork makes itself, empty, under `.cw-jj-controls`, its
+  generation recorded), `ready` (`jj workspace add <token>/ws` under the attempt's own name `cw-<hash>-control-<token>`,
+  `ws`'s generation recorded). A ready control is used only while both generations, its checkout's name, its store and
+  its empty sparse state hold.
+- **Recovery never deletes anything unproved:** an interrupted attempt is never adopted (a child with no recorded
+  baseline proves nothing); an empty token folder of its own is removed (`rmdir`, never recursive); anything else, and any
+  registration under its name, is kept as a residue the record lists, reported, for the user to remove (the pool's prune
+  forgets a residue registration whose folder is gone, from the next control: no snapshot). A first set-up interrupted
+  before it was ever ready is made again; **a control that was ready once and is lost is made again automatically too**
+  (Darren's (a) on HI-2887, 10 Nov: under the same condition, recording the working copy again); the port refuses it
+  unless its composition allows it (`remakeAllowed`, the app's: true).
+- **Tests:** `tests/jjControl.test.ts` (the real jj, both modes: made with the project folder held open and an uncommitted
+  edit recorded into the user's `@`, refused with an agent there; each crash point; a replaced `ws`; a user's file kept;
+  an empty attempt folder removed; a lost control refused without `remakeAllowed`, made again with it; two makings at once; a
+  replacement while the lock is awaited), `tests/launchHolds.test.ts`.
+
+##### jj cards in the runtime, through Review (1.5.0's J9b1, HI-2868)
+
+J9b is split: J9b1 (this) a jj card's start, submission, checks and sameness, through Review to Approved; J9b2 (HI-2882)
+reconciling it to Integrated, with the observer. Still **behind the guard**: every jj ruleset carries
+`start.platformReady` until J9e (HI-2874); a test compiles jj rulesets without it through one seam
+(`setJjCardsReadyForTests`, compile.ts), which J9e removes. Its design is HI-2868/s7 to s19 (HR1's). Decision A holds:
+Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and create-only `refs/cw/cards/…` pins.
+- **Composition:** `JjPlatform` is built with its workflow (`adapters.ts`) and takes its dependencies from the workflow's
+  config (`cfg.jj`, the app's `jjCards.ts`, set while slots run): J9a's registered port, the store's lock, `git
+  --git-dir <store>`, J5's reads (pinned in the project folder), the card's lease and slot rows read synchronously, and
+  the pins' ownership records in board_meta.
+- **Start:** a code card in its builder's slot (jj needs slots; a no-code card starts where its agent is, with no line);
+  its target `card.target || o.target`, required (jj has no default branch); its base J5's `jjTargetHead`; its line J9a's
+  key `jj:<workspace>/<card>.<n>`, `n` the card's start ordinal (one more than its Started and Adopted facts: unique per
+  cycle, known at the plan, the cycle rechecked by the evidence in the Started write). `Started.platform.jj` records the
+  slot's workspace, store and generation. **A restart** of the same card in the same slot (its binding this card's, one
+  of its own keys, the same folder generation and target) **carries**: the start records the old base, and J9a's
+  preparation publishes the new key with the old base and submitted commits, no jj write. What the card left in the
+  folder uncommitted is its own and stays (HI-2981): the pool's dirty refusal is skipped when the port's `carries`
+  says the preparation carries the slot's binding (`carriesBinding`, the same test the preparation makes), as Git's
+  same branch skips it; any other preparation over uncommitted edits is refused as before. A carry is never of a stale
+  workspace (HI-3095: the card's commit rewritten elsewhere while its slot was kept, a rebase say): the preparation
+  reads the folder's staleness at the pinned head it carries at (`staleAt`) and refuses `stale` (unknown: refused too),
+  so the start says `slot.prepare.stale` with Recover… (`SlotPrepareFailed`'s `stale`) before any agent runs there, and
+  nothing in the folder changes: an edit not recorded yet stays for Recover… to keep aside, where a builder's
+  `jj workspace update-stale` would have dropped it. On another target it is
+  refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
+  recovered.
+- **A card lease ended with the card's committed work in its slot** (HI-2995; design HI-2995/s12): put back, or
+  stopped, with commits that aren't in the target, so the detach that would return the slot to the pool is refused
+  for good (`WorkspaceStep.kept`: the chain not integrated, or not the binding's; a transient refusal, the fence, an
+  uncertain write, a moved head or a failed read, never sets it). The slot is **kept for that card**: `dirty`, with
+  `slot_heldfor:<project>:<slot>` = `{ card, generation }` in the same fenced write, shown in Slots and copies as
+  "Kept for <card>", never lent to another card (by name either) and never lent with no lease. That card's next lend
+  takes it back (`SlotStore.take`, in its write: the record still the card's at the row's generation, the slot dirty
+  with no lease, operation, job, writer or aside), and the warm checks again through the port (`heldFor`: jj's
+  binding still the card's at the folder's generation, its working copy on its base). The start then carries its
+  base and work. Refused at either step (busy, another generation, another binding, the folder gone, another slot
+  asked for), the lend is refused naming the slot (`slot.refusal.kept`), the slot kept as it was, never a fresh
+  slot instead. Once its work is in the target (or the user moves the card to Done, HI-2924), the next settle's
+  detach succeeds and the slot is ready again, its record deleted; removal deletes it too. With an edit not committed
+  yet beside the work (HR1's round 1), the slot settles dirty and no detach is asked: it is kept for the card all the
+  same while the port says its binding is still that card's (`heldFor`), and a take-back checks that ownership first,
+  before any clean check, the card's edits then carried by its preparation (HI-2981). Lanes keep their lease
+  across a put-back, so only a card lease ends kept; Git's slots have no such answer.
+  A take-back that fails (its setup or install), is interrupted (its Combwork gone, the operation taken over) or is
+  cut short by Combwork closing leaves the slot **kept as it was** (HI-3032): `dirty`, its record unchanged, the
+  failure's why on the slot (`warmError`, cleared by the next take-back that succeeds), its lease ended
+  `setupFailed`/`interrupted`; never `creating`, which nothing lends, settles or removes. A kept slot whose folder a
+  refresh found gone first (`gone`) refuses its card's start saying so (`slot.kept.gone`); Slots and copies shows it
+  as "Kept for <card>, but its folder is missing" with **Remove…**, the user's explicit removal (`slots:removeKept`,
+  `SlotPool.removeKeptGone`): only of the record the window showed (card and generation), checked again under the
+  removal's operation (still `gone`, its folder still absent, the same record at the slot's generation, the platform's
+  fence admitting it) and then by the removal's own guards; its confirmation names the work's last commit (the newest
+  `endRev` recorded for its card there, a failed take-back's lease recording none), which stays in jj's store. Any other slot state since: refused (`changed`), nothing removed.
+  **Its workspace forgotten by the user** (HI-3097: `jj workspace forget` outside Combwork, its folder left): still
+  `gone` (jj doesn't list it), told apart by its folder being there: the start says `slot.kept.forgotten`, Slots and
+  copies "Kept for <card>, but jj no longer lists its workspace" (`keptGone.forgotten`), and Remove…'s confirmation
+  says the folder goes whole to the Recycle Bin. Remove… carries the mode the user confirmed (`slots:removeKept`'s
+  `forgotten`): the folder there and forgotten, or missing; a folder in the other state now, at the first read or under
+  the removal's operation, is `changed` (HR2's round 1: a missing-folder confirmation never trashes a folder put back
+  meanwhile). `removeKeptGone`'s read then only makes it eligible (the folder there, `present` false); the removal (`remove`'s `keptForgotten`, this action's only) keeps the session, in-flight and
+  process guards on every attempt and waives only dirty and unmerged, which jj can't read of a forgotten workspace. The
+  port (`remove`'s `forgotten`) proves it afresh on every attempt, inside the store's lock, fail-closed: exactly one
+  operation head, whose listing names no such workspace nor any at the folder; the folder the recorded workspace by its
+  files alone (`owns`) and the existing pre-trash checks; the pool's fence; then, nothing awaited, the same single head
+  as the trash starts (`moved` otherwise). Never journalled, never resumed: a failed trash leaves the slot `gone` and
+  kept, and the next Remove… proves it all again. A colocated slot's Git worktree receipt is dropped only after the
+  trash, by HI-3046's checks. Remaking the workspace in place isn't offered (jj can't add one at an existing folder).
+  **A slot kept for no card** (HI-3103) goes the same way: such a slot is left `ready` (nothing looks at a ready slot
+  again until a lend tries it), then `creating` with its error once a lend fails it ("not listed"), or `gone` or `dirty`
+  (`forgettable`). Slots and copies shows it "Not listed by jj" with **Remove…** (`SlotView.forgotten`, the slot's
+  generation, read by `SlotPool.forgottenFree`: no kept record, its folder there, `present` positively false), its
+  confirmation `workflow.slots.removeForgottenFree` (the folder to the Recycle Bin with any changes in it);
+  `slots:removeForgotten` → `SlotPool.removeForgotten(name, generation)`: eligible only so, at the generation shown, in
+  the project's own platform, all of it again under the removal's operation (`changed` otherwise: a slot kept since
+  goes through its own Remove…), then `remove`'s forgotten mode and the port's fresh proof, as above.
+  **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
+  own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
+  started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an
+  earlier read found, so a record a refresh writes meanwhile decides) takes the kept slot back as a card's lease
+  does, kind `lane`, the warm's ownership check asked for that card; the builder's carried slot is not handed over for
+  it, and both the hand-off's and the written slot's takeover writes refuse a card kept a slot elsewhere; the builder's
+  run still writing in another slot is waited for (`slot.kept.written`); a lane already holding another slot refuses
+  the card's start (`slot.kept.lane`), no slot swapped; a dry start answers the kept slot, or the kept refusal. A lane's
+  lease on a kept slot ending with the work still not in the target keeps it again for the recorded card (its
+  generation the slot's), never left lent with no lease; a lane that went on to another card there (HI-3057) keeps it
+  for the card the slot's binding names now (the port's `heldCard`), committed work or only an edit, and the earlier
+  card's record goes; the binding unreadable, for the recorded card as before. The record follows the binding while the
+  lane still works there too (HI-3130): each preparation of the lane's next card in that slot (`keptFollows`, after the
+  port's prepare, under its operation's fence, only a record at the slot's generation) rewrites it to the card the
+  binding names, and again on a preparation finding the slot already on that line (a retry: a move cut short or its
+  binding unread is repaired then), so the earlier card (its work in the target: the lane can't prepare another over it, HI-3057) starts
+  elsewhere at once, dry or real, never refused as kept in a slot another card works in.
+  **What a kept slot holds, said** (HI-3143): a record kept by the settle's dirty branch (the card's edit, or files jj
+  doesn't track) carries `edit` when the port's `holdsCommits` (its commits over the binding's base, read pinned) says
+  none; with commits too, or unreadable, it doesn't, as a record kept by the refused detach (committed work) never does.
+  The listing's `keptEdit` gives Slots and copies *Holds a card's uncommitted changes* and *Kept for {card}: its changes
+  aren't committed yet* in place of the committed-work words; a lane's next card moves the record without it (HI-3130).
+  **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
+  else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
+  runtime's `keptHere`, checked right after the plan, any slot lent for it given back). Waiting for that slot stays a
+  wait for an agent's or a lane's start (`start.slotAvailable`), but the user's start across that wait, which would
+  start the card where its builder is, is refused too, an override included: under jj (whose cards always use slots)
+  that drag was the one way a card started in the project folder without its kept work.
+  **A kept jj slot's target** (HI-3129, Darren's decision (a) of 13 Nov): a jj card keeps the bookmark it started on.
+  Its start (jj's `resolveTarget`, read by `startTarget`, `start` and the Todo `prime`, so the evidence, the slot lent
+  and `Started.target` agree) reads the kept slot's binding (the port's `identity` and `binding`) and starts on the
+  binding's target whatever G7 is now; only a fresh start follows G7. Refused before any slot is lent, nothing
+  changed: the binding unproved (unreadable, or not this card's: `platform.keptOnTarget`, `why: unread`), never
+  started on G7 instead; the card's own Merges into naming another bookmark (`platform.keptOnTarget`, `why: mismatch`);
+  its lane merging elsewhere (`platform.keptLine`). The field shows the card's own target or G7, never a kept one, so
+  the card dialog notes beside it where a waiting card would start when that differs (`tasks.keptTarget`: the platform's
+  `startTarget`, read only, the card's own target unchanged; unproved, it says it can't be read; HR2's round 1). The kept target goes with the lease request (`slotFor`'s `kept`:
+  slot, generation, target), and the lease checks it again where the start records it (`SlotPool.keptBindingStill`,
+  the port's `heldTarget` at that generation): failing closed (binding unreadable, another card's, another generation,
+  another target), the slot is given back unused and the start waits (`slot.start.keptMoved`). **A jj project's
+  targets** are its repository's local bookmarks, read through the port (`targetLines`, pinned at the operation head,
+  conflicted ones left out), never Git's history: the card dialog and a lane's start info (`projectTargets`) list them (G7b
+  isn't needed to name one), and a pick is checked through the port (`targetExists`, `lineHead`). The list unreadable
+  (`othersUnread`), only G7 can be picked. jj has no retarget of work in flight (capability `retarget`, Git's only):
+  a started card's Merges into is fixed (`fixedInFlight`, `TARGET.started`). The Assistant's retarget preview for jj
+  is a follow-up.
+  **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
+  store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
+  platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,
+  the builder's own worktree), is refused before its folder is chosen (`platform.keptAcross`, the runtime's
+  `keptAcross`), naming the way on by its folder as read then, not the row's `gone` (a folder restored since, or an
+  unlisted jj workspace's, HI-3097; absent only on ENOENT or ENOTDIR, unreadable never worded as gone, HR1's round 3):
+  its folder there, switching the repository back to the slot's
+  platform (Remove… refuses a slot whose commits aren't in the target, and nothing removes it by force); its folder
+  gone, **Remove…**. The pool's own lend and dry start say the same (`slot.kept.platform`), never `slot.kept.busy`.
+  That Remove… forgets only Combwork's record (`recordOnly`): the fence asked to admit the project's platform now, no
+  journal resumed, nothing asked of the slot's own platform's port, the session and in-flight guards, and the folder's
+  absence checked again right before the record goes, so a folder restored meanwhile is `changed`, nothing removed;
+  then Git's one registration of that absent folder (a colocated jj workspace's, `<common>/worktrees/<id>` whose
+  gitdir names it, a relative one read from the entry) is dropped by the project's port (`dropRegistration`), never by
+  a repository-wide prune, which would also drop another worktree gone meanwhile (HR1's round 1). It is dropped on
+  HI-3046's owned-entry proof (`jjGitLink.ts`), its receipt taken then: the entry's file id and birth time, `worktrees`'
+  own, its `gitdir` and `commondir` bytes; proved synchronously (in place, physically in the store, not `locked`, the
+  folder absent, absence only on ENOENT or ENOTDIR, any other error a doubt), moved aside out of `worktrees` with
+  nothing awaited between, proved again on what was moved (a name reused meanwhile is another entry), then removed
+  (HR2's round 2). Anything unproved is left, logged: put back under its name when what was moved isn't it.
+- **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
+  (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
+  workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that
+  records nothing moves), the folder's generation, the slot's binding pointer, the lease and slot rows (open, the same
+  slot, no operation or job, its builder's writer only), and the target's ref. `content` is the same without the epoch,
+  so another card's submission meanwhile gathers the intent again once instead of refusing it. A Todo card's evidence
+  keeps the single operation head beside its target's ref (the head witnesses jj's whole view of the target, not only
+  its export), so a start beside Combwork's own jj operations (a slot made, another detached) is gathered again up to
+  three times while only that moved, each pass read afresh, and refused once they're spent (HI-2916). A fingerprint
+  that can't be read at the instant it is asked (the operation heads while any jj operation lands: jj writes the new
+  head before it removes the old one) also gathers it again while passes are left, rather than refusing (HI-2972); the
+  write still needs exactly the fingerprint it gathered. So is the target's ref read while a jj write of Combwork's
+  holds or waits on the store (its file gate, HI-2918): unreadable then, never an empty ref, which looked like a change
+  by content and refused the start beside a slot being detached (HI-3012). A start refused as `evidence.changed` logs which check refused
+  it (the plan, the write, the lane, the baseline) and on which pass, and each pass gathered again logs why. The
+  target's read itself is made again whole when the head moves under it, at most three reads.
+- **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
+  transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
+- **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
+  its builder's and (a card lease) this card's, with no operation or job in the slot and no writer but its builder's
+  under this lease, beside what it read. A submission and a check need it held at entry (refused `unbound` otherwise,
+  nothing read or written), at every boundary await (held and unchanged), and in the final write (its print in the
+  evidence): an ended or foreign lease is refused, never compared with itself.
+- **Submission:** J3's boundary (the snapshot under the store's lock, its owner the card's held lease and slot rows and
+  its stage); a predicted submission only reads. Refused: something recorded or a non-empty `@` (`submit.empty`, commit it
+  with `jj commit`); `@` with more than one parent, the chain not from the binding's base, a divergent or conflicted
+  commit, more than 500 commits, or a commit another card recorded (`platform.jjRefused`, worded by its reason); the
+  slot not bound to this card's key. A revision an agent names is a hex prefix the Git store resolves to exactly the
+  head: never a change id or a revset. **Attribution**: every commit of the chain `base::P ~ base` is recorded by no card
+  or by this one (J3's `jjAttribute` over every card's recorded ids); the start's base is never authorship. The fixed
+  endpoints are on the Git store (the base where P and the target's head meet now, the files and key from it to P).
+  `Submitted.platform.jj` records P's ids and the whole chain (`chain`: each commit and change id, oldest first), read
+  by `recordedIds` as the card's provenance (a fact from before, with no chain, is read as it always was).
+- **Retention:** the runtime's post-write `pin` action (one per submission, `refs/cw/cards/<key>/<n>`), on jj in one
+  ordered action: its intent journalled (board_meta `jj_pin:<ref>`), the ref created only if absent (`update-ref` with
+  the zero oid), read back, its ownership recorded (`owned` true; a ref there before any intent of ours at the same
+  commit `false`; an interrupted create whose ref is there `uncertain`; at another commit the action fails and nothing
+  is overwritten), and only then the slot's binding's submitted commits advanced, seq-ordered (`submittedSeq`: an older
+  submission's record never replaces a newer one's). The action is bound to its own submission (HR2's round 1): the
+  Submitted fact records the slot it was made from (`platform.jjSlot`: folder, line key, store, workspace, generation),
+  the pin is made in that store, and only that binding is advanced, while still bound to that key at that generation and
+  while the live folder is still that workspace (its generation, its checkout's workspace and store: the port's ownership
+  check, under the store's lock and again right before the publication; HR2's round 2): a restart in another slot or
+  under a new key, a removed folder, or a folder replaced at the same path is never filled from a late action. No ref is ever deleted here; reclaiming only `owned` ones is later.
+- **Checks:** J3's bracket in one adapter call: B1 (the snapshot) and the revision read at its head, the run, then
+  always the end (its write record, J3's stat fallback, B2) whatever the run did, and the credit. **No check copies**:
+  the new capability `checkCopies` (Git's) is what a check copy needs, apart from `isolation` (slots); the check API,
+  the submit refusal, the checks view and cw-progress offer `--isolated` by it, and a jj card's `--isolated` is refused
+  before anything runs.
+- **Sameness:** J3's `jjSameRevision` with Git's `sameChange` on the store. **Containment** (`contains`) is a typed
+  unknown in J9b1: J9b2's proof (J5's `jjContains`) decides it; `targetHead` is J5's `jjTargetHead`.
+- **Approved:** a jj card that passes review waits in Approved (`userIntegrates`, its OK asked first where G10 applies)
+  until J9b2's reconciliation finds it in its target.
+- **Tests** (the real jj, both Git-backed modes): `tests/jjCards.test.ts` (start, commit, a predicted submission writing
+  nothing, submit, pin, a credited check, review and pass; the submission's refusals, the lease ended or an operation
+  installed before the write; attribution of another card's intermediate commit and its rewrite, and the card's own
+  rewrite; a claim committed between the plan and the write; restart carry and the changed target; pin ownership and
+  seq order; check credit, a transient edit, a throw, `--isolated`; the guard without the seam; the epoch).
+
+##### Agents in jj slots (1.5.0's J9d, HI-2870)
+
+Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-2870/s7 (HR2's OK). One owner per rule:
+- **The rule** stays J7's `contract.agent.jj` line (above): record work with jj, no git command that moves HEAD, the
+  index, branches or refs. Its last sentence, which said no card starts in a jj project, is now "The user integrates
+  finished work: nothing you do moves a bookmark or pushes", so J9e changes no agent text. It's addressed to agents:
+  Combwork's owned slot writes and the user's integration aren't theirs.
+- **The gates** say their own next step (`submit.empty`, `platform.jjRefused`, `api.check.noCopies`); no skill repeats
+  them.
+- **The workflow** is the bundled skills':
+  - work-on-card: a jj card's work is a commit, as a Git card's ("for a code card in Git or jj": the run record names
+    it, and the submission is the card's own revision, so commit first; a change id named is refused by
+    `check.revisionMismatch`, so the skill doesn't say it). After a pass, where the user integrates, there is nothing for
+    the agent to merge: the card waits for the user.
+  - card-loop and review-agent-work: their "for a code card in Git" clauses (commit each round, name the commit, ask for
+    a missing one) are "in Git or jj".
+  - review-agent-work: a jj review copy's working copy is an empty commit on the revision, so the reviewer diffs the
+    base to the revision, not `@`.
+  - The skills' size budgets (`tests/guidance.test.ts`) grow by those words only.
+- **Scenarios:** `jj-plain-git` (J7's), and `jj-card-submit`, `jj-card-review` and `jj-card-passed` (a jj project with
+  slots: a card built and submitted, reviewed in its copy, and told it passed). They check `tests/scenarios/gitMutations.cjs`
+  and `tests/scenarios/jjPublishes.cjs` (a bookmark or tag moved, a push, a repository set up or a remote changed:
+  every attempt, a failed one too; unit-tested), the bookmarks unchanged and jj consistent. Before J9e they start jj
+  cards through `CW_TEST_JJ_CARDS=1` (`jjCardsTestSwitch`, compile.ts), honoured only by an unpackaged build;
+  J9e removes it with the seam.
+  - `jj-card-review` also checks the review copy is left as it was (HR2's round 1; `tests/scenarios/jjReviewCopy.cjs`,
+    unit-tested): the reviewer's tool calls (a file tool's edit there; a jj command that records, or a command that
+    writes files, run there), and the copy's files and jj's `@` and its parent looked at again while it is still the
+    reviewer's. Its review starts at the submitted revision.
+  - Its fixture was colocated only here; J9f (HI-2896) adds the non-colocated jj-card scenarios, HR2's non-colocated
+    review fixture among them.
+- **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
+  project's worktrees folder is absent before its first slot), inside the store's lock and before the control's proof:
+  nothing is awaited between that proof's final check and the add (HI-2887).
+##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
+
+Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
+Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle pins and the workspace database's rows.
+- **Approved → Integrated** (`reconcileJj`, workflow/reconcile.ts, beside `reconcileHistory`): Gone for the repository or
+  the slot folder; the slot's head observed (HeadMoved); in Approved, J5's `jjContains` first (the card and cycle's
+  journalled bundles, every bundle an Integrated fact already names as consumed, and since HI-2871 the cycle's J4 attempt records, so a move onto J4's candidate is proved `via: 'candidate'`; the user's own merge,
+  fast-forward or replay is proved by J5's ancestry or replay fallback). Contained: `Integrated { by: 'outside', method,
+  result: the head J5 proved at, platform: J5's provenance }`, written only while the card is still exactly the approval
+  proved (its cycle, stage, approved submission, revision, base, key, recorded jj commit and target) and nothing it
+  depends on is undone, its obligation and retained-bundle rows in the same transaction, then Done (an Integrated fact
+  recorded while the rules were off is applied once they're on, with no second proof or rows). Not contained: Git's
+  stale and carry-over rules on the jj head (J3's sameness; a sameness that can't be read is unknown, never Stale).
+  Refused or unknown: nothing written, never "not integrated". J5's bundle journal is merged in one write, never
+  replaced, so a concurrent observer's proof never erases the bundle the Integrated fact names (HR1's round 1). **Not offered for jj in 1.5.0:** InTarget (Review), MergedInPart (Active) and LeftTarget (Done): each
+  would need a containment decision outside J5's proof; `contains` stays a typed unknown.
+- **The records** (board migration 29, `schema/jjPublishStep.ts`), every key and query scoped by the project's canonical
+  id: `jj_obligations` (HI-2873's publish obligations, indexed by target and state and by target and seq),
+  `jj_oblig_targets` (each target's settle sequence and re-check sweep) and `jj_retained` (each Integrated card's retained
+  bundle, when it was last verified and how). `sqlObligations` (platform/jjObligations.ts) is HI-2873's store in SQL: each
+  change one compare-and-set statement, owed rows read whole (never truncated), settled history only through the indexed,
+  limited re-check page; nothing cached in memory.
+- **The publish observation** runs once per reconciliation run per target with owed or settled rows (the adapter's
+  `afterRun`, which the reconciler calls after each project run, unfinished cards or none). J5's `observePublish` decides
+  on main as before (its processes through jj's worker); its synchronous tail (the validator's file reads, then the
+  re-check and the settles: `jjPublishTail.ts`) runs in **jj's publish worker** (`jjPublishWorker.ts`) on a connection of
+  its own, in one `BEGIN IMMEDIATE` transaction: the request's cancel fence (a shared flag the follow sets synchronously
+  as it drops), the repository's and the store's identity (their folders' file ids and birth times), the database binding,
+  the tail, the fence again, the commit; anything failing rolls it back. Two Combworks are independent observers: SQLite
+  serializes their transactions and the compare-and-sets keep one winner; no owner. `checkThis` stays for the window
+  (J9c): nothing automatic moves it.
+- **Retention:** each run verifies a fair page of 8 due retained bundles (J5's `ensureRetained`), oldest first; a visit
+  completes its due whatever the outcome (kept for the window), so a broken bundle never starves the rest. Due: marked by
+  an invalidation, or verified longer than 6 hours ago. While more are due, a continuation run follows after 2 s (a timer,
+  while the follow lives).
+- **The watch** (`jjRepoWatch.ts`, the reconciler's beside the watcher's, by platform): one watch on the operation heads,
+  one recursive watch on the store's folder itself (its refs and `packed-refs` read from the events, the rest dropped:
+  no handle below the store, HI-3033, since Windows refuses to move a folder with one open beneath it and the user's
+  `jj git colocation enable` or `disable` moves the store), one minute's timer that re-arms
+  what is missing and reads the operation heads (nothing more on main: no file loop over refs); every jj operation (a
+  slot's commit included) and every branch ref's change (a raw Git move) schedules a run; a change under a bundle's pins
+  marks that bundle due, `packed-refs` or an armed watch (at the start, an open or reopen, too) marks every bundle due;
+  disposed with the project's follow (which sets its requests' fences first).
+  Where the repository is, is asked of jj until it answers (HI-2977): an unknown answer at the start (jj busy, missing or
+  being replaced, several operation heads) is asked again at each minute's tick, one detection at a time, and the
+  watches open when it answers; once known, the tick reads the workspace's store pointer from its files (no process)
+  and, when the store changed (`jj git colocation enable` or `disable`), moves the store's watch to it.
+- **Tests:** `tests/jjReconcile.test.ts` (the real jj, both modes: fast-forward and replay integrations, nothing before;
+  unknown writes nothing; two observers; the approval replaced during the proof; Stale after a slot amend; the publish pass
+  published then checkThis; a deleted pin recreated), `tests/jjObligations.test.ts` (the SQL store across connections,
+  project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
+  before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
+  pins, re-armed, disposed).
+
+##### jj's pre-integration candidate (1.5.0, HI-2871)
+
+Darren's decision (11 Nov): J4's candidates run for jj cards as a pre-integration check, as strict's update and the test
+merge do for Git, in J9b2's runtime; the user still integrates (decision A: Combwork never moves a bookmark or pushes).
+Merge checks on the candidate are HI-2938's (his answer to r17: two cards). Its design is HI-2871/s13 and s21 (HR3's OK).
+- **When** (`reconcileJj`, workflow/reconcile.ts): a card in Approved that J5's proof finds not yet contained, its pass
+  holding at its slot's head (no Stale, the head the approved revision), with the rules enforced. One step per run
+  (`jjCandidateStep`, platform/jjCandidateStep.ts): every attempt of the cycle that isn't settled recovered with J4's
+  `recoverJjAttempt` and dropped with `dropJjAttempt` (uncertain commits kept, never blocking); the target's head read
+  (J5's `jjTargetHead`); a head that already reaches a done candidate of the reviewed revision and base (the user
+  integrated it after the run's proof read the target) ends the step with nothing built, dropped or published (`none:
+  'reached'`), and the next run's proof credits it (HI-2989: a rebase built there failed `notUpToDate` and returned a card
+  the user had integrated); a done candidate for exactly the fingerprint and that head, still visible (`jjCandidateNow`), is
+  answered again, a failure for them likewise, never rebuilt; every other done candidate or update dropped (J4's drop
+  keeps what the target reaches); then strict's update (merge and squash, strict on: `prepareJjUpdate`, Squash rebasing as
+  Git's) and the candidate (`prepareJjCandidate`, the project's style), from J5's control folder under its store-checked
+  lock, Git's replay on the store for sameness (a replay that can't be read: unknown, never "not the same").
+- **The fingerprint** (`JjCandidateFingerprint`): the approval (`approvalOf`: cycle, approved submission, revision, base,
+  key, recorded jj commit, target; the stage Approved, its pass holding: no Stale recorded and the slot's observed head
+  the approved revision, HR3's round 1), the effective ruleset's id (its options' hash: an Override that
+  applies other options changes it) and the style and strict used. Each attempt is journalled with it (board_meta
+  `jj_attempts:<project>:<card>:<cycle>`, merged by attempt in one write; J4's phases durable before their step). J4's
+  owner is the fingerprint read from the board again (`still`), before every write, pin and abandon: a new approval or
+  options applied mid-build stop the attempt (`owner`, interrupted, recovered and dropped next run).
+- **Withdrawn first** (HR3's rounds 1 and 2): a ready offer that isn't current any more (its head not the target's, or
+  its candidate superseded or gone by `jjCandidateNow`, the target unmoved; or either unreadable: `offerCurrent`) is
+  deleted (that exact row) before anything is recovered, dropped or rebuilt, so an interrupted or failed rebuild never
+  leaves it.
+- **Published only while still true:** the target's head read again just before (J5's), then the write's own predicate:
+  the same cycle and the fingerprint the card's in that transaction. A candidate: the window's record (board_meta
+  `jj_candidate:<project>:<card>:<cycle>`: its fingerprint, a generation reserved before the step, ordered as HI-2869's
+  containment record), shown only while its fingerprint is the card's now and, a ready one, while the target's head as
+  the window just read it (`jjWaiting`'s `targetHeads`) is the head it was built on (`candidateShown`): a moved target
+  hides it at once, before any reconciliation and across restarts. A conflict, or not up to
+  date (a merge in a rebase's suffix, not on top, or strict's update not the same change): `IntegrationFailed` (entry
+  `jj:<attempt>`; jj has no merge queue) with its files, hunks and log, the card to Active, its builder woken in jj's words
+  (`jjReturnedWake`) and the card's comment (`tasks.history.jjCandidateReturned`). A repository that signs
+  (`signing.behavior` own or force): a record saying so, nothing built. Unknown: nothing offered or returned; counted in
+  the record, shown from the third in a row.
+- **The credit:** J5's proof gets the cycle's attempt records (`candidates`): the user's `jj bookmark set` onto the
+  candidate is Integrated `via: 'candidate'`, its update validated again as J5 already does.
+- **Descriptions on one line:** J4 reads its writes back from jj's operation log a line each, and a newline in `-m`'s
+  argument makes that read malformed (0.47.1), so a candidate's and an update's descriptions are the first line of
+  Combwork's (`mergeMessage`, `updateMessage`): the card's key and title.
+- **Options:** jj's Merging group shows `style` (*Candidate style*) and `strict` (*The candidate brings work up to date
+  first*), each with its own words where the user integrates (`OptionText.integrates`, `optionTitle`, `optionDesc`: by the
+  descriptor, never the platform's id).
+- **The window:** Waiting for you to integrate shows *Candidate ready* (commit, change id, style, the head built on; no
+  conflicts, no merge checks) with `jj bookmark set <target> -r <candidate>` in place of the duplicate's commands; *No
+  candidate* for a signing repository and *couldn't build a candidate* (after three tries) keep the manual commands.
+- **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
+  Integrated via the candidate, Done; the target moved between runs; a conflict returning the card; a new approval, other
+  options applied and the target moved during the build, each at J4's hook; a crash after the pins recovered and dropped;
+  rebase and strict merge; a signing repository; HR3's round 1: a ready offer withdrawn when the target moves and its
+  rebuild is interrupted, after a restart too; a candidate rewritten in place, main unmoved, likewise; a stale pass after the offer and during the build; HI-2989,
+  each style in both modes: main set onto the candidate between a run's proof and its step, nothing built or returned,
+  Integrated via the candidate by the next run; HI-2992, both modes: a crash after its pins, then 205 operations, the next
+  run recovering and dropping it and offering a new candidate), and the e2e suites
+  `jjcandidate` and `jjcandidatenc` (the real app, both modes: Candidate ready, the user's `jj bookmark set`, Done).
+
+##### The merge checks on a jj card's candidate (1.5.0, HI-2938)
+
+Darren's split of HI-2871 (11 Nov, r17's answer (b)): the project's merge checks (G9) run on the candidate before it is
+offered, as the merge queue runs them on its test merge. Decision A holds: the user integrates. Its design is HI-2938/s7
+and s11 (HR1's OK).
+- **The candidate's identity** (HI-2871's `JjCandidateFingerprint`, extended here for every use of it): also the card's
+  decision generation and the seq of the move into Approved the current approval came from, so a re-approval with
+  identical endpoints, or a decision, is another candidate whose checks start anew.
+- **The checks' key** (`checksKeyOf`): a hash of the checks' names in order, each one's command, `mergeInstall` and the
+  project's setup command. Results are bound to the candidate's fingerprint, attempt and commit and this key.
+- **Offered only once green:** with merge checks configured, the window's record of a candidate carries its checks
+  (`checks`: running, passed, waiting, stopped, failing) and its `jj bookmark set` command shows only once they passed.
+  No merge checks configured: offered after its conflict check alone, as HI-2871 left it.
+- **Where they run:** JjPlatform's checks runner (one look at a time per workflow, asked for by the reconciliation, by
+  `afterRun` after a restart, and by a timer while waiting), off the reconciliation. Each candidate's checks run in a
+  **check copy** of the project's copies pool (copies.ts) leased at exactly the candidate's commit, with its job opened
+  as an isolated check's is (`candidateCheckLease`): every process of its install and checks starts in that job
+  (`jobSpawn`, the queue runner's launcher handshake) and is the merge queue's runner's run (queueChecks.ts: its log, the
+  session environment, `cw.queue.checkMinutes`, `classifyCheckFailure`), placed in the copy and stoppable from the
+  Progress panel (`stoppable`; Stop ends the lease's job). The install runs only with `mergeInstall: 'always'` (the pool
+  installs again on a reset whose lock files changed). `CW_CHECK_BASE` is the head the candidate is built on.
+- **The lease is the attempt's** (HR1's round 1): held for the whole run, its install and every check
+  (`holdCandidateLease`, candidateLeases.ts), so the pool's `leaseOver` (`checkLeaseOver`) never calls it over between
+  its Progress runs; given back (released) only by the runner. After a crash nothing is held, and the pool's own rules
+  (its ref's run ended, a link's age) return it through its barrier. Each run is the lease's ref, so Stop finds its job.
+- **Credit:** jj's check bracket (J3's B1, run, B2) at the copy, counted only when its credit is exactly the candidate's
+  commit; each run a `CheckRan` of the candidate's commit under its attempt's entry (`jj:<attempt>`). Exit 0 uncounted is
+  never green (tried again). The copy's run is credited by the copy's own state (HI-2991, `scope: 'workspace'`, jjChecks.ts):
+  this workspace's checkout record unchanged through the run (no jj command updated its working copy), B2 taken at
+  whatever head there is (no `expect`), recording nothing, not stale and at B1's @, and the write record clean; the
+  repository's operation head and Git's state aren't compared, so another lane's `jj commit` or the user's own jj during
+  a check leaves it counted (they made every multi-minute check uncounted). A builder's own check keeps the repository's
+  scope, as strict as before.
+- **Journal** (`jj_candidate_checks:<project>:<card>:<cycle>:<attempt>`, `runCandidateChecks`): the fingerprint, attempt,
+  commit, head and key, the lease, and each check's phase written before its step (`started`, then `ended` with ok,
+  counted and revision). Another fingerprint, attempt, commit or key starts afresh: no green reused. A check `started`
+  with no end (Combwork stopped mid-run) is ended `interrupted` and runs again; one ended counted green at the candidate
+  stands.
+- **While a command runs** (HR1's round 1), its validity is read again every 2 s (`WATCH_MS`): invalid (a re-approval,
+  a decision, other options, a moved target or candidate), the lease's job is ended at once (the command's whole tree)
+  and the lease given back; the run answers invalid, never waiting for the command to finish. The offer's state
+  (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
+  unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
+  current.
+- **The setup command** is read with a stamp of the setup command itself (HI-3122, `jjSetupStamp.ts`: a hash of
+  project.json's `worktreeSetup`, read synchronously only when the file's identity changed since the last look, by one
+  plain read and parse that never waits: HR3's round 1, no kept-file recovery on main's thread; a file caught mid-save
+  gives an unread stamp, new each time, never kept and never equal to any (HR3's round 2), and nothing is made or
+  published under one (`knownStamp`), so a check started or published across it fails closed and is looked at again); the
+  publishing transaction reads the stamp again and refuses a result made under a setup since changed, and the next look
+  starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
+  project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running
+  check as invalid.
+- **Unsettled checks are always looked at again** (HI-3122): at the end of each pass, every candidate whose checks are
+  still shown running, waiting or failing gets its next look at its retry time, or at the bounded retry (`againMs(0)`,
+  30 s) when it has none ahead, whatever ended its turn (an invalid run, a restart refused for an unknown or changed setup,
+  any early exit): the look runs the checks anew under the key then, or not at all once the candidate has gone. Before,
+  nothing asked again, and the checks stayed shown running.
+- **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
+  progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
+  card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at
+  the candidate's head and the candidate still its recorded commit (`offerCurrent`). Not valid: the lease is given back
+  with its job ended, and nothing is published.
+- **Restart and quiescence** (s11 §3): a lease is given back through the pool's barrier (no run in it, its job settled,
+  the folder renamed aside and back); the runner never leases again for a candidate while the journal's last lease isn't
+  freed (`copyLeaseFreed`), so a crashed run's tree that can still write is never overlapped or its copy reset; a lease
+  whose Combwork is gone is returned by the pool, as review and isolated leases are.
+- **Outcomes:** all green: offered. Red (not transient): `IntegrationFailed { reason: 'checks', check, logPath, log }`, the
+  card to Active, its builder woken (`jj.candidate.checks`) and the card's comment (`tasks.history.jjCandidateReturned`'s
+  checks branch). Transient (couldn't start, its time limit, killed, uncounted, no job): failing, tried again after
+  30 s doubling up to 15 min; the window says why from the third in a row. No copy free, or the last lease not freed:
+  waiting, tried again in 30 s. Stop (a check's run or the install's): stopped, never red and never retried by itself.
+  The retry time is kept with the record (`retryAt`, HI-2991): every look before it (each reconciliation asks for one)
+  leaves a waiting or failing set alone and sets the runner's timer for it; other checks or commands (a new checks key)
+  restart them at once. The misses in a row (`misses`) are kept while the set runs again (`progress`) and cleared only by a
+  pass or a restart, so they rise to the window's message and the retry doubles with each (after a restart the first
+  miss is the first again, its retry the first delay).
+- **Run Checks Again** (s11 §1, `jj:candidateChecksAgain`, JjPlatform `checksAgain`): under a stopped or failing
+  candidate; it publishes `running` under the same validity as any publication (refused when anything changed) and asks
+  the runner to look. It never adopts or moves anything.
+- **Options:** jj's Checks group shows `mergeChecks` (*Checks pass on the candidate*) and `mergeInstall` (shown with merge
+  checks; its value *Before every candidate's checks*), by the descriptor. Focused tests (G20) stay the merge queue's.
+- **Tests:** `tests/jjCandidateChecks.test.ts` (the runner's decisions: journal phases, interrupted checks, no lease while
+  the last isn't freed, validity, each outcome, the checks key); `tests/jjCandidateChecksRuntime.test.ts` (the real jj,
+  real copies at the candidate and real check commands: green then offered and integrated via the candidate, red returning
+  the card, both modes; Stop then Run Checks Again; a re-approval with identical endpoints, a decision, changed check
+  options and the target moved, during a check and at the publication write; a restart whose previous lease's job still
+  runs a writing process: no lease until its tree is ended, then the interrupted check runs again; on the real copies
+  pool: a refresh between the install and a check and between two checks leaves the lease the attempt's; the setup
+  command changed during the final check and at the publication write; in real jobs, Stop on a running install, then Run
+  Checks Again; a re-approval, a moved target and other options while a check runs: its job ended at once; HI-2991, both
+  modes: a check that keeps not counting run again only at its retry time, doubling, its misses rising to 3 and shown;
+  another slot's `jj commit` during a check: still counted, passed); `tests/jjHistory.test.ts` (HI-2991: a copy's
+  bracket counted through another workspace's operation at each barrier, never through its own checkout record moving, a
+  write, or its @ rewritten; the repository's scope as strict as before); the
+  scenario `jj-checks-back` (a builder given the checks' wake fixes the card with jj and submits again); the e2e suites
+  `jjchecks` and `jjchecksnc`.
+
+##### Candidates of ended cycles (1.5.0, HI-2950)
+
+A candidate is dropped (J4's `dropJjAttempt`: owned pins only, what the target reaches kept) when its card's cycle ends
+without Integrated, not only when it is superseded (HI-2871) or after Integrated. Its design is HI-2950/s10 (HR1's OK).
+- **Ended** (`cycleEnded`, reconcile.ts): an earlier cycle than the card's current one; the current one while the card is
+  in Todo, or Done with no Integrated fact (the user's own Done). A reopen or a restart is a new cycle, so an ended cycle
+  never becomes live again; an Approved, Review or Active card's current cycle never has ended.
+- **The sweep** (JjPlatform `sweepEnded`, from `afterRun`, whatever the cards' stages, so after every start too): at most
+  `SWEEP_SCAN` (32) of the project's attempt journals read a run, by the key's index after the cursor, each
+  card looked up by its key (never the whole board: HR1's round 1); each card and cycle with something left (an attempt not dropped or
+  kept, a checks journal, the window's record) whose cycle has ended, a fair page of 8 after a durable cursor
+  (`jj_sweep_cursor:<project>`, past every row scanned). A pass runs from the start to the last key and ends there, its
+  cursor back at the start (HR1's round 2): `more` asks for a continuation run only mid-pass or for a page cut short, and
+  the minute's tick asks for a new pass while anything was left unresolved, on any page of the pass under way or the last
+  finished one (HR2's round 3: kept across a pass's pages, reset as a pass begins). That memory is the running
+  workflow's, so a workflow's first sweep (after a restart) begins a pass at the start, whatever the cursor (HR1's round
+  4). The `moved` hook asks for a run on a move
+  into Todo or Done too.
+- **Integrated cycles too** (HI-2990): the sweep's predicate and owner is `cycleOver` (reconcile.ts): ended, or the
+  current cycle with Integrated recorded, whatever its stage (Done, or Approved when the rules were off). The drop right
+  after the Integrated write (`candidatesDone`) is the same `cleanCycle`, under the card's lock; what it can't finish (a
+  check copy still leased at the candidate, a held drop, an attempt cut short, a crash before it) the sweep finds again
+  until the cycle is settled.
+- **Each cycle** (`cleanCycle`), under the card's lock (`withCardLock`, shared with the candidate step, so the two never
+  run on a card at once): its unsettled attempts recovered and its live candidates and updates dropped, `cycleOver` the
+  owner (read before every J4 write, pin delete and abandon); an interrupted drop is left as it was (found again next
+  sweep), only J4's `uncertain` kept for good; failures keep their pinned evidence. Then its window record and its checks
+  journals deleted in a write that finds the cycle still ended, a checks journal only once its lease is freed.
+- **Check copies parked first** (`CopyPool.parkFree`): a check copy stays where its checks ran, its working copy on the
+  candidate, which J4 never abandons under a working copy. Before a candidate is dropped (here, and a superseded one in the
+  candidate step), the pool's free copies at it are reset onto the head it was built on (the port's `resetTo`, under an
+  operation of a lease's kind, never while a run or a process is in one); a copy leased or returning leaves the drop
+  untried and unresolved until it is freed. A drop J4 keeps back for anything but the target reaching it (a working copy
+  or a bookmark on it) settles nothing: the entry stays live and is dropped again later (HR1's round 1), by the sweep and
+  by the candidate step's supersession alike (HI-2990: its phase `dropped` with no state, whatever its outcome).
+- **Order and leftovers** (HI-2990): candidates are dropped before the updates they were built on (strict's update is
+  their parent, so dropped first it would be kept back by its child). A step that provably made nothing (jj refused it
+  before it ran, or it ended with the operation head unmoved, under the lock) clears its journalled step, so recovery
+  never takes it for an uncertain one (a squash's restore with nothing to restore, its scratch commit left otherwise).
+- **Successors** (HI-2990): when jj rewrote an attempt's commit itself (its automatic rebase after the builder rewrote an
+  ancestor, so the recorded commit is hidden and its change id on a new visible commit), the drop adopts that successor:
+  exactly one visible commit of the change outside the attempt's, not divergent, not reached by the target, with an
+  empty `jj interdiff` from the attempt's commit and its description and author unchanged (HR1's round 1: rebased, never
+  edited; a change of the user's to its files or its metadata stays theirs). It is
+  journalled into the attempt's commits and pinned before the guarded abandon, as the attempt's own.
+  **Only jj's automatic rebase** (HI-3045, design HI-3045/s15): a successor is adopted only when the operation that made
+  it (`jj evolog`'s, one read) rebased it as a descendant of something it **rewrote in place**. The successors one
+  operation made are decided together. For each root (one with a parent outside the attempt), each outside parent is the
+  same commit or that parent's change rewritten by that operation with its own parents the same changes (a describe,
+  metaedit, squash-into, amend, absorb), at least one of that root's own so rewritten (never one shared across the
+  group: a root rewritten with its parents unchanged is ambiguous), and each inside parent is that commit's successor
+  there. Anything else is the user's own operation (their `jj rebase -r/-s/-b` of the candidate or its revision, onto
+  the moved target say, meaning to set the target onto it) or ambiguous, and stays. An operation with several parents
+  (concurrent history) or with the root as its parent (history abandoned below it) can't be classified: kept, and the
+  drop finishes (`keptSuccessors`, logged); a read that fails interrupts the drop with nothing adopted, read again on
+  the next pass. Reads only until every group is decided; none at all without a hidden commit with a successor.
+- **Brought back** (HI-3150, design HI-3150/s7, s10, s13): the user's `jj op restore` to before a drop shows the
+  dropped attempt's commits again, without its pins (Git refs jj doesn't restore). A `dropped` entry with an owned commit
+  visible again is **revived** (`reviveDropped`, jjCandidateStep.ts): under the card's lock, its row's journal and its
+  commits' visibility read again there, and saved live (`state` removed) only while it is the entry read (the same
+  attempt and record, still `dropped`) and its owner holds; nothing pinned or abandoned in that pass before the save, so
+  any interruption after it is resumed by the ordinary drop paths. The drop (`dropJjAttempt`) pins again each owned
+  visible commit no pin holds (`<prefix>r<n>`, as adopted successors are) before its guarded abandon: what the target
+  reaches is kept (and settles `kept` for good: `JjDropped.dropped.reached`), as is anything the user built on it.
+  **Where it is noticed:** the live cycle's step, before its drops; ended cycles through the sweep, every row the page already scanned with dropped entries (settled or due for
+  something else, a retained checks journal or a live sibling: HR2's round 1) nominated by one visibility read of
+  the owned commits of every such row, in chunks of 256 (`visibleCommits`), evidence only: a
+  read jj can't make admits none, read again next run. No new scan or timer; journals cleared since are out of reach.
+- **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
+  restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
+  candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
+  strict merge with the target moved twice, the builder's rewrite under a merge candidate, a successor the user edited
+  (its files, or its description alone) kept, a squash attempt cut short by a crash, then the user's own merge, Integrated with the rules off and its drop crashed);
+  `tests/jjEndedCycles.test.ts` (`cycleOver`, `cycleLive` with held drops);
+  `tests/jjCandidateChecksRuntime.test.ts` (a held check's card moved to Done: its job ended, the checks journal kept
+  while its lease is out, the copy parked and the candidate dropped; HI-2990, both modes: the user's own fast-forward
+  while a check runs at the candidate, dropped by the sweep once the copy is freed); e2e `jjcandidate`/`jjcandidatenc` (a card put back
+  to Todo in the app: its candidate leaves the jj log by itself).
+
+##### The window for jj cards (1.5.0's J9c, HI-2869)
+
+What the window shows of jj cards and the user's acts on them; design HI-2869/s7 to s16 (HR2's). Behind
+`start.platformReady` like the rest until J9e (HI-2874). Decision A holds: nothing here moves a bookmark or pushes; the
+only writes are an acknowledgement, the containment record and the leftovers' prune.
+- **Containment record** (`reconcile.ts`): each J5 proof of an Approved jj card that finds it not in its target yet
+  (`notYet`) or can't say (`unknown`, with J5's reason) writes `jj_contained:<project>:<card>:<cycle>` in `board_meta`:
+  the exact approval observed (submission, revision, base, line key, jj commit, target), what was seen and when. Ordered
+  by a **generation** reserved from the project's `jj_contained_gen:<project>` counter in a board write before the proof
+  starts, never by a clock: it's written only while the card is still that approval (checked in the write) and over no
+  record or a lower generation's, so an older observation finishing later writes nothing. The Integrated transaction
+  deletes it. **Waiting for you to integrate** (`jj:waiting`, `jjWindow.ts`) shows a record only when all six of its
+  identity fields equal the card's now; any other is *not checked yet*.
+- **Publish records to check** (`jj:toCheck`): the project's unresolved `checkThis` rows (§ J9b2's publish pass), 50 a
+  page in (target, flag time, card, cycle, bundle) order, the cursor that whole key (rows flagged at the same moment page
+  once each). Each row says what was recorded (published to which remote, or no longer in its target) and what differs
+  now. **Mark as checked** (`jj:markChecked`, after a confirmation) is an acknowledgement only: one compare-and-set that
+  sets `check.resolvedAt` while the row is exactly the one shown (the project's, its key and target, still `checkThis`,
+  the same flag time, not resolved); `seen` and the differences are kept, and nothing in the repository or remote changes.
+- **Leftovers from setting up jj slots** (`jj:leftovers`): HI-2887's residues of the control workspace (an interrupted or
+  lost set-up, a folder not empty or not proved Combwork's), at most 100 listed with the total, each with **Show in
+  folder**; Combwork never deletes them. Before listing, a bounded prune (`pruneResidues`, under the store's lock) drops
+  a residue only on a **proved absence**: its path's `lstat` says ENOENT or ENOTDIR (any other error keeps it) and its
+  name isn't registered at the pinned operation head. The last step runs inside the journal's own write (the journal's
+  `update`, in the board write's transaction, after any wait for its lock: HR2's round 1), reading nothing
+  asynchronously: the record still exactly the one read, the operation heads unchanged, each `lstat` again; anything
+  else writes nothing. 16 a batch from a rotating cursor kept in the journal, so every residue is reached.
+- **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
+  Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
+  card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
+- **The folder's commit still beside the head's** (HI-3134; HR1's design s7: a refusal). A record of the slot that
+  raced another write (the user's `jj op abandon`, say), reconciled by jj, can leave the head giving the workspace a commit
+  HW while the commit the folder's checkout is (WS) is still visible beside it: the same change, divergent, or another.
+  `update-stale` would check HW out and take what only WS holds out of the folder, which equals WS, so nothing is
+  preserved. `recoverStale` reads, pinned at the head, HW and whether WS is still visible (an ancestor of a visible head);
+  then it refuses `divergent` with both full commits and `same`, nothing changed. It does so when a fresh recovery
+  starts, before its journal or any copy is written, and again right before `update-stale` whatever phase a recovery
+  resumed from, its journal kept; there the head that decision was read at is compared again in `update-stale`'s recheck
+  under the file gate's admission (`headsNow`, no jj process: HR1's round 1), and moved, the decision is made again
+  (`divergent`, else `changing`), never jj's update on a head it wasn't made for. Unreadable, it refuses `unreadable`. A WS hidden (rewritten or abandoned: the usual
+  stale slot, HI-3099's) recovers as before. The window says it in a window of its own: both short ids, how to look at
+  them (`jj log`, `jj diff`), and to choose the slot's version keeping what its folder holds, then Recover… again.
+- **Stale after `jj op abandon`** (HI-3099): a folder whose checkout operation is no longer in the head's history (the
+  user discarded old operations; jj then refuses to read or record it, "a sibling of the working copy's operation") is
+  stale too (`staleAt`'s `inHistory`: the op log read pinned at the head, 200 ids then up to 20,000; only a completed
+  walk proves it outside, a truncated or unreadable one is unknown). A slot so is shown stale with Recover…, its badge
+  saying so (HI-3135: the port's `staleWhy`, `abandoned` against `rewritten`, carried by the listing's stale view as read;
+  *Stale: its jj operation was abandoned (jj op abandon)*), which mends
+  it: `update-stale` there leaves the working copy U a divergent sibling of X (its preserved snapshot: the same change,
+  parents and author time), so the record of the restored files, which would make a commit identical to X within X's
+  committer second (Git's whole seconds: jj refuses "already exists"), waits, polled every 50 ms, until the clock's
+  second is past it, capped at 3 s of waiting (never the wall clock), stopped at once on a lost fence: `collision` or
+  `fence`, nothing recorded or abandoned, the journal still `restored` for Recover… again; U, X and the head re-read
+  after the last wait, the record's owned guard at its write. Its provenance is journalled on every attempt (HR3's round 1, HR1's round 2): `recordFrom`, the head right before the record, and `recorded`, the working copy that attempt starts on (when already a record of this phase's) and then the one it made; a resume after any number of stops between a record and the journal's end accepts a working copy other than U only as such a record (the journalled commit, or the one snapshot of this workspace made directly on `recordFrom`, by the op log), and refuses any other movement (`provenance`). Combwork's control workspace so is mended automatically
+  (`control()`'s `mendIn`, under the store's lock: proved again, one head H, a `controlProof` taken then; `jj workspace
+  update-stale` in it alone, its recheck that proof's `check()` and H still the only head, nothing awaited before jj
+  starts; the proof discarded, the control returned only when usable and no longer stale, its consumers proving it
+  afresh; any change or failure refused and retried by the next use). Never `jj op integrate` (probed on 0.47.1: it puts
+  the user's own workspace back to an old view, and their `update-stale` then removes their files from the folder), and
+  never another workspace touched. Tests: `tests/jjOpAbandon.test.ts`; the window's in jjWindowRun.cjs.
+- **Recover… under jj's line-ending conversion** (HI-3098): the user's own `working-copy.eol-conversion` (`input`, or
+  `input-output`, which checks text files out with CRLF) is read in the folder when recovery begins (`jj config get`,
+  journalled as `eol`; anything but its three values refuses) and the folder's bytes are compared with commits as jj will
+  store them (`storedForm`): every CRLF as LF, unless the file looks binary (a NUL, or a CR followed by anything but LF,
+  in its first 8192 bytes; a CR in the window's last byte doesn't count). Probed on jj 0.47.1, `.gitattributes` playing no
+  part. The scan's blob and the restore's `C` use it; the preserved and restored bytes stay the folder's own. So an
+  untouched file is no edit, X (exactly the delta) is tidied, and no `-late` or `beside` copies appear. The switch to jj
+  still allows the setting (unlike Git's `core.autocrlf`). Tests: `tests/jjRecoveryEol.test.ts`.
+- **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
+  a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
+  `slots:recoverStale`, its refusal said (busy, with stop its agent first; its card still being prepared; no longer
+  stale; not the recorded workspace; or jj's failure). What it did reaches the window (HI-2996, `SlotRecovery`): with
+  nothing to look at, a notice; else a window (one button) listing each copy it wrote beside a file (`beside` and `late`,
+  by its full path), each moved-aside file it had to leave (`asides`: its path created again meanwhile), how many files it
+  put back, the deletions it kept (`deletedLocally`, `kept`) and the commit it kept
+  (X, divergent). A copy (`*.cw-recovered-*`, or a file left moved aside, `*.cw-before-recovery-*`) is recorded by jj
+  like any file, so a jj submission any of whose chain's commits adds or changes one (`git log base..P`, a merge against each of its
+  parents, not only the net change: a later deletion leaves it in the history the integration takes) is refused (`platform.jjRefused`,
+  `recovered`, naming the files) until no commit holds it: never part of a card's work unasked.
+- **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
+  change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
+  was proved (`via`: history, replay, the same tree, a prepared candidate).
+- **Tests:** `tests/jjReconcile.test.ts` (the record for exactly the approval, an older observation dropped, newer ones
+  replacing it at equal and earlier clocks, gone with Integrated; not shown for another approval), `tests/jjWindow.test.ts`
+  (paging more than a page flagged at once across targets, other projects' and resolved rows out; Mark as checked's
+  compare-and-set; a slot journal's `update` deciding on what is stored then), `tests/jjControl.test.ts` (the prune:
+  present, registered, unreadable and changed-meanwhile residues kept, rotating batches; a leftover recreated, or a
+  residue added, while the write waits for its lock), and the e2e suites `jjview` (the publish records and leftovers,
+  seeded, Mark as checked, Refresh) and `jjwindow`: a real jj card in the app, colocated (a non-colocated project can't
+  be switched to before J9f, HI-2896, which checks these views there). An unpackaged build starts jj cards before J9e
+  through HI-2870's switch (`CW_TEST_JJ_CARDS=1`, `jjCardsTestSwitch`; never a packaged one, J9e removes it): a fake
+  builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
+  written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
+  through its confirmation once nothing works in it, its unrecorded edit kept; the slot back in the pool after Done and the
+  next card started in it (HI-2906); light and dark, and the seven locales.
+
+##### Non-colocated jj repositories (1.5.0's J9f, HI-2896)
+
+Darren's yes (10 Nov): non-colocated jj as its own piece of J9, before J9e. A non-colocated repository keeps Git's data in
+`.jj/repo/store/git` (named by `store/git_target`) with no `.git` in the folder. Everything J2 to J9d built reads through
+`ctx.store` with `--git-dir` and was tested in both modes; J9f opens the app's edges. Its design is HI-2896/s10, s13 and
+s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports, imports or changes colocation.
+- **Detection and the switch**: jj is offered and switched to in both modes (`switchRefused`, `offer`); `foundKey` is
+  `jj:noncolocated` (the earlier `jj:separate` no longer matches, so a user who chose None then is offered jj once).
+  Refused `jjInGit` (`Detection.jj.inGit`, `vcsDetect.gitAbove`): a non-colocated root, or the folder its slots go in
+  (`<workspace>.worktrees\<project>`), inside a Git working tree, where any git run there reaches that repository.
+  `storeOf` names a jj repository's store from its files (`repoBoundary.boundaryOf`), so a non-colocated member keeps
+  its fence membership; `jjReady` confirms it whatever its colocation. The gates (`assessJj`'s `separate`) never run git
+  in the folder: Git's config and vars from the store (`--git-dir`), the tracked files from the single head's
+  working-copy commit's tree (`ls-tree -r -z --full-tree`, read pinned), plus the root's own `.gitattributes` on disk.
+  **Back to Git** has no Git working copy: refused `jjNoGitCopy` (make it colocated with `jj git colocation enable`,
+  the user's, then switch); jj → None stays the project's own switch. `setPlatform` refuses what detection shows before
+  comparing the group's token.
+- **The boundary** (`platform/repoBoundary.ts`, a leaf: file reads only, asynchronous, bounded): a folder's platform is
+  its nearest marker's. A `.jj` with no `.git` beside it is jj's, whatever Git repository is above; an unreadable one
+  (no repo, an empty pointer, another backend, no store, a `.jj` file, levels exhausted) is unknown, never Git's; a
+  `.jj` beside a `.git` naming the same store is a colocated pair (Git's context); a valid `.jj` naming another store is
+  unknown (two repositories claim the folder, HR1's round 1), and `commonGitDir`'s own `.git` fast path asks the boundary
+  whenever a `.jj` sits beside it; a stray or damaged `.jj` beside a `.git` leaves Git's own repository there. Every first-match helper of
+  `repoPorts` takes it (`repoContext`, `repoContexts`, `withFolderRepoLocks`, `mainTree`, `trustRoot`, `excludeFile`,
+  `ignoredIn`, `fileListOf`, `currentLine`); a non-colocated folder's context is `platform: 'jj'` with its store, its
+  exclude file the store's `info/exclude` (Combwork's skill copies kept out there too), its main tree the repository's
+  own workspace, its trust root `none` (J7's). `repoLock.commonGitDir` vetoes such a folder (`git.repoLock.jjFolder`)
+  unless it is itself a Git dir (the bare store, as the store's own lock names it), and an unknown context refuses the
+  lock (`git.repoLock.unknownRepo`), never skipped. Git-only reads of a slot's folder (a reorder's put-back, Resume
+  taking a free slot, a takeover's cleanliness, the Slots panel's files) answer unknown for a non-colocated jj folder
+  (`gitCantRead`) and keep the slot. A jj card's start re-reads it: a Git working tree above the slot made after the
+  switch refuses it (`workflow.jj.start.inGit`), and J2's `nestedIn` already refuses a slot made inside one.
+- **One lock owner** (`repoLock.takeStores`): every take (`withRepoLock`, `withRepoLocks`, the ports' `withRepoLocks`,
+  `slotsApp.storeLock`) resolves to stores, each once by its key, sorted, before any platform grouping. Each physical
+  take is an owner, live until just before its first release; a nested take runs through only for a store a live
+  inherited owner holds (a continuation outliving its take takes the lock again), and that claim is checked again once
+  the take's own locks are in: one that expired while it waited releases them, runs nothing, and the take is made again,
+  taking that store itself (HR1's round 1). A callback admitted on an inherited claim is pinned to that owner, which
+  keeps its locks (and stays live) until every such callback has settled, its own fn failing or not; a dependent's
+  failure is its own caller's, and one still running 30 s after its holder finished is logged, never released
+  (HI-2896/s104, HR1's round 2). A nested take of a store ordered
+  before one already held never waits: taken if free at once, else refused (`git.repoLock.order`). Across processes both
+  aliases of a store name one lock file, taken in the same order.
+- **A colocation change** (the user's `jj git colocation enable/disable` moves the store between `.jj/repo/store/git`
+  and `.git`; linked workspaces keep their mode): the jj port's cached context is used only while its root's files name
+  its store; every lock it takes checks the store again inside it (`JjStoreChanged`, nothing written), as J9b's
+  integration lock does. J2's identity, the slot bindings' keys and the fence carry the store, so earlier slots aren't
+  lent and the switch's token changes.
+- **The views**: the header says colocated or not (`git.vc.fact.jj`), `jjInGit` its own fact; Bookmarks marks no
+  `gitDiffers` when not colocated (Git isn't a view of the repository there); E8 (`gitAgrees`, the store's refs against
+  the view's `gitref:` entries) refuses with `unimportedStore` (`jj git import`, the user's).
+- **Guidance**: `contract.agent.jjSeparate` (platformRule's `jj-separate`, `platformRuleKey`): no Git working copy, git
+  doesn't work there and could reach another repository, jj for everything, history included; never `jj git init` or
+  `jj git colocation`.
+- **Tests**: `tests/repoBoundary.test.ts` (the boundary, the veto, the ports' answers, the lock owner: aliases, nesting,
+  opposite orders, out of order, a deferred continuation, a failed take, another process), `tests/storeSwitch.test.ts`
+  (a non-colocated group switched under its store's lock, Git refused, None; `jjInGit` by its slots folder; an
+  unreadable `.jj`), `tests/platformRegistry.test.ts`, `tests/platformSwitch.test.ts`, `tests/jjViewsReal.test.ts`
+  (views and the gates through the store), `tests/jjIntegrationReal.test.ts` (a manual export then a move and a push),
+  `tests/jjColocationChange.test.ts` (both ways, while a slot's making waits for the lock) and `tests/jjCards.test.ts`
+  (an outer Git refuses a start) on the pinned jj, beside the existing both-mode suites.
+
+##### jj card starts on (1.5.0's J9e, HI-2874)
+
+The only activation point of J9 (design HI-2874/s7, HR1's). Decision A holds: nothing in Combwork moves a bookmark or
+pushes, and lifting the guard enables nothing beyond J9a–J9f.
+- **The guard retired:** `guardsOf` (compile.ts) no longer adds `start.platformReady` to a jj ruleset, and the start's
+  special case in `gatherStart` is gone. The test seams that turned it off (`setJjCardsReadyForTests`, J9b1's;
+  `jjCardsTestSwitch` and `CW_TEST_JJ_CARDS`, HI-2870's) are gone with it: the scenarios and e2e suites start jj cards
+  the way the product does. Git's and None's rulesets, ids included, are unchanged.
+- **Rulesets stored before it:** a lane started on a jj project before J9e keeps the rules then in force, and so may an
+  Override; both carry the guard. `loadRuleset` (the one reader of a stored ruleset) drops `start.platformReady` from a
+  supported jj ruleset after its ordinary validation, on a copy, keeping its id and version and every other guard,
+  option and stage: so every read of that id is unguarded, and its cards start under the rest of its rules (slots
+  only, the user integrating). A newer version's read-only row, and every non-jj row, are left as they are. The guard id
+  stays a known piece (an old row still loads), and its refusal and rule texts stay, for the `Refused` facts already in
+  cards' histories.
+- **Tests:** `tests/workflow/compile.test.ts` (a jj ruleset has no guard; Git's and None's ids unchanged; a stored
+  guarded jj ruleset loads unguarded with its id; a future version and a Git row untouched), `tests/storeSwitch.test.ts`
+  (a project switched to jj: its start reaches jj's adapter), `tests/jjCards.test.ts`
+  (a lane, and an Override, under a stored guarded ruleset: its card starts, in a slot), the scenarios `jj-card-submit`,
+  `jj-card-review`, `jj-card-passed` and their `-nc` variants on the fakes `fakeScope.cjs` gives them, and the e2e
+  suites `jjwindow` and `jjwindownc` (a jj card started, submitted, passed, integrated by the user and Done, in both
+  modes), `jjview` (a jj project's card start isn't refused for jj) and `vcswitch`.
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -2289,6 +4090,58 @@ contract fixes:
   never a boolean.
 - **If J1 can't prove it,** jj has no automatic advance (gate: advance stays closed, rule 6), and the trade-off comes
   back to Darren; Git's guarantees are never weakened to match.
+
+**J1's finding (HI-2794, 9 Nov): the tested jj 0.47.1 CLI protocol does not meet R4.1, and no conforming protocol has
+been proved.** gate:advance stays **closed**. **Decided** (Darren, 9 Nov [HI-2794]: "Let's do A and not request them to
+change anything right now"): jj has **no automatic advance**. jj work goes on toward **user-performed integration**: the
+user merges, and Combwork's containment checks (J3) record the result. An attended advance (a merge the user starts,
+with a preview) isn't taken, and nothing is asked of the jj project for now: that is carded on hold, for later, if
+Combwork's use grows. J4/J5 build no advance of their own on jj. The evidence is an **unregistered diagnostic probe**, `platform/jjAdvanceProbe.ts`: in no
+port, writing no fact, imported by nothing in `src` (`tests/integrationPortsImports.test.ts`). Its verdicts are
+observations, never a CAS result: `advancedObserved` is not Integrated evidence and `notApplied` is not permission to
+retry. It tries the strongest protocol the CLI offers, one step at a time, each mutation journaled first and the lease
+checked just before it:
+1. **Base:** the single operation head P0, read pinned (`--at-op`, which never merges), with the Git refs and every
+   worktree's HEAD. It refuses unless T = `T@git` = the Git ref = E, nothing else is pending export, and no worktree has
+   T checked out.
+2. **Prepare:** `jj --at-op P0 --no-integrate-operation bookmark move T --from E --to R`. This is a conditional set
+   evaluated in exactly P0; it gives an operation O that isn't a head yet, with its id. The probe validates O: its
+   parent is P0, it carries the attempt's marker (`--config=combwork.txn=…`, kept in its `args`), and its view differs
+   from P0's only in T.
+3. **Integrate:** `jj op integrate O`. This doesn't export.
+4. **Export:** `jj git export`. Per ref, this is a real Git compare-and-swap against `T@git`.
+5. **Observe:** every head and its ancestry back to P0, each view, the Git refs and the worktrees, each read twice.
+   Anything torn, incomplete, unexpected or unexplained is Unknown.
+
+`tests/jjAdvanceProbeReal.test.ts` runs it on the pinned jj in both Git-backed modes, with racers placed by hooks
+between steps and between the observation's reads. It shows where the protocol falls short:
+- **(a) No single conditional operation.** The precondition holds in P0, but O becomes part of the repository only
+  when it is integrated. Nothing re-checks T at that moment. Every step exits 0 whatever happened.
+- **(b) A race doesn't refuse the late writer.** A concurrent move of T to X from the same operation lands as well, and
+  T is left **conflicted**. So does a move backwards. **(b′) Moves along one line of history aren't conflicts:** jj's
+  operation merge takes the descendant silently. A racer moving T to R's descendant wins (the probe says Unknown), and
+  our R over a racer's ancestor of it removes their move with nothing to show it (observed as advanced).
+- **(c) Two visible steps.** Between integrate and export, jj says R and Git says E. A Git move there makes the export
+  fail (exit 0, a warning), and so does a stale `refs/heads/T.lock`: `partialExport`.
+- **(d) The export isn't confined to T.** It writes every pending bookmark and tag, someone else's included, and it
+  **detaches** Git checkouts of what it moves, clean or dirty, in the main worktree and in linked ones (exit 0). A
+  checkout made and detached during the attempt can't be seen by comparing before and after.
+- **(e) Later imports.** After an external Git move, the next ordinary jj command imports it and conflicts T (and may
+  abandon commits).
+- **ABA** is invisible, as it is with Git's CAS.
+- **Recovery:**
+  - Prepared but not integrated, and an object made with no operation: `notApplied`, because no marked operation is in
+    any head's complete history.
+  - Integrated but not exported: `partialExport`, or observed as advanced once another jj command exports.
+  - Crashed inside the export (simulated: the ref written, its operation not recorded): `partialExport`.
+  - Another agent's operation after integrate: Unknown.
+  - A lease lost before each mutation: nothing more runs.
+  - A checkout made stale doesn't apply to a bookmark move, since it rewrites no commit: that case is J4's (candidate
+    preparation), and the owed push is J5's.
+
+On jj 0.47.1, a read is a write when operation heads have diverged: any command not pinned with `--at-op`, even with
+`--ignore-working-copy`, merges them into a new "reconcile divergent operations" operation. Ports that must not write
+(R5.3) read pinned.
 
 ##### Type map
 
@@ -2369,10 +4222,10 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - common (the folder fence);
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
   - defect with its card: none left. HI-2821 moved HI-2753's move proof behind port 3's optional `ownWork` (Git's in `platform/gitOwnWork.ts`), its hold through port 1's `holdRefs`; a platform without `ownWork` doesn't offer the move (rule 6).
-- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0, and J0 routes each by the project's platform.
+- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0; the J card implementing each one's port routes it by the project's platform (J0's section above).
 - **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, a changed seam count, or a changed count of platform-id switches (HI-2822). `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
-- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`), what a code card delivers (`deliverables`: Git `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git only). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
+- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`, jj `user`: the user integrates, option A), what a code card delivers (`deliverables`: Git and jj `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git and jj). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, a gate (jj's closed `sharedFolder`: slots only), or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
 - **The switch guard:** `tests/gitAudit.mjs`'s `SWITCHES` lists, per file, the switches on a platform's id left outside the descriptors, the adapters and the registry, each justified: Git-facing text that names Git (the project status's `git at`, the tab's fact line), git's own status read on Git's page, and HI-1997's one-time step over stored Git options. `tests/gitAudit.test.ts` fails on a new one, or one gone.
 
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
@@ -2462,6 +4315,7 @@ that can't be written fails the change whole.
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `InTarget` (observed) | revision, target, submission (its `Submitted` fact) | A card in Review whose submitted change is in its target already: the **already in main** mark; it stays in Review (§16.4.4) [HI-2709]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
+| `BackInTarget` (observed) | revision, target | A Done card marked `LeftTarget` whose result is in its target again, or whose own change is (merged back by hand, by the test that marks it left: HI-3041): the mark cleared (HI-2988). |
 | `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
 | `Refused` | intent or move, rule, message ids, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
@@ -2603,8 +4457,32 @@ reading the card after the decision; today's `decisionsNotice` and decision wake
 these moments).
 
 - **Submit** records the builder's received generation. If a decision is newer than that, submit is refused
-  (`submit.decisionsReceived`): "AM-12 has a decision you haven't read: read it, check your work against it, then
-  submit."
+  (`submit.decisionsReceived`): "AM-12 has a decision or a comment from the user that you haven't seen. Check your work
+  against each (listed below, or read the card), then submit again."
+- **The user's comments too** (HI-2854, Darren's decision 11 Nov: the builder no longer reads the card again before it
+  submits). Each comment the user writes on the card is a `UserComment` fact with a **comment generation** of its own (not
+  the decision generation, so a comment makes no pass or approval stale), and `DecisionsReceived` also records the comment
+  generation an agent has received (`comments`). Only a full read gives it (`cw_read_task` with no `comments`, `summary`
+  or `latestComment`), or a card's start task that carried the whole card (below), never a narrowed read, and only as far as the comments it
+  gives: from the agent's receipt, through each of the user's comments in order, stopping before the first it leaves out
+  (archived since, HI-2641). Receipts only
+  go forward: a late, older one leaves a newer one as it is. A comment by the Assistant or an agent doesn't hold a
+  submit; their words reach the builder in its inbox. **The refusal gives them**: an agent's refused submit lists each
+  unseen decision and comment of the user's in full (`unread` in the refusal, one line each, with who and when), and
+  records exactly those as received before it replies, so the next submit goes on, unless another came meanwhile, which
+  refuses it again. The card, its facts and the archived comments it needs are read in one snapshot, and only while the
+  card is still the agent's project's: a decision is given in its newest fact's words, a comment from the card or,
+  archived, from the whole archive, searched page by page for it (one found in neither, not expected, is said to be
+  missing and counted as received, so the refusal can't repeat for ever). A decision or comment written after that snapshot is neither listed nor
+  counted as received.
+- **A start task that carries the whole card** (HI-2854): a card's start prompt (taskStart, a slot's placement) carries
+  its decisions and every comment, each in full with who and when, ending "This is the card in full…", only when all of it
+  fits uncut within Settings → Advanced, **A card in full at its start, up to** (6,000 characters; 0: never), with no
+  comment archived or lost and every attachment named; else the usual start, which sends the agent to read the card. Its
+  delivery keeps the decision and comment generations of the snapshot it was made from, and when `cw_inbox` gives it
+  (received), those are recorded as received, and the reply flag's baseline moves to then. The launch's prompt is still
+  the doorbell (ids only, #650): only what `cw_inbox` returns carries the card. The prompt also says "It is in Doing and
+  yours." when Combwork started the card on the agent, so work-on-card doesn't start it again.
 - **Verdict** records the reviewer's received generation, and is refused if the reviewer hasn't received the newest
   (`review.decisionsReceived`). A submission made before a newer decision shows "decided since this was submitted"
   to the reviewer, who judges whether the work meets it (passing it says it does).
@@ -2788,7 +4666,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `submit.checksPassed` | Every configured pre-review check has a passing, counted `CheckRan` on this exact revision (§16.13). | revisions | G3 / N3 |
 | `submit.identity` | Every commit of the change is authored with the project's identity. | authorship | G12 |
 | `submit.ownRunsStopped` | The agent has no runs or background processes it started still running (Progress, background tasks). | — | G13 |
-| `submit.decisionsReceived` | The builder has received every decision on the card (§16.4.6). | — | Any review, and **any ruleset with a merge step** (Combwork merges, the agent merges), so a no-review card a decision returned to Active reads it before submitting again; all off and Solo (committed) stay free [#1118 20 Oct; HI-2275 applies it] |
+| `submit.decisionsReceived` | The builder has received every decision on the card, and every comment the user wrote on it (§16.4.6). | — | Any review, and **any ruleset with a merge step** (Combwork merges, the agent merges); all off and Solo (committed) don't compile it, so the user's drags there ask nothing, but the runtime refuses an **agent's own submit** there on it all the same, in the submit's write (HI-2854: work-on-card no longer reads the card again before submitting); with the workflow rules off nothing is held, and the reply flag tells of a new decision [#1118 20 Oct; HI-2275 applies it; HI-2854: the user's comments, and agents' submits in every ruleset] |
 | `review.notAuthor` | The reviewer isn't among the card's builders (Combwork's records). | authorship | G2 / N2 (forced on with a reviewer) |
 | `review.decisionsReceived` | The reviewer has received every decision on the card (§16.4.6). | — | Any review |
 | `verdict.reviewing` | The reviewer started a review (`ReviewStarted`) of the submission it names. | — | Any reviewer agent |
@@ -2848,7 +4726,16 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   else G7. From then on that one value is the branch it is made from, its queue and merge, its dependency check and its
   slot. A **lane's** target is recorded in its ruleset: a lane started on another branch records the rules in force with
   G7 set to it (`targetedOf`, id the base's with `~target:<branch>`), so its cards take it as any rule, and old rules
-  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. It is fixed for the lane's life
+  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. A lane started on the project's
+  own records G7 as it was, unmarked, and keeps merging there when G7 moves on (Start the next version: running lanes
+  stay on the release), so a lane's target is read in one place (HI-3113, `laneTargetOf`): the mark, else its recorded
+  ruleset's G7. Such a lane isn't on old rules for that either (HI-3142): its unmarked ruleset is compared with the
+  project's rules now compiled with its own G7 (`rulesetNowAt`), so only a real rule change marks it. Nor are its cards
+  (HI-3161): a card whose ruleset recorded G7 unmarked (its lane's, or its own) is compared with the rules now on that
+  target (`RulesNow.at`, the badges' old rules mark). Every check reads
+  it so (a lane named among a branch's uses, a card's target against its lane's, a
+  card brought into it, a lane's restart, the lane's info, which names it when it isn't G7 now, and the options its
+  start and slot go by). It is fixed for the lane's life
   (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
@@ -2859,7 +4746,74 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
-  never an empty name (HI-2825). Both name only
+  never an empty name (HI-2825). A card put back with no target of its own keeps the one its line was made from
+  (`Started.target`) while that line (its own, built in a slot) holds history the target it would follow lacks, work or
+  not (HI-3112, `keptLineTarget`): its start (the git platform's `startTarget` and `start`, so the evidence, the slot
+  lent, the plan and `Started.target` agree) carries the line on there, said so (`slotMove`'s `carried`); a change of
+  G7's preview keeps it (`line`) and `referencesTo` counts it, read against the destination (an untouched line is in its
+  own branch, never in the new one); setting it back to that branch is accepted, its line kept. Unreadable, it is kept
+  (`cantCheck`, counted) and its start refused; in a lane merging elsewhere its start is refused (`platform.keptLine`).
+  Its line gone, or all of it in the new target, it follows. A card set to one of the project's other targets keeps it through any later change of
+  G7, even to that branch; `cw_update_task`'s reply says so, and how to follow G7 instead (change it first, then clear
+  the card's), HI-3017: setting cards before their project pinned them unnoticed. `cw_create_task` with such a target
+  says the same (HI-3043), and the reply says the target as stored, so a forward's resolution pinned to G7's own
+  branch (HI-2985) is said to merge into that branch, with no note: it never follows another. Both name only
+- **The release offer (HI-3155, design s7 → s11 with HR1; Darren's 1A and 2A of 13 Nov).** A project's own For you item,
+  not a card's (`ReleaseOffer`, `workflow/releaseOffer.ts`), with two parts, either alone:
+  - **move:** G7 released (HI-3148's port) → `moveTo`, its `nextVersionName` when it exists and is known not released,
+    else `startNext`, its name when it doesn't exist; neither when the next is released too or the name isn't a version;
+  - **cleanup:** each released G7b, in `drop` when nothing uses it (`referencesTo`, the save's own check) or in `kept`
+    with its uses.
+  Unknown reads offer nothing and leave the project due. Its `basis` is G7 and G7b as read; its id is a fingerprint of
+  basis and parts. Move… and Remove… apply `offerOptions`: G7 to `moveTo` with the old G7 joining G7b, and `drop` taken
+  off.
+
+  **Followed per open workspace** (`startReleaseOffers`, stopped with it): an admission key (the port's `watch` answers
+  for G7, its next version and each G7b; platform, G7 and G7b; a generation bumped by card and lane changes) is looked at
+  every 60 s, on `lineMoved`, on `workflow-changed` and at open. The full read runs only when the key moved or the last
+  read was unknown, one per project at a time, coalesced, and is published only if the key didn't move while it read.
+
+  **Acting on it:** every action is bound to the offer's id and checked (`checkOffer`: still the current offer, and G7
+  and G7b still its basis) under the action's own locks:
+  - the window's save from Move…/Remove… (`workflow:setOptions` `offer`; the form fills it in only with nothing unsaved
+    and the saved options matching its basis);
+  - Start the next version from Start… (`offer`);
+  - the Assistant's `cw_update_setting` `offer` and `cw_branch nextVersion` `offer`;
+  - a changed offer refuses with nothing written.
+
+  **Not now:** board_meta `release.offerDismissed.<projectId>` holds the dismissed id (another offer shows again). The
+  user's is IPC; the Assistant's is `cw_branch dismissOffer` (`POST /v1/projects/{name}/release-offer/dismiss`, Control's
+  agents level, recorded with undo that clears only the value it set).
+
+  **Seeing it:** the Assistant reads it in `GET /v1/projects/{name}` (`releaseOffer`, its alone) and is told once per
+  offer id in its inbox; project agents never see it.
+- **Starting on a released line (HI-3148, design s15, Darren's decisions of 13 Nov: 1A, 2A, 3A, split).** A line is
+  **released** when a tag named exactly `v<line>` or `<line>` (peeled to its commit) is in its history and the line is
+  in the default line's (Git: `main`, else `master`; jj: the first local bookmark of `main`, `master`, `trunk`), read
+  locally through the platform's release reads port (`releaseReadsOf(platform)`: `released()` gives `{ tag, into,
+  date }`, the date only from an annotated tag's tagger; `null`; or unknown, never "not released"; None has none). A
+  **fresh start** (Todo or On Hold → Active, a reopened Done card, a put-back card started again) onto a released line
+  is refused (`start.released`), naming the tag and where it went, and a line to start on instead only when it exists
+  and is known not released (Work merges into, else the next version's: `unreleasedFor`); an unreadable one is refused
+  as `start.releaseUnknown`. Both before anything is written (no `Started`, lease or lane). What lets a start through
+  without the user's or the Assistant's word (the line not released, or its lane's grant) is bound to the write (HR2's
+  round 1): the port's `watch` (Git: the exact tag refs, the line's and the main line's heads, read from the common dir;
+  jj: the single operation head), taken before the read, and the lane's grant as stored, are read again synchronously in
+  the start's transaction (the drag's too) and the lanes' save; moved, the start is gathered again and decided afresh,
+  so a tag made meanwhile refuses it. A card already in a cycle,
+  its resubmits, reviews and merges are never refused for it. **Who may start there anyway:** the user (the board's
+  Start and drag ask, `board.move.askReleased`, and Move Anyway gives back the line asked about) or the Assistant
+  (`override: { reason, released: <line> }` on a move or `cw_start_task`), for exactly the line its refusal named: a
+  start whose line differs asks again. It is recorded with that start (`Override { rules: ['start.released'], target }`)
+  and covers that start only. **A lane:** a new lane on a released line is refused the same way; the user's Start Anyway
+  (Start Lane… reads the refusal first, `lanes:releaseCheck`) or the Assistant's `released: { target, reason }` starts
+  it and is kept on the lane (`releasedOverride`), so its cards' fresh starts onto that line go through while it is
+  active; given to a running lane (its list change), it is that lane's grant for its own fixed line, another line
+  refused. It ends with the lane. A running lane whose line is released meanwhile has its next fresh start refused
+  until then. Project agents and scripts can't give either (`403`, or refused as an agent's start). A card's Merges
+  into set to a released line (`cw_update_task`/`cw_create_task` `target`) is changed, and the reply says its start
+  there will be refused (`api.card.targetReleased`); the change grants nothing. Offering to move Work merges into after
+  a release (HI-3155) and RELEASING.md's step (HI-3156) are cards of their own.
 - **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
   branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
   in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`
@@ -2924,13 +4878,30 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   none); gone → `gone`; anything else → `dirty`, set aside (`board_meta` `slot_aside:`, with what it was moving to and
   what was found): no later look makes it ready, and it is never lent, carried or renamed (a rename that met one carries it to the new name), until it is removed. A store failure
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
-  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, slots),
+  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
+  slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
+  any kind, not set aside), whose recorded target is only the last its lease served (HI-2928: once that branch is
+  deleted, a free slot's idle tidy and Remove check it against the default target instead (never for a jj preparation's
+  key, which has no head by design), so work in it that isn't
+  there keeps it, `unmerged`, and a slot with none is freed, rather than kept as `cantCheck`); the slots read inside the save's board write, the
+  pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
+  every slot recording it, its clean-up checking against it),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
   lock) and the removal are serial; it is never taken out by itself. The window: Save…'s preview with **Also retarget
   what can move**, applied after the save; the Assistant: the setting's reply lists what can move with a preview id
   (`offerRetarget`: kept in memory, the newest 50 for a day), applied with `cw_queue` `retarget` (`POST
   /v1/workflow/retarget`, the id and the items named: only those that preview listed, each as it was seen then; `from`
   and `to` alone make a new preview, moving nothing).
+  **On jj** (HI-3152, after HI-3129; a platform without the capability `retarget`): work can't move between bookmarks,
+  so the preview is read through the platform, never Git's history (`keptPreview`). Running lanes on `A` stay (`lane`;
+  with a card in flight, `started`), and so do cards in flight started on `A` (`started`). A waiting card is asked for
+  its kept work (`keptWork`: its kept slot's binding, proved as a start proves it): kept on `A`, it and its slot stay
+  (`kept`, Darren's decision (a)); unproved, both stay, named (`cantCheck`), never left out; with none, a card set to `A`
+  can move. Free slots aren't listed: a jj slot is prepared at its card's bookmark as it is lent. The apply skips any
+  lane, started card or slot a preview lists (an old or forged one, or the platform changed since) as `fixed`, the
+  platform read again at each, nothing of it changed. `tasks.setTarget` on such a platform reads a waiting card's work
+  the same way (its kept slot, never Git's lines nor `dropEmptyLines`): kept on another bookmark, refused naming it (set
+  back to it, allowed); unproved, refused as unknown.
   the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
   target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - **A target that doesn't exist, and Start the next version (HI-2807, design s10 after s7).** A save naming a branch in
@@ -2940,7 +4911,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   branch deleted after the window's check is caught; branches named already are never re-checked. The section shows
   each such branch under its field with *doesn't exist: create it from [branch ▾]* (a branch made without switching)
   and holds Save until it exists. **Start the next version…** (Workflow, under G7, shown while G7 reads as a version:
-  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable) does in one hold, the
+  `v?X.Y` or `v?X.Y.Z`, a proposal only: `nextVersionName`, `1.3.0` → `1.4.0`, editable; HI-3128: under G21 the
+  dialog says the new branch is made here only and tracks no remote branch, with the commands that give it one for the
+  name typed, §16.9.4's remedy, its remote read locally; nothing is pushed) does in one hold, the
   repository's lock then the turn of workflow writes, inside it the save's core and never the public wrapper
   (`startNextVersion`, `workflow/nextVersion.ts`): the release checked to be G7 still and its head the commit the dialog
   showed (`pinnedStart`), the new branch made there (`makeBranchAt`, atomic), then one save with G7 the new branch and
@@ -2953,7 +4926,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and the new branch's head is never read, so it is made before the branch exists): the window applies the one it showed
   after the start, the Assistant the one offered in the reply (`offerRetarget`), so a fresh preview with equal heads
   never widens it. The Assistant: `cw_branch` (`create`: `POST /v1/git/branch`, from a ref, never switching;
-  `nextVersion`: `POST /v1/workflow/next-version`), through its change boundary (Control agents), recorded for undo: the
+  `nextVersion`: `POST /v1/workflow/next-version`, naming the release it starts from as it read it, `from`, required
+  as the dialog sends it, so a retried or repeated request is refused once the project has moved on, HI-3114), through its change boundary (Control agents), recorded for undo: the
   two options as setting changes and the branch as a `setting` change whose target is `branch:<name>` (the board's
   change kinds are fixed by its schema, which older Combworks read), undone only while the branch is still at its
   commit and nothing uses it, G7b, a lane, a slot or a card included (`undoBranch`, in the repository lock, the turn of
@@ -3020,10 +4994,10 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Combwork merges (queue) · The agent merges, Combwork checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Combwork merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G7b | **Other branches work can merge into** (`otherTargets`, HI-2556) | Branch names, none by default | The branches besides G7 a lane's or card's **Merges into** may name. Not a rule: left out of every ruleset (`ruleOptions`), never set by a preset, never Custom, so a change applies at once. A pick is checked against it as it is made. |
-| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
+| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate`. In a jj project (HI-2871) it shapes the candidate Combwork builds before the user integrates (*Candidate style*, *The candidate brings work up to date first*). |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Combwork merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
@@ -3034,6 +5008,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
 | G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Combwork merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
+| G21 | **The target branch follows its remote** | On / Off (default Off) | The merge queue (§16.9.4), Combwork merges only, Git only. Fetches the branch the target tracks before each test merge, tests on its head, publishes there first (an exact compare-and-swap) and catches the local target up after; implies G18. Not a rule, as G18: in no ruleset, read as the options are when the queue runs (HI-1183). |
 | G20 | **Each card's focused tests pass on the merged result** | On / Off, with the project's commands `focused.pick` (optional) and `focused.run` | `submit.focusedChosen`; the merge queue's step 5 (§16.9.1), Combwork merges only. Built [HI-1367]. |
 | G19 | **Commit message** | Combwork's: the card's key and title, with trailers · The branch's own, with no card key or trailers (default, HI-1997) | The message of the queue's merge commit or squash commit (§16.9.1 step 4); shown when Combwork merges with Merge commit or Squash (Rebase makes no commit of its own). The branch's own leaves out the `Combwork-` trailers its commits carry (HI-2588; an old-name one of a commit from before 1.1 is history, kept as written: HI-2594); the branch's commits keep theirs. Not a rule, as G18: in no ruleset, read as the options are when the queue merges (HI-1697). |
 | — | Card loops: wake reviewers and builders, rounds, wait (hours), design check wait (minutes) | On, 10, 6, 30 | Workflow options since HI-1766 (§16.6.7), for None and Git, a group of their own. |
@@ -3069,6 +5044,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 | G18 push after merging | — | Off | Off | Pushing reaches your remote and its sign-in: it stays yours unless you turn it on (#1179). |
+| G21 target follows its remote | — | Off | Off | Following a remote reaches it and its sign-in before every merge: it stays yours unless you turn it on (HI-1183). |
 | G19 commit message | — | The branch's own | The branch's own | Card titles name people and details a public history shouldn't keep (Darren, HI-1997); Combwork's, chosen, links each merge to its card (HI-1697). |
 | Maximum agents | 1 | 2 | 12 | The team each is for (Darren's decision, HI-2001), so the Assistant never adds agents nobody planned for; All off 12. |
 
@@ -3100,6 +5076,13 @@ The Version Control tab documents each preset's choices and why (P6, from this t
 it applies from the next card, and the running lanes and cards in flight it won't affect yet (they finish under their
 ruleset, marked "old rules"). Confirming saves the options; nothing running is changed. Switching Git → None (or
 back) works the same: cards in flight keep their platform's ruleset; a Git card can't finish under None's rules.
+**Except a fence member** (HI-2974): a project whose repository has been switched between Git and jj (a member of its
+platform fence) switches to None only once nothing runs in it: no running lane, card in flight, queued merge,
+slot or copy lease (`memberDrain`, its drain listed with Check Again). The switch goes through the fence as a group of
+one (`memberSwitch`: begun, drained, written, settled, recovered from the disk as any switch), so its in-flight work is
+never left on leases the fence would refuse, nor outside a later store switch's group and drain. The other members take
+no part and keep their choice; their admissions are told to try again while it runs, as for any switch of the store.
+An unreadable membership or fence refuses (`switching`). A never-switched project's switch to None is unchanged.
 
 **Built [#1419], switching the version control:**
 - **Where:** the header's None · Git choice (`VersionControlHeader.tsx`), the offers (§16.3.5), and the Assistant's
@@ -3124,6 +5107,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   platform the window showed) isn't the one in force is refused ("Changed meanwhile"), and so is an options save read
   before a switch (`setWorkflowOptions` checks the platform under the lock). The window greys Git out with the same
   reason; `project:updateConfig` refuses `platform`.
+- **Git ↔ jj (1.5.0, HI-2799) is the repository's switch**, not this one: every project on the repository using Git
+  or jj switches together, only once nothing runs on it, under the platform fence, and to jj only after the
+  compatibility assessment (§16.3.6, *jj in the window and the switch*). The choice is **None · Git · jj**; jj only
+  where a jj repository is found, colocated or not, and not inside a Git working tree (`noJj`, `jjInGit` in its tooltip otherwise; HI-2896).
 - **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
   (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
   carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.
@@ -3132,6 +5119,40 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   preset, options and `presetAsked`, when it has any) and brings the one chosen back from `kept` (its entry removed),
   else no preset, no options and no answer, so #1423's step offers its presets. Ordinary saves change only the platform
   in force and keep `kept`. A project the upgrade hasn't given `workflow` yet changes only its `platform`.
+  HI-3106: a switch to jj whose resulting jj options, as they resolve (the project's, the workspace's, Combwork's), name
+  no target is given Git's as its own (`seedJjTarget`, in the switch's after): the target Git's options resolve to, else
+  the repository's default branch, a bookmark of the same name in a colocated repository. jj resolves no default, so
+  without one no card could start. A target jj's options already name, kept from before or inherited, is never
+  replaced; Git's unreadable, nothing is seeded. A jj start that still has none (the user cleared it) is refused
+  `platform.noTarget` ("no target bookmark chosen"; next step Version Control → Workflow, Work merges into), never
+  `platform.unknown` with a blank name and "Check Provider Setup".
+  HI-3104: a Git card built in the project folder (a code card; not a provisional plan while a slot is waited for, nor
+  the builder's own worktree, nor a no-code card) while that folder is on no branch (its head detached, as a colocated
+  jj repository leaves Git's after the switch back) is refused `platform.detachedFolder`, naming the head: its commits
+  would be on no branch. Its next step names the branch to check out (`git switch <branch>`) only when one is proved
+  usable (the card's or project's target, else the default branch, a local branch no other worktree has checked out),
+  else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
+  never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
+  the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
+  HI-3141: a slots start waiting for a slot takes the slots path's target in its provisional plan (what the start's
+  evidence read), whatever the project folder's head, so it is refused `start.slotAvailable` as a wait, never
+  `evidence.changed`. The user's start across that wait is built in the project folder: on no branch, the plan's
+  `acrossWait` (`platform.detachedFolder`, as above) refuses it, the user's start only. And the release reads' `watch`
+  (HI-3148) finds a project's refs as git does (`commonDirFast`): a project inside a repository, with no `.git` of its
+  own (a workspace kept in git), was refused `start.releaseUnknown` at every start onto a target.
+  HI-3107 (design HI-3107/s7): a card's committed work from cycles under a version control whose lines are branches (the
+  descriptor's `defaultTarget`: Git's), left on its line when the repository switched to another (jj), is said, never
+  carried or refused: `earlierWork` (workflow/earlierWork.ts) reads the card's recorded starts (`Started`, `Adopted`, each
+  by the ruleset it was decided under; one whose ruleset can't be read is listed `unknown`, its version control null, never
+  guessed; a later start under the one in force on the same line, or the line of the start being made, is the card's own), each line once against the target
+  its last start recorded, through that version control's own ports (`lineHead`, the history's `mergeBase` and
+  `contains`): gone or held by its target is no work; work its target lacks is `ahead`; anything unread or unproved is
+  `unknown`, said with that doubt, never dropped; the card's starts unread is `UNREAD` (line null), said as such (HR2).
+  The texts never claim the new folder lacks the work (its new target, or a kept folder, may hold it): they say it is
+  left on its line, not carried in, and to check the folder first. The switch's warning lists such cards not in flight (code cards, Todo
+  or On hold; `StoreSwitch.carried`); a start under the new version control warns its actor, and once written comments
+  on the card as Combwork (its builder's start task carries the card) and tells the user (`workflow.earlierWork.*`). jj's
+  line keys and kept work aren't read (HI-3069 holds those).
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains
@@ -3252,7 +5273,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
     linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**
-    (#1435's switch, read-only here, with a link to Advanced).
+    (#1435's switch, read-only here, with a link to Advanced). Where the project folder uses submodules or Git LFS (or it
+    is off): **Set up submodules and LFS** (`slots.gitFiles`, HI-1182, §16.10.10), a switch, with what it uses.
   - **Project Settings:** no slot rows (HI-1765 removed its Slots and copies link): the setup command's catalog row stays,
     hidden, for `cw_update_setting`, and the copied files are `project.slotCopy`. Settings → Version Control's Combwork defaults (Git)
     and Workspace defaults set **Files copied into new slots** for the projects under them
@@ -3533,7 +5555,7 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 |---|---|---|---|
 | **start** | The card's builder (or an agent given it) | card | Todo → Active. Replies with the folder (slot path), line, base and target. |
 | **put back** | The builder | card, why | Active → Todo; the slot is released. |
-| **submit** | The builder | card, summary (comment), revision (optional: default the card's revision: its folder's head for a card with its own line, its newest attributed commit in a shared folder, §16.3.2), note (required when the revision was already reviewed: what changed in the answer, if not the code), paths (None: the card's paths, pre-filled, with any unclaimed changes to add or leave, §16.3.3). "Submit" is always **submit for review**: it hands committed work over and never commits (Darren, HI-1618). Nothing committed is refused in git's words (`submit.empty`: "Nothing committed to review."), its next step by the card's folder (HI-2227): uncommitted changes are committed by an agent doing the card, while one asked only to submit it asks the user before committing (HI-2257, Darren's decision: both rules, said only in the refusal), and with none a card that needs no change is no-code, asked for with `cw_ask_user` (action noCode) or, already decided, `cw_ask_assistant`; and a None card with no file changed by `submit.unchanged`. followUp (HI-1832): from Review, its builder's commit the reviewer asked for | → Review, or → Finish without review, or → Merging after a queue failure; a follow-up stays in Review. |
+| **submit** | The builder | card, summary (comment), revision (optional: default the card's revision: its folder's head for a card with its own line, its newest attributed commit in a shared folder, §16.3.2), note (required when the revision was already reviewed: what changed in the answer, if not the code), paths (None: the card's paths, pre-filled, with any unclaimed changes to add or leave, §16.3.3). "Submit" is always **submit for review**: it hands committed work over and never commits (Darren, HI-1618). Nothing committed is refused in git's words (`submit.empty`: "Nothing committed to review."), its next step by the card's folder (HI-2227): uncommitted changes are committed by an agent doing the card, while one asked only to submit it asks the user before committing (HI-2257, Darren's decision: both rules, said only in the refusal), and with none a card that needs no change is no-code, asked for with `cw_ask_user` (action noCode) or, already decided, `cw_ask_assistant`; and a None card with no file changed by `submit.unchanged`. A Git card whose own folder isn't on its line (a detached head, another branch) is refused as `platform.offLine` (HI-3010), naming where it is and how to put the commits on the line: review would pass a head the merge never reads. followUp (HI-1832): from Review, its builder's commit the reviewer asked for | → Review, or → Finish without review, or → Merging after a queue failure; a follow-up stays in Review. |
 | **declare paths** | The builder (None) | card, paths | The card's paths (§16.3.3); replies with the pre-fill, the unclaimed changes and the current revision. |
 | **start review** | A reviewer | card, submission (optional: default the latest) | `ReviewStarted`; replies with the review copy's path, the revision, base and files. |
 | **verdict** | A reviewer | card, submission, pass/fail, kind of fail (content / explanation), comment | §16.7.2 |
@@ -3628,7 +5650,10 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
   outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
   a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
-  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is. For an answer
+  or `proceed`, nothing waiting (`loop.noStep`) and an earlier step named (`loop.staleStep`) are said before whose it is
+  (HI-3011): a design closes when its card leaves Doing (put back to To do), and the reviewer the pool gave it, answering
+  late, hears that nothing waits (its feedback goes on the card as a comment), not that it isn't its.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
   notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
   whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a
@@ -3875,14 +5900,34 @@ and a comment reaches no inbox: it sat an hour unseen):** `cw_ask_assistant` (`P
 in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
 Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
 the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
-("Asked the Assistant: …"), and a `control` delivery to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
+("Asked the Assistant: …"), and a message (`rebrief`, which the Assistant acks once it has dealt with it; a `control`
+notice before HI-2931, which needed no ack) to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
 the agent: sender kind `agent` with its project and id) quoting it whole as an agent's request, not the user's
 decision, with the card's key, offered at once: an idle or watching Assistant (its lane watch, which carries on) is
 woken by the doorbell, a busy one told at its next tool call. The Assistant acts on it only within its Control and what
 the user decided or answered on the card, and tells the agent with `cw_message_agent`. Refused before anything is
 written (409, saying to ask the user with `cw_ask_user`) while the Assistant can't act on it (the same check as the
 relay's); one that ends unread (cancelled when Control is turned down before it is handed out, expired) says so on the
-card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). The card-loop skill says when to
+card and in a notice ("The Assistant couldn't be told of {agent}'s request …"). **The request's wait (HI-2915; on
+11 Nov CB1 and CB2 asked the Assistant for a Windows Sandbox turn, were told to wait, and were reported stalled):** asked
+by the card's own agent on its card in Doing with no waiting mark, the card is marked waiting (§ HI-2618's
+`waitingFor`) in the request's own locked write, the request's words (cut to 200 characters) its reason, the asker its
+`by`, and the request's ref (`#n/<id>`, made first and the same for the mark, the delivery and their clean-up) its
+`ask`. The reply says so (`waiting: true`), and so does the Assistant's line, with how to keep the agent waiting. The
+mark goes, with *No longer waiting*, when that request ends (`clearAskWait`, under the board's lock, only while
+`waitingFor.ask` is still its ref: a mark set since, by anyone, even with the same words, carries no `ask` and is kept):
+acked (the delivery source's `acked` call, new beside `received` and `ended`: the Assistant dealt with it), ended
+without an ack (`ended`: unread, said as above; read and never acked for a week, expired with nothing said, HI-2931),
+or never given. A take-off that fails is retried after 30 s, and each workspace's open (`reconcileAskWaits`) takes off
+every request mark whose delivery is no longer live as the delivery service has it (`isLive`: queued, offered,
+uncertain, or received and not acked; an old `control` request once read is done), so none stays for ever. A wait past
+the answer is the Assistant's own mark, set before it acks; its go is clearing it with the go as that change's comment,
+which wakes the builder's card watch. `ask` is Combwork's alone: never from the Agent API (it takes a string), and kept
+only by undo (HI-2931): the Assistant's change snapshots the mark whole, `ask` with it, and undo puts it back so (a whole
+mark keeps its `ask`), so the request's end still takes it off; one whose request ended meanwhile goes as the undo
+ends (`reconcileAskWaits`). A lane's row in the Progress panel says **waiting**
+(what for on hover) for a card of its in Doing marked waiting while none is stalled, and Activity's agent tab says what
+for under its card. The card-loop skill says when to
 use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
 how the Assistant answers. **No code, proposed:** a code
 card that passes review with its change already in its target (nothing to merge) is proposed no code by Combwork
@@ -3969,7 +6014,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    (merged by hand meanwhile) uses the reviewed revision. G8's `integrate.upToDate` guard has no input from the queue:
    the queue brings the work up to date instead of refusing it.
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
-   at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
+   at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash --ff` + commit: the `--ff`, as the Merge dialog's squash says it too,
+   so a repository's `merge.ff` never refuses a squash, which makes no merge commit: HI-3108) with the
    message `AM-12: <title>` and trailers `Combwork-Card: AM-12`, `Combwork-Revision: <rev>`, `Combwork-Reviewed-By: <reviewer>`;
    the result on a temporary ref `refs/cw/queue/<entry>` [P1].
    **The branch's own message (G19, built [HI-1697]):** with *Commit message* set to the branch's own, the merge commit
@@ -4023,6 +6069,15 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      there is no diff to open; the Progress panel keeps Show log.
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
+     Since HI-1185, a check before each step that signs (§16.9.5) pauses it up front, before anything is committed.
+     HI-3111: as configured *on the target*: the queue's folder and the Merge dialog's temporary worktree are detached,
+     where `includeIf "onbranch:…"` matches nothing, so when any onbranch condition is reachable (one `git config` a
+     round), the signing keys (`commit.gpgsign`, `gpg.*`, `user.signingkey`) are read by git in that same worktree with
+     its HEAD pointed at the target for the read alone (`targetSigning`, branchConfig.ts: its gitdir conditions,
+     config.worktree, scope order and nested includes as git evaluates them) and passed as `-c` to the signing check and
+     every command that commits. The folder must be detached at the expected commit first, and is read back so after
+     (HEAD written back as a detached one when git itself can't); any step failing is `again` (the dialog: nothing
+     merged), never "unsigned", and the next round's `folderAt` detaches the folder before anything.
    **Built [#1350]:**
    - **Identity:** the repository's own (`git config user.name` / `user.email`: local, then
      global), G12 on or off (HI-2266: G12's saved value never stands in for it), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
@@ -4216,7 +6271,86 @@ board's lock another Combwork takes too): refused or stopped part way, none of i
 - a conflict or a red check returns the card to Active (no builder is woken: it says so on itself), both branches as
   they were, and so does its advance declined (Ask each time on a checked-out destination); **Retry merge** freezes the source again at its head then (a new entry, its own checks); **Remove from
   queue** ends it in Done with `IntegrationCancelled`, never an `Integrated` (refused while it advances);
-- a project agent's every intent on it is refused (`forward.notAgents`).
+- a project agent's every intent on it is refused (`forward.notAgents`). Its return says so: its comment's next step is
+  the user's or the Assistant's three choices (Retry merge, Resolve on a builder, Remove from queue), never a builder's
+  `cw_submit`, and its stall (in Active with no agent) names them in place of "no agent has it", on the board too (its
+  work badge's `forwardWait`, `stalledReason`'s): only Remove from queue for one returned for its direction (HI-2959).
+  Its Work section offers what those name (HI-3084, `ForwardChoices` from the same `forwardWaitOf`): Retry merge…,
+  Resolve on a Builder… and Remove from Queue…, for one returned or declined alike, and Remove from Queue… alone for one
+  returned for its direction. Remove's confirmation, there and on a queued forward in the queue's card (its
+  `QueueQueued.forward`), says it ends in Done with nothing merged, never that it goes back to Approved.
+- the user's and the Assistant's moves of it go only where it stays a forward (HI-3086, `forwardMoves`, the runtime's
+  `move` and the board's drop columns, `moveColumns`): On Hold and back to where it was, back into Active (out of the
+  queue, for Retry merge or Resolve on a builder), and Done (nothing merged); a Done one stays Done. Todo (the project's
+  rules now), a start or a Done one reopened (a new `Started` drops `forward`: an ordinary card on the project's default
+  target) and a drag on past where it was (a builder's submit and review) are refused (`move.notFromHere`, naming its
+  own ways on), nothing written. Back from On Hold to Merging it is queued again as a forward (`enqueueForward`), with
+  the commit its latest attempt froze (a Retry's too), never the source's head then.
+
+**Resolve on a builder (HI-2959).** A returned forward (Active, its last entry failed or its advance declined) is handed
+to a builder by the user (the card's Work section, *Resolve on a Builder…*, asking first) or the Assistant (`cw_queue`
+`resolve`, `POST /v1/queue/resolve`, its reason required; never a project agent or a script). As Retry, only in the
+release path's direction as it reads now unless its request recorded the user's override (HI-2892); one returned for its
+direction is never handed over (Remove from queue alone ends it), so a builder's card never makes a merge the forward
+rules refuse. One board change
+(`resolveForward`, queueControls.ts), refused or stopped part way none of it kept: an ordinary code card made in Todo on
+the forward's destination (its Merges into, stored even when it is Work merges into then, HI-2985), linked to it, its description what came back (the files in conflict, or the merge check that failed: HI-3082), the returned attempt's
+frozen commit and the steps; marked with a `ForwardResolution` {forward, from, to, source, by, override?: the forward's request's, HI-2998}, written before its start
+and kept over every cycle; and the forward ended as Remove from queue ends it (Done, an override, never an `Integrated`),
+its comment naming the new card. The forward's intent is refused unless its last entry is still the one read, so a Retry,
+a Remove or another Resolve meanwhile leaves no card. `source` is that attempt's entry `revision`, not the source's head
+now. The new card is an ordinary card: agents start it (it has no `ForwardRequested`), its review, checks and merge
+queue are its rules', except that a card with a `ForwardResolution` merges as a merge commit always
+(`mergeCommitOf`: G6 merge, its id the base's marked `~mergeCommit`, `rulesBaseId` reading through it), so a squash or
+rebase project never drops the source's history from the destination. Its checks of its own commits leave out the
+source's (HI-3145): G12's identity check reads `base..revision` without `source`'s history (`git log … ^source`), so a
+teammate's commit on the release isn't counted as the card's; its merge commit and any commit it makes are checked.
+
+It merges into its `to` alone (HI-2985): Work merges into moving on after it is made (Start the next version) leaves it
+there. Its Merges into set to any other branch is refused (`tasks.setTarget`), a version retarget keeps it and its lane
+(`refused`), a lane merging elsewhere refuses it (`refuseOtherTargets` comparing a card's own target with the lane's,
+the project's default resolved), and its start is refused (`forward.resolutionTarget`) when it would start from another
+branch, as a card made before HI-2985 stored none: setting its Merges into to `to` then starts it there.
+
+Its direction is checked at each queue attempt as a forward's is (HI-2998, `forwardAllowed`: `from` into `to` with the
+default branch as it reads then, or the override its forward's request recorded, carried on its `ForwardResolution`):
+the default branch or the branches changed since Resolve so that it no longer reads forward, it is returned to its
+builder (`direction`, nothing merged), its wake and comment saying not to submit it again and to leave it to the user.
+When the names alone don't decide the direction (two versions do) and the default branch can't be read or named at
+that attempt (git unable to answer, a detached project folder with no main or master), or its head can't be read, that
+is no answer (HI-3040): the entry goes round as any unreadable read does (`readFailed`), then pauses `needsYou` saying
+so, never comes back for good on it. HI-3049: a forward's request and its resolution (at Resolve) record the default
+branch as it read then (`defaultBranch` on `ForwardRequested` / `ForwardResolution`); when the direction doesn't permit
+it, the repository has no main or master (the port's `mainLine` null: the default is only the project folder's
+checked-out branch), and the default now is another than the recorded one, which still exists, that is no answer too
+(the folder switched, not the release path): round again, then paused saying which branch to check out. A main or
+master made since, the recorded branch gone, or nothing recorded (a card from before), still returns it. The user's way on (HI-3040): a forward request for the pair with the override
+(`override: true`), made while the resolution is back in Active for its direction (`overridableEntry`: its last entry
+`failed` for `direction` and its latest submission's, none open, no override yet), records it on the resolution
+(`ResolutionOverride` {override?, entry, by}, checked again in its own write with the caller's guard; nothing else made;
+no `override` when the direction reads forward again, only the requeue) and wakes its builder to submit the same
+revision again; `requeue.allowed` lets that
+revision back in once, bound to that failed entry (whatever transient requeues counted; its new entry uses it up), and
+the override, kept on its `ForwardResolution` from then on, bypasses the direction alone. A resolution in any other
+state is refused as before (`openNoOverride`). A direct forward's way stays Remove from queue, then the request again
+with the override (a new card). The same rule (`forwardNow`, workflow/forwardNow.ts) decides Retry merge and Resolve on
+a builder (HI-3085): the folder switched, or a default branch that can't be read, holds them back saying to check the
+recorded branch out (`folderSwitched`) or to put the folder on its branch (`defaultUnread`), nothing written; only a
+real answer against the release path's direction refuses them with Remove from queue as the way on (`directionRetry`).
+
+Its revision carries `source`, merged (HI-2999): a submission (or a drag past Doing) whose revision doesn't have
+`source` as an ancestor (the change cherry-picked or copied, so the destination's history would still lack it and the
+next forward conflict again) is refused (`forward.resolutionSource`, its next step `git merge <source>`). Read with the
+project's history port (`resolutionHasSource`: true, false, or unknown, never taken as either): unreadable (git failed
+or threw, a platform with no history) it is refused too (`platform.unknown`, naming that rule), submitted again once it
+reads. The queue reads it again at each attempt and merges only on true: false returns it to its builder (`resolution`,
+nothing merged), however it reached the queue; unreadable, the entry goes round again as another read git couldn't
+make (HI-2019), then pauses needs-you with git's text, nothing merged.
+
+While it is open (not Done), it is the pair's open work (HI-3000, `openPairs`: the board's open cards alone read and folded, `cardsOpen`, once per listing), as an open forward is: a forward
+request for `from` into `to` (the window's or the Assistant's) returns it and makes nothing, and the destination's queue
+card names it on that pair's behind line (`QueueForward.behind[].resolving`), offering no Bring Up to Date for that pair
+until it is Done.
 
 Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
 along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
@@ -4232,7 +6366,38 @@ with `main`. A forward entry counts as already in the destination only when its 
 (merged or fast-forwarded), never by the same tree or a squash: one whose files the destination holds already (it was
 brought up to date with the release branch, and only the pull request's merge commit is new) is still merged, a `--no-ff`
 merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
-refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
+refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card. A forward's
+resolution is the exception (HI-3082): its merge commit bringing the resolved `source` into its history, the source not
+in its base's, is its work even when it changes no file (the destination's side kept, or a forward returned for a check
+whose merge changes nothing), and the queue merges it as a merge commit. A forward and its resolution count as in the
+destination only by ancestry wherever that is read (`asCardCounts`, workflow/containment.ts: the queue, reconciliation,
+a pass's no-code proposal, an agent's merge report, a dependency, a line's removal), never by its tree or a squash.
+
+**Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
+next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the
+default branch as the project's own platform port names it and only while it exists (none named or readable: nothing
+counts as `main`): two versions (`X.Y.Z[-pre]` or `X.Y`, an optional `v`, read on the whole name or its last `/`
+segment, compared by semver) give `forward` older into newer and `backward` (`older`) newer into older, and `unknown`
+(`sameVersion`) for one version under two names, decided first, whichever is the default (HR1's round 1: with no
+`main` or `master`, git's default is the checked-out branch, which may be a version); then the default branch, unless
+its name is a version, into any other is `forward`, any other into it `backward` (`default`: a release reaches it
+through its pull request); any other pair is `unknown` (`unordered`).
+Ancestry decides nothing: no graph test tells which branch was made from which (one containing the other is equally a
+release behind its next version and a next version built on it), so a pair the names don't order is unknown, never
+permitted. Only `forward` is permitted by default:
+- **The window** offers Bring Up to Date… and counts *behind* only for sources `forward` into the target; a target with
+  none has no `forward` in its view. It has no override.
+- **A request** (`forwardMerge`: the window's IPC, `POST /v1/queue/forward`, `cw_queue forward`) for a `backward` or
+  `unknown` pair is refused, saying which and why (`invalid`, 400), after the membership, actor and Control checks, which
+  an override never bypasses. `override: true` (the Agent API alone, only the JSON boolean: anything else is 400) is the
+  user's explicit choice: the card's `ForwardRequested` records it (`override: { by, dir, why }`), bound to that card and
+  so to its pair, and the Assistant's `queue-forward` action says so. An open card for the pair made without one is
+  never given it: the request is refused (`conflict`), naming the card to remove first.
+- **Retry merge** on a forward card and **the queue, before each forward entry's test merge**, read the direction again:
+  one not `forward` whose request recorded no override is refused (Retry, the card staying Active), or returned
+  (`IntegrationFailed` `direction`, never merged, both branches as they were): a card from before, or one whose default
+  branch changed since, inherits nothing from having been queued. Remove from queue ends it. A recorded override holds
+  through Retry, the source frozen again.
 
 #### 16.9.2 Advancing the target
 
@@ -4317,6 +6482,180 @@ touched:
   revision (tested again), `staged` (the staged files named), `unstagedChanges` (the listed files with a change in the
   working copy or index, untracked ones included, from the folder's whole status, so a long list never makes a command
   line too long). The user's other edits are left as they are. Resume (#1353) checks each again.
+- **Commit or set aside** (HI-2944; Darren, 11 Nov 2026: relay the truth, never gatekeep): a pause of `unstagedChanges`
+  or `staged` offers **Commit** and **Set Aside** beside its text, on the queue's card (Merges, Version Control → Merge
+  queue) and in the card's Work section (`FolderChangeButtons`), acting on exactly the paused files. Port 5's
+  `folderChanges` (Git only; `gitFolderChanges.ts`, `queue:settleChanges`): main finds the folder itself (where the
+  target is checked out, from the project's own repository; never a folder the window names), acting only while that is
+  the folder the changes were seen in (a `staged` or `unstagedChanges` pause records it, `folder`; a start's warning names
+  it; one recorded before this: refused, saying to Resume, whose check of the condition records the folder it saw it in,
+  and a staged pause's files as staged then, which the pause's text names), and, under the repository
+  lock and that folder's fence (the queue's order), checks the checkout again (moved: refused), the branch, no
+  operation under way, no agent or run working there (`folderBuilders`, an agent session there not idle), and every
+  path shown still changed (an empty or stale list is refused, never a pathless stash). Git does all the index work;
+  Combwork never writes the index. **Refused by name first** (HI-2982; Darren, 11 Nov 2026), before Commit or Set
+  aside runs, nothing committed or changed: a path whose removal from Git is staged (Files' Stop Tracking, `git rm
+  --cached`, or a rename's old side) while its file is still in the folder (absent only when the system says so: a
+  stat failing otherwise refuses too), *"<file> is staged for removal from Git:
+  commit it yourself in Git; Combwork won't add it back."* `commit --only` takes each path from the folder, so it put
+  the file back into Git with its local content (a secret just taken out of Git); a stash puts the committed copy back
+  over it. Files' Commit it refuses `.gitignore` in that state the same way. Only a file of exactly that name counts
+  (HI-3024): each part of the path as its folder lists it, so a case-only rename's old side (`b.txt`, which Windows'
+  lstat finds as `B.txt`) is another name, and a folder now in its place isn't a kept file; the same goes for a file
+  deleted without the deletion staged (HI-3076: ` D b.txt` beside `?? b.txt/x.txt`, which git's stash took with the
+  folder's files and its partial commit refused alike). Git's partial commit
+  takes neither ("will not add file alias"; "does not have a commit checked out"), so such a Commit is built in the
+  private index instead (`commitByIndex`): every other staged change, and every other path in conflict (HR1: a plain
+  commit refuses an index with one; the real index keeps it), taken back to HEAD there, the removed paths
+  `rm --cached`, the rest `add -A`, then a plain commit, each step bounded: the same commit, HEAD with the paths as
+  the folder has them. Set aside refuses a case-only rename by name (*b.txt is renamed to B.txt, a change of letter
+  case only, which Git can't set aside …*: git's stash fails on it after making the stash), and a removal whose path
+  is now a folder, whatever is shown (HR1: the stash takes the folder's files by that path, one made after the check
+  too). Commit: `add --intent-to-add` for
+  untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
+  rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
+  its intent-to-add entries only ever in the private index (below). The commit made is the one git's own summary
+  names (`[main 1a2b3c4] …`, its last such line, the object as short as `core.abbrev` allows (4) and the branch one
+  word, `]` and all: git prints it after the post-commit hook; the commit is run without
+  `--quiet` for it), found on the branch since the HEAD it started from (first parents, at most 50 back), never HEAD
+  alone (HI-3125: another git's commit right after it, or just before it, maybe with the same message) nor its message
+  (HR1's round 1: a commit-msg hook may rewrite it, a ticket prefix); with no summary to read, the newest there with
+  that message. Git saying it committed with none there is said, not credited. Set aside: `stash push --include-untracked` with those paths, named
+  *Combwork: set aside before merging HI-12 [cw:3fa9c1]*: after the card's words, a mark of this Set Aside's own
+  (`[cw:` six random hex digits `]`), so it is told by what it made (HI-3125): the one stash not among those there as
+  it started whose subject is exactly that message. Never the stash ref having moved (another git's stash just before or
+  after it moves it too), nor a message another git can reuse (HR1's rounds 1 and 2, HR2's round 3: the shown path
+  stashed by another git in Combwork's words just before its push, which then saved nothing, holds every path shown and
+  was taken for it). None: nothing was made (below). The stashes unreadable after the push, or two with its mark: never
+  guessed, refused (*Git set changes aside, but Combwork can't tell which stash is its own … Check git stash list and
+  the files*), the stashes kept and the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just
+  before: git says so and exits 0) is never done: refused as the changes not being those shown any more, or as git
+  not setting them aside. Git failing
+  after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in
+  neither the index nor the folder), made the stash then died on it, every try; it is given the new side alone, which
+  stashes the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives
+  the rename back), then the old side is put back from HEAD in the private index, bounded: its entry (`reset`), then its
+  file by `checkout-index` without `--force`, which refuses a path that exists rather than writing over it (HR1: a file
+  made there since the check, in no stash, is kept; the refusal is said with the stash made); either
+  side shown brings the other. A file added then deleted on disk (`AD`): git stashes it, then says "No valid patches
+  in input"; with the stash made and none of the paths changed any more, that is done, never said as a problem.
+  **Bounded** (HI-3021): a commit or stash still running after two
+  minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
+  timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
+  running). **Git Bash's own programs too** (HI-3047): one a hook's shell starts (`sleep`, `cat`, `perl`) has a Windows
+  parent already gone (MSYS's exec), so no tree walk finds it. Each timed git runs with a fresh random
+  `COMBWORK_RUN=<marker>` in its environment, which what it starts inherits; at its end, that Git's own `sh.exe` is
+  asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly
+  that entry, and each is ended with the tree, only while it is provably the process MSYS named (the same winpid
+  before and after the read, listed afterwards with a start no later than the time taken before the search's first
+  read, the usual start-time check when ended). Reading the environment of a native process while it is still starting
+  (another lane's `npx`, run from Git Bash) ends the shell reading it outright (HI-3065: exit status 256, nothing said;
+  seen as a slow hook's `sleep` left running after the bound, about one search in fifty while other lanes start
+  processes). So the script names each entry (`x <pid>`) before reading its environment, and a search that died on one
+  is run again with that entry skipped (its environment unread, as any unreadable entry's), at most three runs. A search
+  that fails otherwise, or every time, ends the tree alone, as before, and is logged. Not found: a program started with its environment cleared,
+  and (as for native programs) one whose parent had exited and that carries no marker. **A private index** (the Assistant's design, HI-3021 round 3, after two rounds of proving a left
+  `index.lock` Combwork's own): the commit and the stash run against a copy of the folder's index beside it
+  (`GIT_INDEX_FILE=<index>.combwork-<pid>-<n>`; intent-to-add entries go there too, by a step bounded as the commit
+  is and running nothing of the repository's, as the step into the real index below: HI-3079), so the real index and its lock
+  are never held while a hook, filter or signer runs, and the user's own `git add` works meanwhile. Combwork never
+  removes an `index.lock` it didn't make: what git leaves is the copy's, removed with the copy and every file git named after it (a
+  stash's own `<copy>.stash.<pid>`), Combwork's by that name. Once something is made (the commit, the branch moved;
+  or a stash, however far it got), the real index's entries for the paths become the copy's in one short step
+  (`ls-files -s` of the copy, `update-index -z --index-info`: each path removed, then git's entries put in); every
+  other entry is left. **A commit's are the commit's** (HI-3074): a pre-commit hook's `git add` (a formatter, a
+  generated file) goes into what git commits, not the copy, so after a commit the paths shown and every path the
+  commit changed (`diff-tree` from the HEAD it started from) take the commit tree's entries (`ls-tree`), a path not in
+  it none: the index matches the commit, nothing left listed and no removal invented. **Their stat data refreshed** (HI-3056): `--index-info` leaves it empty, and what trusts it
+  refused them (the queue's advance, `read-tree -m -u`: *Entry … not uptodate*, so the paused merge paused again as
+  the target moving after a Commit). So the new index is made, and refreshed for those paths alone (`add --refresh`,
+  noHooks, bounded as the commit is: a clean filter may run to compare content), in a scratch file beside the copy
+  **before the real index is locked** (HR3's round 1: never while a filter runs), from the real index's bytes as read
+  then; ended or failed, the entries go in unrefreshed and it is logged. Under the lock (below) it goes in only while
+  the real index is still exactly those bytes; another git wrote it meanwhile, the new index is made again from its
+  new bytes, up to three times, then under the lock unrefreshed (git's own work alone, no filter). **Another
+  git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
+  `git add` of a path being committed can land before that step. So the new index made in the scratch (`update-index`
+  with `GIT_INDEX_FILE`) compares each path's real entries, in the bytes it is made from, with those it had when the
+  copy was taken, flags and all (HI-3125: `ls-files -s -v`, so a skip-worktree or assume-unchanged flag another git sets
+  meanwhile is a change of that entry, kept and said, where `--index-info` would remake it without); and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
+  there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
+  as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
+  in, and the result's warning names the commit or stash made and the path kept (*Git made the commit (…), but another git
+  command staged a.txt meanwhile, so Combwork kept that staging as it was …*). That step runs nothing of the repository's (HR2's rounds 3 and
+  4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
+  as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
+  can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
+  holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
+  the commit (…), but Combwork couldn't update the index for those files afterwards …*). **Made with a warning, never
+  a failure** (HI-3059): from the moment git has made the commit or stash, it is done: either of those two is a warning
+  on the result (`FolderChangesDone.warning`), not an error, and the window titles it as made (*Committed 1 file on
+  main, with a warning*, *Set 2 files aside on main, with a warning*, a warning notification), the warning under it;
+  never *Could not commit*. On a paused merge the queue is then resumed as after any Commit or Set aside: Resume's own
+  check of the folder decides (the index left differing from the commit, staged by another git, keeps it paused,
+  naming the file), never the warning itself. Should git also fail after making a stash (its own error, which names
+  the stash, is said), the warning is in the log. Nothing made: the real index is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
+  more proof), even one made before its post-commit hook was ended: the real index being free, another git can commit
+  meanwhile (HR2's round 3), and a hook's own git, which inherits everything the commit's has, can move HEAD or commit
+  before or after the commit's write (HR2's rounds 1-3 on HI-3075), so nothing proves which made the commit now there.
+  HEAD unreadable before the commit refuses it before anything runs (an unborn branch is not unreadable). The refusal
+  says what happened (*Git didn't finish the commit in 120 seconds …*), naming any stash made by then; *the files and
+  the index are as they were* only while HEAD is where it started. HEAD moved (or unreadable), it names where HEAD is
+  now and that the index was left as it was, for the user to settle (*The branch moved meanwhile, to …, and Combwork
+  can't tell that it is this commit … Check git log and git status*). **Any number of files** (HI-2983): the paths go to git on its input
+  (`--pathspec-from-file=- --pathspec-file-nul`, literal pathspecs), never as arguments (a few hundred passed Windows'
+  32,767-character command line, and a start's warning lists every changed file). Commit takes any number. `stash
+  push` passes its paths on to git commands of its own as arguments, so Set aside of more than about 30,000 characters
+  of paths (some 300 files) is refused before any stash is made (*Git can't set aside this many files (n) at once in
+  …*), even when they are every change in the folder: a stash with no paths would also take a change made after the
+  check, never shown (HR1, HI-2983), so Set aside always names exactly the paths shown. **Refused by name too:** a
+  path in conflict (HI-3025: porcelain `UU`, `AA`, `DD`, `AU`, `UA`, `DU`, `UD`, with no operation under way needed,
+  as after a `git stash pop` that conflicted), since `commit --only` would add it markers and all, marking it
+  resolved (*… is in conflict in Git: resolve it there first …*; Files' Commit it refuses `.gitignore` so too); an untracked repository of its own inside the folder (git lists it whole, `nested/`),
+  never committed or stashed as one (*… is a Git repository of its own inside this one … Add it to .gitignore, or as a
+  submodule, yourself*). And a registered submodule whose only changes are inside it (HI-3023: nothing staged, its
+  recorded commit the one checked out, edited or untracked files in it; porcelain v2 `S.M.`, `S..U`), which neither
+  `commit --only` nor `stash push` has anything of (they failed with git's *On branch main*, nothing said): *… is a
+  submodule whose changes are inside it … Commit them or set them aside inside …*. `WorktreeNow.insideOnly` names
+  such submodules; they stay in `dirty` (work held in the folder, for every check of a clean folder). Its new commit
+  made inside is a change of the folder like any other, for Commit; **Set Aside refuses it by name** (HI-3052): git's
+  stash records the new commit but never checks the recorded one out again, so the submodule stayed changed while Set
+  Aside said it was done (*… is a submodule now at another commit, which Git can't set aside. Commit it instead …*),
+  whether its new commit is staged or not, alone or shown with other files, before anything runs.
+  `WorktreeNow.submodules` names every changed submodule (porcelain v2's `S…`), **each with how it changed**
+  (HI-3124), so the refusal says what is true and a remedy that clears it (each proved on real git; git's stash sets
+  none of them aside, and fails on a staged removal): another commit checked out, not staged (`.M`, its commit
+  changed: *… now at another commit … or check out its recorded commit inside …*); a new commit staged (`M?`: *…
+  whose new commit is staged … or unstage it (git restore --staged …) and check out its recorded commit inside …*);
+  added (`A?`: *… added here … Commit it instead.*); its removal staged (`D?`: *… removed from Git here … Commit the
+  removal instead.*); its folder deleted, nothing staged (`.D`: *… whose folder was deleted … Commit its removal
+  instead, or bring it back with git submodule update …*); anything else (a rename: *… Git can't set aside a
+  submodule's change. Commit it instead.*). Commit takes each, but one: a new commit staged while the recorded commit
+  (HEAD's, `hH`) is checked out in it again (`MM`, the moved remedy followed on a staged commit): `commit --only`
+  commits what the folder has, the recorded commit, so git has nothing to commit (*On branch main*). Read inside it
+  (its `HEAD`), both Commit and Set Aside refuse it by name before anything runs: *… with a new commit staged, but its
+  recorded commit is checked out in it again … Unstage it with git restore --staged …*, which leaves it clean. Staged
+  with a third commit checked out (`MM` too), Commit records that one. A command these name takes the path after `--`,
+  literal to git (HR3's round 2: `gitPathArg`; a path with a glob character, `*`, `?`, `[` or `\`, or starting with `:`
+  is written `:(literal)<path>`, or `git restore --staged -- "libs/[ab]"` would also unstage a staged `libs/a`), and
+  as one argument to the shell (HR3's round 1: `commandPath`): as it is when nothing in it needs quoting, else in double quotes
+  (one argument with its spaces in PowerShell, cmd and Git Bash alike), else, for a `$`, backtick, `"`, `!` or `%` in
+  it, in PowerShell's single quotes. A submodule path starting with `-` stays one argument there too, though git's
+  own submodule commands ignore such a submodule (CVE-2018-17456), so `git submodule update` can't bring it back. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
+  file named `(MERGE_HEAD)` is a file, never a merge. The pause shown (card, reason, time) must still be the current one
+  before anything is touched; afterwards Resume runs for that same pause only (`resumeQueue`'s `expected`), and its
+  own check (git read again) decides whether the merge goes on: a new pause, or a file still changed, stays shown.
+- **Said at start** (HI-2944): a card's start (`gatherStart`, before the start is written or work dispatched) and a
+  lane's (`cw_lane start`) read the target's folder (the adapter's `targetChanges`; Git only) and, when it has
+  uncommitted changes (never a submodule changed only inside it, HI-3023: nothing there to commit or set aside, and a
+  merge pauses on it only if it changes that submodule's commit), warn: a `Warning:` line in the reply (three paths, then how many more: HI-2960) and a
+  notification in the project's window (five paths, then how many more) with **Commit**, **Set Aside** (on all the
+  files found) and **Show Changes**; once a minute for the same folder and files (64 remembered). Never a refusal: git
+  may merge over files the card doesn't touch. **Only where a merge is to come** (HI-2984, `targetChangesApply`): the
+  rules merge into the target (any finish but Committed, whose target is just the line the work is committed on) and
+  that folder isn't where the work is built (the card's folder; a lane's, the project folder when cards are built
+  there). So Solo (Committed, the project folder) never warns: its "target's folder" is the agent's own, maybe with its
+  own half-done work; a pair or team whose target is checked out dirty in the project folder, cards in slots, does.
 - **The journal:** `IntegrationStarted` with the listed files and the folder, then `IntegrationPhase` `files`,
   `read-tree -m -u <expected> <result>`, `IntegrationPhase` `ref`, `update-ref`; each phase's fact is written through
   the runner's lease fence (#1360), and the lease is checked again just before each git step, so a runner that lost its
@@ -4399,7 +6738,12 @@ holder process is gone** (its pid gone, or given to a process that started at an
 renewals stopped: a stalled but living Combwork keeps its queue, and the panel says "run by <profile>". A Combwork that finds
 the lease held **watches the holder's process** while the target has open entries (every 30 s, the renewal period: the
 pid first, then its start time) and, once it is gone, runs the queue itself, taking the lease over with no other
-prompt [#1455, built in #1358: before it, the queue waited for a new entry, Resume or a reopened workspace].
+prompt [#1455, built in #1358: before it, the queue waited for a new entry, Resume or a reopened workspace]. A lease
+naming this Combwork's own process is held only while one of its runners owns it, from just before it takes the lease
+until its release (or failed start) has ended. One that none owns (a runner whose start or release couldn't write the
+board because its workspace closed under it) is stale, and is taken over like a gone holder's. A workspace closing also
+asks a runner it is still acquiring to give its lease up, rather than go live [HI-3120: before it, the workspace opened
+again in the same Combwork found its queue "run by" itself until Combwork restarted].
 
 Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
 check's detached server too: nothing may break away from it), held by Combwork's process supervisor (the one agents'
@@ -4408,6 +6752,18 @@ app's process, such as the Store's PowerShell, starts its children outside every
 as for agents; a process it follows is first written to the lease's journal (a file the supervisor flushes to disk),
 and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
 job and recorded in `combwork.db`.
+
+**Ending a tree never blocks main's thread** (HI-3009, after jj's HI-2997): a bound or a cancel that ends a command's
+whole tree (the runner's bounded commands, the queue's bounded git, a check's or a slot warming's command, a card's
+focused pick, the submodules and LFS step's git, an OpenCode export) lists and ends it with PowerShell runs it awaits
+(`treeEnding` over `endTreeAsync`, `processTree.ts`), never `spawnSync`, which held main's thread, and so every pane's
+typing, for about 2.4 s each time. What came after the tree ended still does: the result, a time-out's grace, an OpenCode
+worker's shutdown reply. Only cw-progress's own process keeps the blocking `endTree` (`tests/endTreeImports.test.ts`, in check:repo;
+`tests/treeEndingOffThread.test.ts` for each caller's behaviour). A command that exits while its tree is being looked
+for (the MSYS search, the listing) has no tree walked from its pid (HI-3054): Windows may already have given that number
+to another process, so only its marked MSYS programs and what they started are ended. Its pid is taken as its own only
+while Node still holds its handle, i.e. it hasn't exited when the listing is read (`tests/processTreeRootReuse.test.ts`,
+mock-only).
 
 **The runner's git** (HI-2079): its git commands with no time bound (reads, and its writes in its own folder and refs)
 run in one **git host** per lease, a process put in the job and recorded as a launcher is, before it runs anything; each
@@ -4456,7 +6812,14 @@ what was reviewed or approved. Ref paths compare keys case-insensitively (NTFS).
 
 **`mergeWorktree`** (`worktrees.ts`) [note §9, #1121] **Built [#1347]**: it returns the merge commit
 (`MergeResult.mergeCommit`), takes a target (default: the project folder's checked-out branch; a branch checked out
-nowhere is merged without touching a folder, the merged tree committed and the branch moved only from its tip; one
+nowhere is merged by `git merge` in a temporary detached worktree at its tip, beside the merge queue's folder
+(HI-3030: so its commit hooks run and it is signed as the repository says, or refused with git's reason, never made
+unsigned as `git commit-tree` made it), the project folder untouched, the branch moved only from that tip and the
+temporary folder removed (said, `MergeResult.note`, when it can't be) on every way out (HI-3109: a
+`post-checkout` hook failing after `git worktree add` made it is no refusal, the merge goes on there, and a worktree
+not at the tip is refused and removed); a refusal there also says the hooks ran in that temporary checkout, without the
+project folder's untracked files (`node_modules`), and to merge with the branch checked out in the project folder to
+run them with everything (HI-3109, Darren's decision A: the hooks still run there, as HI-3030 decided); one
 checked out in another folder is refused; a target is the branch git keeps under that name in any case, since Windows'
 ref store is one ref for `main` and `MAIN`, and two branches differing only in case are refused), and never auto-commits a dirty worktree (before 1.0 it ran `add -A` and
 committed): it refuses with the files counted and the next step ("commit or stash them in the worktree, then merge"),
@@ -4538,7 +6901,11 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   latest 20 outcomes (merged with the result; returned with why, the files and the log; cancelled), the pause (why, the
   card, the files, who and when) and which Combwork runs it. The window reads it with `queue:list` and is told of each change
   (`queue-changed`); the Agent API with `GET /v1/queue` (a project agent its own project's; outcomes say whether there is
-  a log rather than carry it); the Assistant and agents with `cw_queue` (`list`).
+  a log rather than carry it); the Assistant and agents with `cw_queue` (`list`). Every reader lists the same targets,
+  classified by one rule (HI-2994, `queueViews`): those with an entry or a pause, those with cards in flight under
+  Combwork merges, the current options' target and the project's other existing targets, each read with its cards in
+  flight, so a past branch's queue (`markPast`) is the same for agents as for the user; the panel then shows those
+  `queueShown` says, the Agent API leaves out past branches' only. The window's own: forward merges and the returns' seam.
 - **Who may (OP-9):** the user from the window; the Assistant within Settings → Assistant → Control (Control agents),
   through its change boundary (its actions, the per-message limit), with a reason for Remove from queue and Retry merge;
   a project agent never (403, saying whose they are), nor a script (403).
@@ -4585,7 +6952,22 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
   ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
   (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
-  *Queue in Version Control* opens it.
+  *Queue in Version Control* opens it; the card here has no such link (HI-2893). A past branch's queue (HI-2893:
+  `past`, §16.9.3's Merges tab) shows no card (no Pause queue): only its history, under a folded **Past branches (n)**
+  after the live ones. HI-3177 (Darren, 13 Nov: "past branches' history stays, but not listed one after another"): one
+  past branch at a time, picked from a drop-down (the newest version first), its history below, with **Purge history…**
+  for it and **Purge all…** for every past branch listed, each asked first (a danger confirmation naming the branches:
+  it can't be undone; the cards keep their own records). `queue:purgeHistory` takes exactly the branches the dialog
+  named, the whole list (never cut short; a list that isn't one, or over 10,000, is refused whole), and in one board
+  write, holding project.json's lock too (the lock order: the board, then the file) while it reads the project's
+  targets, so no change of them lands between the check and the write, checks each is still a past branch's queue (none of the project's targets, nothing
+  queued or testing, no card in flight, no pause, no Combwork running it, no push of its merges pending, a history to
+  purge; targets unreadable, or read only in part, refuse it), or writes nothing and says which and why. Purged, a branch gets a mark (board
+  meta `queue.purged:<branch>`, the time): its requests and outcomes at or before it are no longer its queue's (not
+  listed, not in its history, before any bound or count), its queue-only logs (the pause log, the settled pushes, the
+  returns seen) are deleted, and the catch-up state and pending pushes (operational) are never touched. Its cards'
+  facts stay: a card still says it merged there. A later request into that branch lists its queue again, with only
+  what came after. The window alone purges: no Agent API or tool.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Combwork merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
@@ -4598,6 +6980,329 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
 **None:** no queue; Accepted is immediate [#1121 c, OP-16].
 
 Later, not 1.0: batching, speculative merges, stacked cards [note §13].
+
+#### 16.9.4 A target that follows its remote (G21) <a id="spec-follow-remote"></a>
+
+**Built [HI-1183]** (the design agreed with HR1 and HR2 on the card, s7 to s20). With *The target branch follows its
+remote* on (Git, Combwork merges; off by default, so a local target behaves exactly as §16.9.1 and §16.9.2 say), the
+target **is** the branch it tracks on its remote: the queue tests on the remote's head and publishes there first, and a
+card is Done once the remote has its merge. G21 implies G18 (the form shows G18 on and fixed); it is in no ruleset and is
+read as the options are when the queue runs.
+
+**The endpoint, captured once for an attempt.** The target must track a remote branch (`branch.<target>.remote`, not
+`.`, and `.merge`): G18's fallback to the only remote or `origin` doesn't apply; none pauses `noUpstream`. Its push URL
+is read as git resolves it then (`git remote get-url --push --all`, rewrites applied): exactly one, else
+`remoteAmbiguous` (the URLs, without credentials, named); a relative filesystem path is made absolute against the
+project, so the sealed context and recovery reach the same repository. A shallow repository pauses `remoteUnsupported`. The snapshot
+holds that URL, the full ref, where the project's objects are, and an allowlist of transport and sign-in settings as
+resolved (`credential.*`, `http.*` per URL too, `core.sshCommand`, `ssh.variant`, `protocol.*`), never `url.*`,
+`remote.*`, `include*` or `core.hooksPath`.
+
+**The sealed context.** Every fetch, publication and verification runs git with `GIT_DIR` a bare gitdir Combwork makes
+in a temp folder for that one operation (removed after it), `GIT_OBJECT_DIRECTORY` the project's common objects (and its
+alternates), `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` an empty file, git's own variables removed from its
+environment, and G18's non-interactive environment. Its only configuration is the snapshot's, plus its own: no gc or
+maintenance, no commit graph, no hooks. A live edit of the user's configuration (a new `insteadOf` or `pushInsteadOf`,
+an include) is never read by these children, so it can't redirect one; nothing of the user's configuration is edited.
+The URL is used literally, never the remote's name.
+
+**Secrets.** A fact (`IntegrationStarted.publish`) keeps only the remote's name, the URL without userinfo, query or
+fragment, the ref, the remote head tested on, and the snapshot's id and SHA-256 digest. The snapshot is in
+`queue-transport.json` in Combwork's profile, encrypted with safeStorage (DPAPI), keyStore.ts's pattern (one atomic
+write, no `.bak`), decrypted only to build a sealed context, never sent to a window, a reply, a log or diagnostics;
+removed once its entry has an outcome. Its file there but unreadable (after three tries) is never read as empty
+(HI-2993): a save then refuses and writes nothing, so other targets' snapshots are never dropped, and the queue tries
+the advance again as a failed read; a load answers none, and a drop or clean-up writes nothing. Each is owned by its project's target, and only that target's queue host drops
+leftovers no begun publication of the target needs, between its entries under its lease, so another target's clean-up
+never takes one between its save and its `IntegrationStarted`. git's words kept
+for a pause or a log are redacted first (URL userinfo, any URL's query and fragment, authorization and bearer values,
+each secret value of the snapshot, its URL's query values included). Where it can't be kept safely, the queue pauses `remoteUnsupported`.
+
+**The queue's steps** (§16.9.1, changed only as follows):
+1. **Fetch first:** the snapshot's ref fetched into the sealed context and its head pinned in the project at
+   `refs/cw/queue/<entry>-fetch` (that fetch's own head, never a shared tracking ref's). The sealed context offers the
+   remote the project's commits as haves (HI-2987: the previous pin, the remote's tracking refs and the local branches,
+   at most 256, read from the project's refs and written as the context's own `refs/have/<n>`; HI-3042: the target's
+   own first, being the pin, the fetched ref's remote-tracking ref, the local branch of its name and any whose upstream
+   that is, then the rest in name order, since a cap on git's name order filled up with `cw/…` or `feature/…` branches
+   past 256 and the history arrived again), so only what is new
+   arrives; with none, the remote sent the branch's whole history at each fetch. A failed fetch pauses
+   `fetchFailed` with git's words. The local target at the fetched head or behind it goes on; one with commits the
+   remote lacks pauses `remoteDiverged` (never forced, never merged silently). An owed G18 push or catch-up is settled
+   first, as today.
+2. **Test on the remote's head** (`onto`): strict's update, the test merge, the merge checks (`CW_CHECK_BASE`) and "already
+   in the target" use it; the local head stays the advance's `expected`. A card found in that head (published by someone
+   else) is recorded from it (`Integrated` by outside, the blocker rule applying), never from the local target, and the
+   local catch-up is owed. Ask each time on a checked-out target asks after the test (OP-40); its Approve publishes the
+   test merge asked about, on the remote head and snapshot it was tested on, which this Combwork keeps by project and
+   entry across its queue runs (HI-2986: the host makes a queue per run, and a run ends at the ask) until the entry's
+   snapshot goes, at most 256; after a restart, or one dropped, it is tested, and asked about, again.
+3. **Publish** (the advance): the result proved to contain `onto` (else nothing is published), the snapshot kept,
+   `IntegrationStarted` with its record, then two journal phases:
+   - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
+     remote's name and the URL without credentials as its arguments and git's own line for an object-name source on its
+     stdin (`<X> <X> <ref> <onto>`). Refused: nothing published, the entry fails (`pushRefused`, transient), the card is
+     queued again and the queue pauses `publishRefused` with its words; ran too long, `hookTimedOut`.
+   - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>`. The remote takes it
+     only while its ref is exactly `onto`, and it is a fast-forward by construction, so the lease never discards remote
+     history. Pushed, or at the result already (`atResult`: the lease never applied, counted only because the result
+     is there): `Integrated`, the push logged as made, and the local catch-up owed in the same write. Stale lease or not a
+     fast-forward (someone pushed meanwhile): the entry fails (`targetMoved`), is queued again and tested from step 1,
+     toward the 3-retests pause. The remote's own refusal (`[remote rejected]`): `publishRefused` with its words, which
+     name a protected branch only when the remote does.
+   - **Never connected** (HI-3091, Darren's decision, 12 Nov): no ref line, and git's words say plainly it never reached
+     the remote (no repository at that address, a host it couldn't resolve or reach, a refused sign-in or key, a
+     repository not found), with nothing of a transfer begun (no "hung up", "RPC failed", "Writing objects"…:
+     `neverConnected`, gitTransport.ts). A failed push, not an unknown one: the remote is looked at all the same (there,
+     Done); else nothing was published, the entry fails (`notPublished`) and is queued again, and the queue pauses
+     `publishFailed` with git's words. Resume tests and publishes it again once the remote answers (still unreachable,
+     its fetch pauses `fetchFailed`). Never asked in For you as a push that may have arrived.
+   - **Unknown** (a timeout, a signal, an error after the send began, a lost acknowledgement, or a crash or lost lease
+     in phase `push`): verified at the snapshot's endpoint (a fresh fetch). There, Done. Anything else (absent, even
+     exactly at `onto`, moved, deleted, unreadable, or the snapshot missing or not matching its digest): paused
+     `publishUnknown`, the entry left begun with its pins and snapshot, and For you asks once (Approve: it was
+     published, Done; Decline: it wasn't, tested again), the answer running the queue at once (HI-3088). Never pushed or
+     tested again before the remote shows it or the user answers; Resume looks again. A crash in phase `prePush` sent nothing: tested again.
+4. **The owed catch-up** (store meta `queue.catchUp:<target>`, settled before the next entry): a recorded step first, by
+   §16.9.2's recovery table (`files`, `ref`, `rollback`, journalled in the meta); then from the local head as it is now
+   (another ancestor of the result gets its own journalled plan, never an earlier one's files). Not checked out: a
+   compare-and-swap. Checked out: §16.9.2's conditions, files and ref. With Ask each time, nothing moves in the folder unasked
+   (HI-3092, Darren's decision): a publication was asked about before it was pushed, and that approval (an advance
+   request on its entry and result) stands; a catch-up with none (a card found already on the remote, Done as merged
+   outside) asks once conditions hold ("{card} is merged and on {target}'s remote already: update {target} in {folder}
+   to it now?", `QUEUE_ADVANCE_GATE` on the Done card's entry), the queue paused `approval` until the answer. Approved,
+   it goes on; declined, the catch-up ends and the folder stays as it is (the user pulls when they want). An answer
+   covers only the update it was asked about (HR2's HI-3092 round 1): the request's entry, result, `folder` and
+   `revision` (the local head); the target checked out in another folder since, or moved, is asked about again, the new
+   request replacing the old. A catch-up that ends any way (done by itself once Automatically, the user's pull, which
+   the paused queue notices, declined, left) closes its open question (`RequestClosed`, `done`). A
+   condition pauses with its reason, naming the published card; a terminal state asks in For you as an advance's does.
+   A local target moved to something that doesn't lead to the result is left as it is, the catch-up still owed, and
+   pauses `remoteDiverged` naming the published card (HI-2988: dropped, it left the result out of the local target with
+   nothing said). Before that pause the remote is fetched (into `refs/cw/catch-up/<target>`): when it no longer has the
+   result either (a force-push took the published merge off it), the catch-up ends, the queue goes on and the
+   reconciler marks the card `LeftTarget` (HI-3041: paused, it could never be put right); unknown (a failed fetch),
+   paused as above. A local target behind the result is asked about the same way before it is brought there, unless
+   the catch-up is the one right after this run published the result: one the remote no longer has is never brought
+   into the local target, and the catch-up ends; unknown, nothing moves and it stays owed (only a remote seen holding
+   the result lets it go on). A recorded step about to swap the ref (its files moved before a stop) asks the same:
+   gone, its files go back by the table's rollback and the catch-up then ends; unknown, it is left as it is, still
+   owed. A remote read that couldn't tell pauses with its reason (`fetchFailed` with git's words, or the destination's
+   own pause), naming the published card, whether or not an entry waits, and Resume reads it again (HI-3089: a Resume
+   made offline cleared the pause and said nothing); a local read that couldn't tell waits for the next look, as an
+   advance's does. Still owed, it holds the target's next entry (HI-3055: published, that entry's catch-up replaced
+   the journal, its recorded step lost and its staged files left for the user), and it is open work for its target:
+   the queue runs as the workspace opens (and on a team's Resume, the rules back on, or a change of the checked-out
+   setting) for an owed catch-up alone (HI-3089: one stopped part way was left staged in the user's folder with
+   nothing said until another card came). A recorded step that finds the local target moved meanwhile (the user's pull or commit, which the
+   table reads as another client's `rollback` or `requeue`) is the user's branch, not a lost race (HI-3039): one that
+   holds the result already is settled with no file moved (a rollback there undid the merge in a clean, up-to-date
+   folder); one that lacks it keeps the catch-up owed, its phase dropped, and is looked at again as above (never
+   cleared, which let the reconciler mark the card `LeftTarget`), its files never rolled back while any of them is as
+   the user's new head has it (HI-3090: a commit of some or all of what the catch-up had staged had its files rolled
+   back under it, a staged deletion left in the folder; what is still staged is kept as it is). A recorded step whose listed files are all as they were before it (the user's
+   `git reset --hard` or `git stash` after a stop, or the folder switched to another branch before anything moved),
+   which the table reads as its terminal state, has nothing of it left: its phase dropped, it is looked at again as a
+   fresh one (HI-3090: paused needing the user, with no command, over a clean folder). A pause of the owed catch-up (its card named by `queue.catchUp:<target>`) is shown as one
+   (`QueuePauseInfo.catchUp`, `catchUpPaused`): its folder's changes are offered Set Aside only (stashed "before
+   bringing <target> up to date with <card>"), and `settleQueueChanges` refuses Commit, which would put a commit on the
+   local target its remote lacks. Nothing here reopens, retests or publishes again. The reconciler never marks a card
+   published to the remote (its `IntegrationStarted.publish`, or integrated by outside while following) `LeftTarget`
+   while its catch-up is owed, or while the local target is behind its result and the remote still has it (HI-3041,
+   Darren's decision: undone on the remote too, it is marked as with a push after merging; the remote's branch fetched,
+   sealed, into `refs/cw/reconcile/<target>`, its head kept a minute per target; unreadable, nothing is recorded and the
+   pass is retried).
+
+**Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
+seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
+remote lacks refuses the start with why: never the local head instead.
+
+**A target with no upstream** (HI-3128; the design agreed with HR3 and HR2 on the card, s7 to s17). A branch made here
+only (Start the next version's) tracks nothing, and follow mode needs it to: Combwork never publishes it or sets what it
+tracks (no `--set-upstream`, no config written). A target that tracks nothing at all (neither `branch.<b>.remote` nor
+`.merge` set, as git says it) refuses a start `platform.noUpstream`, and pauses the queue `noUpstream`, each with what the
+user runs (`UpstreamRemedy`, read locally, `upstreamCommands`, rendered by `shellLine`, the branch named in each so the
+checked-out branch is never touched): **publish**, `git push -u <remote> refs/heads/<b>:refs/heads/<b>` (an explicit
+refspec: a tag of the release's name makes a bare one ambiguous), when the remote hasn't it; **track**, `git config
+branch.<b>.remote <remote>` and `git config branch.<b>.merge refs/heads/<b>`, the two settings follow mode reads, when it
+has (whatever the remote's fetch mapping: `--set-upstream-to` refuses a ref outside it). The remote is named only when it
+is known (the branch's own `branch.<b>.remote`, else the branch it was made from's, each one git knows, else the
+repository's only remote); otherwise a marked placeholder, `<remote>`, and words asking the user to choose, never
+`origin` guessed. A named remote follow mode can't use (not exactly one push address) or a shallow repository: no
+commands, what to set up first. Tracking half set up keeps the remote setup's refusal. The pause carries the remedy's
+kind as its one file (a select key) and the commands as its message line. Removing the card a pause about the target's
+setup names (`noUpstream`, `remoteAmbiguous`, `remoteUnsupported`, `fetchFailed` with no catch-up owed) clears it in the
+same write; the next entry meets the same cause and pauses naming itself.
+
+**An owed catch-up once G21 is off** (HI-3128). The catch-up then never asks the remote (its look and HI-3041's checks
+are off): the local target is the target again. Every other rule is as above (the recovery table, HI-3039, HI-3090,
+`needsYou`, unknown reads keeping the journal); a recorded swap is finished by compare and swap from where it was; a
+fresh one behind is brought in; a fresh one the local target has moved away from (it owns no files: nothing journalled
+in a folder) is dropped, nothing moved or forced, the user's commits kept, and the reconciler reads the card against the
+local target from then on. A remainder HI-3090 left staged still pauses the next entry (`staged`) until the user settles
+it. With G21 on and the remote gone for good, the hold stays (HI-3041), and its pause (`fetchFailed` naming the
+published card) says both ways out: fix the remote, or turn G21 off and resume.
+
+**Returns** (HI-3127; the design agreed with HR3 on the card, s7, s11 and s14). A card returned from a tested merge (a
+conflict, strict's update, red checks or a hook) whose attempt was tested on a remote head the local target hasn't got
+names it: `IntegrationFailed.onto` (that commit) and `remote` (`<remote>/<branch>`, a name, never an address), and its
+builder's next step says to merge that commit (`git merge <commit>`), which is kept in the repository at the card's
+tested pin `refs/cw/tested/<key>` (the latest attempt's; dropped with the card's pins once it is archived; never one of
+the card's own refs, `refs/cw/cards/<key>/`, which the own-work proof reads). The pin is written first: one that can't be
+written is a failed read (no return recorded, nobody told, the round tried again, then paused with git's words), so a
+return never names a commit that isn't kept. Nothing of the user's moves: the local target and its tracking ref stay
+behind until a publication catches the target up. A submission under G21 bases its change on the newest head Combwork
+knows the remote had and the card's head holds (the head it started from, or the one its last return was tested on),
+not only on the local target, so the remote's commits merged as told are never counted as the card's own (its files, its
+identity check). A forward's resolution starts in a slot like any card, from the remote's head; in a pre-P7 stand-in
+worktree (a 0.9 one carried across the upgrade), which keeps its own base, its first return names the remote's head the
+same way. Before, the builder was told to merge the target, which the local branch already had, and an unchanged
+submission was refused.
+
+**Forward merges** (§16.9's Bring Up to Date, HI-3126; the design agreed with HR2 on the card, s7 and s11). With G21 on,
+a forward request reads both branches' remotes, each fetched now in the sealed context (within 60 seconds, the window or
+the Assistant waiting on the reply; pinned at `refs/cw/forward/<branch>`; no checkout, the local branches never moved):
+- **The source** is the head of the remote branch `from` tracks, frozen on the card as any forward's source is. It is
+  never the local `from`, which may lack what someone else published (hunt 7's S1: a release hotfix pushed from another
+  clone, which the request answered "up to date" and the next version never got) or hold commits never published
+  (P2: published to the next version's remote though the release's never had them). The local `from`'s commits the
+  remote lacks are left out and counted (`localAhead`, along its first parents): the window's notification and the
+  Agent API's reply say so, in every outcome (queued, already open, up to date).
+- **"Up to date"** is said only when the head of the remote branch `to` tracks, fetched too, has the source: a local `to`
+  holding it unpublished doesn't count, and one behind its remote isn't asked. The card's base is where the source and
+  that head meet. The queue then tests on `to`'s remote head as for any card (step 1 above).
+- **A branch that tracks none** (neither `branch.<b>.remote` nor `branch.<b>.merge` set, as git says it, exit 1: `main`
+  set up without an upstream, say) is read locally, as with G21 off; a setting set to nothing is set (HR2's round 1).
+  Tracking set up any other way (one of the two settings only, either set to nothing, another
+  local branch, `.`, a merge ref that isn't a branch, a remote git doesn't know, several push addresses, a shallow
+  repository), a setting git can't read, or a fetch that fails refuses the request with nothing queued, saying what
+  couldn't be read and git's words (`service.forward.unreadable`): never the local head instead.
+- **Retry merge** freezes its new source by the same rules, refused the same way.
+- **The window** (`QueueForward.follows`) offers Bring Up to Date… for every source it may take, even one whose local
+  count is 0 (its "N commits behind" line, a local count read without fetching, isn't shown then): only the request,
+  once chosen and confirmed, reaches the remotes. Off G21, everything is as before: both branches read locally.
+Seen in the real app at 295e8e59a (HG1, hunt 7: `queue:forward` answered `upToDate` while `origin/1.4.0` had a hotfix
+`origin/1.5.0` lacked) and checked again with the change in the `forwardremote` e2e suite.
+
+**The one residue:** a hook is the user's own code, run in the project with the project's configuration.
+
+#### 16.9.5 Signing checked before the queue signs <a id="spec-signing-check"></a>
+
+**Built [HI-1185]** (the design agreed with HR1 on the card, s7 to s17). Agents' own commits failing fast instead of
+prompting (the ready check's part 2) was split off by Darren's decision (HI-1185/r61) and built as HI-2867 (below).
+
+**The read** (`platform/gitSigning.ts`), in the folder a commit runs in, with that commit's own `-c` overrides
+(`git config --show-scope`): `commit.gpgsign`; `gpg.format` (openpgp by default, ssh, x509); `user.signingkey`, shown
+shortened (an openpgp id's last 16 digits, an ssh key file's name, a literal key's type and comment; never key material);
+the program git would run: `gpg.ssh.program` for ssh; for openpgp `gpg.program` and `gpg.openpgp.program`, one setting
+under two names, read together with the last line git reads winning. Each value's scope is shown as git reports it.
+
+**The check** signs a throwaway payload, in a temp folder removed after, in the commit's folder and environment, bounded
+at 5 s with its tree ended there. It runs only what Combwork can vouch for: the program a commit would run is resolved to
+a full path first, as git for Windows finds it (HI-2934: a path as given, with no extension added; a name in each folder
+of the commit's PATH in turn, `<name>.exe` then `<name>`, never by PATHEXT), and is run only when that
+path is a known installation: Git for Windows' own `usr\bin\gpg.exe` or `usr\bin\ssh-keygen.exe` (beside the git
+Combwork runs, or its `--exec-path`), GnuPG's `…\GnuPG\bin\gpg.exe` under Program Files, or Windows' own
+`System32\OpenSSH\ssh-keygen.exe`. Anything else, an unrecognised default found on PATH included, is `notChecked` and is
+never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`sk-`).
+- openpgp: `--batch --no-tty --pinentry-mode error --no-autostart --status-fd=2 -bsau <key>` on stdin, the key being
+  `user.signingkey` or git's default, the committer's identity as that commit would have it (`git var
+  GIT_COMMITTER_IDENT` with its overrides).
+- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
+  written to a temp file as git does, a path's
+  `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
+- Either runs with no console (detached, HI-3208), as cw-sign runs it: Windows' own ssh-keygen asks a locked key's
+  passphrase on any console it has, a hidden one too (what Windows gives a console program started by Electron's main or
+  by the merge queue's launcher), and waited there until the bound (`couldNotComplete` where `needsSomeone` was right).
+- Either is started as git starts it (HI-2947): git's command line written out as is, each word quoted with
+  `quote_arg_msvc`, so Git's own MSYS2 gpg and ssh-keygen get a `'`, `*`, `?` or `{` (a key or temp folder under
+  `C:\Users\O'Brien`) as a commit would give it, never as Node's quoting would. The same in the merge queue's run and in
+  the Git view's.
+- Outcomes: `unattended`, `needsSomeone` (the signer's words), `couldNotComplete` (the bound: never taken as proof
+  either way), `cantSign` (its words), `notChecked`, `off`, `unreadable` (never taken for off).
+- **Its limits, said:** a check that succeeds means only that this signer, key and environment signed just then, never
+  that another process's commit will or that a cache will still hold; an agent already running, a smartcard or a hardware
+  key may still ask in its own way, and the check then ends at its bound. Combwork never writes git, ssh or gpg
+  configuration, and never starts or stops an agent.
+
+**The queue** runs it, through its runner in the lease's job, just before each step that signs: strict's update, the merge
+or squash test merge, and a rebase that rewrites commits (an on-top linear suffix landing unchanged signs nothing, so it
+isn't checked). Once per entry pass; Resume is a new one. `needsSomeone` and `couldNotComplete` pause `signingWaits`, and
+`cantSign` pauses `signing`, before anything is committed or rewritten; `unreadable` is the existing `again`;
+`notChecked` and `unattended` go on to the commit, whose bound and classification (above) stay the backstop.
+
+**The Git view** (Version Control → Branches & remotes → **Signing**, under Commit identity, read-only): the settings
+above and the check's outcome, checked when shown at most once a minute per folder (callers share one), and **Check
+again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent,
+signed with Windows' own `ssh-keygen` as `gpg.ssh.program`: Git for Windows' reads only `SSH_AUTH_SOCK`, never that agent's
+pipe, measured by Darren on 13 Nov, HI-3110; gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
+optional `signing` (jj has none, so nothing is shown).
+
+**The view's checks, their lifecycle** (HR1's round 1):
+- **Nothing blocks the main thread:** program lookup, the key file's start (at most 4 KB), the temp folder and the
+  signer's tree all go through asynchronous calls (`endTreeAsync`, never `spawnSync`).
+- **Each check is owned from the call that asks for it**, before it waits its turn, by owner (the folder). A workspace
+  closing, a project removed or Combwork quitting gives it up wherever it is, queued, reading or signing
+  (`platform/ownedWork.ts`, platform-neutral: the app imports no platform's module for it). One still queued or reading
+  starts nothing after; one signing has its signer ended. The close waits until each has ended and its signer and temp
+  folder are gone, and refuses new checks for that owner while it runs (HR1's round 2).
+- **Quitting** awaits it in the quit sequence, before the app exits, installs or relaunches, and admits no new check
+  from then on; will-quit keeps a synchronous fallback (each signer's process ended, its temp folder removed) for a
+  shutdown that can't wait.
+- **One in flight per folder**, admissions in turn: a look with the same settings joins it (Check again included);
+  changed settings cancel it and wait for it before starting anew; Check again with nothing in flight starts a fresh check.
+- **A finished check is kept apart** from what is in flight: written only by its own generation, reused for a minute
+  while its settings (re-read at each look) stay, and swept at expiry and when its owner goes.
+
+**Agents' own commits never wait for a passphrase [HI-2867]** (the design agreed with HR2 on the card, s7 and s10; its
+measurements recorded there). An agent's signed commit used to wait on a pinentry or passphrase prompt nobody was there
+to answer, or (Windows' own `ssh-keygen`, measured) on the agent's own terminal. Now it signs with nobody there or fails
+at once, saying why. **Signing is never turned off**: no `commit.gpgsign` or `tag.gpgsign` entry, no fallback to an
+unsigned commit; every failure stays one, with git's own nonzero exit.
+- **Only the session's environment, never config.** A session with Combwork's tools (none "as from a terminal") gets two
+  `GIT_CONFIG_*` entries, first so the user's own entries after them still win: `gpg.program` and `gpg.ssh.program` set
+  to `cw-sign.exe`, and the variables it reads (`CW_SIGN_*`). Entries naming another Combwork's `cw-sign.exe` (a dev
+  build started from a session) are dropped. A `GIT_CONFIG_COUNT` git takes, 0 or empty included (HI-2934), gets them;
+  one git refuses, or an entry missing, is left as it is for git to refuse. Combwork writes no git, ssh or gpg
+  configuration.
+- **The launcher, `cw-sign.exe`** (`resources/cw-sign/cw-sign.cs`, compiled at each build by Windows' own .NET Framework
+  `csc.exe` into `out/bin`, shipped as `resources\bin`; none built, sessions get no entries and sign as before). Git
+  names one program with no arguments of its own, a `.cmd` loses arguments to cmd's parsing and a `#!/bin/sh` script
+  runs only where git finds `sh` on PATH (both measured), so it is a program of its own. It hands git's arguments to
+  `cw-sign.js` in `CW_SIGN_ARGV` (their count, then base64 of their UTF-8 joined by NUL), never re-quoted, and relays
+  stdin, stdout and stderr byte for byte through pipes of its own: started with exactly those three handles to inherit
+  (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`), because a gpg-agent gpg starts otherwise inherits git's pipe and git waits for
+  its end as long as the agent runs (measured). It puts itself in a job object that ends its processes when its last
+  handle closes (the session ending its tree), detached or not; once `cw-sign.js` has finished, the job stops ending what
+  is left, so a gpg-agent gpg started stays. A job it can't make or join is a failure (exit 2).
+- **The signer, `cw-sign.js`** (Node's built-ins and Combwork's chunks, run by Combwork's executable as Node): the signer
+  git would have run without Combwork, read from git in the commit's folder with Combwork's two entries taken out (only
+  when they are exactly Combwork's: `CW_SIGN_OURS`, the keys and `CW_SIGN_SELF`'s path; else nothing is dropped and it
+  refuses), every other scope, include and command entry kept, `gpg.program` and `gpg.openpgp.program` as one setting
+  (§16.9.5's read). A result that is a `cw-sign.exe` refuses: it never runs itself.
+- **What changes:** only a known installation's (the check's list above) signing call (gpg's detach-sign, `ssh-keygen -Y
+  sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
+  no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
+  default: long enough for a hardware key's touch). Verification and every other signer run as before, the protection
+  being for known installations only. Every signer, known or not, is started as git for Windows starts it (HR2's round
+  1, HI-2934): a `.cmd` or `.bat` through `cmd /c` with git's own command line (so cmd reads it as it did), a `#!`
+  script through its interpreter looked up on PATH as git looks it up (the interpreter, the script's path, then git's
+  arguments), anything else, an `.exe` included, with git's command line, written out as is; each word quoted as git
+  quotes it, `quote_arg_msys2` for MSYS2's `sh` and `quote_arg_msvc` for the rest, so an MSYS2 program (Git's own gpg
+  and ssh-keygen among them) neither globs a `*`, `?` or `{` nor reads a `'` as a quote (a profile such as
+  `C:\Users\O'Brien`), where Node's own quoting would let it. Git's stdio and exit are kept; an unknown signer shares the
+  launcher's console, which `cw-sign.exe` gives `cw-sign.js` whenever it has one.
+- **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
+  words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
+  change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
+  section). A signer ended at its bound says so instead, never claiming a prompt. Among those words, ssh-keygen's own
+  for a key only an agent can hold: "No private key found for public key" (a `.pub` path) and, for a literal key
+  (`key::ssh-ed25519 …` or the bare form), which git passes with `-U`, "Couldn't get agent socket" and "Couldn't find
+  key in agent" (HI-3110).
+- **The off switch:** Advanced → **Agents' signed commits never wait for a passphrase** (on by default), read at launch.
+- **Not measured** (recorded as limitations, the user's machine left alone): Gpg4win's gpg (not installed where it was
+  built; the same GnuPG options), and Windows' ssh-agent service with a detached signer (loading a key would change the
+  user's machine-wide agent; a private Git for Windows agent was measured).
 
 ### 16.10 Slots, review copies and sessions
 
@@ -5018,6 +7723,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
   Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
 - **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
   "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A switch's resume is automatic too** (HI-2920): a connection switch, a usage move or a restart for its tools resumes
+  only where `canResumeNow` allows, never taking a free slot by hand. Its run's lease ended meanwhile (its card Done), it
+  is refused and the slot stays in the pool; a stop while its start waits for the old run's writer claims nothing.
 - **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Combwork lets its turn finish (not in a
   turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
   gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes
@@ -5025,6 +7733,16 @@ Whether a conversation may resume there is its **hold** (none: it may):
   included) and the slot looked at.
   A run of another Combwork is that Combwork's to stop; the slot stays its until it exits. No off switch: one writer needs it
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
+- **A lane over with its card in flight keeps that card's slot** (HI-3118; design HI-3118/s12, agreed with HR2). The
+  slot pass decides a running-no-more lane's lease in one write (`SlotStore.laneOver`), reading there the lane's row and
+  each card whose current cycle started on that lease (its Started `lease`) at a stage that keeps a slot. None: the
+  lease ends (`laneEnded` / `laneAbandoned`), as below. One: the lease becomes that card's in place (same id, slot and
+  agent; `kind: card`), whoever the card is given to now, so the card keeps its slot and work, is never lent away from
+  them, and its lease then ends as a card's does (Done, or put back, HI-2995 keeping committed work). Several (a race;
+  the rules allow one): nothing ends, the slot stays protected, and the log says which. A lane running again is left
+  alone. **A Git submit** from a card started on a slot's lease is refused (`platform.slotLeft`) unless that lease is
+  open now, on that slot at the card's folder, and the card's own or a lane's listing the card; unreadable, refused
+  too. Nothing is changed there on refusal.
 - **A lane's end lets its builder finish** (HI-1706, Darren 26 Oct: "Who the heck wants cut off like that."; design
   HI-1706/s10, agreed with HR1). A lane's lease ending (`laneEnded`, `laneAbandoned`) never cuts its builder off
   mid-turn, and ends it cleanly (`slotsApp.ts`'s `laneEnd`). Other lease ends, Stop and restarts are as above.
@@ -5114,7 +7832,36 @@ Whether a conversation may resume there is its **hold** (none: it may):
     taken over once its holder is gone; only with no writer but the lease's own), under the folder's fence (#646: nothing
     typed into or started there meanwhile) and, for the switch, the repository's lock. The builder's quiet, the cycle and
     the rules are checked again at the boundary, inside the lock after any wait for it, before the files change (and
-    again before an install). A slot already on its line is prepared as it is. With
+    again before an install). A slot already on its line is prepared as it is. **In place first** (HI-3010): a Git slot
+    detached at the card's base or a commit past it (as a lane's slot waits between cards) gets the card's new line at
+    once, whatever its builder is doing, since that changes no file (`branchHere`: `merge-base --is-ancestor` with the
+    base, then `git switch -c` with no start point, so a commit made meanwhile is on the line; no hook runs, since a
+    post-checkout or reference-transaction hook could change files beside the builder: for that command alone
+    `core.hooksPath` names a folder that can't exist and `core.fsmonitor` is off, the repository's settings never
+    written); only the cycle and the
+    rules are checked at that boundary. Only the lease's own commits may be over the base (HI-3031): where the head was
+    as the lease began (the worktree's `HEAD` reflog at the lease's start, to the whole second, a move in that second
+    counted as before it) must be the base or behind it, else the preparation that waits for its builder runs. A free
+    slot waits at its last target's head, which can be past the base with another target's work (an integration branch
+    over main; a local target ahead of the remote in follow mode), and a stray commit on a free slot is no card's; no
+    reflog (turned off, expired) is a refusal too. **On the last card's line** (HI-3116; design HI-3116/s19, agreed with
+    HR1 and HR3), as when that card went Done while its builder was in a turn, the next line is made at the base by ref
+    transactions alone (`lineAtBase`), never a checkout: only while HEAD names a branch whose commit's tree is the base's
+    (the last card's work merged, by merge, squash or fast-forward; equal content, the old line and any commit on it kept).
+    T1 (`update-ref --stdin`, reflog message `combwork: next line for lease <id>`) creates the line at the base while the
+    old line is still where it was read; T2 (`--no-deref`) attaches HEAD while it still names the old line and the new one
+    is still at the base (git can't take both in one transaction). Each is all or nothing; read back after, never
+    "prepared" otherwise. A line already there is carried on only when provably that lease's (its reflog's one entry ours,
+    still at the base); anything else is left exactly as it is. A commit landing on the old line between T1 and T2 stays
+    there, its changes staged on the new line. Hooks and fsmonitor off as for `branchHere`. Below git 2.46 (no
+    `symref-update`), nothing is tried: it waits for its builder, logged once. What is left (a line made before and not
+    provably the lease's, another line whose files aren't the base's, submodules and LFS files, an install) waits for its
+    builder as above. **A submit off the card's line** (`platform.offLine`) says how to make the line from the card's own
+    start (`git switch -c <line> <start>`, its Started base) when it doesn't exist yet, and to switch back when it does;
+    its commands' arguments as typed in PowerShell (`shellLine`). Before, a builder told of its lane's next card another way (a wake, the
+    Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its
+    submission moved the card on, the preparation gave up, and the line never existed (HI-2997: passed, then stale at
+    the merge). With
     **G15** on it installs again when the lock files differ from its last install (a run of "Combwork (slot slot-b)"); off,
     nothing is installed (a lend never reinstalls for a card). Then `SlotPrepared`, in a write that finds the cycle the
     same.
@@ -5203,6 +7950,11 @@ Whether a conversation may resume there is its **hold** (none: it may):
   running, or unknown), else the slot is held by a `process` as before. Each retry looks again, so what is said follows
   the broker starting, stopping or ending. It only names what holds the slot: whether the slot can be lent is still the
   rename alone, and Combwork ends nothing (HI-2309).
+  **A slot its builder already holds** (HI-3168): a waiting lane's lend refused `agentLeased` (one agent, one slot: its
+  builder holds a lease for a card, typically one in flight when an earlier lane of its ended, HI-3118) keeps that for
+  its status too (`held`: `card`, the slot, the builder as `agent` and the card as `heldFor`): *waiting for a slot: B1
+  still builds in slot-a for HI-2, which keeps it until that card is Done or put back*. No retry is scheduled: that
+  card's Done or put back is a board change, whose pass lends the lane a slot.
   **A refused start, its slot held** (HI-2468): a lane recorded over a builder that is still running isn't waiting for
   a slot. Combwork's own start gives it its first card (`laneStarts.ts`), and that start can be refused for its slot
   (`start.slotAvailable`). The start's wait (`startWait`, `why: "refused"`) then names the slot and what holds it
@@ -5593,7 +8345,13 @@ repeating them (#533) [note §8].
   (any merge into a branch), cw_lane and the builder's moves. **Usable if any set of rules still in force allows it**
   (`hiddenForWorkflow`): the project's options now, each distinct ruleset recorded on the facts of its cards out of Hold,
   Todo and Done (not archived), and its running lanes' (`cardWork.workRetained`, one snapshot), and kept by a card's stage
-  (Review keeps the review tools, Approved and Merging the merge report) whatever its rules say. Nothing hidden when the
+  (Review keeps the review tools, Approved and Merging the merge report) past what those options allow: the merge report
+  only where one of those sets finishes in a way its handler takes it (Combwork merges, the agent merges, not checked), so
+  an Approved card under You integrate or Committed is done keeps nothing (`WORKFLOW_TOOL_STAGES`' `under`; HI-3008: each
+  jj card's Approved restarted its builder, or asked to, for a tool it could never use). A stage keeps a tool only under
+  the rules of the cards in it (HI-3014: each card's own recorded rulesets, the project's options now for a card with none),
+  never another set's: a Solo card moved into Approved can't borrow the merge report from the project's not-checked
+  options, which it isn't under. Nothing hidden when the
   rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
   included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
   be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database
@@ -5952,6 +8710,113 @@ checked every agent and process by hand.
   **After any restart** the team runs: nothing of a pause is kept.
 - **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
 
+#### 16.10.10 Submodules and Git LFS [HI-1182]
+
+Slots, review and check copies and the merge queue's folder are linked worktrees (§16.10.1): git makes them with empty
+submodule folders, and Combwork's checkouts there leave LFS files as pointers. In a Git repository that uses either,
+Combwork sets them up itself (`src/main/platform/gitModules.ts`; the design agreed on the card, HI-1182/s7–s16). jj
+refuses such repositories (§16.3, HI-2799's gates), so the step is the Git workspace port's (`filesNeeded`) alone.
+
+- **The setting:** Version Control → Slots and copies' **Set up submodules and LFS** (project.json `slots.gitFiles`:
+  `false` turns it off; left out, it is on). Shown where the project folder uses submodules or LFS, or where it is off,
+  with what it uses (`slots:gitFiles`: its submodules, LFS and git-lfs's version, or that git-lfs is missing or not set
+  up). Slots, copies and the queue read it as it is when they run.
+- **Detected per folder at its revision**, read before any run starts (one `git ls-files` for a tracked `.gitmodules`
+  and any file under `filter=lfs`, nested `.gitattributes` counted): a folder that uses neither runs nothing. A read
+  that fails is a preparation failure, never "unused".
+- **When:** before the setup script and before every ready, being idempotent: a slot as it is made and at every
+  preparation for a card (after its switch, or on the line it is on: a step that failed or was ended, or the setting
+  turned on since, is done then); a copy after every make or reset; the queue's folder before its install and checks
+  each time (a run of "Combwork (merge queue)"). A failure leaves the slot or copy not ready with why and the run's log,
+  as a setup failure does; in the queue it is a red check. While the setting is on, Combwork's own checkouts of these
+  folders run with `GIT_LFS_SKIP_SMUDGE=1` (that process only), so every LFS download happens in the step: a slot's
+  make and switch, a copy's make and reset, and every git the queue runs in its own folder (its add and checkouts, the
+  test merge, squash or rebase, strict's update, their aborts and resets), never one in the project's folder.
+- **The run:** one of Combwork's runs (the slot's, the copy's credited to its reviewer, the queue's), its gits with no
+  shell in the run's job, within the setup's time limit, ended with it, with no prompt (`GIT_TERMINAL_PROMPT=0`,
+  `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`) and logged.
+- **Submodules, with no config written:** never `git submodule sync`, a top-level `--init` (both write the shared
+  `.git/config`, so the project folder's) or `foreach`. Before anything changes, each first-level submodule's folder must
+  be missing, empty or this worktree's own clone (its `.git` file naming `<worktree git dir>/modules/<name>`, whose
+  `core.worktree` is that folder, by real paths, no link on the way, and that clone itself strictly inside the
+  worktree's `modules` folder with no link from there down to it); anything else stops the step, naming it, and
+  nothing is touched. Except in a copy or the queue's folder (HI-3080): a folder holding only what an earlier run left
+  there (a revision had ordinary files at that path; their ignored build output outlives the reset's `clean -fd`, and
+  git's clean skips a path the index holds as a gitlink) is removed first, but only when, within bounds (depth 64,
+  200,000 entries), nothing in it is named `.git`, no folder in it is a bare repository (a HEAD beside config,
+  objects, refs or the like), and nothing is a link, the path's way down included; a failed
+  removal stops the step, saying so, and anything else is named as above. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
+  work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
+  resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the
+  environment, before whatever the run's environment carries, so the user's still win; a URL override, `active = false`
+  and `update = none` are git's to honour. A linked worktree clones its submodules into its own git dir, so each folder
+  clones each once. Nested ones: `git submodule update --init --recursive` inside each first-level clone checked again to
+  be this worktree's own, with `GIT_CEILING_DIRECTORIES` at the superproject: their config writes stay in those
+  private clones.
+- **Removed submodules:** a copy removes the folder of one its revision no longer has only when its own private clone
+  claims it (core.worktree a literal path strictly inside the copy, no link, its `.git` naming that clone back, no
+  gitlink there now), by `git clean -ffdx` of that path with literal pathspecs; its clone stays. Read from the copy's
+  git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
+  another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
+  with it; a copy whose setup failed goes as any does.
+  A copy's reset (HI-3028) removes such a checkout before its checkout too, where the revision has ordinary files at
+  that path (the submodule vendored), as the queue's folder does below (`clearSubmoduleCheckouts`): a forced checkout
+  would write those files into the old checkout and `clean -fd` keep its `.git` file, so git run inside would see the
+  old clone. Its clone stays, so a later lease at a revision with the submodule sets it up again.
+  A slot (HI-3078) switches its branch rather than resetting: git's switch refuses over such a folder where the
+  revision has ordinary files there, and leaves it, `.git` file and all, untracked where the revision has nothing. So
+  a slot's move to a revision (a card's line prepared, a free slot detached at its target, a retarget) first removes
+  each of its own submodule checkouts, claimed as the queue's folder's are, that the revision doesn't keep as a
+  submodule, but only a checkout whose own status lists nothing (`--untracked-files=all --ignore-submodules=none`;
+  its ignored files go with it, as `git submodule deinit` does): one with a change or an untracked file is left for
+  git to name. Its clone, and so its commits, stay. A slot whose git dir holds no clones runs no git for it.
+  The merge queue's folder (HI-3027) removes such a checkout earlier: just before its test merge, strict's update or
+  a rebase, each checkout of its own clones (as above, but claimed whether or not a gitlink is there now) that the
+  revision checked out or the one merged into it doesn't keep as a submodule (vendored into ordinary files, or gone),
+  folder and all; its clone stays. git's checkout and merge leave a populated submodule's folder in place, whose files
+  would otherwise stand as untracked where the card tracks its own, pausing the queue on every pass. A doubtful one is
+  left for git to name.
+- **A slot with submodule clones, removed and renamed** (HI-3026, design HI-3026/s11). git refuses any unforced
+  `worktree remove` of a worktree whose git dir has `modules` (the files step's clones), and forced it skips its own
+  clean check and deletes the clones with it. So a slot's removal, once its guards pass, removes such a worktree forced
+  only after: git's clean check made as git would (`status --porcelain --ignore-submodules=none` empty, so a user's
+  `ignore` setting hides nothing here), and every clone under `<gitdir>/modules`, nested ones too, holding no commit
+  that its remote-tracking refs lack (`rev-list -n1 --all --not --remotes`: branches, tags, a stash, HEAD, any ref).
+  A clone where that finds something is read again with its remotes' tags (HI-3077; `ls-remote --tags --refs` per
+  remote, no prompt, only then): a tag a remote has under the same name at the same object is the remote's (a release
+  tag whose branch was deleted, fetched with the clone), so what it reaches doesn't count; any other tag, one moved
+  locally included, is local work. A remote that can't be read is "couldn't check", kept.
+  Else the slot is kept (`gitRefused`), its detail naming the submodule. Conservative by design: a commit fetched by
+  its id alone keeps it; another checkout's copy is never taken as proof. The
+  clones are found failing closed (an unreadable folder, a link, a stray file, a clone missing HEAD or config, a
+  depth past the bound: "couldn't check", kept), and any failed read keeps it. Without `modules`, the plain removal as
+  before; copies keep their forced removal. git refuses `worktree move` of such a worktree, forced or not, so an adopted
+  slot's rename (The rename, above) keeps its name before anything is copied or reserved, logged with why.
+- **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
+  status reports it (a user's `ignore` setting honoured).
+- **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A
+  submodule's LFS files are smudged as the user's own git-lfs filter config says. git-lfs missing, or no LFS filter set
+  up (`git lfs install`, without which `git lfs pull` leaves pointers), fails the preparation, saying so; where the
+  user's config requires the filter, git's own checkout fails first, setting or not.
+- **A moved gitlink in diffs** (HI-2864, design HI-2864/s10; `src/shared/gitlink.ts`, `components/GitlinkDiff.tsx`):
+  the Changes tab's diff, its comparison of two branches and a card's Work section show a submodule's change as one row,
+  "Submodule lib/sub: 0bbdde2 → 0fc182f" (added, removed, and replaced by or replacing a file or symbolic link worded
+  as such; the full ids in its tooltip), in place of the empty diff git's commit couldn't be read into. **Show git's
+  diff** shows git's own `Subproject commit` lines; a side that is a file or link keeps its real content there.
+  - **Told by its mode, never by a failed read**: one `git --literal-pathspecs diff --raw -z --no-abbrev --no-renames`
+    of that path per diff opened (the comparison's two commits, or the ref against the working tree). Only a side of
+    mode 160000 is a gitlink, so one whose commit is in the parent's store is still one. A blob's id is never shown.
+  - **The working tree's commit** is git's own patch line for that path (`--submodule=short`, its gitlink section
+    only), read for every working gitlink side: raw gives zeros once the checkout moved, and a checkout dirty at the
+    index's commit has raw's id but only the patch says `-dirty` ("uncommitted changes inside"; that section has no
+    `index` line, so it is taken as the gitlink's only where raw says both sides are gitlinks, and only as the one
+    section). A line that can't be read is an error with Retry, never an empty side or a guessed id. An unpopulated folder shows the
+    index's commit; a deleted one, the submodule removed. A ref that isn't a commit yet (no commit in the repository)
+    has no committed side to be a gitlink.
+  - **The Work section** reads a submission's files as raw rows (`filesChanged`: the same paths and letters as
+    `--name-status`), and a row with a gitlink side keeps each side (`FileChange.gitlink`), stored with the submission:
+    earlier submissions show their paths as before. Output that isn't raw rows is unknown, never a partial list.
+
 ### 16.11 Lanes, with or without the Assistant
 
 #### 16.11.1 Combwork owns the lane's card list
@@ -5991,7 +8856,7 @@ picked up in a clean slot, by the builder that knows it, and the next card alway
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
 a returned card gets its own slot and a fresh conversation) is put to Darren as OP-36.
 
-**Combwork starts the next card** [HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance]. On 29 Oct LE-250's builder read its Done, said it had only been asked to do LE-250, and went idle: the lane sat until the Assistant started LE-246 by hand (the card's own prompt, naming one card, won over the lane's brief). With the rules on, Combwork starts the lane's next card itself (`main/laneStarts.ts`): the first of the lane's own open cards (not Done, gone or held elsewhere), in Todo and not blocked, every card before it Done or another lane's (`laneStartDue` in `shared/lanes.ts`; its first card too since HI-2029, below), in an active lane (never a paused one). It is started on the lane's builder as the Assistant's Start gives one (`startTask` with Combwork as the actor, through the start's rules, so one card at a time, a line behind and a slot to wait for still refuse it): its slot's placement gives the builder the card, or the card is typed into the idle builder, or the builder is started with it when it isn't running. Each start is decided again just before it is made and checked once more where it is written, in the start's own transaction (`StartGuard`, from `laneNow` in `lanes.ts`: `laneView` itself, read synchronously from the same inputs as the lane view, so its effective pause for the user, a block, a merge, a slot or its hooks counts; the lane still running in that workspace, still the builder's, the card still its next due): a lane abandoned, changed or newly paused, or its card given to another agent, while an earlier start was on its way gets nothing assigned, written or delivered, and goes on once that clears [HR1's rounds 1 and 2]. **When:** only while the builder is free: idle (its turn over, nobody typing in its terminal), or not running and not starting or queued to resume. A builder in a turn (reading the Done wake, finishing a follow-up of the card) is waited for until its turn ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741). Looked at on the board's and lanes' changes, on the builder's status changes while its lane's next card waits, and every 30 s while one waits (a refused start is tried again at most that often). Its first card too [HI-2029: Legible's lane over a running LB1 sat "active" for 2 h 26 min with LE-259 in Todo, as nothing but its builder started a first card]: the builder starting it itself, in the turn it registers its lane (card-loop), is never free in between, and its own start of one Combwork started is that start. Nor while the lane's own start launches its agents (Start Lane…, or a lane the Assistant or a script records or updates: `holdLaneStart`, from before its record until its slot is lent and its agents started), as Combwork's start then took the slot the lane was being lent, or gave the builder a second conversation; nor while the lane waits for a slot (`slotWait`, `stoppedOnly` or not: the slot pass keeps it until it has lent the slot and launched the lane's agents, `laneWaitsForSlot`, read again just before the start) [HR1's round 1]. While a due card waits (its builder in a turn, on a watch of other work, a line of Combwork's queued for it, a failed start, or Combwork's start refused for now), the lane's status says why at once (`startWait`, *LE-259 waits to start: LB1 is in a turn*), never "active" with nothing said; after 15 minutes the lane-next stall (now its first card too, since the lane started) escalates it. **A card it depends on not Done** [HI-2129: HB5's lane sat on HI-2118, which depends on HI-2108, then in Review after a merge-queue conflict; HB5 watched HI-2108 for Done, and after 30 minutes the lane watch called HI-2118 stalled]: where the card's rules have `start.dependenciesIntegrated` (Dependencies must be Done), a card one of whose `blockedBy` cards isn't Done waits for it, whatever its builder does (`startWait` `why: "dependencies"`, `waitsFor` that card's key: *HI-2118 waits to start: it waits for HI-2108 to merge*). Combwork doesn't try the start meanwhile, and the lane-next stall says nothing of it (`laneOrderView`'s `waitsForDependency`), as nothing waits on its builder: once the card is Done the usual rules apply, Combwork starting it when its builder is free. One Done but not yet in the card's target is left to the start's own refusal (`refused`), as before. A line of Combwork's queued for the builder is offered first, by the delivery service under its own rules, and holds the start until it is given or cancelled: time alone never lets the card's start overlap it (the lane says *a line of Combwork's is on its way*). With the rules off the lane is bookkeeping, as before: the builder starts the next card. **The Done wake** to a lane's builder (`loopWakes.ts`, the lane holding the card) names what comes next in place of "carry on": *Your lane's next card is HI-12 ("…"): Combwork starts it for you once your turn ends, so end your turn now*; with the rules off *…: start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane*; one already under way, one that can't start yet (*cw_lane next says when it can start*), the lane paused, or *That was your lane's last card*. The card-loop skill says the same for a builder, as a backup and for the rules off.
+**Combwork starts the next card** [HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance]. On 29 Oct LE-250's builder read its Done, said it had only been asked to do LE-250, and went idle: the lane sat until the Assistant started LE-246 by hand (the card's own prompt, naming one card, won over the lane's brief). With the rules on, Combwork starts the lane's next card itself (`main/laneStarts.ts`): the first of the lane's own open cards (not Done, gone or held elsewhere), in Todo and not blocked, every card before it Done or another lane's (`laneStartDue` in `shared/lanes.ts`; its first card too since HI-2029, below), in an active lane (never a paused one). It is started on the lane's builder as the Assistant's Start gives one (`startTask` with Combwork as the actor, through the start's rules, so one card at a time, a line behind and a slot to wait for still refuse it): its slot's placement gives the builder the card, or the card is typed into the idle builder, or the builder is started with it when it isn't running. Each start is decided again just before it is made and checked once more where it is written, in the start's own transaction (`StartGuard`, from `laneNow` in `lanes.ts`: `laneView` itself, read synchronously from the same inputs as the lane view, so its effective pause for the user, a block, a merge, a slot or its hooks counts; the lane still running in that workspace, still the builder's, the card still its next due): a lane abandoned, changed or newly paused, or its card given to another agent, while an earlier start was on its way gets nothing assigned, written or delivered, and goes on once that clears [HR1's rounds 1 and 2]. **When:** only while the builder is free: idle (its turn over, nobody typing in its terminal), or not running and not starting or queued to resume. A builder in a turn (reading the Done wake, finishing a follow-up of the card) is waited for until its turn ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741), except one watching its own lane alone [HI-2889: on 10 Nov HB2 watched its lane after each Done, so its turn ended `watching` and its next card sat until the stall, four times; a lane watch's default events don't count a Done or a start]: that watch (its lane's id alone, maybe cards of that lane, no agents or usage, not firing) waits for what the start is, so Combwork ends it and starts the card, whose prompt wakes the builder (`endOwnLaneWatch`). Whether it may is decided again under the watch store's lock, just before the record is removed, from the lane as it is then (`laneNow`: still due on the same builder, still watching, the watch's cards still the lane's): a lane paused, ended or changed meanwhile keeps the watch. Looked at on the board's and lanes' changes, on the builder's status changes while its lane's next card waits, and every 30 s while one waits (a refused start is tried again at most that often). Its first card too [HI-2029: Legible's lane over a running LB1 sat "active" for 2 h 26 min with LE-259 in Todo, as nothing but its builder started a first card]: the builder starting it itself, in the turn it registers its lane (card-loop), is never free in between, and its own start of one Combwork started is that start. Nor while the lane's own start launches its agents (Start Lane…, or a lane the Assistant or a script records or updates: `holdLaneStart`, from before its record until its slot is lent and its agents started), as Combwork's start then took the slot the lane was being lent, or gave the builder a second conversation; nor while the lane waits for a slot (`slotWait`, `stoppedOnly` or not: the slot pass keeps it until it has lent the slot and launched the lane's agents, `laneWaitsForSlot`, read again just before the start) [HR1's round 1]. While a due card waits (its builder in a turn, on a watch of other work, a line of Combwork's queued for it, a failed start, or Combwork's start refused for now), the lane's status says why at once (`startWait`, *LE-259 waits to start: LB1 is in a turn*), never "active" with nothing said; after 15 minutes the lane-next stall (now its first card too, since the lane started) escalates it. **A card it depends on not Done** [HI-2129: HB5's lane sat on HI-2118, which depends on HI-2108, then in Review after a merge-queue conflict; HB5 watched HI-2108 for Done, and after 30 minutes the lane watch called HI-2118 stalled]: where the card's rules have `start.dependenciesIntegrated` (Dependencies must be Done), a card one of whose `blockedBy` cards isn't Done waits for it, whatever its builder does (`startWait` `why: "dependencies"`, `waitsFor` that card's key: *HI-2118 waits to start: it waits for HI-2108 to merge*). Combwork doesn't try the start meanwhile, and the lane-next stall says nothing of it (`laneOrderView`'s `waitsForDependency`), as nothing waits on its builder: once the card is Done the usual rules apply, Combwork starting it when its builder is free. One Done but not yet in the card's target is left to the start's own refusal (`refused`), as before. A line of Combwork's queued for the builder is offered first, by the delivery service under its own rules, and holds the start until it is given or cancelled: time alone never lets the card's start overlap it (the lane says *a line of Combwork's is on its way*). With the rules off the lane is bookkeeping, as before: the builder starts the next card. **The Done wake** to a lane's builder (`loopWakes.ts`, the lane holding the card) names what comes next in place of "carry on": *Your lane's next card is HI-12 ("…"): Combwork starts it for you once your turn ends, so end your turn now*; with the rules off *…: start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane*; one already under way, one that can't start yet (*cw_lane next says when it can start*), the lane paused, or *That was your lane's last card*. The card-loop skill says the same for a builder, as a backup and for the rules off.
 
 #### 16.11.2a Built [#1270]: Combwork owns the lane
 
@@ -6017,7 +8882,13 @@ a returned card gets its own slot and a fresh conversation) is put to Darren as 
 - **One card at a time:** the runtime refuses to start a lane's card while a card before it in the lane isn't Done
   (`lane.oneAtATime`, a refusal in all 7 locales; no option of its own: `workflow.enforce` off turns it off; the user's
   own drag isn't refused). `cw_lane next` (`GET /v1/lanes/next`) names the card to start or carry on, or why the lane
-  waits. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
+  waits. **A queued list counts once its boundary has passed** (HI-3118): with no card of the lane's own in flight,
+  `cw_lane next` names its next card from the queued list and an agent's `cw_lane end` is refused while that list has
+  open work, whether or not the lanes' look has applied it yet; neither applies it, and the user's End ends the lane as
+  asked. For an agent that **only reviews** running lanes, `cw_lane next` answers as a reviewer: the first card of its
+  lanes waiting in Review, or that none waits; never a card to start. Once its lane has ended, it says "all its cards
+  are Done" only when the lane's kept snapshot says so; ended with cards open (the user's End), it names them; with
+  nothing kept, it claims nothing. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
   goes before the earlier cards of the lane nobody has started (Todo), in the submission's own write (`LaneChanged`):
   its reviewer's wake says so and names the card the lane goes on to, and the submit's reply says it moved. Not while
   an earlier card is in flight unreviewed (Doing or Review: the lane waits on that one as it is), while a list change is
@@ -6296,7 +9167,17 @@ where it ran) and counts for a card's submission only if all of these hold; othe
 - the folder was clean when it started (§16.3.2's dirty), and is clean and at the same checkout when it ends;
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
-  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it.
+  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it,
+  nor one deleting them (HI-3173, `gitIgnoredByKind.ts`): Git's folder-only rules (`out/`) match a path without a slash
+  only when it is a folder on disk, so each path of the record is asked by every kind it had during the run, in a work
+  tree of its own holding only the `.gitignore` files on its way, with the folder's git dir and index (a tracked path
+  is never ignored). Its kinds: each event's entry as read soon after the event came (8 reads at a time, at most 4096
+  events waiting however many name one path, past which an event stays unread; a closed watch drops its queue;
+  settling waits for the reads, up to its cap), a folder where the record has paths under it, and, where
+  an event's entry wasn't read or none of those says, what is on disk now and a file too. It is ignored only as every
+  one: a deleted `out/` is, a file `out` the run wrote and replaced with an `out/` folder isn't. Its residual is
+  HI-3158's (Darren, 13 Nov, option 2): a file named as an ignored folder, made and gone again before its event is
+  read, passes as the folder; and an empty ignored folder deleted counts, as nothing says it was a folder.
   Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them. A write
   is the run's by the file's own times, not when its event came in (HI-1767): a check copy's reset or the target merged
   in just before the start, whose events came in after it under load, isn't (its file last written before the start,
@@ -6449,11 +9330,18 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   Control**, which opens the project's Git tab (#1357 points it at its Merge queue section). **When a queue shows**
   (item 0, round 2 of #1338) is decided from its actual state, never the current options alone: an entry testing,
   queued or paused, a return not seen (or seen in the last 10 s), a merge of the last 8 s, a lease, a pause, or a card
-  in flight (started, not Done, not archived) whose own ruleset has Combwork merge into that target; and, empty (*Nothing
+  in flight (started, not On Hold (HI-3177) or Done, not archived) whose own ruleset has Combwork merge into that target; and, empty (*Nothing
   queued.*), while the project's current options have Combwork merge into it (`queue:list` gives the window those targets
   too, with `combworkMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
-  out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
+  out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
+  the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
+  or queued, HI-2927: no card in flight into it (HI-3177: a card On Hold isn't, though it started into that branch: a
+  held card works toward no queue until it is taken out; HI-1758 and HI-1901, held, kept 1.0.0's queue live), no pause, a stuck one too, and no Combwork running it, so those stay
+  controllable) is a past branch's (`QueueView.past`, set in every listing); targets that can't be read (the project not
+  Git now, git's default unreadable), or only in part (HI-3177: a jj project's bookmarks unlisted), make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
+  history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
+  only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
   busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
   inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. While a
@@ -6519,7 +9407,73 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     its own card in flight), the cards added, those taken off, each one another running lane's list will have (its
     queued list when it has one, else its cards) as moving to that lane's builder's lane, and the whole new list when the cards it keeps change order: *Next, once
     HI-12 is Done: HI-14 added, HI-9 moves to HB6’s lane*. None when nothing is queued (it goes once it applies) or the
-    queued list is the same; Pulse keeps its one-height row and its *list changes after* header. Editing it is HI-1927's.
+    queued list is the same; Pulse keeps its one-height row and its *list changes after* header. Editing it is HI-2898's
+    (below), with **Cancel Change** after the line.
+  - **Editing a lane's cards** (HI-2898, carrying HI-1927; Darren 10 Nov: the picker and dragging from the board, Move
+    here, the local day): in the Lanes tab, a running lane's open cards show its working list (its queued list when it
+    has one). A card waiting its turn (Todo, not another agent's) drags to another place (Alt+Up and Alt+Down, on its row or
+    its key or ×; HI-2970: inside the opened cards they never move the lane, which takes them on its own row only), comes off
+    with × or Delete (back to the board, never deleted; HI-3068: a held Delete takes one card, its repeats ignored, and
+    the focus moves to the next card's row, or the lane's, only once the lane shows it off: another update of the lane
+    meanwhile leaves it waiting, and a refused or skipped edit, a move too, leaves it where it was, `QueueFocus`). A
+    lane keeps a card to do (HI-3066, Darren 12 Nov, decision A): its last card not Done can't be taken off nor moved
+    away by Move here, refused in place naming the lane and saying to end it (End Lane, Abandon Lane…), nothing saved,
+    and its ×'s tooltip says so (not turned off: a turned-off button shows no tooltip; a click shows the refusal) (a list of none was saved but never read back: the lane vanished,
+    its Undo refused; one of Done cards only ended it at once). Add Card… searches the project's Todo cards by key or title, and
+    a card dragged from the board (`application/x-combwork-card`) drops on the lane's row (last) or into its open cards
+    (where dropped). The working list's start up to its last card that isn't queued (in flight, Review, Approved, Done,
+    on hold, another agent's) keeps its places in every edit that moves or brings in a card; a card in it still
+    waiting (not started, nobody else's) can be taken off, by × or Delete or Move here, the rest keeping its order, and
+    its Undo puts it back there (HI-3067, Darren's decision, 12 Nov); the card in flight shows a lock. Over a row of that start,
+    where nothing can go, a drag shows no line and a drop does nothing (HI-2969: it went last before).
+    - **One list writer:** `lanes:edit` (`laneEdits.ts`) saves each edit through `applyLaneList`, the decision
+      `cw_lane start` uses (§16.11.1): queued behind the card in flight, or applied between cards. Editing a lane with a
+      queued list edits that list. **Cancel Change** always drops the queued list (HI-3062), whatever it held: the lane's
+      list becomes its applied one, its own, with none of an edit's list checks (which compared it with the queued list:
+      a queued reorder of the card in flight, or one leaving out a held card, refused it). Each card the queued change
+      took off comes back in its place unless it can't now, decided under the board's lock on the board as it is then;
+      one that can't stays where it is (left out, `LaneEditResult.leftOut`, named in the notification): missing,
+      archived or another project's, held by another running lane (Move here after a queued reorder, HI-2943), given
+      to an agent other than the builder, started (Doing, Review, Passed, whoever has it), or in To do keeping work from
+      a start. One in To do with none, Done or on hold comes back. The lane's own card in flight (the first of the
+      applied list started and not another's) always stays, even when the queued list left it out. Saved at once,
+      never queued (not through `applyLaneList`), changing no card's assignment, column or facts. The builders of the lanes it
+      changed are started on them if they aren't running, as an update by the user or the Assistant does.
+    - **Bound to what was shown:** each edit names its lane's id and its list's revision (`LaneRecord.listRev`, up by
+      one at every save that changes `cards` or `pending`, lanes.ts' and the runtime's `writeLane` alike, never reset);
+      a lane gone, ended or at another revision is refused, nothing saved. **Quick edits in turn** (HI-2932): the window
+      asks its lane edits and undos one at a time, whatever the lane (`editLaneInTurn`), each made when its turn comes
+      from the lanes read again after the last (a card's place from the rows then: a move by the card, a card from the
+      board by the card it goes before, `addedPlace`), a read keeping each lane at the higher revision (`newerLanes`), naming the revision main's reply said the window's own last edit
+      or undo (HI-3064) left (`LaneEditResult.lanes[].rev`) only while nothing else changed the list between (`revisionToName`); else the
+      revision shown, refused as changed meanwhile. A keyboard move is said to screen readers once made, never before.
+      Every check is made again at the write, under
+      the board's lock: the card's project, column, archive, other running lanes, earlier work (a start or line on its
+      facts, an open slot lease, a run in progress), Merges into (`refuseOtherTargets`), dependency order (no card put
+      before a card of the list it depends on, where it wasn't), the fixed start, and the most cards a lane has
+      (`LANE_MAX_CARDS`, 50, as `cw_lane start`'s; HI-3061: a longer list was saved but never read back, the lane or
+      its queued change lost). These are the window's refusals:
+      `cw_lane start` keeps its own rules.
+    - **One board change:** the lanes and the card assignment an edit makes are saved in one transaction
+      (`mutateInBoard`, `saveTableInBoard`), the lanes' stale-read check kept. A card brought into a lane (Add, Move
+      here) that is given to another agent than the lane's builder is given to nobody through the card-change owner, so
+      the lane takes it next; given to the builder or nobody, it is left as it is.
+    - **Move here:** a card another running lane has is refused, naming its builder, with **Move Here**: the card off
+      that lane and onto this one in the same change (both lists, the assignment), or nothing. A card that lane's
+      queued change took off is still on its applied list, so still that lane's (HI-3063): Move here takes it off the
+      applied list too, at once, while the queued list waits; its undo puts both back.
+    - **Undo:** a notification with Undo, and Ctrl+Z in the tab, for the last change made in the window. It puts back
+      each lane's `cards` and `pending` exactly, and the card's agent, only while each lane is still at the revision
+      the edit left and the card is as it left it (its agent, Todo, and the history entry it left as the last: a token a
+      later change always moves on). A card started since makes it refused (queued is not as it was); never partial.
+  - **Ended today** (HI-2898): a collapsed row atop the Lanes tab, hidden with none, of the lanes that ended or were
+    abandoned since local midnight (`lanes:endedSince`, calendar days: 23 or 25 hours on a summer-time change), read
+    again as the lanes change, at midnight, on focus and each minute (a change of date, clock or time zone). Each shows
+    its builder and reviewer, name, merged or abandoned, its cards, how long it ran (*ran 2 h 5 min*: from the lane's
+    start to its end, waits and pauses included, a lane given new cards keeping its start; its hover names both) and its
+    merge commit (copied with a click), and opens to its cards as it left them, read only. They show there only, not
+    again in the tab's list; Pulse keeps its lanes ended in the last hour. It is the first part of the tab's lane list,
+    scrolling with it (HI-3178); a row's facts keep to one line, beside the name where they fit, else under it.
   - **A lane's wait time** (HI-1926): main stamps each running lane's status when its key (reason, card, ask) first
     appears (`stampWait`, kept per workspace in memory, one for every window, bounded, a lane leaving it when it stops
     running) as `status.since`; a wait already under way at the first listing (Combwork started, the workspace opened) is
@@ -7309,8 +10263,8 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Push the target after Combwork merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Combwork's commits) |
-| Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
-| Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |
+| Submodules and Git LFS in slots and review copies | **Built [HI-1182]:** set up as a run of Combwork's in slots, review and check copies and the queue's folder, before the setup and every ready (§16.10.10); Version Control → Slots and copies' **Set up submodules and LFS** |
+| Remote targets: fetch before testing, push after (Team with a shared remote) | **Built [HI-1183]:** G21 (§16.6.2, §16.9.4) |
 | Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |
 | Pin refs for submitted revisions; hooks and signing pauses in the queue; Combwork's commit identity | P5 (in scope, §16.9) |

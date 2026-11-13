@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { SigningInfo } from './gitSigning'
 import type { BranchStart, ResolvedStart, StartPoints } from './nextVersion'
 import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
@@ -22,7 +23,10 @@ import type {
   CopyView,
   SlotTestOp,
   SlotOptions,
+  GitFilesStatus,
   SlotView,
+  SlotRecoverDivergent,
+  SlotRecovery,
   HeldWriter,
   BoardState,
   SetAsideCard,
@@ -79,6 +83,10 @@ import type {
   FileContent,
   FileEntry,
   FileGitDone,
+  FolderChangeAction,
+  FolderChangesDone,
+  QueueChangesSettled,
+  QueuePauseRef,
   FileGitInfo,
   FileGitRuleText,
   GitDiff,
@@ -100,6 +108,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneEdit,
+  LaneEditResult,
   LaneStartRequest,
   LaneStartInfo,
   LaneStartResult,
@@ -118,6 +128,7 @@ import type {
   QuitChoice,
   QuitScope,
   QuitSession,
+  QuitUpdate,
   SessionBulkAction,
   SessionBulkResult,
   SessionAttachmentGroup,
@@ -131,6 +142,7 @@ import type {
   SessionUsage,
   SkillInfo,
   SkillTarget,
+  KeptTargetShown,
   TaskCard,
   TaskChanges,
   TaskCursor,
@@ -142,6 +154,7 @@ import type {
   TranscriptSearchResult,
   TranscriptTool,
   WorkflowChange,
+  ReleaseOffer,
   RetargetPreview,
   RetargetResult,
   NextVersionPlan,
@@ -157,6 +170,7 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
+import type { SwitchRefusal } from './platform/switching'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { MetricsQuery, MetricsReport } from './metrics'
@@ -168,10 +182,11 @@ import type { ConnectionAnswers, ConnectionsApplied, ConnectionsPlan } from './t
 import type { TemplateWorkflow } from './workflow/templateOptions'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
-import type { AdvancedState } from './advanced'
+import type { AdvancedState, Text } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjLeftover, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjToCheckRow, JjView, JjWaitingCard } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -196,7 +211,8 @@ export interface CombworkRequests {
   'app:quit': () => void
   /** Restarts Combwork: quits as app:quit does (asking about running agents), then starts it again (#676). */
   'app:restart': () => void
-  'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean) => void
+  /** `install`: the version the dialog showed, when Install now was chosen (HI-3167); null or absent: not installed. */
+  'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean, install?: string | null) => void
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
@@ -213,7 +229,7 @@ export interface CombworkRequests {
   /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */
   'commands:run': (ref: CommandRef) => void
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
-  'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; pending: boolean; working: number }
+  'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; update: QuitUpdate | null; pending: boolean; working: number }
   'app:openExternal': (url: string) => void
   'app:openPath': (path: string) => void
   'app:showInFolder': (path: string) => void
@@ -387,7 +403,7 @@ export interface CombworkRequests {
   /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
-  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[]; offer?: string }) => WorkflowForm
   /** HI-2680: moves what a confirmed Retarget preview listed, as the user: each item rechecked; what happened to each. */
   'workflow:retarget': (projectPath: string, preview: RetargetPreview) => RetargetResult
   /** HI-2807: what Start the next version's dialog shows: the release, its head, the proposed name, what can follow. */
@@ -395,7 +411,13 @@ export interface CombworkRequests {
   /** HI-2807: what can follow `to` from the release with both going on (the dialog's name edited). */
   'workflow:nextVersionPreview': (projectPath: string, from: string, to: string) => RetargetPreview | null
   /** HI-2807: Start the next version: the branch made at the release's head as shown, the release added to Other branches, Work merges into moved to it. */
-  'workflow:startNextVersion': (projectPath: string, args: { name: string; from: BranchStart; base: NextVersionPlan['base'] }) => NextVersionResult
+  'workflow:startNextVersion': (projectPath: string, args: { name: string; from: BranchStart; base: NextVersionPlan['base']; offer?: string }) => NextVersionResult
+  /** HI-3155: the workspace's release offers the user hasn't put off (Not now), a project's For you items. */
+  'workflow:releaseOffers': () => ReleaseOffer[]
+  /** HI-3155: Not now on a project's release offer `id` (its current one, else refused): hidden until it changes. */
+  'workflow:releaseOfferDismiss': (projectPath: string, id: string) => void
+  /** HI-3155: whether offer `id` is still the project's, read afresh (the repository and the options now), before a button acts on it. */
+  'workflow:releaseOfferCurrent': (projectPath: string, id: string) => boolean
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
@@ -414,7 +436,10 @@ export interface CombworkRequests {
    * Switches the project's version control from its next card (#1419), checked again under its lock: refused when
    * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
    */
-  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
+  /** `token` (HI-2799): a switch between Git and jj, the group its warning showed (`PlatformSwitchCheck.store.token`). */
+  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { from: PlatformId; to: PlatformId }
+  /** HI-3105: as workflow:setPlatform, but a repository switch's refusal returned as data (its reason), for the dialog to look again; every other failure still throws. */
+  'workflow:switchPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { switched: { from: PlatformId; to: PlatformId } } | { refused: SwitchRefusal }
   /**
    * "How do you work?" answered Not now (#1423) for the platform the step showed: no preset, the options inherited, not
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
@@ -439,7 +464,9 @@ export interface CombworkRequests {
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
-  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
+  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize' | 'gitFiles', value: string | number | boolean | null) => { slots: SlotOptions; copies: { size?: number } }
+  /** HI-1182: what the project folder uses of submodules and Git LFS, and git-lfs's version; null when git couldn't say. */
+  'slots:gitFiles': (projectPath: string) => GitFilesStatus | null
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
@@ -451,6 +478,13 @@ export interface CombworkRequests {
   'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
+  /** A stale jj slot recovered (HI-2866): the user's explicit action, with what it did (HI-2996); a protocol code when refused. */
+  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string; divergent?: SlotRecoverDivergent }
+  /** HI-3032: a slot kept for a card with its folder gone, removed (Remove…): only that card's record at that generation. */
+  /** `forgotten` (HI-3097): the mode the user confirmed, its folder there (true) or missing (false); another now: `changed`. */
+  'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string, forgotten: boolean) => { ok: true } | { ok: false; why: string }
+  /** HI-3103: a slot kept for no card whose workspace the user forgot, at the generation shown; anything else: `changed`. */
+  'slots:removeForgotten': (projectPath: string, slot: string, generation: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
   /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */
@@ -466,14 +500,25 @@ export interface CombworkRequests {
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
+  /** HI-3177: purges the merge queue history of exactly these past branches (the ones the user confirmed), or of none, refused, if any isn't past now. */
+  'queue:purgeHistory': (projectPath: string, targets: string[]) => void
   /** HI-2679: brings `to` up to date with `from` (a forward merge through `to`'s queue), as the user. */
-  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean }
+  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean; localAhead?: number }
   /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
+  /**
+   * HI-2944: Commit or Set aside exactly `shown`, the uncommitted changes in the folder `target` is checked out in (main
+   * finds it), only while that is still the folder they were seen in: a paused merge's own record (`pause` as shown:
+   * refused unless that pause is still current, and the queue resumed only if it still is and its condition is gone), or
+   * a start's warning's (`folder`, with `pause` null).
+   */
+  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null) => QueueChangesSettled
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
   'queue:retry': (n: number, reason?: string) => TaskCard
+  /** HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder. */
+  'queue:resolve': (n: number, reason?: string) => TaskCard
   /** Adds the project's .combwork to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeCombwork': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .combwork git tracks (#364), for the confirmation before untracking them. */
@@ -532,6 +577,7 @@ export interface CombworkRequests {
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
   /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
+  'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   /** A change; with `more`, its comment and the dialog's drafts (HI-1700) in the same change. */
@@ -540,7 +586,7 @@ export interface CombworkRequests {
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
    */
-  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null }) => TaskMoveResult
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null; released?: string }) => TaskMoveResult
   /** The columns a card can be moved to under its rules (#1275): where a drag may drop it; null: every column (no rule applies). */
   'tasks:columns': (n: number) => TaskColumn[] | null
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
@@ -571,7 +617,7 @@ export interface CombworkRequests {
   /** To the Recycle Bin. */
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
-  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[] }
+  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
@@ -937,6 +983,14 @@ export interface CombworkRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * The user edits a running lane's list (HI-2898, Progress → Lanes): moves, adds or removes a queued card, cancels its
+   * queued change, moves a card here from another lane, or undoes such an edit. Applied or queued as `cw_lane start` is;
+   * refused, with nothing changed, once the lane's list moved on from the revision the edit names.
+   */
+  'lanes:edit': (edit: LaneEdit) => LaneEditResult
+  /** The window's workspace's lanes that ended at or after `since` (an ISO time, HI-2898: today's, from local midnight). */
+  'lanes:endedSince': (since: string) => LaneInfo[]
   /** The user retries a lane's new conversations no more tried (HI-2034: an agent busy as the lane started): how many. */
   'lanes:retryFresh': (laneId: string) => number
   /** Test copies only (HI-2034): a lane agent owed its new conversation, as a busy start leaves it, `minutesAgo` since. */
@@ -950,6 +1004,11 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /**
+   * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
+   * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.
+   */
+  'lanes:releaseCheck': (projectPath: string, builder: string, target: string | null) => { target: string; text: Text } | null
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).
@@ -1052,6 +1111,8 @@ export interface CombworkRequests {
   'files:gitUntrack': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
   /** Include again: removes the plain line that ignores the item. */
   'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** HI-2944: Commit it, after a shared exclude: the top .gitignore as it is now, committed alone on the project folder's branch. */
+  'files:gitCommitIgnore': (projectPath: string) => FolderChangesDone
   /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
   'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 
@@ -1080,7 +1141,29 @@ export interface CombworkRequests {
   'git:tool': (recheck?: boolean) => GitTool
   /** The Git view (#607), the project folder's only (agents' worktrees change through the merge flow). The user's: no agent tool reaches these. */
   'git:summary': (projectPath: string) => GitRepoSummary
+  /** A jj project's views (HI-2799): read-only, pinned at the single operation head; the user's window only. */
+  'jj:repo': (projectPath: string) => JjView<JjRepoView>
+  'jj:history': (projectPath: string) => JjView<JjHistoryView>
+  'jj:bookmarks': (projectPath: string) => JjView<JjBookmarksView>
+  'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
+  'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
+  /** jj's operations, newest first, a page from the head or from `from` (HI-2800). */
+  'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
+  /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
+  'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
+  /** HI-2869: the passed jj cards with their last containment observation for exactly their approval. */
+  'jj:waiting': (projectPath: string) => JjWaitingCard[]
+  /** HI-2938: Run Checks Again for a jj card's candidate whose checks were stopped or keep failing; whether it did. */
+  'jj:candidateChecksAgain': (projectPath: string, card: number) => boolean
+  /** HI-2869: a page of the publish records to check (J9b2's checkThis), after a cursor. */
+  'jj:toCheck': (projectPath: string, after?: { target: string; checkAt: number; card: string; cycle: number; bundle: string } | null) => { rows: JjToCheckRow[]; more: boolean }
+  /** HI-2869: Mark as checked, the user's acknowledgement (false: the record changed meanwhile). */
+  'jj:markChecked': (projectPath: string, row: { target: string; card: string; cycle: number; bundle: string; checkAt: number }) => boolean
+  /** HI-2869: what an interrupted or lost set-up left (after a prune of the ones proved gone). */
+  'jj:leftovers': (projectPath: string) => { rows: JjLeftover[]; total: number }
   'git:info': (projectPath: string) => GitRepoInfo
+  /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
+  'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops

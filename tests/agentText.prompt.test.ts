@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
-import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt } from '../src/shared/tasks'
+import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt, taskStartPrompt } from '../src/shared/tasks'
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
 import { laneNextWaitReason } from '../src/main/cardStall'
@@ -37,6 +37,9 @@ function prompts(): { name: string; text: string }[] {
         for (const cs of [[], comments.slice(0, 1), comments, [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }]])
           for (const a of [0, 1, 12])
             out.push({ name: `prompt ${withTools} ${inLane} ${from} ${cs.length} ${a}`, text: taskPrompt({ ...card, comments: cs, blockedBy: a ? [3, 4] : [] } as never, withTools, { from, note: 'Only the tests.', inLane, attachments: atts(a) }) })
+  // HI-2854: the whole card, the agent's already.
+  const decisions = [{ id: 'd1', text: 'Items 2 to 5 only.', decidedBy: 'user', recordedBy: 'Assistant', at: '2026-10-03T10:00:00Z' }]
+  for (const inLane of [true, false]) out.push({ name: `whole ${inLane}`, text: taskStartPrompt({ ...card, comments, decisions } as never, true, { inLane, yours: true, wholeMax: 6000 }).text })
   const ok = [
     { ref: 'docs/A.md#intro', size: 1234 },
     { ref: 'docs/B.md', size: 23456 },
@@ -61,6 +64,9 @@ function stalls(): { name: string; text: string | null }[] {
   const review = { ...doing, column: 'review', history: [{ at: at(125), by: 'You', what: 'Moved to Review' }] }
   const out: { name: string; text: string | null }[] = [
     { name: 'no agent', text: stalledReason({ ...doing, agent: null } as never, null) },
+    // HI-2959: a returned forward merge, and one returned for its direction.
+    { name: 'forward waits', text: stalledReason({ ...doing, agent: null } as never, null, undefined, { from: 'main', to: 'main', removeOnly: false }) },
+    { name: 'forward remove only', text: stalledReason({ ...doing, agent: null } as never, null, undefined, { from: 'main', to: 'main', removeOnly: true }) },
     { name: 'removed', text: stalledReason(doing as never, null) },
     { name: 'removed unnamed', text: stalledReason({ ...doing, agentName: null } as never, null) },
     { name: 'not running', text: stalledReason(doing as never, { name: 'Agent2', running: false }) },
@@ -134,7 +140,7 @@ function briefs(): { name: string; text: string }[] {
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
   out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as const)
-    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
+    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates'] as const)
       for (const okBefore of [{ mode: 'every' }, { mode: 'labels', labels: ['ui'] }])
         out.push({ name: `rules ${review} ${finish} ${okBefore.mode}`, text: laneRules({ review, finish, preChecks: ['lint'], okBefore, target: 'main' } as never).join('\n') })
   out.push({ name: 'rules off', text: laneRules(null).join('\n') })

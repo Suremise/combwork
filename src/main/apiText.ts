@@ -106,6 +106,8 @@ export const API = {
     saidReviewed: agentMsg({ id: 'api.card.saidReviewed', text: 'Reviewed' }),
     saidSkipsReview: agentMsg({ id: 'api.card.saidSkipsReview', text: 'Skips review' }),
     saidTarget: agentMsg({ id: 'api.card.saidTarget', text: "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}", note: 'HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project\'s Work merges into.' }),
+    targetReleased: agentMsg({ id: 'api.card.targetReleased', text: "{target} is released ({tag}, merged into {into}): {card}'s start there is refused unless the user OKs work on {target} (a hotfix), given as override.released {target}.{has, select, yes { Did you mean {suggest}?} other {}}", note: 'HI-3148: below a card update or new card whose Merges into ({target}) is already released: tagged ({tag}) and merged into the default branch ({into}). {suggest}: a branch that exists and isn’t released.' }),
+    ownTarget: agentMsg({ id: 'api.card.ownTarget', text: "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to \"\" (its project's).", note: 'HI-3017: below a card update (HI-3043: or a new card) that gave the card a target other than its project\'s ({default}). Setting cards before the project pinned them, unnoticed (HI-3004\'s trials of assistant-retarget-release).' }),
     setReviewed: agentMsg({ id: 'api.card.setReviewed', text: 'set it to be reviewed' }),
     setSkipReview: agentMsg({ id: 'api.card.setSkipReview', text: 'set it to skip review' }),
     stayInProject: agentMsg({ id: 'api.card.stayInProject', text: 'Cards stay in your project ({project}).' }),
@@ -140,12 +142,15 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
     pauseAQueue: agentMsg({ id: 'api.change.pauseAQueue', text: 'pause a merge queue' }),
     forwardAny: agentMsg({ id: 'api.change.forwardAny', text: 'bring a branch up to date with another' }),
+    resolveForwardAny: agentMsg({ id: 'api.change.resolveForwardAny', text: 'hand a returned forward merge to a builder' }),
+    resolveForward: agentMsg({ id: 'api.change.resolveForward', text: 'hand {card} to a builder to resolve', note: 'HI-2959: Resolve on a builder on a forward merge card the queue returned.' }),
     createBranchAny: agentMsg({ id: 'api.change.createBranchAny', text: 'create a branch' }),
     createBranch: agentMsg({ id: 'api.change.createBranch', text: 'create the branch {name} from {from} in {project}', note: 'HI-2807: cw_branch create. {from}: a branch, tag or commit as named.' }),
+    dismissOffer: agentMsg({ id: 'api.change.dismissOffer', text: 'put off the release offer of {project}', note: 'HI-3155: cw_branch dismissOffer (the user’s Not now).' }),
     nextVersion: agentMsg({ id: 'api.change.nextVersion', text: 'start the next version of {project}', note: 'HI-2807: cw_branch nextVersion.' }),
     retargetAny: agentMsg({ id: 'api.change.retargetAny', text: "move cards and slots to a project's new target" }),
     retarget: agentMsg({ id: 'api.change.retarget', text: 'move cards and slots from {from} to {to} in {project}' }),
-    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
+    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}', note: 'HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice).' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
     planTemplate: agentMsg({ id: 'api.change.planTemplate', text: 'plan loading a template' }),
@@ -177,6 +182,7 @@ export const API = {
     isolatedNeedsCheck: agentMsg({ id: 'api.check.isolatedNeedsCheck', text: '--isolated runs a check in a copy of its own: use it with --check <name>' }),
     leaseArgs: agentMsg({ id: 'api.check.leaseArgs', text: 'lease, pid, after and before are required' }),
     noVcs: agentMsg({ id: 'api.check.noVcs', text: 'This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card\'s files' }),
+    noCopies: agentMsg({ id: 'api.check.noCopies', text: "This project's version control has no check copies yet: run the check again without --isolated, in the card's slot", note: 'HI-2868: an isolated check asked for on a platform with slots but no check copies (jj in 1.5.0).' }),
     onlyIsolated: agentMsg({ id: 'api.check.onlyIsolated', text: 'Only an agent\'s isolated check puts its launcher in a check copy\'s job' }),
     waiting: agentMsg({ id: 'api.check.waiting', text: 'waiting for {what}' })
   },
@@ -250,10 +256,12 @@ export const API = {
     promptedFresh: agentMsg({ id: 'api.done.promptedFresh', text: 'Gave {agent} in {project} a task in a new conversation' }),
     queuePaused: agentMsg({ id: 'api.done.queuePaused', text: 'Paused the merge queue for {target} in {project}' }),
     branchCreated: agentMsg({ id: 'api.done.branchCreated', text: 'Created {name} from {from} ({commit}) in {project}', note: 'HI-2807: {commit} is a short hash.' }),
+    offerDismissed: agentMsg({ id: 'api.done.offerDismissed', text: 'Put off the release offer of {project} until it changes', note: 'HI-3155: what the Assistant’s dismissOffer did (stored, said in the Default).' }),
     nextVersionStarted: agentMsg({ id: 'api.done.nextVersionStarted', text: 'Started {name} from {from} ({commit}) in {project}: {added, select, yes {{from} added to the other branches work can merge into, } other {}}work merges into {name} now', note: 'HI-2807: Start the next version. {commit} is a short hash.' }),
     retargeted: agentMsg({ id: 'api.done.retargeted', text: 'Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why' }),
-    forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: '{to} has everything of {from} already: nothing queued' }),
-    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}" }),
+    forwardResolved: agentMsg({ id: 'api.done.forwardResolved', text: 'Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged', note: 'HI-2959: Resolve on a builder’s reply. {card}: the new card; {forward}: the forward merge card it ended; {source}: a short commit id.' }),
+    forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: "{to} has everything of {from} already: nothing queued{ahead, plural, =0 {} one {. {aheadTotal} commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. {aheadTotal} commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}", note: 'HI-3126: ahead, under follow mode, the commits of the local branch its remote lacks (0: none), for its plural; aheadTotal: the same number as written (HI-3151).' }),
+    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{override, select, yes {Recorded the user’s override on {card}, the resolution bringing {to} up to date with {from}: its builder is told to submit it again} other {{card} is bringing {to} up to date with {from} already}}}}{ahead, plural, =0 {} one {. {aheadTotal} commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. {aheadTotal} commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}", note: 'HI-3126: ahead, under follow mode, the commits of the local branch {from} its remote lacks, left out (0: none), for its plural; aheadTotal: the same number as written (HI-3151). HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card. HI-3040: queued no with override yes: the override was recorded on the resolution the queue returned for its direction.' }),
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
@@ -320,6 +328,8 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.journal.onlyAssistant', text: 'Only the Assistant keeps a journal.' })
   },
   lane: {
+    releasedArg: agentMsg({ id: 'api.lane.releasedArg', text: 'released takes target and reason: the released branch the lane starts on, as its refusal named it, and the user’s reason', note: 'HI-3148: POST /v1/lanes with a released that isn’t one.' }),
+    releasedNotYours: agentMsg({ id: 'api.lane.releasedNotYours', text: 'Only the user or the Assistant starts work on a released branch: ask the user', note: 'HI-3148: a project agent or a script passing released.' }),
     agentStartsOwn: agentMsg({ id: 'api.lane.agentStartsOwn', text: 'An agent starts its own lane, as its builder: a reviewer joins its builder\'s lane (join)' }),
     applyNowArg: agentMsg({ id: 'api.lane.applyNowArg', text: 'applyNow must be true or false' }),
     briefMax: agentMsg({ id: 'api.lane.briefMax', text: 'brief is at most {max} characters' }),
@@ -389,7 +399,7 @@ export const API = {
   project: {
     nameRequired: agentMsg({ id: 'api.project.nameRequired', text: 'name is required' }),
     stopBeforeDeactivating: agentMsg({ id: 'api.project.stopBeforeDeactivating', text: 'Stop the running session before deactivating the project' }),
-    vcsGit: agentMsg({ id: 'api.project.vcsGit', text: 'git at {root}{subfolder, select, yes { (a subfolder of that repository)} other {}}', note: 'The version control found in a project folder.' }),
+    // HI-3140: what each platform found in a project folder says is its own (platform/agentPresentation.ts).
     vcsUnsupported: agentMsg({ id: 'api.project.vcsUnsupported', text: '{name} (not supported: None)' })
   },
   provider: {
@@ -402,6 +412,8 @@ export const API = {
     retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
     retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
     branchArgs: agentMsg({ id: 'api.queue.branchArgs', text: 'name and from are required: the new branch and where it starts (a branch, a tag or a commit)', note: 'HI-2807: cw_branch create without them.' }),
+    nextVersionArgs: agentMsg({ id: 'api.queue.nextVersionArgs', text: "from is required: the project's Work merges into as you read it, the release the next version starts from (refused if it moved on)", note: 'HI-3114: cw_branch nextVersion without from.' }),
+    overrideArg: agentMsg({ id: 'api.queue.overrideArg', text: 'override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction', note: 'HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true.' }),
     forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },

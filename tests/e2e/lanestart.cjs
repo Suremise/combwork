@@ -4,7 +4,9 @@
 // stopped, is started), the lane shows in the Progress panel, its menu has End Lane and Abandon Lane…, Abandon asks
 // first, End ends it; the Lanes tab's Start Lane… starts another, which Abandon ends. B1 is given its first card and its
 // brief in one task, one turn, with no "end your turn, it's coming" round (HI-2558). Screenshots of the dialog and the
-// lane's menu in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// lane's menu in both themes. HI-3148: Start Lane… on a released branch (1.0.0, tagged v1.0.0 and in main) says so,
+// its Start Anyway needs a reason, and the lane's card is then started on 1.0.0 under the lane's grant. Dev build,
+// throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -32,6 +34,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.git(alpha, ['branch', '-M', 'main'])
+  // HI-3148: 1.0.0 released: a branch whose annotated tag v1.0.0 is in its history, its head in main's.
+  lib.git(alpha, ['branch', '1.0.0'])
+  lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'tag', '-a', 'v1.0.0', '-m', 'release 1.0.0', '1.0.0'])
   // The lane's slot too (#1438): its builder works in slot-a, a new branch per card.
   const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), slotA.toLowerCase()]))
@@ -54,7 +59,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // A reviewer agent reviews each card: the brief says so.
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', preChecks: ['typecheck'], commands: { typecheck: 'npm run typecheck' } } })
+    const options = { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', preChecks: ['typecheck'], commands: { typecheck: 'npm run typecheck' } }
+    await inv('workflow:setOptions', alpha, { preset: null, options })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -235,6 +241,65 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Back in Todo for what follows, as it was before Combwork's start.
     if (cStarted) await inv('tasks:move', c.number, 'todo', { confirm: true, reason: 'the e2e puts it back' })
 
+    // --- HI-3168: a lane of B1's while the first lane's card (in Doing) still holds slot-a (below) says which slot and
+    // card it waits for, in its status and its row in the Progress panel's Lanes tab. Abandoned before the slot is freed.
+    const heldKey = (await card(chosen[0]))?.key
+    const waitOn = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c.number], note: '' })
+    check('a lane of B1’s while its first lane’s card holds slot-a waits for a slot', !!waitOn?.waitingForSlot && (await card(chosen[0]))?.column === 'doing', JSON.stringify({ waitingForSlot: waitOn?.waitingForSlot, held: (await card(chosen[0]))?.column }))
+    const heldStatus = await until(async () => {
+      const s = (await lanes()).find((l) => l.id === waitOn?.lane?.id)?.status
+      return s?.reason === 'slot' && s.held === 'card' && s.slot === 'slot-a' && s.heldFor === chosen[0] && s.agent === 'B1' ? s : null
+    }, HUNG_MS)
+    check('…its status names slot-a, B1 and the card holding it', !!heldStatus, JSON.stringify((await lanes()).find((l) => l.id === waitOn?.lane?.id)?.status))
+    const heldWhy = panel.locator(`.progress-tab-lanes .progress-lane[data-lane="${waitOn?.lane?.id}"] .progress-lane-why`)
+    const heldSaid = `waiting for a slot: B1 still builds in slot-a for ${heldKey}, which keeps it until that card is Done or put back`
+    check(`…its row in the Progress panel says "${heldSaid}"`, !!(await until(async () => ((await heldWhy.textContent().catch(() => '')) ?? '') === heldSaid, HUNG_MS)), await heldWhy.textContent().catch(() => ''))
+    await shoot('lane-slot-card', panel)
+    if (waitOn?.lane?.id) await inv('lanes:end', waitOn.lane.id, true)
+    check('…abandoned, its card never started', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === waitOn?.lane?.id)?.state === 'abandoned', HUNG_MS)) && (await card(c.number))?.column === 'todo', JSON.stringify(await card(c.number)))
+
+    // --- B1's slot freed for the lanes that follow (HI-3162). The first lane ended with its card in Doing, and that card
+    // keeps its lease on slot-a (HI-3118), so every later lane of B1's is refused a slot (one agent, one slot: "this
+    // agent already builds in slot-a for" that card) and waits for one, paused, "waiting for a slot": none of their cards is
+    // started until that card is Done or put back. Put back here, as the user would.
+    if ((await card(chosen[0]))?.column === 'doing') await inv('tasks:move', chosen[0], 'todo', { confirm: true, reason: 'the e2e frees its slot' })
+    check(`the first lane's card ${chosen[0]} is back in Todo, freeing slot-a`, !!(await until(async () => (await card(chosen[0]))?.column === 'todo', HUNG_MS)), JSON.stringify(await card(chosen[0])))
+
+    // --- HI-3148: Start Lane… on 1.0.0, released. The dialog says so before Start, naming the tag and main to start on
+    // instead; Start Anyway waits for a reason; given one, the lane starts on 1.0.0 and its card is started there by
+    // Combwork under the lane's grant (nobody else could: a start onto 1.0.0 is refused).
+    const factsOf = async (n) => (await inv('tasks:facts', n)) ?? []
+    const b1Quiet = async () => !(await live(b1.id)) || ['ready', 'finished'].includes((await live(b1.id))?.status)
+    await inv('workflow:setOptions', alpha, { preset: null, options: { ...options, otherTargets: ['1.0.0'] } })
+    const h1 = (await inv('tasks:create', { title: 'Hotfix 1.0.1', project: 'alpha' })).number
+    await until(b1Quiet, HUNG_MS)
+    // Start Lane from Todo with only the hotfix card in its list.
+    await openFromTodo()
+    await until(async () => (await order()).length > 0, HUNG_MS)
+    for (const x of await order()) if (x !== h1) await dialog.locator(`.lane-start-cards > li[data-card="${x}"] button[aria-label^="Take"]`).click()
+    // The new card reaches the window's Todo after the dialog may have opened: added from the picker if missing.
+    if (!(await order()).includes(h1)) await dialog.locator('.lane-start-add').selectOption(String(h1))
+    check('Start Lane with only the hotfix card', !!(await until(async () => JSON.stringify(await order()) === JSON.stringify([h1]), HUNG_MS)), JSON.stringify(await order()))
+    const pickTarget = dialog.locator('#lane-start-target')
+    check('Start Lane offers Merges into 1.0.0', !!(await until(async () => (await pickTarget.count()) === 1 && (await pickTarget.locator('option[value="1.0.0"]').count()) === 1, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await pickTarget.selectOption('1.0.0')
+    const warn = dialog.locator('[data-lane-released="1.0.0"]')
+    check('…picked, it says 1.0.0 is released, naming its tag and main to start on instead', !!(await until(async () => (await warn.count()) === 1 && /^1\.0\.0 is released \(v1\.0\.0, tagged .+, merged into main\)\. Did you mean main\?/.test(await warn.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const anyway = dialog.getByRole('button', { name: 'Start Anyway' })
+    check('…its button is Start Anyway, off until a reason is given', (await anyway.count()) === 1 && (await anyway.isDisabled()), await dialog.innerText().catch(() => ''))
+    await dialog.locator('[data-lane-released-reason]').fill('hotfix 1.0.1')
+    check('…on with a reason', !(await anyway.isDisabled()))
+    await shoot('released', dialog)
+    await anyway.click()
+    check('…Start Anyway closes the dialog', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const hot = await until(async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === h1)) ?? null, HUNG_MS)
+    check('…the lane is recorded on 1.0.0', hot?.target === '1.0.0', JSON.stringify(hot))
+    const hotStart = await until(async () => (await factsOf(h1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
+    check("…and its card is started on 1.0.0 by Combwork, under the lane's grant", hotStart?.data?.target === '1.0.0', JSON.stringify({ hotStart, facts: (await factsOf(h1)).map((f) => f.kind) }))
+    // Back as it was for what follows: the lane abandoned, its card in Todo.
+    if (hot) await inv('lanes:end', hot.id, true)
+    if ((await card(h1))?.column === 'doing') await inv('tasks:move', h1, 'todo', { confirm: true, reason: 'the e2e puts it back' })
+
     // --- HI-1995: Apply now. A lane of two, its first card started (B1 placed in the lane's slot); Start Lane for B1 with
     // the other card offers Apply now, which puts the first back in Todo and applies the new order.
     // Then, that second card in Review, the dialog says why it can't apply now. Screenshots of both.
@@ -249,7 +314,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await until(quiet, HUNG_MS)
     // HI-2029: nobody starts it: Combwork gives the lane's first card to B1 once B1 is free (the lane started over it).
     const facts = async (n) => (await inv('tasks:facts', n)) ?? []
-    check("…its first card started by Combwork on B1, with no one starting it (HI-2029)", !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'Started' && f.actor === 'combwork') && (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify(await facts(d1)))
+    check("…its first card started by Combwork on B1, with no one starting it (HI-2029)", !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'Started' && f.actor === 'combwork') && (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ facts: (await facts(d1)).map((f) => f.kind), lane: (await lanes()).find((l) => l.id === third?.id)?.status ?? null }))
     await until(quiet, HUNG_MS)
     /** Start Lane from the Todo column with only card n left in its list (the other Todo cards taken out). */
     const openWithOnly = async (n) => {

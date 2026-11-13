@@ -1,13 +1,15 @@
 {
   "lease a new copy": [
     "<base>/ws/project :: worktree prune",
-    "<base>/ws/project :: worktree add --detach <base>/ws.worktrees/project/copies/copy-1 <id>"
+    "<base>/ws/project :: worktree add --detach <base>/ws.worktrees/project/copies/copy-1 <id>",
+    "<base>/ws.worktrees/project/copies/copy-1 :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)"
   ],
   "return it": [],
   "lease it again at another revision": [
     "<base>/ws/project :: worktree list --porcelain",
     "<base>/ws.worktrees/project/copies/copy-1 :: checkout --detach --force <id>",
-    "<base>/ws.worktrees/project/copies/copy-1 :: clean -fd"
+    "<base>/ws.worktrees/project/copies/copy-1 :: clean -fd",
+    "<base>/ws.worktrees/project/copies/copy-1 :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)"
   ],
   "remove it": [
     "<base>/ws/project :: worktree remove --force <base>/ws.worktrees/project/copies/copy-1"

@@ -1,0 +1,10 @@
+{
+  "jj": {
+    "version": "0.47.1",
+    "testedAt": "2026-11-09",
+    "download": {
+      "url": "https://github.com/jj-vcs/jj/releases/download/v0.47.1/jj-v0.47.1-x86_64-pc-windows-msvc.zip",
+      "sha256": "72f9f80bc99d07a7f48d5f219cf5bab91f7e906e4b53f6c827948e646cd1152f"
+    }
+  }
+}

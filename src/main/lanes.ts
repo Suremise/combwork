@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -16,11 +16,18 @@ import { CombworkError, saidError } from './combworkError'
 import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
-import { openTable, readTable, saveTable } from './storeTables'
+import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
-import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
-import { targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
+import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
+import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
+import { laneTarget } from './laneTarget'
+import { releaseReadsOf } from './platform/releaseReadsPorts'
+import { isUnknown, unknown } from './platform/types'
+import type { PlatformId } from '../shared/platform/descriptors'
+import { stillAsRead, unreleasedFor } from './platform/releaseReads'
+import { storedAsText } from '../shared/workflow/refusals'
+import { UNREADABLE } from '../shared/workflow/texts'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -34,13 +41,15 @@ import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
 import { factHeadsOf, roundLimitCards, rulesetStages } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
-import { rulesetsNow } from './workflow/rulesets'
+import { rulesetNowAt, rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
 import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
 import { independentIn } from './independent'
+import { admitOrThrow, projectIdOf } from './platform/fenceAdmit'
+import { platformIdOf } from './platform/registry'
 
 const log = createLogger('lanes')
 
@@ -80,6 +89,8 @@ const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
   unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' }),
   targetNotListed: msg({ id: 'service.lanes.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}', description: 'HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
+  released: msg({ id: 'service.lanes.released', defaultMessage: '{target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}). {has, select, yes {Did you mean {suggest}? Start it on {suggest}; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.}}', description: 'HI-3148: a lane’s start refused: the branch it would work on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}). With dated yes, the tag’s own date. With has yes, {suggest} is a branch that exists and isn’t released.' }),
+  releaseUnknown: msg({ id: 'service.lanes.releaseUnknown', defaultMessage: 'Combwork couldn’t check whether {target} is released ({what}). Try again once the repository can be read; for work that has to go on now, the user or the Assistant can start it anyway.', description: 'HI-3148: a lane’s start refused: whether its branch ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read).' }),
   targetMissing: msg({ id: 'service.lanes.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}', description: 'HI-2556: an error starting a lane (a card loop) on a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
   targetFixed: msg({ id: 'service.lanes.targetFixed', defaultMessage: '{builder}’s lane merges into {target} until it ends: start a new lane for another branch. Once {target} has been merged into another branch, a retarget of Work merges into moves the lane and its card there (Also retarget what can move).', description: 'HI-2556, HI-2753: an error changing a running lane’s Merges into (fixed for its life, except through a retarget once its branch has been merged into another). {builder} is the lane’s builder agent, {target} its branch. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there.' }),
   targetCard: msg({ id: 'service.lanes.targetCard', defaultMessage: '{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.', description: 'HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names.' }),
@@ -139,6 +150,8 @@ const A = {
   endNotDone: agentMsg({ id: 'lane.refused.end.notDone', text: 'The lane ends by itself once all its cards are Done: {cards} not yet', note: "cw_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet." }),
   movedOn: agentMsg({ id: 'lane.refused.end.movedOn', text: 'Its cards moved on meanwhile: read the lane again', note: "cw_lane end refused: the lane's cards moved between its read and its save (a card reopened)." }),
   nextEnded: agentMsg({ id: 'lane.refused.next.ended', text: "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "cw_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again." }),
+  nextEndedOpen: agentMsg({ id: 'lane.refused.next.endedOpen', text: "Your lane {lane} was ended with {cards} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with {n, plural, one {that card} other {those cards}}.", note: 'cw_lane next (HI-3118), for an agent whose lane was just ended (by the user, say) while cards of it were still open: never "all its cards are Done". {cards} is their keys, joined with ", "; {n} how many.' }),
+  nextEndedUnknown: agentMsg({ id: 'lane.refused.next.endedUnknown', text: "Your lane {lane} has ended. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "cw_lane next (HI-3118), for an agent whose lane just ended when how its cards stood then wasn't kept: says nothing of them." }),
   nextAbandoned: agentMsg({ id: 'lane.refused.next.abandoned', text: "Your lane {lane} was abandoned: don't start it again; ask the user if there is more to do.", note: 'cw_lane next, for an agent whose lane was just abandoned (HI-2273).' }),
   nextNone: agentMsg({ id: 'lane.refused.next.none', text: 'No running lane of yours: start one with cw_lane start, or ask the user', note: 'cw_lane next, for an agent with no running lane.' }),
   journal: agentMsg({ id: 'lane.journal.fact', text: 'Lane {named, select, yes {"{name}" } other {}}{state, select, started {started} ended {ended} merged {ended, merged at {commit}} other {abandoned}}: {who}, {cards}', note: "A lane's start or end as a fact in the Assistant's journal (#1031), stored: {who} is \"builder / reviewer\", {cards} its cards; {named} yes when the lane has a name ({name})." })
@@ -255,7 +268,8 @@ export function onLanesWritten(fn: () => void): () => void {
   return () => writtenListeners.delete(fn)
 }
 
-async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void, also?: (db: Writer) => void): Promise<void> {
+async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void, also?: (db: Writer) => void, inBoard = false): Promise<void> {
+  bumpListRevs(lanes)
   const ids = await ws.projectIds()
   const stamped = keptLanes(lanes, Date.now()).map((l) => {
     const saved = savedProjectName(l.project)
@@ -267,14 +281,37 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
   const gen = readGens.get(lanes)
   const seen = readAs.get(lanes)
   const path = ws.path!
-  await saveTable(path, 'lanes', stamped, {}, () => {
+  const guard = (): void => {
     if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
     // Another writer (the runtime, #1270) changed the lanes since they were read: nothing is saved over it.
     if (seen !== undefined && boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== seen) throw new StaleRead('the lanes changed since they were read') // i18n-ignore: internal, caught and retried (never shown)
     // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.
     check?.()
-  }, also)
+  }
+  // Inside a board change (HI-2898: a window's lane edit with the card it changes), in its transaction: the listeners
+  // are told once it commits (mutateInBoard).
+  if (inBoard) {
+    if (also) throw new Error('a lane save inside a board change takes no extra writes') // i18n-ignore: a mistake in Combwork's code, never shown
+    return saveTableInBoard(ws, 'lanes', stamped, guard)
+  }
+  await saveTable(path, 'lanes', stamped, {}, guard, also)
   for (const fn of writtenListeners) fn()
+}
+
+/**
+ * Each lane whose list (`cards` or `pending`) this save changes from what was read gets the next list revision
+ * (HI-2898, LaneRecord.listRev); a new lane keeps none (0). Before the save, so the revision is in its transaction.
+ */
+function bumpListRevs(lanes: LaneRecord[]): void {
+  const seen = readAs.get(lanes)
+  if (seen === undefined) return
+  const was = new Map<string, { cards?: unknown; pending?: unknown }>()
+  for (const v of JSON.parse(seen) as unknown[]) if (v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string') was.set((v as { id: string }).id, v as { cards?: unknown; pending?: unknown })
+  for (const l of lanes) {
+    const w = was.get(l.id)
+    if (!w) continue
+    if (JSON.stringify(w.cards ?? null) !== JSON.stringify(l.cards) || JSON.stringify(w.pending ?? null) !== JSON.stringify(l.pending ?? null)) l.listRev = (l.listRev ?? 0) + 1
+  }
 }
 
 /**
@@ -360,6 +397,31 @@ async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks:
     await write(ws, lanes, () => checks.forEach((c) => c()), (db) => also.forEach((w) => w(db)))
     return r
   }))
+  changed(ws)
+  return result
+}
+
+/**
+ * A change of the lanes saved with changes of the board, in one transaction (HI-2898: a window's lane edit and the card
+ * assignment it makes). Under the lanes' lock, as mutate: the lanes are read first (before the board's change, which
+ * holds every card change while it runs), then `decide` works out the change from them, with the awaited reads it needs;
+ * then, inside one board change, `commit` makes the card changes (through the card-change owner, re-entrant into this
+ * change) and the checks run with the lanes' save. A refusal, a check, or a stale read (the runtime changed the lanes
+ * meanwhile: decided again from a fresh read, as mutate) rolls all of it back. Listeners are told after it commits.
+ */
+export async function mutateInBoard<D, T>(ws: WorkspaceService, decide: (lanes: LaneRecord[]) => Promise<D>, commit: (lanes: LaneRecord[], d: D, checks: (() => void)[]) => Promise<T>): Promise<T> {
+  if (!ws.path) throw new LaneError(409, M.noWorkspace)
+  const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
+    const lanes = await read(ws)
+    const d = await decide(lanes)
+    return boardWrite(ws, async () => {
+      const checks: (() => void)[] = []
+      const r = await commit(lanes, d, checks)
+      await write(ws, lanes, () => checks.forEach((c) => c()), undefined, true)
+      return r
+    })
+  }))
+  for (const fn of writtenListeners) fn()
   changed(ws)
   return result
 }
@@ -564,7 +626,24 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
   const deps = await dueDepsOf(ws, lanes, cards)
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined)))
+  // Each running lane's Merges into against its project's own now (HI-3113): one left on the release by Start the next
+  // version names it, though its ruleset id marks none.
+  const defaults = new Map<string, string | null>()
+  const targets = new Map<string, string | null>()
+  const nowOn = new Map<string, string>()
+  for (const l of lanes.filter((x) => running(x) && x.ruleset)) {
+    const key = l.project.toLowerCase()
+    if (!defaults.has(key)) defaults.set(key, (await projectTargetsOf(ws, l.project))?.default ?? null)
+    const other = otherThanOwn(laneTarget(ws, l), defaults.get(key))
+    targets.set(l.id, other)
+    // HI-3142: one left on the release by Start the next version, its ruleset unmarked (its G7 the old Work merges into):
+    // compared with the project's rules now on that target, so its Merges into alone isn't old rules.
+    if (other && !targetOfRulesetId(l.ruleset!)) {
+      const at = await rulesetNowAt(ws, l.project, other)
+      if (at) nowOn.set(l.id, at)
+    }
+  }
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, nowOn.get(l.id) ?? current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined, targets.has(l.id) ? targets.get(l.id) : undefined)))
 }
 
 /**
@@ -793,10 +872,19 @@ function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] 
   })
 }
 
-/** Checked under the board's lock (#1270): the lane's cards are still all Done (gone ones aside), else nothing is saved. */
+/**
+ * Checked under the board's lock (#1270): the lane still has no card of its own left to do (allDone: each Done, gone, or
+ * held elsewhere, HI-3117, as stillBetweenCards reads an owner), else nothing is saved.
+ */
 const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
   const places = placesOf(ws, l, cards)
-  if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
+  const owners = cardOwnersNow(ws, cards)
+  // Given to another agent (allDone's givenAway): a card given to none stays the lane's to wait for (HI-3118).
+  const others = (n: number): boolean => {
+    const o = owners.get(n)
+    return !!o?.agent && o.agent !== l.builder.id
+  }
+  if (!places.every((c, i) => c === 'done' || c === 'gone' || others(cards[i]))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
 }
 
 /**
@@ -805,15 +893,34 @@ const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly numbe
  * lane's by cardOwnersNow).
  */
 const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
+  if (ownInFlight(ws, l, cards)) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
+}
+
+/** Who reviews each card now, as the board has it (its review's agent; null: none), on one read (HI-3118). */
+function reviewOwnersNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, string | null> {
+  if (!numbers.length) return new Map()
+  return boardRead(ws, (db) => new Map((db.prepare(`SELECT number, review_agent FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; review_agent: string | null }[]).map((r) => [r.number, r.review_agent]))) // i18n-ignore: SQL
+}
+
+/** Whether one of a lane's own cards (HI-1821: not another agent's or lane's) is in flight now: Doing, Review or Passed. */
+function ownInFlight(ws: WorkspaceService, l: LaneRecord, cards: readonly number[]): boolean {
   const places = cardPlacesNow(ws, cards)
   const owners = cardOwnersNow(ws, cards)
-  const flying = cards.some((n) => {
+  return cards.some((n) => {
     const c = places.get(n)
     const o = owners.get(n)
     const own = o?.agent ? o.agent === l.builder.id : !o?.lane || o.lane === l.id
     return !!c && !c.archived && same(c.project, l.project) && FLYING.has(c.column) && own
   })
-  if (flying) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
+}
+
+/**
+ * A running lane's list as its next start reads it (HI-3118): its queued list once none of its own cards is in flight
+ * (the boundary has passed, so the queue applies at the next start), else its list. Read only: the queue stays queued
+ * for its boundary writer (applyLaneList, the runtime's applyLaneBoundary).
+ */
+export function effectiveCards(ws: WorkspaceService, l: LaneRecord): number[] {
+  return l.pending?.length && !ownInFlight(ws, l, l.cards) ? [...l.pending] : [...l.cards]
 }
 
 const FLYING: ReadonlySet<string> = new Set(['doing', 'review', 'passed'])
@@ -836,6 +943,24 @@ function listChange(v: LaneInfo, was: readonly number[], cards: readonly number[
   const removal = sameList(was.filter((n) => cards.includes(n)), cards)
   if (removal && flying.every((n) => cards.includes(n))) return { behind: null, check: was.filter((n) => !cards.includes(n)) }
   return { behind: flying[0] ?? null, check: [...was] }
+}
+
+/**
+ * Gives a running lane a new list (`cards`), as Combwork owns it (#1270, §16.11.1): with the rules on, a change while a
+ * card of it is in flight is queued for the next card boundary (`pending`), never refused; between cards it applies now,
+ * checked as it saves (stillBetweenCards, pushed onto `checks`). With rules off, at once. Returns the card in flight it
+ * was queued after, or null. The one place a lane's list changes for cw_lane start and the window's edits (HI-2898).
+ */
+export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], on: boolean, checks: (() => void)[]): Promise<number | null> {
+  const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
+  if (change && change.behind !== null) {
+    was.pending = [...cards]
+    return change.behind
+  }
+  if (change) checks.push(stillBetweenCards(ws, was, change.check))
+  was.cards = [...cards]
+  delete was.pending
+  return null
 }
 
 const sameList = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((n, i) => n === b[i])
@@ -1015,6 +1140,11 @@ export interface StartLane {
    */
   applyNow?: boolean
   /**
+   * HI-3148: the user's or the Assistant's override of a new lane on a released line (a hotfix lane): the line it is given
+   * for (the lane's Merges into as the refusal named it; another is refused again), why, and who.
+   */
+  released?: { target: string; reason: string; by: 'user' | 'assistant' }
+  /**
    * A new card placed on the builder's lane as it is made (HI-2167, cw_create_task's lane): the list is the running
    * lane's, as read under the lock (its queued list when it has one), with the card added last or `next` (before its first
    * card still in Todo); with no running lane, a new lane of the card alone, or refused when `needsLane`. `cards` is
@@ -1135,8 +1265,9 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   const state = wf.state(wf.store.card(flying.number))
   const folder = state.started?.folder
   if (folder && folder !== 'project') {
-    const { slotWorkspaces } = await import('./platform/workspacePorts')
-    const d = await slotWorkspaces().dirty(folder)
+    const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
+    // A non-colocated jj slot (HI-2896): Git can't read it, and jj can't see unrecorded edits without a snapshot: kept.
+    const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder)
     if (!Array.isArray(d) || d.length) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   }
   const { runIntent, CW_LANE_START } = await import('./tasks')
@@ -1185,9 +1316,21 @@ function carriedNote(builder: string, from: LaneRecord | null, ownName: boolean)
   return say(A.carriedBrief, { builder, lane: from.id, what: brief && name ? 'both' : brief ? 'brief' : 'name' })
 }
 
-/** A project's targets (HI-2556), or null: not a Git project, or none readable. */
+/** HI-2944: a lane's target's folder with uncommitted changes, told to the window; the warning for the caller, or null. */
+async function targetChangesWarning(ws: WorkspaceService, projectPath: string, target: string | null): Promise<string | null> {
+  if (!target) return null
+  const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
+  return wf ? wf.targetChangesWarning(target) : null
+}
+
+/** A project's targets (HI-2556), or null: none readable. */
 async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<ProjectTargets | null> {
   return ws.path ? await projectTargets(ws, join(ws.path, project)).catch(() => null) : null
+}
+
+/** A project's own Merges into (HI-2556: its Work merges into), for a lane's target check (HI-2898's window edits); null: none. */
+export async function laneDefaultTarget(ws: WorkspaceService, project: string): Promise<string | null> {
+  return ws.path ? ((await projectTargetsOf(ws, project))?.default ?? null) : null
 }
 
 /** A lane's Merges into as a start names it (HI-2556): null for the project's own, else a branch it lists; refused otherwise. */
@@ -1196,7 +1339,7 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
   const p = pickTarget(t, raw)
   if ('target' in p) {
     // A listed branch work can start from now (HR2's round 1: listed is not made).
-    const there = p.target && ws.path ? await branchExists(join(ws.path, project), p.target) : true
+    const there = p.target && ws.path ? await targetExists(ws, join(ws.path, project), p.target) : true
     if (there !== true) throw new LaneError(409, withValues(M.targetMissing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
     return p.target
   }
@@ -1204,10 +1347,52 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
 }
 
 /**
+ * HI-3148: a new lane's line released (its platform's release reads), or unreadable: refused with what to do, unless the
+ * user's or the Assistant's override names exactly that line, which is then its grant (kept on the lane). Null: the line
+ * isn't released (or its platform has no release reads).
+ */
+async function laneReleased(projectPath: string, platform: PlatformId | null, target: string | null, workTarget: string | null, given?: StartLane['released']): Promise<{ grant: LaneRecord['releasedOverride'] | null; bound?: () => boolean }> {
+  const reads = target && platform ? releaseReadsOf(platform) : null
+  if (!target || !reads) return { grant: null }
+  // The user's or the Assistant's for exactly this line: theirs whatever the line is now.
+  if (given && given.target === target) return { grant: { target, by: given.by, reason: given.reason.slice(0, 4000), at: new Date().toISOString() } }
+  // What `released` rests on, read before it: asked again in the lanes' save (HR2's round 1), moved, decided again.
+  const check = await reads.watch(projectPath, target).catch(() => null)
+  const first = check ? check() : null
+  const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(projectPath, target)
+  if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
+  if (isUnknown(r)) throw new LaneError(409, withValues(M.releaseUnknown, { target, what: r.whatText ? storedAsText(r.whatText) : r.what }))
+  const suggest = await unreleasedFor(reads, projectPath, target, workTarget)
+  throw new LaneError(409, withValues(M.released, { target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' })) // i18n-ignore: select keys
+}
+
+/**
+ * HI-3148, for Start Lane…: whether a new lane of `builder` on `target` (null: the project's Work merges into) would be
+ * refused for its line being released or unreadable: the line and the refusal's words, or null (it wouldn't, the rules are
+ * off, or the builder's lane is running, whose list change isn't a new start). The start checks again as it records.
+ */
+export async function laneReleaseCheck(ws: WorkspaceService, project: string, builder: string, target: string | null): Promise<{ target: string; text: Text } | null> {
+  if (!ws.path || !(await enforced())) return null
+  if ((await read(ws)).some((l) => running(l) && same(l.project, project) && l.builder.id === builder)) return null
+  const projectPath = join(ws.path, project)
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const defaultTarget = (await projectTargetsOf(ws, project))?.default ?? null
+  const line = target ? await lanePick(ws, project, target) : defaultTarget
+  if (!line) return null
+  try {
+    await laneReleased(projectPath, platformIdOf(projectPath, cfg?.platform), line, defaultTarget)
+    return null
+  } catch (e) {
+    if (e instanceof LaneError && e.status === 409) return { target: line, text: e.text }
+    throw e
+  }
+}
+
+/**
  * HI-2556: a lane is one target: refused when a card of `cards` has its own Merges into (the board's `target`) and it isn't
  * the lane's (`target`, null: the project's). Read under the lanes' lock, as the list is.
  */
-function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readonly number[], target: string | null, def: string | null, scope: string | null): void {
+export function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readonly number[], target: string | null, def: string | null, scope: string | null): void {
   const store = FactStore.forBoard(ws, { project, key: '' })
   for (const n of cards) {
     let own: string | null = null
@@ -1216,7 +1401,8 @@ function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readon
     } catch {
       continue
     }
-    if (own && own !== target) throw new LaneError(409, withCardNames(ws, () => withValues(M.targetCard, { card: cardRef(n), cardTarget: own, target: target ?? def ?? '' }), scope))
+    // Its own target may name the project's own as itself (HI-2985: a forward's resolution, pinned): the same branch.
+    if (own && own !== (target ?? def)) throw new LaneError(409, withCardNames(ws, () => withValues(M.targetCard, { card: cardRef(n), cardTarget: own, target: target ?? def ?? '' }), scope))
   }
 }
 
@@ -1235,6 +1421,8 @@ function unknownReviewerRefusal(name: string, project: string, lane: LaneRecord)
 
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
   refuseWhileTeamPaused(ws)
+  // Its name as the reader keeps it (HI-3119): every way in (the window, cw_lane, the API) saves at most LANE_NAME_MAX.
+  const named = laneName(s.name)
   const builder = await agentIn(ws, s.project, s.builder)
   if (!builder) throw new LaneError(404, say(A.unknownBuilder))
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
@@ -1247,7 +1435,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
   const projectPath = ws.path ? join(ws.path, s.project) : s.project
-  const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
+  const laneCfg = ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null
+  const prefs = projectPreferences(ws, projectPath, laneCfg)
+  // The platform fence (HI-2799): a new lane is an admission on its project's repository, refused while it switches.
+  const admission = { id: projectIdOf(laneCfg, projectPath), platform: platformIdOf(projectPath, laneCfg?.platform) }
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   // The texts for the caller name cards as it may see them (HR3's HI-2169 round 1): a builder's own start is a project
@@ -1265,9 +1456,14 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (pick && s.ownBuilder) throw new LaneError(403, M.targetBuilder)
   if (pick && !on) throw new LaneError(409, M.targetRulesOff)
   const defaultTarget = ws.path ? ((await projectTargetsOf(ws, s.project))?.default ?? null) : null
+  // HI-3148: a new lane's grant to start on a released line (its record's), or null.
+  let releasedGrant: LaneRecord['releasedOverride'] | null = null
   if (ws.path) {
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
-    const target0 = running0?.ruleset ? targetOfRulesetId(running0.ruleset) : null
+    // A new lane on a released line (or one that can't be checked) is refused, unless the user's or the Assistant's
+    // override names that line; a running lane's list change isn't a new start of its line (its cards' starts are checked).
+    if (!running0 && on) await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+    const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
   }
@@ -1308,8 +1504,11 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const cards = kept.length ? [...given, ...kept] : given
     // HI-2556: a running lane's Merges into is fixed for its life, and a lane is one target: a card of its own other target
     // is refused into it.
-    const wasTarget = was?.ruleset ? targetOfRulesetId(was.ruleset) : null
+    const wasTarget = was ? otherThanOwn(laneTarget(ws, was), defaultTarget) : null
     if (was && pick !== undefined && (pick ?? null) !== wasTarget) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
+    // HI-3148: the user's or the Assistant's override given to a running lane: its grant for its own line (fixed for its
+    // life), as read under this lock; given for another line, refused (its line moved, or it was never that one).
+    if (was && on && s.released && s.released.target !== (wasTarget ?? defaultTarget)) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, cards, was ? wasTarget : (pick ?? null), defaultTarget, scope)
     shared = sharedCards(ws, lanes, s.project, builder.id, cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
@@ -1320,21 +1519,14 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => cards.includes(n)) || on)) {
       // Combwork owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
-      if (change && change.behind !== null) {
-        queuedAfter = change.behind
-        was.pending = [...cards]
-      } else {
-        if (change) checks.push(stillBetweenCards(ws, was, change.check))
-        was.cards = cards
-        delete was.pending
-      }
+      queuedAfter = await applyLaneList(ws, was, cards, on, checks)
       Object.assign(was, {
         builder,
         ...(reviewer !== undefined ? { reviewer } : {}),
         ...(s.rounds !== undefined ? { rounds: s.rounds } : {}),
         ...(s.waitMinutes !== undefined ? { waitMinutes: s.waitMinutes } : {}),
-        ...(s.name !== undefined && s.name !== null ? { name: s.name } : {}),
+        ...(named !== null ? { name: named } : {}),
+        ...(on && s.released ? { releasedOverride: { target: s.released.target, by: s.released.by, reason: s.released.reason.slice(0, 4000), at: t } } : {}),
         updatedAt: t
       })
       // Its brief under the same lock (HI-1795): kept unless the start gives one; a queued list change keeps it too.
@@ -1347,6 +1539,19 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       } else if (pool === false) delete was.pool
       also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
+    }
+    // HI-3148: a new lane's line, decided again under the lanes' lock (refused as above), and what let it through bound
+    // to the save (its checks, run just before it): a tag made meanwhile throws it back to be decided again, so it is refused then.
+    releasedGrant = null
+    if (on) {
+      const rel = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+      releasedGrant = rel.grant
+      if (rel.bound) {
+        const stillBound = rel.bound
+        checks.push(() => {
+          if (!stillBound()) throw new StaleLane()
+        })
+      }
     }
     let replaced: LaneRecord | null = null
     if (was) {
@@ -1366,7 +1571,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const rec: LaneRecord = {
       id: newId(),
       project: s.project,
-      name: s.name ?? carried?.name ?? null,
+      name: named ?? carried?.name ?? null,
       builder,
       reviewer: reviewer ?? null,
       cards: cards.filter((n) => !done.includes(n)),
@@ -1379,11 +1584,13 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       endedAt: null,
       mergeCommit: null,
       ...(ruleset ? { ruleset } : {}),
-      ...(pool ? { pool: true as const } : {})
+      ...(pool ? { pool: true as const } : {}),
+      ...(releasedGrant ? { releasedOverride: releasedGrant } : {})
     }
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
+    also.push((db) => admitOrThrow(db, admission.id, admission.platform))
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }
   })
@@ -1410,7 +1617,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const carriedText = carriedNote(builder.name, carried, s.name != null)
   const gone = leftOut.length ? withCardNames(ws, () => say(A.leftOut, { cards: leftOut.map(cardRef).join(', '), n: leftOut.length }), scope) : null
   const stays = kept.length ? withCardNames(ws, () => say(A.stays, { cards: kept.map(cardRef).join(', '), n: kept.length }), scope) : null
-  const note = [applied, carriedText, gone, stays, queued, shared].filter(Boolean).join(' ') || undefined
+  // HI-2944: the folder its target is checked out in has uncommitted changes: said before its first card starts.
+  const dirty = r.did === 'started' && ws.path ? await targetChangesWarning(ws, join(ws.path, s.project), laneTarget(ws, r.rec) ?? defaultTarget) : null
+  const note = [applied, carriedText, gone, stays, queued, shared, dirty].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 
@@ -1545,15 +1754,25 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
     if (o.agent && l.builder.id !== o.agent && l.reviewer?.id !== o.agent) throw new LaneError(403, say(A.endNotOurs))
     if (running(l)) {
       const v = (await views(ws, [l]))[0]
+      // HI-3118: its cards as its next start reads them, a queued list included once its boundary has passed (read
+      // here, never applied: refused, the queue stays for its own writer; ended, it was all Done anyway).
+      const list = effectiveCards(ws, l)
+      const queued = !sameList(list, l.cards)
+      const ev = queued ? (await views(ws, [{ ...l, cards: list, pending: undefined }]))[0] : v
       // Combwork owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, say(A.abandonNotOurs))
-      if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone').map((c) => cardRef(c.number)).join(', ') })))
+      if (on && o.agent && !allDone(ev.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: ev.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.givenAway).map((c) => cardRef(c.number)).join(', ') })))
       // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
       const given = on && o.agent ? null : (o.mergeCommit ?? null)
-      if (!o.abandoned && allDone(v.cards)) {
-        checks.push(stillAllDone(ws, l, [...l.cards]))
-        endVerified(ws, l, v.cards, on, verified, given)
+      if (!o.abandoned && allDone(ev.cards)) {
+        checks.push(stillAllDone(ws, l, list))
+        // Ended on its queued list (every card of it Done): that list is the one it ends with.
+        if (queued) {
+          l.cards = list
+          delete l.pending
+        }
+        endVerified(ws, l, ev.cards, on, verified, given)
       }
       else close(l, o.abandoned ? 'abandoned' : 'ended', v.cards, given)
       ended = true
@@ -1576,7 +1795,26 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
  * The next card of an agent's running lane (#1270, `cw_lane next`): the card to start, the one in flight to carry on,
  * or why the lane waits (a card passed but not merged: one card at a time, §16.11.2); none once every card is Done.
  */
-export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status'] }> {
+export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status']; review?: { card: number; title: string } | null }> {
+  // An agent that reviews lanes and builds none (HI-3118): a reviewer's answer, the first card of its lanes (in their
+  // order) waiting in Review, or none; never a builder's next card. One that builds a lane gets that lane, as before.
+  const runningHere = (await read(ws)).filter((l) => running(l) && same(l.project, project))
+  if (!runningHere.some((l) => l.builder.id === agentId)) {
+    const reviews = runningHere.filter((l) => l.reviewer?.id === agentId)
+    if (reviews.length) {
+      const vs = await views(ws, reviews)
+      // Who reviews each card in Review now (its review's agent on the board): one another agent holds is theirs (HR2's
+      // round 1), never offered; one already the caller's first (it carries on with it), else the first free one.
+      const inReview = vs.flatMap((v) => v.cards.filter((x) => x.column === 'review' && !x.elsewhere).map((x) => x.number))
+      const owners = reviewOwnersNow(ws, inReview)
+      for (const holder of [agentId, null])
+        for (const v of vs) {
+          const c = v.cards.find((x) => x.column === 'review' && !x.elsewhere && (owners.get(x.number) ?? null) === holder)
+          if (c) return { lane: v, next: null, waits: null, review: { card: c.number, title: c.title } }
+        }
+      return { lane: vs[0], next: null, waits: null, review: null }
+    }
+  }
   const lane = await laneOf(ws, project, agentId)
   if (!lane) {
     // HI-2273: its lane just ended (all its cards Done) or was abandoned: said so, never "start one", which invited a
@@ -1584,12 +1822,33 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
     const gone = (await read(ws))
       .filter((l) => !running(l) && same(l.project, project) && (l.builder.id === agentId || l.reviewer?.id === agentId) && !!l.endedAt && Date.parse(l.endedAt) >= Date.now() - LANE_CARRY_MS)
       .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
-    if (gone?.state === 'ended') throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+    // HI-3118: "all its cards are Done" only when they were: its kept snapshot, or, with none (the runtime's own end, as
+    // its last card finished), its cards' places on the board now; ended with cards open (the user's End), which; a
+    // place unrecorded or unreadable, nothing claimed.
+    if (gone?.state === 'ended') {
+      let columns: { number: number; column: string }[] | null = gone.frozen ?? null
+      if (!columns) {
+        try {
+          const places = placesOf(ws, gone, gone.cards)
+          columns = gone.cards.map((n, i) => ({ number: n, column: places[i] }))
+        } catch {
+          columns = null
+        }
+      }
+      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
+      const open = columns.filter((c) => c.column !== 'done' && c.column !== 'gone')
+      if (open.length) throw new LaneError(404, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
+      throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+    }
     if (gone) throw new LaneError(404, say(A.nextAbandoned, { lane: gone.id }))
     throw new LaneError(404, say(A.nextNone))
   }
+  // Its queued list once the boundary has passed (HI-3118: no card of its own in flight), as the next start reads it.
+  const rec = (await read(ws)).find((x) => x.id === lane.id)
+  const list = rec ? effectiveCards(ws, rec) : null
+  const eff = rec && list && !sameList(list, rec.cards) ? (await views(ws, [{ ...rec, cards: list, pending: undefined }]))[0] : lane
   // Another agent's card is never the lane's next (HI-1821).
-  const open = lane.cards.filter(ownOpen)
+  const open = eff.cards.filter(ownOpen)
   const pauses = lane.state === 'paused' ? lane.status : null
   if (pauses) return { lane, next: null, waits: pauses }
   const flying = open.find((c) => c.column === 'doing' || c.column === 'review')
@@ -1603,7 +1862,8 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
  * from the same inputs read synchronously (its record, its cards' rows, their facts while the rules are enforced, the
  * round limit, its agents' hooks, its slot, its line, the cards' owners), so it pauses for what the lane view pauses for
  * (a request for the user, a block, a merge, a slot…). Only the names it shows aren't read (agents' new names, the old
- * rules mark): nothing that decides whether it waits. With a list change queued, its cards are that list, which applies
+ * rules mark, its Merges into beyond its ruleset id's mark: HI-3113's needs the project's options): nothing that decides
+ * whether it waits. With a list change queued, its cards are that list, which applies
  * once no card is in flight. Read inside a write's transaction it is what that write sees, so a check there can't be
  * undone by a lane or card change. By its id, or the builder's lane holding `card`. `as`: a card as the caller has it
  * (a start's write moves its card in the same transaction: the lane is read as it stood for that start). Null: no such
@@ -1659,14 +1919,15 @@ export async function lanesHolding(ws: WorkspaceService, cards: readonly number[
 }
 
 /**
- * HI-2556: the running lanes holding any of `cards`, each with its builder's name and its Merges into: the target its
- * recorded ruleset marks (`targetOfRulesetId`), null for the project's own.
+ * HI-2556: the running lanes holding any of `cards`, each with its builder's name and its Merges into (`laneTarget`,
+ * HI-3113), null for the project's own.
  */
 export async function laneTargetsHolding(ws: WorkspaceService, cards: readonly number[]): Promise<{ id: string; builder: string; target: string | null }[]> {
   if (!ws.path || !cards.length) return []
-  return (await read(ws))
-    .filter((l) => running(l) && cards.some((n) => l.cards.includes(n) || !!l.pending?.includes(n)))
-    .map((l) => ({ id: l.id, builder: l.builder.name, target: l.ruleset ? targetOfRulesetId(l.ruleset) : null }))
+  const holding = (await read(ws)).filter((l) => running(l) && cards.some((n) => l.cards.includes(n) || !!l.pending?.includes(n)))
+  const out: { id: string; builder: string; target: string | null }[] = []
+  for (const l of holding) out.push({ id: l.id, builder: l.builder.name, target: otherThanOwn(laneTarget(ws, l), (await projectTargetsOf(ws, l.project))?.default) })
+  return out
 }
 
 /** A workspace's lanes: those listed (running, or ended lately), or with `all` every one kept; `project` narrows them. */
@@ -1674,6 +1935,13 @@ export async function listLanes(ws: WorkspaceService, o: { project?: string | nu
   if (!ws.path) return []
   const lanes = (await read(ws)).filter((l) => !o.project || same(l.project, o.project))
   return views(ws, o.all ? [...lanes].sort((a, b) => a.startedAt.localeCompare(b.startedAt)) : listedLanes(lanes, Date.now()))
+}
+
+/** The lanes that ended (or were abandoned) at or after `since` (ms), newest first (HI-2898: Progress → Lanes' Ended today). */
+export async function lanesEndedSince(ws: WorkspaceService, since: number): Promise<LaneInfo[]> {
+  if (!ws.path) return []
+  const ended = (await read(ws)).filter((l) => !running(l) && !!l.endedAt && Date.parse(l.endedAt) >= since)
+  return views(ws, ended.sort((a, b) => b.endedAt!.localeCompare(a.endedAt!)))
 }
 
 /** One lane by id (`project`: only one of that project's). */

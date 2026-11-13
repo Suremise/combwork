@@ -6,7 +6,7 @@ import { nextChange, queueShown, returnCheck, returnRun, returnWhy } from '@shar
 import type { ProgressRun, ProjectInfo } from '@shared/types'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call, callShared } from '../api'
-import { set, useLanguage, useStore } from '../store'
+import { confirm, set, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
 import { DataTable, useDateColumns, type DataColumn } from './DataTable'
 import { QueueCard, RevisionButton } from './ProgressQueue'
@@ -16,7 +16,10 @@ import { Icon } from './ui'
  * The Version Control tab's Merge queue section (#1357, SPEC §16.9.3): each target's queue as the Progress panel's card shows it (now,
  * Pause queue / Resume queue), and its history, the latest 50 outcomes (card, revision, result or reason, when). A target
  * shows by #1356's rule (its state, old rulesets included), and while it has a history. Placed in the Version Control
- * tab as it was (#1416), for None too while an old Git ruleset's queue is there.
+ * tab as it was (#1416), for None too while an old Git ruleset's queue is there. HI-2893: a past branch's queue (none of
+ * the project's targets now, nothing in it) shows only its history, under Past branches, folded: no card, no Pause queue.
+ * HI-3177: one past branch at a time, picked from a drop-down (the newest version first), with Purge history… for it and
+ * Purge all…, each asked first (it can't be undone; the cards keep their own records).
  */
 
 const list = (items: string[]): string => fmt.list(items, 'conjunction')
@@ -24,6 +27,15 @@ const list = (items: string[]): string => fmt.list(items, 'conjunction')
 const M = {
   region: msg({ id: 'git.queue.region', defaultMessage: 'Merge queues', description: "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue." }),
   reading: msg({ id: 'git.queue.reading', defaultMessage: 'Reading the merge queues…', description: "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue." }),
+  past: msg({ id: 'git.queue.past', defaultMessage: '{n, plural, one {Past branches (# branch)} other {Past branches (# branches)}}', description: "HI-2893: a folded part of the Version Control tab's Merge queue section: the history of the queues of branches that aren't the project's targets any more (Work merges into, Other branches work can merge into), {n} of them. A click unfolds it." }),
+  pastPick: msg({ id: 'git.queue.pastPick', defaultMessage: 'Past branch', description: "HI-3177: label of the drop-down under Past branches in the Version Control tab's Merge queue section: picks the past branch whose merge queue history shows below." }),
+  purge: msg({ id: 'git.queue.purge', defaultMessage: 'Purge history…', description: "HI-3177: a button under Past branches in the Version Control tab's Merge queue section: removes the merge queue history of the past branch picked in the drop-down, asked first." }),
+  purgeAll: msg({ id: 'git.queue.purgeAll', defaultMessage: 'Purge all…', description: "HI-3177: a button under Past branches in the Version Control tab's Merge queue section: removes the merge queue history of every past branch listed, asked first." }),
+  purgeTitle: msg({ id: 'git.queue.purgeTitle', defaultMessage: '{n, plural, one {Purge the merge queue history of {target}?} other {Purge the merge queue history of # past branches?}}', description: "HI-3177: title of the dialog asking before purging past branches' merge queue history: one branch ({target}: its name) or {n} of them." }),
+  purgeMessage: msg({ id: 'git.queue.purgeMessage', defaultMessage: "{n, plural, one {Its history leaves Past branches.} other {Their history leaves Past branches.}} This can't be undone. The cards keep their own records of what was merged.", description: "HI-3177: the dialog asking before purging past branches' merge queue history ({n}: how many branches, listed under it): what happens." }),
+  purgeConfirm: msg({ id: 'git.queue.purgeConfirm', defaultMessage: 'Purge', description: "HI-3177: the confirm button of the dialog asking before purging past branches' merge queue history." }),
+  purging: msg({ id: 'git.queue.purging', defaultMessage: 'Purging…', description: "HI-3177: the confirm button of the dialog purging past branches' merge queue history while it runs." }),
+  pastTip: msg({ id: 'git.queue.pastTip', defaultMessage: 'Branches that work no longer merges into, with nothing in their queue: what their queues merged and returned.', description: "HI-2893: tooltip of Past branches in the Version Control tab's Merge queue section." }),
   none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Combwork merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Combwork's names: keep them as Combwork shows them. Glossary 2.5: merge queue." }),
   history: msg({ id: 'git.queue.history', defaultMessage: 'History of {target}', description: "A heading in the Git tab's Merge queue section: the latest outcomes of the queue for the branch {target} follow." }),
   noHistory: msg({ id: 'git.queue.noHistory', defaultMessage: 'Nothing merged or returned yet.', description: "The Git tab's Merge queue section, under a queue's history heading, when it has none yet." }),
@@ -90,17 +102,69 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
         </div>
       </div>
     )
-  const shown = views.filter((v) => queueShown(v, now) || v.recent.length > 0).sort((a, b) => a.target.localeCompare(b.target))
+  const byTarget = (a: QueueView, b: QueueView): number => a.target.localeCompare(b.target)
+  const shown = views.filter((v) => !v.past && (queueShown(v, now) || v.recent.length > 0)).sort(byTarget)
+  // HI-2893: past branches' queues, their history only, folded under the live ones. HI-3177: the newest version first.
+  const past = views.filter((v) => v.past && v.recent.length > 0).sort((a, b) => b.target.localeCompare(a.target, undefined, { numeric: true }))
   return (
-    <div className="git-queue" role="region" aria-label={tr(M.region)}>
-      {!shown.length && <div className="pane-empty">{tr(M.none)}</div>}
+    // Focusable (HI-2894): the page scrolls with the keyboard too, its history tables' own scroll inside it.
+    <div className="git-queue" role="region" aria-label={tr(M.region)} tabIndex={0}>
+      {!shown.length && !past.length && <div className="pane-empty">{tr(M.none)}</div>}
       {shown.map((v) => (
         <section key={v.target} className="git-queue-target" data-target={v.target}>
-          <QueueCard view={v} runs={runs} now={now} showProject={false} />
+          <QueueCard view={v} runs={runs} now={now} showProject={false} inVersionControl />
           <QueueHistory project={project} view={v} />
         </section>
       ))}
+      {past.length > 0 && <PastBranches project={project} past={past} />}
     </div>
+  )
+}
+
+/**
+ * HI-3177: Past branches, folded: a drop-down picks one past branch (the first, the newest version, until another is
+ * picked; one gone since falls back to it), its history below, and Purge history… / Purge all…, asked first. Purge sends
+ * exactly the branches the dialog named, and Combwork refuses them all if any isn't past by then (the dialog says why).
+ */
+function PastBranches({ project, past }: { project: ProjectInfo; past: QueueView[] }) {
+  const [picked, setPicked] = useState<string | null>(null)
+  const view = past.find((v) => v.target === picked) ?? past[0]
+  const purge = (targets: string[]): void =>
+    void confirm({
+      title: tr(M.purgeTitle, { n: targets.length, target: targets[0] }),
+      message: tr(M.purgeMessage, { n: targets.length }),
+      list: targets,
+      listOnly: true,
+      confirmLabel: tr(M.purgeConfirm),
+      busyLabel: tr(M.purging),
+      danger: true,
+      run: () => call('queue:purgeHistory', project.path, targets)
+    })
+  return (
+    <details className="git-queue-past" data-queue-past="">
+      <summary title={tr(M.pastTip)}>{tr(M.past, { n: past.length })}</summary>
+      <div className="git-queue-past-bar">
+        <label>
+          {tr(M.pastPick)}{' '}
+          <select className="select" data-past-pick="" value={view.target} onChange={(e) => setPicked(e.target.value)}>
+            {past.map((v) => (
+              <option key={v.target} value={v.target}>
+                {v.target}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="btn small subtle" data-action="purge" onClick={() => purge([view.target])}>
+          {tr(M.purge)}
+        </button>
+        <button type="button" className="btn small subtle" data-action="purge-all" onClick={() => purge(past.map((v) => v.target))}>
+          {tr(M.purgeAll)}
+        </button>
+      </div>
+      <section key={view.target} className="git-queue-target" data-target={view.target} data-past="">
+        <QueueHistory project={project} view={view} />
+      </section>
+    </details>
   )
 }
 

@@ -53,6 +53,8 @@ const state = vi.hoisted(() => ({
   noCode: [] as number[],
   /** The pool's own, over the stand-in's (a lend held, say). */
   pool: {} as Record<string, unknown>,
+  /** Every function run under the repository's lock (withRepoLock), in order (HI-3165: which preparations take it). */
+  lockedFns: [] as unknown[],
   /** The slots' log, as `<level> <line>`. */
   logged: [] as string[],
   /** The builder's conversation bound to the card's lease, as sessions.leaseConversation gives it (HI-1746). */
@@ -80,7 +82,14 @@ const state = vi.hoisted(() => ({
   /** Freed just after the pass's look (HR1's round 1): before its wait listens, with no event to come. */
   freeAfterHeldLook: false,
   /** Folders sessions run in (sessions.liveStates' cwd, HI-2466). */
-  sessionsIn: [] as string[]
+  sessionsIn: [] as string[],
+  /** The builder's run as sessions.runNow gives it (HI-2913), or null. */
+  run: null as null | { run: string; starting: boolean },
+  /** sessions.quit's stand-in (HI-2913): its answer, after asking the caller's fence. */
+  quit: null as null | ((o: { fenced: () => boolean; ready?: () => string | null }) => 'sent' | 'held' | 'gone'),
+  quits: 0,
+  /** Its builder in a turn (lineUpdates.agentBusy, HI-3010): not quiet. */
+  working: false
 }))
 vi.mock('../src/main/agentFolders', async (orig) => ({
   ...(await orig<object>()),
@@ -142,19 +151,30 @@ vi.mock('../src/main/git', async (orig) => {
     }
   }
 })
-vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => false }))
+vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => state.working }))
 vi.mock('../src/main/tasks', async (orig) => ({ ...(await orig<object>()), getTask: async (n: number) => ({ number: n, key: `AM-${n}`, title: 'Placed', description: '', project: 'project', column: 'doing', labels: [], comments: [], history: [], blockedBy: [] }) }))
 vi.mock('../src/main/slotsApp', async (orig) => ({
   ...(await orig<object>()),
   holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
   // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
-  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], ...state.pool })
+  // Its port's preparation keys (HI-3165): none, as Git's.
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], lineIsKey: () => false, preparesUnderOwnLock: () => false, heldEarly: async () => null, ...state.pool })
 }))
+// The repository's lock as it is, each function it runs recorded (HI-3165).
+vi.mock('../src/main/repoLock', async (orig) => {
+  const real = await orig<typeof import('../src/main/repoLock')>()
+  return { ...real, withRepoLock: (folder: string, fn: () => Promise<unknown>, o?: object) => (state.lockedFns.push(fn), real.withRepoLock(folder, fn, o)) }
+})
 vi.mock('../src/main/lanes', async (orig) => ({
   ...(await orig<object>()),
   rawLanes: async () => (state.lanes ? state.lanes() : []),
   lanesWaitingForSlot: async () => (state.waitingLooks++, state.waiting),
-  setLaneSlotWait: async (_ws: unknown, lane: string) => void state.calls.push(`lane ${lane} waits no more`)
+  // A lane that waits no more is no longer among those waiting, as in lanes.ts (HI-3101: a pass run again after it, such
+  // as a held slot's retry landing during it, would otherwise lend it a slot again).
+  setLaneSlotWait: async (_ws: unknown, lane: string) => {
+    state.calls.push(`lane ${lane} waits no more`)
+    state.waiting = (state.waiting as { id: string }[]).filter((l) => l.id !== lane)
+  }
 }))
 vi.mock('../src/main/laneStart', async (orig) => ({
   ...(await orig<object>()),
@@ -181,7 +201,7 @@ vi.mock('../src/main/advanced', async (orig) => {
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
-    liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
+    liveFor: () => (state.live ? { ...state.live, status: 'ready', runId: state.run?.run ?? '' } : null),
     // The sessions running, where they run (HI-2466: one in a lane's held slot holds it).
     liveStates: () => state.sessionsIn.map((cwd) => ({ cwd, agentId: 'b9', agentName: 'B9', status: 'working' })),
     // The pause after the user typed in its builder's pane, while it holds (HI-2191): when it ends.
@@ -189,7 +209,8 @@ vi.mock('../src/main/sessions', async (orig) => {
     combworkToolsWaiting: () => false,
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
-    runNow: () => null,
+    runNow: () => state.run,
+    quit: async (_p: string, _a: string, _r: string, o: { fenced: () => boolean; ready?: () => string | null }) => (state.quits++, state.quit ? state.quit(o) : 'gone'),
     combworkMcp: () => null,
     start: async (_p: string, o: { prompt?: string; resumeId?: string }) => {
       const name = `${o.resumeId ? `resume ${o.resumeId}` : 'start'}${o.prompt ? ' with the card' : ''}`
@@ -258,7 +279,7 @@ const { gitTestHooks } = await import('../src/main/git')
 const { observer } = await import('../src/main/platform/observe')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, heldRetryOf, laneSlotHeld, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, freeSlotOfBuilder, recoverHeldSlot, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, heldRetryOf, laneSlotHeld, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
@@ -266,7 +287,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [] })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, lockedFns: [], logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
 })
 
 /**
@@ -413,6 +434,26 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     expect(hasLine(e, line)).toBe(false)
   })
 
+  it("HI-3165: a line its pool's port calls a preparation key (jj's): the slot never read, locked or moved; Git's line is", async () => {
+    const { e, n, line, slot } = await doneInSlot('Keyed line')
+    let looks = 0
+    const counted = () => (looks++, view(slot)())
+    expect(await finishedSlot(e.project, e.wf, n, 'l-1', counted, null, () => true, (l) => l === line)).toBe(false)
+    expect(looks).toBe(0)
+    expect(state.lockedFns).toEqual([])
+    expect(branch(slot)).toBe(line)
+    // The pass asks the pool: a key there, left; none, detached under the lock.
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: n, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    const ws = { path: e.home, lifetime: { aborted: false } } as never
+    const pool = (keyed: boolean) => ({ openLeases: () => [lease], endedSince: () => [], openLease: () => lease, slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null, writer: null, state: 'lent' }), lineIsKey: (l: string) => keyed && l === line }) as never
+    await finishedSlots(ws, e.project, e.wf, pool(true), new Map())
+    expect(branch(slot)).toBe(line)
+    expect(state.lockedFns).toEqual([])
+    await finishedSlots(ws, e.project, e.wf, pool(false), new Map())
+    expect(branch(slot)).toBe('HEAD')
+    expect(state.lockedFns.length).toBeGreaterThan(0)
+  })
+
   it("a slot made from main whose card targeted another line: detached at that line's head, not main's (HI-2185)", async () => {
     const { e, n, line, slot } = await doneInSlot('Card for 1.0.0', '1.0.0')
     expect(sh(e.project, 'rev-parse', '1.0.0').trim()).not.toBe(sh(e.project, 'rev-parse', 'main').trim())
@@ -513,7 +554,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     rmSync(join(slot, 'wip.txt'))
     // The lane's lease ended long ago, and the lane has left the list the pass reads (an empty map).
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-old', agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'laneEnded', endRev: null }
-    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null }), openLease: () => null, lease: () => lease }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null }), openLease: () => null, lease: () => lease, lineIsKey: () => false }
     await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
     expect(asked(e, n)).toBe(0)
   })
@@ -549,7 +590,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'card', card: n, lane: null, agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'done', endRev: null }
     let row: Record<string, unknown> = { name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }
-    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => row, openLease: () => null, lease: () => lease }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => row, openLease: () => null, lease: () => lease, lineIsKey: () => false }
     const pass = () => finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
     // Its builder's session still draining there, the pool not having looked since the lease ended.
     row = { ...row, writer: { run: 'r-1', lease: 'l-1', agent: 'b1', pid: 1, started: 1 } }
@@ -576,7 +617,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     const next = e.wf.createCard({ title: 'Second of the lane' })
     moved(await e.wf.start(next.key, B1))
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', agent: 'b1', from: '2026-01-01T00:00:00Z', to: null, why: null, endRev: null }
-    const pool = { openLeases: () => [lease], endedSince: () => [], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }), openLease: () => lease, lease: () => lease }
+    const pool = { openLeases: () => [lease], endedSince: () => [], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }), openLease: () => lease, lease: () => lease, lineIsKey: () => false }
     const lanes = new Map([['lane-1', { id: 'lane-1', cards: [n, next.id], state: 'active' }]])
     await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, lanes as never)
     expect(asked(e, n)).toBe(0)
@@ -1030,7 +1071,8 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const { e, n, cycle, ws } = await owed()
     state.conv = resume
     await place(ws, e.project, e.wf, n, cycle, lease)
-    expect(state.deliveries.map((d) => d.meta)).toEqual([{ how: 'resumed' }])
+    // HI-2854: with what marks it the card's start task.
+    expect(state.deliveries.map((d) => d.meta)).toEqual([{ cardTask: true, how: 'resumed' }])
   })
 
   it("its conversation's lookup failing (unknown): nothing launched, tried again; resumed once it can be read", async () => {
@@ -1378,7 +1420,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
   it("a window Start's own prompt is kept whole, the brief after it", async () => {
     state.lanes = async () => keptLanes() as never
     const { e, n, cycle, ws } = await laneCard()
-    expectStartPrompt(e.project, n)('Work on task AM-1 from the window, with the user\'s note: be quick.')
+    expectStartPrompt(e.project, n)({ text: 'Work on task AM-1 from the window, with the user\'s note: be quick.', meta: {} })
     await place(ws, e.project, e.wf, n, cycle, laneLease)
     expect(bodies()[0]).toMatch(/^Work on task AM-1 from the window, with the user's note: be quick\.\n\nYour lane's brief/)
     expect(bodies()[0]).toMatch(BRIEF)
@@ -1472,7 +1514,7 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
   it("a lane waiting for a slot whose lend is under way as Combwork quits isn't started: it keeps the slot and its wait for the next start", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
-    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
     let lends = 0
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
@@ -1724,6 +1766,250 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
     expect(at('await sessions.writersSettled(')).toBeLessThan(at('app.quit()'))
     const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
     expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
+  })
+})
+
+describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout: 60_000 }, () => {
+  it('the slot is on its line at once, with what its builder committed, and no hook runs; placed once its builder is free', async () => {
+    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    const { NOT_IN_PLACE } = await import('../src/main/slots')
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    // Hooks that change files, as a repository may have (HR1's round 1): neither may run beside a busy builder.
+    for (const hook of ['post-checkout', 'reference-transaction']) writeFileSync(join(e.project, '.git', 'hooks', hook), `#!/bin/sh\necho "changed by ${hook}" > builder.txt\n`)
+    const card = e.wf.createCard({ title: 'Next in the lane' })
+    // The lane's slot, detached at the target's head after its last card.
+    const slot = join(tempDir('slot-'), 'slot-a')
+    sh(e.project, 'worktree', 'add', '-q', '--detach', slot, 'main')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: false })
+    moved(await e.wf.start(card.key, B1))
+    const line = e.wf.state(card).started!.line!
+    // Its builder, told of the card another way, already at work: a commit on the detached head, an edit still open.
+    state.live = { cwd: slot, sessionId: 's1' }
+    state.working = true
+    // Its lease began after the slot was made; its commit in a later second (HI-3031: only commits since then are its own).
+    const from = new Date().toISOString()
+    const work = commit(slot, { 'a.txt': 'a\n' }, 'its work', { trailer: card.key, at: Date.parse(from) + 2000 })
+    writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', project: 'p', from, to: null, why: null, endRev: null }
+    state.lanes = async () => [{ id: 'lane-1', state: 'active', cards: [card.id] }]
+    // The pool as SlotPool.prepare answers (slots.test.ts proves it): in place, Git's branchHere; else its builder's quiet first.
+    const asked: string[] = []
+    state.pool = {
+      openLeases: () => [lease],
+      lease: () => lease,
+      prepare: async (_id: string, p: { line: string; base: string; ready?: () => Promise<string | null>; inPlace?: () => Promise<string | null> }) => {
+        asked.push(p.inPlace ? 'in place' : 'once quiet')
+        const notYet = await (p.inPlace ?? p.ready)?.()
+        if (notYet) return { retry: notYet }
+        if (!p.inPlace) return { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') }
+        const r = await gitWorkspacePort.branchHere!(slot, p.line, p.base, lease.from)
+        return r.ok ? { ok: true, revision: sh(slot, 'rev-parse', 'HEAD') } : { retry: NOT_IN_PLACE }
+      }
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(cycleIn(e.store.facts(card.id))?.prepared).toMatchObject({ line, revision: work }), { timeout: HUNG_MS })
+    expect(state.working).toBe(true)
+    expect(asked).toEqual(['in place'])
+    expect(sh(slot, 'branch', '--show-current')).toBe(line)
+    expect(sh(slot, 'rev-parse', 'HEAD')).toBe(work)
+    expect(readFileSync(join(slot, 'builder.txt'), 'utf8')).toBe('builder still editing\n')
+    expect(e.kinds(card.id)).not.toContain('BuilderPlaced')
+    // Its builder free: given the card there, once.
+    state.working = false
+    tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
+    await vi.waitFor(() => expect(e.kinds(card.id)).toContain('BuilderPlaced'), { timeout: HUNG_MS })
+    // Its work committed and submitted from the slot, on its line (the hooks gone first: its own commit would run them).
+    for (const hook of ['post-checkout', 'reference-transaction']) rmSync(join(e.project, '.git', 'hooks', hook))
+    commit(slot, {}, 'its edit', { trailer: card.key })
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+  })
+
+  it("the hooks are real: the same switch without Combwork's settings runs them (the test above isn't vacuous)", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    writeFileSync(join(e.project, '.git', 'hooks', 'post-checkout'), '#!/bin/sh\necho "changed by post-checkout" > builder.txt\n')
+    const slot = join(tempDir('slot-'), 'slot-a')
+    sh(e.project, 'worktree', 'add', '-q', '--detach', slot, 'main')
+    writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
+    sh(slot, 'switch', '-q', '-c', 'cw/AM/AM-9-plain')
+    expect(readFileSync(join(slot, 'builder.txt'), 'utf8')).toMatch(/changed by post-checkout/)
+  })
+})
+
+describe("HI-3165: a preparation as its pool's port has the line: in place and under the repository's lock, or its own key", { timeout: 60_000 }, () => {
+  async function preparing(keyed: boolean, early: unknown[] = []) {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Prepared' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const line = e.wf.state(card).started!.line!
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    // Each preparation asked: in place or not, and whether its step ran under the repository's lock.
+    const asked: { inPlace: boolean; locked: boolean }[] = []
+    state.pool = {
+      openLeases: () => [lease],
+      lease: () => lease,
+      lineIsKey: (l: string) => keyed && l === line,
+      preparesUnderOwnLock: (l: string) => keyed && l === line,
+      heldEarly: async () => early.shift() ?? null,
+      prepare: async (_id: string, p: { inPlace?: unknown; around: (fn: () => Promise<unknown>) => Promise<unknown> }) => {
+        const step = async () => ({ ok: true, revision: 'r' })
+        const r = await p.around(step)
+        asked.push({ inPlace: !!p.inPlace, locked: state.lockedFns.includes(step) })
+        return r
+      }
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(cycleIn(e.store.facts(card.id))?.prepared).toMatchObject({ revision: 'r' }), { timeout: HUNG_MS })
+    return { e, card, asked }
+  }
+
+  it("Git's line: tried in place first, under the repository's lock", async () => {
+    const { asked } = await preparing(false)
+    expect(asked).toEqual([{ inPlace: true, locked: true }])
+  })
+
+  it("the port's key: never in place, outside the repository's lock (the port takes its own); its early held work said with the port's code", async () => {
+    const work = { why: 'extra', commits: ['c1'], edits: null, select: 'c1', base: 'b', target: 'main' }
+    const { e, card, asked } = await preparing(true, [{ code: 'held (test)', work }])
+    expect(asked).toEqual([{ inPlace: false, locked: false }])
+    expect(e.store.facts(card.id).find((f) => f.kind === 'SlotPrepareHeld')?.data).toMatchObject({ lease: 'l-1', why: 'extra:held (test)' })
+  })
+})
+
+describe("a slot that couldn't be prepared, recorded and recovered (HI-2913)", { timeout: 60_000 }, () => {
+  async function failing(error: { error: string; stale?: true }) {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    const answers: unknown[] = [error]
+    const tries = { n: 0 }
+    state.pool = { openLeases: () => [lease], lease: () => lease, prepare: async () => (tries.n++, answers.shift() ?? { ok: true, revision: 'r' }) }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    const facts = () => e.store.facts(card.id)
+    await vi.waitFor(() => expect(facts().some((f) => f.kind === 'SlotPrepareFailed')).toBe(true), { timeout: HUNG_MS })
+    const pool = async () => (await import('../src/main/slotsApp')).poolFor(ws, e.project) as never
+    return { e, lease, tries, ws, facts, pool }
+  }
+
+  it('records the failure on its cycle (stale or not), and its cycle reads as failed, not prepared, until a SlotPrepared', async () => {
+    const { facts } = await failing({ error: 'slot-a is stale (test)', stale: true })
+    expect(facts().find((f) => f.kind === 'SlotPrepareFailed')?.data).toEqual({ lease: 'l-1', slot: 'slot-a', why: 'slot-a is stale (test)', stale: true })
+    expect(cycleIn(facts())).toMatchObject({ prepared: null, prepareFailed: { stale: true } })
+  })
+
+  it("the user's Recover… of its held slot: let through for that cycle, its fence asked; then its preparation is tried again, and prepared", async () => {
+    const { e, lease, tries, ws, facts, pool } = await failing({ error: 'stale (test)', stale: true })
+    expect(tries.n).toBe(1)
+    let asked = 0
+    state.pool = { ...state.pool, recoverStale: async (_name: string, _run: unknown, held: { lease: string; refresh: () => Promise<boolean>; now: () => boolean }) => (asked++, expect(held.lease).toBe('l-1'), expect(await held.refresh()).toBe(true), expect(held.now()).toBe(true), { ok: true }) }
+    expect(await recoverHeldSlot(ws, e.project, await pool(), 'slot-a', lease as never, async () => ({ ok: true }))).toEqual({ ok: true })
+    expect(asked).toBe(1)
+    await vi.waitFor(() => expect(cycleIn(facts())?.prepared).toMatchObject({ revision: 'r' }), { timeout: HUNG_MS })
+    expect(tries.n).toBe(2)
+    expect(cycleIn(facts())?.prepareFailed).toBeNull()
+    // Prepared now: another Recover… is refused (busy), nothing asked of the pool.
+    expect(await recoverHeldSlot(ws, e.project, await pool(), 'slot-a', lease as never, async () => ({ ok: true }))).toEqual({ ok: false, why: 'busy' })
+    expect(asked).toBe(1)
+  })
+
+  it("a refused Recover…, or one cut short: its failure and its one-shot key kept (not tried again)", async () => {
+    const { e, lease, tries, ws, facts, pool } = await failing({ error: 'stale (test)', stale: true })
+    state.pool = { ...state.pool, recoverStale: async () => ({ ok: false, why: 'busy' }) }
+    expect(await recoverHeldSlot(ws, e.project, await pool(), 'slot-a', lease as never, async () => ({ ok: true }))).toEqual({ ok: false, why: 'busy' })
+    await settleSlotCards(ws, e.project)
+    expect(tries.n).toBe(1)
+    expect(cycleIn(facts())?.prepareFailed).not.toBeNull()
+  })
+
+  it('a cycle whose preparation is still owed (nothing failed): Recover… refused as preparing; a busy preparation is a wait, never a failure', async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    let recovered = 0
+    state.pool = { openLeases: () => [], lease: () => lease, recoverStale: async () => (recovered++, { ok: true }) }
+    const pool = (await (await import('../src/main/slotsApp')).poolFor(ws, e.project)) as never
+    expect(await recoverHeldSlot(ws, e.project, pool, 'slot-a', lease as never, async () => ({ ok: true }))).toEqual({ ok: false, why: 'preparing' })
+    expect(recovered).toBe(0)
+    // Busy once, then ready: prepared, and no failure recorded.
+    const answers: unknown[] = [{ retry: 'slot-a is busy (test)' }]
+    state.pool = { openLeases: () => [lease], lease: () => lease, prepare: async () => answers.shift() ?? { ok: true, revision: 'r' } }
+    await settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(cycleIn(e.store.facts(card.id))?.prepared).toMatchObject({ revision: 'r' }), { timeout: HUNG_MS })
+    expect(e.store.facts(card.id).some((f) => f.kind === 'SlotPrepareFailed')).toBe(false)
+  })
+})
+
+describe("a jj lane's builder out of its slot before its next card is prepared (HI-2913)", () => {
+  const folder = join('C:', 'ws.worktrees', 'p', 'slot-a')
+  const elsewhere = join('C:', 'elsewhere')
+  const live = (cwd: string, run = 'r1') => {
+    state.live = { cwd, sessionId: 's1' }
+    state.run = { run, starting: false }
+  }
+  it('no run of its builder, or one working elsewhere: free, nothing stopped', async () => {
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('free')
+    live(elsewhere)
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('free')
+    expect(state.quits).toBe(0)
+  })
+  it('starting, or resuming: a wait, nothing stopped', async () => {
+    state.run = { run: 'r1', starting: true }
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('wait')
+    live(folder)
+    state.resuming = true
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('wait')
+    expect(state.quits).toBe(0)
+  })
+  it("its input held (the user's draft or typing), or a turn begun as it types: a wait, its run left running", async () => {
+    live(folder)
+    state.quit = () => 'held'
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('wait')
+    expect(state.quits).toBe(1)
+  })
+  it('its run replaced, or moved out of the slot, after the first look: its fence fails at the quit, so nothing is stopped', async () => {
+    live(folder)
+    const seen: boolean[] = []
+    state.quit = (o) => {
+      state.run = { run: 'r2', starting: false }
+      seen.push(o.fenced())
+      state.run = { run: 'r1', starting: false }
+      state.live = { cwd: elsewhere, sessionId: 's1' }
+      seen.push(o.fenced())
+      return seen.some(Boolean) ? 'sent' : 'gone'
+    }
+    expect(await freeSlotOfBuilder('P', 'B1', folder, () => false)).toBe('wait')
+    expect(seen).toEqual([false, false])
+  })
+  it('ended with its exit command: waits for its run to end, then free; its cycle moving on meanwhile: gone', async () => {
+    live(folder)
+    state.quit = (o) => (o.fenced() ? 'sent' : 'gone')
+    const waiting = freeSlotOfBuilder('P', 'B1', folder, () => false)
+    await new Promise((r) => setImmediate(r))
+    state.run = null
+    tellListeners({ type: 'session-status', state: { agentId: 'B1', projectPath: 'P', status: 'exited' } } as never)
+    expect(await waiting).toBe('free')
+    live(folder)
+    let gone = false
+    const cancelled = freeSlotOfBuilder('P', 'B1', folder, () => gone)
+    await new Promise((r) => setImmediate(r))
+    gone = true
+    tellListeners({ type: 'session-status', state: { agentId: 'B1', projectPath: 'P', status: 'ready' } } as never)
+    expect(await cancelled).toBe('gone')
   })
 })
 

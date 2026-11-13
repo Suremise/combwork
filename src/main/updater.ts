@@ -1,5 +1,5 @@
 import { msg, tr } from '../shared/i18n'
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { writeFileSync } from 'original-fs'
 import { join } from 'path'
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
@@ -16,6 +16,7 @@ import { installedCopy, runningIdentity } from './buildIdentity'
 import { installDecision, updateDecision, type BuildIdentity } from '../shared/updates'
 import { RELEASES_REPO } from '../shared/defaults'
 import { CombworkGitHubProvider } from './updateFeed'
+import { InstallConsent, type InstallConsentRecord, type InstallOffer } from './updateConsent'
 
 const log = createLogger('updates')
 
@@ -41,7 +42,15 @@ let firstCheck: ReturnType<typeof setTimeout> | null = null
 const autoCheck = (): void => {
   if (config.settings.updates.checkAutomatically) void check(false)
 }
-let restartForUpdate: () => void = () => undefined
+let restartForUpdate: (version: string) => void = () => undefined
+/** HI-3167: the user's say to install, for one quit and one version (updateConsent.ts). */
+const consent = new InstallConsent()
+/**
+ * About how long an update's install takes, for the quit dialog's line (HI-3167): measured in Windows Sandbox on 13 Nov,
+ * 1.2.0-beta.1 updated to a 1.4.0 build, from the installer's start to its finish page: 29 s and 49 s (its window after
+ * 5 to 12 s, the progress page 24 to 37 s), so about 45. The finish page, not this, says it is safe to shut down.
+ */
+export const INSTALL_SECONDS = 45
 /** The check in progress was started by the user, so its result is shown even if nothing is found. */
 let manualCheck = false
 
@@ -213,8 +222,43 @@ export function restartAndInstall(version?: string): void {
     return
   }
   // Its notice keeps its button until the quit goes ahead (HI-2425): the quit may still ask, and Cancel leaves Combwork
-  // and the offer as they were. markInstalling() says Installing once it does.
-  restartForUpdate()
+  // and the offer as they were. markInstalling() says Installing once it does. Its consent is the quit's (HI-3167).
+  restartForUpdate(state.version!)
+}
+
+/** The downloaded update's version while it is ready, else null. */
+export const readyVersion = (): string | null => (state.status === 'ready' && state.version ? state.version : null)
+
+/** What a plain quit's dialog offers to install now (HI-3167): the ready update when Install is automatic and it may be. */
+export function installOffer(): InstallOffer | null {
+  const v = readyVersion()
+  return v && installsOnQuit() ? consent.offer(v) : null
+}
+
+/** The quit dialog's Install now for what it offered: false when the offer no longer holds (another version, a session end). */
+export function acceptInstall(offer: InstallOffer): boolean {
+  const ok = consent.accept(offer, readyVersion())
+  log.info(ok ? `Install now chosen for ${offer.version}` : `Install now for ${offer.version} no longer holds: not installing`)
+  return ok
+}
+
+/** Restart and Update for this version, as its quit goes ahead. */
+export const grantInstall = (version: string): void => consent.grant(version)
+
+/** Nothing installs as this quit ends (a new request, Next time, Cancel, Close this window only, a cancelled wait). */
+export const clearInstall = (): void => consent.clear()
+
+/** The consent that holds now for the ready update, or null: the end of the quit installs only with one. */
+export const installConsent = (): InstallConsentRecord | null => consent.valid(readyVersion())
+
+/** Windows ending the session (HI-3167): any consent so far is void, so a shutdown never starts an install. */
+function watchSessionEnd(win: BrowserWindow): void {
+  const ending = (ev: string): void => {
+    if (installConsent()) log.info(`Windows is ending the session (${ev}): the update won't be installed as Combwork quits`)
+    consent.sessionEnding()
+  }
+  win.on('query-session-end', () => ending('query-session-end'))
+  win.on('session-end', () => ending('session-end'))
 }
 
 /** The quit is going ahead and installs the update (HI-2425): its notice says so in place of Restart and Update. */
@@ -229,32 +273,37 @@ function notInstalledText(): string {
     : tr(msg({ id: 'main.update.notInstalledNotNewer', defaultMessage: 'The copy installed on this computer is the same version or newer (a local build, say).', description: 'Why Combwork did not install a downloaded update: what is installed is not older than it.' }))
 }
 
-/** Whether Combwork's quit installs the downloaded update: Install is automatic, and it may be installed now (mayInstall). */
+/** Whether a plain quit offers to install the downloaded update (HI-3167): Install is automatic, and it may be installed now (mayInstall). */
 export function installsOnQuit(): boolean {
   return state.status === 'ready' && config.settings.updates.install === 'auto' && mayInstall()
 }
 
 /**
- * Called at the very end of quitting (index.ts' quit flow, so never for a quit the user cancelled): Restart and Update
- * (`restart`) installs and opens Combwork again; Install automatically, without. Checked again first (mayInstall): the copy
- * on disk read now, and Combwork quits without installing when it may not.
+ * Called at the very end of quitting (index.ts' quit flow, so never for a quit the user cancelled), with the quit's
+ * consent (HI-3167). Checked again first (mayInstall): the copy on disk read now, and Combwork quits without installing
+ * when it may not. The installer is shown, never silent: its progress, then its finish page, which says it is installed
+ * and whose Run Combwork (ticked) opens it again. electron-updater gives a shown installer `--updated` only (forceRunAfter
+ * applies to a silent one), so the update's own pages (welcome, folder) are skipped.
  */
-export function installNow(restart = true): void {
+export function installNow(c: InstallConsentRecord): void {
   if (!mayInstall()) {
     exitBy('app.quit', 'quitting without the update (the installed copy is newer or unreadable)', () => app.quit())
     return
   }
+  const why = c.kind === 'restart' ? 'Restart and Update' : 'Install now' // i18n-ignore: combwork.log's English
   if (testFeed()) {
-    log.info(`Test mode: would install ${state.version}${restart ? ' and restart' : ' (on quit)'}`)
+    log.info(`Test mode: would install ${state.version} (${why}), the installer shown and Combwork reopened from its finish page`)
     exitBy('app.quit', 'the update would be installed (test feed)', () => app.quit())
     return
   }
-  log.info(`Installing ${state.version}${restart ? ' and restarting' : ' on quit'}`)
-  exitBy('autoUpdater.quitAndInstall', 'installing the update', () => autoUpdater.quitAndInstall(true, restart))
+  log.info(`Installing ${state.version} (${why}), the installer shown`)
+  exitBy('autoUpdater.quitAndInstall', 'installing the update', () => autoUpdater.quitAndInstall(false, true))
 }
 
-export function initUpdater(opts: { restart: () => void }): void {
+export function initUpdater(opts: { restart: (version: string) => void }): void {
   restartForUpdate = opts.restart
+  for (const w of BrowserWindow.getAllWindows()) watchSessionEnd(w)
+  app.on('browser-window-created', (_e, w) => watchSessionEnd(w))
   running = app.isPackaged || testFeed() ? runningIdentity(app.getVersion(), resourcesDir()) : running
   state = { ...state, local: localOf(running) }
   autoUpdater.logger = { info: (m: unknown) => log.info(String(m)), warn: (m: unknown) => log.warn(String(m)), error: (m: unknown) => log.error(String(m)), debug: () => undefined }
@@ -304,7 +353,7 @@ export function initUpdater(opts: { restart: () => void }): void {
     toast(
       'info',
       tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Combwork's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
-      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Combwork, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
+      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'Combwork asks to install it when you quit, or restart now.', description: 'The notice that an update is ready, with updates installed automatically: quitting asks Install now or Next time (HI-3167).' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
       [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Combwork and installs the update." })), command: 'update.install', args: [info.version] }],
       undefined,
       undefined,

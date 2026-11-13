@@ -29,9 +29,24 @@
     "note": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it.",
     "audience": "both"
   },
+  "git.repoLock.jjFolder": {
+    "text": "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.",
+    "note": "An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git.",
+    "audience": "both"
+  },
   "git.repoLock.noGitDir": {
     "text": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message.",
+    "audience": "both"
+  },
+  "git.repoLock.order": {
+    "text": "This repository is busy with another change. Nothing was changed: try again in a moment.",
+    "note": "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other.",
+    "audience": "both"
+  },
+  "git.repoLock.unknownRepo": {
+    "text": "Combwork couldn't read the jj repository at {root} ({why}), so nothing was changed.",
+    "note": "An error (HI-2896): a change needed the lock of a project's repository, and the jj (Jujutsu) repository holding the folder couldn't be read ({why}: a short code, kept in English). Keep jj.",
     "audience": "both"
   },
   "git.tool.missing": {
@@ -84,6 +99,11 @@
     "note": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep).",
     "audience": "both"
   },
+  "git.vc.jj": {
+    "text": "jj",
+    "note": "Jujutsu’s command name, as its users call it, in the choice atop the Version Control tab (HI-2799). Keep it: a product’s name, lower case.",
+    "audience": "both"
+  },
   "git.vc.none": {
     "text": "None",
     "note": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None).",
@@ -91,7 +111,62 @@
   },
   "git.vc.switch.changed": {
     "text": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
-    "note": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git.",
+    "note": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.drain": {
+    "text": "Work is still running on this repository: switch once it has finished.",
+    "note": "Why a switch between Git and jj is refused (HI-2799): lanes, cards in flight, the merge queue or slots are still in use on the repository (listed in the same dialog). Keep Git and jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.fallback": {
+    "text": "The repository isn’t ready to go back to Git: see the list.",
+    "note": "Why a jj project can’t be switched back to Git (HI-2799): conflicted bookmarks, changes Git hasn’t received and the like (listed in the same dialog). Keep Git.",
+    "audience": "both"
+  },
+  "git.vc.switch.gates": {
+    "text": "This repository uses what jj doesn’t support: see the list.",
+    "note": "Why a project can’t be switched to jj (HI-2799): the compatibility check found Git features jj doesn’t support (listed in the same dialog). Keep jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.groupChanged": {
+    "text": "This repository’s projects changed meanwhile: look again before switching.",
+    "note": "Why a switch between Git and jj is refused (HI-2799): a project joined the repository, or one of its projects’ choices or options changed, after the warning was shown.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjInGit": {
+    "text": "This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.",
+    "note": "Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjNoGitCopy": {
+    "text": "No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.",
+    "note": "Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjTool": {
+    "text": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.",
+    "note": "Why a project can’t be switched to jj (HI-2799): the jj tool Combwork found. Keep jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjToolBack": {
+    "text": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so Combwork can’t check that this repository is ready to go back to Git. Install the jj Combwork is tested with, then switch. Or, if you’re done with jj, remove the .jj folder: the project can then go back to Git without it.",
+    "note": "Why a jj project can’t be switched back to Git (HI-2975): jj itself is missing or not the tested version, so whether its bookmarks reached Git can’t be checked. Keep jj, Git and .jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.jjUnknown": {
+    "text": "jj couldn’t confirm this repository ({code}), so this project can’t switch.",
+    "note": "Why a project can’t be switched to or from jj (HI-2799): jj didn’t confirm what its files say. {code} is a short code for why (kept in English). Keep jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.memberDrain": {
+    "text": "Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.",
+    "note": "Why a project can’t be switched to None now (HI-2974): its repository was once switched between Git and jj, and lanes, cards in flight, the merge queue, slots or review copies of this project are still in use (listed in the same dialog). Keep Git, jj and None (glossary 2.1).",
+    "audience": "both"
+  },
+  "git.vc.switch.memberNoJj": {
+    "text": "{project} is on this repository, but its folder isn’t a jj workspace (a Git worktree, say), so it can’t use jj. Choose None for {project}, or remove it from the workspace, then switch.",
+    "note": "Why a switch to jj is refused (HI-3034): every project on the repository switches together, and {project}, another project on it, is a folder jj doesn’t know (typically a git worktree the user made). Keep jj, Git and None (glossary 2.1).",
     "audience": "both"
   },
   "git.vc.switch.noGit": {
@@ -99,9 +174,29 @@
     "note": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there.",
     "audience": "both"
   },
+  "git.vc.switch.noJj": {
+    "text": "No jj repository here. Combwork never makes one: create it with jj.",
+    "note": "Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj.",
+    "audience": "both"
+  },
   "git.vc.switch.otherFound": {
     "text": "{vcs} found: not supported yet, so this project can only use None.",
-    "note": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Jujutsu) was found in its folder. None: glossary 2.1.",
+    "note": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Subversion) was found in its folder. None: glossary 2.1.",
+    "audience": "both"
+  },
+  "git.vc.switch.otherWorkspace": {
+    "text": "This repository is also a project of the open workspace {workspace}: close it there first.",
+    "note": "Why a switch between Git and jj is refused (HI-2799): another open workspace (another window) has a project on the same repository, whose work Combwork can’t hold while it switches. {workspace} is its name. Keep Git and jj.",
+    "audience": "both"
+  },
+  "git.vc.switch.storeRuns": {
+    "text": "This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.",
+    "note": "Why a project can’t be switched to Git (HI-3072): it is on a repository (a Git worktree of one, say) whose other projects switched it to jj, so a Git project there would mix Git and jj on one repository. {platform} is jj (or Git), as the window names it.",
+    "audience": "both"
+  },
+  "git.vc.switch.switching": {
+    "text": "This repository’s version control is being switched: try again in a moment.",
+    "note": "Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way.",
     "audience": "both"
   }
 }

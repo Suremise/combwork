@@ -9,6 +9,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
+import type { PlatformId } from '../src/shared/platform/descriptors'
 import { bound } from './keepType'
 
 const base = tempDir('cw-wfoptions-')
@@ -54,8 +55,12 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 const savedWorkflow = config.settings.workflow
-afterEach(() => {
+afterEach(async () => {
   config.settings.workflow = savedWorkflow
+  // HI-2954: each test's workspaces closed as it ends. Kept open to the file's end, every earlier test's board, repository
+  // lock and watchers went on working in later tests' time: on CI's runner (11 Nov, its disk taking seconds to sync) their
+  // boards' idle checkpoints (1.2 to 2.7 s each) ran during HR3's gap 3's open, the 53rd, which took 22 s of its 20.
+  for (const w of opened.splice(0)) await disposeWorkspaceService(w)
 })
 
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
@@ -385,6 +390,9 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
       combworkMergesNeedsGit: { ...allOff('none'), finish: 'combworkMerges' },
       noneHasNoSlots: { ...allOff('none'), folder: 'slots' },
+      // jj (HI-2799): the user integrates, in slots.
+      jjYouIntegrate: { ...allOff('jj'), finish: 'notChecked' },
+      jjNeedsSlots: { ...allOff('jj'), folder: 'project' },
       // G20 on with no runner (HI-1367).
       focusedNeedsRunner: { ...allOff('git'), finish: 'combworkMerges', folder: 'slots', focusedTests: true },
       // A project inside a larger repository (#1419), its target not its own: known where the save checks it.
@@ -1077,15 +1085,15 @@ describe('G15 and G17 in the form (#1445)', () => {
   })
 
   it("the scripts' origins: a slot's setup, archive and copied files fall back to the project's from before 1.0, then the levels', else none", () => {
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, { global: { copy: 'global' } })).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
-    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, { global: { copy: '.env' } })).toEqual({ setup: '', archive: '', copy: '.env' })
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, { global: { copy: 'global' } })).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json' })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, { global: { copy: 'global' } })).toEqual({ setup: 'npm install', archive: '', copy: '.env*', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, { global: { copy: '.env' } })).toEqual({ setup: '', archive: '', copy: '.env', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, { global: { copy: 'global' } })).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json', gitFiles: true })
   })
 })
 
 describe("G15 saved before P7: the one-time step (#1445)", () => {
   // The step's check, as a save makes it (no defaults at the levels here).
-  const problemsOf = (platform: 'git' | 'none', o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
+  const problemsOf = (platform: PlatformId, o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
   const { platform: _gp, ...pairWhole } = preset('git', 'pair')
   const { platform: _gt, ...teamWhole } = preset('git', 'team')
 
@@ -1115,7 +1123,7 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
     // One whose folder isn't stored resolves the project folder (all-off's): left Off, never On.
     expect(settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { slotsUpToDate: false } }, problemsOf)).toBeNull()
     // With no preset, a drop that would inherit a contradiction keeps the stored Off.
-    const inherits = (platform: 'git' | 'none', o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { workspace: { git: { slotsUpToDate: true, folder: 'slots' } }, project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
+    const inherits = (platform: PlatformId, o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { workspace: { git: { slotsUpToDate: true, folder: 'slots' } }, project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
     expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'project', slotsUpToDate: false } }, inherits)).toBeNull()
     expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'slots', slotsUpToDate: false } }, inherits)?.options).toEqual({ folder: 'slots' })
   })
@@ -1397,6 +1405,21 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
     await setSlotSetting(w, repo, 'copiesSize', 3)
     await setSlotSetting(w, repo, 'copiesSize', null)
     expect((await w.projectConfig(repo)).copies).toEqual({})
+  })
+
+  it('Set up submodules and LFS (HI-1182): off is stored, on (or null) removes it, anything else is refused', async () => {
+    const { setSlotSetting } = await import('../src/main/slotSettings')
+    const { w, repo } = await workspace({})
+    await setSlotSetting(w, repo, 'setup', 'npm ci')
+    await setSlotSetting(w, repo, 'gitFiles', false)
+    expect((await w.projectConfig(repo)).slots).toEqual({ setup: 'npm ci', gitFiles: false })
+    expect(slotOptionsOf(await w.projectConfig(repo), {}).gitFiles).toBe(false)
+    await setSlotSetting(w, repo, 'gitFiles', true)
+    expect((await w.projectConfig(repo)).slots).toEqual({ setup: 'npm ci' })
+    await setSlotSetting(w, repo, 'gitFiles', false)
+    await setSlotSetting(w, repo, 'gitFiles', null)
+    expect(slotOptionsOf(await w.projectConfig(repo), {}).gitFiles).toBe(true)
+    await expect(setSlotSetting(w, repo, 'gitFiles', 'yes')).rejects.toThrow('Set up submodules and LFS is on or off.')
   })
 
   it("Combwork's and the workspace's copied files (HI-1765): set, none or inherit at each level, the project's own winning, each with its origin", async () => {

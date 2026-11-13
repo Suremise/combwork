@@ -10,8 +10,8 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -21,24 +21,37 @@ import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
-import type { StoredText } from '../../shared/types'
+import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
+import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
+import { historyOf } from '../platform/historyPorts'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
-import { isUnknown, unknown, type Maybe } from '../platform/types'
-import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
+import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
+import { releaseReadsOf } from '../platform/releaseReadsPorts'
+import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
+import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
+import { HISTORY, storedText } from '../../shared/taskHistory'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
+import { admit } from '../platform/platformFence'
+import { createLogger, userText } from '../logger'
+import { GatherDepth } from './gatherDepth'
+import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
+import { asCardCounts } from './containment'
+
+const log = createLogger('workflow')
 
 export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
@@ -64,6 +77,11 @@ export interface Ask {
    * then the unclaimed changes, which may be another card's). Moved again with `paths` to include them, or without asking.
    */
   leftOut?: { paths: string[]; files: string[] }
+  /**
+   * HI-3148: the released line the start among its rules would go onto (`start.released`): the override confirmed is for
+   * this line only, given back with it (`released`); a line changed meanwhile is asked about again.
+   */
+  released?: string
 }
 
 export type Reply = Moved | Refusal
@@ -110,6 +128,22 @@ export interface Effects {
 }
 
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
+/** HI-3107: a card's earlier work on another version control's line, said to agents (a start's warning, the card's comment). */
+export const earlierWorkText = (card: string, e: EarlierLine, now: PlatformId): string =>
+  e.line === null ? say(W.earlierUnread, { card }) : say(W.earlierWork, { card, line: e.line, from: e.platform ? 'known' : 'unknown', now: shownPlatform(now), state: e.state, target: e.target ?? '' }) // i18n-ignore: select keys
+
+/** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross): its platform's and the project's now. */
+export interface KeptAcross {
+  slot: string
+  platform: string
+  now: string
+  gone: boolean
+}
+
+/** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
+/** A platform's product name, the same in every language (HI-3140: its descriptor's). */
+export const shownPlatform = (p: string): string => platformName(p)
+
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 
 /**
@@ -175,6 +209,8 @@ export interface WorkflowConfig {
   project: string
   /** The project key (`AM`). */
   projectKey: string
+  /** The project's identity as the slot and copy tables key it (HI-2799: the platform fence's admissions); absent in tests. */
+  projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
@@ -184,9 +220,42 @@ export interface WorkflowConfig {
    * its lease (a lane's, kept for the lane; else the card's own, `fresh` when lent now), or why none can be now (`wait`,
    * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
    */
-  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /** HI-3129: `kept`, a kept slot's proved binding the start resolved its target from: checked again before the lend records it. */
+  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
+  /**
+   * HI-3069: the card's committed work kept in a slot of the other version control (a switch since it was put back): the
+   * slot, its platform, the project's now, and whether its folder is gone. Every start asks it before its folder is
+   * chosen (`platform.keptAcross`). Left out, none.
+   */
+  keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
+  /**
+   * HI-3132: the card's committed work kept in a slot of the project's own version control (HI-2995): the slot and its
+   * folder. A start placing the card anywhere else (the project folder, its builder's own, a user's start across a slot
+   * wait) is refused naming it (`platform.keptElsewhere`). Left out, none.
+   */
+  keptHere?: (card: CardRecord) => Promise<{ slot: string; folder: string } | null>
+  /**
+   * HI-3148: the released line a running lane's starts may go onto, by the user's or the Assistant's override given with
+   * the lane's start (its record's, for its fixed Merges into while it runs), or null: none. Synchronous (the lanes as
+   * stored, never a cached copy): read again inside the start's write, so a lane ended or replaced meanwhile grants nothing.
+   */
+  releaseGrant?: (lane: string) => string | null
+  /** HI-3164: a platform's release reads (default: `releaseReadsOf`, Combwork's own runners). A seam for a test world whose version control runs through its own runner, never a way round the check: null is a platform with nothing released, as the default's. */
+  releaseReads?: (platform: PlatformId) => ReleaseReads | null
+  /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
+  earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
+  /**
+   * HI-3118: whether the lease a card's cycle started on still holds its slot for it (FactStore.leaseHolds: open, that
+   * slot at that folder, the card's own or a lane's listing it); null when it can't be read. The app's; left out (tests
+   * of a slot made by hand), a submit doesn't ask.
+   */
+  slotHeld?: (lease: string, slot: string, folder: string, card: number) => boolean | null
+  /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
+  targetChanges?: (changes: TargetChanges, card: string) => void
+  /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
+  jj?: JjCardDeps
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
   /**
@@ -234,6 +303,11 @@ export interface WorkflowConfig {
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
+  /**
+   * After a write that moved a card, once it is committed: from and to (HI-2938: a jj card's pass changes no jj operation
+   * or ref, so the app asks for its reconciliation here, which builds its candidate).
+   */
+  moved?: (card: CardRecord, from: StageId, to: StageId) => void
   /** Test seams: called between gathering and the transaction. */
   hooks?: { beforeWrite?: (move: string) => void | Promise<void>; unsubmittedRead?: () => void | Promise<void> }
   /**
@@ -295,7 +369,21 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
  * is a durable action delivered later, and a fact's reason is stored: both are said in the Default (`stored`) until
  * stored text is said when read (dialects, 4 and 5b); a reply's text is said in the caller's scope.
  */
+/** HI-2944: paths as a warning names them: three at most, then how many more (HI-2960: an agent's reply, kept short). */
+const FILES_NAMED = 3
+const filesNamed = (files: readonly string[]): string => (files.length <= FILES_NAMED ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, FILES_NAMED).join(', '), more: files.length - FILES_NAMED }))
+
+/**
+ * HI-2984: whether the target's folder with uncommitted changes is worth a start's warning (and the window's notice):
+ * only when the rules merge something into the target (a finish other than Committed, whose target is just the line
+ * the work is committed on) and that folder isn't where the work is built (Solo's: the agent's own folder, maybe its
+ * own half-done work, never a merge's).
+ */
+const targetChangesApply = (o: WorkflowOptions, folder: string, workFolder: string | null): boolean =>
+  o.finish !== 'committed' && (workFolder === null || resolvePath(folder).toLowerCase() !== resolvePath(workFolder).toLowerCase())
+
 const W = {
+  forwardResolving: agentMsg({ id: 'runtime.forward.resolving', text: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.', note: 'HI-2959: the comment on a forward merge card (Combwork merging branch {from} into {to}) ended by Resolve on a builder. {card}: the new card’s key; {source}: a short commit id.' }),
   choiceCarryOn: agentMsg({ id: 'runtime.choice.carryOn', text: 'carry on', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceAccept: agentMsg({ id: 'runtime.choice.accept', text: 'accept it with follow-ups', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
@@ -317,8 +405,12 @@ const W = {
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
   blocked: agentMsg({ id: 'runtime.start.blocked', text: '{card} is blocked: {why}', note: "A start's warning: the card is blocked. {why}: the block's reason, in its author's words." }),
+  targetChanges: agentMsg({ id: 'runtime.start.targetChanges', text: "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.", note: "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more." }),
+  moreFiles: agentMsg({ id: 'runtime.start.moreFiles', text: '{files} and {more} more', note: 'HI-2944: a list of paths cut at three, and how many more there are.' }),
+  earlierWork: agentMsg({ id: 'runtime.start.earlierWork', text: "{card} has earlier work on {line}, {from, select, known {from before its project switched to {now}} other {from a start whose version control Combwork couldn't read}}: {state, select, ahead {commits its target {target} doesn't hold} other {Combwork couldn't tell whether its target holds it}}. Combwork leaves it on that line and doesn't carry it in, though this start's target may hold it by now: check whether your folder has it before bringing in what you need, or leave it.", note: 'HI-3107: a start’s warning (never a refusal): the card ran before under another version control (Git, say, before the repository switched to jj; from other: its start’s ruleset couldn’t be read), and its line from then has (ahead) or may have (other: it couldn’t be read) work the target recorded then lacked. Never claims the new folder lacks it (its new target, or a kept folder, may hold it). {line} and {target} are branch or bookmark names; {now} is the version control in force (Git, jj).' }),
+  earlierUnread: agentMsg({ id: 'runtime.start.earlierUnread', text: "Combwork couldn't read {card}'s earlier starts, so it can't tell whether work from before (on a line of another version control) was left behind: if the card ran before, check its earlier line before bringing in what you need.", note: 'HI-3107: a start’s warning (never a refusal): the card’s recorded starts couldn’t be read, so its earlier work can’t be looked for; said rather than taken for none (HR2).' }),
   slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
-  slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now." }),
+  slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)." }),
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
   approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
   movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
@@ -326,6 +418,7 @@ const W = {
   aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
   inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
   failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
+  resolutionOverride: agentMsg({ id: 'runtime.wake.resolutionOverride', text: '{card}: the user’s override of the release path’s direction is recorded on it, so its merge may bring {to} up to date with {from}. Submit the same revision again (cw_submit): it goes back into the merge queue once, as approved.', note: 'HI-3040: the builder’s wake when the user (or the Assistant on their explicit request) recorded an override on a forward merge’s resolution the queue returned for its direction. {from} and {to}: branch names.' }),
   staleSubmit: agentMsg({ id: 'runtime.wake.stale', text: 'stale: submit again', note: "The builder's wake when its pass went stale at the verdict (its line moved)." }),
   focusedSkip: agentMsg({ id: 'runtime.wake.focusedSkip', text: '{card}: its reviewer {merge, select, yes {accepted} other {declined}} the focused tests its merge skipped ({why})', note: "The builder's wake for its reviewer's cw_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason." }),
   answered: agentMsg({ id: 'runtime.wake.answered', text: '{card}: the user {answer, select, approved {approved} declined {declined} other {answered}} "{question}"', note: "An answer's wake: what the user did with a question. {answer}: approved, declined or another answer. {question}: the question, quoted short (#1626); what they chose or noted follows." }),
@@ -419,6 +512,8 @@ interface StartGathered {
   warnings: string[]
   /** A slot's lease lent for this start (#1438): given back if the start isn't written. */
   lent: string | null
+  /** HI-3107: its earlier work on lines of another version control, said once the start is written. */
+  earlier: EarlierLine[]
   /** None (HI-2340): the generation its whole-project read was made under; another at the write, it is gathered again. */
   baselineGen?: number
 }
@@ -441,6 +536,8 @@ interface SubmitGathered {
   files: FactData['Submitted']['files']
   commits?: string[]
   paths?: string[]
+  /** What only the platform records of the submission (`Submitted.platform`: jj's ids and chain, HI-2868). */
+  platform?: Record<string, unknown>
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
   /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
   focusedOp?: AbortSignal
@@ -482,6 +579,9 @@ class DragUndone extends Error {
 const undo = (g: GuardRefusal): never => {
   throw new DragUndone(g)
 }
+
+/** HI-3128: the queue pauses about a target's setup, not a card: Remove from queue of the card one names clears it. */
+const SETUP_PAUSES = new Set(['noUpstream', 'remoteAmbiguous', 'remoteUnsupported', 'fetchFailed'])
 
 export class Workflow {
   readonly store: FactStore
@@ -547,7 +647,8 @@ export class Workflow {
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
     const facts = this.store.facts(card.id)
-    const base = this.baseRulesetOf(card, s, facts)
+    // A forward resolution (HI-2959) merges as a merge commit, whatever its base's style.
+    const base = s.resolves ? mergeCommitOf(this.baseRulesetOf(card, s, facts)) : this.baseRulesetOf(card, s, facts)
     // A card that skips review (#1625) runs under its rules with no review, whenever the skip was set.
     if (!reviewSkipOf(facts).skip) return base
     const skipped = skipReviewOf(base)
@@ -662,6 +763,7 @@ export class Workflow {
    */
   async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>): Promise<T> {
     const also = alongsideOf.getStore()
+    let movedTo: { from: StageId; to: StageId } | null = null
     const out = await this.locked(async () => {
       const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
@@ -683,8 +785,19 @@ export class Workflow {
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
       if (also && w && (w as Write).written.length) await also.written(w)
+      const done = w as Write | null
+      if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
       return r
     })
+    // Set in the write's continuation above (TypeScript can't see it there).
+    const m = movedTo as { from: StageId; to: StageId } | null
+    if (m && this.cfg.moved) {
+      try {
+        this.cfg.moved(card, m.from, m.to)
+      } catch {
+        // A hook's own failure never undoes or fails the committed write.
+      }
+    }
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
   }
@@ -862,6 +975,8 @@ export class Workflow {
   /** The intents an agent can use from a stage under a ruleset (§16.7.2's table): what a refusal offers as the next step. */
   movesFrom(stage: StageId, r?: Ruleset, s?: CardState): string[] {
     const o = r?.options
+    // HI-3086: a forward merge's own (the user's or the Assistant's): no agent's intent applies to it.
+    if (s?.forward) return stage === 'active' ? ['retry merge', 'resolve on a builder', 'remove from queue'] : stage === 'approved' || stage === 'merging' ? ['remove from queue'] : [] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     switch (stage) {
       case 'todo':
         return ['start']
@@ -883,6 +998,18 @@ export class Workflow {
   /** Guards evaluated inside the transaction, on the card's facts as they are now. */
   private check(w: Write, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
     return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
+  }
+
+  /**
+   * HI-2854 (Darren's B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
+   * All off: their compiled guards and ids unchanged, so the user's drags there still ask nothing), is refused all the
+   * same while the agent hasn't seen a decision or a comment of the user's: work-on-card no longer reads the card again
+   * before submitting. In the submit's write, under its lock; nothing with the rules off, or what an override leaves out.
+   */
+  private agentHasSeen(w: Write, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    const id: GuardId = 'submit.decisionsReceived'
+    if (!this.enforced() || !inputs.agent || (only && !only(id)) || (w.ruleset?.guards.submit ?? []).includes(id)) return null
+    return evaluate([id], this.guardInputs(w, inputs))
   }
 
   private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
@@ -939,7 +1066,7 @@ export class Workflow {
   // --- Intents and moves (§16.7.2).
 
   /** start: Todo → Active, the card's line and base recorded, its folder prepared (slots). */
-  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean } = {}): Promise<Reply> {
+  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean; released?: { target: string; reason: string } } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -974,11 +1101,26 @@ export class Workflow {
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     try {
+      // HI-3148: never new work on a released line, unless the user or the Assistant says so (a hotfix).
+      const rel = this.enforced() ? await this.releasedStart(card, g, actor, opts.released) : { grant: null }
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
+      if ('refusal' in rel) return await this.refuse(card, actor, 'start', rel.refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      // HI-2985: a forward's resolution starts only on the branch it resolves (one made unpinned, or Work merges into moved).
+      const res = from.resolves
+      if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
       // Its ruleset is stored by the write that names it (write()), under the store's lock.
       await this.cfg.hooks?.beforeWrite?.('start')
-      if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+      // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
+      // with Combwork's own jj operations beside it).
+      const gathers = this.platform(g.o).startGathers ?? 1
+      // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
+      // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
+      // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
+      if (await this.revalidate(card, from, g.o, g.before, gathers)) return await this.regather(card, () => this.start(ref, actor, opts))
       let laneMoved = false
       let baselineMoved = false
+      let evidenceMoved = false
+      let releaseMoved = false
       const out = await this.writeWhole(card, g.r, actor, (w) => {
         const moved = this.stillAt(w, s, 'start')
         if (moved) return moved
@@ -989,7 +1131,10 @@ export class Workflow {
         const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
         // None (HI-2340): its baseline read under the folders left out as they are now, else gathered again (once).
         const changed = this.evidenceChanged(w, g.o, g.before)
-        if (changed) return undone(changed)
+        if (changed) {
+          evidenceMoved = true
+          return undone(changed)
+        }
         if (g.baselineGen !== undefined && g.baselineGen !== this.none.generation) {
           baselineMoved = true
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
@@ -997,6 +1142,9 @@ export class Workflow {
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
+        // The platform fence (HI-2799): a start is an admission on the project's repository, decided in this transaction.
+        const fenced = this.cfg.projectId ? admit({ get: (k) => this.store.boardMeta(k), set: () => undefined }, this.cfg.projectId(), g.o.platform) : null
+        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: shownPlatform(fenced.now) } })
         if (this.enforced() && !opts.drag) {
           this.applyLaneBoundary(w, this.store.card(card.id))
           // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
@@ -1010,20 +1158,68 @@ export class Workflow {
         }
         const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
         if (waits) return undone(waits)
+        // HI-3148: what let it through onto its line still holds here (no tag made, no lane's grant ended): else decided again.
+        if ('bound' in rel && rel.bound && !rel.bound()) {
+          releaseMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
         // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
         const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
         if (bad) return undone(bad)
+        // The release override it was given, recorded with the start it lets through, for the line it was given for.
+        if (rel.grant) w.fact('Override', rel.grant) // i18n-ignore: a fact's kind and codes, not text
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })
-      if (out && (laneMoved || baselineMoved) && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
+      if (out && (laneMoved || baselineMoved || releaseMoved) && !this.gathering.depth(card.id)) return await this.regather(card, () => this.start(ref, actor, opts))
+      // Its fingerprint moved again between the last gather and the write, its answer by content still the same, or the
+      // fingerprint unreadable at that instant (HI-2972): gathered again from the top while its platform allows more
+      // passes (none beyond #1206's one unless it says so), else refused.
+      if (out && evidenceMoved) {
+        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, from, g.o, g.before) : null
+        if (again) {
+          this.startPassLog(card, 'write', again, gathers)
+          return await this.regather(card, () => this.start(ref, actor, opts))
+        }
+      }
+      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : releaseMoved ? 'release' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+      // HI-3107: written, its earlier work is said where the user and its builder read it (a comment, a notice).
+      if (g.earlier.length) void Promise.resolve(this.cfg.earlierWork?.(card, g.earlier, g.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
     } finally {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
       if (g.lent) await this.slotUnused(card, g.lent)
     }
+  }
+
+  /**
+   * HI-3148: a fresh start onto a released line (its platform's release reads: a tag named after it, the line in the main
+   * line) is refused, with the line to start on instead where one is known (`start.released`); one that can't be read is
+   * refused too (`start.releaseUnknown`), never taken for unreleased. Let through by the user's or the Assistant's override
+   * for exactly this line (`given`, the grant written with the start), or the card's running lane's (`releaseGrant`).
+   *
+   * Bound to the write (HR2's round 1): what let it through without the start's own override (the line not released, or
+   * the lane's grant) is `bound`, which the write asks again synchronously: the release reads' refs as they were before
+   * this read (`watch`), or the lane's grant as stored now. Moved, the start is gathered again and decided afresh.
+   */
+  private async releasedStart(card: CardRecord, g: StartGathered, actor: Actor, given?: { target: string; reason: string }): Promise<{ refusal: GuardRefusal } | { grant: FactData['Override'] | null; bound?: () => boolean }> {
+    const target = g.data.target
+    const reads = target ? (this.cfg.releaseReads ?? releaseReadsOf)(g.o.platform) : null
+    if (!target || !reads) return { grant: null }
+    const by = actor === 'user' || actor === 'assistant' ? actor : null
+    // The user's or the Assistant's for exactly this line: theirs whatever the line is now, so nothing to bind.
+    if (given && by && given.target === target) return { grant: { rules: ['start.released'], move: 'start', by, reason: given.reason, target } }
+    const check = await reads.watch(this.cfg.project, target).catch(() => null)
+    const first = check ? check() : null
+    const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+    if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
+    const laneId = card.lane ?? null
+    if (laneId && this.cfg.releaseGrant?.(laneId) === target) return { grant: null, bound: () => this.cfg.releaseGrant?.(laneId) === target && (this.store.card(card.id).lane ?? null) === laneId }
+    if (isUnknown(r)) return { refusal: { rule: 'start.releaseUnknown', values: { card: card.key, target, what: r.whatText ?? r.what } } }
+    const suggest = await unreleasedFor(reads, this.cfg.project, target, this.cfg.options().target)
+    return { refusal: { rule: 'start.released', values: { card: card.key, target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' } } } // i18n-ignore: select keys
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */
@@ -1035,26 +1231,68 @@ export class Workflow {
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
+    // HI-3069: its work kept in a slot of the other version control: refused before any folder is chosen (a slot, the
+    // project folder or its builder's own), so it never starts without that work, the user's start included.
+    const across = await this.cfg.keptAcross?.(card)
+    if (across) return { rule: 'platform.keptAcross', values: { card: card.key, slot: across.slot, platform: shownPlatform(across.platform), now: shownPlatform(across.now), gone: across.gone ? 'yes' : 'no' } }
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
-    if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
-    const { existing, slotWait, fresh, baselineGen, ...planned } = plan
+    if (isUnknown(plan)) {
+      // A refusal of the platform's own (HI-3106: no target chosen), not a read that failed.
+      if (plan.rule) {
+        log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
+        return { rule: plan.rule, values: { card: card.key, ...plan.ruleValues } }
+      }
+      // Which read and why (HI-2916): the refusal says only what couldn't be read.
+      log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
+      return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
+    }
+    const { existing, slotWait, acrossWait, fresh, baselineGen, carried, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
+    // HI-3132: its work kept in a slot of the project's own version control: it starts there or not at all. A plan
+    // placing it anywhere else (the project folder, its builder's own) is refused naming the slot, as keptAcross is;
+    // waiting for that slot stays a wait for an agent's or a lane's start, but a user's start across that wait (which
+    // would start it where it is) is refused too: an override of the slot's rule never leaves the work behind.
+    const here = card.kind === 'no-code' ? null : await this.cfg.keptHere?.(card)
+    const elsewhere = !!here && (planned.folder === 'project' || resolvePath(planned.folder).toLowerCase() !== resolvePath(here.folder).toLowerCase())
+    if (here && elsewhere && (!slotWait || actor === 'user')) {
+      if (lent) await this.slotUnused(card, lent)
+      return { rule: 'platform.keptElsewhere', values: { card: card.key, slot: here.slot } }
+    }
+    // HI-3141: a user's start across a slot wait is built where the card's agent is; the platform's reason it can't be
+    // built there (a project folder on no branch) refuses that start, never a card on no branch.
+    if (slotWait && actor === 'user' && acrossWait) {
+      if (lent) await this.slotUnused(card, lent)
+      return { rule: acrossWait.rule, values: { card: card.key, ...acrossWait.ruleValues } }
+    }
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
       if (lent) await this.slotUnused(card, lent)
+      this.startRefusedLog(card, 'plan', this.platform(o).startGathers ?? 1)
       return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     if (dry) delete data.lease
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
+    // HI-3107: work from cycles under another version control, left on its line, said (never carried, never refused).
+    const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project, data.line).catch((e: unknown) => (log.warn(`#${card.id}: its earlier work couldn't be read`, e), [UNREAD])) : []
+    if (earlier.length) log.info(`#${card.id} has earlier work: ${earlier.map((e) => `${e.line === null ? 'its starts unread' : userText(e.line)} (${e.state})`).join(', ')}`) // i18n-ignore: a log line
+    for (const e of earlier) warnings.push(earlierWorkText(card.key, e, o.platform))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
-    if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key }))
+    if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
+    // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
+    // a merge into it that changes them pauses. A warning only; never asked of a dry run (a drag's plan). HI-2984: only
+    // where something merges into the target, from another folder than the one the card is built in.
+    const tc = !dry && data.target ? await this.platform(o).targetChanges?.(String(data.target)).catch(() => null) : null
+    if (tc && targetChangesApply(o, tc.folder, data.folder === 'project' ? this.cfg.project : String(data.folder))) {
+      warnings.push(say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) }))
+      this.cfg.targetChanges?.(tc, card.key)
+    }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, earlier, ...(baselineGen !== undefined ? { baselineGen } : {}) }
   }
 
   /**
@@ -1123,8 +1361,11 @@ export class Workflow {
     return { primed, value: this.evidenceNow(card, s, o, primed), content }
   }
 
-  /** Cards whose intent is being gathered again (`regather`): at most once, so a fingerprint moving again refuses. */
-  private regathering = new Set<number>()
+  /**
+   * How many passes deep each intent is in being gathered again (`regather`), its own call chain's (gatherDepth.ts): at
+   * most once, so a fingerprint moving again refuses, except a start on a platform allowing more (`startGathers`, HI-2916).
+   */
+  private readonly gathering = new GatherDepth()
 
   /**
    * Just before an intent's transaction (#1206): whether to gather it again from the top. Only when the fingerprint
@@ -1134,25 +1375,71 @@ export class Workflow {
    * inputs: dirty files, the revision) may have seen another state and back, so it is never reused with a new
    * fingerprint: the intent starts again, reading everything afresh, once (`regather`). A real change refuses at once,
    * as does a fingerprint moving again in the second pass. Git, the files and SQLite can't be one transaction:
-   * reconciliation settles what comes after the transaction's read.
+   * reconciliation settles what comes after the transaction's read. `passes`: how many passes deep it may go (a start's
+   * platform may allow more than one, `startGathers`).
    */
-  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<boolean> {
-    if (before.value === null || before.content === null || this.regathering.has(card.id)) return false
-    const a = this.evidenceNow(card, s, o, before.primed)
-    if (a === null || a === before.value || this.depsOf(a) !== this.depsOf(before.value)) return false
-    const content = await this.platform(o).content(card, s, o, before.primed)
-    const b = this.evidenceNow(card, s, o, before.primed)
-    return content !== null && content === before.content && b === a
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1): Promise<boolean> {
+    if (this.gathering.depth(card.id) >= passes) return false
+    // A start allowed several passes (HI-2972): `startAgain`'s answer, a steady fingerprint going on to the write.
+    if (passes > 1) {
+      const again = await this.startAgain(card, s, o, before)
+      if (again === 'moved' || again === 'unreadable') this.startPassLog(card, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
+      return again === 'moved' || again === 'unreadable'
+    }
+    const a = before.value === null ? null : this.evidenceNow(card, s, o, before.primed)
+    return a !== null && a !== before.value && (await this.sameContent(card, s, o, before))
   }
 
-  /** Runs an intent again from the top, once (`revalidate`). */
-  private async regather<T>(card: CardRecord, run: () => Promise<T>): Promise<T> {
-    this.regathering.add(card.id)
-    try {
-      return await run()
-    } finally {
-      this.regathering.delete(card.id)
-    }
+  /**
+   * Whether a start on a platform allowing several passes (`startGathers`) is gathered again (HI-2972), asked with passes
+   * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
+   * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
+   * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
+   * null, a real change (the cards waited for, or the content). Another pass reads everything afresh, and the write
+   * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
+   * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
+   */
+  private async startAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
+    if (before.value === null || before.content === null) return 'unreadable'
+    const a = this.evidenceNow(card, s, o, before.primed)
+    if (a === null) return 'unreadable'
+    if (a === before.value) return 'steady'
+    if (this.depsOf(a) !== this.depsOf(before.value)) return null
+    const content = await this.platform(o).content(card, s, o, before.primed)
+    if (content === null) return 'unreadable'
+    return content === before.content ? 'moved' : null
+  }
+
+  /** A start gathered again (HI-2972): where, why, and the pass the next one is, in the log. */
+  private startPassLog(card: CardRecord, at: string, why: string, passes: number): void {
+    log.info(`#${card.id}'s start gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
+  }
+
+  /** A start refused as `evidence.changed` (HI-2972): which check, on which pass, in the log (` not started: `, as the platform's). */
+  private startRefusedLog(card: CardRecord, check: string, passes: number, why?: string): void {
+    log.info(`#${card.id} not started: evidence.changed at ${check}, pass ${this.gathering.depth(card.id) + 1} of ${passes}${why ? ` (${why})` : ''}`)
+  }
+
+  /** Why a start whose fingerprint moved at its write wasn't gathered again (HI-2972's log): its passes, or a real change. */
+  private noPassWhy(card: CardRecord, passes: number): string {
+    return passes <= 1 ? 'one pass' : this.gathering.depth(card.id) >= passes ? 'passes spent' : 'a change by content' // i18n-ignore: a log line's codes, never shown
+  }
+
+  /**
+   * Whether the platform's answer by content is still the one the intent gathered on, the cards waited for unchanged and
+   * the fingerprint steady across the asking (`revalidate`'s test, whether or not the fingerprint moved).
+   */
+  private async sameContent(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<boolean> {
+    if (before.value === null || before.content === null) return false
+    const a = this.evidenceNow(card, s, o, before.primed)
+    if (a === null || this.depsOf(a) !== this.depsOf(before.value)) return false
+    const content = await this.platform(o).content(card, s, o, before.primed)
+    return content !== null && content === before.content && this.evidenceNow(card, s, o, before.primed) === a
+  }
+
+  /** Runs an intent again from the top, one pass deeper in its own call chain (`revalidate`). */
+  private regather<T>(card: CardRecord, run: () => Promise<T>): Promise<T> {
+    return this.gathering.again(card.id, run)
   }
 
   /** The part of a fingerprint that is the cards waited for (`evidenceNow`). */
@@ -1245,6 +1532,19 @@ export class Workflow {
   }
 
   /**
+   * HI-2944: a lane starting for `target` (a start's own warning is gatherStart's): its folder's uncommitted changes told to
+   * the window, and the warning for the caller's reply; null when there are none (or no such folder, or no platform read).
+   */
+  async targetChangesWarning(target: string): Promise<string | null> {
+    const o = this.cfg.options()
+    const tc = await this.platform(o).targetChanges?.(target).catch(() => null)
+    // HI-2984: as a card's start says it (targetChangesApply): the lane's cards are built in the project folder, or slots.
+    if (!tc || !targetChangesApply(o, tc.folder, o.folder === 'project' ? this.cfg.project : null)) return null
+    this.cfg.targetChanges?.(tc, '')
+    return say(W.targetChanges, { target: tc.target, folder: tc.folder, files: filesNamed(tc.files) })
+  }
+
+  /**
    * The cards a card waits for that aren't Done by facts **in its target** (§16.7.4): accepted, or with their change in
    * that target now, by containment of their stored endpoints (merged into a release branch and then into main counts;
    * a target reset since doesn't). A Done card with no `Integrated` (Not checked, an override) counts once its change is
@@ -1270,7 +1570,7 @@ export class Workflow {
         out.push(key)
         continue
       }
-      const c = await this.platform(o).contains(target, { base, revision, key: d.latest?.key })
+      const c = asCardCounts(d, await this.platform(o).contains(target, { base, revision, key: d.latest?.key }))
       if (isUnknown(c)) return c
       if (!c) out.push(key)
     }
@@ -1307,7 +1607,7 @@ export class Workflow {
    * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
    * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
    */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; folder?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
     const s = w.state()
     // Combwork's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
@@ -1315,7 +1615,7 @@ export class Workflow {
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.actions?.length ? { actions: o.actions } : {}), ...(o.tests ? { tests: o.tests } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.folder ? { folder: o.folder } : {}), ...(o.actions?.length ? { actions: o.actions } : {}), ...(o.tests ? { tests: o.tests } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -1382,7 +1682,7 @@ export class Workflow {
    * source frozen at `d.source`. Under its own rules (`forwardOf`), recorded with these facts. Only from the forward
    * request (queueControls' `forwardMerge`), as the user or the Assistant: refused for a card started before.
    */
-  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
+  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string; override?: ForwardOverride; defaultBranch?: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1391,7 +1691,7 @@ export class Workflow {
       const now = w.state()
       if (now.started || now.stage !== 'todo') return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'start', moves: '' } } as GuardRefusal // i18n-ignore: intent names
       w.fact('Started', { folder: 'project', line: null, base: d.base, target: d.to, builder: 'combwork', cardKind: 'code' }) // i18n-ignore: a fact's kind and codes, not text
-      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by, ...(d.override ? { override: d.override } : {}), ...(d.defaultBranch ? { defaultBranch: d.defaultBranch } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       w.move('active', 'intent')
       this.enqueueForward(w, d.source)
       return null
@@ -1471,6 +1771,12 @@ export class Workflow {
         } else {
           w.move('done', 'derived')
         }
+        return
+      case 'userIntegrates':
+        // jj (HI-2868, option A): the user integrates what passed. It waits in Approved, its OK asked there first where G10
+        // applies, until reconciliation finds it in its target (J9b2); Combwork never merges or moves anything for it.
+        if (hasStage(r, 'approved')) w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
       default:
         return
@@ -1577,7 +1883,7 @@ export class Workflow {
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
       const ins = this.submitInputs(g)
-      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
+      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
       ahead = this.enforced() && !args.drag && !followUp && g.o.review !== 'none' ? this.laneReorder(w, card) : null
@@ -1629,6 +1935,7 @@ export class Workflow {
     let files: FactData['Submitted']['files'] = []
     let commits: string[] | undefined
     let paths: string[] | undefined
+    let platform: Record<string, unknown> | undefined
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder: this.folderOf(s) }
     const warnings: string[] = []
     // A lock taken before the submission is in the cards' records before it reads them (G16, submit.clean: #1481).
@@ -1646,7 +1953,7 @@ export class Workflow {
     if (card.kind === 'code') {
       const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit, predicted })
       if (!plan.ok) return plan.refusal
-      ;({ revision, base, key, files, commits, paths } = plan)
+      ;({ revision, base, key, files, commits, paths, platform } = plan)
       Object.assign(inputs, plan.inputs)
       warnings.push(...plan.warnings, ...(await this.pathNotices(card, o, !!args.paths, op)))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
@@ -1654,13 +1961,18 @@ export class Workflow {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
         s = this.state(card)
       }
+      // HI-2999: a forward's resolution carries the commit it resolves, merged, never cherry-picked or copied; what can't
+      // be read refuses too (Unknown never satisfies a rule), saying what: submitted again once it reads.
+      const has = s.resolves ? await this.resolutionHasSource(o, s, revision) : null
+      if (isUnknown(has)) return { rule: 'platform.unknown', values: { card: card.key, what: has.whatText ?? has.what, rule: 'forward.resolutionSource' } }
+      if (has === false && s.resolves) return { rule: 'forward.resolutionSource', values: { card: card.key, from: s.resolves.from, to: s.resolves.to, source: s.resolves.source, revision: (revision ?? '').slice(0, 7) } }
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') {
       inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
       // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
       const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
-      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'isolation') && !last.isolated }
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'checkCopies') && !last.isolated }
     }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
@@ -1677,7 +1989,7 @@ export class Workflow {
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
-    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
+    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), ...(platform ? { platform } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
 
   /** Each card's latest submission's operation (`submitOperation`): a newer one aborts the one before (its pick, and its write). */
@@ -1724,10 +2036,11 @@ export class Workflow {
       ...(args.followUp ? { followUp: true } : {}),
       ...(g.paths ? { paths: g.paths } : {}),
       ...(g.commits ? { commits: g.commits } : {}),
+      ...(g.platform ? { platform: g.platform } : {}),
       ...(g.warnings.length ? { warnings: g.warnings } : {}),
       ...(g.inputs.focused ? { focused: g.inputs.focused } : {})
     })
-    if (g.revision) w.action('pin', { ref: `refs/cw/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
+    if (g.revision) w.action('pin', { ref: `refs/cw/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq, card: g.card.id })
     if (g.o.review === 'none') {
       this.finish(w, g.fin)
       return
@@ -1824,7 +2137,7 @@ export class Workflow {
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
-    const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
+    const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? asCardCounts(s, await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key })) : null
     const nothingToMerge = !!merged && !isUnknown(merged)
     const present = args.startReview ? await this.reviewersPresent(actor) : null
     // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
@@ -1978,9 +2291,10 @@ export class Workflow {
         if (e) w.action('enqueue', { target: e.target })
         if (card.reviewer) this.wake(w, card.reviewer, said, 'answer')
       }
-      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE) {
+      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE || req.gate === QUEUE_PUBLISH_GATE) {
         // The merge queue's own (#1351): its target's queue looks at the answer now (an approved update runs at once; a
-        // stuck advance is looked at again, as Resume does).
+        // stuck advance is looked at again, as Resume does; HI-3088: an unknown publication's answer is taken up, its
+        // `publishUnknown` pause lifted, rather than waiting for a Resume, another card or a restart).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
       }
@@ -2088,7 +2402,7 @@ export class Workflow {
       // Integration needs a non-empty change (§16.4.4).
       if (!rev || !s.approved?.base || rev === s.approved.base) contained = false
       else {
-        const c = await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key }, !isUnknown(th) && th ? th : undefined)
+        const c = asCardCounts(s, await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key }, !isUnknown(th) && th ? th : undefined))
         contained = isUnknown(c) ? c : !!c
         if (!isUnknown(c) && c) method = c.method === 'sameTree' ? 'sameTree' : c.method
       }
@@ -2157,7 +2471,7 @@ export class Workflow {
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'isolation'))
+    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'checkCopies'))
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */
@@ -2238,6 +2552,12 @@ export class Workflow {
         const at = opts.now ?? Date.now()
         if (this.enforced()) {
           const builder = now.started?.builder ?? null
+          // An answer or going ahead names a step waiting: none waiting, or an earlier one, is said first (HI-3011), so a
+          // reviewer the pool gave a design that has since closed (the card put back) hears that, not that it isn't its.
+          if (step !== 'design' && step !== 'followUp') {
+            if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
+            if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+          }
           // Each side its own (an agent; the user and the Assistant take either): the builder's steps by the card's
           // builder, an answer by its reviewer, never its builder.
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
@@ -2249,9 +2569,7 @@ export class Workflow {
             if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
             // A pool lane's design (HI-2310) needs no reviewer yet: the pool gives it to the next free one.
             if (!(step === 'design' && w.card.reviewerPool) && (!reviewer || reviewer === builder)) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
-          } else {
-            if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
-            if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+          } else if (now.step) {
             // A follow-up was asked for: it waits for its check, with no going ahead unchecked.
             if (step === 'proceed' && now.step.step === 'followUp') return { rule: 'loop.followUpChecked', values: { card: card.key } } as GuardRefusal
             const due = now.step.until ? Date.parse(now.step.until) : NaN
@@ -2389,12 +2707,15 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
+    // HI-3086: a forward merge (HI-2679) goes only where it stays one (forwardMoves); its other ways are its controls.
+    const fm = this.forwardMoves(card, s)
+    if (fm && !fm.includes(to)) return this.refuse(card, by, 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'move', moves: this.movesFrom(from, this.rulesetOf(card, s), s).join(', ') } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // `dry` (the user's, #1275): only whether it would ask, and which rules; nothing written (a window Start asks first).
     if (opts.dry && by !== 'user') throw new Error('a dry move is the user\'s') // i18n-ignore: a programming error, never shown
     // The Assistant's move on, while the card waits for the user at its round limit: only the user's answer resumes it.
@@ -2434,10 +2755,18 @@ export class Workflow {
           if (this.leavesNobody(to, by, opts)) w.fact('Override', { rules: ['move.doingNobody'], move: `${from}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
           // A card that was queued (Merging, or Approved under Combwork merges) is queued again.
           const requeue = to === was && (was === 'merging' || (was === 'approved' && r.options.finish === 'combworkMerges' && !s.stale && !notApproved(s, r, card.labels)))
-          w.move(requeue ? 'approved' : was, 'user')
-          if (requeue) this.enqueue(w)
-          // The trip to On Hold retired the gate's request (it belongs to its stage): asked again, if still unmet.
-          else this.reask(w)
+          // HI-3086 (HR2's round 1): a forward merge has no submission: its attempt again, the commit that attempt froze
+          // (its latest entry's, a Retry's too), never the source's head now nor an ordinary entry with no revision.
+          const fw = w.state().forward
+          if (requeue && fw) {
+            w.move('approved', 'user')
+            this.enqueueForward(w, w.state().entries.at(-1)?.revision || fw.source)
+          } else {
+            w.move(requeue ? 'approved' : was, 'user')
+            if (requeue) this.enqueue(w)
+            // The trip to On Hold retired the gate's request (it belongs to its stage): asked again, if still unmet.
+            else this.reask(w)
+          }
           return null
         })
         if (out) return this.refuse(card, by, 'move', out)
@@ -2480,6 +2809,26 @@ export class Workflow {
   }
 
   /**
+   * HI-3086: the stages a forward merge (HI-2679) can be moved to by the user or the Assistant, null for any other card.
+   * It has no builder and no line, and is started only by its request: Todo would give it the project's rules now, a start
+   * from there (or a Done one reopened) a new `Started` that drops its `forward` (an ordinary card on the default target),
+   * and a drag on past where it was a builder's intents (submit, review). So: On Hold and back to where it was, back into
+   * Active (where Retry merge and Resolve on a builder take it on), and Done (nothing merged, as Remove from queue); a
+   * Done one stays Done.
+   */
+  forwardMoves(card: CardRecord, s: CardState = this.state(card)): StageId[] | null {
+    if (!s.forward) return null
+    if (s.stage === 'done') return ['done']
+    if (s.stage === 'hold') {
+      const back = [...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')
+      const was = back?.data.from ?? 'active'
+      return [...new Set<StageId>(['hold', was === 'todo' ? 'active' : was, 'active', 'done'])]
+    }
+    // Queued (Merging): back into Active takes it out of the queue, still a forward, Retry merge's to send again.
+    return [...new Set<StageId>([s.stage, 'active', 'hold', 'done'])]
+  }
+
+  /**
    * A forward drag's intents (§16.8.4), decided whole and written in one write (HR2's #1265 round 1): each step is
    * gathered first, outside the lock (a start; a submission on the state the start would leave; past Review, the review
    * skipped), and the rules they would skip, together, are the question (the user's, nothing written), the refusal (the
@@ -2488,7 +2837,7 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
@@ -2521,6 +2870,11 @@ export class Workflow {
       if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
       const rules = new Set<string>()
       if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
+      // HI-3148: a start onto a released line (or one that can't be checked) is a rule the user's or the Assistant's
+      // override can skip, for that line only: confirmed with the line the ask named (`released`), never another.
+      const releasedRule = gs && this.enforced() ? await this.releasedStart(card, gs, by) : { grant: null }
+      const releasedTarget = 'refusal' in releasedRule ? (gs!.data.target ?? null) : null
+      if (releasedTarget) rules.add('start.released')
       if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
       // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
       if (pastReview && this.enforced()) rules.add('integrate.approved')
@@ -2531,14 +2885,20 @@ export class Workflow {
       if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
-      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list, ...(releasedTarget ? { released: releasedTarget } : {}) } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
       if (nobody && asking) return (await this.nobodyOn(card, to, by, opts, others))!
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      // Confirmed for another line than the one it would start on now (it changed since the ask): asked again, the user;
+      // the Assistant's refused with the line's own words, to confirm that line.
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
+      if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
-      if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-      if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
+      const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
+      if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
       // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
       const decided = (now: string[]): void => {
@@ -2546,19 +2906,28 @@ export class Workflow {
         if (more.length) throw new DragUndone({ rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: [...skipped, ...more].join(', ') } })
       }
       let out: GuardRefusal | null
+      let startMoved = false
+      let releaseMoved = false
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
           if (moved) return moved
           // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
           // approved for the latest submission), else first.
-          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
+          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '', ...(releasedTarget ? { target: releasedTarget } : {}) })) // i18n-ignore: a fact's kind and codes, not text
           const approves = pastReview && !!gsub
           if (!approves) override()
           if (fromHold) w.move(fromHold, 'user')
           // The evidence on the state it was gathered on (back where it was, from On Hold): moved since, the write is undone.
           const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+          startMoved = !!changed && !!gs
           if (changed) throw new DragUndone(changed)
+          // HI-3148: a start let onto its line without the user's confirmation (not released, or its lane's grant), as
+          // `start`'s: what let it through still holds here, else decided again.
+          if (gs && 'bound' in releasedRule && releasedRule.bound && !releasedRule.bound()) {
+            releaseMoved = true
+            throw new DragUndone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+          }
           if (gs) {
             decided(this.failingIn(w, 'start', gs.ins))
             this.applyStart(w, gs, cause)
@@ -2580,10 +2949,21 @@ export class Workflow {
         })
       } catch (e) {
         if (!(e instanceof DragUndone)) throw e
+        if (releaseMoved && !this.gathering.depth(card.id)) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+        // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
+        // allows more passes (`start`'s rule, HI-2916).
+        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, s, gs.o, gs.before) : null
+        if (again) {
+          this.startPassLog(card, 'write', again, gathers)
+          return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+        }
+        if (startMoved) this.startRefusedLog(card, 'write', gathers, this.noPassWhy(card, gathers))
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
       }
+      // HI-3107: a start written by the move (a board drag, the Assistant's move), its earlier work said as start's is.
+      if (!out && gs && !opts.dry && gs.earlier.length && this.state(card).stage === 'active') void Promise.resolve(this.cfg.earlierWork?.(card, gs.earlier, gs.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
     } finally {
       // A slot lent for its start and not started with (asked, refused, undone): given back (#1438).
@@ -2654,12 +3034,22 @@ export class Workflow {
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       const e = openEntry(w.state())
+      // HI-3128: a pause about its target's setup (no upstream, its remote unusable, a fetch that failed) naming this card,
+      // in this write: cleared with it, unless a catch-up owes it (the published card's, not this one's). The next entry
+      // meets the same cause, if it lasts, and pauses naming itself; a pause about the card itself is left as it is.
+      const clearSetupPause = (target: string): void => {
+        const p = this.store.queuePause(target) as { reason: string; card: string } | null
+        if (p && p.card === card.key && SETUP_PAUSES.has(p.reason) && !this.store.meta(`queue.catchUp:${target}`)) this.store.setQueuePause(target, null)
+      }
       // A forward merge (HI-2679), queued or returned: it ends, not merged (Done with no `Integrated`), unless it is
       // advancing now (whose outcome the queue records, in the same lock).
       if (w.state().forward && w.state().stage !== 'done') {
         if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
         w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
-        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+        if (e) {
+          w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+          clearSetupPause(e.target)
+        }
         w.move('done', 'user')
         return null
       }
@@ -2667,6 +3057,7 @@ export class Workflow {
       if (e.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+      clearSetupPause(e.target)
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
       this.wake(w, w.state().started?.builder, stored(W.removed, { card: card.key, by: by === 'user' ? 'user' : 'assistant', reason: reason ? `: ${reason}` : '' }))
@@ -2709,6 +3100,106 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, by, 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2999: whether a forward's resolution (`s.resolves`) has the commit it resolves in `revision`'s history: false when
+   * it doesn't (cherry-picked or copied, not merged: the next forward would conflict again), unknown when that can't be
+   * read (git failed or threw, no revision, a platform with no history): never taken as either. Null for any other card.
+   */
+  async resolutionHasSource(o: WorkflowOptions, s: CardState, revision: string | null): Promise<Maybe<boolean> | null> {
+    const res = s.resolves
+    if (!res) return null
+    const what = unknown(UNREADABLE.contains, { revision: res.source.slice(0, 7), target: (revision ?? '').slice(0, 7) || '?' })
+    const h = historyOf(o.platform)
+    if (!revision || !h) return what
+    const has = await h.isAncestor(this.cfg.project, res.source, revision).catch((e: unknown) => withDetail(what, e instanceof Error ? e.message : String(e)))
+    return isUnknown(has) ? { ...what, ...(has.detail ? { detail: has.detail } : {}) } : has
+  }
+
+  /**
+   * HI-2959: the attempt Resolve on a builder would hand over, on a forward merge the queue returned (Active, its last
+   * entry failed, or its advance declined): that entry, its frozen source and what came back; null for any other card,
+   * and for one returned against the release path's direction (HI-2892: Remove from queue alone ends that).
+   */
+  returnedForward(card: CardRecord, s: CardState = this.state(card)): { entry: string; from: string; to: string; source: string; failed: FactData['IntegrationFailed'] | null } | null {
+    const last = s.entries.at(-1)
+    if (!s.forward || s.stage !== 'active' || !last || (last.state !== 'failed' && last.state !== 'cancelled')) return null
+    const failed = this.store.facts(card.id).findLast((f) => f.kind === 'IntegrationFailed' && (f.data as FactData['IntegrationFailed']).entry === last.id)
+    // Returned against the release path's direction (HI-2892): only Remove from queue ends it, never a builder's merge.
+    if ((failed?.data as FactData['IntegrationFailed'] | undefined)?.reason === 'direction') return null
+    return { entry: last.id, from: s.forward.from, to: s.forward.to, source: last.revision, failed: failed ? (failed.data as FactData['IntegrationFailed']) : null }
+  }
+
+  /**
+   * HI-2959: Resolve on a builder, on a forward merge the queue returned (the user's, or the Assistant's with a reason):
+   * it ends in Done, nothing merged (as Remove from queue: an override, never an `Integrated`), its comment naming
+   * `resolver`, the card made for a builder in the same board change. Refused unless its last attempt is still `entry`
+   * (read by the caller, which froze that attempt's source for the new card): a Retry, a Remove or another Resolve since
+   * leaves it as it is.
+   */
+  async resolveForward(ref: unknown, d: { entry: string; resolver: string }, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = this.rulesetOf(card, s)
+    const out = await this.write(card, r, by, (w) => {
+      guard?.()
+      const now = w.state()
+      const back = this.returnedForward(card, now)
+      if (!back || back.entry !== d.entry) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: this.movesFrom(now.stage, r, now).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      w.fact('Override', { rules: ['integrate'], move: 'resolve on a builder', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+      w.move('done', 'user')
+      const values = { card: d.resolver, from: back.from, to: back.to, source: back.source.slice(0, 12) }
+      w.action('comment', { text: stored(W.forwardResolving, values), shown: storedText(HISTORY.forwardResolving, values) })
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-2959: marks a card made a moment ago by Resolve on a builder (in Todo, never started) as the forward resolution
+   * of `d.forward`: its `ForwardResolution`, kept over every cycle, which makes its rules merge it as a merge commit.
+   */
+  async markForwardResolution(ref: unknown, d: Omit<FactData['ForwardResolution'], 'by'>, by: 'user' | 'assistant', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, null, by, (w) => {
+      guard?.()
+      const now = w.state()
+      if (now.started || now.stage !== 'todo' || now.resolves) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('ForwardResolution', { ...d, by }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /**
+   * HI-3040: the user's override recorded on a forward merge's resolution the queue returned for its direction, by a
+   * forward request with the override for its pair (queueControls' forwardMerge, the user's or the Assistant's alone).
+   * Only while, read in this write, it can take it (`overridableEntry`: back in Active for its direction, that entry its
+   * latest submission's, no override yet). `d.override` none: the direction reads forward again, so only the requeue.
+   * Its builder is woken to submit the same revision again, which `requeue.allowed` lets back in once. Refused
+   * (`move.notFromHere`) otherwise, nothing written.
+   */
+  async overrideResolution(ref: unknown, d: { from: string; to: string; override?: ForwardOverride }, by: 'user' | 'assistant', guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, null, by, (w) => {
+      guard?.()
+      const now = w.state()
+      const last = overridableEntry(now, d.from, d.to, !!d.override)
+      if (!last) return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'resolve on a builder', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('ResolutionOverride', { ...(d.override ? { override: d.override } : {}), entry: last.id, by }) // i18n-ignore: a fact's kind and codes, not text
+      this.wake(w, now.started?.builder, stored(W.resolutionOverride, { card: card.key, from: d.from, to: d.to }))
+      return null
+    })
+    if (out) return this.refuse(card, by, 'resolve on a builder', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
@@ -2900,6 +3391,8 @@ export class Workflow {
     if (!card.lane) return null
     const l = this.lane(card.lane)
     if (!l || l.ended) return null
+    // Given to another agent (HI-3117): that agent's work, never waiting on the lane's cards before it.
+    if (!this.laneOwn(l.id, card.id)) return null
     const now = this.laneNow(l)
     let open: number | undefined
     // Never on another agent's card (HI-1821).
@@ -2983,7 +3476,7 @@ export class Workflow {
     const base = s.approved?.base ?? s.latest?.base ?? s.started?.base
     if (!base) return unknown(UNREADABLE.branchedOffTarget)
     // In the target's head the line was compared with (#1376: not read again).
-    const c = await p.contains(b.target, { base, revision: b.head, key: null }, b.targetHead)
+    const c = asCardCounts(s, await p.contains(b.target, { base, revision: b.head, key: null }, b.targetHead))
     if (isUnknown(c)) return c
     if (c) return []
     const from = s.approved?.revision ?? base
@@ -3114,7 +3607,13 @@ export class Workflow {
         const l = this.lane(card.lane)
         if (!l || l.ended) return
         const cards = l.pending ?? l.cards
-        if (!cards.every((c) => this.laneDone(c))) return
+        // A card given to another agent (HI-3117) isn't the lane's to wait for, as lanes.ts's allDone reads it; one given to
+        // none that a newer lane lists still is (HI-3118).
+        const givenAway = (c: number): boolean => {
+          const agent = this.store.cardAgent(c)
+          return !!agent && agent !== this.store.laneBuilder(l.id)
+        }
+        if (!cards.every((c) => this.laneDone(c) || givenAway(c))) return
         const results = cards.map((c) => this.state(c).integrated?.result ?? null)
         this.saveLane({ ...l, ended: true, current: null })
         this.store.deliver({ action: id, kind: 'laneEnded', target: l.id, payload: { results } })

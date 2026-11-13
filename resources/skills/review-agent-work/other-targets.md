@@ -9,4 +9,4 @@
 
 **A card from the pool:** A reviewer from the project's pool is told of each card it is given in its inbox: that is its start.
 
-**Work sent uncommitted:** For a code card in Git, work that revision doesn't hold (sent uncommitted) gets a request for a commit (`cw_request_builder`), not a verdict (card-loop, Reviewer).
+**Work sent uncommitted:** For a code card in Git or jj, work that revision doesn't hold (sent uncommitted) gets a request for a commit (`cw_request_builder`), not a verdict (card-loop, Reviewer).

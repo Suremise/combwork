@@ -3,13 +3,23 @@
 // recreation ran themselves before (or delegates to the module that did: worktrees.ts, platform/git.ts), with the same
 // argv, folder, bounds and parsing, so no git command is added, dropped or reordered (tests/slotTraces.test.ts).
 
+import { randomBytes } from 'crypto'
 import { dirname, join, resolve } from 'path'
-import { readFile } from 'original-fs/promises'
+import { existsSync, renameSync } from 'original-fs'
+import { readFile, rm as removeTree } from 'original-fs/promises'
 import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
-import type { WorkspacePort, WorkspaceStep } from './workspacePort'
+import { clearSubmoduleCheckouts, GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, hasPrivateModules, prepareGitFiles, SKIP_SMUDGE, submoduleWorkKept } from './gitModules'
+import { gitFilesExec } from './gitModulesRun'
+import { asideOf, entryIdSync, linksTo, provedSync, worktreesOf, type GitLinkReceipt } from './jjGitLink'
+import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
+import { gitTool } from '../gitTool'
+import { compareGitVersions } from '../../shared/gitTool'
+import { createLogger, userText } from '../logger'
+
+const log = createLogger('slots')
 
 /** A git command's answer as a step's: done, or git's own words. */
 const step = async (r: Promise<{ ok: boolean; err: string }>): Promise<WorkspaceStep> => {
@@ -28,10 +38,160 @@ async function prunable(repo: string): Promise<string[]> {
   const common = (await git(repo, ['rev-parse', '--git-common-dir'])).out.trim()
   const out: string[] = []
   for (const m of `${r.out}\n${r.err}`.matchAll(/^Removing worktrees\/([^:]+):/gm)) {
-    const gitdir = await readFile(join(resolve(repo, common), 'worktrees', m[1], 'gitdir'), 'utf8').catch(() => '')
-    out.push(gitdir.trim() ? dirname(resolve(gitdir.trim())) : `(${m[1]})`)
+    const entry = join(resolve(repo, common), 'worktrees', m[1])
+    const gitdir = await readFile(join(entry, 'gitdir'), 'utf8').catch(() => '')
+    // A relative gitdir (git's worktree.useRelativePaths, or a colocated jj workspace's, HI-3069) is the entry's own.
+    out.push(gitdir.trim() ? dirname(resolve(entry, gitdir.trim())) : `(${m[1]})`)
   }
   return out
+}
+
+/** Tests: a synchronous step right before a registration is moved aside (dropRegistration), as HI-3046's hooks. */
+export const registrationSeams: { beforeAside?: (entry: string) => void } = {}
+
+/**
+ * HI-3069: the one registration (`<common>/worktrees/<id>`) whose gitdir names `folder`, dropped while that folder is
+ * absent, never by a repository-wide prune (which would also drop another worktree gone meanwhile, needing its
+ * registration for Repair). On HI-3046's owned-entry proof (jjGitLink.ts), its receipt taken now: the entry's file id
+ * and birth time, `worktrees`' own, its `gitdir` and `commondir` bytes. Proved synchronously (in place, physically in
+ * the store, not `locked`, the folder absent: only ENOENT or ENOTDIR counts as absent, any other error as doubt), moved
+ * aside out of `worktrees` atomically with nothing awaited between, proved again on what was moved (a reused name, a new
+ * entry: other ids), and only then removed. Anything that doesn't prove it is left: put back under its name when what
+ * was moved isn't it and the name is free, else left aside, said so. Nothing else is touched.
+ */
+async function dropRegistration(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }> {
+  const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  if (!r.ok) return { left: gitErrorLine(r.err) }
+  const store = r.out.trim()
+  const links = await linksTo(store, folder)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (!links) return { left: 'worktrees unreadable' } // i18n-ignore: a log line's detail, never shown
+  if (!links.length) return 'none'
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (links.length > 1) return { left: `${links.length} registrations name it` } // i18n-ignore: a log line's detail, never shown
+  const entry = links[0]
+  const [gitdir, commondir] = await Promise.all(['gitdir', 'commondir'].map((f) => readFile(join(entry, f), 'utf8').catch(() => null)))
+  const entryId = entryIdSync(entry)
+  const worktreesId = entryIdSync(worktreesOf(store))
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  if (gitdir === null || commondir === null || !entryId || !worktreesId) return { left: 'unreadable' } // i18n-ignore: a log line's detail, never shown
+  const receipt: GitLinkReceipt = { store, folder, workspace: '', generation: '', entry, entryId, worktreesId, gitdir, commondir }
+  // Synchronous from here to the move: nothing can be awaited between the proof and the rename.
+  const before = provedSync(receipt, entry, 'entry')
+  if (before) return { left: before }
+  const aside = asideOf(store, randomBytes(8).toString('hex'))
+  registrationSeams.beforeAside?.(entry)
+  try {
+    renameSync(entry, aside)
+  } catch (e) {
+    return { left: e instanceof Error ? e.message : String(e) }
+  }
+  const after = provedSync(receipt, aside, 'aside')
+  if (after) {
+    // What was moved isn't the entry proved (replaced between the proof and the move): back under its name if still free.
+    if (!existsSync(entry)) {
+      try {
+        renameSync(aside, entry)
+        return { left: after }
+      } catch {
+        /* left aside */
+      }
+    }
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    return { left: `${after}, left at ${aside}` } // i18n-ignore: a log line's detail, never shown
+  }
+  const e = await removeTree(aside, { recursive: true }).then(() => null, (x: Error) => x.message)
+  // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+  return e ? { left: `${e}, left at ${aside}` } : 'dropped' // i18n-ignore: a log line's detail, never shown
+}
+
+/** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */
+const smudge = (o?: CheckoutOptions): { env?: NodeJS.ProcessEnv } => (o?.skipSmudge ? { env: { ...process.env, ...SKIP_SMUDGE } } : {})
+
+/**
+ * HI-3010: a hooks folder no hook can be in, for one command: a new name under the folder's `.git` (a worktree's `.git`
+ * is a file, so nothing can be under it; a repository's own `.git` has no such random name). Never made.
+ */
+export const noHooks = (folder: string): string => join(folder, '.git', `combwork-no-hooks-${randomBytes(8).toString('hex')}`)
+
+/**
+ * HI-3078: a slot's own submodule checkouts that `revision` doesn't keep as submodules (vendored into ordinary files
+ * there, or gone) removed before it moves there, as a copy's and the queue's folder's are (HI-3027, HI-3028): git's
+ * switch leaves such a folder where it is, so the switch refuses over its files, or leaves it untracked with its `.git`
+ * file. A slot is someone's work folder, so a checkout with a change or an untracked file is left for git to name; its
+ * clone stays. Only a worktree whose own git dir holds clones (`modules`, an fs read): with none, or no `.git` file
+ * naming a git dir, no git runs for it and nothing is removed.
+ */
+async function clearSlotSubmodules(folder: string, revision: string): Promise<string | null> {
+  if ((await hasPrivateModules(folder)) !== true) return null
+  return clearSubmoduleCheckouts(gitReads, folder, [revision], { keepChanged: true })
+}
+
+/** HI-3116: test seams in `lineAtBase`: between T1 (its line made) and T2 (HEAD attached). */
+export const lineAtBaseHooks: { beforeCreate: (() => Promise<void>) | null; afterCreate: (() => Promise<void>) | null } = { beforeCreate: null, afterCreate: null }
+/** HI-3116: the git `update-ref --stdin` first takes `symref-update` in (Combwork supports git from 2.38). */
+export const LINE_AT_BASE_GIT = '2.46'
+/** Folders (and git versions) whose too-old git `lineAtBase` has logged once already. */
+const oldGitSaid = new Set<string>()
+/** The reflog message of a line `lineAtBase` made for a lease: what proves a line its own on a later pass. */
+const madeFor = (lease: string): string => `combwork: next line for lease ${lease}` // i18n-ignore: a reflog message, never shown
+
+/**
+ * HI-3116 (design HI-3116/s19): a lane's next card's `line`, made at `base` and checked out where the slot is on the last
+ * card's line, changing no file and no index entry: only while HEAD names a branch whose commit's tree is `base`'s (the
+ * last card's work merged into the target, nothing more on that line in content). Two ref transactions (git can't take
+ * them as one: "multiple updates for HEAD … via its referent"), each atomic, with the message `madeFor(lease)`:
+ * T1 makes the line at `base` while the old line is still where it was read; T2 attaches HEAD while it still names the
+ * old line and the new line is still at `base`. Read back after. A line already there is carried on only when provably
+ * this lease's own (its reflog's one entry `madeFor(lease)`, still at `base`); anything else is left exactly as it is.
+ * A commit landing on the old line between T1 and T2 stays there, its changes staged on the new line (logged). Hooks and
+ * fsmonitor are off for each command, as `branchHere`'s. Refused (nothing written) below git 2.46.
+ */
+export async function lineAtBase(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep> {
+  const no = (err: string): WorkspaceStep => ({ ok: false, err })
+  const version = gitTool().version
+  if (!version || compareGitVersions(version, LINE_AT_BASE_GIT) < 0) {
+    const key = `${folder.toLowerCase()}|${version ?? ''}`
+    if (!oldGitSaid.has(key)) {
+      oldGitSaid.add(key)
+      log.info(`${userText(folder)}: a lane's next line is made in place on a branch only with git ${LINE_AT_BASE_GIT} or later (this is ${version ?? 'unknown'}): it waits for its builder instead`)
+    }
+    return no(`in place on a branch needs git ${LINE_AT_BASE_GIT}`) // i18n-ignore: a log line's detail, never shown
+  }
+  const quiet = ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false']
+  const read = async (args: string[]): Promise<string | null> => {
+    const r = await git(folder, args)
+    return r.ok ? r.out.trim() : null
+  }
+  const target = `refs/heads/${line}`
+  const headRef = await read(['symbolic-ref', '-q', 'HEAD'])
+  if (!headRef?.startsWith('refs/heads/') || headRef === target) return no("HEAD isn't on another branch") // i18n-ignore: a log line's detail, never shown
+  const oldOid = await read(['rev-parse', '--verify', '-q', `${headRef}^{commit}`])
+  const baseOid = await read(['rev-parse', '--verify', '-q', `${base}^{commit}`])
+  const trees = oldOid && baseOid ? await Promise.all([read(['rev-parse', `${oldOid}^{tree}`]), read(['rev-parse', `${baseOid}^{tree}`])]) : null
+  if (!oldOid || !baseOid || !trees?.[0] || !trees[1]) return no("its branch or the base can't be read") // i18n-ignore: a log line's detail, never shown
+  if (trees[0] !== trees[1]) return no(`${headRef}'s files aren't the base's: the last card's work isn't merged, or more is on that line`) // i18n-ignore: a log line's detail, never shown
+  const note = madeFor(lease)
+  const there = await read(['rev-parse', '--verify', '-q', target])
+  if (there) {
+    // A line already there (T1 done, T2 not): carried on only when provably this lease's, at the base.
+    const reflog = await read(['reflog', 'show', '--format=%H%x09%gs', target, '--'])
+    const entries = reflog ? reflog.split(/\r?\n/).filter(Boolean) : []
+    if (there !== baseOid || entries.length !== 1 || entries[0] !== `${baseOid}\t${note}`) return no(`${line} is there already, not provably this lease's`) // i18n-ignore: a log line's detail, never shown
+  } else {
+    await lineAtBaseHooks.beforeCreate?.()
+    const t1 = await git(folder, [...quiet, 'update-ref', '-m', note, '--stdin'], undefined, `start\ncreate ${target} ${baseOid}\nverify ${headRef} ${oldOid}\nprepare\ncommit\n`)
+    if (!t1.ok) return no(gitErrorLine(t1.err) || 'its line could not be made') // i18n-ignore: a log line's detail, never shown
+    await lineAtBaseHooks.afterCreate?.()
+  }
+  const t2 = await git(folder, [...quiet, 'update-ref', '--no-deref', '-m', note, '--stdin'], undefined, `start\nverify ${target} ${baseOid}\nsymref-update HEAD ${target} ref ${headRef}\nprepare\ncommit\n`)
+  if (!t2.ok) return no(gitErrorLine(t2.err) || 'HEAD could not be attached') // i18n-ignore: a log line's detail, never shown
+  // Read back: never "prepared" unless HEAD names the line and the line is at the base.
+  const [now, at] = await Promise.all([read(['symbolic-ref', '-q', 'HEAD']), read(['rev-parse', '--verify', '-q', target])])
+  if (now !== target || at !== baseOid) return no(`read back: HEAD names ${now ?? 'nothing'}, ${line} is at ${at ?? 'nothing'}`) // i18n-ignore: a log line's detail, never shown
+  const oldNow = await read(['rev-parse', '--verify', '-q', headRef])
+  if (oldNow !== oldOid) log.warn(`${userText(headRef)} moved between making ${userText(line)} and attaching HEAD to it: its commit stays there, its changes staged on ${userText(line)}`)
+  return { ok: true, err: '' }
 }
 
 export const gitWorkspacePort: WorkspacePort = {
@@ -51,20 +211,67 @@ export const gitWorkspacePort: WorkspacePort = {
   defaultLine: (repo) => G.defaultBranch(repo),
   lineExists: async (repo, line) => (await git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${line}`])).ok,
   prunable,
-  create: (repo, folder, at) => step(git(repo, ['worktree', 'add', '--detach', folder, at])),
+  create: (repo, folder, at, o) => step(git(repo, ['worktree', 'add', '--detach', folder, at], undefined, undefined, smudge(o))),
   attach: (repo, folder, line) => step(git(repo, ['worktree', 'add', folder, line])),
   createOnNewLine: (repo, folder, line, base) => createWorktree(repo, folder, line, base),
   copyIgnored: (repo, folder, patterns) => copyIgnored(repo, folder, patterns),
+  files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
-  prepare: (folder, line, base) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base])),
-  detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
-  resetTo: async (folder, revision) => {
-    const co = await git(folder, ['checkout', '--detach', '--force', revision])
+  dropRegistration,
+  prepare: async (folder, line, base, o) => {
+    const cleared = await clearSlotSubmodules(folder, base ?? `refs/heads/${line}`)
+    if (cleared) return { ok: false, err: cleared }
+    return step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o)))
+  },
+  // HI-3010: the head past `base` first (git's own exit, no words, when it isn't), then the line made where HEAD is now
+  // (no start point: a commit meanwhile is on it, and no file changes). Its builder may be at work, so no hook runs
+  // (HR1's round 1: a post-checkout or reference-transaction hook can change files): for this command only, hooks are
+  // looked for where none can be and fsmonitor is off; the repository's settings are never written.
+  // HI-3031: and the commits past the base the lease's own: where HEAD was as the lease began (its reflog, to the second,
+  // read at the lease's start's whole second, so a move in that second counts as before it) is the base or behind it. A
+  // free slot waits at its last target's head, which can be past the base with another target's commits; no reflog
+  // (turned off, expired) is a refusal too.
+  branchHere: async (folder, line, base, since) => {
+    const past = await git(folder, ['merge-base', '--is-ancestor', base, 'HEAD'])
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!past.ok) return { ok: false, err: past.err.trim() || `HEAD isn't at ${base} or past it` } // i18n-ignore: a log line's detail, never shown
+    const at = Math.floor(Date.parse(since) / 1000)
+    const was = Number.isFinite(at) ? await git(folder, ['rev-parse', '--verify', '--quiet', `HEAD@{@${at}}`]) : null
+    const wasHash = was?.ok ? was.out.trim() : ''
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!wasHash) return { ok: false, err: `HEAD's place as its lease began isn't known` } // i18n-ignore: a log line's detail, never shown
+    const own = await git(folder, ['merge-base', '--is-ancestor', wasHash, base])
+    // agent-protocol: a log line's detail (slots.ts logs it), never sent to an agent
+    if (!own.ok) return { ok: false, err: own.err.trim() || `HEAD was past ${base} before its lease began` } // i18n-ignore: a log line's detail, never shown
+    return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
+  },
+  lineAtBase: (folder, line, base, lease) => lineAtBase(folder, line, base, lease),
+  detach: async (folder, revision, o) => {
+    const cleared = await clearSlotSubmodules(folder, revision)
+    if (cleared) return { ok: false, err: cleared }
+    return step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision]))
+  },
+  // HI-3028: a copy's own submodule checkouts the revision doesn't keep as submodules removed first (their clones stay):
+  // a forced checkout writes ordinary files into such a folder and `clean -fd` leaves its `.git` file, so git run in it
+  // would see the old clone as its repository. A failure is the checkout's, with its words. A copy with no clones (its git
+  // dir has no `modules`, an fs read) runs no git for it.
+  resetTo: async (folder, revision, o) => {
+    const cleared = (await hasPrivateModules(folder)) === false ? null : await clearSubmoduleCheckouts(gitReads, folder, [revision])
+    if (cleared) return { ok: false, failed: 'checkout', err: cleared }
+    const co = await git(folder, ['checkout', '--detach', '--force', revision], undefined, undefined, smudge(o))
     if (!co.ok) return { ok: false, failed: 'checkout', err: co.err }
     const cl = await git(folder, ['clean', '-fd'])
     return cl.ok ? { ok: true } : { ok: false, failed: 'clean', err: cl.err }
   },
-  remove: (repo, folder, o) => step(git(repo, o?.force ? ['worktree', 'remove', '--force', folder] : ['worktree', 'remove', folder])),
+  // HI-3026: git refuses any unforced removal of a worktree holding submodule clones (`<gitdir>/modules`, made by the
+  // files step). Such a worktree is removed forced only once git's own clean check, made here as git would, and every
+  // clone holding nothing a remote lacks say it loses nothing; else refused, saying why. Without clones, as before.
+  remove: async (repo, folder, o) => {
+    if (o?.force) return step(git(repo, ['worktree', 'remove', '--force', folder]))
+    if ((await hasPrivateModules(folder)) !== true) return step(git(repo, ['worktree', 'remove', folder]))
+    const kept = await submoduleWorkKept(gitReads, folder)
+    return kept ? { ok: false, err: kept } : step(git(repo, ['worktree', 'remove', '--force', folder]))
+  },
   dropLine: (repo, line, at) => step(git(repo, ['update-ref', '-d', `refs/heads/${line}`, at])),
   restoreLine: (repo, line, revision) => step(git(repo, ['update-ref', `refs/heads/${line}`, revision, ''])),
   errorLine: gitErrorLine,

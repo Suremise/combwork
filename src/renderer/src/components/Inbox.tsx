@@ -8,6 +8,7 @@ import { cardLabel } from '@shared/projectKeys'
 import type { SessionStatus } from '@shared/types'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { openInboxChanges, openInboxItem, openInboxMerge, openRequest, useNeedsYou } from '../inbox'
+import { ReleaseOfferRow } from '../releaseOffers'
 import { set, useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
 import { cx, timeAgo } from '../util'
@@ -76,7 +77,7 @@ function needYouTip(cards: number, agents: number): string {
 /** The inbox popover above the status bar: oldest first; a click goes to the agent. */
 export function InboxPopover() {
   const open = useStore((s) => s.inboxOpen)
-  const { grouped, count, finished, toReview } = useNeedsYou()
+  const { grouped, count, finished, toReview, offers } = useNeedsYou()
   const tasks = useStore((s) => s.tasks)
   const ref = useRef<HTMLDivElement>(null)
   useNow(30000)
@@ -167,6 +168,14 @@ export function InboxPopover() {
       <div className="inbox-section">{count ? tr(msg({ id: 'board.inbox.needYouHeading', defaultMessage: 'Need you ({n, number})', description: 'Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n}).' }), { n: count }) : tr(msg({ id: 'board.inbox.needYouEmptyHeading', defaultMessage: 'Need you', description: 'Heading in the inbox popover above what waits for the user, when nothing does.' }))}</div>
       {count ? (
         <>
+          {offers.map((o) => (
+            <div key={o.id} className="inbox-row inbox-offer" data-release-offer-row={o.id}>
+              <Icon name="tag" />
+              <div className="inbox-text">
+                <ReleaseOfferRow offer={o} compact />
+              </div>
+            </div>
+          ))}
           {grouped.cards.map(card)}
           {grouped.agents.map((a) => row(a))}
         </>

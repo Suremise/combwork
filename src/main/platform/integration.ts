@@ -16,6 +16,7 @@
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import type { QueueFileSide, QueueStuck } from '../../shared/workflow/queue'
 import type { Maybe } from './types'
+import type { SigningStatus } from '../../shared/gitSigning'
 
 /** How the queue runs a command that may run the repository's hooks or sign (#1350): its environment and bound. */
 export interface QueueGitOptions {
@@ -82,11 +83,18 @@ export interface CandidateHost {
   project: string
   folder: string
   run: QueueRun
+  /**
+   * HI-1185: a program other than git run to its end within a bound, its tree ended there (the signing check's signer),
+   * in the queue's run (its lease's job). Left out, a bounded spawn of its own (tests).
+   */
+  spawn?: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; argv0?: string; verbatim?: boolean; noConsole?: boolean }) => Promise<QueueGitResult>
   /** The longest a signed commit runs (Advanced `cw.queue.signSeconds`). */
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
-  reads: { signs?: Promise<boolean | Again> }
+  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus>; onTarget?: Promise<string[] | Again> }
+  /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
+  skipSmudge?: () => Promise<boolean>
 }
 
 /** The change a candidate is built of: the card, its reviewed revision and base, its candidate key, and the target's head tested on. */
@@ -115,7 +123,7 @@ export interface IntegrationPort {
    * is ready (a branch's own messages: its read after the workspace's). A failure leaves the workspace clean at the head;
    * the result is kept on the card's queue pin.
    */
-  candidate(h: CandidateHost, c: CandidateOf & { style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
+  candidate(h: CandidateHost, c: CandidateOf & { target: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
 
   // The advance (§16.9.2, R4.1, R4.7): the steps between its journal's phases, and the reads it decides on.
 
@@ -153,8 +161,12 @@ export interface IntegrationPort {
   contains(project: string, a: string, b: string): Promise<Maybe<boolean>>
   /** Where a target is pushed: its upstream, else the only remote or origin; `unreadable` for a read the tool couldn't make. */
   pushDest(h: CandidateHost, target: string): Promise<{ remote: string; ref: string } | null | 'unreadable'>
-  /** Pushes exactly `commit` to `dest`: never forced, never changing what the target tracks, no prompt, bounded. */
-  push(h: CandidateHost, dest: { remote: string; ref: string }, commit: string): Promise<'pushed' | { rejected: string } | { failed: string }>
+  /**
+   * Pushes exactly `commit` to `dest`: never forced, never changing what the target tracks, no prompt, bounded. `rejected`:
+   * not a fast-forward (the remote has commits the target hasn't); `refused` (HI-1183): the remote refused it (a hook, a
+   * protected branch), its own words; `failed`: anything else (a sign-in, the network, the bound).
+   */
+  push(h: CandidateHost, dest: { remote: string; ref: string }, commit: string): Promise<'pushed' | { rejected: string } | { refused: string } | { failed: string }>
 
   // The queue host's and runner's clean-up (§16.9.3): pins and the queue's own workspace.
 
@@ -164,16 +176,83 @@ export interface IntegrationPort {
   cardPins(project: string): Promise<Map<string, string[]> | null>
   /** Drops one pin. */
   dropPin(project: string, ref: string): Promise<void>
+  /**
+   * HI-3127: keeps `commit`, the remote's head a card's returned attempt was tested on (follow mode), in the project's
+   * repository for its builder to merge, at the card's own tested pin (one per card, the latest attempt's), in the queue's
+   * run. `again` with git's words when it can't be written: the return then isn't recorded (it promises the commit).
+   * Listed with the card's pins (`cardPins`), dropped once the card is archived. Absent: no remote to follow.
+   */
+  keepTested?(h: CandidateHost, card: string, commit: string): Promise<Again | null>
+  /** HI-3128: the commands that give `branch` an upstream follow mode can use (UpstreamRemedy), `from` the branch it was made from. */
+  upstreamRemedy?(project: string, branch: string, from?: string): Promise<UpstreamRemedy>
   /** The platform's own removal of one of the queue's workspaces (its guard is the runner's); whether it succeeded. */
   removeWorkspace(project: string, folder: string): Promise<boolean>
   /** The platform's record of workspaces gone from disk tidied (after a removal). */
   pruneWorkspaces(project: string): Promise<void>
   /**
    * A checked-out target's paused condition read again (Resume's check): `null` when it no longer holds (or the target
-   * isn't checked out), `{}` when it still does or can't be told, with the files it names now.
+   * isn't checked out), `{}` when it still does or can't be told, with the files it names now and (HI-2944: staged or
+   * uncommitted changes, seen there) the folder it saw them in.
    */
-  pausedCondition(project: string, target: string, reason: 'wrongBranch' | 'staged' | 'unstagedChanges', files: string[] | undefined): Promise<{ files?: string[] } | null>
+  pausedCondition(project: string, target: string, reason: 'wrongBranch' | 'staged' | 'unstagedChanges', files: string[] | undefined): Promise<{ files?: string[]; folder?: string } | null>
+
+  // Follow mode (HI-1183, SPEC §16.9.4): the target is the branch it tracks on its remote. Optional: a platform without
+  // them has no follow mode (the option isn't shown), and the queue never calls them for one.
+
+  /**
+   * The one publication endpoint of a target and its transport settings, captured once for an attempt (§16.9.4's
+   * snapshot): the branch it tracks (else `noUpstream`), exactly one push URL (else `remoteAmbiguous`, the URLs without
+   * their credentials in `files`), a repository whose objects the sealed context can address (else `remoteUnsupported`).
+   */
+  destination?(h: CandidateHost, target: string): Promise<Again | { snapshot: TransportSnapshot } | { pause: FollowSetupPause; files?: string[] }>
+  /** Fetches the snapshot's ref from its endpoint in the sealed context, and sets the project's `into` ref to that fetch's own head. */
+  fetchHead?(h: CandidateHost, snap: TransportSnapshot, into: string): Promise<{ head: string } | { failed: string }>
+  /** The project's pre-push hook, run once in the project for the exact update (`lease` → `result`): none is `ok`. */
+  prePush?(h: CandidateHost, snap: TransportSnapshot, lease: string, result: string): Promise<'ok' | { refused: string } | { timedOut: string }>
+  /** The exact compare-and-swap publication of `result` over `lease` at the snapshot's endpoint, in the sealed context, with no hook. */
+  publish?(h: CandidateHost, snap: TransportSnapshot, lease: string, result: string): Promise<PublishReply>
+  /** A tool's words with the snapshot's credentials taken out (URL userinfo, authorization values, each secret value). */
+  redact?(text: string, snap: TransportSnapshot | null): string
 }
+
+/** Why follow mode can't use a target's remote (HI-1183): it tracks none, it has several push URLs or none, or the sealed context can't reach its objects. */
+export type FollowSetupPause = 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported'
+
+/**
+ * HI-3128: what the user runs to give a branch with no upstream the one follow mode needs, read locally only (no fetch,
+ * nothing run or changed). `ready`: a remote Combwork can name (the branch's own, else `from`'s, else the repository's only
+ * one) that follow mode can use; `choose`: none it can name, the commands with the placeholder `<remote>`; `unusable`: the
+ * named remote has several push addresses (or none), or the repository is shallow: no commands, the setup to fix first.
+ * `publish` creates it there and sets what it tracks; `track` (two commands) sets the two settings follow mode reads,
+ * whatever the remote's fetch mapping. Each rendered with shellLine, the branch named explicitly.
+ */
+export type UpstreamRemedy = { kind: 'ready' | 'choose'; remote: string | null; publish: string; track: [string, string] } | { kind: 'unusable'; remote: string | null; why: 'ambiguous' | 'shallow' }
+
+/**
+ * Follow mode's captured transport (HI-1183, §16.9.4): the endpoint (its exact URL, which may hold credentials), the full
+ * ref, the allowlisted transport and sign-in settings as resolved then, and how to reach the project's objects. Secret:
+ * kept only in the protected store (queueTransportStore.ts), never in a fact, a log or a reply; `display` is what may be shown.
+ */
+export interface TransportSnapshot {
+  remote: string
+  url: string
+  /** The URL without userinfo, query or fragment: what a record, a log or a hook may name. */
+  display: string
+  ref: string
+  config: [string, string][]
+  objects: string
+  alternates: string[]
+  format: string
+}
+
+/**
+ * A publication's reply (HI-1183): `pushed`; `atResult` (the remote was at the result already, so the lease never
+ * applied); `stale` (the lease or a fast-forward refused it before anything was written: the remote moved); `refused`
+ * (the remote refused it: a hook, a protected branch; nothing written); `failed` (HI-3091: it never reached the remote, as
+ * git says plainly: offline, a refused sign-in, a moved repository; nothing sent); `unknown` (anything else: it may have
+ * been published).
+ */
+export type PublishReply = 'pushed' | 'atResult' | { stale: string } | { refused: string } | { failed: string } | { unknown: string }
 
 /** An advance begun into a checked-out target, as its journal recorded it. */
 export interface BegunAdvance {

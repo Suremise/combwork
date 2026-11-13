@@ -3,6 +3,7 @@ import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
 import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, ProgressRun, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
+import type { ForwardWait } from './workflow/workView'
 
 /**
  * The window's tr() (#798), passed in: agent scripts (cw-mcp.js) import this module and must not load the
@@ -166,6 +167,7 @@ export function columnColor(colors: Partial<Record<TaskColumn, string>> | undefi
 /** The Agent API's stall reasons (its `stalled`), as agents read them: the window says its own (tr, board.stalled.*). */
 const ST = {
   noAgent: agentMsg({ id: 'stall.doing.noAgent', text: 'In Doing, but no agent has it.', note: 'A card in Doing that no agent has (#170).' }),
+  forwardWaits: agentMsg({ id: 'stall.forward.waits', text: "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for the user or the Assistant: {removeOnly, select, yes {it went against the release path's direction, so only Remove from queue ends it.} other {Retry merge, Resolve on a builder (a card for a builder to resolve it) or Remove from queue.}}", note: "HI-2959: the stalled reason of a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) that came back from the merge queue. removeOnly yes: it was refused for the release path's direction (HI-2892). Retry merge, Resolve on a builder and Remove from queue are the window's commands." }),
   startWaiting: agentMsg({ id: 'stall.doing.startWaiting', text: '{agent} waits to start: {why}', note: "HI-2304: the card's agent can't start in its slot yet. why: what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")." }),
   startFailed: agentMsg({ id: 'stall.doing.startFailed', text: "{agent}'s start failed: {why}", note: "HI-1976: the card's agent couldn't be started. why: the failure, in Combwork's or the CLI's own words." }),
   removed: agentMsg({ id: 'stall.agent.removed', text: '{agent} was removed.', note: "The card's agent (or reviewer) was removed from the project." }),
@@ -206,12 +208,21 @@ const ST = {
  * has finished its turn isn't stalled: it is waiting for the user to look. Cards in any other column never are: nobody is
  * expected to be on them (On Hold and Passed included, #170).
  */
-export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr): string | null {
+export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr, forward?: ForwardWait | null): string | null {
   if (card.archived || card.column !== 'doing') return null
+  // HI-2959: a returned forward merge has no agent by design: what it waits for, in place of "no agent has it".
+  if (!card.agent && forward) return forwardWaitText(forward, tr)
   if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Active, but no agent has it.', description: 'Why a card in the Active column is stalled (on the card). Active is the column.' })) : say(ST.noAgent)
   if (!agentNow) return removedText(card.agentName, tr)
   if (!agentNow.running) return notRunningText(agentNow.name, tr)
   return null
+}
+
+/** HI-2959: what a returned forward merge waits for (stalledReason), in the window's language with `tr`. */
+function forwardWaitText(f: ForwardWait, tr?: Tr): string {
+  const values = { from: f.from, to: f.to, removeOnly: f.removeOnly ? 'yes' : 'no' } // i18n-ignore: select keys
+  if (!tr) return say(ST.forwardWaits, values)
+  return tr(msg({ id: 'board.stalled.forwardWaits', defaultMessage: "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for you. {removeOnly, select, yes {It went against the release path's direction: Remove from queue ends it.} other {Open it for Retry merge, Resolve on a Builder… or Remove from queue.}}", description: "HI-2959: why a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) in the Active column has no agent, on the card: it came back from the merge queue and waits for the user. removeOnly yes: refused for the release path's direction (only Remove from queue). Keep the select keys; the commands as translated in the card's Work section." }), values)
 }
 
 /** A card's agent as the stall check reads it: its name, whether it runs (or starts), and why its start failed when it does (HI-1976). */
@@ -823,6 +834,12 @@ const PR = {
     text: 'The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with cw_read_task.',
     note: 'After the skill line, when the card has comments. count: how many (n, as text); again: yes for more work on a card, whose latest comment the prompt carries.'
   }),
+  yours: agentMsg({ id: 'prompt.card.yours', text: 'It is in Doing and yours.', note: "HI-2854: said when Combwork started the card on the agent (taskStart, a slot's placement), so it needn't start it again." }),
+  decisionsHead: agentMsg({ id: 'prompt.card.whole.decisions', text: "The user's decisions on it, oldest first:", note: 'HI-2854: in a start that carries the whole card, before its decisions (prompt.card.whole.decision), one a line.' }),
+  decision: agentMsg({ id: 'prompt.card.whole.decision', text: '- {text} ({date}, recorded by {by})', note: 'HI-2854: one decision in a start that carries the whole card. text: in full; date: YYYY-MM-DD; by: who recorded it.' }),
+  commentsHead: agentMsg({ id: 'prompt.card.whole.comments', text: 'Its comments, oldest first, each in its author\'s words:', note: 'HI-2854: in a start that carries the whole card, before every comment it has (prompt.card.whole.comment).' }),
+  comment: agentMsg({ id: 'prompt.card.whole.comment', text: '{by}, {date}:\n{text}', note: 'HI-2854: one comment in a start that carries the whole card. by: its author; date: YYYY-MM-DD; text: in full.' }),
+  inFull: agentMsg({ id: 'prompt.card.whole.inFull', text: 'This is the card in full: every decision and comment it has now.', note: "HI-2854: the last line of a start that carries the whole card, after the skill line: the agent needn't read it again." }),
   readFirst: agentMsg({ id: 'prompt.context.readFirst', text: 'Read these first: {list}.', note: '#818: the doc sections the card says to read first (prompt.context.item), joined with commas; the agent fetches what it needs.' }),
   readFirstNoTools: agentMsg({ id: 'prompt.context.readFirstNoTools', text: "Read these sections of the project's docs first: {list}.", note: "#818: as prompt.context.readFirst, for an agent without Combwork's tools." }),
   item: agentMsg({ id: 'prompt.context.item', text: '{ref} ({size} characters)', note: 'A doc section to read first, with its size: "1.2k", "56k".' }),
@@ -895,13 +912,49 @@ const PROMPT_ATTACHMENTS_MAX = 10
 /** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Combwork's start or its own (HI-2092). */
 export const laneBuilderSkill = (): string => say(PR.laneBuilder)
 
-export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[]; inLane?: boolean } = {}): string {
+/** What taskStartPrompt is told besides taskPrompt's: whether the card is the agent's in Doing, and whether it may carry the whole card. */
+export interface StartPromptOpts {
+  from?: TaskColumn
+  note?: string
+  context?: ContextLine[]
+  attachments?: Pick<CardAttachment, 'id' | 'path'>[]
+  inLane?: boolean
+  /** Combwork started the card on the agent: it is in Doing and the agent's (HI-2854). */
+  yours?: boolean
+  /** The most characters the whole card may take (HI-2854, WHOLE_CARD_MAX); absent or 0: never whole. */
+  wholeMax?: number
+  /** How many older comments the card has archived (HI-2641): any, and it is never whole. */
+  archivedComments?: number
+}
+
+/**
+ * A card's start prompt (taskPrompt), and whether it carries the whole card (HI-2854): every decision and comment in full,
+ * said so in its last line, only when all of it fits uncut within `wholeMax`, with nothing archived and every attachment
+ * named. Anything else is the usual start, which sends the agent to read the card.
+ */
+export function taskStartPrompt(card: TaskCard, withTools: boolean, opts: StartPromptOpts = {}): { text: string; whole: boolean } {
+  const files = opts.attachments ?? []
+  const max = opts.wholeMax ?? 0
+  if (withTools && max > 0 && !opts.archivedComments && files.length <= PROMPT_ATTACHMENTS_MAX) {
+    const text = promptParts(card, withTools, opts, true)
+    if (text.length <= max) return { text, whole: true }
+  }
+  return { text: promptParts(card, withTools, opts, false), whole: false }
+}
+
+export function taskPrompt(card: TaskCard, withTools: boolean, opts: StartPromptOpts = {}): string {
+  return promptParts(card, withTools, opts, false)
+}
+
+function promptParts(card: TaskCard, withTools: boolean, opts: StartPromptOpts, whole: boolean): string {
   // Its attachments (HI-1700): the text's links to them as their paths, and their paths listed.
   const files = opts.attachments ?? []
   const paths = (t: string): string => (files.length ? withAttachmentPaths(t, files) : t)
   const parts = [say(PR.start, { card: cardName(card), title: card.title })]
   const again = opts.from === 'review' || opts.from === 'passed' || opts.from === 'done'
   if (again) parts.push(say(PR.backFrom, { column: columnLabel(opts.from!) }))
+  // Back for more work already says it is in Doing.
+  if (opts.yours && !again) parts.push(say(PR.yours))
   if (opts.note?.trim()) parts.push(opts.note.trim())
   if (card.description.trim()) parts.push(paths(card.description.trim()))
   if (card.blockedBy.length) parts.push(say(PR.dependsOn, { cards: card.blockedBy.map((n) => `${cardRef(n)}`).join(', ') }))
@@ -915,13 +968,21 @@ export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: Ta
         moreCount: String(files.length - PROMPT_ATTACHMENTS_MAX)
       })
     )
+  const skillLine = say(opts.inLane ? PR.laneBuilder : PR.workOnCard)
+  // The whole card (HI-2854): its decisions and every comment, each in full with who and when, and that it is all of it.
+  if (whole) {
+    if (card.decisions?.length) parts.push([say(PR.decisionsHead), ...card.decisions.map((d) => say(PR.decision, { text: d.text, date: (d.editedAt ?? d.at).slice(0, 10), by: d.recordedBy }))].join('\n'))
+    if (card.comments.length) parts.push([say(PR.commentsHead), ...card.comments.map((c) => say(PR.comment, { by: c.by, date: c.at.slice(0, 10), text: paths(c.text.trim()) }))].join('\n\n'))
+    parts.push(`${skillLine} ${say(PR.inFull)}`)
+    return parts.join('\n\n')
+  }
   const latest = card.comments[card.comments.length - 1]
   if (again && latest?.text.trim()) {
     const text = paths(latest.text.trim())
     parts.push(say(PR.latestComment, { by: latest.by, date: latest.at.slice(0, 10), comment: text.length > PROMPT_COMMENT_MAX ? say(PR.commentCut, { start: text.slice(0, PROMPT_COMMENT_MAX) }) : text }))
   }
   // A running lane's builder (HI-2047) works its cards in turn with card-loop, which does each with work-on-card.
-  const skill = say(opts.inLane ? PR.laneBuilder : PR.workOnCard)
+  const skill = skillLine
   if (withTools) parts.push(card.comments.length ? `${skill} ${say(PR.comments, { n: card.comments.length, count: String(card.comments.length), again: again ? 'yes' : 'no' })}` : skill)
   return parts.join('\n\n')
 }

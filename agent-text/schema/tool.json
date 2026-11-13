@@ -110,6 +110,9 @@
   "tool.branch.arg.from": {
     "placeholders": {}
   },
+  "tool.branch.arg.offer": {
+    "placeholders": {}
+  },
   "tool.branch.description": {
     "placeholders": {}
   },
@@ -118,6 +121,11 @@
       "name": "plain",
       "from": "plain",
       "commit": "plain"
+    }
+  },
+  "tool.branch.reply.dismissed": {
+    "placeholders": {
+      "offer": "plain"
     }
   },
   "tool.branch.reply.nextVersion": {
@@ -379,6 +387,9 @@
   "tool.lane.arg.pool": {
     "placeholders": {}
   },
+  "tool.lane.arg.released": {
+    "placeholders": {}
+  },
   "tool.lane.arg.reviewer": {
     "placeholders": {}
   },
@@ -520,6 +531,12 @@
   "tool.queue.arg.items": {
     "placeholders": {}
   },
+  "tool.queue.arg.override": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.past": {
+    "placeholders": {}
+  },
   "tool.queue.arg.preview": {
     "placeholders": {}
   },
@@ -549,7 +566,17 @@
       "to": "plain",
       "from": "plain",
       "queued": "select",
-      "card": "plain"
+      "card": "plain",
+      "overridden": "select"
+    }
+  },
+  "tool.queue.reply.resolve": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
     }
   },
   "tool.queue.reply.retarget": {
@@ -772,6 +799,9 @@
     "placeholders": {}
   },
   "tool.updateAgent.description": {
+    "placeholders": {}
+  },
+  "tool.updateSetting.arg.offer": {
     "placeholders": {}
   },
   "tool.updateSetting.arg.value": {
