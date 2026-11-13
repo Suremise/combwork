@@ -503,6 +503,9 @@ export function refusalValues(rule: RuleId, values: RefusalValues, f: RefusalFor
   return vals
 }
 
+/** A stored message (and the messages in its values) as data (HI-3148): it follows the language of what it is said in. */
+export const storedAsText = (s: StoredText): TextPart => (workflowLine(s, ((m: Msg, v?: Record<string, string | number>) => (v ? { m, values: v } : m)) as unknown as RefusalFormat['one']) as unknown as Text | null) ?? ''
+
 /**
  * A refusal's message as data (HI-3136, HR1's round 1): what a WorkflowRefusedError carries, for the log and agents in
  * English and for the window in the language it shows. Its values as `refusalValues` takes them, but kept as messages

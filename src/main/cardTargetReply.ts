@@ -9,6 +9,10 @@ import { cardRef } from '../shared/projectKeys'
 import { API } from './apiText'
 import { FactStore } from './workflow/factStore'
 import { projectTargets } from './workflow/targets'
+import { releaseReadsOf } from './platform/releaseReadsPorts'
+import { platformIdOf } from './platform/registry'
+import { unreleasedFor } from './platform/releaseReads'
+import { isUnknown } from './platform/types'
 import type { WorkspaceService } from './workspace'
 
 export interface CardTargetSaid {
@@ -29,5 +33,22 @@ export async function cardTargetSaid(ws: WorkspaceService, n: number, project: s
     own = null
   }
   // Pinned to the project's own branch (a forward's resolution): its branch said, no note (it never follows another).
-  return { own, note: own && t && own !== t.default ? say(API.card.ownTarget, { card: cardRef(n), target: own, default: t.default }) : '' }
+  const ownNote = own && t && own !== t.default ? say(API.card.ownTarget, { card: cardRef(n), target: own, default: t.default }) : ''
+  return { own, note: [ownNote, await releasedNote(ws, project, n, own ?? t?.default ?? null, t?.default ?? null)].filter(Boolean).join('\n') }
+}
+
+/**
+ * HI-3148: the card's line already released: its start there will be refused unless the user OKs it, so the reply says
+ * so now. Unreadable, or a platform with no release reads: nothing (its start says what couldn't be read).
+ */
+async function releasedNote(ws: WorkspaceService, project: string, n: number, line: string | null, workTarget: string | null): Promise<string> {
+  if (!line || !ws.path) return ''
+  const projectPath = join(ws.path, project)
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const reads = releaseReadsOf(platformIdOf(projectPath, cfg?.platform))
+  if (!reads) return ''
+  const r = await reads.released(projectPath, line).catch(() => null)
+  if (!r || isUnknown(r)) return ''
+  const suggest = await unreleasedFor(reads, projectPath, line, workTarget).catch(() => null)
+  return say(API.card.targetReleased, { target: line, tag: r.tag, into: r.into, card: cardRef(n), has: suggest ? 'yes' : 'no', suggest: suggest ?? '' })
 }

@@ -46,7 +46,7 @@ const T = {
   'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
   'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'builder, reviewer, either (never its own), generalist (no lanes) or independent (no workflow). Default: by name.' }),
-  'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
+  'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up. released: the released branch its refusal named, once the user OKs work there.", note: 'HI-3148: released added.' }),
   'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
   'putBack.arg.why': agentMsg({ id: 'tool.putBack.arg.why', text: 'Why it goes back.' }),
@@ -122,6 +122,7 @@ const T = {
   'waitForTasks.arg.usage': agentMsg({ id: 'tool.waitForTasks.arg.usage', text: "With wake: also when an account's use reaches percent." }),
   'mergeSlot.description': agentMsg({ id: 'tool.mergeSlot.description', text: "Your project's merge slot: one merge at a time into a branch. claim waits for it; release gives it up. (detail: use-cw-api, tools.md)" }),
   'lane.arg.builder': agentMsg({ id: 'tool.lane.arg.builder', text: 'Agent name or id.' }),
+  'lane.arg.released': agentMsg({ id: 'tool.lane.arg.released', text: "start: { target, reason }: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.", note: 'HI-3148: the Assistant’s override of a new lane on a released line.' }),
   'lane.arg.pool': agentMsg({ id: 'tool.lane.arg.pool', text: "start: reviewed by the project's reviewer pool." }),
   'lane.arg.builderJoin': agentMsg({ id: 'tool.lane.arg.builderJoin', text: "join: the builder's name." }),
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),
@@ -436,7 +437,7 @@ const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/a
 /** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
 /** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
-const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: say(T['arg.override']) }
+const overrideArg = { type: 'object', properties: { reason: { type: 'string' }, released: { type: 'string' } }, required: ['reason'], description: say(T['arg.override']) }
 const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: say(T['arg.cards'], { what }) })
 /** Files kept with a card (HI-1700): local paths, copied in. */
 const attachmentsArg = (where: 'description' | 'comment') => ({
@@ -959,7 +960,7 @@ const tools: Tool[] = [
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg(say(T['lane.arg.cards'])),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) }, target: { type: 'string', description: say(T['arg.target']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) }, target: { type: 'string', description: say(T['arg.target']) }, released: { type: 'object', properties: { target: { type: 'string' }, reason: { type: 'string' } }, required: ['target', 'reason'], description: say(T['lane.arg.released']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
         reviewer: { type: 'string', description: say(T['lane.arg.reviewer']) },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -983,7 +984,7 @@ const tools: Tool[] = [
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
-      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target', 'released']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
@@ -1295,11 +1296,11 @@ const tools: Tool[] = [
       say(T['startTask.description']),
     inputSchema: {
       type: 'object',
-      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: say(T['startTask.arg.note']) }, name: { type: 'string', description: say(T['startTask.arg.name']) }, connection: { type: 'string', description: say(T['startTask.arg.connection']) } },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: say(T['startTask.arg.note']) }, name: { type: 'string', description: say(T['startTask.arg.name']) }, connection: { type: 'string', description: say(T['startTask.arg.connection']) }, ...(ASSISTANT ? { override: overrideArg } : {}) },
       required: ['number']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, connection: a.connection, reply: 'short', ...legacyWorktreeArgs(a), ...legacyAgentArgs(a) })) as { agent: string; added: boolean; card: TaskRow }
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, connection: a.connection, ...(ASSISTANT && a.override !== undefined ? { override: a.override } : {}), reply: 'short', ...legacyWorktreeArgs(a), ...legacyAgentArgs(a) })) as { agent: string; added: boolean; card: TaskRow }
       return say(T['startTask.reply.started'], { card: cardName(r.card), title: r.card.title, added: r.added ? 'yes' : 'no', agent: r.agent, hasProject: r.card.project ? 'yes' : 'no', project: r.card.project ?? '', column: r.card.column })
     }
   },

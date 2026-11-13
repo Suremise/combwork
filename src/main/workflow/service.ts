@@ -245,6 +245,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
     keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
     keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
+    // HI-3148: a running lane's grant to start on a released line (its record's, given with its start), for its cards' starts.
+    releaseGrant: async (lane) => {
+      const { rawLanes } = await import('../lanes')
+      const l = (await rawLanes(ws)).find((x) => x.id === lane && x.state === 'active')
+      return l?.releasedOverride?.target ?? null
+    },
     earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),

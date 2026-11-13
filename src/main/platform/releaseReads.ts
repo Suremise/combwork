@@ -4,7 +4,8 @@
 // that already shipped. Read through this port only (SPEC §16.3.6's rule 2: never a switch on a platform id), local
 // reads only, never the network. Unknown when anything can't be read: the caller refuses, never takes it as unreleased.
 
-import type { Maybe } from './types'
+import { nextVersionName } from '../../shared/nextVersion'
+import { isUnknown, type Maybe } from './types'
 
 /** A released line: the tag that says so, the line it is merged into, and the tag's own date where it has one. */
 export interface ReleaseInfo {
@@ -25,6 +26,21 @@ export interface ReleaseReads {
   released(projectPath: string, line: string): Promise<Maybe<ReleaseInfo | null>>
   /** Whether `line` is a line of the repository now (a suggestion is only ever one that is). */
   exists(projectPath: string, line: string): Promise<Maybe<boolean>>
+}
+
+/**
+ * The line to start on instead of released `target`: the project's Work merges into (`workTarget`), else the one named as
+ * its next version, the first that exists and is known not released; null when none is (never a guess).
+ */
+export async function unreleasedFor(reads: ReleaseReads, projectPath: string, target: string, workTarget: string | null | undefined): Promise<string | null> {
+  for (const c of new Set([workTarget, nextVersionName(target)])) {
+    if (!c || c === target) continue
+    const there = await reads.exists(projectPath, c)
+    if (isUnknown(there) || !there) continue
+    const rel = await reads.released(projectPath, c)
+    if (!isUnknown(rel) && rel === null) return c
+  }
+  return null
 }
 
 /** The tag names that say `line` is released, in the order looked for. */

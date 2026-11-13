@@ -34,8 +34,7 @@ import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
-import type { ReleaseReads } from '../platform/releaseReads'
-import { nextVersionName } from '../../shared/nextVersion'
+import { unreleasedFor } from '../platform/releaseReads'
 import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
@@ -1200,23 +1199,8 @@ export class Workflow {
     const lane = card.lane ? ((await this.cfg.releaseGrant?.(card.lane)) ?? null) : null
     if (lane === target) return { grant: null }
     if (isUnknown(r)) return { refusal: { rule: 'start.releaseUnknown', values: { card: card.key, target, what: r.whatText ?? r.what } } }
-    const suggest = await this.unreleasedFor(reads, target)
+    const suggest = await unreleasedFor(reads, this.cfg.project, target, this.cfg.options().target)
     return { refusal: { rule: 'start.released', values: { card: card.key, target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' } } } // i18n-ignore: select keys
-  }
-
-  /**
-   * The line to start on instead of released `target`: the project's Work merges into, else the one named as its next
-   * version, the first that exists and is known not released; null when none is (no guess).
-   */
-  private async unreleasedFor(reads: ReleaseReads, target: string): Promise<string | null> {
-    for (const c of new Set([this.cfg.options().target, nextVersionName(target)])) {
-      if (!c || c === target) continue
-      const there = await reads.exists(this.cfg.project, c)
-      if (isUnknown(there) || !there) continue
-      const rel = await reads.released(this.cfg.project, c)
-      if (!isUnknown(rel) && rel === null) return c
-    }
-    return null
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */

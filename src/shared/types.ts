@@ -4585,6 +4585,8 @@ export interface LaneStartRequest {
   applyNow?: boolean
   /** Its Merges into (HI-2556): one of LaneStartInfo.targets' others; null or absent, the project's own. */
   target?: string | null
+  /** HI-3148: the user's Start Anyway for a lane on a released line (a hotfix lane): the line as the window named it, and why. */
+  released?: { target: string; reason: string }
 }
 
 /**

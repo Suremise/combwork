@@ -178,7 +178,7 @@ import type { ConnectionAnswers, ConnectionsApplied, ConnectionsPlan } from './t
 import type { TemplateWorkflow } from './workflow/templateOptions'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
-import type { AdvancedState } from './advanced'
+import type { AdvancedState, Text } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
@@ -990,6 +990,11 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /**
+   * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
+   * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.
+   */
+  'lanes:releaseCheck': (projectPath: string, builder: string, target: string | null) => { target: string; text: Text } | null
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

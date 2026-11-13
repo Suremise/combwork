@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AgentInfo, LaneStartInfo, ProjectInfo } from '@shared/types'
+import { shownText, type Text } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
 import { LANE_NAME_MAX } from '@shared/lanes'
 import { cardLabel } from '@shared/projectKeys'
@@ -82,6 +83,8 @@ const M = {
   applyNow: msg({ id: 'board.laneStart.applyNow', defaultMessage: 'Apply now', description: "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done." }),
   applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress. Todo is a board column." }),
   applyNowNot: msg({ id: 'board.laneStart.applyNowNot', defaultMessage: "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.", description: "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)." }),
+  releasedReason: msg({ id: 'board.laneStart.releasedReason', defaultMessage: 'Why start it there anyway (a hotfix, say)', description: 'HI-3148: a field label in the Start Lane dialog, shown when the branch the lane would merge into is already released (or Combwork couldn’t check): the user’s reason for starting on it anyway, recorded with the lane.' }),
+  startAnyway: msg({ id: 'board.laneStart.startAnyway', defaultMessage: 'Start Anyway', description: 'HI-3148: the Start Lane dialog’s button when the lane’s branch is already released (or couldn’t be checked): starts the lane there anyway, with the reason given. Enabled once a reason is written.' }),
   show: msg({ id: 'board.laneStart.show', defaultMessage: 'Show', description: 'A button on the toast after a lane started: shows its builder.' })
 }
 
@@ -103,6 +106,10 @@ export function LaneStartDialog() {
   const lanes = useStore((s) => s.lanes)
   // What the project's rules offer (#1443): the reviewer pool, read for the project chosen.
   const [info, setInfo] = useState<{ path: string; info: LaneStartInfo } | null>(null)
+  // HI-3148: the lane's line released (or unreadable), as Start would refuse it: for Start Anyway, with the user's reason.
+  const [released, setReleased] = useState<{ key: string; target: string; text: Text } | null>(null)
+  const [releasedWhy, setReleasedWhy] = useState('')
+  const [recheck, setRecheck] = useState(0)
   const action = useBusy()
   const project: ProjectInfo | null = projects.find((p) => p.path === projectPath) ?? null
   const pool = info && info.path === projectPath ? info.info.pool : null
@@ -125,6 +132,7 @@ export function LaneStartDialog() {
     setApplyNow(false)
     // Each opening starts on the project's own branch (HI-2556): a pick never carries over to the next lane.
     setTarget('')
+    setReleasedWhy('')
     action.setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req])
@@ -149,11 +157,26 @@ export function LaneStartDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req, projectPath, builder])
 
+  // HI-3148: whether this lane's line is released, read again whenever the project, builder or Merges into changes.
+  const releasedKey = `${projectPath ?? ''}|${builder}|${target}`
+  useEffect(() => {
+    if (!req || !projectPath || !builder) return setReleased(null)
+    let gone = false
+    void call('lanes:releaseCheck', projectPath, builder, target || null)
+      .then((got) => !gone && setReleased(got ? { key: releasedKey, ...got } : null))
+      .catch(() => !gone && setReleased(null))
+    return () => {
+      gone = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [req, releasedKey, recheck])
+  const releasedNow = released && released.key === releasedKey ? released : null
+
   const agentOf = (id: string): AgentInfo | undefined => project?.agents.find((a) => a.id === id)
   const pooled = reviewer === POOL && !!pool
   const chosen = [agentOf(builder), reviewer && !pooled ? agentOf(reviewer) : undefined].filter((a): a is AgentInfo => !!a)
   const busyNow = chosen.filter(busy)
-  const ready = !!project && !!agentOf(builder) && builder !== reviewer && (reviewer !== POOL || pooled) && cards.length > 0
+  const ready = !!project && !!agentOf(builder) && builder !== reviewer && (reviewer !== POOL || pooled) && cards.length > 0 && (!releasedNow || !!releasedWhy.trim())
   // The builder's running lane with its own card in flight (HI-1995): this start edits that lane, its list queued until
   // that card is Done unless applied now.
   const running = project ? (lanes ?? []).find((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === project.name.toLowerCase() && l.builder.id === builder) : undefined
@@ -167,8 +190,12 @@ export function LaneStartDialog() {
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
     if (!project || !ready || !req || get().laneStartFor !== req) return
-    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name, ...(applyNow && canApplyNow ? { applyNow: true } : {}), ...(target && targets && !running ? { target } : {}) }))
-    if (!out) return setWaiting(false)
+    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name, ...(applyNow && canApplyNow ? { applyNow: true } : {}), ...(target && targets && !running ? { target } : {}), ...(releasedNow && !running ? { released: { target: releasedNow.target, reason: releasedWhy.trim() } } : {}) }))
+    // Refused (its line released since, say): read again, so Start Anyway shows for the line as it is now.
+    if (!out) {
+      setRecheck((n) => n + 1)
+      return setWaiting(false)
+    }
     const r = out.value
     const pair = r.lane.reviewer ? `${r.lane.builder.name} / ${r.lane.reviewer.name}` : r.lane.pool && pool ? `${r.lane.builder.name} / ${tr(M.pool, { agents: poolNames(builder) })}` : r.lane.builder.name
     notify('success', tr(M.started, { pair }), tr(M.startedText, { n: cards.length }), [{ label: tr(M.show), command: 'agent.show', args: [project.path, builder] }])
@@ -219,7 +246,7 @@ export function LaneStartDialog() {
             {tr(M.cancel)}
           </button>
           <BusyButton className="primary" busy={action.busy === 'start' || waiting} busyLabel={waiting && busyNow.length ? tr(M.waiting, { agents: names }) : tr(M.starting)} disabled={!ready} onClick={() => (busyNow.length ? setWaiting(true) : void go())}>
-            <Icon name="play" /> {busyNow.length ? tr(M.waitAndStart) : tr(M.start)}
+            <Icon name="play" /> {busyNow.length ? tr(M.waitAndStart) : releasedNow ? tr(M.startAnyway) : tr(M.start)}
           </BusyButton>
         </>
       }
@@ -291,6 +318,15 @@ export function LaneStartDialog() {
                   </select>
                 </>
               )}
+            </>
+          )}
+          {releasedNow && (
+            <>
+              <p className="warn-text span2" data-lane-released={releasedNow.target}>
+                {shownText(releasedNow.text)}
+              </p>
+              <label htmlFor="lane-start-released">{tr(M.releasedReason)}</label>
+              <input id="lane-start-released" className="input" value={releasedWhy} disabled={waiting} maxLength={4000} onChange={(e) => setReleasedWhy(e.target.value)} data-lane-released-reason />
             </>
           )}
           <label>{tr(M.cards)}</label>

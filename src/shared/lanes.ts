@@ -98,6 +98,12 @@ export interface LaneRecord {
    */
   slotWait?: { since: string; note: string; stoppedOnly?: true }
   /**
+   * HI-3148: started on a released line by the user's or the Assistant's override (a hotfix lane): the line it was given
+   * for (the lane's fixed Merges into), who gave it, why and when. Its cards' starts onto that line go through while it
+   * runs; ended or replaced, it goes with the lane. Kept in its row's `extra`.
+   */
+  releasedOverride?: { target: string; by: 'user' | 'assistant'; reason: string; at: string }
+  /**
    * The lane's agents still owed their new conversation (HI-2034): its start found one in a turn or with a prompt it
    * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `cw.lanes.freshStartWaitMinutes`.
    * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Combwork gives
@@ -676,6 +682,7 @@ export function readLane(v: unknown): LaneRecord | null {
     mergeCommit: v.mergeCommit as string | null,
     ...(snapshot ? { frozen: snapshot } : {}),
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
+    ...(isObj(v.releasedOverride) && text(v.releasedOverride.target, 250) && (v.releasedOverride.by === 'user' || v.releasedOverride.by === 'assistant') && typeof v.releasedOverride.reason === 'string' && time(v.releasedOverride.at) ? { releasedOverride: { target: v.releasedOverride.target as string, by: v.releasedOverride.by, reason: (v.releasedOverride.reason as string).slice(0, 4000), at: v.releasedOverride.at as string } } : {}),
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
