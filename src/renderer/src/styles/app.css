@@ -8584,10 +8584,12 @@ button.agent-place:hover {
 .activity-map-ring-mark .fill {
   stroke: var(--accent);
 }
+/* A ring is only ever stroked: an amber one's warning fill painted its whole hex solid (HI-3190). */
 .activity-map-context.amber .fill,
-.activity-map-ring-mark.amber .fill,
-.activity-map-centre-context.amber {
+.activity-map-ring-mark.amber .fill {
   stroke: var(--warning);
+}
+.activity-map-centre-context.amber {
   fill: var(--warning) !important;
 }
 .activity-map-context .fill,
