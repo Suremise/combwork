@@ -18,7 +18,8 @@ import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { JjPlatform, SWEEP_SCAN } from '../src/main/platform/jjPlatform'
 import { jjIntegratedOf } from '../src/main/platform/jjFacts'
-import { attemptsKey, readAttempts, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
+import { attemptsKey, readAttempts, reviveDropped, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
+import { visibleCommits } from '../src/main/platform/jjCandidates'
 import type { SqlDb } from '../src/main/platform/jjObligations'
 import { waitingOf } from '../src/main/jjWindow'
 import { candidateFingerprint, candidateKey, type JjCandidateShown } from '../src/main/workflow/reconcile'
@@ -1010,3 +1011,144 @@ const ofChange = (w: World, change: string): string[] =>
     .jj(w.repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `change_id(${change}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"')
     .split(/\r?\n/)
     .filter(Boolean)
+
+/** The jj operation now (the repository's), for the user's `jj op restore` back to it. */
+const opNow = (w: World): string => w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
+/** Every ref left under an attempt's pin prefix. */
+const pinsOf = (w: World, card: { key: string }, attempt: string): string[] =>
+  execFileSync('git', ['--git-dir', w.ctx.store, 'for-each-ref', '--format=%(refname)', `refs/cw/jj/${card.key}/${attempt}/`], { encoding: 'utf8', env: w.h.env })
+    .split(/\r?\n/)
+    .filter(Boolean)
+
+describe.skipIf(!jjExe)('HI-3150: a dropped candidate the user’s jj op restore brings back', { timeout: REAL_JJ_MS * 2 }, () => {
+  /** A card's candidate dropped as its cycle ended (put back, restarted, swept), then `jj op restore` to just before the drop. */
+  async function restoredAfterSweep(colocated: boolean) {
+    const w = await world(colocated, { candidates: true, oneSlot: true })
+    const { card } = await approved(w)
+    const jjp = new JjPlatform(w.wf)
+    await jjp.reconcile(card, {})
+    const cycle = w.wf.state(card).cycle
+    const c = shown(w, card, cycle)!.offer!
+    expect(await w.wf.move(card.key, 'todo', 'user', { confirm: true, reason: 'again' })).toMatchObject({ ok: true })
+    moved(await w.wf.start(card.key, B1))
+    const before = opNow(w)
+    await jjp.afterRun()
+    expect(visible(w, c.result)).toBe(false)
+    expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+    // The user restores to before the drop: the candidate is back in the log, its pins (Git refs) not.
+    w.h.jj(w.repo, 'op', 'restore', before)
+    expect(visible(w, c.result)).toBe(true)
+    expect(pinsOf(w, card, c.attempt)).toEqual([])
+    // Only the attempts journal is left for that cycle: no candidate or checks rows (the sweep's admission must still see it).
+    expect(shown(w, card, cycle)).toBeNull()
+    return { w, card, cycle, c, jjp }
+  }
+
+  describe.each([true, false] as const)('colocated: %s', (colocated) => {
+    it('the sweep, through its own entry: revived, dropped again, no pin left; the entry dropped', async () => {
+      const { w, card, cycle, c, jjp } = await restoredAfterSweep(colocated)
+      await jjp.sweepEnded()
+      expect(visible(w, c.result)).toBe(false)
+      expect(pinsOf(w, card, c.attempt)).toEqual([])
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+      // Settled again: the next sweep reads it and writes nothing.
+      const was = JSON.stringify(entries(w, card, cycle))
+      await jjp.sweepEnded()
+      expect(JSON.stringify(entries(w, card, cycle))).toBe(was)
+    })
+
+    it('the user built on the restored candidate: it and their commit kept', async () => {
+      const { w, card, c, jjp } = await restoredAfterSweep(colocated)
+      w.h.jj(w.repo, 'new', c.result, '-m', 'mine')
+      writeFileSync(join(w.repo, 'mine.txt'), 'mine\n')
+      w.h.jj(w.repo, 'commit', '-m', 'mine')
+      const mine = w.h.id(w.repo, '@-')
+      await jjp.sweepEnded()
+      expect(visible(w, c.result)).toBe(true)
+      expect(visible(w, mine)).toBe(true)
+      // Nothing of the user's lost; whatever pins the re-drop made for it are what holds it, never a deleted one it needed.
+      expect(card.key).toBeTruthy()
+    })
+
+    it('the target moved onto the restored candidate: kept, never abandoned', async () => {
+      const { w, card, cycle, c, jjp } = await restoredAfterSweep(colocated)
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', c.result, '--allow-backwards')
+      await jjp.sweepEnded()
+      expect(visible(w, c.result)).toBe(true)
+      expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('kept')
+    })
+  })
+
+  it('a live cycle: the step drops a superseded candidate the restore brought back', async () => {
+    const w = await world(true, { candidates: true, oneSlot: true })
+    const { card } = await approved(w)
+    const jjp = new JjPlatform(w.wf)
+    await jjp.reconcile(card, {})
+    const cycle = w.wf.state(card).cycle
+    const old = shown(w, card, cycle)!.offer!
+    onTarget(w, 'theirs.txt', 'theirs\n')
+    const before = opNow(w)
+    await jjp.reconcile(card, {})
+    expect(visible(w, old.result)).toBe(false)
+    w.h.jj(w.repo, 'op', 'restore', before)
+    expect(visible(w, old.result)).toBe(true)
+    await jjp.reconcile(card, {})
+    expect(visible(w, old.result)).toBe(false)
+    expect(pinsOf(w, card, old.attempt)).toEqual([])
+  })
+
+  it('the visibility read, in chunks: every commit read whatever its chunk; the revival revalidates under the lock (a changed or cleared journal: nothing written)', async () => {
+    const { w, card, cycle, c } = await restoredAfterSweep(true)
+    const integ = (await w.deps.integration())!
+    const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder }
+    const e0 = entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)!
+    // The candidate last, past several chunks of one: still found; hidden ones (its other journalled commits) not.
+    const ids = [...e0.record.commits.filter((x) => x !== c.result), w.main(), c.result]
+    const seen = await visibleCommits(j4, ids, () => true, 1)
+    expect(seen?.has(c.result)).toBe(true)
+    expect(seen?.has(w.main())).toBe(true)
+    // The journal changed between the nomination and the lock (an entry saved anew), or cleared: nothing revived.
+    const saved: JjAttemptEntry[] = []
+    let calls = 0
+    const changed = () => (++calls === 1 ? [e0] : [{ ...e0, record: { ...e0.record, ops: [...e0.record.ops, 'x'] } }])
+    expect(await reviveDropped({ j4, entries: changed, save: (e) => void saved.push(e), still: () => true })).toBe(0)
+    calls = 0
+    const cleared = () => (++calls === 1 ? [e0] : [])
+    expect(await reviveDropped({ j4, entries: cleared, save: (e) => void saved.push(e), still: () => true })).toBe(0)
+    expect(saved).toEqual([])
+    // Its owner gone meanwhile: nothing either.
+    expect(await reviveDropped({ j4, entries: () => [e0], save: (e) => void saved.push(e), still: () => false })).toBe(0)
+    expect(saved).toEqual([])
+    // As read: revived, live.
+    expect(await reviveDropped({ j4, entries: () => [e0], save: (e) => void saved.push(e), still: () => true })).toBe(1)
+    expect(saved[0].state).toBeUndefined()
+  })
+
+  describe('interrupted after its revival (colocated)', () => {
+    for (const [at, point] of [
+      ["after a new pin's intent, before it is made", (p: string) => p.startsWith('beforePin:') && p.includes('/r')],
+      ['after a new pin', (p: string) => p.startsWith('afterPin:') && p.includes('/r')],
+      ['after the abandon, before the pins are deleted', (p: string) => p.startsWith('beforeDelete:')]
+    ] as const) {
+      it(`${at}: the next sweep, as after a restart, completes the drop`, async () => {
+        const { w, card, cycle, c, jjp } = await restoredAfterSweep(true)
+        let once = true
+        w.deps.candidateHook = async (p) => {
+          if (once && point(p)) {
+            once = false
+            throw new Error('crash')
+          }
+        }
+        await jjp.sweepEnded()
+        expect(once).toBe(false)
+        // Live from its revival on: never back to `dropped` until the drop has finished.
+        expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBeUndefined()
+        w.deps.candidateHook = undefined
+        await new JjPlatform(w.another()).sweepEnded()
+        expect(visible(w, c.result)).toBe(false)
+        expect(pinsOf(w, card, c.attempt)).toEqual([])
+        expect(entries(w, card, cycle).find((e) => e.record.attempt === c.attempt)?.state).toBe('dropped')
+      })
+    }
+  })
+})
