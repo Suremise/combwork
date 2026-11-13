@@ -2997,6 +2997,9 @@ export class SlotPool {
           return { error: sayFor(this.port, 'branchUnread', { slot: name }) }
         }
         const there = on === p.line
+        // HI-3130 (HR1's round 1): already on its line (a prepare whose record write was cut short, or whose binding read
+        // failed, tried again): the kept record follows the binding here too, idempotent, before any way out below.
+        if (there) await this.keptFollows(name, token, lease.kind)
         const inPlace = !!p.inPlace
         // In place (HI-3010): a detached slot gets its line where its head is; on another line (HI-3116: the last card's,
         // its work merged), made at the base by ref transactions alone. Neither possible: it waits for its builder.

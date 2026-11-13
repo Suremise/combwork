@@ -12,7 +12,7 @@
 
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder } from '../src/main/slots'
 import { gitHistory } from '../src/main/platform/gitHistory'
@@ -296,6 +296,30 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     expect(w.pool.keptCard(a.name)).toBe(3)
     expect(await w.pool.lend({ card: 3, agent: 'a-3' }, { target: 'main' })).toMatchObject({ ok: true, slot: { name: a.name } })
     expect(w.h.id(a.folder, '@-')).toBe(R3)
+  })
+
+  // HI-3130 (HR1's round 1): the prepare that put card 2's binding in the slot didn't get to move the record (its binding
+  // read failed once: left as it was, never guessed); its retry, the slot already on card 2's line, moves it then.
+  it.each([true, false])('C3: the record\'s move missed once (the binding unread): the prepare tried again moves it (colocated: %s)', async (colocated) => {
+    const w = world(colocated)
+    const a = await putBackWithWork(w, false)
+    const lane = await w.pool.lend({ lane: 'lane-1', agent: 'a-1', startsCard: 1 }, { target: 'main' })
+    if (!lane.ok) throw new Error('lane refused')
+    w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', a.R)
+    const row = w.store.slot(a.name)!
+    const generation = row.identity!.generation
+    const line = jjLineKey(row.identity!.workspace, 2, 1)
+    const spy = vi.spyOn(w.port, 'heldCard').mockResolvedValueOnce(null)
+    expect(await w.pool.prepare(lane.lease.id, { line, base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+    expect(w.pool.keptRecord(a.name)).toEqual({ card: 1, generation })
+    expect(await w.pool.prepare(lane.lease.id, { line, base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+    expect(w.pool.keptRecord(a.name)).toEqual({ card: 2, generation })
+    expect(await w.pool.keptPreview(1)).toBeNull()
+    const one = await w.pool.lend({ card: 1, agent: 'a-9' }, { target: 'main' })
+    expect(one).toMatchObject({ ok: true })
+    expect(one.ok && one.slot.name).not.toBe(a.name)
   })
 
   // HI-3130: with card 1's work not in main, the lane can't prepare card 2 there (HI-3057), so the record stays card 1's.
