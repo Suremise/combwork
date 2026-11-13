@@ -22,7 +22,19 @@ const exact = (fn: 'bookmarks' | 'tags', name: string): string => `${fn}(exact:$
 
 /** Release reads through jj `runner` (Combwork's own unless a test gives one). */
 export function jjReleaseReadsWith(runner: JjRunner): ReleaseReads {
+  /** The line's bookmark at one operation: exactly one commit (true), none (false), or unknown (several: conflicted). */
+  async function existsAt(projectPath: string, line: string): Promise<Maybe<boolean>> {
+    const what = (u?: JjReadUnknown) => withDetail(unknown(U.line, { branch: line }), u ? (u.detail ?? u.jjUnknown) : undefined)
+    const ctx = await jjContextOf(projectPath, runner)
+    if (!('jj' in ctx)) return what()
+    const reads = new JjReads({ folder: ctx.jj.root, jjRepo: ctx.jj.jjRepo }, runner)
+    const pinned = await reads.pinned((op) => reads.run(op, ['log', '--no-graph', '-r', `present(${exact('bookmarks', line)})`, '-T', 'commit_id ++ "\\n"']))
+    if (isJjUnknown(pinned)) return what(pinned)
+    const n = lines(pinned.value).length
+    return n > 1 ? what() : n === 1
+  }
   return {
+    exists: existsAt,
     async released(projectPath, line): Promise<Maybe<ReleaseInfo | null>> {
       const what = (u?: JjReadUnknown) => withDetail(unknown(U.line, { branch: line }), u ? (u.detail ?? u.jjUnknown) : undefined)
       const ctx = await jjContextOf(projectPath, runner)

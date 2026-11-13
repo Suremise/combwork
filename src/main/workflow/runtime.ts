@@ -33,6 +33,9 @@ import { historyOf } from '../platform/historyPorts'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
+import { releaseReadsOf } from '../platform/releaseReadsPorts'
+import type { ReleaseReads } from '../platform/releaseReads'
+import { nextVersionName } from '../../shared/nextVersion'
 import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
@@ -225,6 +228,11 @@ export interface WorkflowConfig {
    * wait) is refused naming it (`platform.keptElsewhere`). Left out, none.
    */
   keptHere?: (card: CardRecord) => Promise<{ slot: string; folder: string } | null>
+  /**
+   * HI-3148: the released line a running lane's starts may go onto, by the user's or the Assistant's override given with
+   * the lane's start (its record's, for its fixed Merges into while it runs), or null: none.
+   */
+  releaseGrant?: (lane: string) => Promise<string | null>
   /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
   earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
@@ -1049,7 +1057,7 @@ export class Workflow {
   // --- Intents and moves (§16.7.2).
 
   /** start: Todo → Active, the card's line and base recorded, its folder prepared (slots). */
-  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean } = {}): Promise<Reply> {
+  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean; released?: { target: string; reason: string } } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1084,6 +1092,9 @@ export class Workflow {
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     try {
+      // HI-3148: never new work on a released line, unless the user or the Assistant says so (a hotfix).
+      const rel = this.enforced() ? await this.releasedStart(card, g, actor, opts.released) : { grant: null }
+      if ('refusal' in rel) return await this.refuse(card, actor, 'start', rel.refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       // HI-2985: a forward's resolution starts only on the branch it resolves (one made unpinned, or Work merges into moved).
       const res = from.resolves
       if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
@@ -1139,6 +1150,8 @@ export class Workflow {
         // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
         const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
         if (bad) return undone(bad)
+        // The release override it was given, recorded with the start it lets through, for the line it was given for.
+        if (rel.grant) w.fact('Override', rel.grant)
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })
@@ -1163,6 +1176,42 @@ export class Workflow {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
       if (g.lent) await this.slotUnused(card, g.lent)
     }
+  }
+
+  /**
+   * HI-3148: a fresh start onto a released line (its platform's release reads: a tag named after it, the line in the main
+   * line) is refused, with the line to start on instead where one is known (`start.released`); one that can't be read is
+   * refused too (`start.releaseUnknown`), never taken for unreleased. Let through by the user's or the Assistant's override
+   * for exactly this line (`given`, the grant written with the start), or the card's running lane's (`releaseGrant`).
+   */
+  private async releasedStart(card: CardRecord, g: StartGathered, actor: Actor, given?: { target: string; reason: string }): Promise<{ refusal: GuardRefusal } | { grant: FactData['Override'] | null }> {
+    const target = g.data.target
+    const reads = target ? releaseReadsOf(g.o.platform) : null
+    if (!target || !reads) return { grant: null }
+    const r = await reads.released(this.cfg.project, target)
+    if (!isUnknown(r) && !r) return { grant: null }
+    const by = actor === 'user' || actor === 'assistant' ? actor : null
+    if (given && by && given.target === target) return { grant: { rules: ['start.released'], move: 'start', by, reason: given.reason, target } }
+    const lane = card.lane ? ((await this.cfg.releaseGrant?.(card.lane)) ?? null) : null
+    if (lane === target) return { grant: null }
+    if (isUnknown(r)) return { refusal: { rule: 'start.releaseUnknown', values: { card: card.key, target, what: r.whatText ?? r.what } } }
+    const suggest = await this.unreleasedFor(reads, target)
+    return { refusal: { rule: 'start.released', values: { card: card.key, target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' } } } // i18n-ignore: select keys
+  }
+
+  /**
+   * The line to start on instead of released `target`: the project's Work merges into, else the one named as its next
+   * version, the first that exists and is known not released; null when none is (no guess).
+   */
+  private async unreleasedFor(reads: ReleaseReads, target: string): Promise<string | null> {
+    for (const c of new Set([this.cfg.options().target, nextVersionName(target)])) {
+      if (!c || c === target) continue
+      const there = await reads.exists(this.cfg.project, c)
+      if (isUnknown(there) || !there) continue
+      const rel = await reads.released(this.cfg.project, c)
+      if (!isUnknown(rel) && rel === null) return c
+    }
+    return null
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */

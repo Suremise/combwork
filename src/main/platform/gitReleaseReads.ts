@@ -28,6 +28,10 @@ async function tag(repo: string, name: string): Promise<Maybe<{ commit: string; 
 }
 
 export const gitReleaseReads: ReleaseReads = {
+  async exists(projectPath, line): Promise<Maybe<boolean>> {
+    const h = await G.lineHead(projectPath, line)
+    return isUnknown(h) ? h : !!h
+  },
   async released(projectPath, line): Promise<Maybe<ReleaseInfo | null>> {
     const into = await G.mainBranch(projectPath)
     if (isUnknown(into)) return into

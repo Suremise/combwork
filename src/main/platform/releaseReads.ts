@@ -23,6 +23,8 @@ export interface ReleaseInfo {
 export interface ReleaseReads {
   /** `line` released (`ReleaseInfo`), not (null: not tagged, not merged, or no such line), or unknown. */
   released(projectPath: string, line: string): Promise<Maybe<ReleaseInfo | null>>
+  /** Whether `line` is a line of the repository now (a suggestion is only ever one that is). */
+  exists(projectPath: string, line: string): Promise<Maybe<boolean>>
 }
 
 /** The tag names that say `line` is released, in the order looked for. */
