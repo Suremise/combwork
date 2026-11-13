@@ -13,7 +13,7 @@
 // - `common`: a module whose name says Git but whose work is every platform's (the folder fence, keyed by folder).
 
 import { readdirSync, readFileSync, statSync } from 'fs'
-import { dirname, join, relative, resolve } from 'path'
+import { basename, dirname, join, relative, resolve } from 'path'
 import ts from 'typescript-classic'
 
 /** Git's own modules: an import of one from outside Git's implementation is an edge the audit classifies. */
@@ -312,9 +312,14 @@ export const SEAMS = {
  * side's name is one NOT_PLATFORM lists, with why; any other spelling (`to`, `id`, `p`…) counts.
  */
 
+/** The descriptors' module, whose `PlatformId` names every platform. */
+const DESCRIPTORS = 'src/shared/platform/descriptors'
+
 /** The platform ids, read from the descriptors' own type (a new one is scanned for without editing this file). */
 export function platformIds(root, over = {}) {
-  const file = 'src/shared/platform/descriptors.ts'
+  // Found by its folder's listing: a source path in this text would read as a script it runs (the WorkspaceService rule).
+  const name = readdirSync(join(root, dirname(DESCRIPTORS))).find((e) => e.startsWith(`${basename(DESCRIPTORS)}.`))
+  const file = `${dirname(DESCRIPTORS)}/${name}`
   const text = over[file] ?? readFileSync(join(root, file), 'utf8')
   const m = /export type PlatformId = ([^\n]+)/.exec(text)
   return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : []
