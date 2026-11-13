@@ -6354,8 +6354,10 @@ touched:
   commits what the folder has, the recorded commit, so git has nothing to commit (*On branch main*). Read inside it
   (its `HEAD`), both Commit and Set Aside refuse it by name before anything runs: *… with a new commit staged, but its
   recorded commit is checked out in it again … Unstage it with git restore --staged …*, which leaves it clean. Staged
-  with a third commit checked out (`MM` too), Commit records that one. A command these name takes the path after `--`
-  as one argument (HR3's round 1: `commandPath`): as it is when nothing in it needs quoting, else in double quotes
+  with a third commit checked out (`MM` too), Commit records that one. A command these name takes the path after `--`,
+  literal to git (HR3's round 2: `gitPathArg`; a path with a glob character, `*`, `?`, `[` or `\`, or starting with `:`
+  is written `:(literal)<path>`, or `git restore --staged -- "libs/[ab]"` would also unstage a staged `libs/a`), and
+  as one argument to the shell (HR3's round 1: `commandPath`): as it is when nothing in it needs quoting, else in double quotes
   (one argument with its spaces in PowerShell, cmd and Git Bash alike), else, for a `$`, backtick, `"`, `!` or `%` in
   it, in PowerShell's single quotes. A submodule path starting with `-` stays one argument there too, though git's
   own submodule commands ignore such a submodule (CVE-2018-17456), so `git submodule update` can't bring it back. The operation under way is read apart from the files (`WorktreeNow.operations`), so a changed
