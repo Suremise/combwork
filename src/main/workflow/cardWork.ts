@@ -11,6 +11,8 @@ import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 import type { WorkflowToolOptions } from '../../shared/assistantTools'
 import { isAllOff, type WorkflowOptions } from '../../shared/workflow/options'
+import { targetOfRulesetId } from '../../shared/workflow/compile'
+import type { RulesNow } from './rulesets'
 
 type Row = Record<string, string | number | null>
 
@@ -121,9 +123,12 @@ export function cardWork(ws: WorkspaceService, n: number): WorkView | null {
 /**
  * Every live card's badges (IPC `tasks:workBadges`), in number order. Archived cards are left out in the query: neither
  * their rows nor their facts are read (#1107's rule). `rulesetsNow`: each project's ruleset now, by its folder name in
- * lower case (rulesets.ts), for the old rules marks (#1421); a card whose project has none has no mark.
+ * lower case (rulesets.ts), for the old rules marks (#1421); a card whose project has none has no mark. `nowAt`
+ * (HI-3161, `RulesNow.at`): a project's ruleset now on another Merges into. A card whose ruleset recorded G7 unmarked
+ * (a lane's left on the release by Start the next version, or its own) is compared with the rules now on that target,
+ * as HI-3142 compares its lane, so its Merges into alone isn't old rules.
  */
-export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string, string> = new Map()): WorkBadge[] {
+export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string, string> = new Map(), nowAt?: RulesNow['at']): WorkBadge[] {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
     const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, kind, target, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
@@ -131,8 +136,18 @@ export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string
     // ruleset never changes, so a card whose key is as it was keeps its badge.
     const heads = factHeads(db)
     const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.kind, r.target ?? '', heads.get(r.number as number) ?? '', rulesetsNow.get(String(r.project ?? '').toLowerCase()) ?? ''].join('\n')
-    let stages: ReturnType<typeof stagesReader> | null = null
-    return keptValues(db, keptOf(badges, ws), cards, keyOf, (r, facts) => workBadge(workView(cardOf(r), facts), rulesetsNow.get(String(r.project ?? '').toLowerCase()), (stages ??= stagesReader(db))))
+    let stored: ReturnType<typeof rulesetReader> | null = null
+    const stages = (id: string): StageId[] | null => (stored ??= rulesetReader(db))(id).stages
+    return keptValues(db, keptOf(badges, ws), cards, keyOf, (r, facts) => {
+      const v = workView(cardOf(r), facts)
+      const project = String(r.project ?? '').toLowerCase()
+      let current = rulesetsNow.get(project)
+      if (current && nowAt && v.ruleset && !targetOfRulesetId(v.ruleset)) {
+        const target = (stored ??= rulesetReader(db))(v.ruleset).target
+        current = (target && nowAt(project, target)) || current
+      }
+      return workBadge(v, current, stages)
+    })
   })
 }
 
@@ -143,23 +158,38 @@ export function forgetBadges(ws: WorkspaceService): void {
   badges.delete(ws)
 }
 
-/** A stored ruleset's stages by its id, in board order (each read once; null for one not stored or not readable). */
-function stagesReader(db: Db['reader']): (ruleset: string) => StageId[] | null {
-  const read = new Map<string, StageId[] | null>()
+/** What a stored ruleset says of itself, as the badges read it: its stages, and the Merges into (G7) it recorded. */
+interface StoredRuleset {
+  stages: StageId[] | null
+  target: string | null
+}
+
+/** A stored ruleset's stages and target by its id, in board order (each read once; nulls for one not stored or not readable). */
+function rulesetReader(db: Db['reader']): (ruleset: string) => StoredRuleset {
+  const read = new Map<string, StoredRuleset>()
   return (id) => {
-    if (!read.has(id)) {
+    let got = read.get(id)
+    if (!got) {
       const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
-      let stages: StageId[] | null = null
+      got = { stages: null, target: null }
       try {
-        const parsed = row ? (JSON.parse(row.data) as { stages?: { id?: unknown }[] }) : null
-        stages = Array.isArray(parsed?.stages) ? parsed.stages.map((s) => s.id).filter((x): x is StageId => typeof x === 'string' && Object.hasOwn(STAGE_CATEGORY, x)) : null
+        const parsed = row ? (JSON.parse(row.data) as { stages?: { id?: unknown }[]; options?: { target?: unknown } }) : null
+        const stages = Array.isArray(parsed?.stages) ? parsed.stages.map((s) => s.id).filter((x): x is StageId => typeof x === 'string' && Object.hasOwn(STAGE_CATEGORY, x)) : null
+        const target = parsed?.options?.target
+        got = { stages, target: typeof target === 'string' && target ? target : null }
       } catch {
-        stages = null
+        // Not readable: nulls.
       }
-      read.set(id, stages)
+      read.set(id, got)
     }
-    return read.get(id) ?? null
+    return got
   }
+}
+
+/** A stored ruleset's stages by its id (rulesetReader's). */
+function stagesReader(db: Db['reader']): (ruleset: string) => StageId[] | null {
+  const read = rulesetReader(db)
+  return (id) => read(id).stages
 }
 
 /** The stages of these stored rulesets (a lane's recorded one, #1421), by id: one snapshot of combwork.db. */
