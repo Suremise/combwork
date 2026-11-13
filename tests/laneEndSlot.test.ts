@@ -3,7 +3,7 @@
 // and work and no other card is lent it; with none in flight the lease ends as before; with several it stays, protected;
 // a lane still running is left alone. And a card whose slot's lease Combwork did end can't submit from that folder
 // (platform.slotLeft), whoever works there now. Real Git, the runtime and a slot pool on the board's database.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { B1, B2, commit, moved, refusedBy, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
@@ -106,6 +106,30 @@ describe('a lane over with its card in flight (HI-3118)', { timeout: 120_000 }, 
     const r = await releaseLane(lane.lease.id)
     expect(r && 'ended' in r ? r.ended : r).toMatchObject({ id: lane.lease.id, why: 'laneEnded' })
     expect(store.openLease(lane.slot.name)).toBeNull()
+  })
+
+  it("a card of it that can't be read keeps the lease (HR2's round 1): nothing ends, nothing is re-kinded, the folder as it was", async () => {
+    const { e, store, laneWith, startIn, endLane, releaseLane } = await lanePool(1)
+    const c1 = e.wf.createCard({ title: 'Lane card' })
+    const lane = await laneWith([c1.id])
+    await startIn(c1, B1, lane.lease.id)
+    const head = commit(lane.slot.folder, { 'one.txt': 'one\n' }, 'card 1 work')
+    endLane()
+    const read = e.wf.store.card.bind(e.wf.store)
+    const spy = vi.spyOn(e.wf.store, 'card').mockImplementation((n: number) => {
+      if (n === c1.id) throw Object.assign(new Error('EIO: i/o error, read'), { code: 'EIO' })
+      return read(n)
+    })
+    try {
+      expect(await releaseLane(lane.lease.id)).toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(store.openLease(lane.slot.name)).toMatchObject({ id: lane.lease.id, kind: 'lane' })
+    expect(sh(lane.slot.folder, 'rev-parse', 'HEAD')).toBe(head)
+    // Readable again: the next pass decides, the card keeping its slot.
+    const r = await releaseLane(lane.lease.id)
+    expect(r && 'card' in r ? r.card.card : r).toBe(c1.id)
   })
 
   it('with two cards started on the lane lease (rules allow one; a race), nothing ends: the slot stays protected', async () => {

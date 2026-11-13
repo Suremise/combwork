@@ -16,6 +16,7 @@ const lanes = await import('../src/main/lanes')
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const { laneNextText } = await import('../src/shared/lanes')
+const { workspaceDb } = await import('../src/main/boardStore')
 
 vi.setConfig({ testTimeout: 60_000 })
 afterEach(async () => {
@@ -132,6 +133,19 @@ describe('a lane ended or asked for its next card with a list change queued (HI-
     expect([r.lane.id, r.review?.card]).toEqual([b.id, y1.number])
     expect(laneNextText(r)).toMatch(new RegExp(`${ref(y1.number).source}.*waits for your review \\(lane ${b.id}\\)`))
     expect(laneNextText(r)).not.toMatch(/Start it/)
+    // HR2's round 1: the first lane's card in Review too, its review held by another agent (r1): never offered; the free
+    // one is. Once B9 holds a review itself, that one comes first (it carries on with it).
+    await run(() => tasks.updateTask(x1.number, { column: 'review' }, user))
+    const reviewBy = (n: number, agent: string | null) => workspaceDb(w.path!).writer.prepare('UPDATE cards SET review_agent = ?, review_agent_name = ?, review_since = ? WHERE number = ?').run(agent, agent?.toUpperCase() ?? null, agent ? new Date().toISOString() : null, n)
+    reviewBy(x1.number, 'r1')
+    expect((await lanes.laneNext(w, 'alpha', 'b9')).review?.card).toBe(y1.number)
+    reviewBy(y1.number, 'r1')
+    expect((await lanes.laneNext(w, 'alpha', 'b9')).review).toBeNull()
+    reviewBy(x1.number, 'b9')
+    expect((await lanes.laneNext(w, 'alpha', 'b9')).review?.card).toBe(x1.number)
+    reviewBy(y1.number, null)
+    expect((await lanes.laneNext(w, 'alpha', 'b9')).review?.card).toBe(x1.number)
+    reviewBy(x1.number, null)
     // An agent that builds a lane and reviews another: its own lane, as a builder.
     const own = (await lanes.startLane(w, { project: 'alpha', builder: 'r1', reviewer: 'b2', cards: [z1.number], by: 'You' })).lane
     await lanes.endLane(w, a.id, { abandoned: true })

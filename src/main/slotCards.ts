@@ -789,12 +789,20 @@ export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: 
     if (row?.state === 'active') return { over: false, cards: [] }
     const kind = 'Started' as const // i18n-ignore: a fact kind, not text
     const started = new Set(wf.store.factsOfKind(kind).filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
-    const cards = [...started].filter((n) => {
-      const card = cardOf(wf, n)
-      if (!card) return false
+    const cards: number[] = []
+    for (const n of started) {
+      // Read for real, never cardOf (which takes any failure for "no card"): a card that can't be read keeps the lease
+      // (HR2's round 1: an unreadable live card released its slot). Only a card the board has no row of is absent.
+      let card: ReturnType<Workflow['store']['card']>
+      try {
+        card = wf.store.card(n)
+      } catch (e) {
+        if (!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n)) continue // i18n-ignore: SQL
+        throw e
+      }
       const s = wf.state(card)
-      return s.started?.lease === lease && KEEPS.has(s.stage)
-    })
+      if (s.started?.lease === lease && KEEPS.has(s.stage)) cards.push(n)
+    }
     return { over: true, cards }
   } catch (e) {
     log.warn(`lane ${lane}'s end couldn't read its cards on ${lease}: ${userText(e instanceof Error ? e.message : String(e))}`)

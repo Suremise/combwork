@@ -870,6 +870,12 @@ const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly 
   if (ownInFlight(ws, l, cards)) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
 }
 
+/** Who reviews each card now, as the board has it (its review's agent; null: none), on one read (HI-3118). */
+function reviewOwnersNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, string | null> {
+  if (!numbers.length) return new Map()
+  return boardRead(ws, (db) => new Map((db.prepare(`SELECT number, review_agent FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; review_agent: string | null }[]).map((r) => [r.number, r.review_agent]))) // i18n-ignore: SQL
+}
+
 /** Whether one of a lane's own cards (HI-1821: not another agent's or lane's) is in flight now: Doing, Review or Passed. */
 function ownInFlight(ws: WorkspaceService, l: LaneRecord, cards: readonly number[]): boolean {
   const places = cardPlacesNow(ws, cards)
@@ -1701,10 +1707,15 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
     const reviews = runningHere.filter((l) => l.reviewer?.id === agentId)
     if (reviews.length) {
       const vs = await views(ws, reviews)
-      for (const v of vs) {
-        const c = v.cards.find((x) => x.column === 'review' && !x.elsewhere)
-        if (c) return { lane: v, next: null, waits: null, review: { card: c.number, title: c.title } }
-      }
+      // Who reviews each card in Review now (its review's agent on the board): one another agent holds is theirs (HR2's
+      // round 1), never offered; one already the caller's first (it carries on with it), else the first free one.
+      const inReview = vs.flatMap((v) => v.cards.filter((x) => x.column === 'review' && !x.elsewhere).map((x) => x.number))
+      const owners = reviewOwnersNow(ws, inReview)
+      for (const holder of [agentId, null])
+        for (const v of vs) {
+          const c = v.cards.find((x) => x.column === 'review' && !x.elsewhere && (owners.get(x.number) ?? null) === holder)
+          if (c) return { lane: v, next: null, waits: null, review: { card: c.number, title: c.title } }
+        }
       return { lane: vs[0], next: null, waits: null, review: null }
     }
   }
