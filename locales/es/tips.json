@@ -396,6 +396,8 @@
   "tips.palette.title": "Todo está en la paleta de comandos",
   "tips.paneCells.text": "Arrastra un panel por su encabezado a un panel vacío para moverlo allí, o a otro para intercambiarlos. Cada diseño recuerda dónde los pusiste: al cambiar de diseño y volver, todo queda en su sitio.",
   "tips.paneCells.title": "Pon un agente en cualquier panel",
+  "tips.pastBranches.text": "Control de versiones → Cola de fusión guarda en Ramas anteriores el historial de las ramas en las que ya no se fusiona trabajo: elige una para ver lo que fusionó su cola. Purgar historial… elimina el de una rama y Purgar todo… el de todas, tras preguntarte.",
+  "tips.pastBranches.title": "El historial de fusión de ramas antiguas, de una en una",
   "tips.pasteScreenshot.text": "Presiona Ctrl+V en la terminal de un agente con una imagen en el portapapeles, o suelta una imagen en ella: el agente la ve, y Combwork guarda una copia.",
   "tips.pasteScreenshot.title": "Pega una captura en una sesión",
   "tips.pathsLeftOut.text": "Sin control de versiones, el trabajo de una tarjeta son solo los archivos que indican sus rutas. Cuando arrastras una a Revisión y otros archivos cambiaron desde que empezó, Combwork los enumera primero: inclúyelos en su trabajo o déjalos fuera.",

@@ -2,8 +2,8 @@
 // made when there is nothing to bring in, one card per pair, the Assistant's guard checked as it writes; and the window's
 // queue listing: an empty destination listed with how far behind it is, counted along the source's first-parent history.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { mkdirSync, renameSync, writeFileSync } from 'fs'
+import { dirname, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -432,6 +432,32 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect(api.find((v) => v.target === '1.4.0')?.past).toBeUndefined()
   })
 
+  it("HI-3177: a card On Hold since it started into an old target doesn't keep that past branch's queue live", async () => {
+    const { w, repo } = await versions()
+    const tasks = await import('../src/main/tasks')
+    const { agentActor } = await import('../src/shared/workflow/facts')
+    const { shownQueues } = await import('../src/shared/progressQueue')
+    // The board as HI-3177 found it: a card started into 1.4.0, put On Hold, and 1.4.0 dropped from the project's targets since.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Parked work', project: 'p', target: '1.4.0' }, user))
+    const wf = (await workflowFor(w, repo))!
+    git(repo, 'checkout', '-q', '1.4.0')
+    expect(await store.boardWrite(w, async () => wf.start(`#${c.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'hold', blocked: 'later' }, user))
+    expect(wf.state(wf.store.card(c.number))).toMatchObject({ stage: 'hold', started: { target: '1.4.0' } })
+    await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['next'] } } })))
+    for (const window of [true, false]) {
+      const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, window))
+      // Not live: past, or (with no history here) not listed at all.
+      expect(views.filter((v) => !v.past).map((v) => v.target)).not.toContain('1.4.0')
+      if (window) expect(shownQueues(views, Date.now()).map((v) => v.target)).not.toContain('1.4.0')
+    }
+    // Taken out of On Hold, it works toward 1.4.0 again: the queue is live.
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, user))
+    const again = await inWorkspace(w, () => controls.queueViews(w, repo))
+    expect(again.find((v) => v.target === '1.4.0')).toMatchObject({ inFlight: [c.number] })
+    expect(again.find((v) => v.target === '1.4.0')?.past).toBeUndefined()
+  })
+
   it("HI-2927: a card in flight, a pause or a Combwork running it keeps an old target's queue live; unreadable targets mark none past", async () => {
     const { w, repo } = await versions()
     const { past: _past, ...one } = (await inWorkspace(w, () => controls.queueViews(w, repo, '1.0.0')))[0]
@@ -850,5 +876,119 @@ describe('HI-3087: cw_queue forward says what it did', () => {
     expect(reply(true, true)).toBe("Queued AL-2: bringing 1.2.0 up to date with trunk through 1.2.0's queue, with the user's override of the release path's direction.")
     expect(reply(false, true)).toBe("Recorded on AL-2, which resolves bringing 1.2.0 up to date with trunk: its builder is told to submit the same revision again, which goes back into 1.2.0's queue once.")
     expect(reply(false, false)).toBe('AL-2 is bringing 1.2.0 up to date with trunk already.')
+  })
+})
+
+describe("HI-3177: purging a past branch's merge queue history", () => {
+  /** versions(), with 1.1.0 and 1.2.0 made from 1.4.0, each with one forward merged through its queue: both past. */
+  async function pastTwo(): Promise<{ w: WS; repo: string; cards: number[] }> {
+    const { w, repo } = await versions()
+    const cards: number[] = []
+    for (const t of ['1.1.0', '1.2.0']) {
+      git(repo, 'branch', t, '1.4.0')
+      cards.push((await oldForward(w, repo, 'main', t)).number)
+      expect(await drain(w, repo, t)).toHaveLength(1)
+    }
+    return { w, repo, cards }
+  }
+  const pastOf = async (w: WS, repo: string, window = false) => (await inWorkspace(w, () => controls.queueViews(w, repo, undefined, window))).filter((v) => v.past).map((v) => v.target)
+  const purge = (w: WS, repo: string, targets: string[]) => inWorkspace(w, () => controls.purgeQueueHistory(w, repo, targets))
+  const factsOf = async (w: WS, repo: string, cards: number[]) => {
+    const wf = (await workflowFor(w, repo))!
+    return JSON.stringify(cards.map((c) => wf.store.facts(c)))
+  }
+
+  it('hides exactly the confirmed branches’ history, for good (a restart too), its queue-only logs gone and its cards’ facts kept', async () => {
+    const { pauseLogKey, pushLogKey, purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo, cards } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    // A pause and its lifting leave 1.1.0 a pause log; a settled push leaves it a push log.
+    await inWorkspace(w, () => controls.pauseQueue(w, repo, '1.1.0', 'user'))
+    await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.1.0', null)))
+    await inWorkspace(w, () => wf.locked(() => wf.store.setMeta(pushLogKey('1.1.0'), '[]')))
+    expect(wf.store.queuePauseLog('1.1.0').length).toBeGreaterThan(0)
+    // The listing as the window keeps it (viewsKept), read before the purge.
+    expect(await pastOf(w, repo, true)).toEqual(['1.1.0', '1.2.0'])
+    const facts = await factsOf(w, repo, cards)
+    await purge(w, repo, ['1.1.0'])
+    // Read again at once: the kept listing isn't served (the board's revision moved).
+    for (const window of [true, false]) expect(await pastOf(w, repo, window)).toEqual(['1.2.0'])
+    expect(await inWorkspace(w, () => controls.queueHistory(w, repo, '1.1.0'))).toEqual([])
+    expect(await inWorkspace(w, () => controls.queueHistory(w, repo, '1.2.0'))).toHaveLength(1)
+    expect([wf.store.meta(pauseLogKey('1.1.0')), wf.store.meta(pushLogKey('1.1.0'))]).toEqual([null, null])
+    expect(wf.store.meta(purgedKey('1.2.0'))).toBeNull()
+    expect(await factsOf(w, repo, cards)).toBe(facts)
+    // Combwork restarted: the same.
+    await disposeWorkspaceService(w)
+    store.closeBoard(dirname(repo))
+    const again = createWorkspaceService()
+    await again.open(dirname(repo))
+    opened.push(again)
+    expect(await pastOf(again, repo)).toEqual(['1.2.0'])
+    expect(await inWorkspace(again, () => controls.queueHistory(again, repo, '1.1.0'))).toEqual([])
+    expect(await factsOf(again, repo, cards)).toBe(facts)
+  })
+
+  it('a later request into a purged branch lists it again, with only its newer history', async () => {
+    const { w, repo } = await pastTwo()
+    await purge(w, repo, ['1.1.0', '1.2.0'])
+    expect(await pastOf(w, repo)).toEqual([])
+    const later = await oldForward(w, repo, 'main', '1.1.0')
+    expect(await drain(w, repo, '1.1.0')).toHaveLength(1)
+    expect(await pastOf(w, repo)).toEqual(['1.1.0'])
+    expect((await inWorkspace(w, () => controls.queueHistory(w, repo, '1.1.0'))).map((r) => r.card)).toEqual([later.number])
+  })
+
+  it('refuses the whole list, nothing written, when one isn’t a past branch’s now', async () => {
+    const { pushPendingKey, purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    const marks = () => ['1.1.0', '1.2.0', '1.5.0', 'gone'].map((t) => wf.store.meta(purgedKey(t)))
+    await expect(purge(w, repo, ['1.1.0', '1.5.0'])).rejects.toThrow('Nothing was purged: 1.5.0 is a branch work merges into now.')
+    await expect(purge(w, repo, ['1.1.0', 'gone'])).rejects.toThrow('Nothing was purged: gone has no merge queue history to purge.')
+    // A merge of 1.2.0's still owed its push: operational, kept, and the purge refused.
+    await inWorkspace(w, () => wf.locked(() => wf.store.setMeta(pushPendingKey('1.2.0'), JSON.stringify([{ entry: 'e1', result: 'abc' }]))))
+    await expect(purge(w, repo, ['1.1.0', '1.2.0'])).rejects.toThrow('Nothing was purged: 1.2.0 still has merges waiting to be pushed.')
+    expect(marks()).toEqual([null, null, null, null])
+    expect(await pastOf(w, repo)).toEqual(['1.1.0', '1.2.0'])
+  })
+
+  it('a branch made live while the purge waits for the board refuses it whole; one past since the list was taken is untouched', async () => {
+    const { purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    // Purge all's list, as confirmed: 1.1.0 and 1.2.0. The board is held, 1.2.0 paused in that write, then let go.
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const held = inWorkspace(w, () =>
+      store.boardWrite(w, async () => {
+        await gate
+        wf.store.setQueuePause('1.2.0', { reason: 'user', card: '', by: 'user' })
+      })
+    )
+    const purging = purge(w, repo, ['1.1.0', '1.2.0'])
+    release()
+    await held
+    await expect(purging).rejects.toThrow('Nothing was purged: 1.2.0 has work in its merge queue again.')
+    expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0'))]).toEqual([null, null])
+    // Purge all confirmed with 1.1.0 alone; 1.2.0 past since (its pause lifted): left as it is.
+    await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.2.0', null)))
+    await purge(w, repo, ['1.1.0'])
+    expect(await pastOf(w, repo)).toEqual(['1.2.0'])
+  })
+
+  it("refuses when the project's targets can't be read, nothing written", async () => {
+    const { purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    // No target set and git's default unreadable: the targets are unknown.
+    await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, target: '' } } })))
+    renameSync(join(repo, '.git'), join(repo, '.git-away'))
+    try {
+      await expect(purge(w, repo, ['1.1.0'])).rejects.toThrow("Nothing was purged: Combwork can't read which branches this project merges into right now.")
+    } finally {
+      renameSync(join(repo, '.git-away'), join(repo, '.git'))
+    }
+    expect(wf.store.meta(purgedKey('1.1.0'))).toBeNull()
   })
 })

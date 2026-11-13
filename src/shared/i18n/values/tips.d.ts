@@ -416,6 +416,8 @@ interface CombworkMessageValues {
   'tips.palette.title': undefined
   'tips.paneCells.text': undefined
   'tips.paneCells.title': undefined
+  'tips.pastBranches.text': undefined
+  'tips.pastBranches.title': undefined
   'tips.pasteScreenshot.text': undefined
   'tips.pasteScreenshot.title': undefined
   'tips.pathsLeftOut.text': undefined

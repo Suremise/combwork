@@ -414,6 +414,8 @@
   "tips.palette.title": "Everything is in the command palette",
   "tips.paneCells.text": "Drag a pane by its header onto an empty pane to move it there, or onto another to swap them. Each layout keeps where you put them, so switching layouts and back restores it.",
   "tips.paneCells.title": "Put an agent in any pane",
+  "tips.pastBranches.text": "Version Control → Merge queue keeps the history of branches work no longer merges into under Past branches: pick one to see what its queue merged. Purge history… removes one branch’s, Purge all… every one’s, asked first.",
+  "tips.pastBranches.title": "Old branches’ merge history, one at a time",
   "tips.pasteScreenshot.text": "Press Ctrl+V in an agent's terminal with an image on the clipboard, or drop an image onto it: the agent sees it, and Combwork keeps a copy.",
   "tips.pasteScreenshot.title": "Paste a screenshot into a session",
   "tips.pathsLeftOut.text": "Without version control, a card's work is only the files its paths list. When you drag one to Review and other files changed since it started, Combwork lists them first: include them in its work, or leave them out.",

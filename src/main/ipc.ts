@@ -156,7 +156,7 @@ import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
-import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -1100,6 +1100,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:purgeHistory': (p, targets) => purgeQueueHistory(workspace, workspace.assertProject(p), (Array.isArray(targets) ? targets : []).slice(0, 200).map(queueTarget)),
     'queue:forward': async (p, from, to) => {
       const r = await forwardMerge(currentWorkspace(), workspace.assertProject(p), queueTarget(from), queueTarget(to), { kind: 'user' })
       const ahead = r.localAhead ? { localAhead: r.localAhead } : {}

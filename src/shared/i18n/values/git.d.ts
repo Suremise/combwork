@@ -221,7 +221,14 @@ interface CombworkMessageValues {
   'git.queue.open': { card: string | number }
   'git.queue.outcome': undefined
   'git.queue.past': { n: number }
+  'git.queue.pastPick': undefined
   'git.queue.pastTip': undefined
+  'git.queue.purge': undefined
+  'git.queue.purgeAll': undefined
+  'git.queue.purgeConfirm': undefined
+  'git.queue.purgeMessage': { n: number }
+  'git.queue.purgeTitle': { n: number; target: string | number }
+  'git.queue.purging': undefined
   'git.queue.reading': undefined
   'git.queue.region': undefined
   'git.queue.result': undefined

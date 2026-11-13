@@ -38,7 +38,7 @@ import type { WorkspaceService } from '../workspace'
 import { catchUpKey, catchUpPaused, MergeQueue } from './mergeQueue'
 import { kickQueue, queueChanged, queueHostsStamp, queueLive } from './queueHost'
 import { queueOrder } from './queueState'
-import { entryTook, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from './queueLogs'
+import { entryTook, pauseLogKey, purgedKey, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from './queueLogs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
@@ -52,11 +52,25 @@ import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type Branch
  */
 export function queueTargets(wf: Workflow, also: Iterable<string> = []): string[] {
   const out = new Set<string>()
-  for (const f of wf.store.factsOfKind('IntegrationRequested')) out.add((f.data as FactData['IntegrationRequested']).target)
+  const mark = purgeMarks(wf)
+  // HI-3177: a request at or before its target's purge is the purged history's: it lists nothing.
+  for (const f of wf.store.factsOfKind('IntegrationRequested')) {
+    const t = (f.data as FactData['IntegrationRequested']).target
+    if (!out.has(t) && !purgedBy(mark(t), f)) out.add(t)
+  }
   for (const t of wf.store.pausedTargets()) out.add(t)
   for (const t of also) out.add(t)
   return [...out].filter(Boolean)
 }
+
+/** HI-3177: each target's purge mark (purgedKey), read once a target per listing. */
+function purgeMarks(wf: Workflow): (target: string) => string | null {
+  const read = new Map<string, string | null>()
+  return (t) => (read.has(t) ? read.get(t)! : (read.set(t, wf.store.meta(purgedKey(t))), read.get(t)!))
+}
+
+/** HI-3177: a fact at or before its target's purge mark belongs to the purged history. */
+const purgedBy = (mark: string | null, f: Fact): boolean => mark !== null && f.at <= mark
 
 /** Where a project's queues stand beyond their entries (#1356): its cards in flight by target, and its current target. */
 interface QueueScope {
@@ -237,16 +251,7 @@ export async function commitsBehind(projectPath: string, from: string, to: strin
  * target its current options merge into.
  */
 async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
-  const inFlight = new Map<string, number[]>()
-  // Only the cards past Todo and not Done are read (#1629: the window polls this, and a board keeps every card it had).
-  for (const card of wf.store.cardsInFlight()) {
-    const s = wf.state(card)
-    if (!s.started || s.stage === 'todo' || s.stage === 'done') continue
-    const o = wf.rulesetOf(card, s).options
-    const t = s.started.target
-    if (!merges(o.platform) || o.finish !== 'combworkMerges' || !t) continue
-    inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
-  }
+  const inFlight = cardsInFlightByTarget(wf)
   const o = wf.currentRuleset(false).options
   let current: string | null = null
   if (merges(o.platform) && o.finish === 'combworkMerges') {
@@ -254,6 +259,23 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
     current = def && !isUnknown(def) ? def : null
   }
   return { inFlight, current, open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
+}
+
+/** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order (QueueScope.inFlight). */
+function cardsInFlightByTarget(wf: Workflow): Map<string, number[]> {
+  const inFlight = new Map<string, number[]>()
+  // Only the cards past Todo and not Done are read (#1629: the window polls this, and a board keeps every card it had).
+  // HI-3177: nor On Hold: a held card works toward no queue until it's taken out, so one held since its target was
+  // dropped (HI-1758, started into 1.0.0) doesn't keep that past branch's queue live; taken out, it counts again.
+  for (const card of wf.store.cardsInFlight()) {
+    const s = wf.state(card)
+    if (!s.started || s.stage === 'todo' || s.stage === 'hold' || s.stage === 'done') continue
+    const o = wf.rulesetOf(card, s).options
+    const t = s.started.target
+    if (!merges(o.platform) || o.finish !== 'combworkMerges' || !t) continue
+    inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
+  }
+  return inFlight
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
@@ -320,22 +342,24 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
   const out: (QueueRecent & { seq: number })[] = []
   // HI-3169: each outcome's card named only if it is listed (below), all in one read: never the whole history's cards.
   const named = (f: Fact) => ({ card: f.card, key: '', title: '', at: f.at, seq: f.seq })
+  // HI-3177: a purged history's outcomes are left out before anything is bounded or counted.
+  const mark = wf.store.meta(purgedKey(target))
   for (const f of wf.store.factsOfKind('Integrated')) { // i18n-ignore: a fact's kind, not text
     const d = f.data as FactData['Integrated']
     // A card of this queue merged into its target (by the queue, or seen merged outside it).
-    if (d.target !== target || !cards.has(f.card) || (d.entry && !entries.has(d.entry))) continue
+    if (d.target !== target || !cards.has(f.card) || (d.entry && !entries.has(d.entry)) || purgedBy(mark, f)) continue
     out.push({ ...named(f), entry: d.entry ?? '', outcome: 'merged', revision: d.revision, result: d.result, by: d.by })
   }
   for (const f of wf.store.factsOfKind('IntegrationFailed')) {
     const d = f.data as FactData['IntegrationFailed']
     // A target that moved is tested again (a new entry), never returned.
-    if (d.target !== target || !entries.has(d.entry) || d.reason === 'targetMoved') continue
+    if (d.target !== target || !entries.has(d.entry) || d.reason === 'targetMoved' || purgedBy(mark, f)) continue
     const at = seen.get(d.entry)
     out.push({ ...named(f), entry: d.entry, outcome: 'returned', revision: d.revision, reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.check ? { check: d.check } : {}), ...(d.logPath ? { logPath: d.logPath } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
   }
   for (const f of wf.store.factsOfKind('IntegrationCancelled')) {
     const d = f.data as FactData['IntegrationCancelled']
-    if (!entries.has(d.entry)) continue
+    if (!entries.has(d.entry) || purgedBy(mark, f)) continue
     out.push({ ...named(f), entry: d.entry, outcome: 'cancelled', reason: d.reason })
   }
   // Newest first: by time; within one instant, the later card, then each card's own order (a fixed order across reads).
@@ -428,6 +452,49 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
   queueChanged(ws, projectPath, target)
   if (!still) void kickQueue(ws, projectPath, target)
   return { resumed: expected ? cleared : !still, view: queueView(ws, wf, projectPath, target) }
+}
+
+const PURGE_REFUSED = msg({ id: 'service.queue.purgeRefused', defaultMessage: "Nothing was purged: {target} {why, select, current {is a branch work merges into now} live {has work in its merge queue again} pushes {still has merges waiting to be pushed} other {has no merge queue history to purge}}.", description: "HI-3177: an error from Version Control → Merge queue → Past branches' Purge: a branch's queue ({target}: its name) can't be purged now, and why; nothing was purged, the other branches asked for included. Keep the select keys." })
+const PURGE_UNKNOWN = msg({ id: 'service.queue.purgeUnknown', defaultMessage: "Nothing was purged: Combwork can't read which branches this project merges into right now. Try again in a moment.", description: "HI-3177: an error from Version Control → Merge queue → Past branches' Purge when the project's target branches can't be read (no Git workflow now, or git's default branch unreadable for a moment)." })
+
+/**
+ * HI-3177 (SPEC §16.9.3, Past branches): purges the merge queue history of these past branches, exactly these (the ones
+ * the user confirmed: Purge all sends the list it showed). Checked and written in one board write: every one must still
+ * be a past branch's queue (none of the project's targets, nothing queued or testing, no card in flight into it, no
+ * pause, no Combwork running it, no push of its merges pending, a history to purge), or nothing is written. Its purge
+ * mark hides what came before it (queueTargets, recentOutcomes), and its queue-only logs (pauses, settled pushes, returns
+ * seen) are deleted; its cards keep their own facts. Pending pushes and the catch-up state are operational: a pending
+ * push refuses the purge, and the catch-up state is never touched.
+ */
+export async function purgeQueueHistory(ws: WorkspaceService, projectPath: string, targets: readonly string[]): Promise<void> {
+  const wanted = [...new Set(targets)]
+  if (!wanted.length) return
+  const wf = await needWorkflow(ws, projectPath)
+  // The project's targets are its options and git's default, not the board's: read before the write, as markPast does.
+  const named = await projectTargets(ws, projectPath).catch(() => null)
+  await wf.locked(() => {
+    if (!named) throw combworkError(PURGE_UNKNOWN)
+    const current = [named.default, ...named.others]
+    // Read in this write, never from a kept listing (viewsKept): the board as it is now.
+    const listed = new Set(queueTargets(wf))
+    const inFlight = cardsInFlightByTarget(wf)
+    const store = wf.store
+    for (const t of wanted) {
+      const live = queueLive(ws, projectPath, t)
+      const order = listed.has(t) ? queueOrder(wf, t, live) : null
+      const why = current.includes(t) ? 'current' : !order ? 'none' : order.testing || order.queued.length || inFlight.get(t)?.length || store.queuePause(t) || store.queueLease(t) || live.running ? 'live' : pushPendingOf(store.meta(pushPendingKey(t))).length ? 'pushes' : null // i18n-ignore: select keys
+      if (why) throw combworkError(PURGE_REFUSED, { target: t, why })
+    }
+    const at = new Date().toISOString()
+    for (const t of wanted) {
+      const entries = store.factsOfKind('IntegrationRequested').flatMap((f) => ((f.data as FactData['IntegrationRequested']).target === t ? [(f.data as FactData['IntegrationRequested']).entry] : []))
+      store.setMeta(purgedKey(t), at)
+      store.deleteMeta(pauseLogKey(t))
+      store.deleteMeta(pushLogKey(t))
+      store.forgetQueueSeen(entries)
+    }
+  })
+  for (const t of wanted) queueChanged(ws, projectPath, t)
 }
 
 /** HI-2944: a pause as stored is the one the window showed (its reason, card and time). */

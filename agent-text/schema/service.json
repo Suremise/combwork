@@ -1225,6 +1225,15 @@
   "service.queue.pauseNoFolder": {
     "placeholders": {}
   },
+  "service.queue.purgeRefused": {
+    "placeholders": {
+      "target": "plain",
+      "why": "select"
+    }
+  },
+  "service.queue.purgeUnknown": {
+    "placeholders": {}
+  },
   "service.releaseOffer.drop": {
     "placeholders": {
       "branches": "plain",

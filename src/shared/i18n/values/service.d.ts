@@ -324,6 +324,8 @@ interface CombworkMessageValues {
   'service.queue.catchUpNoCommit': { card: string | number; target: string | number }
   'service.queue.pauseChanged': undefined
   'service.queue.pauseNoFolder': undefined
+  'service.queue.purgeRefused': { target: string | number; why: string }
+  'service.queue.purgeUnknown': undefined
   'service.releaseOffer.stale': { project: string | number }
   'service.repoOps.notOffered': { platform: string | number }
   'service.slots.held': { card: string | number; slot: string | number; kind: string; target: string | number; why: string | number; hasCommits: string; ids: string | number; more: number; selectArg: string | number; hasEdits: string; at: string | number; base: string | number; stopped: string; builder: string | number }
