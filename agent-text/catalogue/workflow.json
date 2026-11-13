@@ -1444,6 +1444,31 @@
     "note": "The next step after a verdict without a started review.",
     "audience": "both"
   },
+  "workflow.refused.why.passes": {
+    "text": "{n, number} of {q, plural, one {# reviewer} other {# reviewers}} passed it.",
+    "note": "The {why} of a refused merge: not enough distinct reviewers passed the revision. {n} and {q} are numbers.",
+    "audience": "both"
+  },
+  "workflow.refused.why.requeueLimit": {
+    "text": "it was sent back unchanged {n, plural, one {# time} other {# times}} already.",
+    "note": "The {why} of a refused requeue: the limit of unchanged requeues was reached. {n} is how many.",
+    "audience": "both"
+  },
+  "workflow.refused.why.requeueNotTransient": {
+    "text": "its last merge failed for a reason in the work (a conflict, red checks or a hook), which needs a new revision.",
+    "note": "The {why} of a refused requeue: the merge failure wasn't transient. Starts lower case: it follows a colon.",
+    "audience": "both"
+  },
+  "workflow.refused.why.stale": {
+    "text": "its pass is stale.",
+    "note": "The {why} of a refused merge or requeue: the revision's pass no longer holds.",
+    "audience": "both"
+  },
+  "workflow.refused.why.userOk": {
+    "text": "it waits for the OK before merging.",
+    "note": "The {why} of a refused merge: the user's approval is missing.",
+    "audience": "both"
+  },
   "workflow.roundChoice": {
     "text": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
     "note": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces.",
