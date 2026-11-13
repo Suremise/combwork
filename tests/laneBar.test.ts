@@ -510,6 +510,8 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     // HI-2466: its only free slot held, and by what.
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'session', agent: 'CB1' }, name, tr)).toBe('waiting for slot-a: CB1’s session is still in it')
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'process' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open')
+    // HI-3168: its builder already builds in slot-a for another card.
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'card', agent: 'B1', heldFor: 7 }, name, tr)).toBe('waiting for a slot: B1 still builds in slot-a for HI-7, which keeps it until that card is Done or put back')
     // HI-2467: Windows Sandbox's broker seen working in it; its idleness said only when known.
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: true }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with no Sandbox running')
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it')

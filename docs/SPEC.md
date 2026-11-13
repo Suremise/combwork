@@ -7912,6 +7912,11 @@ Whether a conversation may resume there is its **hold** (none: it may):
   running, or unknown), else the slot is held by a `process` as before. Each retry looks again, so what is said follows
   the broker starting, stopping or ending. It only names what holds the slot: whether the slot can be lent is still the
   rename alone, and Combwork ends nothing (HI-2309).
+  **A slot its builder already holds** (HI-3168): a waiting lane's lend refused `agentLeased` (one agent, one slot: its
+  builder holds a lease for a card, typically one in flight when an earlier lane of its ended, HI-3118) keeps that for
+  its status too (`held`: `card`, the slot, the builder as `agent` and the card as `heldFor`): *waiting for a slot: B1
+  still builds in slot-a for HI-2, which keeps it until that card is Done or put back*. No retry is scheduled: that
+  card's Done or put back is a board change, whose pass lends the lane a slot.
   **A refused start, its slot held** (HI-2468): a lane recorded over a builder that is still running isn't waiting for
   a slot. Combwork's own start gives it its first card (`laneStarts.ts`), and that start can be refused for its slot
   (`start.slotAvailable`). The start's wait (`startWait`, `why: "refused"`) then names the slot and what holds it

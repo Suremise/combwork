@@ -251,8 +251,10 @@ export interface LaneSlotHeld {
    * HI-2468, a refused start's: `left`, programs the last run of `agent` left running there (`program`, the first by
    * name, and `more` beyond it); `lastRun`, that run of `agent`'s not known to have ended.
    */
-  held: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
+  held: 'session' | 'process' | 'broker' | 'left' | 'lastRun' | 'card'
   agent?: string
+  /** `card` (HI-3168): the slot is lent to this card, which `agent` builds there (one agent, one slot), so none is lent. */
+  card?: number
   broker?: string
   idle?: boolean
   program?: string
@@ -309,7 +311,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
   // waits for the user, or its hooks, says more. A free slot held (HI-2466): which, and what holds it.
   const held = slot?.held ?? null
-  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}), ...(held.broker ? { broker: held.broker } : {}), ...(held.idle !== undefined ? { idle: held.idle } : {}) } : {}) } : null
+  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}), ...(held.card !== undefined ? { heldFor: held.card } : {}), ...(held.broker ? { broker: held.broker } : {}), ...(held.idle !== undefined ? { idle: held.idle } : {}) } : {}) } : null
   // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
@@ -484,6 +486,7 @@ const L = {
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
   slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}", note: "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free." }),
+  slotCard: agentMsg({ id: 'lane.status.slotCard', text: 'waiting for a slot: {agent} still builds in {slot} for {card}, which keeps it until that card is Done or put back', note: "HI-3168: a lane waiting for a slot, refused one because its builder {agent} already holds {slot} for another card, {card} (one agent, one slot): typically a card still in flight when an earlier lane of {agent}'s ended (HI-3118). Combwork lends the lane a slot once that card is Done or put back." }),
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
@@ -585,6 +588,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'checkCopy':
       return say(L.checkCopy, { card })
     case 'slot':
+      if (s.slot && s.held === 'card' && s.heldFor !== undefined) return say(L.slotCard, { agent: s.agent ?? say(L.anAgent), slot: s.slot, card: cardRef(s.heldFor) })
       return s.slot && s.held ? say(L.slotHeld, { slot: s.slot, held: s.held, agent: s.agent ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle) }) : say(L.slot)
     case 'teamPause':
       return say(L.teamPause)

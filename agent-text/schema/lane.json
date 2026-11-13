@@ -538,6 +538,13 @@
   "lane.status.slot": {
     "placeholders": {}
   },
+  "lane.status.slotCard": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain",
+      "card": "plain"
+    }
+  },
   "lane.status.slotHeld": {
     "placeholders": {
       "slot": "plain",
