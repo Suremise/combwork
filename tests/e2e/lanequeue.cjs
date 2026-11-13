@@ -4,8 +4,9 @@
 // it depends on), nothing changed; a card dropped from the board onto the lane; a Done card dropped from the board
 // refused; Add Card… taking a card given to another agent off that agent; a card on another lane refused with Move Here,
 // which moves it in one change, and the notification's Undo putting both lanes and its agent back; × taking a card off
-// and Ctrl+Z putting it back; Cancel Change; and Ended today listing a lane that ended, opening to its cards read only.
-// Screenshots of the editable queue with a refusal, and of Ended today, in both themes. Dev build, throwaway profile,
+// and Ctrl+Z putting it back; Cancel Change; and Ended today listing a lane that ended, opening to its cards read only,
+// and a long one scrolling to its last lane with compact rows at the panel's narrowest and widest (HI-3178).
+// Screenshots of the editable queue with a refusal, and of Ended today, in both themes (the long one dark, both widths). Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -99,7 +100,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('the panel opens', !!(await until(async () => (await panel.count()) === 1, HUNG_MS)))
   await panel.locator('.progress-tab[data-tab="lanes"]').click()
   const tab = panel.locator('.progress-tab-lanes')
-  const lane = (id) => tab.locator(`.progress-lanes-list .progress-lane[data-lane="${id}"]`)
+  const lane = (id) => tab.locator(`.progress-lanes-list > .progress-lane[data-lane="${id}"]`)
   const row = (id, n) => lane(id).locator(`.progress-lane-queue-row[data-card="${n}"]`)
   const rows = (id) => lane(id).locator('.progress-lane-queue-row').evaluateAll((els) => els.map((e) => Number(e.dataset.card)))
   await until(async () => (await lane(la).count()) === 1, HUNG_MS)
@@ -182,7 +183,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
 
   // --- Alt+Up and Alt+Down inside the opened cards (HI-2970): from a waiting card's link or × they move that card, and
   // from anything else there (the locked card's link, Add Card…) nothing; never the lane among the running lanes.
-  const laneOrder = () => tab.locator('.progress-lanes-list .progress-lane').evaluateAll((els) => els.map((e) => e.dataset.lane))
+  const laneOrder = () => tab.locator('.progress-lanes-list > .progress-lane').evaluateAll((els) => els.map((e) => e.dataset.lane))
   const order0 = (await laneOrder()).join()
   check('both lanes are listed', order0.split(',').includes(la) && order0.split(',').includes(lb), order0)
   await row(la, a2).locator('.progress-lane-queue-key').focus()
@@ -318,6 +319,96 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.screenshot({ path: path.join(shots, `ended-today-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
+
+  // --- A long Ended today (HI-3178): more ended lanes than the panel holds scroll with the list, to the last one, at the
+  // panel's narrowest and widest; each row's facts stay on one line (beside the name where they fit, else under it).
+  for (let i = 1; i <= 14; i++) {
+    const n = await make(`Ended lane card ${i}`, 'todo', b3.id)
+    const r = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B3', reviewer: 'R1', cards: [n], name: `1.5.0: an ended lane with a longer name ${i}` })
+    const gone = r.status === 200 && (await api('POST', `/v1/lanes/${r.body.lane.id}/end`, { abandoned: true })).status === 200
+    if (!gone) check(`ended lane ${i} is started and ended`, false, JSON.stringify(r))
+  }
+  // And one merged, with its commit: the widest facts (HR1's HI-3178 round 1).
+  const mc = await make('Merged lane card', 'todo', b3.id)
+  const ml = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B3', reviewer: 'R1', cards: [mc], name: 'CLI parity: a merged lane' })
+  const merged = ml.status === 200 && (await api('POST', `/v1/lanes/${ml.body.lane.id}/end`, { mergeCommit: '19e1778c0ffee0123456789abcdef0123456789a' })).status === 200
+  check('a lane is ended with its merge commit', merged, JSON.stringify(ml))
+  check('Ended today lists 16 lanes, open', !!(await until(async () => /Ended today \(16\)/.test(await ended.locator('.progress-lanes-ended-bar').innerText()) && (await ended.locator('.progress-lane-ended').count()) === 16, HUNG_MS)), await ended.locator('.progress-lanes-ended-bar').innerText().catch(() => ''))
+  check('…the merged one with its commit', (await ended.locator('.progress-lane-ended .progress-lane-queue-commit', { hasText: '19e1778' }).count()) === 1)
+  // The longest "ran 143 h 2 min" of every language (CB1's lane on the card): no lane here runs that long, so each row's
+  // time is set to it in the page, measured, and put back.
+  const longestRan = fs
+    .readdirSync(path.join(lib.ROOT, 'locales'))
+    .filter((c) => fs.existsSync(path.join(lib.ROOT, 'locales', c, 'board.json')))
+    .map((c) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', c, 'board.json'), 'utf8'))['board.lanes.endedRan'])
+    .map((v) => (typeof v === 'string' ? v : v?.defaultMessage ?? '').replace('{time}', '143 h 2 min'))
+    .sort((a, b) => b.length - a.length)[0]
+  await lib.fitWindow(app, page, { width: 1500, height: 600 })
+  const resizer = panel.locator(':scope > .pane-resizer')
+  const panelAt = async (want) => {
+    const edge = await resizer.boundingBox()
+    const now = (await panel.boundingBox()).width
+    await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(edge.x + edge.width / 2 + (now - want), edge.y + edge.height / 2, { steps: 5 })
+    await page.mouse.up()
+    return !!(await until(async () => Math.abs((await panel.boundingBox()).width - want) <= 2, HUNG_MS))
+  }
+  const endedList = tab.locator('.progress-lanes-list')
+  const reach = () =>
+    endedList.evaluate((el, oldest) => {
+      el.scrollTop = el.scrollHeight
+      const frame = el.getBoundingClientRect()
+      const endRow = el.querySelector(`.progress-lane-ended[data-lane="${oldest}"]`)?.getBoundingClientRect()
+      return { scrolls: el.scrollHeight > el.clientHeight + 1, lastBottom: endRow ? Math.round(frame.bottom - endRow.bottom) : null }
+    }, lc)
+  // Each row: its lines (a line is the pair's height), whether its facts are one line beside the pair, and whether all
+  // of it, each fact whole, stays inside the row and the list (never cut off by the list's overflow-x). With `ran`,
+  // each row's time is that text while measured.
+  const compact = (ran = null) =>
+    ended.locator('.progress-lane-ended > .progress-lane-top').evaluateAll((tops, said) => {
+      const list = tops[0]?.closest('.progress-lanes-list')?.getBoundingClientRect()
+      return tops.map((t) => {
+        const took = t.querySelector('.progress-lane-ended-took')
+        const was = took?.textContent ?? null
+        if (said && took) took.textContent = said
+        const topBox = t.getBoundingClientRect()
+        const pair = t.querySelector('.progress-lane-pair').getBoundingClientRect()
+        const facts = t.querySelector('.progress-lane-ended-facts')
+        const factsBox = facts.getBoundingClientRect()
+        const right = Math.max(...[...facts.children].map((f) => f.getBoundingClientRect().right))
+        const whole = [...facts.children].every((f) => f.scrollWidth <= f.clientWidth + 1 || f.tagName === 'BUTTON')
+        // Lines by where items sit (their middles), not by height: the commit's button is taller than a line of text.
+        const linesOf = (els) => els.map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => (r.top + r.bottom) / 2).sort((a, b) => a - b).filter((y, i, ys) => i === 0 || y - ys[i - 1] > pair.height / 2).length
+        const items = [...t.children].flatMap((c) => (c === facts ? [...facts.children] : [c]))
+        const measured = { lines: linesOf(items), factsLines: linesOf([...facts.children]), oneLine: Math.abs(factsBox.top - pair.top) < pair.height / 2, inside: right <= topBox.right + 1 && topBox.right <= list.right + 1, whole }
+        if (said && took) took.textContent = was
+        return measured
+      })
+    }, ran)
+  // The narrowest is the panel's CSS min-width (240px), above its resizer's 220.
+  for (const [width, label] of [[240, 'narrowest'], [640, 'widest']]) {
+    check(`the panel at its ${label} (${width}px)`, await panelAt(width), String((await panel.boundingBox()).width))
+    check(`…the list scrolls to the last ended lane (${label})`, !!(await until(async () => {
+      const r = await reach()
+      return r.scrolls && r.lastBottom !== null && r.lastBottom >= -1
+    }, HUNG_MS)), JSON.stringify(await reach()))
+    const tops = await compact()
+    check(`…each row inside the list, each fact whole (${label})`, tops.length === 16 && tops.every((r) => r.inside && r.whole), JSON.stringify(tops.filter((r) => !r.inside || !r.whole).slice(0, 3)))
+    check(`…each row compact: its facts at most two lines, the row at most three (${label})`, tops.every((r) => r.factsLines <= 2 && r.lines <= 3), JSON.stringify(tops.filter((r) => r.factsLines > 2 || r.lines > 3).slice(0, 3)))
+    if (label === 'narrowest') check('…the abandoned ones’ facts on one line', tops.filter((r) => r.factsLines === 1).length >= 15, JSON.stringify(tops.slice(0, 3)))
+    if (label === 'widest') check('…and at the widest, each row is one line', tops.every((r) => r.oneLine && r.lines === 1), JSON.stringify(tops.slice(0, 3)))
+    const long = await compact(longestRan)
+    check(`…with the longest "${longestRan}", still inside, each fact whole (${label})`, long.every((r) => r.inside && r.whole && r.factsLines <= 2), JSON.stringify(long.filter((r) => !r.inside || !r.whole || r.factsLines > 2).slice(0, 3)))
+    await painted()
+    await page.screenshot({ path: path.join(shots, `ended-today-long-${label}.png`) })
+    // Its top too: the newest, the merged lane with its commit.
+    await endedList.evaluate((el) => {
+      el.scrollTop = 0
+    })
+    await painted()
+    await page.screenshot({ path: path.join(shots, `ended-today-long-${label}-top.png`) })
+  }
 
   await app.close().catch(() => undefined)
   console.log(failed ? `\n${failed} FAILED` : '\nAll passed')

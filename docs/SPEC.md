@@ -9442,9 +9442,11 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   - **Ended today** (HI-2898): a collapsed row atop the Lanes tab, hidden with none, of the lanes that ended or were
     abandoned since local midnight (`lanes:endedSince`, calendar days: 23 or 25 hours on a summer-time change), read
     again as the lanes change, at midnight, on focus and each minute (a change of date, clock or time zone). Each shows
-    its builder and reviewer, name, merged or abandoned, its cards, how long it ran (start to end) and its merge commit
-    (copied with a click), and opens to its cards as it left them, read only. They show there only, not again in the
-    tab's list; Pulse keeps its lanes ended in the last hour.
+    its builder and reviewer, name, merged or abandoned, its cards, how long it ran (*ran 2 h 5 min*: from the lane's
+    start to its end, waits and pauses included, a lane given new cards keeping its start; its hover names both) and its
+    merge commit (copied with a click), and opens to its cards as it left them, read only. They show there only, not
+    again in the tab's list; Pulse keeps its lanes ended in the last hour. It is the first part of the tab's lane list,
+    scrolling with it (HI-3178); a row's facts keep to one line, beside the name where they fit, else under it.
   - **A lane's wait time** (HI-1926): main stamps each running lane's status when its key (reason, card, ask) first
     appears (`stampWait`, kept per workspace in memory, one for every window, bounded, a lane leaving it when it stops
     running) as `status.since`; a wait already under way at the first listing (Combwork started, the workspace opened) is

@@ -1306,7 +1306,7 @@ When Combwork can't make a change, it says why under the lane and changes nothin
 
 Each change says what it did in a notification with **Undo**, and **Ctrl+Z** in the tab undoes the last change you made in this window. An undo puts back exactly what was there, or nothing: it's refused once the lane or the card changed since (a card started, someone else changed the lane or gave the card to an agent).
 
-**Ended today**, at the top of the tab, lists the lanes that ended or were abandoned today (since midnight, your time), collapsed until you open it: each with its builder and reviewer, merged or abandoned, its cards and how long it ran, and its merge commit (click it to copy). Open a lane for its cards as it left them. A lane that ended today shows there, not again in the list below.
+**Ended today**, at the top of the tab, lists the lanes that ended or were abandoned today (since midnight, your time), collapsed until you open it: each with its builder and reviewer, merged or abandoned, its cards and how long it ran (from its start to its end, waits and pauses included: hover for when it started and ended), and its merge commit (click it to copy). It scrolls with the lanes below it. Open a lane for its cards as it left them. A lane that ended today shows there, not again in the list below.
 
 #### Slots, pools and copies in the Progress panel <a id="slots-pools-and-copies-in-the-progress-panel"></a>
 
