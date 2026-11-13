@@ -356,7 +356,8 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
         return { line: Math.round(pair.height), facts: Math.round(facts.height), top: Math.round(t.getBoundingClientRect().height), oneLine: Math.abs(facts.top - pair.top) < pair.height / 2 }
       })
     )
-  for (const [width, label] of [[220, 'narrowest'], [640, 'widest']]) {
+  // The narrowest is the panel's CSS min-width (240px), above its resizer's 220.
+  for (const [width, label] of [[240, 'narrowest'], [640, 'widest']]) {
     check(`the panel at its ${label} (${width}px)`, await panelAt(width), String((await panel.boundingBox()).width))
     check(`…the list scrolls to the last ended lane (${label})`, !!(await until(async () => {
       const r = await reach()
