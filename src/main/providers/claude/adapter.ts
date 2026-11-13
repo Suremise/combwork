@@ -42,6 +42,7 @@ import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
+import { launchFolderOf } from '../../launchFolderNames'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
@@ -483,7 +484,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * replaces the folder while the project's other agents may still be reading theirs.
    */
   launchDir(projectPath: string, agentId: string): string {
-    return join(projectPath, CW_DIR, `launch-${agentId}`)
+    return launchFolderOf(projectPath, agentId)
   }
 
   /** Rebuilds the agent's launch folder with exactly the session's Combwork skills, MCP servers and Combwork's hooks. */

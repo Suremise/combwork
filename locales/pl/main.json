@@ -360,6 +360,7 @@
   "main.server.url.scheme": "Adres URL musi zaczynać się od https:// (albo http:// dla serwera na tym komputerze).",
   "main.server.url.userinfo": "Adres URL nie może zawierać nazwy użytkownika ani hasła: podaj klucz w osobnym polu.",
   "main.storage.claimed": "Folder znów należy do sesji.",
+  "main.storage.launchInUse": "jego agent znów należy do projektu albo właśnie się uruchamia",
   "main.storage.noLonger": "{path}: już się nie kwalifikuje",
   "main.storage.purgeChanged": "Zmieniło się od podglądu.",
   "main.storage.purgeClaimed": "Znów należy do sesji.",

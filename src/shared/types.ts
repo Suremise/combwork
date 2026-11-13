@@ -3578,10 +3578,12 @@ export interface CleanupOptions {
   archivedBackupsDays: number | null
   /** Backups of archived sessions the CLI no longer has: the session is deleted (its usage still counts). */
   goneBackups: boolean
+  /** Launch folders of removed agents (HI-3144: `.combwork/launch-<id>`). */
+  launchFolders?: boolean
 }
 
 export interface CleanupItem {
-  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup'
+  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup' | 'launch-folder'
   path: string
   bytes: number
   sessionId?: string

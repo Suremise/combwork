@@ -1443,6 +1443,10 @@
     "defaultMessage": "The folder belongs to a session again.",
     "description": "Why Clean Up (Settings → Storage) skipped a session's attachments folder: it had no session, and has one now."
   },
+  "main.storage.launchInUse": {
+    "defaultMessage": "its agent is the project’s again, or is starting",
+    "description": "Why Clean Up (Settings → Storage) skipped a launch folder (HI-3144): since the preview, its agent was added back to the project (an undo) or is starting, or the folder is gone."
+  },
   "main.storage.noLonger": {
     "defaultMessage": "{path}: no longer qualifies",
     "description": "What Clean Up (Settings → Storage) skipped: it changed since the preview listed it. {path} is the file or folder."

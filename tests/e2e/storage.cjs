@@ -82,6 +82,9 @@ const write = (file, text) => {
   }
   write(path.join(dataDir, 'attachments', DELETED, 'shot.png'), lib.samplePng(90, 60))
   write(path.join(dataDir, 'attachments', 'run-deadbeef', 'early.png'), lib.samplePng(70, 50))
+  // HI-3144: a removed agent's launch folder left from before (the open's sweep removes it), the project's agents read.
+  write(path.join(dataDir, 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  write(path.join(dataDir, 'launch-a-e2egone', 'plugin', 'skills', 'x', 'SKILL.md'), 'x'.repeat(4096))
   write(
     path.join(dataDir, 'sessions.json'),
     JSON.stringify({
@@ -113,6 +116,7 @@ const write = (file, text) => {
   const logFile = path.join(userData, 'logs', 'combwork.log')
   const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], 30000)
   check("the open's background work has ended, its worktree adoption with it", !!opened)
+  check("HI-3144: the open's sweep removed a removed agent's launch folder", !!(await until(() => !fs.existsSync(path.join(dataDir, 'launch-a-e2egone')), HUNG_MS)))
 
   // A running launch (its early attachments folder must stay) and a worktree agent (its folder is counted).
   const live = await lib.addAgent(inv, alpha, { name: 'Live' })
@@ -182,34 +186,37 @@ const write = (file, text) => {
   await group.locator('.storage-table th button', { hasText: 'Size' }).click()
   await page.screenshot({ path: path.join(lib.WORK, 'storage-page.png') })
 
-  // Clean Up…: the default (old archived sessions' attachments), then every option.
+  // A removed agent's launch folder made since the open (HI-3144): Clean Up lists it, its option on at first.
+  write(path.join(dataDir, 'launch-a-e2elate', 'plugin', 'skills', 'x', 'SKILL.md'), 'x'.repeat(4096))
+  // Clean Up…: the default (old archived sessions' attachments, removed agents' launch folders), then every option.
   await group.getByRole('button', { name: 'Clean Up…' }).click()
   const dialog = page.getByRole('dialog', { name: 'Clean Up alpha' })
   const rows = () => dialog.locator('.cleanup-preview tbody [title]').evaluateAll((els) => els.map((e) => e.getAttribute('title')))
   const norm = (list) => list.map((p) => path.relative(dataDir, p).replace(/\\/g, '/')).sort()
   const want = (list) => JSON.stringify([...list].sort())
   const previewIs = async (list) => (await until(async () => want(norm(await rows())) === want(list), 5000)) || norm(await rows())
-  let got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`])
-  check("by default: old archived sessions' attachments", got === true, JSON.stringify(got))
+  let got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate'])
+  check("by default: old archived sessions' attachments and a removed agent's launch folder", got === true, JSON.stringify(got))
   await dialog.locator('label.choice', { hasText: 'Attachments of deleted sessions' }).locator('input').check()
   await dialog.locator('label.choice', { hasText: "Combwork's backups of archived sessions" }).locator('input[type=checkbox]').check()
-  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`])
+  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate', `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`])
   check('orphan attachments (not the running launch’s) and the backup the CLI still has', got === true, JSON.stringify(got))
   check('no warning before the last-copies option', (await dialog.locator('.banner.danger').count()) === 0)
   await dialog.locator('label.choice', { hasText: 'the CLI no longer has' }).locator('input').check()
-  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`])
+  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate', `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`])
   check('the last copy of the session the CLI lost', got === true, JSON.stringify(got))
   check('… with a warning that it cannot be resumed or read', ((await dialog.locator('.banner.danger').textContent()) ?? '').includes("can't be resumed or read"))
   // A shorter age takes the recent session's attachments and backup too; back to 90 leaves them out again.
   await dialog.getByLabel('Attachment age in days').fill('5')
-  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, `attachments/${RECENT}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`])
+  got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate', `attachments/${RECENT}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`])
   check('the days field changes what is listed', got === true, JSON.stringify(got))
   await dialog.getByLabel('Attachment age in days').fill('90')
-  const listed = [`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`]
+  const listed = [`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate', `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`, `archive/${OLD_GONE}.jsonl.gz`]
   got = await previewIs(listed)
   check('back to 90 days', got === true, JSON.stringify(got))
   const button = dialog.getByRole('button', { name: /to the Recycle Bin/ })
-  check('the button says how much goes', /Move 6 items \(.+\) to the Recycle Bin/.test((await button.textContent()) ?? ''), await button.textContent())
+  check('… the launch folder under its own heading, as a removed agent', (await dialog.locator('.cleanup-preview > div', { hasText: 'Launch folders of removed agents' }).locator('tbody tr', { hasText: 'Removed agent a-e2elate' }).count()) === 1)
+  check('the button says how much goes', /Move 7 items \(.+\) to the Recycle Bin/.test((await button.textContent()) ?? ''), await button.textContent())
   await page.screenshot({ path: path.join(lib.WORK, 'storage-cleanup.png') })
   const everything = (dir) => fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, String(f)))
   const keptBefore = everything(dataDir).filter((p) => !listed.some((l) => p.toLowerCase().startsWith(path.join(dataDir, l).toLowerCase())))
