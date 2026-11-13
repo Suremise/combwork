@@ -187,6 +187,10 @@
     "text": "Combwork can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).",
     "note": "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default."
   },
+  "slot.place.held": {
+    "text": "{card} waits for {slot}: {kind, select, notIntegrated {the last card's work isn't in {target} yet. Integrate it there; your own Done on exactly that card's cycle also counts.} cantInspect {Combwork can't read what it holds ({why}). It tries again; nothing there was changed.} other {it holds {hasCommits, select, yes {commits over the last card's work that are neither in {target} nor among the last card's own: {ids}{more, plural, =0 {} other { and # more (see them all with jj log -r {selectArg})}}{hasEdits, select, yes {, and edits in its working copy, recorded as {at}} other {}}} other {edits in its working copy over the last card's work, recorded as {at}}}. Set them aside so Combwork can prepare {slot}: jj new {base} keeps them where they are. Once {card} is prepared, bring what belongs to it under its working copy: jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes { (or squash the edits in: jj squash --from {at} --into ''@'')} other {}}; leave out what doesn't, or jj abandon it.}}{stopped, select, yes { {builder} was stopped so Combwork could read {slot}: resume it from its pane (Resume) to deal with this; {card} is prepared once {slot} is clear.} other {}}",
+    "note": "HI-3115: the builder's wake (and the card's notice, kept in the Default) when its jj slot can't be prepared yet for what it holds; service.slots.held's English, with the same values. Said once per cycle and reason."
+  },
   "slot.place.notReady": {
     "text": "Combwork couldn't get {slot} ready: {error}",
     "note": "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default."

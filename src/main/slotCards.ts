@@ -48,8 +48,10 @@ import { samePath } from '../shared/movePaths'
 import { laneRunsWith, lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
-import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
+import type { HeldWork, WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
+import { shellLine } from '../shared/workflow/queue'
 import { gitCantRead, isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
+import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
@@ -232,6 +234,7 @@ const T = {
   changed: agentMsg({ id: 'slot.takeover.changed', text: 'changed while it was taken over', note: 'As slot.takeover.gone: the slot changed while the start took it over, twice.' }),
   notReady: agentMsg({ id: 'slot.place.notReady', text: "Combwork couldn't get {slot} ready: {error}", note: "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default." }),
   notReadyFor: agentMsg({ id: 'slot.place.notReadyFor', text: "Combwork couldn't get {slot} ready for {card}: {error}", note: "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default." }),
+  held: agentMsg({ id: 'slot.place.held', text: "{card} waits for {slot}: {kind, select, notIntegrated {the last card's work isn't in {target} yet. Integrate it there; your own Done on exactly that card's cycle also counts.} cantInspect {Combwork can't read what it holds ({why}). It tries again; nothing there was changed.} other {it holds {hasCommits, select, yes {commits over the last card's work that are neither in {target} nor among the last card's own: {ids}{more, plural, =0 {} other { and # more (see them all with jj log -r {selectArg})}}{hasEdits, select, yes {, and edits in its working copy, recorded as {at}} other {}}} other {edits in its working copy over the last card's work, recorded as {at}}}. Set them aside so Combwork can prepare {slot}: jj new {base} keeps them where they are. Once {card} is prepared, bring what belongs to it under its working copy: jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes { (or squash the edits in: jj squash --from {at} --into ''@'')} other {}}; leave out what doesn't, or jj abandon it.}}{stopped, select, yes { {builder} was stopped so Combwork could read {slot}: resume it from its pane (Resume) to deal with this; {card} is prepared once {slot} is clear.} other {}}", note: "HI-3115: the builder's wake (and the card's notice, kept in the Default) when its jj slot can't be prepared yet for what it holds; service.slots.held's English, with the same values. Said once per cycle and reason." }),
   cantResume: agentMsg({ id: 'slot.place.cantResume', text: "Combwork can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).", note: "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default." }),
   resumeEnded: agentMsg({ id: 'slot.place.resumeEnded', text: "its conversation in {slot} didn't resume ({tries} tries): {why}", note: "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default." }),
   resumeFailed: agentMsg({ id: 'slot.place.resumeFailed', text: "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.", note: "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default." }),
@@ -1419,6 +1422,47 @@ export async function freeSlotOfBuilder(projectPath: string, builder: string, fo
   return (await until(projectPath, builder, () => sessions.runNow(projectPath, builder)?.run !== run, gone)) ? 'free' : 'gone'
 }
 
+
+/** HI-3115: ids a hold notice lists, at most; the rest counted, and all of them selectable with its frozen revset. */
+const HELD_IDS = 20
+
+/**
+ * HI-3115 (decision B, design s42): a jj slot's hold, said on the card (the window's words) and to its builder (English):
+ * what holds it, from the port's frozen evidence (full ids, never `@` or a bookmark but as a destination), how to set it
+ * aside and bring what belongs to the card back once prepared; whether its builder was stopped to read it (resume it).
+ */
+export function heldTold(work: HeldWork | null, reason: string, slot: string, card: string, builder: string, stopped: boolean): { english: string; shown: ReturnType<typeof workflowText> } {
+  const kind = work?.why ?? 'cantInspect'
+  const commits = work?.commits ?? []
+  const edits = work?.edits ?? null
+  // The selection: under HELD_IDS ids, the ids themselves; else the frozen revset, which selects the same.
+  const all = [...commits, ...(edits ? [edits] : [])]
+  const select = all.length && all.length < HELD_IDS ? all.join('|') : (work?.select ?? '')
+  const values = {
+    card,
+    slot,
+    kind,
+    target: work?.target ?? '',
+    why: reason,
+    hasCommits: commits.length ? 'yes' : 'no',
+    ids: commits.slice(0, HELD_IDS).join(' '),
+    more: Math.max(0, commits.length - HELD_IDS),
+    hasEdits: edits ? 'yes' : 'no',
+    at: edits ?? '',
+    base: work?.base ?? '',
+    selectArg: shellLine([select]),
+    stopped: stopped ? 'yes' : 'no',
+    builder
+  }
+  return { english: inDefaultDialect(() => say(T.held, values)), shown: workflowText(SLOT_NOTICES.held, values) }
+}
+
+/** An agent's name in its project now (null: not there). */
+async function agentNameOf(ws: WorkspaceService, projectPath: string, id: string): Promise<string | null> {
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  return cfg ? (projectAgents(cfg).find((a) => a.id === id)?.name ?? null) : null
+}
+
 /** Failed tries of a cycle's preparation or placement before its card is stalled with the failure (HI-1976). */
 const START_FAIL_TRIES = 3
 
@@ -1447,6 +1491,10 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       // A jj card's (HI-2913): its builder's idle run out of the slot first, under this same fence, so jj's record finds
       // the folder quiet; not now, the fence lifted and looked at again.
       if (isJjLineKey(st.line)) {
+        // HI-3115 (decision B): committed work over the last card's there, read without recording the folder: held with its
+        // builder still running, so the wake reaches it; edits are found by the preparation's own record, after its run ends.
+        const early = await pool.heldEarly(l.id, st.line!, st.base!)
+        if (early) return { retry: 'its slot holds work over the last card', held: JJ_REFUSED.unintegrated, heldWork: early } // i18n-ignore: why a preparation waits, for the log
         const free = await freeSlotOfBuilder(projectPath, builder, st.folder, gone)
         if (free !== 'free') return { retry: free === 'gone' ? 'the card moved on' : 'its builder is still in the slot' } // i18n-ignore: why a preparation waits, for the log
       }
@@ -1468,7 +1516,8 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       const fact: FactData['SlotPrepared'] = { lease: l.id, line: st.line!, revision: r.revision }
       await wf.write(card.card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
-        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
+        if (!(now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared)) return
+        w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
       })
       // A line the slot was on before (the lane's last card's) may go now that nothing has it out.
       void settleSlotCards(ws, projectPath)
@@ -1494,6 +1543,24 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     }
     // Not in place: on at once to the wait for its builder.
     if (tried) continue
+    // HI-3115 (decision B, design s42): a jj slot that can't be prepared yet for what it holds: the cycle waits (never
+    // SlotPrepareFailed), said on the card and to its builder once per cycle and reason (a SlotPrepareHeld fact, which a
+    // submit's advice reads), then looked at again: corrected, the next pass prepares, with no put-back.
+    if (r.held) {
+      const what = r.heldWork?.why ?? 'cantInspect'
+      const reason = `${what}:${r.held}`
+      const name = (await agentNameOf(ws, projectPath, st.builder)) ?? st.builder
+      const told = heldTold(r.heldWork ?? null, r.held, st.slot ?? '', card.card.key, name, !sessions.runNow(projectPath, st.builder))
+      await wf.write(card.card, null, 'combwork', (w) => {
+        const facts = w.tx.facts(n)
+        const now = cycleIn(facts)
+        if (!(now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared)) return
+        if (facts.some((f) => f.kind === 'SlotPrepareHeld' && f.seq > cycle.seq && (f.data as FactData['SlotPrepareHeld']).lease === l.id && (f.data as FactData['SlotPrepareHeld']).why === reason)) return
+        w.fact('SlotPrepareHeld', { lease: l.id, slot: st.slot ?? '', why: reason, told: told.english }) // i18n-ignore: a fact's kind, not text
+        w.action('notify', { text: told.english, shown: told.shown })
+        wf.wake(w, st.builder, told.english)
+      })
+    }
     // Not now (busy, not quiet at the boundary): looked at again at the next change.
     log.info(`Slot ${userText(st.slot)} for #${n}: not yet (${userText(r.retry)})`)
     await new Promise((res) => setTimeout(res, 2000))

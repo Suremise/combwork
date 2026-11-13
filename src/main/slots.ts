@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { FenceDb, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, HeldWork, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { JJ_REFUSED } from './platform/jjWorkspacePort'
 import { isJjLineKey } from './platform/jjSlotPrep'
@@ -296,10 +296,13 @@ export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: fals
 
 /** What a card's preparation came to (#1438): done at a revision, not now (tried again), or not possible (why). */
 /** `stale` (HI-2913): the error is a stale jj workspace's, which the user's Recover… mends. */
-export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null; stale?: true }
+export type PrepareResult = { ok: true; revision: string } | { retry: string; held?: string; heldWork?: HeldWork } | { error: string; logPath?: string | null; stale?: true }
 
 /** HI-3010: an in-place preparation's `retry` (the log's words): what is left waits for the slot's builder. */
 export const NOT_IN_PLACE = 'not in place: it waits for its builder' // agent-protocol: a log line's detail, never sent to an agent
+
+/** HI-3115: jj's refusals for what its slot holds: the card's pending cycle waits on them (said once on the card), never fails. */
+const JJ_HELD: ReadonlySet<string> = new Set([JJ_REFUSED.unintegrated, JJ_REFUSED.notIntegrated, JJ_REFUSED.divergent, JJ_REFUSED.notEmpty, JJ_REFUSED.journal])
 
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
@@ -2072,6 +2075,17 @@ export class SlotPool {
    * A lane's lease as its lane is over (HI-3118, SlotStore.laneOver): ended as `release` ends one (its writer drained,
    * the slot settled), kept as its one card in flight's lease, or left protected when several claim it.
    */
+  /**
+   * HI-3115: committed work over the last card's in a lease's jj slot while its builder still runs there (the port's
+   * read-only `heldEarly`); null when there's none, the port has no such read, or the lease is over.
+   */
+  async heldEarly(lease: string, line: string, base: string): Promise<HeldWork | null> {
+    const l = this.store.lease(lease)
+    const slot = l && !l.to ? this.store.slot(l.slot) : null
+    if (!slot || !this.port.heldEarly) return null
+    return this.port.heldEarly(slot.folder, line, base, { identity: slot.identity ?? null })
+  }
+
   async releaseLane(lease: string, why: string, decide: Parameters<SlotStore['laneOver']>[2]): Promise<Awaited<ReturnType<SlotStore['laneOver']>>> {
     const r = await this.store.laneOver(lease, why, decide)
     if (!r || !('ended' in r)) return r
@@ -2954,7 +2968,9 @@ export class SlotPool {
         if (!there && !carried && !inPlace) {
           // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
           const d = await this.dirtyOwned(slot, token)
-          if (isUnknown(d) || d.length) {
+          // HI-3115: a port that records the folder itself (jj's) decides on edits there: its own refusal, which is the
+          // pending cycle's wait (JJ_HELD), never a failure. Unreadable, as before.
+          if (isUnknown(d) || (d.length && !this.port.record)) {
             await end()
             // A stale jj workspace (HI-2913) said as itself, with its way out; else Git's words as before.
             if (isUnknown(d) && d.detail === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
@@ -3028,6 +3044,9 @@ export class SlotPool {
             const err = r.err.trim()
             if (this.port.platform === 'jj' && (err === JJ_REFUSED.fence || err === JJ_REFUSED.uncertain)) return { retry: sayStored(T.prepareBusy, { slot: name }) }
             if (this.port.platform === 'jj' && err === JJ_REFUSED.stale) return { error: sayStored(T.stale, { slot: name }), stale: true }
+            // HI-3115: what the slot holds (work over the last card's, its divergence, its record unreadable) is the card's
+            // pending cycle's wait, said on the card once, never a failure that locks the card out: corrected, the next pass prepares.
+            if (this.port.platform === 'jj' && JJ_HELD.has(err)) return { retry: sayFor(this.port, 'switchFailed', { slot: name, error: err }), held: err, ...(r.held ? { heldWork: r.held } : {}) }
             return { error: sayFor(this.port, 'switchFailed', { slot: name, error: err.split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}${inPlace ? ' (in place)' : ''}`)

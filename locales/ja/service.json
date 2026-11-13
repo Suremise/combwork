@@ -320,6 +320,7 @@
   "service.queue.pauseChanged": "その間にマージキューの一時停止が変わりました。コミットも退避もしていません。もう一度確認してください。",
   "service.queue.pauseNoFolder": "これらの変更がどのフォルダーにあったか Combwork にはわかりません。キューを再開してください。もう一度確認して場所を示します。",
   "service.repoOps.notOffered": "バージョン管理（{platform}）では、ここでその操作はできません。",
+  "service.slots.held": "{card} は {slot} を待っています: {kind, select, notIntegrated {前のカードの作業がまだ {target} にありません。そこに統合してください。そのカードのサイクルに対するあなた自身の完了も有効です。} cantInspect {Combwork はその中身を読み取れません ({why})。再試行します。そこでは何も変更されていません。} other {{hasCommits, select, yes {前のカードの作業の上に、{target} にも前のカード自身のコミットにも含まれないコミットがあります: {ids}{more, plural, =0 {} other { ほか # 件 (すべて jj log -r {selectArg} で確認できます)}}{hasEdits, select, yes {。また作業コピーに編集があり、{at} として記録されています} other {}}} other {前のカードの作業の上で、作業コピーに編集があり、{at} として記録されています}}。Combwork が {slot} を準備できるよう、それらを脇に置いてください: jj new {base} はそれらをそのまま残します。{card} の準備ができたら、属するものをその作業コピーの下に移してください: jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes { (または編集を取り込む: jj squash --from {at} --into ''@'')} other {}}。属さないものは除くか、jj abandon で破棄してください。}}{stopped, select, yes { Combwork が {slot} を読み取るため {builder} は停止されました。これに対処するには、そのペインから再開 (再開) してください。{slot} が空き次第 {card} が準備されます。} other {}}",
   "service.slots.notPrepared": "Combworkは{card}のために{slot}を準備できませんでした：{why}",
   "service.slots.resumeFailed": "Combworkは{card}のために{slot}にある{agent}の会話を再開できませんでした（3回試行）：{why}。セッション履歴から{agent}を再開するか、新しく開始すると、Combworkが{card}を渡します。",
   "service.slots.resumeHeld": "Combworkはまだ{agent}に{card}を渡せません：{slot}にある{agent}の会話を今は再開できません（{why}）。再開できるようになり次第、Combworkが{card}を渡します。",

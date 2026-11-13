@@ -320,6 +320,7 @@
   "service.queue.pauseChanged": "合并队列的暂停在此期间发生了变化：没有提交或搁置任何内容。请重新查看。",
   "service.queue.pauseNoFolder": "Combwork 不知道这些更改位于哪个文件夹。请恢复队列：它会重新检查并说明位置。",
   "service.repoOps.notOffered": "版本控制（{platform}）在此不提供该操作。",
+  "service.slots.held": "{card} 正在等待 {slot}：{kind, select, notIntegrated {上一张卡片的工作还不在 {target} 中。请将其集成到那里；你自己对该卡片这一周期的“完成”也算数。} cantInspect {Combwork 无法读取其中的内容（{why}）。它会重试；那里没有任何改动。} other {其中有{hasCommits, select, yes {在上一张卡片的工作之上、既不在 {target} 中也不属于上一张卡片自己的提交：{ids}{more, plural, =0 {} other { 等另外 # 个（用 jj log -r {selectArg} 查看全部）}}{hasEdits, select, yes {，以及工作副本中的编辑，记录为 {at}} other {}}} other {在上一张卡片的工作之上、工作副本中的编辑，记录为 {at}}}。请把它们放到一边，以便 Combwork 准备 {slot}：jj new {base} 会把它们原样保留。{card} 准备好后，把属于它的内容移到它的工作副本之下：jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes {（或合并这些编辑：jj squash --from {at} --into ''@''）} other {}}；不属于它的留下不动，或用 jj abandon 丢弃。}}{stopped, select, yes { 为让 Combwork 读取 {slot}，{builder} 已被停止：请从它的面板继续（继续）来处理此事；{slot} 一空出来就会为 {card} 准备。} other {}}",
   "service.slots.notPrepared": "Combwork 无法为 {card} 准备 {slot}：{why}",
   "service.slots.resumeFailed": "Combwork 无法为 {card} 恢复 {agent} 在 {slot} 中的对话（已尝试三次）：{why}。请在“会话历史”中恢复 {agent}，或重新开始，Combwork 随后会把 {card} 交给它。",
   "service.slots.resumeHeld": "Combwork 暂时无法把 {card} 交给 {agent}：{agent} 在 {slot} 中的对话现在无法恢复（{why}）。一旦可以，Combwork 就会把 {card} 交给它。",

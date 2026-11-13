@@ -172,6 +172,18 @@ describe('the workflow text in every locale', () => {
     }
   })
 
+  it("renders platform.jjRefused's unbound by its {state} in every locale: pending says to end the turn, held repeats the hold's own sentence, other is today's (HI-3115)", async () => {
+    const told = 'AM-12 waits for slot-a: jj new 0123abcd keeps them where they are.'
+    const of = (state: string) => refusalLines('platform.jjRefused', { card: 'AM-12', why: 'unbound', state, told }, WINDOW)
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [pending, held, other] = [of('pending'), of('held'), of('other')]
+      for (const line of [pending.message, pending.next, held.message, held.next, other.message, other.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(held.next, code).toBe(told)
+      expect(pending.next, code).not.toBe(other.next)
+    }
+  })
+
   it("renders both branches of review.inProgress's {who} select in every locale: the user's in each language's words, an agent's by its name (HI-2487, HR1's round 2)", async () => {
     // runtime.ts's reviewTaken: the user's review is who 'user' with no name; an agent's is who 'agent' with its name.
     const user = { card: 'AM-12', who: 'user', reviewer: '', submission: 40, minutes: 3 }
