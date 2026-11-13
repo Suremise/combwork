@@ -1437,6 +1437,15 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const b = await bindingNow(folder)
       return !isUnknown(b) && !!b && b.card === card && b.generation === identity.generation ? b.target : null
     },
+    holdsCommits: async (folder, identity) => {
+      if (!identity || !(await owns(folder, identity))) return null
+      const b = await bindingNow(folder)
+      if (isUnknown(b) || !b || b.generation !== identity.generation || !/^[0-9a-f]{40}$/.test(b.base)) return null
+      const op = await pinned(folder)
+      if (isUnknown(op)) return null
+      const out = await read(folder, op, ['log', '--no-graph', '-r', `(${b.base}::${revsetName(identity.workspace)}@-) ~ ${b.base}`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revisionIn, { folder }))
+      return isUnknown(out) ? null : lines(out).length > 0
+    },
     heldCard: async (folder, identity) => {
       if (!identity || !(await owns(folder, identity))) return null
       const b = await bindingNow(folder)

@@ -300,6 +300,12 @@ export interface WorkspacePort {
    */
   heldTarget?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<string | null>
   /**
+   * HI-3143: whether the folder holds commits of its binding's card over the binding's base (the working copy's parents'
+   * ancestry, its own uncommitted edit left out), read pinned; null when it can't tell (another generation, no binding,
+   * unreadable). Git has none.
+   */
+  holdsCommits?(folder: string, identity: WorkspaceIdentity | null): Promise<boolean | null>
+  /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
    * HI-3031: and only while every commit past `base` was made since `since` (the lease's start, ISO): a free slot waits

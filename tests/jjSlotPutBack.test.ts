@@ -87,6 +87,8 @@ describe.skipIf(!jjExe)(`a jj card put back with committed work (jj ${TESTED_JJ.
       expect(w.store.slot(a.name)?.state).toBe('dirty')
       expect(w.store.openLease(a.name)).toBeNull()
       expect(w.pool.keptCard(a.name)).toBe(1)
+      // HI-3143: kept for committed work (the window says so), not for an edit alone.
+      expect(w.pool.keptRecord(a.name)?.edit).toBeUndefined()
       // Another card: another slot; asked by name, refused.
       const two = await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })
       expect(two.ok && two.slot.name).not.toBe(a.name)
@@ -150,6 +152,25 @@ describe.skipIf(!jjExe)(`a jj card put back with committed work (jj ${TESTED_JJ.
       expect(w.store.slots().map((s) => s.name)).toEqual([a.name])
     })
 
+    // HI-3143: a card put back with only an edit (nothing committed): kept for it, recorded as kept for that edit, so the
+    // window says its changes aren't committed yet rather than that its committed work isn't in the target.
+    it('only an edit, nothing committed: kept for the card, recorded as kept for its uncommitted changes', async () => {
+      const w = world(colocated)
+      const lent = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
+      if (!lent.ok) throw new Error(`not lent: ${JSON.stringify(lent)}`)
+      const row = w.store.slot(lent.slot.name)!
+      const ws = row.identity!.workspace
+      expect(await w.pool.prepare(lent.lease.id, { line: jjLineKey(ws, 1, 1), base: w.main(), install: false, target: 'main' })).toMatchObject({ ok: true })
+      writeFileSync(join(row.folder, 'half.txt'), 'half done\n')
+      await w.pool.release(lent.lease.id, 'putBack')
+      await w.pool.refresh()
+      expect(w.store.slot(row.name)?.state).toBe('dirty')
+      expect(w.pool.keptRecord(row.name)).toEqual({ card: 1, generation: row.identity!.generation, edit: true })
+      // A commit made there since: the next settle says committed work.
+      w.h.jj(row.folder, 'commit', '-m', 'half, committed')
+      expect(await w.port.holdsCommits!(row.folder, row.identity!)).toBe(true)
+    })
+
     it.each(['before it is put back', 'in the kept slot afterwards'] as const)("an edit not committed yet beside the work (%s): the card's own, kept with it and given back (HR1's round 1)", async (when) => {
       const w = world(colocated)
       const edit = (folder: string): void => writeFileSync(join(folder, 'half.txt'), 'half done\n')
@@ -158,6 +179,8 @@ describe.skipIf(!jjExe)(`a jj card put back with committed work (jj ${TESTED_JJ.
       expect(w.store.slot(a.name)?.state).toBe('dirty')
       expect(w.store.openLease(a.name)).toBeNull()
       expect(w.pool.keptCard(a.name)).toBe(1)
+      // HI-3143: its commit beside the edit: kept for committed work, as the window says it.
+      expect(w.pool.keptRecord(a.name)?.edit).toBeUndefined()
       // (b) the edit made in the slot once it is kept.
       if (when === 'in the kept slot afterwards') edit(a.folder)
       // Never another card's: refused by name, its folder as it was.

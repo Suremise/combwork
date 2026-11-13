@@ -460,9 +460,11 @@ const onDb = (fn) => {
     await section('workflow')
     const row6 = page.locator(`[data-slot="${slot6}"]`)
     // Its card's own uncommitted work beside its binding: kept for that card (HI-2995), so its next start gets it back.
-    check(`Slots and copies: kept for ${key3}, not ready`, !!(await until(async () => new RegExp(`Kept for ${key3}`).test(await text(row6)) && !/Ready/.test(await text(row6)), HUNG_MS)), await text(row6))
+    // HI-3143: kept for changes not committed (a file jj doesn't track), never said as committed work; in every language.
+    check(`Slots and copies: kept for ${key3}'s uncommitted changes, not ready`, !!(await until(async () => new RegExp(`Kept for ${key3}: its changes aren’t committed yet`).test(await text(row6)) && /Holds a card’s uncommitted changes/.test(await text(row6)) && !/committed work/.test(await text(row6)) && !/Ready/.test(await text(row6)), HUNG_MS)), await text(row6))
     await row6.scrollIntoViewIfNeeded()
     await shoot(row6, 'slot-untracked-dirty')
+    await inEach(row6, 'slot-untracked-dirty', (cat) => cat['workflow.slots.state.keptEdit'])
     const removed6 = await inv('slots:test', shop, { op: 'remove', slot: slot6 })
     console.log(`INFO HI-3096 the pool's removal: ${JSON.stringify(removed6)}`)
     check('…the pool\'s removal refuses it as dirty, the untracked file kept', removed6?.why === 'dirty' && fs.existsSync(path.join(w6.folder, 'untracked-notes.txt')), JSON.stringify(removed6))

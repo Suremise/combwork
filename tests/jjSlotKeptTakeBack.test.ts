@@ -244,6 +244,8 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     await w.pool.refresh()
     expect(w.store.slot(a.name)?.state).toBe('dirty')
     expect(w.pool.keptCard(a.name)).toBe(2)
+    // HI-3143: kept for card 2's uncommitted edit alone, or for its commits (an edit beside them or not).
+    expect(w.pool.keptRecord(a.name)?.edit).toBe(work === 'edit' ? true : undefined)
     expect(w.pool.keptSlotFor(1)).toBeNull()
     // Card 1 (its work in main) starts elsewhere; card 2 gets its slot back, its work in it.
     const one = await w.pool.lend({ card: 1, agent: 'a-1' }, { target: 'main' })

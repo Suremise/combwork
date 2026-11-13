@@ -1972,6 +1972,8 @@ export interface SlotView {
   staleWhy?: 'abandoned'
   /** HI-2995: a jj slot kept for a card put back with committed work not in its target yet: that card's number. */
   keptFor?: number
+  /** HI-3143: kept for that card's uncommitted edit (or files jj doesn't track), not commits. */
+  keptEdit?: true
   /**
    * HI-3032: a kept slot whose folder is gone (state `gone`): the generation it was kept at (Remove… sends it back, so only
    * that slot is removed) and its work's last commit, as recorded when its card's lease ended (null: none recorded).

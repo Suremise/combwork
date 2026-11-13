@@ -3424,6 +3424,11 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   binding names, and again on a preparation finding the slot already on that line (a retry: a move cut short or its
   binding unread is repaired then), so the earlier card (its work in the target: the lane can't prepare another over it, HI-3057) starts
   elsewhere at once, dry or real, never refused as kept in a slot another card works in.
+  **What a kept slot holds, said** (HI-3143): a record kept by the settle's dirty branch (the card's edit, or files jj
+  doesn't track) carries `edit` when the port's `holdsCommits` (its commits over the binding's base, read pinned) says
+  none; with commits too, or unreadable, it doesn't, as a record kept by the refused detach (committed work) never does.
+  The listing's `keptEdit` gives Slots and copies *Holds a card's uncommitted changes* and *Kept for {card}: its changes
+  aren't committed yet* in place of the committed-work words; a lane's next card moves the record without it (HI-3130).
   **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
   else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
   runtime's `keptHere`, checked right after the plan, any slot lent for it given back). Waiting for that slot stays a

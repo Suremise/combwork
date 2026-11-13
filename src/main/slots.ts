@@ -1530,10 +1530,12 @@ export const heldKey = (project: string, slot: string): string => `slot_heldfor:
 export interface SlotKeptFor {
   card: number
   generation: string
+  /** HI-3143: kept for the card's uncommitted edit (or files jj doesn't track), no commit of it: the window says so. */
+  edit?: true
 }
 function heldOf(v: unknown): SlotKeptFor | null {
   const h = v as Partial<SlotKeptFor> | null
-  return h && typeof h.card === 'number' && Number.isInteger(h.card) && typeof h.generation === 'string' ? { card: h.card, generation: h.generation } : null
+  return h && typeof h.card === 'number' && Number.isInteger(h.card) && typeof h.generation === 'string' ? { card: h.card, generation: h.generation, ...(h.edit === true ? { edit: true as const } : {}) } : null
 }
 function retargetIntentOf(v: string): RetargetIntent | null {
   try {
@@ -2218,14 +2220,14 @@ export class SlotPool {
               const lastLease = this.store.lastLease(s.name)
               const port = this.portOf(s)
               if (lastLease?.kind === 'card' && lastLease.card !== null && s.identity && port.heldFor && (await port.heldFor(s.folder, s.identity, lastLease.card))) {
-                held = { card: lastLease.card, generation: s.identity.generation }
+                held = { card: lastLease.card, generation: s.identity.generation, ...((await this.editOnly(s)) ? { edit: true as const } : {}) }
                 log.info(`${userText(s.name)} is kept for #${lastLease.card}: its work, an edit not committed yet included, is still in it`)
               } else if (lastLease?.kind === 'lane' && s.identity && this.store.keptRecord(s.name)?.generation === s.identity.generation) {
                 // A lane's lease on a slot it took back for its kept card (HI-3032), gone on to another card there
                 // (HI-3057): kept for the card its binding names now, else as it was kept.
                 const card = await this.laneCard(s)
                 if (card !== null) {
-                  held = { card, generation: s.identity.generation }
+                  held = { card, generation: s.identity.generation, ...((await this.editOnly(s)) ? { edit: true as const } : {}) }
                   log.info(`${userText(s.name)} is kept for #${card}: its lane's work, an edit not committed yet included, is still in it`)
                 }
               }
@@ -2453,6 +2455,15 @@ export class SlotPool {
       db.prepare("UPDATE board_meta SET value = ? WHERE key = ? AND json_extract(value, '$.card') = ? AND json_extract(value, '$.generation') = ?").run(JSON.stringify({ card, generation }), heldKey(this.store.project, name), was.card, generation) // agent-protocol: SQL
     })
     log.info(`${userText(name)}'s kept record follows its lane to #${card} (was #${was.card})`)
+  }
+
+  /**
+   * HI-3143: a slot kept with an uncommitted edit holds no commit of its card (the port's `holdsCommits` says none): the
+   * window then says it is kept for changes not committed yet. Commits too, or the port can't tell: as committed work.
+   */
+  private async editOnly(s: Slot): Promise<boolean> {
+    const port = this.portOf(s)
+    return !!s.identity && !!port.holdsCommits && (await port.holdsCommits(s.folder, s.identity)) === false
   }
 
   private async laneCard(s: Slot): Promise<number | null> {
