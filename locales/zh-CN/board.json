@@ -957,6 +957,8 @@
   "board.strip.oneRun": "1 个运行，{state, select, running {运行中} failed {失败} stale {已停止报告} passed {成功} other {已停止}}",
   "board.strip.runs": "{n, plural, other {# 个运行}}：{states}",
   "board.target.failed": "未能更改卡片的合并目标",
+  "board.target.kept": "它的工作保留在 {branch} 上：无论这里显示什么，它都会在那里重新开始。",
+  "board.target.keptUnknown": "它的工作保留在一个 Combwork 现在无法读取其分支的槽位中：在能读取之前不会开始。",
   "board.target.field": "合并到",
   "board.target.mark": "合并到 {branch}",
   "board.target.markTip": "此卡片的工作从 {branch} 创建并合并回该分支，而不是项目的目标分支。",

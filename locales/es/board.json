@@ -957,6 +957,8 @@
   "board.strip.oneRun": "1 ejecución, {state, select, running {en ejecución} failed {fallida} stale {dejó de informar} passed {superada} other {detenida}}",
   "board.strip.runs": "{n, plural, one {# ejecución} many {# ejecuciones} other {# ejecuciones}}: {states}",
   "board.target.failed": "No se cambió dónde se fusiona la tarjeta",
+  "board.target.kept": "Su trabajo está reservado en {branch}: vuelve a empezar ahí, diga lo que diga este campo.",
+  "board.target.keptUnknown": "Su trabajo está reservado en un slot cuya rama Combwork no puede leer ahora: no empezará hasta que pueda.",
   "board.target.field": "Se fusiona en",
   "board.target.mark": "En {branch}",
   "board.target.markTip": "El trabajo de esta tarjeta se crea a partir de {branch} y se fusiona en ella, no en la rama de destino del proyecto.",

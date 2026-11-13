@@ -15,7 +15,8 @@ import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, s
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
-import type { CombworkErrorKind, TaskMoveResult } from '../shared/types'
+import { isUnknown } from './platform/types'
+import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -2259,11 +2260,37 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
 }
 
 /**
+ * HI-3129: where card `n`, waiting in On Hold or Todo, would start when that isn't the Merges into its dialog shows (its
+ * own, else its lane's or the project's): a card put back whose work is kept on another branch or bookmark starts there
+ * (its platform's `startTarget`, the start's own rule). `unknown`: where its kept work is can't be read now, so its start
+ * is refused until it can. Null: it starts where it shows. Reads only; the card's own Merges into is never changed by it.
+ */
+export async function keptTarget(n: number): Promise<KeptTargetShown> {
+  const ws = workspace
+  const card = await getTask(n, ws)
+  if (!card.project || card.archived || !ws.path) return null
+  const projectPath = join(ws.path, card.project)
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return null
+  const rec = wf.store.card(n)
+  const s = wf.state(rec)
+  if (s.stage !== 'todo' && s.stage !== 'hold') return null
+  const options = wf.rulesetOf(rec, s).options
+  if (options.finish === 'committed') return null
+  const t = await wf.platform(options).startTarget?.(rec, options)
+  if (t === undefined || t === null) return null
+  if (isUnknown(t)) return { unknown: true }
+  const def = (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
+  return t === (rec.target || options.target || def) ? null : { target: t }
+}
+
+/**
  * Sets the branch a card merges into (HI-2556, its Merges into): the user's or the Assistant's; one of the project's
  * targets (null or the default: none of its own). Only while its branch has no work (never started, or nothing of its
  * own on a line it had), and as its running lane's, if any.
  */
-export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
+export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const ws = workspace
   // Its project's runtime, before the board's lock (made the first time, it takes that lock itself).

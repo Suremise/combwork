@@ -3405,7 +3405,9 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   binding's target whatever G7 is now; only a fresh start follows G7. Refused before any slot is lent, nothing
   changed: the binding unproved (unreadable, or not this card's: `platform.keptOnTarget`, `why: unread`), never
   started on G7 instead; the card's own Merges into naming another bookmark (`platform.keptOnTarget`, `why: mismatch`);
-  its lane merging elsewhere (`platform.keptLine`). The kept target goes with the lease request (`slotFor`'s `kept`:
+  its lane merging elsewhere (`platform.keptLine`). The field shows the card's own target or G7, never a kept one, so
+  the card dialog notes beside it where a waiting card would start when that differs (`tasks.keptTarget`: the platform's
+  `startTarget`, read only, the card's own target unchanged; unproved, it says it can't be read; HR2's round 1). The kept target goes with the lease request (`slotFor`'s `kept`:
   slot, generation, target), and the lease checks it again where the start records it (`SlotPool.keptBindingStill`,
   the port's `heldTarget` at that generation): failing closed (binding unreadable, another card's, another generation,
   another target), the slot is given back unused and the start waits (`slot.start.keptMoved`). **A jj project's

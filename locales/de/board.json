@@ -957,6 +957,8 @@
   "board.strip.oneRun": "1 Lauf, {state, select, running {läuft} failed {fehlgeschlagen} stale {meldet nicht mehr} passed {bestanden} other {gestoppt}}",
   "board.strip.runs": "{n, plural, one {# Lauf} other {# Läufe}}: {states}",
   "board.target.failed": "Wohin die Karte gemergt wird, wurde nicht geändert",
+  "board.target.kept": "Ihre Arbeit ist auf {branch} aufbewahrt: Dort startet sie wieder, egal was hier steht.",
+  "board.target.keptUnknown": "Ihre Arbeit ist in einem Slot aufbewahrt, dessen Branch Combwork gerade nicht lesen kann: Sie startet erst, wenn das wieder geht.",
   "board.target.field": "Wird gemergt in",
   "board.target.mark": "In {branch}",
   "board.target.markTip": "Die Arbeit dieser Karte wird aus {branch} erstellt und dorthin gemergt statt in den Zielbranch des Projekts.",

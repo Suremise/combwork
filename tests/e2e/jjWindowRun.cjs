@@ -591,7 +591,16 @@ const onDb = (fn) => {
     const field8 = page.locator('#card-target')
     const options8 = async () => (await field8.locator('option').allInnerTexts().catch(() => [])).map((s) => s.trim())
     check('card 2\'s Merges into lists the repository\'s bookmarks: main and release-x (in no Other branches), and next', !!(await until(async () => { const o = await options8(); return o.includes('release-x') && o.includes('main') && o.some((x) => /next/.test(x)) && !(await field8.isDisabled()) }, HUNG_MS)), JSON.stringify(await options8()))
+    // HR2's round 1: the field shows the project's next, so beside it the dialog says where the kept card starts: main.
+    const keptNote8 = page.locator('.card-target-kept')
+    check('…and says its work is kept on main, where it starts again', !!(await until(async () => (await keptNote8.getAttribute('data-card-target-kept').catch(() => null)) === 'main' && /kept on main/.test(await text(keptNote8)), HUNG_MS)), await text(page.locator('.dialog')))
     await shoot(field8.locator('xpath=..'), 'card-target-bookmarks')
+    await inEach(keptNote8, 'card-target-kept', (cat) => (cat['board.target.kept'] ?? '').split('{branch}')[0].trim().slice(0, 12))
+    await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    // A fresh card (no kept work): no such note; it starts on next.
+    const n9 = (await inv('tasks:create', { title: 'Shop fresh after next', project: 'shop', agent: b1.id })).number
+    await openByTitle(page, n9)
+    check('a fresh card\'s dialog: Merges into the project\'s next, no kept note', !!(await until(async () => (await field8.count()) === 1 && /next/.test((await field8.locator('option:checked').innerText().catch(() => '')) ?? ''), HUNG_MS)) && (await page.locator('.card-target-kept').count()) === 0, await text(page.locator('.dialog')))
     await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
     const givenBefore8 = givenCount()
     const started8 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 after the target changed' }).catch((e) => ({ error: String(e) }))
