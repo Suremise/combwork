@@ -3889,7 +3889,9 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   preserved. `recoverStale` reads, pinned at the head, HW and whether WS is still visible (an ancestor of a visible head);
   then it refuses `divergent` with both full commits and `same`, nothing changed. It does so when a fresh recovery
   starts, before its journal or any copy is written, and again right before `update-stale` whatever phase a recovery
-  resumed from, its journal kept. Unreadable, it refuses `unreadable`. A WS hidden (rewritten or abandoned: the usual
+  resumed from, its journal kept; there the head that decision was read at is compared again in `update-stale`'s recheck
+  under the file gate's admission (`headsNow`, no jj process: HR1's round 1), and moved, the decision is made again
+  (`divergent`, else `changing`), never jj's update on a head it wasn't made for. Unreadable, it refuses `unreadable`. A WS hidden (rewritten or abandoned: the usual
   stale slot, HI-3099's) recovers as before. The window says it in a window of its own: both short ids, how to look at
   them (`jj log`, `jj diff`), and to choose the slot's version keeping what its folder holds, then Recover… again.
 - **Stale after `jj op abandon`** (HI-3099): a folder whose checkout operation is no longer in the head's history (the

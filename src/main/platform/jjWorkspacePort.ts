@@ -162,6 +162,12 @@ export interface JjWorkspacePort extends WorkspacePort {
   /** The pinned operation for a folder's repository: the one op head, confirmed by jj; unknown with several. */
   pinned(folder: string): Promise<Maybe<string>>
   /**
+   * HI-3134: a reader of the folder's repository's operation heads as they are now, joined, read with no jj process (for a
+   * write's recheck, which runs synchronously under the file gate's admission); null from it when they can't be read. Null
+   * when the folder's repository can't be found.
+   */
+  headsNow(folder: string): Promise<(() => string | null) | null>
+  /**
    * A card's submitted commits recorded on its slot's binding (HI-2866; J9b1 records them once a submission's pin is held,
    * HI-2868): only while the slot is still bound to that line and generation, and only from a later submission than the
    * one recorded (`seq`, its Submitted fact's), by compare and swap. What a reuse of the slot then allows over the base.
@@ -1213,6 +1219,10 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     says: JJ_SAYS,
     nameFor: (repo, folder) => nameFor(createHash('sha256').update(resolve(repo).toLowerCase()).digest('hex').slice(0, 8), folder),
     pinned,
+    headsNow: async (folder) => {
+      const ctx = await contextOf(folder)
+      return ctx ? () => readOpHeads(ctx.jjRepo)?.join() ?? null : null
+    },
     jj,
     owns,
     stale: async (folder) => {

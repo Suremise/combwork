@@ -394,6 +394,25 @@ describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj b
       expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
     }, 120_000)
 
+    it(`the head moving between its last read and jj's update (the folder's commit made visible then): refused, the folder as it was, its journal kept (colocated: ${colocated})`, async () => {
+      // HR1's round 1: the pre-update read sees WS hidden (the usual stale slot); then, before the write's recheck, a user's
+      // operation makes WS visible beside the head's commit. The recheck sees the head moved: decided again, refused.
+      const s = await stale(colocated)
+      const before = files(s.slot)
+      let WS = ''
+      const r = await run(s, s.deps({
+        hooks: {
+          afterPreserve: () => void (WS = (s.h.journals.of('rec').read() as { WS: string }).WS),
+          beforeUpdateWrite: () => void s.h.jj(s.repo, '--ignore-working-copy', 'new', '--no-edit', WS, '-m', 'made visible meanwhile')
+        }
+      }))
+      expect(WS).toMatch(/^[0-9a-f]{40}$/)
+      expect(r).toMatchObject({ ok: false, why: 'divergent', divergent: { folder: WS, same: true } })
+      expect(files(s.slot)).toEqual(before)
+      expect(await s.h.port.stale(s.slot)).toBe(true)
+      expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
+    }, 120_000)
+
     it(`once the user gives the slot the folder's version again, it isn't stale and nothing is lost (colocated: ${colocated})`, async () => {
       const s = await raced(colocated)
       writeFileSync(join(s.slot, 'later.txt'), 'later\n')

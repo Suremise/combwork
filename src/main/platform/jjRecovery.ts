@@ -54,6 +54,8 @@ export interface RecoveryDeps {
     beforePlace?: (path: string) => void | Promise<void>
     afterPath?: (path: string) => void | Promise<void>
     afterRestore?: () => void | Promise<void>
+    /** HI-3134: after the last pre-update read of the head, before `update-stale` is asked for (its recheck runs then). */
+    beforeUpdateWrite?: () => void | Promise<void>
     /** HI-3099: right before phase 5's record (its `recordFrom` journalled). */
     beforeRecord?: () => void | Promise<void>
     /** Between a file's size read and its bytes read (tests: a writer growing it). */
@@ -264,6 +266,9 @@ async function plainPath(folder: string, rel: string): Promise<boolean> {
   return resolve(at).toLowerCase().startsWith(resolve(folder).toLowerCase() + sep)
 }
 
+/** HI-3134: `update-stale`'s recheck found the operation head moved since the recovery's last decision. */
+const HEAD_MOVED = 'headMoved'
+
 export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Promise<RecoveryResult> {
   const { port, git } = deps
   const { folder, journal } = req
@@ -384,20 +389,21 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
    * HI-3134: the workspace's own recorded commit (WS, the folder's checkout) still visible at the head beside the commit
    * the head gives the workspace (HW): a record that raced another write, reconciled with the same change divergent (or
    * WS left beside another commit). `update-stale` would check HW out and take WS's files out of the folder, where only
-   * WS holds them: refused, naming both, nothing changed. Read pinned at the head; unreadable fails closed. Null: none.
+   * WS holds them: refused, naming both, nothing changed. Read pinned at the head; unreadable fails closed. Otherwise the
+   * head it was decided at, which `update-stale`'s recheck compares again (HR1's round 1).
    */
-  const leftBeside = async (WS: string, workspace: string): Promise<RecoveryResult | null> => {
+  const leftBeside = async (WS: string, workspace: string): Promise<RecoveryResult | { head: string }> => {
     const head = await port.pinned(folder)
     if (isUnknown(head)) return refuse('unreadable', head.detail ?? head.what)
     const hw = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(workspace)}@`, '-T', 'commit_id ++ " " ++ change_id'], { op: head })
     const [HW, hwChange] = hw.ok ? hw.out.trim().split(' ') : []
     if (!HW || !/^[0-9a-f]{40}$/.test(HW) || !hwChange) return refuse('unreadable', hw.ok ? 'HW' : hw.err)
-    if (HW === WS) return null
+    if (HW === WS) return { head }
     // Visible at the head: an ancestor of a visible head (a hidden commit, abandoned or rewritten, isn't).
     const ws = await port.jj(folder, ['log', '--no-graph', '-r', `${WS} & ::visible_heads()`, '-T', 'change_id'], { op: head })
     if (!ws.ok) return refuse('unreadable', ws.err)
     const wsChange = ws.out.trim()
-    if (!wsChange) return null
+    if (!wsChange) return { head }
     return { ok: false, why: 'divergent', divergent: { folder: WS, head: HW, same: wsChange === hwChange } } // i18n-ignore: a refusal's code, said in words in the window
   }
 
@@ -418,7 +424,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     if (eol !== 'none' && eol !== 'input' && eol !== 'input-output') return refuse('unreadable', conv.ok ? `eol-conversion ${eol}` : conv.err) // i18n-ignore: a protocol detail, never wording
     // HI-3134: refused before anything is written (no journal, no preservation).
     const beside = await leftBeside(ws.out.trim(), co.name)
-    if (beside) return beside
+    if ('ok' in beside) return beside
     await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, generation: req.identity.generation, folder: resolve(folder), S: co.op, WS: ws.out.trim(), ...(eol !== 'none' ? { eol } : {}) })
   }
   let cur = j as unknown as Journal
@@ -457,11 +463,20 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       await deps.hooks?.beforeUpdate?.()
       // HI-3134: again right before jj's update, whatever phase this recovery resumed from; the journal kept.
       const beside = await leftBeside(cur.WS, cur.workspace)
-      if (beside) return beside
+      if ('ok' in beside) return beside
+      // The head that decision was made at, compared again in the write's recheck (HR1's round 1): moved meanwhile, the
+      // decision is made again, never jj's update on a head it wasn't made for.
+      const headsNow = await port.headsNow(folder)
+      if (!headsNow) return refuse('unreadable', 'op heads')
+      await deps.hooks?.beforeUpdateWrite?.()
       if (!(await mine())) return refuse('fence')
       // The whole proof again under the file gate's admission, right before jj starts (HI-2918; with HI-2913's held path,
       // its held fence unsplit and in its own order).
-      const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true, recheck: async () => ((await mine()) ? null : 'fence') })
+      const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true, recheck: async () => (!(await mine()) ? 'fence' : headsNow() !== beside.head ? HEAD_MOVED : null) })
+      if (up.refused === HEAD_MOVED) {
+        const again = await leftBeside(cur.WS, cur.workspace)
+        return 'ok' in again ? again : refuse('changing', 'the operation head moved before the update')
+      }
       if (up.refused) return refuse('fence')
       if (!up.ok && (await port.stale(folder)) === true) return refuse('update', up.err)
     }
