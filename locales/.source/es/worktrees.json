@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git couldn't check the worktree for uncommitted changes (git status failed in {folder}). Fix it, then merge again.",
   "worktrees.merge.caseAlias": "The branches {branch} and {other} differ only in case, which Windows can't tell apart, so nothing was merged. Rename one of them, then merge.",
   "worktrees.merge.detached": "The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.",
+  "worktrees.merge.hooksElsewhere": "If one of the repository's hooks refused it: they ran in a temporary checkout of {branch}, which has none of the project folder's untracked files (node_modules, say). Check out {branch} in the project folder and merge there to run them with everything in place.",
   "worktrees.merge.intoItself": "{branch} can't be merged into itself.",
   "worktrees.merge.noTarget": "There is no branch {branch} to merge into.",
   "worktrees.merge.notRemoved": "Merged, but the worktree was not removed",

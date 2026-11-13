@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git 无法检查工作树中的未提交更改（在 {folder} 中运行 git status 失败）。请修复后再合并。",
   "worktrees.merge.caseAlias": "分支 {branch} 和 {other} 仅大小写不同，而 Windows 不区分大小写，因此没有合并任何内容。请重命名其中一个，然后再合并。",
   "worktrees.merge.detached": "项目文件夹不在任何分支上（detached HEAD）。请先检出要合并到的分支。",
+  "worktrees.merge.hooksElsewhere": "如果是仓库的某个钩子拒绝了它：这些钩子是在 {branch} 的临时检出中运行的，其中没有项目文件夹的任何未跟踪文件（例如 node_modules）。请在项目文件夹中检出 {branch} 并在那里合并，以便在一切就绪的情况下运行它们。",
   "worktrees.merge.intoItself": "无法将 {branch} 合并到它自身。",
   "worktrees.merge.noTarget": "没有可合并到的分支 {branch}。",
   "worktrees.merge.notRemoved": "已合并，但未删除工作树",

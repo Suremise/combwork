@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git nie mógł sprawdzić, czy worktree ma zmiany bez commita (git status nie powiódł się w {folder}). Napraw to i scal ponownie.",
   "worktrees.merge.caseAlias": "Gałęzie {branch} i {other} różnią się tylko wielkością liter, której Windows nie rozróżnia, więc nic nie zostało scalone. Zmień nazwę jednej z nich, a potem scal.",
   "worktrees.merge.detached": "Folder projektu nie jest na żadnej gałęzi (detached HEAD). Najpierw przełącz się na gałąź, do której chcesz scalić.",
+  "worktrees.merge.hooksElsewhere": "Jeśli odrzucił to któryś z hooków repozytorium: uruchomiły się w tymczasowym wybraniu {branch}, które nie ma żadnych nieśledzonych plików folderu projektu (na przykład node_modules). Wybierz {branch} w folderze projektu i scal tam, aby uruchomiły się ze wszystkim na miejscu.",
   "worktrees.merge.intoItself": "Gałęzi {branch} nie można scalić z nią samą.",
   "worktrees.merge.noTarget": "Nie ma gałęzi {branch}, do której można scalić.",
   "worktrees.merge.notRemoved": "Scalono, ale nie usunięto worktree",

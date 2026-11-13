@@ -13,8 +13,8 @@ const slash = (p: string): string => p.replace(/\\/g, '/')
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 const worktrees = (project: string): string[] => run(project, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree '))
 
-/** main with two commits, release (checked out nowhere) at its head, cw/a a commit past it; a post-checkout hook `hook`. */
-async function repo(hook: string) {
+/** main with two commits, release (checked out nowhere) at its head, cw/a a commit past it; the hook `name`, `hook`. */
+async function repo(hook: string, name = 'post-checkout') {
   const root = tempDir('cw-merge-hooks-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', project)
@@ -33,7 +33,7 @@ async function repo(hook: string) {
   // The hook from here on: the worktree above was made before it.
   const hooks = join(root, 'hooks')
   mkdirSync(hooks)
-  writeFileSync(join(hooks, 'post-checkout'), hook)
+  writeFileSync(join(hooks, name), hook)
   run(project, 'config', 'core.hooksPath', slash(hooks))
   return { root, project, a }
 }
@@ -72,4 +72,24 @@ describe('a merge into a branch checked out nowhere, with a post-checkout hook (
     expect(worktrees(project)).toEqual(listed)
     expect(leftIn(root)).toEqual([])
   })
+})
+
+describe("a commit hook needing the project folder's untracked files (HI-3109, Darren's decision A)", () => {
+  for (const squash of [false, true]) {
+    it(`refused (${squash ? 'squash' : 'merge commit'}), saying the hooks ran in a temporary checkout and where to merge instead`, async () => {
+      // Husky's way: a commit-msg hook running a tool in node_modules, which only the project folder has.
+      const { root, project, a } = await repo('#!/bin/sh\nexec ./node_modules/.bin/lint-msg "$1"\n', 'commit-msg')
+      mkdirSync(join(project, 'node_modules', '.bin'), { recursive: true })
+      writeFileSync(join(project, 'node_modules', '.bin', 'lint-msg'), '#!/bin/sh\nexit 0\n')
+      const listed = worktrees(project)
+      const release = run(project, 'rev-parse', 'release')
+      const res = await mergeWorktree(project, a, { squash, message: 'into release', target: 'release' })
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/^Nothing was merged: .*lint-msg/s)
+      expect(res.error).toContain("they ran in a temporary checkout of release, which has none of the project folder's untracked files (node_modules, say). Check out release in the project folder and merge there")
+      expect(run(project, 'rev-parse', 'release')).toBe(release)
+      expect(worktrees(project)).toEqual(listed)
+      expect(leftIn(root)).toEqual([])
+    })
+  }
 })

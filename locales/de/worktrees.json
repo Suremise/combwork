@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git konnte den Worktree nicht auf nicht committete Änderungen prüfen (git status ist in {folder} fehlgeschlagen). Behebe das und merge dann erneut.",
   "worktrees.merge.caseAlias": "Die Branches {branch} und {other} unterscheiden sich nur in der Groß- und Kleinschreibung, die Windows nicht unterscheidet, daher wurde nichts gemergt. Benenne einen davon um und merge dann.",
   "worktrees.merge.detached": "Der Projektordner ist auf keinem Branch (detached HEAD). Checke zuerst den Branch aus, in den gemergt werden soll.",
+  "worktrees.merge.hooksElsewhere": "Falls einer der Hooks des Repositorys ihn abgelehnt hat: Sie liefen in einem temporären Checkout von {branch}, der keine der nicht versionierten Dateien des Projektordners hat (etwa node_modules). Checke {branch} im Projektordner aus und merge dort, damit sie mit allem ausgeführt werden.",
   "worktrees.merge.intoItself": "{branch} kann nicht in sich selbst gemergt werden.",
   "worktrees.merge.noTarget": "Es gibt keinen Branch {branch}, in den gemergt werden kann.",
   "worktrees.merge.notRemoved": "Gemergt, aber der Worktree wurde nicht entfernt",
